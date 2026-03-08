@@ -26,48 +26,90 @@ export const dolbyConfigs = [
   { value: "9.1.6", label: "9.1.6 Atmos — P2 - L4" },
 ];
 
-export default function NewProjectDialog({ open, onOpenChange, onProjectCreated }) {
-  const [formData, setFormData] = useState({
-    name: "",
-    client_name: "",
-    project_status: "Prospective",
-    room_length: "",
-    room_width: "",
-    room_height: "",
-    dolby_config: "",
-    target_spl: 105,
-    amplifier_power: "",
-    notes: ""
-  });
+export const splOptions = [
+  { value: "99",  label: "99 dB — P12 - L1 Minimum" },
+  { value: "102", label: "102 dB — P12 - L2 Minimum" },
+  { value: "105", label: "105 dB — P12 - L3 Minimum" },
+  { value: "108", label: "108 dB — P12 - L4 Minimum" },
+  { value: "102", label: "102 dB — P12 - L1 Recommended" },
+  { value: "105", label: "105 dB — P12 - L2 Recommended" },
+  { value: "108", label: "108 dB — P12 - L3 Recommended" },
+  { value: "111", label: "111 dB — P12 - L4 Recommended" },
+];
+
+const EMPTY_FORM = {
+  name: "",
+  client_name: "",
+  project_status: "Prospective",
+  room_length: "",
+  room_width: "",
+  room_height: "",
+  dolby_config: "",
+  target_spl: 105,
+  amplifier_power: "",
+  notes: ""
+};
+
+// editProject: if provided, modal is in edit mode
+export default function NewProjectDialog({ open, onOpenChange, onProjectCreated, editProject, onProjectUpdated }) {
+  const isEditMode = !!editProject;
+
+  const [formData, setFormData] = useState(EMPTY_FORM);
+
+  // When editProject changes (or dialog opens), populate form
+  useEffect(() => {
+    if (isEditMode && editProject) {
+      setFormData({
+        name: editProject.name || "",
+        client_name: editProject.client || "",
+        project_status: editProject.status || "Prospective",
+        room_length: editProject.roomLength != null ? String(editProject.roomLength) : "",
+        room_width: editProject.roomWidth != null ? String(editProject.roomWidth) : "",
+        room_height: editProject.roomHeight != null ? String(editProject.roomHeight) : "",
+        dolby_config: editProject.dolby_config || "",
+        target_spl: editProject.target_spl ?? 105,
+        amplifier_power: editProject.amplifier_power != null ? String(editProject.amplifier_power) : "",
+        notes: editProject.notes || "",
+      });
+    } else if (!isEditMode) {
+      setFormData(EMPTY_FORM);
+    }
+  }, [editProject, open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      room_length: formData.room_length ? parseFloat(formData.room_length) : null,
+      room_width: formData.room_width ? parseFloat(formData.room_width) : null,
+      room_height: formData.room_height ? parseFloat(formData.room_height) : null,
+      amplifier_power: formData.amplifier_power ? parseInt(formData.amplifier_power) : null,
+    };
     try {
-      const created = await Project.create({
-        ...formData,
-        room_length: formData.room_length ? parseFloat(formData.room_length) : null,
-        room_width: formData.room_width ? parseFloat(formData.room_width) : null,
-        room_height: formData.room_height ? parseFloat(formData.room_height) : null,
-        amplifier_power: formData.amplifier_power ? parseInt(formData.amplifier_power) : null,
-      });
-      setFormData({
-        name: "",
-        client_name: "",
-        project_status: "Prospective",
-        room_length: "",
-        room_width: "",
-        room_height: "",
-        dolby_config: "",
-        target_spl: 105,
-        amplifier_power: "",
-        notes: ""
-      });
-      // Pass created project to parent for session hydration
-      onProjectCreated && onProjectCreated(created);
-      onOpenChange(false);
+      if (isEditMode) {
+        const updated = await Project.update(editProject.id, {
+          name: payload.name,
+          client_name: payload.client_name,
+          project_status: payload.project_status,
+          room_length: payload.room_length,
+          room_width: payload.room_width,
+          room_height: payload.room_height,
+          dolby_config: payload.dolby_config,
+          target_spl: payload.target_spl,
+          amplifier_power: payload.amplifier_power,
+          notes: payload.notes,
+        });
+        onProjectUpdated && onProjectUpdated(updated);
+        onOpenChange(false);
+      } else {
+        const created = await Project.create(payload);
+        setFormData(EMPTY_FORM);
+        onProjectCreated && onProjectCreated(created);
+        onOpenChange(false);
+      }
     } catch (error) {
-      console.error("Failed to create project:", error);
-      alert("Failed to create project. Please try again.");
+      console.error("Failed to save project:", error);
+      alert("Failed to save project. Please try again.");
     }
   };
 
