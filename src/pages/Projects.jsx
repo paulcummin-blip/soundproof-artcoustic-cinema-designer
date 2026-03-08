@@ -595,7 +595,7 @@ export default function ProjectsPage() {
 
           <button
             type="button"
-            onClick={() => onEdit && onEdit(p)}
+            onClick={() => onEdit(p)}
             style={{
               padding: "8px 12px",
               borderRadius: 10,
