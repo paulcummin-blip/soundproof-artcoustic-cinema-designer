@@ -112,15 +112,7 @@ export default function ProjectsPage() {
   // New Project dialog state (canonical NewProjectDialog)
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
 
-  // Edit project dialog state (inline, for existing projects only)
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [draft, setDraft] = useState({
-    name: "",
-    client: "",
-    status: "Prospective",
-  });
-
-  // If not null, dialog is editing an existing project
+  // Edit project — reuse NewProjectDialog with editProject prop
   const [editingProject, setEditingProject] = useState(null);
 
   // Banner after create
