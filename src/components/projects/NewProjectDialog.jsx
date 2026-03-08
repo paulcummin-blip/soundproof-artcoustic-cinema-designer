@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Project } from "@/entities/Project";
 
-const dolbyConfigs = [
+export const dolbyConfigs = [
   { value: "5.1", label: "5.1 Surround — P2 - L1" },
   { value: "7.1", label: "7.1 Surround — P2 - L1" },
   { value: "5.1.2", label: "5.1.2 Atmos — P2 - L1" },
