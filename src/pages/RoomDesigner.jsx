@@ -1200,11 +1200,15 @@ function RoomDesignerWithState() {
   }, [_sevenBedLayoutType, dolbyPreset, placedSpeakers, setSpeakers, stableDimensions.width, stableDimensions.length, _isFrozen]);
 
   // Speaker reconciliation extracted to useSpeakerReconciliation hook
+  // Clean slate: Free Use (scratch) or immediately after a user-triggered reset
+  const isCleanSlateMode = loadState?.phase === "scratch" || !!didUserRequestResetRef.current;
+
   useSpeakerReconciliation({
     appState, dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers,
     _sevenBedLayoutType, lastPresetRef, _overheadGlobalModel, _overheadFrontOverride,
     _overheadMidOverride, _overheadRearOverride, _useFrontGlobal, _useMidGlobal, _useRearGlobal,
     loadState, resolvedProjectId, projectIdState, didUserRequestResetRef,
+    isCleanSlateMode,
   });
 
   // Overhead seeding (compacted)

@@ -52,12 +52,12 @@ import CinemaAgent from './pages/CinemaAgent';
 import ComplianceReportPrint from './pages/ComplianceReportPrint';
 import Home from './pages/Home';
 import PrintableReport from './pages/PrintableReport';
+import Projects from './pages/Projects';
 import RP22Report from './pages/RP22Report';
 import RoomDesigner from './pages/RoomDesigner';
 import SPLCalculator from './pages/SPLCalculator';
 import SPLCalculatorV2 from './pages/SPLCalculatorV2';
 import SpeakerDatabase from './pages/SpeakerDatabase';
-import Projects from './pages/Projects';
 import __Layout from './Layout.jsx';
 
 
@@ -67,12 +67,12 @@ export const PAGES = {
     "ComplianceReportPrint": ComplianceReportPrint,
     "Home": Home,
     "PrintableReport": PrintableReport,
+    "Projects": Projects,
     "RP22Report": RP22Report,
     "RoomDesigner": RoomDesigner,
     "SPLCalculator": SPLCalculator,
     "SPLCalculatorV2": SPLCalculatorV2,
     "SpeakerDatabase": SpeakerDatabase,
-    "Projects": Projects,
 }
 
 export const pagesConfig = {
