@@ -730,9 +730,39 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
       setAutosaveStatus("local");
       const hasSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
       const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
-      if (!hasSpeakers && !hasSeats && appState?.roomDims) {
-        if (typeof initWithDefaultsAndRules === "function") {
-          initWithDefaultsAndRules();
+      if (!hasSpeakers && !hasSeats) {
+        // Free Use starter: clean blank tool, no preset seeding
+        const freeUseRoom = { widthM: 4.0, lengthM: 6.0, heightM: 2.4 };
+        if (typeof appState?.setRoomDims === "function") {
+          appState.setRoomDims(freeUseRoom);
+        }
+        if (typeof setScreen === "function") {
+          setScreen((prev) => ({
+            ...prev,
+            visibleWidthInches: 120,
+            aspectRatio: prev?.aspectRatio || "16:9",
+            mountMode: "floating",
+            floatDepthM: typeof prev?.floatDepthM === "number" ? prev.floatDepthM : 0.2,
+            heightFromFloorM: typeof prev?.heightFromFloorM === "number" ? prev.heightFromFloorM : 0.5,
+          }));
+        }
+        // 57.5° seating row for 120" screen
+        const cx = freeUseRoom.widthM / 2;
+        const THETA = 57.5 * Math.PI / 180;
+        const viewWidthM = 120 * 0.0254;
+        const d = (viewWidthM / 2) / Math.tan(THETA / 2);
+        const y = Math.max(0.4, Math.min(freeUseRoom.lengthM - 0.4, d));
+        const spacing = 0.6;
+        if (typeof setSeatingPositions === "function") {
+          setSeatingPositions([
+            { id: "seat-left",   x: cx - spacing, y, z: 1.2, rowNumber: 1, seatNumber: 1 },
+            { id: "seat-center", x: cx,            y, z: 1.2, rowNumber: 1, seatNumber: 2, isPrimary: true },
+            { id: "seat-right",  x: cx + spacing,  y, z: 1.2, rowNumber: 1, seatNumber: 3 },
+          ]);
+        }
+        // Explicitly clear speakers — no preset seeding
+        if (typeof setSpeakerSystem === "function") {
+          setSpeakerSystem((prev) => ({ ...(prev || {}), placedSpeakers: [] }));
         }
       }
       lastBootTargetRef.current = currentTargetKey;
