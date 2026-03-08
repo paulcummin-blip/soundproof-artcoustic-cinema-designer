@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Project } from "@/entities/Project";
 
-const dolbyConfigs = [
+export const dolbyConfigs = [
   { value: "5.1", label: "5.1 Surround — P2 - L1" },
   { value: "7.1", label: "7.1 Surround — P2 - L1" },
   { value: "5.1.2", label: "5.1.2 Atmos — P2 - L1" },
@@ -24,6 +24,29 @@ const dolbyConfigs = [
   { value: "9.1.2", label: "9.1.2 Atmos — P2 - L2" },
   { value: "9.1.4", label: "9.1.4 Atmos — P2 - L2" },
   { value: "9.1.6", label: "9.1.6 Atmos — P2 - L4" },
+];
+
+export const splLabels = {
+  "99_min":  "99 dB — P12 - L1 Minimum",
+  "102_min": "102 dB — P12 - L2 Minimum",
+  "105_min": "105 dB — P12 - L3 Minimum",
+  "108_min": "108 dB — P12 - L4 Minimum",
+  "102_rec": "102 dB — P12 - L1 Recommended",
+  "105_rec": "105 dB — P12 - L2 Recommended",
+  "108_rec": "108 dB — P12 - L3 Recommended",
+  "111_rec": "111 dB — P12 - L4 Recommended",
+};
+
+// SPL select options in order (value must be unique per <option>, so we use compound keys)
+export const splOptions = [
+  { value: "99",  label: "99 dB — P12 - L1 Minimum" },
+  { value: "102", label: "102 dB — P12 - L2 Minimum" },
+  { value: "105", label: "105 dB — P12 - L3 Minimum" },
+  { value: "108", label: "108 dB — P12 - L4 Minimum" },
+  { value: "102", label: "102 dB — P12 - L1 Recommended" },
+  { value: "105", label: "105 dB — P12 - L2 Recommended" },
+  { value: "108", label: "108 dB — P12 - L3 Recommended" },
+  { value: "111", label: "111 dB — P12 - L4 Recommended" },
 ];
 
 export default function NewProjectDialog({ open, onOpenChange, onProjectCreated }) {
