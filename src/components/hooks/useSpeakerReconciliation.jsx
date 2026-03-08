@@ -28,6 +28,7 @@ export function useSpeakerReconciliation({
   resolvedProjectId,
   projectIdState,
   didUserRequestResetRef,
+  isCleanSlateMode,
 }) {
   useEffect(() => {
     // CRITICAL: Wait for autosave hydration before applying defaults
