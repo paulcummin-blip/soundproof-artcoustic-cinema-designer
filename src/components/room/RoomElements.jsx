@@ -189,13 +189,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
         </div>
       </div>
 
-      {/* EMPTY STATE */}
-      {(elements || []).length === 0 ? (
-        <p className="text-[#3E4349] text-center py-8">
-          No room elements added. Use "Add Door" above to create one.
-        </p>
-      ) : (
-        (elements || []).map((element) => {
+      {(elements || []).map((element) => {
           const wall = normaliseWallValue(element?.wall);
           const isFrontOrRear = wall === 'front' || wall === 'rear';
 
