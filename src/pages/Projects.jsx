@@ -229,7 +229,6 @@ export default function ProjectsPage() {
   }
 
   function handleNewProjectCreated(newProject) {
-    // Create-mode callback from NewProjectDialog
     const p = {
       id: newProject.id,
       name: newProject.name || "Untitled Project",
