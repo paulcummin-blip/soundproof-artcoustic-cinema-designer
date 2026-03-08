@@ -359,10 +359,13 @@ function RoomDesignerWithState() {
     // IMPORTANT: Do NOT calculate/store mlpY_m until this is a real finite number,
     // otherwise the MLP dot "locks in" a consistent wrong offset on first load.
     const screenFrontPlaneM_raw = appState?.screenFrontPlaneM;
-    if (!Number.isFinite(screenFrontPlaneM_raw)) {
-      return;
-    }
-    const screenFrontPlaneM = Number(screenFrontPlaneM_raw);
+    // Use real value when available; otherwise derive a first-pass fallback so the
+    // green dot is positioned correctly on first load without waiting for RV to publish.
+    const screenFrontPlaneM = Number.isFinite(screenFrontPlaneM_raw)
+      ? Number(screenFrontPlaneM_raw)
+      : (Number.isFinite(Number(_screen?.screenPlaneY_m)) && Number(_screen?.screenPlaneY_m) > 0
+          ? Number(_screen?.screenPlaneY_m)
+          : Number(_screen?.floatDepthM) || 0.20);
 
     const screenVisibleWidthM =
       Number(screenVisibleWidthInchesEffective) * 0.0254;
