@@ -746,12 +746,13 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
             heightFromFloorM: typeof prev?.heightFromFloorM === "number" ? prev.heightFromFloorM : 0.5,
           }));
         }
-        // 57.5° seating row for 120" screen
+        // 57.5° seating row for 120" screen, measured from the screen plane (not the front wall)
         const cx = freeUseRoom.widthM / 2;
         const THETA = 57.5 * Math.PI / 180;
         const viewWidthM = 120 * 0.0254;
         const d = (viewWidthM / 2) / Math.tan(THETA / 2);
-        const y = Math.max(0.4, Math.min(freeUseRoom.lengthM - 0.4, d));
+        const screenPlaneY = 0.20; // matches default floatDepthM used by MLP effect fallback
+        const y = Math.max(0.4, Math.min(freeUseRoom.lengthM - 0.4, screenPlaneY + d));
         const spacing = 0.6;
         if (typeof setSeatingPositions === "function") {
           setSeatingPositions([
