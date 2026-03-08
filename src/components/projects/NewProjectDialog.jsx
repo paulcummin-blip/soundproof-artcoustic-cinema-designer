@@ -261,7 +261,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
               className="hover:bg-[#3E4349]"
               style={{ backgroundColor: "#1B1A1A", color: "#FFFFFF" }}
             >
-              Create Project
+              {isEditMode ? "Save Changes" : "Create Project"}
             </Button>
           </div>
         </form>
