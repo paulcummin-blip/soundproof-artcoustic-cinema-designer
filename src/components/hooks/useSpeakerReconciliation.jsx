@@ -75,6 +75,12 @@ export function useSpeakerReconciliation({
 
     const noSpeakers = (placedSpeakers || []).length === 0;
 
+    // CLEAN SLATE GUARD: Free Use / reset mode with no speakers — do not auto-seed
+    if (isCleanSlateMode && noSpeakers) {
+      if (globalThis.__B44_LOGS) console.log("[RD RECON] Skipping seeding — clean slate mode with no speakers.");
+      return;
+    }
+
     // Skip only if preset is unchanged AND we have speakers AND user didn't request reset
     // CRITICAL: If preset changed, ALWAYS run reconciliation
     if (!presetChanged && !noSpeakers && !didUserRequestResetRef.current) {
