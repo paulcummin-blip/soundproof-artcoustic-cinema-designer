@@ -953,11 +953,16 @@ export default function ProjectsPage() {
         </SegmentBoundary>
       )}
 
-      {/* Canonical New Project Dialog */}
+      {/* Canonical New / Edit Project Dialog */}
       <NewProjectDialog
         open={newProjectDialogOpen}
-        onOpenChange={setNewProjectDialogOpen}
+        onOpenChange={(val) => {
+          setNewProjectDialogOpen(val);
+          if (!val) setEditingProject(null);
+        }}
         onProjectCreated={handleNewProjectCreated}
+        editProject={editingProject}
+        onProjectUpdated={handleProjectUpdated}
       />
 
       {/* Edit Project Modal (existing projects only) */}
