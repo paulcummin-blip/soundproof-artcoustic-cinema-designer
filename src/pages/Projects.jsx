@@ -235,99 +235,43 @@ export default function ProjectsPage() {
   }
 
   function handleEditProject(p) {
-    setEditingProject(p);
-    setDraft({
-      name: p.name || "",
-      client: p.client || "",
-      status: p.status || "Prospective",
-    });
-    setCreateError(null);
-    setDialogOpen(true);
+    // Pass the full raw project data so NewProjectDialog can pre-fill all fields.
+    // We need the original backend field names, so fetch from the projects list.
+    const raw = {
+      id: p.id,
+      name: p.name,
+      client_name: p.client,
+      project_status: p.status,
+      room_length: p.roomLength,
+      room_width: p.roomWidth,
+      room_height: p.roomHeight,
+      dolby_config: p.dolby_config,
+      target_spl: p.target_spl,
+      notes: p.notes,
+    };
+    setEditingProject(raw);
   }
 
-  function toNumberOrNull(v) {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-
-  async function saveProject() {
-    const name = draft.name.trim();
-    const client = draft.client.trim();
-    const status = draft.status;
-
-    if (!name) {
-      setCreateError("Please enter a project name.");
-      return;
-    }
-
-    try {
-      setCreateError(null);
-
-      const projectData = {
-        name,
-        client_name: client || "",
-        project_status: status,
-        // Room dimensions will be filled in by Room Designer and autosave.
-        // We deliberately do NOT set room_length / room_width / room_height here.
-      };
-
-      if (!editingProject) {
-        // CREATE NEW PROJECT
-        const newProject = await base44.entities.Project.create(projectData);
-
-        const p = {
-          id: newProject.id,
-          name: newProject.name,
-          client: newProject.client_name || "",
-          status: newProject.project_status || status,
-          roomLength: newProject.room_length,
-          roomWidth: newProject.room_width,
-          roomHeight: newProject.room_height,
-          createdAt: new Date(newProject.created_date).getTime(),
-          lcrModel: null,
-          surroundModel: null,
-          heightModel: null,
-          subModel: null,
-          subCount: null,
-          screenSizeInches: null,
-          seats: null,
-        };
-
-        setProjects((arr) => [p, ...arr]);
-        setDialogOpen(false);
-        setEditingProject(null);
-        setCreated(p);
-        window.setTimeout(() => setCreated(null), 4000);
-      } else {
-        // UPDATE EXISTING PROJECT
-        const updated = await base44.entities.Project.update(
-          editingProject.id,
-          projectData
-        );
-
-        setProjects((arr) =>
-          arr.map((p) =>
-            p.id === editingProject.id
-              ? {
-                  ...p,
-                  name: updated.name,
-                  client: updated.client_name || "",
-                  status: updated.project_status || status,
-                  roomLength: updated.room_length,
-                  roomWidth: updated.room_width,
-                  roomHeight: updated.room_height,
-                }
-              : p
-          )
-        );
-
-        setDialogOpen(false);
-        setEditingProject(null);
-      }
-    } catch (err) {
-      console.error("[Projects] Failed to save project:", err);
-      setCreateError(err?.message || "Failed to save project. Please try again.");
-    }
+  function handleProjectUpdated(updated) {
+    setProjects((arr) =>
+      arr.map((p) =>
+        p.id === updated.id
+          ? {
+              ...p,
+              name: updated.name || p.name,
+              client: updated.client_name || "",
+              status: updated.project_status || p.status,
+              roomLength: updated.room_length,
+              roomWidth: updated.room_width,
+              roomHeight: updated.room_height,
+              dolby_config: updated.dolby_config,
+              target_spl: updated.target_spl,
+              notes: updated.notes,
+            }
+          : p
+      )
+    );
+    setEditingProject(null);
   }
 
   function startHoldDelete(id) {
