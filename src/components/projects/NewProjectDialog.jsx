@@ -118,7 +118,9 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-white border-[#DCDBD6] text-[#1B1A1A] max-w-2xl overflow-y-auto max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold font-header">Create New Cinema Project</DialogTitle>
+          <DialogTitle className="text-xl font-bold font-header">
+            {isEditMode ? "Edit Cinema Project" : "Create New Cinema Project"}
+          </DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6 font-body">
