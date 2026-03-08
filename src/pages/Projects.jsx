@@ -3,7 +3,13 @@ import React, { useMemo, useRef, useState, useEffect } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import { useProjectActions } from "@/components/state/project-session";
 import { base44 } from "@/api/base44Client";
-import NewProjectDialog from "@/components/projects/NewProjectDialog";
+import NewProjectDialog, { dolbyConfigs, splOptions } from "@/components/projects/NewProjectDialog";
+
+// Build lookup maps from shared constants
+const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(d => [d.value, d.label]));
+// SPL: prefer the last matching entry (Recommended tier wins over Minimum)
+const splLabelMap = {};
+splOptions.forEach(opt => { splLabelMap[opt.value] = opt.label; });
 
 // ---- Brand tokens ----
 const BRAND = {
