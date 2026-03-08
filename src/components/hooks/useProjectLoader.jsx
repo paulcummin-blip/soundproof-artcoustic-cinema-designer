@@ -754,6 +754,19 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
         const screenPlaneY = 0.20; // matches default floatDepthM used by MLP effect fallback
         const y = Math.max(0.4, Math.min(freeUseRoom.lengthM - 0.4, screenPlaneY + d));
         const spacing = 0.6;
+
+        // Publish matching seating/MLP state so all downstream logic starts from the same anchor
+        if (typeof appState?.setSeatingRows === "function") appState.setSeatingRows(1);
+        if (typeof appState?.setSeatsPerRow === "function") appState.setSeatsPerRow(3);
+        if (typeof appState?.setSeatsPerRowByRow === "function") appState.setSeatsPerRowByRow([3]);
+        if (typeof appState?.setSeatSpacing === "function") appState.setSeatSpacing(0.6);
+        if (typeof appState?.setRowSpacingM === "function") appState.setRowSpacingM(1.8);
+        if (typeof appState?.setSeatingBlockOffset === "function") appState.setSeatingBlockOffset(0);
+        if (typeof appState?.setMlpBasis === "function") appState.setMlpBasis("front");
+        if (typeof appState?.setRowCentersM === "function") appState.setRowCentersM([y]);
+        if (typeof appState?.setMlpY_m === "function") appState.setMlpY_m(y);
+        if (typeof appState?.setMlpOverride === "function") appState.setMlpOverride(null);
+
         if (typeof setSeatingPositions === "function") {
           setSeatingPositions([
             { id: "seat-left",   x: cx - spacing, y, z: 1.2, rowNumber: 1, seatNumber: 1 },
