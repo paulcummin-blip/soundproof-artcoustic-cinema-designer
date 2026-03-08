@@ -728,10 +728,8 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
     if (!isProjectMode) {
       setLoadState({ phase: "scratch" });
       setAutosaveStatus("local");
-      const hasSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
-      const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
-      if (!hasSpeakers && !hasSeats) {
-        // Free Use starter: clean blank tool, no preset seeding
+      // Free Use starter: always apply clean state on scratch boot, overrides any stale autosave
+      {
         const freeUseRoom = { widthM: 4.0, lengthM: 6.0, heightM: 2.4 };
         if (typeof appState?.setRoomDims === "function") {
           appState.setRoomDims(freeUseRoom);
