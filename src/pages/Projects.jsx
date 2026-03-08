@@ -229,25 +229,7 @@ export default function ProjectsPage() {
   }
 
   function handleNewProjectCreated(newProject) {
-    const p = {
-      id: newProject.id,
-      name: newProject.name || "Untitled Project",
-      client: newProject.client_name || "",
-      status: newProject.project_status || "Prospective",
-      roomLength: newProject.room_length || null,
-      roomWidth: newProject.room_width || null,
-      roomHeight: newProject.room_height || null,
-      createdAt: new Date(newProject.created_date).getTime(),
-      lcrModel: null, surroundModel: null, heightModel: null,
-      subModel: null, subCount: null, screenSizeInches: null, seats: null,
-    };
-    setProjects((arr) => [p, ...arr]);
-    setCreated(p);
-    window.setTimeout(() => setCreated(null), 4000);
-  }
-
-  function handleNewProjectCreated(newProject) {
-    // This is now only the create-mode callback from NewProjectDialog
+    // Create-mode callback from NewProjectDialog
     const p = {
       id: newProject.id,
       name: newProject.name || "Untitled Project",
