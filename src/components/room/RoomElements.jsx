@@ -376,8 +376,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
               )}
             </div>
           );
-        })
-      )}
+        })}
     </div>
   );
 }
