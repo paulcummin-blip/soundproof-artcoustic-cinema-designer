@@ -133,7 +133,9 @@ function RoomDesignerWithState() {
   const [existingProjects, setExistingProjects] = useState([]);
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
 
-  const baseResolvedId = sessionActiveProjectId || initialProjectIdFromUrl || null;
+  // Only resolve from explicit URL param — session state is for display only.
+  // Generic /RoomDesigner (no ?project=) must open as Free Use, not re-attach a stale project.
+  const baseResolvedId = initialProjectIdFromUrl || null;
   const resolvedProjectId = userProjectOverride === "free"
     ? null
     : (userProjectOverride || baseResolvedId);
@@ -1935,7 +1937,8 @@ export default function RoomDesignerPage() {
   // Calculate project ID at page level to use as remount key
   const sessionActiveProjectId = useActiveProjectId();
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
-  const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
+  // Only use an explicit URL project param — not stale session state.
+  const resolvedProjectId = initialProjectIdFromUrl || null;
   
   if (disabled) {
     return <div className="p-6 text-sm">Room Designer is temporarily disabled.</div>;
