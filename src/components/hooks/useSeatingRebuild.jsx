@@ -28,6 +28,18 @@ export function useSeatingRebuild({
     const currentSeats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
     const hasProjectId = resolvedProjectId || projectIdState;
 
+    // Guard: preserve Free Use starter seating written by useProjectLoader on first scratch load
+    if (
+      loadState?.phase === "scratch" &&
+      !hasProjectId &&
+      !didUserRequestResetRef.current &&
+      currentSeats.length > 0 &&
+      Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length > 0 &&
+      Number.isFinite(appState?.mlpY_m)
+    ) {
+      return;
+    }
+
     const isLoadedProject = loadState?.phase === "loaded" && !!hasProjectId;
     const userHasChangedSeatingSinceLoad =
       seatingConfigEpoch !== (seatingLoadedEpochRef?.current ?? 0);
