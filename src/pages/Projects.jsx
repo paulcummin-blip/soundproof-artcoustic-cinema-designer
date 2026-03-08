@@ -277,13 +277,7 @@ export default function ProjectsPage() {
 
   function handleEditProject(p) {
     setEditingProject(p);
-    setDraft({
-      name: p.name || "",
-      client: p.client || "",
-      status: p.status || "Prospective",
-    });
-    setCreateError(null);
-    setDialogOpen(true);
+    setNewProjectDialogOpen(true);
   }
 
   function toNumberOrNull(v) {
