@@ -508,6 +508,19 @@ export default function ProjectsPage() {
             Client: {p.client || "—"}
           </div>
 
+          {p.dolby_config && (
+            <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 4 }}>
+              <span style={{ fontWeight: 600 }}>Dolby:</span>{" "}
+              {dolbyLabelMap[p.dolby_config] || p.dolby_config}
+            </div>
+          )}
+          {p.target_spl != null && (
+            <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 2 }}>
+              <span style={{ fontWeight: 600 }}>Target SPL:</span>{" "}
+              {splLabelMap[String(p.target_spl)] || `${p.target_spl} dB`}
+            </div>
+          )}
+
           <div
             style={{
               marginTop: 10,
