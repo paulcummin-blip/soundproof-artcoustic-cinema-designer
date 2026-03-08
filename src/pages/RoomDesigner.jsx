@@ -1573,7 +1573,7 @@ function RoomDesignerWithState() {
           <RoomDesignerPlanToolbar
             allowExtraSurrounds={allowExtraSurrounds}
             extraSurroundCount={appState?.extraSurroundCount}
-            dolbyPreset={dolbyPreset}
+            dolbyPreset={isProjectMode ? dolbyPreset : "5.1"}
             frontSubsCfg={_frontSubsCfg}
             rearSubsCfg={_rearSubsCfg}
             viewEmphasis={viewEmphasis}
