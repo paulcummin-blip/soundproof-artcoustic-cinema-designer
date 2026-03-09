@@ -70,7 +70,7 @@ export default function ViewingAnglePanel({
       label: rp23Level.label,
       color: rp23Level.color
     };
-  }, [mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio]);
+  }, [mlpY_m, mlpOverride, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio]);
 
   if (!rp23Data) {
     return (
