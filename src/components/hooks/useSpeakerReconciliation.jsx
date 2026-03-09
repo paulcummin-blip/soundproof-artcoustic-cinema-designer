@@ -328,18 +328,11 @@ export function useSpeakerReconciliation({
 
         // Process bed-layer speakers (preserve models from previous)
         // For surround roles without models, try to inherit from any existing surround speaker OR globalSurroundModel
-        const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-
-        // Get global surround model from AppState as PRIMARY source
-        const globalSurroundModel = appState?.globalSurroundModel;
-
-        // Get any existing surround model as fallback
-        const anySurroundModel = prevBedSpeakers.
-        filter((s) => surroundRoles.has(safeCanon(s.role))).
-        find((s) => {
-          const m = String(s.model || '').trim().toLowerCase();
-          return m && m !== 'off' && m !== 'none';
-        })?.model;
+        // NOTE: surroundRoles / globalSurroundModel / anySurroundModel / isValidSurroundModel
+        //       are already declared above in the pushIfMissing block — reuse them.
+        const surroundRoles = surroundRolesSet;
+        const globalSurroundModel = globalSurroundModelEarly;
+        const anySurroundModel = anySurroundModelEarly;
 
         // [B44 FIX] Use bedSpeakers (already filtered and ensured) instead of seededBed
         const nextBed = bedSpeakers.map((seed) => {
@@ -348,21 +341,15 @@ export function useSpeakerReconciliation({
 
           let finalModel = seed.model; // Start with seed default
 
-          // For surround roles: bulletproof model persistence
+          // For surround roles: deterministic model priority using shared validator
           if (surroundRoles.has(canonRole)) {
-            const prevModelStr = String(prevMatch?.model || '').trim().toLowerCase();
-            const hasValidPrevModel = prevModelStr && prevModelStr !== 'off' && prevModelStr !== 'none';
-
-            if (hasValidPrevModel) {
+            if (isValidSurroundModel(prevMatch?.model)) {
               finalModel = prevMatch.model;
-            } else if (globalSurroundModel) {
-              const globalModelStr = String(globalSurroundModel).trim().toLowerCase();
-              if (globalModelStr && globalModelStr !== 'off' && globalModelStr !== 'none') {
-                finalModel = globalSurroundModel;
-              }
-            } else if (anySurroundModel) {
+            } else if (isValidSurroundModel(globalSurroundModel)) {
+              finalModel = globalSurroundModel;
+            } else if (isValidSurroundModel(anySurroundModel)) {
               finalModel = anySurroundModel;
-            } else if (hint) {
+            } else if (isValidSurroundModel(hint)) {
               finalModel = hint;
             }
 
