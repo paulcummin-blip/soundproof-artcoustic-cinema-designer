@@ -132,6 +132,26 @@ export function useSpeakerDragUpdate({
         fwOffsetCurrent: fwOffsetRef.current,
       });
 
+      // ── LCR fallback: solver returns empty when constraintZones are absent ────
+      // Instead of leaving the speaker frozen or broken, provide a safe room-geometry
+      // clamp so FL/FC/FR stay visible and draggable at all times.
+      if (finalPositions.length === 0 && ['FL', 'FC', 'FR'].includes(canonicalRole)) {
+        const raw = canvasToRoom(newCanvasPos);
+        if (raw && Number.isFinite(raw.x)) {
+          const W = widthM || 4.5;
+          const halfW = W / 2;
+          const buf = WALL_BUFFER_M || 0.01;
+          let safeX;
+          if (canonicalRole === 'FL')      safeX = Math.max(buf, Math.min(halfW - buf, raw.x));
+          else if (canonicalRole === 'FR') safeX = Math.max(halfW + buf, Math.min(W - buf, raw.x));
+          else                             safeX = halfW; // FC: always on centerline
+          finalPositions.push({
+            id: speakerId,
+            position: { ...(spk.position || {}), x: safeX },
+          });
+        }
+      }
+
       // ── apply ref side-effects ────────────────────────────────────────
       if (additionalUpdates.slsrMode !== undefined) {
         slsrModeRef.current = additionalUpdates.slsrMode;

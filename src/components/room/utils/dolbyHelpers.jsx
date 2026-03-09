@@ -63,11 +63,12 @@ export function seedSpeakersFromPreset({ preset, roomDimensions, listeningArea =
   const x50 = w * 0.50;
   const x75 = w * 0.75;
 
-  // LCR seed: place at a reasonable front-zone depth (behind typical screen).
-  // The LCR lock effect in RoomDesigner will correct to the exact wall-hugged position
-  // once a speaker model is assigned. Using 10cm (or 3% of room length) avoids the
-  // speaker appearing inside the screen bar on first seed.
-  const yLcr = Math.max(0.10, l * 0.03);
+  // LCR seed: use the same physics as the RoomDesigner LCR lock effect:
+  //   wallY = gapM + halfDepth  (gapM=0.01, default depthM=0.082 → halfDepth=0.041)
+  // This places FL/FC/FR exactly where the lock effect will put them, so no correction
+  // is needed on first render and the speakers appear in the correct front zone.
+  const DEFAULT_LCR_DEPTH_M = 0.082;
+  const yLcr = 0.01 + DEFAULT_LCR_DEPTH_M / 2; // = 0.051 m
 
   const la = listeningArea && typeof listeningArea === "object" ? listeningArea : null;
   const sideY = la ? la.midY : l * 0.60;

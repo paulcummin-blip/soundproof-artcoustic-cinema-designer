@@ -1109,10 +1109,18 @@ function RoomDesignerWithState() {
       return spk;
     });
     if (needsUpdate) setSpeakers((prev) => mergePreserveOverheads(prev, updated, dolbyPreset));
-    // Push floatDepthM so screen front stays >= 1cm clear of the farthest LCR extent
-    if (maxFrontExtentY > 0 && _setScreen && _screen?.mountMode !== 'baffle') {
-      const req = maxFrontExtentY + gapM;
-      if ((Number(_screen?.floatDepthM) || 0.20) < req) _setScreen(prev => ({ ...prev, floatDepthM: Math.round(req * 1000) / 1000 }));
+    // Push screen front plane out to maintain >= 1cm clearance from the farthest LCR extent.
+    // Works for ALL mount modes: floating drives floatDepthM; baffle/recessed drives speakerClearanceM
+    // (in AppStateProvider, screenFrontPlaneY = speakerClearanceM for baffle mode).
+    if (maxFrontExtentY > 0 && _setScreen) {
+      const req = Math.round((maxFrontExtentY + gapM) * 1000) / 1000;
+      const mountMode = _screen?.mountMode || 'baffle';
+      if (mountMode === 'floating') {
+        if ((Number(_screen?.floatDepthM) || 0) < req) _setScreen(prev => ({ ...prev, floatDepthM: req }));
+      } else {
+        // baffle / recessed: speakerClearanceM IS the screen front plane in AppStateProvider
+        if ((Number(_screen?.speakerClearanceM) || 0) < req) _setScreen(prev => ({ ...prev, speakerClearanceM: req }));
+      }
     }
   }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective, _screen, _setScreen]);
 
