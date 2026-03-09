@@ -1079,6 +1079,7 @@ function RoomDesignerWithState() {
 
   // Effect to lock LCR to front wall + z=1.2, and drive screen clearance
   useEffect(() => {
+    if (isDraggingRef?.current) return; // Skip entirely while drag is active
     if (_isFrozen && _isFrozen('speakers')) return;
     if (!placedSpeakers || !placedSpeakers.length) return;
     if (!mlpAnchorEffective) return;
