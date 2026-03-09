@@ -27,8 +27,13 @@ export default function ViewingAnglePanel({
     : Math.max(0, Number(screen?.floatDepthM) || 0.20);
 
   const rp23Data = useMemo(() => {
-    // Must have both the MLP Y and the screen front plane
-    if (!Number.isFinite(mlpY_m) || !Number.isFinite(screenFrontPlaneM)) {
+    // Derive effective viewer Y: prefer the visible RSP/primary-seat override,
+    // fall back to mlpY_m from app state.
+    const effectiveViewerY = Number.isFinite(mlpOverride?.y)
+      ? mlpOverride.y
+      : (Number.isFinite(mlpY_m) ? mlpY_m : null);
+
+    if (effectiveViewerY === null || !Number.isFinite(screenFrontPlaneM)) {
       return null;
     }
 
@@ -37,7 +42,7 @@ export default function ViewingAnglePanel({
 
     // Use the exact same inputs as dot placement
     const computedAngle = calculateViewingAngle(
-      { y: mlpY_m }, // viewer position (the green dot)
+      { y: effectiveViewerY }, // viewer position (follows visible RSP/seat)
       visibleWidthInches, // visible width in inches
       aspectRatio, // aspect ratio
       { y: screenFrontPlaneM } // screen front plane Y
@@ -45,7 +50,7 @@ export default function ViewingAnglePanel({
 
     if (computedAngle == null) return null;
 
-    const viewerDistance = Math.abs(mlpY_m - screenFrontPlaneM);
+    const viewerDistance = Math.abs(effectiveViewerY - screenFrontPlaneM);
     const rp23Level = assignRP23Level(computedAngle);
 
     // Optional diagnostics (guarded)
