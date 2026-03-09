@@ -15,6 +15,7 @@ export function useAutoHugSurroundsToWalls({
   isAnyDraggingRef,
   getCanonicalRole,
   getModelDimsM,
+  sideSurroundVisualSpanM, // optional: {minY, maxY} from useRoomGeometry
 }) {
   useEffect(() => {
     if (isAnyDraggingRef.current) return;
@@ -23,6 +24,14 @@ export function useAutoHugSurroundsToWalls({
     const W = widthM || 0;
     const L = lengthM || 0;
     if (!(W > 0 && L > 0)) return;
+
+    // Compute the canonical Y midpoint for side surrounds
+    // Use sideSurroundVisualSpanM when available (same logic as resetSideSurroundsToDefault)
+    const yMin_center = Number(sideSurroundVisualSpanM?.minY);
+    const yMax_center = Number(sideSurroundVisualSpanM?.maxY);
+    const sideSurroundDefaultY = (Number.isFinite(yMin_center) && Number.isFinite(yMax_center) && yMax_center > yMin_center)
+      ? (yMin_center + yMax_center) / 2
+      : L / 2;
 
     let needsUpdate = false;
     const updated = placedSpeakers.map(spk => {
@@ -50,10 +59,14 @@ export function useAutoHugSurroundsToWalls({
       let targetX = spk.position.x; // Default: keep current X
       let targetY = spk.position.y; // Default: keep current Y
       
-      // Side wall speakers: icon edge 1cm from wall
+      // Side wall speakers: snap X to wall, and Y to span midpoint
       if (isSideSurround || isFrontWide) {
         const isLeft = canon.startsWith('SL') || canon === 'LW';
         targetX = sideWallX(W, dims, isLeft ? 'L' : 'R');
+        // For SL/SR only: also snap Y to the canonical midpoint (not seed position)
+        if (isSideSurround) {
+          targetY = sideSurroundDefaultY;
+        }
       }
       
       // Rear wall speakers: icon edge 1cm from wall

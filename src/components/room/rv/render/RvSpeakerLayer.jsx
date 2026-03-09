@@ -1,6 +1,7 @@
 import React from "react";
-import { SpeakerIcon, isRenderableSpeaker, getSpeakerDims, safeYawToMLP } from "@/components/room/rv/RenderPrimitives";
+import { SpeakerIcon, isRenderableSpeaker, getSpeakerDims } from "@/components/room/rv/RenderPrimitives";
 import { getCanonicalRole as defaultGetCanonicalRole } from "@/components/utils/surroundRoleMap";
+import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
 
 /**
  * RvSpeakerLayer — renders all bed-layer draggable speaker icons onto the SVG canvas.
@@ -11,6 +12,11 @@ export default function RvSpeakerLayer({
   scale,
   mlp,
   aimAtMLP,
+  aimFrontWidesAtMLP,
+  aimSideSurroundsAtMLP,
+  aimRearSurroundsAtMLP,
+  widthM,
+  lengthM,
   lcrAngleInfo,
   getCanonicalRole,
   bedLayerSpeakerMouseDownHandler,
@@ -30,11 +36,20 @@ export default function RvSpeakerLayer({
         const { widthM, depthM } = getSpeakerDims(speaker.model);
         const [canvasX, canvasY] = toPx(speaker.position.x, speaker.position.y);
 
-        // Compute yaw: aim at MLP if enabled, else 0
-        let yawDeg = 0;
-        if (aimAtMLP && mlp) {
-          yawDeg = safeYawToMLP(speaker.position, mlp);
-        }
+        // Compute role-aware yaw using the plan aiming helper
+        // Pass position fields at top level as expected by getPlanAimDeg / getAimingYawDeg
+        const speakerForAim = { ...speaker, x: speaker.position.x, y: speaker.position.y };
+        const yawDeg = getPlanAimDeg(
+          speakerForAim,
+          mlp,
+          widthM,
+          lengthM,
+          aimAtMLP,
+          aimFrontWidesAtMLP,
+          aimSideSurroundsAtMLP,
+          aimRearSurroundsAtMLP,
+          lcrAngleInfo,
+        );
 
         const onMouseDown = bedLayerSpeakerMouseDownHandler
           ? (e) => bedLayerSpeakerMouseDownHandler(e, speaker.id)

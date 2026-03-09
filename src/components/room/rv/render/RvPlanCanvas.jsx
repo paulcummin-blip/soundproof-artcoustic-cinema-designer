@@ -424,6 +424,11 @@ export default function RvPlanCanvas({
               scale={scale}
               mlp={mlp}
               aimAtMLP={aimAtMLP}
+              aimFrontWidesAtMLP={aimFrontWidesAtMLP}
+              aimSideSurroundsAtMLP={aimSideSurroundsAtMLP}
+              aimRearSurroundsAtMLP={aimRearSurroundsAtMLP}
+              widthM={widthM}
+              lengthM={lengthM}
               lcrAngleInfo={lcrAngleInfo}
               getCanonicalRole={getCanonicalRole}
               bedLayerSpeakerMouseDownHandler={bedLayerSpeakerMouseDownHandler}

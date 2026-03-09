@@ -31,12 +31,6 @@ export function useFrontWideAutoPlacement({
     // Only attempt FW positioning when LW/RW are actually present
     if (!lwSpeaker && !rwSpeaker) return;
 
-    // Only proceed when both have real models (not off/none)
-    const lwModel = String(lwSpeaker?.model || '').toLowerCase();
-    const rwModel = String(rwSpeaker?.model || '').toLowerCase();
-    if (!lwModel || lwModel === 'off' || lwModel === 'none') return;
-    if (!rwModel || rwModel === 'off' || rwModel === 'none') return;
-
     if (frontWideZones?.status !== 'ok') return;
 
     const W = widthM || 4.5;
@@ -57,6 +51,10 @@ export function useFrontWideAutoPlacement({
         if (role !== "LW" && role !== "RW") return s;
 
         if (s.positionSource === "user") return s;
+
+        // Validate model independently per side — do not block one side because of the other
+        const modelStr = String(s.model || '').toLowerCase();
+        if (!modelStr || modelStr === 'off' || modelStr === 'none') return s;
 
         const zone = role === "LW" ? frontWideZones.left : frontWideZones.right;
         if (!zone || !zone.medianY) return s;
