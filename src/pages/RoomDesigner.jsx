@@ -381,6 +381,19 @@ function RoomDesignerWithState() {
       return;
     }
 
+    // First-load scratch guard: if starter mlpY_m is already written and user hasn't
+    // changed seating yet, don't overwrite the clean starter anchor on first pass.
+    const hasProjectId = resolvedProjectId || projectIdState;
+    if (
+      loadState?.phase === "scratch" &&
+      !hasProjectId &&
+      seatingConfigEpoch === 0 &&
+      Number.isFinite(appState?.mlpY_m) &&
+      Array.isArray(appState?.seatingPositions) && appState.seatingPositions.length > 0
+    ) {
+      return;
+    }
+
     // 1. Compute ideal distance for 57.5° FOV (base position)
     const idealDistM = distanceFor57_5FromWidth(screenVisibleWidthM);
     const mlpY_base = screenFrontPlaneM + idealDistM;
