@@ -31,7 +31,7 @@ export function buildRowCenters(mlpY, rows, spacingM, reference /* 'front' | 'ba
       const base = mlpY - (rows - 1) * spacingM;
       return indexes.map(i => base + i * spacingM);
     }
-    case 'average': // symmetric around dot
+    case 'average': // symmetric around dot — also handles 'all' (mapped above)
     default: {
       // Center of the stack sits on the dot (midpoint between front/back).
       // For 2 rows: front = mlp - spacing/2, back = mlp + spacing/2
