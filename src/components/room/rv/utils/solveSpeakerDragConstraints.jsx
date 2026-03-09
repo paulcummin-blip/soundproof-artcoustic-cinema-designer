@@ -151,8 +151,8 @@ export function solveSpeakerDragConstraints({
       (frSpk && Math.abs((frSpk.position?.x ?? 0) - finalRightX) > 0.001);
 
     if (needsUpdate) {
-      if (flSpk) finalPositions.push({ id: flSpk.id, position: { ...(flSpk.position || {}), x: finalLeftX } });
-      if (frSpk) finalPositions.push({ id: frSpk.id, position: { ...(frSpk.position || {}), x: finalRightX } });
+      if (flSpk) finalPositions.push({ id: flSpk.id, position: { ...(flSpk.position || {}), x: finalLeftX }, positionSource: 'user' });
+      if (frSpk) finalPositions.push({ id: frSpk.id, position: { ...(frSpk.position || {}), x: finalRightX }, positionSource: 'user' });
     }
     return { finalPositions, additionalUpdates };
   }
