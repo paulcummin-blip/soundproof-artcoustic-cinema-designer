@@ -111,8 +111,13 @@ export function solveSpeakerDragConstraints({
       return { finalPositions, additionalUpdates };
     }
 
-    // FL or FR
+    // FL or FR — if zones not ready yet, keep speaker at its current position
+    // instead of returning an empty result that causes the speaker to vanish or freeze.
     if (!constraintZones?.FL || !constraintZones?.FR) {
+      finalPositions.push({
+        id: speakerId,
+        position: { ...(spk.position || {}) },
+      });
       return { finalPositions, additionalUpdates };
     }
 

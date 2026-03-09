@@ -1183,48 +1183,46 @@ useEffect(() => {
     }
   }, [placedSpeakers, widthM, lengthM, heightM, screen, visualConstraintZones, getModelDimsM]); // Use new dimension variables
 
-  // Auto-adjust LCR speakers on screen/zone changes
-  // [B44] This effect is LCR-only; bed surrounds are not touched
+  // Snap FL/FR to zone midpoints once constraintZones are ready.
+  // This corrects generic seed positions (e.g. w*0.25) to the real approved zone centres.
+  // Only snaps if the current X is outside the valid clamp range — speakers already
+  // inside the zone (i.e. placed by a drag) are not moved.
   useEffect(() => {
-    if (!onSetSpeakers || !constraintZones?.FL || !constraintZones?.FR) {
-      return;
-    }
+    if (!onSetSpeakers || !constraintZones?.FL || !constraintZones?.FR) return;
 
     const flSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
-    if (!flSpeaker) return;
-
-    // Use the current FL speaker position as the source of truth for re-calculation
-    const { finalLeftX, finalRightX } = resolveSymmetricLCR({
-      desiredX: flSpeaker.position.x,
-      isLeft: true,
-      screenCenterX: screenCenterX_m,
-      leftZone: constraintZones.FL.clamp,
-      rightZone: constraintZones.FR.clamp,
-    });
-
-    // Only update if positions have changed to avoid an infinite loop
     const frSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FR');
-    const flNeedsUpdate = Math.abs((flSpeaker.position.x || 0) - finalLeftX) > EPS;
-    const frNeedsUpdate = frSpeaker && Math.abs((frSpeaker.position.x || 0) - finalRightX) > EPS;
+    const fcSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FC');
 
-    if (flNeedsUpdate || frNeedsUpdate) {
-      onSetSpeakers(prev => {
-        return prev.map(s => {
-          const role = getCanonicalRole(s.role);
-          if (role === 'FL') {
-            return { ...s, position: { ...(s.position || {}), x: finalLeftX } };
-          }
-          if (role === 'FR') {
-            if (frSpeaker) {
-              return { ...s, position: { ...(s.position || {}), x: finalRightX } };
-            }
-          }
-          return s;
-        });
-      });
-    }
+    const flClamp = constraintZones.FL.clamp;
+    const frClamp = constraintZones.FR.clamp;
 
-  }, [constraintZones, screenCenterX_m, onSetSpeakers, placedSpeakers, getCanonicalRole]);
+    // Zone midpoints: the natural resting position for each LCR speaker
+    const flZoneMid = (flClamp.minX + flClamp.maxX) / 2;
+    const frZoneMid = (frClamp.minX + frClamp.maxX) / 2;
+
+    const flCurrentX = Number(flSpeaker?.position?.x);
+    const frCurrentX = Number(frSpeaker?.position?.x);
+    const fcCurrentX = Number(fcSpeaker?.position?.x);
+
+    // Only snap if currently outside the allowed zone (i.e. still at hardcoded seed)
+    const flNeedsSnap = flSpeaker && Number.isFinite(flCurrentX) &&
+      (flCurrentX < flClamp.minX - EPS || flCurrentX > flClamp.maxX + EPS);
+    const frNeedsSnap = frSpeaker && Number.isFinite(frCurrentX) &&
+      (frCurrentX < frClamp.minX - EPS || frCurrentX > frClamp.maxX + EPS);
+    const fcNeedsSnap = fcSpeaker && Number.isFinite(fcCurrentX) &&
+      Math.abs(fcCurrentX - centerX_m) > EPS_M;
+
+    if (!flNeedsSnap && !frNeedsSnap && !fcNeedsSnap) return;
+
+    onSetSpeakers(prev => prev.map(s => {
+      const role = getCanonicalRole(s.role);
+      if (role === 'FL' && flNeedsSnap) return { ...s, position: { ...(s.position || {}), x: flZoneMid } };
+      if (role === 'FR' && frNeedsSnap) return { ...s, position: { ...(s.position || {}), x: frZoneMid } };
+      if (role === 'FC' && fcNeedsSnap) return { ...s, position: { ...(s.position || {}), x: centerX_m } };
+      return s;
+    }));
+  }, [constraintZones, centerX_m, placedSpeakers, onSetSpeakers, getCanonicalRole]);
 
   // [REMOVED] Redundant useEffect for LCR yaw was here.
 
