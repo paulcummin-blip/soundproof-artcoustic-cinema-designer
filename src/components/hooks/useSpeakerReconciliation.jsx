@@ -477,7 +477,8 @@ export function useSpeakerReconciliation({
 
         const ensureFinal = (role) => {
           if (haveFinal.has(role)) return;
-          final.push({ id: role, role, label: role, model: undefined, position: null });
+          const fallbackModel = surroundRolesSet.has(safeCanon(role)) ? pickSurroundModel() : undefined;
+          final.push({ id: role, role, label: role, model: fallbackModel, position: null });
           haveFinal.add(role);
         };
 
