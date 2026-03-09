@@ -536,7 +536,7 @@ function RoomDesignerWithState() {
 
     // If no seats yet, keep null so RV can do its own last-resort fallback
     return null;
-  }, [appState?.mlpY_m, appState?.seatingPositions, stableDimensions?.width, loadState?.phase, resolvedProjectId, projectIdState]);
+  }, [appState?.mlpY_m, appState?.seatingPositions, stableDimensions?.width, isProjectMode]);
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
   const engineSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
