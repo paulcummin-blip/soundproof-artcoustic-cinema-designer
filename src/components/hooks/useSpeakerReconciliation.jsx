@@ -256,6 +256,25 @@ export function useSpeakerReconciliation({
           return true;
         });
 
+        // Shared validity gate — one definition, used everywhere in this closure
+        const isValidSurroundModel = (m) => {
+          const s = String(m ?? '').trim().toLowerCase();
+          return !!s && s !== 'off' && s !== 'none';
+        };
+
+        // Hoist these early so pushIfMissing can use them
+        const surroundRolesSet = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+        const globalSurroundModelEarly = appState?.globalSurroundModel;
+        const anySurroundModelEarly = prevBedSpeakers
+          .filter((s) => surroundRolesSet.has(safeCanon(s.role)))
+          .find((s) => isValidSurroundModel(s.model))?.model;
+
+        // Pick best available surround model for a newly created role
+        const pickSurroundModel = () =>
+          isValidSurroundModel(globalSurroundModelEarly) ? globalSurroundModelEarly
+          : isValidSurroundModel(anySurroundModelEarly)  ? anySurroundModelEarly
+          : undefined;
+
         // [B44 FIX] Ensure required surround roles exist even if seededSpeakers is missing them
         const have = new Set(bedSpeakers.map((s) => safeCanon(s.role)));
 
@@ -266,7 +285,7 @@ export function useSpeakerReconciliation({
             id: role,
             role,
             label: role,
-            model: undefined,
+            model: surroundRolesSet.has(safeCanon(role)) ? pickSurroundModel() : undefined,
             position: null // SpeakerPlacement / resetSurroundPositions will hydrate
           });
 
