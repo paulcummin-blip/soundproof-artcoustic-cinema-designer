@@ -480,8 +480,7 @@ function RoomDesignerWithState() {
     // In scratch/Free Use mode with no project, visually lock the dot to the centre/primary seat.
     // This prevents the dot drifting ahead of the seating row during Viewing Offset changes,
     // because mlpY_m updates before the seating rebuild has finished moving the seats.
-    const hasProjectId = resolvedProjectId || projectIdState;
-    if (loadState?.phase === "scratch" && !hasProjectId && seats.length > 0 && Number.isFinite(roomWidthM)) {
+    if (!isProjectMode && seats.length > 0 && Number.isFinite(roomWidthM)) {
       const primarySeat = seats.find(s => s.isPrimary);
       const candidate = primarySeat || (() => {
         let best = null; let bestDx = Infinity;
