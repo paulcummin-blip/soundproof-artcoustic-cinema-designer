@@ -1102,6 +1102,8 @@ function RoomDesignerWithState() {
       const halfExtentM = yHalfExtentM(depthM, widthM, targetYawDeg);
       const wallY = gapM + halfExtentM;
       if (wallY + halfExtentM > maxFrontExtentY) maxFrontExtentY = wallY + halfExtentM;
+      // Skip auto-lock for manually dragged speakers — preserves user drag result
+      if (spk.positionSource === 'user') return spk;
       if (Math.abs((spk.position?.y ?? 0) - wallY) > 0.001 || Math.abs((spk.position?.z ?? 1.2) - 1.2) > 0.001) {
         needsUpdate = true;
         return { ...spk, position: { ...spk.position, y: wallY, z: 1.2 } };
