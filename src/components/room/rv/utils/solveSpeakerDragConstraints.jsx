@@ -106,6 +106,7 @@ export function solveSpeakerDragConstraints({
         finalPositions.push({
           id: speakerId,
           position: { ...(spk.position || {}), x: centerX_m, y: newY },
+          positionSource: 'user',
         });
       }
       return { finalPositions, additionalUpdates };
@@ -232,10 +233,12 @@ export function solveSpeakerDragConstraints({
       finalPositions.push({
         id: thisSpeaker.id,
         position: { ...(thisSpeaker.position || {}), x: baseSide === 'SL' ? xL_side : xR_side, y: yStar },
+        positionSource: 'user',
       });
       finalPositions.push({
         id: partnerSpeaker.id,
         position: { ...(partnerSpeaker.position || {}), x: partnerBaseSide === 'SL' ? xL_side : xR_side, y: yStar },
+        positionSource: 'user',
       });
       return { finalPositions, additionalUpdates };
     }
@@ -261,10 +264,12 @@ export function solveSpeakerDragConstraints({
     finalPositions.push({
       id: thisSpeaker.id,
       position: { ...(thisSpeaker.position || {}), x: xL_star, y: y_back_this },
+      positionSource: 'user',
     });
     finalPositions.push({
       id: partnerSpeaker.id,
       position: { ...(partnerSpeaker.position || {}), x: xR_star, y: y_back_partner },
+      positionSource: 'user',
     });
     return { finalPositions, additionalUpdates };
   }
@@ -289,14 +294,14 @@ export function solveSpeakerDragConstraints({
     const partnerRoleSbr = canonicalRole === 'SBL' ? 'SBR' : 'SBL';
     const partnerSpk     = placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRoleSbr);
 
-    finalPositions.push({ id: speakerId, position: { ...spk.position, x: finalX, y: finalY } });
+    finalPositions.push({ id: speakerId, position: { ...spk.position, x: finalX, y: finalY }, positionSource: 'user' });
 
     if (partnerSpk) {
       const partnerX    = W - finalX;
       const partnerSide = (partnerX <= W * 0.5) ? 'left' : 'right';
       const cP          = rsRearCorridor(partnerSide, { widthM: W, lengthM: L }, spDims);
       const partnerXC   = clamp(partnerX, cP.xMin, cP.xMax);
-      finalPositions.push({ id: partnerSpk.id, position: { ...partnerSpk.position, x: partnerXC, y: finalY } });
+      finalPositions.push({ id: partnerSpk.id, position: { ...partnerSpk.position, x: partnerXC, y: finalY }, positionSource: 'user' });
     }
 
     return { finalPositions, additionalUpdates };
@@ -402,6 +407,7 @@ export function solveSpeakerDragConstraints({
       finalPositions.push({
         id: speakerId,
         position: { ...(spk.position || {}), x: rawX, y: rawY },
+        positionSource: 'user',
       });
       return { finalPositions, additionalUpdates };
     }
@@ -485,7 +491,7 @@ export function solveSpeakerDragConstraints({
           if (['TFR', 'TRR'].includes(role) && rightColumnX != null) cur.x = rightColumnX;
           if (role === 'TFL' || role === 'TFR') cur.y = frontY;
           if (role === 'TRL' || role === 'TRR') cur.y = rearY;
-          finalPositions.push({ id: s.id, position: cur });
+          finalPositions.push({ id: s.id, position: cur, positionSource: 'user' });
         }
         return { finalPositions, additionalUpdates };
       }
@@ -502,7 +508,7 @@ export function solveSpeakerDragConstraints({
         if (isLeftRole(r)  && leftColumnX  != null) cur.x = leftColumnX;
         if (isRightRole(r) && rightColumnX != null) cur.x = rightColumnX;
         if (r === canonicalRole || (partnerRoleOH && r === partnerRoleOH)) cur.y = newY;
-        finalPositions.push({ id: s.id, position: cur });
+        finalPositions.push({ id: s.id, position: cur, positionSource: 'user' });
       }
       return { finalPositions, additionalUpdates };
     }
@@ -551,7 +557,7 @@ export function solveSpeakerDragConstraints({
       if (isFrontRole(role) && Number.isFinite(newFrontY)) current.y = newFrontY;
       if (isMidRole(role)   && Number.isFinite(newMidY))   current.y = newMidY;
       if (isRearRole(role)  && Number.isFinite(newRearY))  current.y = newRearY;
-      finalPositions.push({ id: s.id, position: current });
+      finalPositions.push({ id: s.id, position: current, positionSource: 'user' });
     }
     return { finalPositions, additionalUpdates };
   }
@@ -563,6 +569,7 @@ export function solveSpeakerDragConstraints({
     finalPositions.push({
       id: speakerId,
       position: { ...(spk.position || {}), x: rawX, y: rawY },
+      positionSource: 'user',
     });
   }
   return { finalPositions, additionalUpdates };
