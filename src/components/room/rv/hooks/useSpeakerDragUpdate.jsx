@@ -171,6 +171,10 @@ export function useSpeakerDragUpdate({
           prev.map(s => {
             const upd = updatedMap.get(s.id);
             if (!upd) return s;
+            // Guard: never write a non-finite position — an invalid position causes the speaker
+            // to fail isRenderableSpeaker and vanish from the plan view.
+            const pos = upd.position;
+            if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return s;
             return {
               ...s,
               position: upd.position,

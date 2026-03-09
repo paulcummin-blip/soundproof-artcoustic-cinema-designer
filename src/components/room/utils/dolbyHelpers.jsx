@@ -63,6 +63,12 @@ export function seedSpeakersFromPreset({ preset, roomDimensions, listeningArea =
   const x50 = w * 0.50;
   const x75 = w * 0.75;
 
+  // LCR seed: place at a reasonable front-zone depth (behind typical screen).
+  // The LCR lock effect in RoomDesigner will correct to the exact wall-hugged position
+  // once a speaker model is assigned. Using 10cm (or 3% of room length) avoids the
+  // speaker appearing inside the screen bar on first seed.
+  const yLcr = Math.max(0.10, l * 0.03);
+
   const la = listeningArea && typeof listeningArea === "object" ? listeningArea : null;
   const sideY = la ? la.midY : l * 0.60;
   const backLeftX = la ? Math.max(m, la.minX) : x25;
@@ -70,9 +76,9 @@ export function seedSpeakersFromPreset({ preset, roomDimensions, listeningArea =
 
   const posForRole = (role) => {
     switch (role) {
-      case "FL": return { x: x25, y: yFront, z: earZ };
-      case "FC": return { x: x50, y: yFront, z: earZ };
-      case "FR": return { x: x75, y: yFront, z: earZ };
+      case "FL": return { x: x25, y: yLcr, z: earZ };
+      case "FC": return { x: x50, y: yLcr, z: earZ };
+      case "FR": return { x: x75, y: yLcr, z: earZ };
       case "FCL": return { x: Math.max(m, x25 - 0.2), y: yFront, z: earZ };
       case "FCR": return { x: Math.min(w - m, x75 + 0.2), y: yFront, z: earZ };
       case "SL": return { x: m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
