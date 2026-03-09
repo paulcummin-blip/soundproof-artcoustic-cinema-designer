@@ -741,7 +741,7 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
             aspectRatio: prev?.aspectRatio || "16:9",
             mountMode: "floating",
             floatDepthM: typeof prev?.floatDepthM === "number" ? prev.floatDepthM : 0.2,
-            heightFromFloorM: typeof prev?.heightFromFloorM === "number" ? prev.heightFromFloorM : 0.5,
+            heightFromFloorM: 0.5,
           }));
         }
         // 57.5° seating row for 120" screen, measured from the screen plane (not the front wall)
