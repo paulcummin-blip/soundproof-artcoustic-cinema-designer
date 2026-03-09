@@ -17,7 +17,14 @@ export default function ViewingAnglePanel({
   onShowMlpRulerChange
 }) {
   // Pull derived MLP and screen plane from app state (single source of truth)
-  const { mlpY_m, screenFrontPlaneM } = useAppState() || {};
+  const { mlpY_m, screenFrontPlaneM: screenFrontPlaneMFromState } = useAppState() || {};
+
+  // Use app state value when available (published by RV canvas), otherwise fall back
+  // to screen.floatDepthM so the analysis matches the same plane used by the MLP effect
+  // and the Free Use starter (both use floatDepthM as the screen plane reference).
+  const screenFrontPlaneM = (Number.isFinite(screenFrontPlaneMFromState) && screenFrontPlaneMFromState > 0)
+    ? screenFrontPlaneMFromState
+    : Math.max(0, Number(screen?.floatDepthM) || 0.20);
 
   const rp23Data = useMemo(() => {
     // Must have both the MLP Y and the screen front plane
