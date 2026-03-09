@@ -334,6 +334,27 @@ export function useSpeakerReconciliation({
         const globalSurroundModel = globalSurroundModelEarly;
         const anySurroundModel = anySurroundModelEarly;
 
+        // [B44 FIX: SYMMETRIC PAIR MODEL] Resolve one shared model per mirrored surround pair
+        // BEFORE nextBed.map so that SL/SR, SBL/SBR, and LW/RW always leave reconciliation
+        // with matching models. The old per-role prevMatch check allowed one side to inherit a
+        // prior model while its mirror partner did not, causing asymmetric wall-hugging downstream.
+        const SURROUND_MIRROR_PAIRS = [['SL', 'SR'], ['SBL', 'SBR'], ['LW', 'RW']];
+        const pairModelMap = new Map();
+        for (const [roleA, roleB] of SURROUND_MIRROR_PAIRS) {
+          const prevA = byCanonPrev.get(roleA);
+          const prevB = byCanonPrev.get(roleB);
+          // Priority: valid prev model from either side → global → any → hint
+          const pairModel =
+            isValidSurroundModel(prevA?.model)     ? prevA.model :
+            isValidSurroundModel(prevB?.model)     ? prevB.model :
+            isValidSurroundModel(globalSurroundModel) ? globalSurroundModel :
+            isValidSurroundModel(anySurroundModel) ? anySurroundModel :
+            isValidSurroundModel(hint)             ? hint :
+            undefined;
+          pairModelMap.set(roleA, pairModel);
+          pairModelMap.set(roleB, pairModel);
+        }
+
         // [B44 FIX] Use bedSpeakers (already filtered and ensured) instead of seededBed
         const nextBed = bedSpeakers.map((seed) => {
           const canonRole = safeCanon(seed.role);
@@ -341,10 +362,11 @@ export function useSpeakerReconciliation({
 
           let finalModel = seed.model; // Start with seed default
 
-          // For surround roles: deterministic model priority using shared validator
+          // For surround roles: use symmetric pair-resolved model to prevent left/right divergence
           if (surroundRoles.has(canonRole)) {
-            if (isValidSurroundModel(prevMatch?.model)) {
-              finalModel = prevMatch.model;
+            const pairModel = pairModelMap.get(canonRole);
+            if (isValidSurroundModel(pairModel)) {
+              finalModel = pairModel;
             } else if (isValidSurroundModel(globalSurroundModel)) {
               finalModel = globalSurroundModel;
             } else if (isValidSurroundModel(anySurroundModel)) {
@@ -356,6 +378,7 @@ export function useSpeakerReconciliation({
             if (globalThis.__B44_LOGS) {
               console.log(`[RD RECON] Surround model for ${canonRole}:`, {
                 prevModel: prevMatch?.model,
+                pairModel,
                 globalSurroundModel,
                 anySurroundModel,
                 hint,
