@@ -17,7 +17,10 @@ export function buildRowCenters(mlpY, rows, spacingM, reference /* 'front' | 'ba
   const half = (rows - 1) / 2;
   const indexes = Array.from({ length: rows }, (_, i) => i);
 
-  switch (reference) {
+  // 'all' is the UI label for the symmetric/average mode — map it to 'average'
+  const ref = reference === 'all' ? 'average' : reference;
+
+  switch (ref) {
     case 'front': {
       // Front row sits on the dot.
       const base = mlpY;
