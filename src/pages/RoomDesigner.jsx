@@ -1077,65 +1077,44 @@ function RoomDesignerWithState() {
     if (anyOutOfBounds) setSpeakers((prev) => preserveSurroundModels(prev, rescued, appState));
   }, [stableDimensions.width, stableDimensions.length, placedSpeakers, _isFrozen, setSpeakers]);
 
-  // Effect to lock LCR to front wall + z=1.2
+  // Effect to lock LCR to front wall + z=1.2, and drive screen clearance
   useEffect(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     if (!placedSpeakers || !placedSpeakers.length) return;
     if (!mlpAnchorEffective) return;
-
-    const gapM = 0.01; // 1cm air gap from wall
+    const gapM = 0.01;
     let needsUpdate = false;
-
+    let maxFrontExtentY = 0;
     const updated = placedSpeakers.map((spk) => {
       const role = safeCanon(spk.role);
       if (!['FL', 'FC', 'FR'].includes(role)) return spk;
-
-      // Only lock if model is actually selected
-      const m = spk.model;
-      const ms = String(m ?? "").trim().toLowerCase();
+      const ms = String(spk.model ?? "").trim().toLowerCase();
       if (!ms || ms === "off" || ms === "none") return spk;
-
-      // Get speaker dimensions
       const meta = getSpeakerModelMeta(spk.model) || {};
       const depthM = Number(meta.depthM) || 0.082;
       const widthM = Number(meta.widthM) || 0.27;
-
-      // Compute target yaw angle if aiming at MLP (same logic as aiming effect)
       let targetYawDeg = 0;
       if (lcrAimMode === "angled" && spk.position) {
         const dx = mlpAnchorEffective.x - spk.position.x;
         const dy = mlpAnchorEffective.y - spk.position.y;
-        const yawRad = Math.atan2(dx, dy);
-        targetYawDeg = Math.abs(yawRad * 180 / Math.PI);
+        targetYawDeg = Math.abs(Math.atan2(dx, dy) * 180 / Math.PI);
       }
-
-      // Calculate wall-hugged Y using stroke-aware half extent with TARGET yaw
       const halfExtentM = yHalfExtentM(depthM, widthM, targetYawDeg);
       const wallY = gapM + halfExtentM;
-
-      const currentY = spk.position?.y ?? 0;
-      const currentZ = spk.position?.z ?? 1.2;
-
-      // Only update if meaningful change
-      if (Math.abs(currentY - wallY) > 0.001 || Math.abs(currentZ - 1.2) > 0.001) {
+      if (wallY + halfExtentM > maxFrontExtentY) maxFrontExtentY = wallY + halfExtentM;
+      if (Math.abs((spk.position?.y ?? 0) - wallY) > 0.001 || Math.abs((spk.position?.z ?? 1.2) - 1.2) > 0.001) {
         needsUpdate = true;
-        return {
-          ...spk,
-          position: {
-            ...spk.position,
-            y: wallY,
-            z: 1.2
-          }
-        };
+        return { ...spk, position: { ...spk.position, y: wallY, z: 1.2 } };
       }
-
       return spk;
     });
-
-    if (needsUpdate) {
-      setSpeakers((prev) => mergePreserveOverheads(prev, updated, dolbyPreset));
+    if (needsUpdate) setSpeakers((prev) => mergePreserveOverheads(prev, updated, dolbyPreset));
+    // Push floatDepthM so screen front stays >= 1cm clear of the farthest LCR extent
+    if (maxFrontExtentY > 0 && _setScreen && _screen?.mountMode !== 'baffle') {
+      const req = maxFrontExtentY + gapM;
+      if ((Number(_screen?.floatDepthM) || 0.20) < req) _setScreen(prev => ({ ...prev, floatDepthM: Math.round(req * 1000) / 1000 }));
     }
-  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective]);
+  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective, _screen, _setScreen]);
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
