@@ -77,9 +77,11 @@ export function seedSpeakersFromPreset({ preset, roomDimensions, listeningArea =
 
   const posForRole = (role) => {
     switch (role) {
-      case "FL": return { x: x25, y: yLcr, z: earZ };
+      // FL/FR: tighter initial seed — w*0.33/0.67 rather than w*0.25/0.75
+      // This avoids absurdly-wide starting positions before LCR zone clamping runs.
+      case "FL": return { x: w * 0.33, y: yLcr, z: earZ };
       case "FC": return { x: x50, y: yLcr, z: earZ };
-      case "FR": return { x: x75, y: yLcr, z: earZ };
+      case "FR": return { x: w * 0.67, y: yLcr, z: earZ };
       case "FCL": return { x: Math.max(m, x25 - 0.2), y: yFront, z: earZ };
       case "FCR": return { x: Math.min(w - m, x75 + 0.2), y: yFront, z: earZ };
       case "SL": return { x: m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
@@ -91,8 +93,9 @@ export function seedSpeakersFromPreset({ preset, roomDimensions, listeningArea =
       }
       case "RBL": return { x: Math.max(m, Math.min(backLeftX, w - m)), y: Math.min(yRear, l - m), z: earZ };
       case "RBR": return { x: Math.max(m, Math.min(backRightX, w - m)), y: Math.min(yRear, l - m), z: earZ };
-      case "LW": return { x: w * 0.15, y: l * 0.4, z: earZ };
-      case "RW": return { x: w * 0.85, y: l * 0.4, z: earZ };
+      // LW/RW: seed on side walls in the front third — between LCR and side surround regions
+      case "LW": return { x: m, y: l * 0.25, z: earZ };
+      case "RW": return { x: w - m, y: l * 0.25, z: earZ };
       case "TML": return { x: x25, y: l * 0.50, z: topZ };
       case "TMR": return { x: x75, y: l * 0.50, z: topZ };
       case "TFL": return { x: x25, y: l * 0.35, z: topZ };

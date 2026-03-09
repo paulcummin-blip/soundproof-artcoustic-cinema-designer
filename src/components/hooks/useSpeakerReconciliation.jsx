@@ -238,11 +238,12 @@ export function useSpeakerReconciliation({
 
         // [B44 FIX] Remove only the surround roles that are NOT required by the current layout
         const major = parseInt(String(dolbyPreset || '').split('.')[0], 10) || 5;
-        const useWidesInsteadOfRears = _sevenBedLayoutType === 'wides';
+        const is9xLayout = major >= 9;
+        // sevenBedLayoutType ONLY applies to 7.x. 9.x always requires BOTH rears AND wides.
+        const useWidesInsteadOfRears = !is9xLayout && _sevenBedLayoutType === 'wides';
 
-        // 7.x chooses between rears and wides. 9.x must keep BOTH.
-        const wantsRears = major >= 9 || major === 7 && !useWidesInsteadOfRears;
-        const wantsWides = major >= 9 || major === 7 && useWidesInsteadOfRears;
+        const wantsRears = is9xLayout || (major === 7 && !useWidesInsteadOfRears);
+        const wantsWides = is9xLayout || (major === 7 && useWidesInsteadOfRears);
 
         // NEW: bed speakers must come from seededSpeakers (canonical roles for the new preset)
         // But filter out only what we DON'T want
