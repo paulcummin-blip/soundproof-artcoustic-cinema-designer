@@ -442,25 +442,18 @@ export function useSpeakerReconciliation({
         });
 
         // CRITICAL: Final safety pass - ensure surround roles NEVER lose their model
-        const surroundRolesToProtect = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+        const surroundRolesToProtect = surroundRolesSet;
         const globalSurroundModelFinal = appState?.globalSurroundModel;
 
-        if (globalSurroundModelFinal) {
-          const modelStr = String(globalSurroundModelFinal).trim().toLowerCase();
-          const isValidGlobalModel = modelStr && modelStr !== 'off' && modelStr !== 'none';
-
-          if (isValidGlobalModel) {
-            withOverheads = withOverheads.map((spk) => {
-              const canonRole = safeCanon(spk.role);
-              if (!surroundRolesToProtect.has(canonRole)) return spk;
-              const currentModel = String(spk.model || '').trim().toLowerCase();
-              const hasValidModel = currentModel && currentModel !== 'off' && currentModel !== 'none';
-              if (!hasValidModel) {
-                return { ...spk, model: globalSurroundModelFinal };
-              }
-              return spk;
-            });
-          }
+        if (isValidSurroundModel(globalSurroundModelFinal)) {
+          withOverheads = withOverheads.map((spk) => {
+            const canonRole = safeCanon(spk.role);
+            if (!surroundRolesToProtect.has(canonRole)) return spk;
+            if (!isValidSurroundModel(spk.model)) {
+              return { ...spk, model: globalSurroundModelFinal };
+            }
+            return spk;
+          });
         }
 
         // DEBUG: Log final state before commit
