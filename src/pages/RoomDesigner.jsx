@@ -481,6 +481,19 @@ function RoomDesignerWithState() {
     // This prevents the dot drifting ahead of the seating row during Viewing Offset changes,
     // because mlpY_m updates before the seating rebuild has finished moving the seats.
     if (!isProjectMode && seats.length > 0 && Number.isFinite(roomWidthM)) {
+      // 'all' (average) mode: RSP is the average of all row-centre Y values, which can fall
+      // between rows (even row counts). Compute directly from unique seat Y values rather than
+      // snapping to the nearest primary seat, which would be off-centre.
+      if (_mlpBasis === 'all') {
+        const uniqueYs = [...new Set(
+          seats.map(s => Number(s.y ?? s.position?.y)).filter(y => Number.isFinite(y))
+        )];
+        if (uniqueYs.length > 0) {
+          const avgY = uniqueYs.reduce((sum, y) => sum + y, 0) / uniqueYs.length;
+          return { x: cx, y: avgY, z: 1.2 };
+        }
+      }
+
       const primarySeat = seats.find(s => s.isPrimary);
       const candidate = primarySeat || (() => {
         let best = null; let bestDx = Infinity;
