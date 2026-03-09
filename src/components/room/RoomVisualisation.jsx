@@ -1188,6 +1188,7 @@ useEffect(() => {
   // Only snaps if the current X is outside the valid clamp range — speakers already
   // inside the zone (i.e. placed by a drag) are not moved.
   useEffect(() => {
+    if (isAnyDraggingRef.current) return; // Skip while drag is active
     if (!onSetSpeakers || !constraintZones?.FL || !constraintZones?.FR) return;
 
     const flSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
@@ -1239,6 +1240,7 @@ useEffect(() => {
 
   // [FC_CENTERLINE_LOCK] — Enforce FC always at room centerline
   useEffect(() => {
+    if (isAnyDraggingRef.current) return; // Skip while drag is active
     if (!placedSpeakers?.length || !onSetSpeakers) return;
 
     let needsFix = false;

@@ -1053,6 +1053,7 @@ function RoomDesignerWithState() {
 
   // LCR re-clamp (compacted)
   useEffect(() => {
+    if (isDraggingRef.current) return; // Skip while drag is active
     if (loadState.phase !== 'loaded' || !placedSpeakers.length || !analysisResult?.zones) return;
     try {
       const getModelDims = (modelId) => getSpeakerModelMeta(modelId) || {};
@@ -1129,6 +1130,7 @@ function RoomDesignerWithState() {
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
+    if (isDraggingRef.current) return; // Skip while drag is active
     if (!placedSpeakers.length || _isFrozen && _isFrozen('speakers') || !stableDimensions.width) return;
 
     const fcSpeaker = placedSpeakers.find((s) => safeCanon(s.role) === 'FC');
