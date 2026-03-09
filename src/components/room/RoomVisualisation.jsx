@@ -1236,6 +1236,7 @@ useEffect(() => {
     isAnyDraggingRef,
     getCanonicalRole,
     getModelDimsM,
+    sideSurroundVisualSpanM,
   });
 
   // [FC_CENTERLINE_LOCK] — Enforce FC always at room centerline
