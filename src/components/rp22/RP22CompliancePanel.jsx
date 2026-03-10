@@ -668,7 +668,9 @@ export default function RP22CompliancePanel({
           if (typeof v === "number" && Number.isFinite(v)) {
             const paramDef = RP22_PARAMS.find(p => p.id === pid);
             const unit = paramDef?.unit || "";
-            return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
+            const isIntParam = pid === 2 || pid === 3 || pid === 11;
+            const formatted = isIntParam ? String(Math.round(v)) : v.toFixed(1);
+            return unit ? `${formatted} ${unit}` : formatted;
           }
           return String(v);
         }
