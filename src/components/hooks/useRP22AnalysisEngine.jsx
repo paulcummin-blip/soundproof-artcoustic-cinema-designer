@@ -560,7 +560,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const failed = flPass === false || frPass === false;
       gradedParameters.primary[3] = {
         level: failed ? "FAIL" : "L4",
-        formatted: failed ? "Outside permitted zone tolerance" : "Achieved",
+        formatted: failed ? "Outside permitted zone tolerance" : "",
         value: failed ? 1 : 0,
         status: "ok",
       };
