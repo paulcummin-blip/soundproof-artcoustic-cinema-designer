@@ -760,6 +760,7 @@ function RoomDesignerWithState() {
     sevenBedLayoutType: appState?.sevenBedLayoutType,
     extraSurroundCount: appState?.extraSurroundCount,
     p15ConstructionLevel: appState?.p15ConstructionLevel,
+    screen: _screen,
     mlpPointOverride: mlpAnchorEffective, // Use same MLP as FW overlay (green dot)
     seatSplMetrics: allSeatSplMetrics,
     overheadState: {
