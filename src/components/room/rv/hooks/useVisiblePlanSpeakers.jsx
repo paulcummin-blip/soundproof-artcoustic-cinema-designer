@@ -43,6 +43,9 @@ export function useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSp
         return true;
       }
 
+      // LCR bed speakers: always visible using canonical runtime names (FL/FC/FR)
+      if (canon === "FL" || canon === "FC" || canon === "FR") return true;
+
       // Bed surrounds: controlled by layout role visibility
       if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
         return allowedRoles.has(canon);
