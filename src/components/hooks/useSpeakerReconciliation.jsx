@@ -177,9 +177,10 @@ export function useSpeakerReconciliation({
     if (!hasCorrectRoles || noSpeakers) {
       // GUARD: For Atmos layouts with existing bed speakers, don't full-reseed
       const parts = String(normalizedPreset || '').split('.');
-      const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
+       const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
+       const major = parseInt(String(normalizedPreset || '').split('.')[0], 10) || 5;
 
-      if (heights > 0 && Array.isArray(placedSpeakers) && placedSpeakers.length) {
+       if (heights > 0 && major < 9 && Array.isArray(placedSpeakers) && placedSpeakers.length) {
         setSpeakers((prev) => {
           const withOverheads = ensureAtmosOverheads({
             placedSpeakers: prev,
