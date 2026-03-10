@@ -23,7 +23,7 @@ const WALL_BUFFER_M = 0.01; // min gap between screen face and speaker face
  */
 export function sideWallX(roomWidth, dims, side) {
   const halfDepth = (dims?.depthM ?? 0.082) / 2;
-  if (side === 'left') {
+  if (side === 'left' || side === 'L') {
     return halfDepth + SURROUND_WALL_GAP_M;
   }
   return roomWidth - halfDepth - SURROUND_WALL_GAP_M;
