@@ -50,58 +50,7 @@ export function useRoomCanvasMouseMove({
     // Convert back to canvas for existing logic
     const targetCanvasPos = roomToCanvas(targetRoomPos);
 
-    const speaker = placedSpeakers.find(s => s.id === draggedItemId);
-    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
-
-    if (dragType === 'speaker' && speaker) {
-      const canonicalRole = getCanonicalRole(speaker.role);
-
-      // --- LCR Mirror-Lock Drag Logic ---
-      if (['FL', 'FC', 'FR'].includes(canonicalRole)) {
-        if (canonicalRole === 'FC') {
-          // FC is locked to centerX_m, so no dragging behavior for X
-          const { y: rawRoomY } = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
-          const nextPos = { x: centerX_m, y: rawRoomY };
-          handleSpeakerDrag(draggedItemId, roomToCanvas(nextPos));
-          return;
-        } else {
-          if (!constraintZones?.FL || !constraintZones?.FR) {
-            setDragWarning({ show: true, message: 'LCR CONSTRAINTS NOT READY', x: e.clientX, y: e.clientY });
-            return;
-          }
-
-          const rawRoomPos = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
-          const desiredX = rawRoomPos.x;
-          const isLeft = canonicalRole === 'FL';
-
-          const { finalLeftX, finalRightX } = resolveSymmetricLCR({
-            desiredX: desiredX,
-            isLeft: isLeft,
-            screenCenterX: screenCenterX_m,
-            leftZone: constraintZones.FL.clamp,
-            rightZone: constraintZones.FR.clamp,
-          });
-
-          // Apply positions
-          onSetSpeakers(prev => {
-            const flSpeaker = prev.find(s => getCanonicalRole(s.role) === 'FL');
-            const frSpeaker = prev.find(s => getCanonicalRole(s.role) === 'FR');
-
-            return prev.map(s => {
-              if (flSpeaker && s.id === flSpeaker.id) {
-                return { ...s, position: { ...(s.position || {}), x: finalLeftX } };
-              }
-              if (frSpeaker && s.id === frSpeaker.id) {
-                return { ...s, position: { ...(s.position || {}), x: finalRightX } };
-              }
-              return s;
-            });
-          });
-          lastInteractionEpoch.current = timeNowMs();
-          return;
-        }
-      }
-    }
+    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!placedSpeakers.find(s => s.id === draggedItemId) });
 
     const clampedCanvasX = Math.max(roomRect?.x ?? 0, Math.min((roomRect?.x ?? 0) + (roomRect?.width ?? 0), targetCanvasPos.x));
     const clampedCanvasY = Math.max(roomRect?.y ?? 0, Math.min((roomRect?.y ?? 0) + (roomRect?.height ?? 0), targetCanvasPos.y));
