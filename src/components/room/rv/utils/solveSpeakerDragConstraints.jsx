@@ -111,48 +111,51 @@ export function solveSpeakerDragConstraints({
       return { finalPositions, additionalUpdates };
     }
 
-    // FL or FR — if zones not ready yet, keep speaker at its current position
-    // instead of returning an empty result that causes the speaker to vanish or freeze.
-    if (!constraintZones?.FL || !constraintZones?.FR) {
-      finalPositions.push({
-        id: speakerId,
-        position: { ...(spk.position || {}) },
-      });
-      return { finalPositions, additionalUpdates };
-    }
-
+    // FL or FR
     const rawRoomPos = canvasToRoom(newCanvasPos);
     const desiredX = rawRoomPos.x;
     const isLeft = canonicalRole === 'FL';
 
-    let leftClamp, rightClamp;
-    if (freeMoveLcr) {
-      const dims = getModelDimsM(spk.model);
-      const halfW = (Number(dims?.widthM) || 0.20) / 2;
-      const eps = 0.01;
-      leftClamp  = { xMin: halfW + eps, xMax: screenCenterX_m - eps };
-      rightClamp = { xMin: screenCenterX_m + eps, xMax: widthM - halfW - eps };
-    } else {
-      leftClamp  = constraintZones.FL.clamp;
-      rightClamp = constraintZones.FR.clamp;
+    // Helper: normalise either { min, max } or { xMin, xMax } into { min, max }
+    function normClamp(z) {
+      if (!z) return null;
+      if (Number.isFinite(z.min) && Number.isFinite(z.max)) return z;
+      if (Number.isFinite(z.xMin) && Number.isFinite(z.xMax)) return { min: z.xMin, max: z.xMax };
+      return null;
     }
 
-    const { finalLeftX, finalRightX } = resolveSymmetricLCR({
-      desiredX, isLeft,
-      screenCenterX: screenCenterX_m,
-      leftZone: leftClamp,
-      rightZone: rightClamp,
-    });
+    const dims = getModelDimsM(spk.model);
+    const halfW = (Number(dims?.widthM) || 0.20) / 2;
+    const eps = 0.01;
+    // Free-move clamps used as both the primary path and the fallback when zones are missing
+    const freeMoveLeft  = { min: halfW + eps, max: screenCenterX_m - eps };
+    const freeMoveRight = { min: screenCenterX_m + eps, max: widthM - halfW - eps };
+
+    let leftClamp, rightClamp;
+    if (freeMoveLcr || !constraintZones?.FL || !constraintZones?.FR) {
+      leftClamp  = freeMoveLeft;
+      rightClamp = freeMoveRight;
+    } else {
+      leftClamp  = normClamp(constraintZones.FL.clamp) || freeMoveLeft;
+      rightClamp = normClamp(constraintZones.FR.clamp) || freeMoveRight;
+    }
+
+    // Clamp the dragged side, mirror the partner
+    const activeClamp = isLeft ? leftClamp : rightClamp;
+    const clampedX = Math.max(activeClamp.min, Math.min(activeClamp.max, desiredX));
+    const mirroredX = widthM - clampedX;
+
+    const finalLeftX  = isLeft ? clampedX : mirroredX;
+    const finalRightX = isLeft ? mirroredX : clampedX;
 
     const flSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
     const frSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FR');
-    const needsUpdate =
-      (flSpk && Math.abs((flSpk.position?.x ?? 0) - finalLeftX) > 0.001) ||
-      (frSpk && Math.abs((frSpk.position?.x ?? 0) - finalRightX) > 0.001);
 
-    if (needsUpdate) {
-      if (flSpk) finalPositions.push({ id: flSpk.id, position: { ...(flSpk.position || {}), x: finalLeftX }, positionSource: 'user' });
-      if (frSpk) finalPositions.push({ id: frSpk.id, position: { ...(frSpk.position || {}), x: finalRightX }, positionSource: 'user' });
+    if (flSpk && Math.abs((flSpk.position?.x ?? 0) - finalLeftX) > 0.001) {
+      finalPositions.push({ id: flSpk.id, position: { ...(flSpk.position || {}), x: finalLeftX }, positionSource: 'user' });
+    }
+    if (frSpk && Math.abs((frSpk.position?.x ?? 0) - finalRightX) > 0.001) {
+      finalPositions.push({ id: frSpk.id, position: { ...(frSpk.position || {}), x: finalRightX }, positionSource: 'user' });
     }
     return { finalPositions, additionalUpdates };
   }
