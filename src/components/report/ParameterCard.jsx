@@ -294,7 +294,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     className="text-sm font-bold"
                                     style={{ color: (level === 'FAIL' || level === 'fail') ? '#A7302F' : '#213428' }}
                                 >
-                                    {formatted || (roomResult?.status === 'no_data' ? '—' : (level === 'FAIL' || level === 'fail') ? 'Outside permitted zone tolerance' : 'Within 50% overhang tolerance')}
+                                    {formatted || (roomResult?.status === 'no_data' ? '—' : (level === 'FAIL' || level === 'fail') ? 'Outside permitted zone tolerance' : 'Achieved')}
                                 </span>
                                 {renderLevelBadge(level || '—')}
                             </div>
