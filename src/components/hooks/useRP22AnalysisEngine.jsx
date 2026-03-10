@@ -507,6 +507,65 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       note: "App enforces zone compliance"
     };
 
+    // RP22 Parameter 3 — Screen wall speakers in LCR zones (binary: L4 or FAIL)
+    (() => {
+      if (screen?.mountMode !== 'floating') {
+        gradedParameters.primary[3] = { level: null, value: null, formatted: null, status: "no_data" };
+        return;
+      }
+
+      const mlpForP3 = mlpPointOverride && isNum(mlpPointOverride.x) && isNum(mlpPointOverride.y)
+        ? mlpPointOverride
+        : (mlp && isNum(mlp.x) && isNum(mlp.y) ? mlp : null);
+
+      if (!mlpForP3) {
+        gradedParameters.primary[3] = { level: null, value: null, formatted: null, status: "no_data" };
+        return;
+      }
+
+      const rawDepth = Number(screen?.floatDepthM) || 0.20;
+      const zoneDepthM = Math.max(0.10, Math.min(0.60, rawDepth));
+      const spanY = mlpForP3.y - zoneDepthM;
+      const tan22_5 = Math.tan(22.5 * Math.PI / 180);
+      const tan30   = Math.tan(30.0 * Math.PI / 180);
+
+      const xIL = mlpForP3.x - spanY * tan22_5;
+      const xOL = mlpForP3.x - spanY * tan30;
+      const xIR = mlpForP3.x + spanY * tan22_5;
+      const xOR = mlpForP3.x + spanY * tan30;
+
+      const zoneLeft  = { xMin: Math.min(xIL, xOL), xMax: Math.max(xIL, xOL) };
+      const zoneRight = { xMin: Math.min(xIR, xOR), xMax: Math.max(xIR, xOR) };
+
+      const speakersForP3 = Array.isArray(visiblePlanSpeakers) ? visiblePlanSpeakers : safeSpeakers;
+      const fl = speakersForP3.find(s => { const r = String(s.role || '').toUpperCase(); return r === 'FL' || r === 'L'; });
+      const fr = speakersForP3.find(s => { const r = String(s.role || '').toUpperCase(); return r === 'FR' || r === 'R'; });
+
+      const checkSpk = (spk, zone) => {
+        if (!spk || !isNum(spk.position?.x)) return null;
+        const cx = Number(spk.position.x);
+        const meta = getSpeakerModelMeta(spk.model) || {};
+        const halfW = (Number(meta.widthM) || 0.20) / 2;
+        return cx >= (zone.xMin - halfW) && cx <= (zone.xMax + halfW);
+      };
+
+      const flPass = checkSpk(fl, zoneLeft);
+      const frPass = checkSpk(fr, zoneRight);
+
+      if (flPass === null && frPass === null) {
+        gradedParameters.primary[3] = { level: null, value: null, formatted: null, status: "no_data" };
+        return;
+      }
+
+      const failed = flPass === false || frPass === false;
+      gradedParameters.primary[3] = {
+        level: failed ? "FAIL" : "L4",
+        formatted: failed ? "Outside permitted zone tolerance" : "Within 50% overhang tolerance",
+        value: failed ? 1 : 0,
+        status: "ok",
+      };
+    })();
+
     // RP22 Parameter 12 — Screen speakers SPL at RSP (rounded UP to whole dB)
     const p12CatalogEntry = RP22_CATALOG["12"];
     let p12Result = null;
