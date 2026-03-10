@@ -1207,11 +1207,12 @@ useEffect(() => {
     const fcCurrentX = Number(fcSpeaker?.position?.x);
 
     // Only snap if currently outside the allowed zone (i.e. still at hardcoded seed)
-    const flNeedsSnap = flSpeaker && Number.isFinite(flCurrentX) &&
+    // Never snap a speaker the user has manually positioned.
+    const flNeedsSnap = flSpeaker && flSpeaker.positionSource !== 'user' && Number.isFinite(flCurrentX) &&
       (flCurrentX < flClamp.minX - EPS || flCurrentX > flClamp.maxX + EPS);
-    const frNeedsSnap = frSpeaker && Number.isFinite(frCurrentX) &&
+    const frNeedsSnap = frSpeaker && frSpeaker.positionSource !== 'user' && Number.isFinite(frCurrentX) &&
       (frCurrentX < frClamp.minX - EPS || frCurrentX > frClamp.maxX + EPS);
-    const fcNeedsSnap = fcSpeaker && Number.isFinite(fcCurrentX) &&
+    const fcNeedsSnap = fcSpeaker && fcSpeaker.positionSource !== 'user' && Number.isFinite(fcCurrentX) &&
       Math.abs(fcCurrentX - centerX_m) > EPS_M;
 
     if (!flNeedsSnap && !frNeedsSnap && !fcNeedsSnap) return;
