@@ -557,11 +557,11 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         return;
       }
 
-      const failed = flPass === false || frPass === false;
+      const failCount = (flPass === false ? 1 : 0) + (frPass === false ? 1 : 0);
       gradedParameters.primary[3] = {
-        level: failed ? "FAIL" : "L4",
-        formatted: failed ? "Outside permitted zone tolerance" : "",
-        value: failed ? 1 : 0,
+        level: failCount > 0 ? "FAIL" : "L4",
+        formatted: failCount > 0 ? "Outside permitted zone tolerance" : "",
+        value: failCount,
         status: "ok",
       };
     })();
