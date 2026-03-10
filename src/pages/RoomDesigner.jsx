@@ -1104,9 +1104,11 @@ function RoomDesignerWithState() {
       }
       const halfExtentM = yHalfExtentM(depthM, widthM, targetYawDeg);
       const wallY = gapM + halfExtentM;
-      if (wallY + halfExtentM > maxFrontExtentY) maxFrontExtentY = wallY + halfExtentM;
-      // Skip auto-lock for manually dragged speakers — preserves user drag result
-      if (spk.positionSource === 'user') return spk;
+      const actualCentreY = Number.isFinite(spk.position?.y) ? spk.position.y : wallY;
+      const effectiveCentreY = Math.max(actualCentreY, wallY);
+      if (effectiveCentreY + halfExtentM > maxFrontExtentY) maxFrontExtentY = effectiveCentreY + halfExtentM;
+      // Skip auto-lock for user-dragged speakers only when their Y already satisfies clearance
+      if (spk.positionSource === 'user' && actualCentreY >= wallY - 0.001) return spk;
       if (Math.abs((spk.position?.y ?? 0) - wallY) > 0.001 || Math.abs((spk.position?.z ?? 1.2) - 1.2) > 0.001) {
         needsUpdate = true;
         return { ...spk, position: { ...spk.position, y: wallY, z: 1.2 } };
