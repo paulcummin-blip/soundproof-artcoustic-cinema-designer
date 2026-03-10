@@ -21,7 +21,8 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
     const formatValue = (val) => {
         if (val === null || val === undefined) return '—';
         if (typeof val === 'number' && Number.isFinite(val)) {
-            return parameter.unit ? `${val.toFixed(1)} ${parameter.unit}` : val.toFixed(1);
+            const display = parameter.id === 3 ? Math.round(val) : val.toFixed(1);
+            return parameter.unit ? `${display} ${parameter.unit}` : String(display);
         }
         return String(val);
     };
