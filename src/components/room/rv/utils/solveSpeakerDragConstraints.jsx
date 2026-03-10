@@ -11,7 +11,6 @@
  *                       setHasManualOverheadEdit, fwMeta }
  */
 
-import { resolveSymmetricLCR } from "@/components/room/rv/utils/rvGeometry";
 import { sideWallX, rearWallY, OVERHEAD_PAIR_MAP } from "@/components/room/rv/utils/rvGeometry";
 
 // ─── small local helpers ───────────────────────────────────────────────────
