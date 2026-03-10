@@ -292,11 +292,11 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             <div className="flex justify-between items-center">
                                 <span 
                                     className="text-sm font-bold"
-                                    style={{ color: '#213428' }}
+                                    style={{ color: (level === 'FAIL' || level === 'fail') ? '#A7302F' : '#213428' }}
                                 >
-                                    0
+                                    {formatted || (roomResult?.status === 'no_data' ? '—' : (level === 'FAIL' || level === 'fail') ? 'Outside permitted zone tolerance' : 'Within 50% overhang tolerance')}
                                 </span>
-                                {renderLevelBadge('L4')}
+                                {renderLevelBadge(level || '—')}
                             </div>
                         ) : parameter.id === 8 ? (
                             <div className="flex justify-between items-center">
