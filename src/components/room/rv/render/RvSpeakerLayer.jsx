@@ -33,7 +33,7 @@ export default function RvSpeakerLayer({
       {(speakers || []).map((speaker) => {
         if (!isRenderableSpeaker(speaker)) return null;
 
-        const { widthM, depthM } = getSpeakerDims(speaker.model);
+        const { widthM: speakerWidthM, depthM: speakerDepthM } = getSpeakerDims(speaker.model);
         const [canvasX, canvasY] = toPx(speaker.position.x, speaker.position.y);
 
         // Compute role-aware yaw using the plan aiming helper
@@ -62,8 +62,8 @@ export default function RvSpeakerLayer({
             canvasX={canvasX}
             canvasY_raw={canvasY}
             yawDeg={yawDeg}
-            widthM={widthM}
-            depthM={depthM}
+            widthM={speakerWidthM}
+            depthM={speakerDepthM}
             scale={scale}
             speakerMouseDownHandler={onMouseDown}
             onIconEnter={handleIconEnter}
