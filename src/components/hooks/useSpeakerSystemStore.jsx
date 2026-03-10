@@ -29,43 +29,42 @@ export function useSpeakerSystemStore() {
     (listOrUpdater) => {
       if (typeof setSpeakerSystem !== "function") return;
 
-      // Resolve the final list immediately without re-merging with prev
-      let finalList = typeof listOrUpdater === "function" ?
-      listOrUpdater(Array.isArray(placedSpeakers) ? placedSpeakers : []) :
-      Array.isArray(listOrUpdater) ? listOrUpdater : [];
+      setSpeakerSystem((prev) => {
+        const prevPlacedSpeakers = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
 
-      // NEW: ensure Atmos overheads are present before we hand off to AppState
-      finalList = ensureAtmosOverheads({
-        placedSpeakers: finalList,
-        dolbyPreset: dolbyLayout,
-        roomDimensions: roomDims ? {
-          width: roomDims.widthM,
-          length: roomDims.lengthM,
-          height: roomDims.heightM
-        } : { width: 4.5, length: 6.0, height: 2.8 },
-        overheadGlobalModel,
-        overheadFrontOverride,
-        overheadMidOverride,
-        overheadRearOverride,
-        useFrontGlobal,
-        useMidGlobal,
-        useRearGlobal
-      });
+        let nextList = typeof listOrUpdater === "function"
+          ? listOrUpdater(prevPlacedSpeakers)
+          : Array.isArray(listOrUpdater)
+            ? listOrUpdater
+            : [];
 
-      // DEBUG: log what we're actually sending into AppStateProvider
-      // (keep this for now while we verify overhead behaviour)
-      // eslint-disable-next-line no-console
-      if (globalThis.__B44_LOGS) console.log("[RD] setSpeakers sending to AppStateProvider:", {
-        count: finalList.length,
-        roles: finalList.map((s) => s.role)
-      });
+        nextList = ensureAtmosOverheads({
+          placedSpeakers: nextList,
+          dolbyPreset: dolbyLayout,
+          roomDimensions: roomDims ? {
+            width: roomDims.widthM,
+            length: roomDims.lengthM,
+            height: roomDims.heightM
+          } : { width: 4.5, length: 6.0, height: 2.8 },
+          overheadGlobalModel,
+          overheadFrontOverride,
+          overheadMidOverride,
+          overheadRearOverride,
+          useFrontGlobal,
+          useMidGlobal,
+          useRearGlobal
+        });
 
-      // Push the finished list into AppStateProvider in one shot
-      setSpeakerSystem({
-        placedSpeakers: finalList
+        // eslint-disable-next-line no-console
+        if (globalThis.__B44_LOGS) console.log("[RD] setSpeakers sending to AppStateProvider:", {
+          count: nextList.length,
+          roles: nextList.map((s) => s.role)
+        });
+
+        return { ...(prev || {}), placedSpeakers: nextList };
       });
     },
-    [setSpeakerSystem, placedSpeakers, dolbyLayout, roomDims, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]
+    [setSpeakerSystem, dolbyLayout, roomDims, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]
   );
 
   const initWithDefaultsAndRules = React.useCallback(() => {
