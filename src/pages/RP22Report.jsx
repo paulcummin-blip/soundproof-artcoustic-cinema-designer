@@ -554,7 +554,11 @@ function RP22ReportInner() {
             if (lvl) return lvl;
         }
         if (paramId === 2 && p2SystemConfig) return normaliseLvl(p2SystemConfig.p2Level);
-        if (paramId === 3) return "L4";
+        if (paramId === 3) {
+          const p3 = analysisResult?.gradedParameters?.primary?.[3];
+          if (p3 && p3.status === "ok" && p3.level) return String(p3.level).toUpperCase() === 'FAIL' ? 'FAIL' : normaliseLvl(p3.level);
+          return null;
+        }
         if (paramId === 8) return "L4";
         if (paramId === 11) return "L4";
         if (paramId === 15) return ({ standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" })[app?.p15ConstructionLevel || 'standard'] || null;
