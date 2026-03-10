@@ -273,6 +273,22 @@ function useDesignerState() {
     __autosavePayload = null;
   }
 
+  // FREE-USE GUARD: detect whether a real project is open via URL
+  // If no projectId is present, this is a free-use / local draft session.
+  // In free-use mode, only room/screen/seating are restored from autosave.
+  // Speaker state always starts clean so stale speaker config does not bleed across sessions.
+  const __isFreeUse = (() => {
+    try {
+      const url = new URL(window.location.href);
+      const pid = url.searchParams.get("projectId") || url.searchParams.get("project") || url.searchParams.get("id");
+      if (pid) return false;
+      const uuidMatch = url.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+      return !uuidMatch;
+    } catch {
+      return true; // safe default: treat as free-use if URL cannot be read
+    }
+  })();
+
   // Strip legacy "_s" suffix from surround models (UI hygiene)
   const stripSurroundSuffix = (v) => {
     const s = String(v || "");
@@ -365,10 +381,10 @@ function useDesignerState() {
   const screenWall = screenWallState;
 
   const [dolbyConfig, _setDolbyConfig] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.dolbyConfig === "string") ? __autosavePayload.dolbyConfig : "5.1"
+    (!__isFreeUse && __autosavePayload && typeof __autosavePayload.dolbyConfig === "string") ? __autosavePayload.dolbyConfig : "5.1"
   ));
   const [dolbyLayout, setDolbyLayout] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.dolbyLayout === "string") ? __autosavePayload.dolbyLayout : "5.1"
+    (!__isFreeUse && __autosavePayload && typeof __autosavePayload.dolbyLayout === "string") ? __autosavePayload.dolbyLayout : "5.1"
   ));
   const setDolbyConfig = useCallback((v) => {
     const p = v || "5.1";
@@ -378,7 +394,7 @@ function useDesignerState() {
 
   const [seededChannels, setSeededChannels] = useState([]);
   const [sevenBedLayoutType, setSevenBedLayoutType] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.sevenBedLayoutType === "string")
+    (!__isFreeUse && __autosavePayload && typeof __autosavePayload.sevenBedLayoutType === "string")
       ? __autosavePayload.sevenBedLayoutType
       : "rears"
   ));
@@ -419,7 +435,7 @@ function useDesignerState() {
   ));
   const [subwoofers, setSubwoofers] = useState([]);
   const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
-    (__autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
+    (!__isFreeUse && __autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
       model: "SUB2-12",
       count: 0,
       positions: [],
@@ -427,7 +443,7 @@ function useDesignerState() {
     }
   ));
   const [rearSubsCfg, setRearSubsCfg] = useState(() => (
-    (__autosavePayload && __autosavePayload.rearSubsCfg) ? __autosavePayload.rearSubsCfg : {
+    (!__isFreeUse && __autosavePayload && __autosavePayload.rearSubsCfg) ? __autosavePayload.rearSubsCfg : {
       model: "SUB2-12",
       count: 0,
       positions: [],
@@ -447,7 +463,7 @@ function useDesignerState() {
   });
 
   const [speakerSystem, _setSpeakerSystem] = useState(() => (
-    (__autosavePayload && __autosavePayload.speakerSystem) ? __autosavePayload.speakerSystem : { placedSpeakers: [], lastUpdated: timeNowMs() }
+    (!__isFreeUse && __autosavePayload && __autosavePayload.speakerSystem) ? __autosavePayload.speakerSystem : { placedSpeakers: [], lastUpdated: timeNowMs() }
   ));
   const [speakersEpoch, setSpeakersEpoch] = useState(0);
   const [enableLayoutSPLWidget, setEnableLayoutSPLWidget] = useState(true);
@@ -479,16 +495,16 @@ function useDesignerState() {
   );
 
   const [overheadGlobalModel, setOverheadGlobalModel] = useState(() => (
-    (__autosavePayload && __autosavePayload.overheadGlobalModel) ? __autosavePayload.overheadGlobalModel : null
+    (!__isFreeUse && __autosavePayload && __autosavePayload.overheadGlobalModel) ? __autosavePayload.overheadGlobalModel : null
   ));
   const [overheadFrontOverride, setOverheadFrontOverride] = useState(() => (
-    (__autosavePayload && __autosavePayload.overheadFrontOverride) ? __autosavePayload.overheadFrontOverride : null
+    (!__isFreeUse && __autosavePayload && __autosavePayload.overheadFrontOverride) ? __autosavePayload.overheadFrontOverride : null
   ));
   const [overheadMidOverride, setOverheadMidOverride] = useState(() => (
-    (__autosavePayload && __autosavePayload.overheadMidOverride) ? __autosavePayload.overheadMidOverride : null
+    (!__isFreeUse && __autosavePayload && __autosavePayload.overheadMidOverride) ? __autosavePayload.overheadMidOverride : null
   ));
   const [overheadRearOverride, setOverheadRearOverride] = useState(() => (
-    (__autosavePayload && __autosavePayload.overheadRearOverride) ? __autosavePayload.overheadRearOverride : null
+    (!__isFreeUse && __autosavePayload && __autosavePayload.overheadRearOverride) ? __autosavePayload.overheadRearOverride : null
   ));
   const [useFrontGlobal, setUseFrontGlobal] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.useFrontGlobal === "boolean") ? __autosavePayload.useFrontGlobal : true
@@ -524,7 +540,7 @@ function useDesignerState() {
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
   const [globalSurroundModel, _setGlobalSurroundModel] = useState(() => (
-    (__autosavePayload && __autosavePayload.globalSurroundModel) ? stripSurroundSuffix(__autosavePayload.globalSurroundModel) : null
+    (!__isFreeUse && __autosavePayload && __autosavePayload.globalSurroundModel) ? stripSurroundSuffix(__autosavePayload.globalSurroundModel) : null
   ));
   const [isHydrated, setIsHydrated] = useState(true);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
@@ -565,7 +581,7 @@ function useDesignerState() {
   }, []);
 
   const [extraSurroundCount, _setExtraSurroundCount] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.extraSurroundCount === 'number') ? __autosavePayload.extraSurroundCount : 0
+    (!__isFreeUse && __autosavePayload && typeof __autosavePayload.extraSurroundCount === 'number') ? __autosavePayload.extraSurroundCount : 0
   ));
 
   const setExtraSurroundCount = useCallback((next) => {
@@ -1113,42 +1129,46 @@ function useDesignerState() {
       if (p.roomDims) setRoomDims(p.roomDims);
       if (p.dimensions) setDimensions(p.dimensions);
       if (p.seatingPositions) setSeatingPositions(normaliseSeatingPositions(p.seatingPositions, p.roomDims || p.roomDimensions || roomDims || null));
-      if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
-      // Restore sub configs explicitly (even if count = 0)
-      if (Object.prototype.hasOwnProperty.call(p, "frontSubsCfg")) {
-        setFrontSubsCfg(p.frontSubsCfg || {
-          model: "SUB2-12",
-          count: 0,
-          positions: [],
-          tuning: []
-        });
-      }
-
-      if (Object.prototype.hasOwnProperty.call(p, "rearSubsCfg")) {
-        setRearSubsCfg(p.rearSubsCfg || {
-          model: "SUB2-12",
-          count: 0,
-          positions: [],
-          tuning: []
-        });
-      }
-      if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
-      if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
-      if (p.globalSurroundModel) _setGlobalSurroundModel(stripSurroundSuffix(p.globalSurroundModel));
-      if (p.overheadGlobalModel) setOverheadGlobalModel(p.overheadGlobalModel);
-      if (p.overheadFrontOverride) setOverheadFrontOverride(p.overheadFrontOverride);
-      if (p.overheadMidOverride) setOverheadMidOverride(p.overheadMidOverride);
-      if (p.overheadRearOverride) setOverheadRearOverride(p.overheadRearOverride);
-      if (typeof p.useFrontGlobal === "boolean") setUseFrontGlobal(p.useFrontGlobal);
-      if (typeof p.useMidGlobal === "boolean") setUseMidGlobal(p.useMidGlobal);
-      if (typeof p.useRearGlobal === "boolean") setUseRearGlobal(p.useRearGlobal);
-      if (typeof p.aimFrontWidesAtMLP === "boolean") setAimFrontWidesAtMLP(p.aimFrontWidesAtMLP);
-      if (typeof p.aimSideSurroundsAtMLP === "boolean") setAimSideSurroundsAtMLP(p.aimSideSurroundsAtMLP);
-      if (typeof p.aimRearSurroundsAtMLP === "boolean") setAimRearSurroundsAtMLP(p.aimRearSurroundsAtMLP);
-      if (typeof p.lcrAimMode === "string") setLcrAimMode(p.lcrAimMode);
-      if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
-      if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
+
+      // FREE-USE GUARD: in free-use mode, never restore speaker/config state from autosave.
+      // Only room dims, screen, and seating are restored above.
+      if (!__isFreeUse) {
+        if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
+        // Restore sub configs explicitly (even if count = 0)
+        if (Object.prototype.hasOwnProperty.call(p, "frontSubsCfg")) {
+          setFrontSubsCfg(p.frontSubsCfg || {
+            model: "SUB2-12",
+            count: 0,
+            positions: [],
+            tuning: []
+          });
+        }
+        if (Object.prototype.hasOwnProperty.call(p, "rearSubsCfg")) {
+          setRearSubsCfg(p.rearSubsCfg || {
+            model: "SUB2-12",
+            count: 0,
+            positions: [],
+            tuning: []
+          });
+        }
+        if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
+        if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
+        if (p.globalSurroundModel) _setGlobalSurroundModel(stripSurroundSuffix(p.globalSurroundModel));
+        if (p.overheadGlobalModel) setOverheadGlobalModel(p.overheadGlobalModel);
+        if (p.overheadFrontOverride) setOverheadFrontOverride(p.overheadFrontOverride);
+        if (p.overheadMidOverride) setOverheadMidOverride(p.overheadMidOverride);
+        if (p.overheadRearOverride) setOverheadRearOverride(p.overheadRearOverride);
+        if (typeof p.useFrontGlobal === "boolean") setUseFrontGlobal(p.useFrontGlobal);
+        if (typeof p.useMidGlobal === "boolean") setUseMidGlobal(p.useMidGlobal);
+        if (typeof p.useRearGlobal === "boolean") setUseRearGlobal(p.useRearGlobal);
+        if (typeof p.aimFrontWidesAtMLP === "boolean") setAimFrontWidesAtMLP(p.aimFrontWidesAtMLP);
+        if (typeof p.aimSideSurroundsAtMLP === "boolean") setAimSideSurroundsAtMLP(p.aimSideSurroundsAtMLP);
+        if (typeof p.aimRearSurroundsAtMLP === "boolean") setAimRearSurroundsAtMLP(p.aimRearSurroundsAtMLP);
+        if (typeof p.lcrAimMode === "string") setLcrAimMode(p.lcrAimMode);
+        if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
+        if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
+      }
 
       setAutosaveMeta(getAutosaveMeta());
       
