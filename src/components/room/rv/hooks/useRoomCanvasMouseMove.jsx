@@ -66,9 +66,8 @@ export function useRoomCanvasMouseMove({
   }, [
     dragging, draggedItemId, dragType, dragState,
     setDragWarning, svgRef, canvasToRoom, roomToCanvas,
-    dragOffsetRoomRef, roomRect, placedSpeakers, onSetSpeakers,
-    constraintZones, centerX_m, screenCenterX_m, getCanonicalRole,
-    lastInteractionEpoch, handleSpeakerDrag, handleSeatDrag, handleSubDrag,
+    dragOffsetRoomRef, roomRect, placedSpeakers,
+    handleSpeakerDrag, handleSeatDrag, handleSubDrag,
     setDragState,
   ]);
 
