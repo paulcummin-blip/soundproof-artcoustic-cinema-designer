@@ -662,13 +662,21 @@ export default function RP22CompliancePanel({
 
       // Engine value if present
       if (res && res.status !== "no_data" && res.status !== "fail") {
-        if (res.formatted) return res.formatted;
         const v = res.value;
+
+        // P3 must always show a whole-speaker count, never the engine's preformatted decimal string
+        if (pid === 3 && v !== null && v !== undefined && typeof v === "number" && Number.isFinite(v)) {
+          const paramDef = RP22_PARAMS.find(p => p.id === pid);
+          const unit = paramDef?.unit || "";
+          return unit ? `${Math.round(v)} ${unit}` : String(Math.round(v));
+        }
+
+        if (res.formatted) return res.formatted;
+
         if (v !== null && v !== undefined) {
           if (typeof v === "number" && Number.isFinite(v)) {
             const paramDef = RP22_PARAMS.find(p => p.id === pid);
             const unit = paramDef?.unit || "";
-            if (pid === 3) return unit ? `${Math.round(v)} ${unit}` : String(Math.round(v));
             return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
           }
           return String(v);
