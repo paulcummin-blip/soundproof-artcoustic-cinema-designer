@@ -1226,7 +1226,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     aimState?.aimFrontWidesAtMLP,
     aimState?.aimSideSurroundsAtMLP,
     aimState?.aimRearSurroundsAtMLP,
-    p15ConstructionLevel
+    p15ConstructionLevel,
+    screen?.mountMode,
+    screen?.floatDepthM,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };
