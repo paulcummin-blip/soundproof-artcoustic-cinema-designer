@@ -29,12 +29,7 @@ export const isRenderableSpeaker = (speaker) => {
   const canon = getCanonicalRole(speaker.role);
   const ms = String(speaker?.model ?? '').trim().toLowerCase();
 
-  // Allow rear surrounds to render once positioned,
-  // even if model assignment lags one render
-  if (
-    (!ms || ms === 'off' || ms === 'none') &&
-    !['SBL', 'SBR'].includes(canon)
-  ) {
+  if (!ms || ms === 'off' || ms === 'none') {
     return false;
   }
 
