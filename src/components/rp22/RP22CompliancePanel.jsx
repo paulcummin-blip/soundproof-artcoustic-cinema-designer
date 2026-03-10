@@ -615,7 +615,10 @@ export default function RP22CompliancePanel({
 
       // Report-page fallback rules
       if (pid === 2 && p2SystemConfig) return p2SystemConfig.p2Level; // "L1".."L4"
-      if (pid === 3) return freeMoveLcr ? "FAIL" : "L4";
+      if (pid === 3) {
+        const p3 = analysisResult?.gradedParameters?.primary?.[3];
+        return (p3 && p3.status === "ok") ? p3.level : "—";
+      }
       if (pid === 8) return "L4";
       if (pid === 11) return "L4";
 
