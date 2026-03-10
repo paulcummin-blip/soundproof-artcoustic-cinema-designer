@@ -1,6 +1,4 @@
 import { useCallback } from "react";
-import { resolveSymmetricLCR } from "@/components/room/rv/utils/rvGeometry";
-import { timeNowMs } from "@/components/utils/timeNow";
 
 /**
  * useRoomCanvasMouseMove
