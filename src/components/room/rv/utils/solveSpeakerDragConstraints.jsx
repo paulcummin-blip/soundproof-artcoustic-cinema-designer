@@ -251,7 +251,7 @@ export function solveSpeakerDragConstraints({
     const leftLaneMax = lanes.left.maxX;
 
     const { x: proposedRoomX_m_slsr } = canvasToRoom(newCanvasPos);
-    const rawXL = (canonicalRole === 'SL')
+    const rawXL = (baseSide === 'SL')
       ? proposedRoomX_m_slsr
       : (W - proposedRoomX_m_slsr);
 

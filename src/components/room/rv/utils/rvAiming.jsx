@@ -124,8 +124,18 @@ export function getPlanAimDeg(
       return 90;
     }
 
-    default:
+    // ── Extra side surrounds (SL2/SR2, SL3/SR3…) ──────────────────────────
+    default: {
+      if (/^SL\d+$/.test(role)) {
+        if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
+        return 90;
+      }
+      if (/^SR\d+$/.test(role)) {
+        if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
+        return -90;
+      }
       return 0;
+    }
   }
 }
 
