@@ -107,7 +107,7 @@ export default function RvMlpRuler(props) {
         x1={mlpX_px}
         y1={screenY_px}
         x2={mlpX_px}
-        y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+        y2={mlpY_px}
         stroke={rulerColor}
         strokeWidth={rulerStroke}
         opacity={0.6}
