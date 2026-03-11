@@ -85,7 +85,7 @@ export function useScreenPlane({
   const screenPlaneY = useActualScreenFrontY({
     effectiveMinScreenDepthM,
     screenFloatDepthM: screen?.floatDepthM,
-    screenPlaneMode: 'autoTight' // Not passed in, assume default
+    screenPlaneMode: 'default', // use max(floatDepth, speakerClearance) — never ignore float depth
   });
 
   // Define ZONE_DEPTH_M from live screen plane (component scope)
