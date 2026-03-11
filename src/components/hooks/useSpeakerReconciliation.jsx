@@ -161,9 +161,10 @@ export function useSpeakerReconciliation({
     const currentRolesSet = new Set((Array.isArray(placedSpeakers) ? placedSpeakers : []).map((s) => safeCanon(s?.role)));
     const expectedRolesSet = new Set((Array.isArray(expectedRoles) ? expectedRoles : []).map((r) => safeCanon(r)));
 
-    // Check if current roles match expected roles
-    const hasCorrectRoles = currentRolesSet.size === expectedRolesSet.size &&
-    [...expectedRolesSet].every((role) => currentRolesSet.has(role));
+    // Check if current roles match expected roles — strip numbered extra surrounds before comparing
+    const baseRoleSet = new Set([...currentRolesSet].filter(r => !/^(SL|SR)\d+$/.test(r)));
+    const hasCorrectRoles = baseRoleSet.size === expectedRolesSet.size &&
+    [...expectedRolesSet].every((role) => baseRoleSet.has(role));
 
     if (globalThis.__B44_LOGS) console.log(
       "[RD RECON] expectedRoles =",
