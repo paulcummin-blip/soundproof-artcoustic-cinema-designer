@@ -56,6 +56,11 @@ export function solveSpeakerDragConstraints({
   // room
   widthM,
   lengthM,
+  // aiming flags — for yaw-aware wall projection
+  aimFrontWidesAtMLP = false,
+  aimSideSurroundsAtMLP = false,
+  aimRearSurroundsAtMLP = false,
+  lcrAngleInfo = null,
   // context
   placedSpeakers,
   seatingPositions,
