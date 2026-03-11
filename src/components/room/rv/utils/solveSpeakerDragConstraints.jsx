@@ -12,6 +12,7 @@
  */
 
 import { sideWallX, rearWallY, OVERHEAD_PAIR_MAP } from "@/components/room/rv/utils/rvGeometry";
+import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
 
 // ─── small local helpers ───────────────────────────────────────────────────
 

@@ -60,6 +60,11 @@ export function useSpeakerDragUpdate({
   clamp,
   isDraggable,
   isRenderableSpeaker,
+  // aiming flags — needed for yaw-aware wall projection in drag solver
+  aimFrontWidesAtMLP = false,
+  aimSideSurroundsAtMLP = false,
+  aimRearSurroundsAtMLP = false,
+  lcrAngleInfo = null,
   // constants
   CORNER_CLEAR_M,
   BACKWALL_HYSTERESIS_M,

@@ -999,6 +999,7 @@ const byId = useEntitiesById({
     clampOverheadXToSeatSpan, nonCrossingClampDirectional, fwDeviationLevel,
     horizontalAngleFromMLP, isOnSideWall, speakerOnWallYFootprint, clamp,
     isDraggable, isRenderableSpeaker,
+    aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, lcrAngleInfo,
     CORNER_CLEAR_M, BACKWALL_HYSTERESIS_M, SURROUND_WALL_GAP_M, SIDE_ALLOW_OVERHANG,
     WALL_BUFFER_M, EPS, timeNowMs,
   });
