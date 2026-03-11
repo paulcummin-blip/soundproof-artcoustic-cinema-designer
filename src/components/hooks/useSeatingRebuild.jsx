@@ -89,7 +89,20 @@ export function useSeatingRebuild({
     }
 
     // Guard: preserve Free Use starter seating written by useProjectLoader on first scratch load
-    // Only skips if the user has not yet changed seating controls
+    // Only skips if the user has not yet changed seating controls AND seats already match current centers
+    const rowsAlreadyMatchCurrentCenters = (() => {
+      if (!Array.isArray(appState?.rowCentersM) || appState.rowCentersM.length === 0) return false;
+      if (!currentSeats.length) return false;
+      const byRow = {};
+      currentSeats.forEach(s => {
+        const r = (s.rowNumber ?? 1) - 1;
+        if (byRow[r] === undefined) byRow[r] = s.y;
+      });
+      return appState.rowCentersM.every((centerY, i) => {
+        if (byRow[i] === undefined) return false;
+        return Math.abs(byRow[i] - centerY) <= 0.001;
+      });
+    })();
     if (
       loadState?.phase === "scratch" &&
       !hasProjectId &&
@@ -97,7 +110,8 @@ export function useSeatingRebuild({
       !userHasChangedSeatingSinceLoad &&
       currentSeats.length > 0 &&
       Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length > 0 &&
-      Number.isFinite(appState?.mlpY_m)
+      Number.isFinite(appState?.mlpY_m) &&
+      rowsAlreadyMatchCurrentCenters
     ) {
       return;
     }
