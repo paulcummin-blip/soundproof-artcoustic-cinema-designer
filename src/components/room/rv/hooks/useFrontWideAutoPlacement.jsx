@@ -61,12 +61,17 @@ export function useFrontWideAutoPlacement({
         if (!zone || !zone.medianY) return s;
 
         const dims = getModelDimsM(s.model);
-        const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
         const halfWidth = (Number(dims?.widthM) || 0.20) / 2;
+        const spkYaw = s.yaw ?? s.rotationDeg ?? s.rotation_deg ?? null;
+        const halfExtent = xHalfExtentSideWall(
+          Number(dims?.depthM) || 0.082,
+          Number(dims?.widthM) || 0.20,
+          spkYaw ?? 0
+        );
 
         const xAtWall = role === "LW"
-          ? (WALL_BUFFER_FW + halfDepth)
-          : (W - WALL_BUFFER_FW - halfDepth);
+          ? (WALL_BUFFER_FW + halfExtent)
+          : (W - WALL_BUFFER_FW - halfExtent);
 
         const sideOffsetKey = role === "LW" ? "L" : "R";
         const currentOffset = fwOffsetRef.current[sideOffsetKey] || 0;
