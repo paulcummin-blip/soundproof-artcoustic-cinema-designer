@@ -441,7 +441,10 @@ export function useSpeakerReconciliation({
           }
         }
 
-        let nextList = [...nextBed, ...nextOverheads];
+        // Preserve extra surrounds (SL2/SR2/SL3/SR3…) — reconciliation must never delete them
+        const extraSurrounds = (prev || []).filter(s => /^(SL|SR)\d+$/.test(safeCanon(s.role)));
+
+        let nextList = [...nextBed, ...nextOverheads, ...extraSurrounds];
 
         if (globalThis.__B44_LOGS) debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
         if (globalThis.__B44_LOGS) console.log("[RD] RECONCILE nextList:", nextList.map((s) => s.role));
