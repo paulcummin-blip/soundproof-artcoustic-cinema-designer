@@ -70,22 +70,36 @@ export function useAutoHugSurroundsToWalls({
         // Get speaker icon dimensions
         const dims = getModelDimsM(spk.model);
 
+        // Compute the live yaw exactly as the renderer does — this accounts for
+        // "aim at MLP" mode and produces the correct rotated half-extent.
+        const liveYaw = getPlanAimDeg(
+          spk,
+          mlp || null,
+          W,
+          L,
+          false,              // aimLeftRightAtMLP — only for LCR, not used here
+          aimFrontWidesAtMLP || false,
+          aimSideSurroundsAtMLP || false,
+          aimRearSurroundsAtMLP || false,
+          lcrAngleInfo || null,
+        );
+
         let targetX = spk.position.x; // Default: keep current X
         let targetY = spk.position.y; // Default: keep current Y
 
-        // Side wall speakers: snap X to wall, and Y to span midpoint
+        // Side wall speakers: snap X to wall using live yaw, and Y to span midpoint
         if (isSideSurround || isFrontWide) {
           const isLeft = canon.startsWith('SL') || canon === 'LW';
-          targetX = sideWallX(W, dims, isLeft ? 'L' : 'R');
+          targetX = sideWallX(W, dims, isLeft ? 'L' : 'R', liveYaw);
           // For SL/SR only: also snap Y to the canonical midpoint (not seed position)
           if (isSideSurround) {
             targetY = sideSurroundDefaultY;
           }
         }
 
-        // Rear wall speakers: icon edge 1cm from wall
+        // Rear wall speakers: icon edge 1cm from wall, using live yaw
         if (isRearSurround) {
-          targetY = rearWallY(L, dims);
+          targetY = rearWallY(L, dims, liveYaw);
         }
 
         const currentX = Number(spk.position.x) || 0;
