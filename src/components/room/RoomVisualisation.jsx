@@ -1241,6 +1241,11 @@ useEffect(() => {
     getCanonicalRole,
     getModelDimsM,
     sideSurroundVisualSpanM,
+    mlp,
+    aimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP,
+    aimFrontWidesAtMLP,
+    lcrAngleInfo,
   });
 
   // [FC_CENTERLINE_LOCK] — Enforce FC always at room centerline
