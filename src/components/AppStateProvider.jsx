@@ -5,6 +5,7 @@ import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 // --- SEATING POSITIONS NORMALISER ---
 const normaliseSeatingPositions = (seats, roomDims) => {
