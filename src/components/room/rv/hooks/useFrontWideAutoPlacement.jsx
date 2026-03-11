@@ -134,5 +134,8 @@ export function useFrontWideAutoPlacement({
     fwOffsetRef,
     clamp,
     SIDE_ALLOW_OVERHANG,
+    mlp,
+    aimFrontWidesAtMLP,
+    lcrAngleInfo,
   ]);
 }
