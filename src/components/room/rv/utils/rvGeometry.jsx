@@ -180,7 +180,7 @@ export function computeMinimumScreenDepthM({
   let maxDepth = 0;
 
   for (const obj of frontObjects) {
-    const dims = getDims(obj);
+    const dims = getDims(obj?.model);
     if (!dims) continue;
 
     const { depthM = 0.082, widthM = 0.082 } = dims;
