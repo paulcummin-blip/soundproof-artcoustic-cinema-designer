@@ -381,8 +381,17 @@ function RoomDesignerWithState() {
     lastScreenWidthForMlpRef.current = screenVisibleWidthInchesEffective;
 
     // Also bypass the guard when the live screen plane has moved (e.g. front speaker clearance)
-    const screenPlaneChanged = lastScreenFrontPlaneForMlpRef.current !== null &&
-      Math.abs(lastScreenFrontPlaneForMlpRef.current - screenFrontPlaneM) > 0.005; // 5mm threshold
+    // On first load (ref is null), treat it as changed if real plane differs from fallback
+    const fallbackScreenPlaneM =
+      (Number.isFinite(Number(_screen?.screenPlaneY_m)) && Number(_screen?.screenPlaneY_m) > 0)
+        ? Number(_screen?.screenPlaneY_m)
+        : Number(_screen?.floatDepthM) || 0.20;
+
+    const screenPlaneChanged =
+      lastScreenFrontPlaneForMlpRef.current === null
+        ? Math.abs(screenFrontPlaneM - fallbackScreenPlaneM) > 0.005
+        : Math.abs(lastScreenFrontPlaneForMlpRef.current - screenFrontPlaneM) > 0.005; // 5mm threshold
+
     lastScreenFrontPlaneForMlpRef.current = screenFrontPlaneM;
 
     if (
