@@ -185,7 +185,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const widthM  = Number(appState?.roomDims?.widthM)  || 4.5;
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
-  const screenFrontPlaneM = Number(appState?.screenFrontPlaneM ?? 0);
   const getSpeakerVisibility = appState?.getSpeakerVisibility || (() => true);
 
   const speakersEpoch = appState?.speakersEpoch || 0;
