@@ -1,11 +1,16 @@
 import { useEffect } from "react";
 import { sideWallX, rearWallY } from "@/components/room/rv/utils/rvGeometry";
+import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
 
 /**
  * useAutoHugSurroundsToWalls
  * Auto-hugs wall-mounted surround speakers (SL/SR/LW/RW/SBL/SBR) to their
  * respective walls whenever room dimensions or speaker list changes.
  * Respects the drag guard and user-positioned lock.
+ *
+ * Uses the same live yaw as the renderer (getPlanAimDeg) to compute the
+ * rotated half-extent toward the wall, preventing any aimed speaker from
+ * visually crossing the wall boundary.
  */
 export function useAutoHugSurroundsToWalls({
   placedSpeakers,
@@ -16,6 +21,12 @@ export function useAutoHugSurroundsToWalls({
   getCanonicalRole,
   getModelDimsM,
   sideSurroundVisualSpanM, // optional: {minY, maxY} from useRoomGeometry
+  // Aiming props — same values used by RvSpeakerLayer / getPlanAimDeg
+  mlp,
+  aimSideSurroundsAtMLP,
+  aimRearSurroundsAtMLP,
+  aimFrontWidesAtMLP,
+  lcrAngleInfo,
 }) {
   useEffect(() => {
     if (isAnyDraggingRef.current) return;
