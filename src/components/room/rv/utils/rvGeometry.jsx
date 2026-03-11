@@ -13,20 +13,23 @@ const WALL_BUFFER_M = 0.01; // min gap between screen face and speaker face
 // ─── Wall-position helpers ────────────────────────────────────────────────────
 
 /**
- * Returns the X position of a side-wall speaker, accounting for speaker depth
- * and the mandatory wall gap.
+ * Returns the X position of a side-wall speaker so its rotated footprint
+ * stays at least SURROUND_WALL_GAP_M from the wall.
  *
- * @param {number} roomWidth  - room width in metres
- * @param {{ depthM?: number, widthM?: number }|null|undefined} dims - speaker dims
- * @param {'left'|'right'} side
+ * @param {number} roomWidth
+ * @param {{ depthM?: number, widthM?: number }|null|undefined} dims
+ * @param {'left'|'right'|'L'|'R'} side
+ * @param {number} [yawDeg=90] - live yaw from the renderer (default 90 = wall-flat)
  * @returns {number}
  */
-export function sideWallX(roomWidth, dims, side) {
-  const halfDepth = (dims?.depthM ?? 0.082) / 2;
+export function sideWallX(roomWidth, dims, side, yawDeg = 90) {
+  const depthM = dims?.depthM ?? 0.082;
+  const widthM = dims?.widthM ?? 0.27;
+  const halfX = xHalfExtentM(depthM, widthM, yawDeg);
   if (side === 'left' || side === 'L') {
-    return halfDepth + SURROUND_WALL_GAP_M;
+    return halfX + SURROUND_WALL_GAP_M;
   }
-  return roomWidth - halfDepth - SURROUND_WALL_GAP_M;
+  return roomWidth - halfX - SURROUND_WALL_GAP_M;
 }
 
 /** Alias kept for callers that use fixedSideX */
