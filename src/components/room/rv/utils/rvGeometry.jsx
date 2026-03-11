@@ -21,12 +21,25 @@ const WALL_BUFFER_M = 0.01; // min gap between screen face and speaker face
  * @param {'left'|'right'} side
  * @returns {number}
  */
-export function sideWallX(roomWidth, dims, side) {
-  const halfDepth = (dims?.depthM ?? 0.082) / 2;
+/**
+ * Half-extent of a rotated rectangular speaker along the wall-normal (X) axis.
+ * For a side-wall speaker, this is the clearance dimension in room-X.
+ * At yaw=90° (natural side orientation, depth into room) → returns halfDepth.
+ */
+export function xHalfExtentSideWall(depthM, widthM, yawDeg) {
+  const rad = (yawDeg || 0) * Math.PI / 180;
+  return (widthM * Math.abs(Math.cos(rad)) + depthM * Math.abs(Math.sin(rad))) / 2;
+}
+
+export function sideWallX(roomWidth, dims, side, yawDeg) {
+  const d = dims?.depthM ?? 0.082;
+  const halfExtent = (yawDeg != null)
+    ? xHalfExtentSideWall(d, dims?.widthM ?? 0.27, yawDeg)
+    : d / 2;
   if (side === 'left' || side === 'L') {
-    return halfDepth + SURROUND_WALL_GAP_M;
+    return halfExtent + SURROUND_WALL_GAP_M;
   }
-  return roomWidth - halfDepth - SURROUND_WALL_GAP_M;
+  return roomWidth - halfExtent - SURROUND_WALL_GAP_M;
 }
 
 /** Alias kept for callers that use fixedSideX */
@@ -39,9 +52,13 @@ export const fixedSideX = sideWallX;
  * @param {{ depthM?: number }|null|undefined} dims
  * @returns {number}
  */
-export function rearWallY(roomLength, dims) {
-  const halfDepth = (dims?.depthM ?? 0.082) / 2;
-  return roomLength - halfDepth - SURROUND_WALL_GAP_M;
+export function rearWallY(roomLength, dims, yawDeg) {
+  const d = dims?.depthM ?? 0.082;
+  if (yawDeg == null) return roomLength - d / 2 - SURROUND_WALL_GAP_M;
+  const w = dims?.widthM ?? 0.27;
+  const rad = (yawDeg || 0) * Math.PI / 180;
+  const halfExtent = (d * Math.abs(Math.cos(rad)) + w * Math.abs(Math.sin(rad))) / 2;
+  return roomLength - halfExtent - SURROUND_WALL_GAP_M;
 }
 
 // ─── Overhead pair map ────────────────────────────────────────────────────────
