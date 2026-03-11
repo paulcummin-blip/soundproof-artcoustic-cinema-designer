@@ -62,10 +62,13 @@ export function useAutoHugSurroundsToWalls({
         let targetX = spk.position.x; // Default: keep current X
         let targetY = spk.position.y; // Default: keep current Y
 
+        // Resolve stored yaw (handles rotationDeg / yaw / rotation_deg)
+        const spkYaw = spk.yaw ?? spk.rotationDeg ?? spk.rotation_deg ?? null;
+
         // Side wall speakers: snap X to wall, and Y to span midpoint
         if (isSideSurround || isFrontWide) {
           const isLeft = canon.startsWith('SL') || canon === 'LW';
-          targetX = sideWallX(W, dims, isLeft ? 'L' : 'R');
+          targetX = sideWallX(W, dims, isLeft ? 'L' : 'R', spkYaw);
           // For SL/SR only: also snap Y to the canonical midpoint (not seed position)
           if (isSideSurround) {
             targetY = sideSurroundDefaultY;
@@ -74,7 +77,7 @@ export function useAutoHugSurroundsToWalls({
 
         // Rear wall speakers: icon edge 1cm from wall
         if (isRearSurround) {
-          targetY = rearWallY(L, dims);
+          targetY = rearWallY(L, dims, spkYaw);
         }
 
         const currentX = Number(spk.position.x) || 0;
