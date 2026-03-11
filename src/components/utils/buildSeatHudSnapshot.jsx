@@ -164,14 +164,16 @@ export function buildSeatHudSnapshot({
     distanceToMLP = Math.hypot(dx, dy);
   }
 
-  // RP23 horizontal viewing angle
+  // RP23 horizontal viewing angle — always at RSP/MLP position (single source of truth, matches ViewingAnglePanel)
   let rp23AngleDeg = null;
   let rp23Level = null;
   let rp23DisplayDeg = null; // Floored integer for display
-  if (screen?.visibleWidthInches && distanceToScreen > 0.1) {
+  const rp23ViewerY = Number.isFinite(mlp?.y) ? mlp.y : seatY;
+  const rp23ScreenDistance = Math.abs(rp23ViewerY - screenFrontPlaneM);
+  if (screen?.visibleWidthInches && rp23ScreenDistance > 0.1) {
     const screenWidthM = (screen.visibleWidthInches * 0.0254) || 0;
     if (screenWidthM > 0) {
-      rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
+      rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / rp23ScreenDistance) * (180 / Math.PI);
       rp23DisplayDeg = Math.floor(rp23AngleDeg);
       
       if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
