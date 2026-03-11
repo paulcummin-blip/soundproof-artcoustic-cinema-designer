@@ -384,11 +384,16 @@ function RoomDesignerWithState() {
 
     // First-load scratch guard: if starter mlpY_m is already written and user hasn't
     // changed seating yet, don't overwrite the clean starter anchor on first pass.
+    // EXCEPTION: always re-run when the screen width has changed so MLP tracks 57.5°.
     const hasProjectId = resolvedProjectId || projectIdState;
+    const screenWidthChanged = lastScreenWidthForMlpRef.current !== null &&
+      Math.abs(lastScreenWidthForMlpRef.current - screenVisibleWidthInchesEffective) > 0.01;
+    lastScreenWidthForMlpRef.current = screenVisibleWidthInchesEffective;
     if (
       loadState?.phase === "scratch" &&
       !hasProjectId &&
       seatingConfigEpoch === 0 &&
+      !screenWidthChanged &&
       Number.isFinite(appState?.mlpY_m) &&
       Array.isArray(appState?.seatingPositions) && appState.seatingPositions.length > 0
     ) {
