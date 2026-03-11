@@ -119,5 +119,6 @@ export function useAutoHugSurroundsToWalls({
 
       return changed ? next : prev;
     });
-  }, [widthM, lengthM, placedSpeakers, onSetSpeakers, getModelDimsM, getCanonicalRole]);
+  }, [widthM, lengthM, placedSpeakers, onSetSpeakers, getModelDimsM, getCanonicalRole,
+      mlp, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, aimFrontWidesAtMLP, lcrAngleInfo]);
 }
