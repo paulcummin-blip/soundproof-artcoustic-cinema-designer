@@ -716,8 +716,16 @@ function useDesignerState() {
 
     const slY = Number.isFinite(slSpeaker?.position?.y) ? slSpeaker.position.y : null;
     const srY = Number.isFinite(srSpeaker?.position?.y) ? srSpeaker.position.y : null;
-    const slX = Number.isFinite(slSpeaker?.position?.x) ? slSpeaker.position.x : WALL_BUFFER_M;
-    const srX = Number.isFinite(srSpeaker?.position?.x) ? srSpeaker.position.x : (Number(roomDims?.widthM) || 4.5) - WALL_BUFFER_M;
+    // Compute wall-hugging X the same way sideWallX() does: halfDepth + WALL_BUFFER_M from each wall.
+    // Fall back to the base SL/SR X if already placed, otherwise compute from model dims.
+    const _extraModel = globalSurroundModel && globalSurroundModel !== 'off' ? globalSurroundModel : null;
+    const _extraMeta = _extraModel ? getSpeakerModelMeta(_extraModel) : null;
+    const _extraHalfDepth = _extraMeta?.depthM ? _extraMeta.depthM / 2 : 0.041; // default ~EVOLVE 2-1 half-depth
+    const _roomW = Number(roomDims?.widthM) || 4.5;
+    const _computedSlX = WALL_BUFFER_M + _extraHalfDepth;
+    const _computedSrX = _roomW - WALL_BUFFER_M - _extraHalfDepth;
+    const slX = Number.isFinite(slSpeaker?.position?.x) ? slSpeaker.position.x : _computedSlX;
+    const srX = Number.isFinite(srSpeaker?.position?.x) ? srSpeaker.position.x : _computedSrX;
 
     // Inject extra speakers directly into placedSpeakers array
     setSpeakerSystem(prev => {
