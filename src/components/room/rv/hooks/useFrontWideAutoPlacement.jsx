@@ -1,6 +1,11 @@
 import { useEffect } from "react";
 import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
-import { xHalfExtentM } from "@/components/room/rv/utils/rvGeometry";
+
+// Inline projection helper (avoids cross-file extension ambiguity)
+function xHalfExtentM(depthM, widthM, yawDeg) {
+  const rad = (yawDeg * Math.PI) / 180;
+  return (depthM * Math.abs(Math.sin(rad)) + widthM * Math.abs(Math.cos(rad))) / 2;
+}
 
 /**
  * useFrontWideAutoPlacement
