@@ -17,12 +17,19 @@ export default function ViewingAnglePanel({
   onShowMlpRulerChange
 }) {
   // Pull derived MLP from app state
-  const { mlpY_m } = useAppState() || {};
+  const { mlpY_m, screenFrontPlaneM: appScreenFrontPlaneM } = useAppState() || {};
 
-  // Use floatDepthM as the screen image face Y (0 for baffle mount, 0.2/0.3 for floating).
-  // This is the correct reference for viewing distance — the visible screen surface, not
-  // the RV canvas's inner geometry reference plane (appState.screenFrontPlaneM).
-  const screenFrontPlaneM = Number(screen?.floatDepthM ?? 0);
+  // Use the published final screen front plane first.
+  // Priority:
+  // 1) appState.screenFrontPlaneM
+  // 2) screen.screenPlaneY_m
+  // 3) screen.floatDepthM
+  // 4) 0
+  const screenFrontPlaneM = Number.isFinite(Number(appScreenFrontPlaneM))
+    ? Number(appScreenFrontPlaneM)
+    : Number.isFinite(Number(screen?.screenPlaneY_m))
+      ? Number(screen.screenPlaneY_m)
+      : Number(screen?.floatDepthM ?? 0);
 
   const rp23Data = useMemo(() => {
     // Derive effective viewer Y: prefer the visible RSP/primary-seat override,
