@@ -147,6 +147,7 @@ function RoomDesignerWithState() {
   const visualisationRef = React.useRef(null);
   const didUserRequestResetRef = useRef(false);
   const lastScreenWidthForMlpRef = useRef(null);
+  const lastScreenFrontPlaneForMlpRef = useRef(null);
 
   // NEW: Seating config epoch tracking for loaded projects
   const [seatingConfigEpoch, setSeatingConfigEpoch] = useState(0);
@@ -389,11 +390,18 @@ function RoomDesignerWithState() {
     const screenWidthChanged = lastScreenWidthForMlpRef.current !== null &&
       Math.abs(lastScreenWidthForMlpRef.current - screenVisibleWidthInchesEffective) > 0.01;
     lastScreenWidthForMlpRef.current = screenVisibleWidthInchesEffective;
+
+    // Also bypass the guard when the live screen plane has moved (e.g. front speaker clearance)
+    const screenPlaneChanged = lastScreenFrontPlaneForMlpRef.current !== null &&
+      Math.abs(lastScreenFrontPlaneForMlpRef.current - screenFrontPlaneM) > 0.005; // 5mm threshold
+    lastScreenFrontPlaneForMlpRef.current = screenFrontPlaneM;
+
     if (
       loadState?.phase === "scratch" &&
       !hasProjectId &&
       seatingConfigEpoch === 0 &&
       !screenWidthChanged &&
+      !screenPlaneChanged &&
       Number.isFinite(appState?.mlpY_m) &&
       Array.isArray(appState?.seatingPositions) && appState.seatingPositions.length > 0
     ) {
