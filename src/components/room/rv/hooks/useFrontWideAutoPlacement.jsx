@@ -44,7 +44,6 @@ export function useFrontWideAutoPlacement({
 
     const W = widthM || 4.5;
     const L = lengthM || 6.0;
-    const WALL_BUFFER_FW = 0.02;
 
     // [FIX] Settle tolerance to prevent flicker (1mm)
     const POS_TOL = 0.001;
