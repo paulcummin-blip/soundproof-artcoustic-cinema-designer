@@ -767,23 +767,23 @@ function useDesignerState() {
         const existingSL = existing.find(s => String(s.role).toUpperCase() === roleSL);
         const existingSR = existing.find(s => String(s.role).toUpperCase() === roleSR);
         
-        // SL speaker (left) - reuse if exists, otherwise create new
+        // SL speaker (left) - reuse if exists, otherwise create new (always spawn on side wall)
         nextExtras.push(existingSL ? { ...existingSL } : {
           id: `${roleSL.toLowerCase()}-${timeNowMs() + pairIndex * 2}`,
           role: roleSL,
           model: modelKey && modelKey !== 'off' ? modelKey : undefined,
-          position: { x: slX, y: baseY, z: 1.2 },
+          position: { x: _computedSlX, y: baseY, z: 1.2 },
           rotation: { x: 0, y: 0, z: 0 },
           draggable: true,
           positionSource: 'auto',
         });
         
-        // SR speaker (right) - reuse if exists, otherwise create new
+        // SR speaker (right) - reuse if exists, otherwise create new (always spawn on side wall)
         nextExtras.push(existingSR ? { ...existingSR } : {
           id: `${roleSR.toLowerCase()}-${timeNowMs() + pairIndex * 2 + 1}`,
           role: roleSR,
           model: modelKey && modelKey !== 'off' ? modelKey : undefined,
-          position: { x: srX, y: baseY, z: 1.2 },
+          position: { x: _computedSrX, y: baseY, z: 1.2 },
           rotation: { x: 0, y: 0, z: 0 },
           draggable: true,
           positionSource: 'auto',
