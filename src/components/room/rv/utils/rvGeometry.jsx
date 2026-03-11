@@ -115,19 +115,33 @@ export function resolveSymmetricLCR({ desiredX, isLeft, screenCenterX, leftZone,
 
 /**
  * Half the Y extent of a speaker box projected onto the room-Y axis at yawDeg.
- * Used to compute how far forward from the screen wall a speaker front face sits.
- *
- * @param {number} depthM  - speaker depth dimension (front-to-back in metres)
- * @param {number} widthM  - speaker width dimension (left-to-right in metres)
- * @param {number} yawDeg  - rotation around vertical axis (0° = facing front)
- * @returns {number}
+ * (0° = facing front wall; 90° = facing right wall)
  */
 function yHalfExtentM(depthM, widthM, yawDeg) {
   const rad = (yawDeg * Math.PI) / 180;
   const cosA = Math.abs(Math.cos(rad));
   const sinA = Math.abs(Math.sin(rad));
-  // Half-extents along Y axis = depth projected + width projected
   return (depthM * cosA + widthM * sinA) / 2;
+}
+
+/**
+ * Half the X extent of a speaker box projected onto the room-X axis at yawDeg.
+ * Used to compute how far a rotated speaker protrudes toward a side wall.
+ *
+ * At yaw=90° (wall-flat, facing into room) this equals depthM/2 — matching
+ * the old halfDepth calculation, so existing callers are unaffected.
+ *
+ * @param {number} depthM
+ * @param {number} widthM
+ * @param {number} yawDeg - 0° = facing front, 90° = facing right (wall-flat on left wall)
+ * @returns {number}
+ */
+function xHalfExtentM(depthM, widthM, yawDeg) {
+  const rad = (yawDeg * Math.PI) / 180;
+  const cosA = Math.abs(Math.cos(rad));
+  const sinA = Math.abs(Math.sin(rad));
+  // X projection is the complement of Y projection: sin↔cos swapped
+  return (depthM * sinA + widthM * cosA) / 2;
 }
 
 /**
