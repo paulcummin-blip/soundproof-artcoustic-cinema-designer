@@ -143,37 +143,53 @@ export default function ProjectsPage() {
         
         if (mounted) {
           // Map to the format expected by the UI
-          const mapped = (projectList || []).map(p => ({
-            id: p.id,
-            name: p.name || "Untitled Project",
-            client: p.client_name || "",
-            status: p.project_status || "Prospective",
-            roomLength: p.room_length || null,
-            roomWidth: p.room_width || null,
-            roomHeight: p.room_height || null,
-            dolby_config: p.dolby_config || null,
-            target_spl: p.target_spl ?? null,
-            amplifier_power: p.amplifier_power ?? null,
-            notes: p.notes || "",
-            createdAt: Number.isFinite(new Date(p.created_date).getTime())
-              ? new Date(p.created_date).getTime()
-              : Date.now(),
-            // Optional fields for display
-            lcrModel: (() => {
-              const obj = safeJson(p.selected_speakers_by_role);
-              if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
-              return (obj.L && obj.L.model) || (obj.FL && obj.FL.model) || null;
-            })(),
-            surroundModel: null,
-            heightModel: null,
-            subModel: null,
-            subCount: null,
-            screenSizeInches: p.screen_size || null,
-            seats: (() => {
-              const arr = safeJson(p.seating_positions);
-              return Array.isArray(arr) ? arr.length : null;
-            })(),
-          }));
+          const mapped = (projectList || []).map(p => {
+            try {
+              return {
+                id: p.id,
+                name: p.name || "Untitled Project",
+                client: p.client_name || "",
+                status: p.project_status || "Prospective",
+                roomLength: p.room_length || null,
+                roomWidth: p.room_width || null,
+                roomHeight: p.room_height || null,
+                dolby_config: p.dolby_config || null,
+                target_spl: p.target_spl ?? null,
+                amplifier_power: p.amplifier_power ?? null,
+                notes: p.notes || "",
+                createdAt: Number.isFinite(new Date(p.created_date).getTime())
+                  ? new Date(p.created_date).getTime()
+                  : Date.now(),
+                lcrModel: (() => {
+                  try {
+                    const obj = safeJson(p.selected_speakers_by_role);
+                    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+                    return (obj.L && obj.L.model) || (obj.FL && obj.FL.model) || null;
+                  } catch (_e) { return null; }
+                })(),
+                surroundModel: null,
+                heightModel: null,
+                subModel: null,
+                subCount: null,
+                screenSizeInches: p.screen_size || null,
+                seats: (() => {
+                  try {
+                    const arr = safeJson(p.seating_positions);
+                    return Array.isArray(arr) ? arr.length : null;
+                  } catch (_e) { return null; }
+                })(),
+              };
+            } catch (mapErr) {
+              console.warn('[Projects] Failed to map project:', p?.id, mapErr);
+              return {
+                id: p.id,
+                name: p.name || "Untitled Project",
+                client: p.client_name || "",
+                status: p.project_status || "Prospective",
+                createdAt: Date.now(),
+              };
+            }
+          });
           
           setProjects(mapped);
           setLoading(false);
