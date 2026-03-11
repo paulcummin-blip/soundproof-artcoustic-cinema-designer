@@ -109,59 +109,85 @@ export default function RvMlpRuler(props) {
         {distRightWall.toFixed(2)}m
       </text>
 
-      {/* Vertical ruler (screen ↔ MLP ↔ back wall) */}
+      {/* ── CENTRE: Screen → RSP ruler (unchanged) ── */}
       <line
-        x1={mlpX_px}
+        x1={rulerX_screen}
         y1={screenY_px}
-        x2={mlpX_px}
+        x2={rulerX_screen}
         y2={mlpY_px}
         stroke={rulerColor}
         strokeWidth={rulerStroke}
         opacity={0.6}
       />
-      
       {/* Screen plane dot */}
-      <circle
-        cx={mlpX_px}
-        cy={screenY_px}
-        r={dotRadius}
-        fill={rulerColor}
-        opacity={0.8}
-      />
-      
-      {/* Back wall dot */}
-      <circle
-        cx={mlpX_px}
-        cy={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
-        r={dotRadius}
-        fill={rulerColor}
-        opacity={0.8}
-      />
-      
-      {/* Screen → MLP distance label (rotated, left side) */}
+      <circle cx={rulerX_screen} cy={screenY_px} r={dotRadius} fill={rulerColor} opacity={0.8} />
+      {/* RSP dot (centre) */}
+      <circle cx={rulerX_screen} cy={mlpY_px} r={dotRadius} fill={rulerColor} opacity={0.8} />
+      {/* Screen → RSP label */}
       <text
-        x={mlpX_px - labelOffset}
+        x={rulerX_screen - labelOffset}
         y={(screenY_px + mlpY_px) / 2}
         textAnchor="middle"
         fontSize={fontSize}
         fill={rulerColor}
         fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
-        transform={`rotate(-90 ${mlpX_px - labelOffset} ${(screenY_px + mlpY_px) / 2})`}
+        transform={`rotate(-90 ${rulerX_screen - labelOffset} ${(screenY_px + mlpY_px) / 2})`}
       >
         {distScreen.toFixed(2)}m
       </text>
-      
-      {/* MLP → Back wall distance label (rotated, right side) */}
+
+      {/* ── LEFT: Front wall → RSP ruler ── */}
+      <line
+        x1={rulerX_frontWall}
+        y1={frontWallY_px}
+        x2={rulerX_frontWall}
+        y2={mlpY_px}
+        stroke={rulerColor}
+        strokeWidth={rulerStroke}
+        opacity={0.6}
+      />
+      {/* Front wall dot */}
+      <circle cx={rulerX_frontWall} cy={frontWallY_px} r={dotRadius} fill={rulerColor} opacity={0.8} />
+      {/* RSP dot (left) */}
+      <circle cx={rulerX_frontWall} cy={mlpY_px} r={dotRadius} fill={rulerColor} opacity={0.8} />
+      {/* Front wall → RSP label */}
       <text
-        x={mlpX_px + labelOffset}
-        y={(mlpY_px + (roomRect?.y ?? 0) + (roomRect?.height ?? 0)) / 2}
+        x={rulerX_frontWall - labelOffset}
+        y={(frontWallY_px + mlpY_px) / 2}
         textAnchor="middle"
         fontSize={fontSize}
         fill={rulerColor}
         fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
-        transform={`rotate(-90 ${mlpX_px + labelOffset} ${(mlpY_px + (roomRect?.y ?? 0) + (roomRect?.height ?? 0)) / 2})`}
+        transform={`rotate(-90 ${rulerX_frontWall - labelOffset} ${(frontWallY_px + mlpY_px) / 2})`}
       >
-        {distBackWall.toFixed(2)}m
+        {distFrontWall.toFixed(2)}m
+      </text>
+
+      {/* ── RIGHT: RSP → Rear wall ruler ── */}
+      <line
+        x1={rulerX_rearWall}
+        y1={mlpY_px}
+        x2={rulerX_rearWall}
+        y2={rearWallY_px}
+        stroke={rulerColor}
+        strokeWidth={rulerStroke}
+        opacity={0.6}
+      />
+      {/* RSP dot (right) */}
+      <circle cx={rulerX_rearWall} cy={mlpY_px} r={dotRadius} fill={rulerColor} opacity={0.8} />
+      {/* Rear wall dot */}
+      <circle cx={rulerX_rearWall} cy={rearWallY_px} r={dotRadius} fill={rulerColor} opacity={0.8} />
+      {/* RSP → Rear wall label */}
+      <text
+        x={rulerX_rearWall + labelOffset}
+        y={(mlpY_px + rearWallY_px) / 2}
+        textAnchor="middle"
+        fontSize={fontSize}
+        fill={rulerColor}
+        fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+        transform={`rotate(-90 ${rulerX_rearWall + labelOffset} ${(mlpY_px + rearWallY_px) / 2})`}
+      >
+        {distRearWall.toFixed(2)}m
       </text>
 
 
