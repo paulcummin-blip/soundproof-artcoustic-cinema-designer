@@ -653,6 +653,11 @@ const byId = useEntitiesById({
   // Alias for backward compatibility with rest of component
   const actualScreenFrontY = screenPlaneY;
 
+  // Single source of truth: prefer the live computed plane; fall back to app state only if not yet ready
+  const screenFrontPlaneM = Number.isFinite(Number(screenPlaneY))
+    ? Number(screenPlaneY)
+    : Number(appState?.screenFrontPlaneM ?? 0);
+
   // ZONE_DEPTH_M: derived from screenPlaneY (matches useScreenPlane's internal computation)
   const ZONE_DEPTH_M = useMemo(() => {
     const y = Number(screenPlaneY);
