@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { xHalfExtentSideWall } from "@/components/room/rv/utils/rvGeometry";
 
 /**
  * useFrontWideAutoPlacement
