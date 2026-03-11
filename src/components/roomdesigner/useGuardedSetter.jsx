@@ -1,4 +1,4 @@
-import React from "react";
+import { useCallback } from "react";
 import { useAppState } from "@/components/AppStateProvider";
 
 export function useGuardedSetter(setter, tabName) {
