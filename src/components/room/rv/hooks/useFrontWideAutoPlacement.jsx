@@ -69,13 +69,13 @@ export function useFrontWideAutoPlacement({
         if (!zone || !zone.medianY) return s;
 
         const dims = getModelDimsM(s.model);
-        const depthM = Number(dims?.depthM) || 0.082;
         const widthMDim = Number(dims?.widthM) || 0.20;
         const halfWidth = widthMDim / 2;
 
         // Compute live yaw the same way the renderer does
+        // Pass a flat {x, y, role} so getPlanAimDeg can read position correctly
         const liveYaw = getPlanAimDeg(
-          s,
+          { x: s.position?.x, y: s.position?.y, role: s.role },
           mlp || null,
           W,
           L,
@@ -86,12 +86,8 @@ export function useFrontWideAutoPlacement({
           lcrAngleInfo || null,
         );
 
-        // Use the rotated X half-extent so the icon never crosses the wall
-        const halfX = xHalfExtentM(depthM, widthMDim, liveYaw);
-
-        const xAtWall = role === "LW"
-          ? (WALL_BUFFER_FW + halfX)
-          : (W - WALL_BUFFER_FW - halfX);
+        // Use the shared sideWallX helper (1cm buffer, correct X-axis projection)
+        const xAtWall = sideWallX(W, dims, role === "LW" ? "L" : "R", liveYaw);
 
         const sideOffsetKey = role === "LW" ? "L" : "R";
         const currentOffset = fwOffsetRef.current[sideOffsetKey] || 0;
