@@ -36,15 +36,19 @@ export function sideWallX(roomWidth, dims, side, yawDeg = 90) {
 export const fixedSideX = sideWallX;
 
 /**
- * Returns the Y position of a rear-wall speaker.
+ * Returns the Y position of a rear-wall speaker so its rotated footprint
+ * stays at least SURROUND_WALL_GAP_M from the rear wall.
  *
  * @param {number} roomLength
- * @param {{ depthM?: number }|null|undefined} dims
+ * @param {{ depthM?: number, widthM?: number }|null|undefined} dims
+ * @param {number} [yawDeg=180] - live yaw from renderer (default 180 = facing front)
  * @returns {number}
  */
-export function rearWallY(roomLength, dims) {
-  const halfDepth = (dims?.depthM ?? 0.082) / 2;
-  return roomLength - halfDepth - SURROUND_WALL_GAP_M;
+export function rearWallY(roomLength, dims, yawDeg = 180) {
+  const depthM = dims?.depthM ?? 0.082;
+  const widthM = dims?.widthM ?? 0.27;
+  const halfY = yHalfExtentM(depthM, widthM, yawDeg);
+  return roomLength - halfY - SURROUND_WALL_GAP_M;
 }
 
 // ─── Overhead pair map ────────────────────────────────────────────────────────
