@@ -146,6 +146,7 @@ function RoomDesignerWithState() {
   const isDraggingRef = useRef(false);
   const visualisationRef = React.useRef(null);
   const didUserRequestResetRef = useRef(false);
+  const lastScreenWidthForMlpRef = useRef(null);
 
   // NEW: Seating config epoch tracking for loaded projects
   const [seatingConfigEpoch, setSeatingConfigEpoch] = useState(0);
