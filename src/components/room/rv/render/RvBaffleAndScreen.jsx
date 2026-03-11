@@ -44,7 +44,7 @@ export default function RvBaffleAndScreen({
   const xFrameR = meterToCanvasX(xCentre + frameWm / 2);
   const frameW_px = xFrameR - xFrameL;
 
-  const baffleH = Math.max(1, planeDepthM * scale);
+  const baffleH = Math.max(0, planeDepthM * scale);
   const screenH_px = SCREEN_THICKNESS_M * scale;
   const baffleTop = yFront;
   const screenPlaneY = yFront + baffleH;
