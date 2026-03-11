@@ -51,6 +51,11 @@ export function useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSp
         return allowedRoles.has(canon);
       }
 
+      // Extra side surrounds (SL2/SR2, SL3/SR3…): visible when side surrounds are allowed
+      if (/^(SL|SR)\d+$/.test(canon)) {
+        return allowedRoles.has("SL");
+      }
+
       // Everything else keeps existing behaviour
       return getSpeakerVisibility(s.role, s.model);
     });
