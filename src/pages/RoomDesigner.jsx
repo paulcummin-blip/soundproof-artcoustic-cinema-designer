@@ -109,15 +109,6 @@ import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 
 // (debug log removed to save space)
 
-// NEW: Guarded setter hook
-function useGuardedSetter(setter, tabName) {
-  const { isFrozen } = useAppState(); // isFrozen here is a function from AppStateProvider
-  return React.useCallback((next) => {
-    if (isFrozen?.(tabName)) return; // ignore edits when frozen
-    setter?.(next); // Use optional chaining for setter
-  }, [setter, isFrozen, tabName]);
-}
-
 
 function RoomDesignerWithState() {
   // All hook calls must be unconditional and at the top level
