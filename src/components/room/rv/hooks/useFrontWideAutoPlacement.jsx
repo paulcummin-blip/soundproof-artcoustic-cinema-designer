@@ -1,9 +1,14 @@
 import { useEffect } from "react";
+import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
+import { xHalfExtentM } from "@/components/room/rv/utils/rvGeometry";
 
 /**
  * useFrontWideAutoPlacement
  * Auto-positions front-wide speakers (LW/RW) to zone medians when zones change.
  * Respects user-locked positions and drag state guards.
+ *
+ * Uses the same live yaw as the renderer (getPlanAimDeg) so that aimed
+ * front-wide speakers never protrude through the side wall.
  */
 export function useFrontWideAutoPlacement({
   isAnyDraggingRef,
@@ -19,6 +24,10 @@ export function useFrontWideAutoPlacement({
   getCanonicalRole,
   clamp,
   SIDE_ALLOW_OVERHANG,
+  // Aiming props
+  mlp,
+  aimFrontWidesAtMLP,
+  lcrAngleInfo,
 }) {
   useEffect(() => {
     if (isAnyDraggingRef.current) return;
