@@ -39,9 +39,18 @@ export default function RvMlpRuler(props) {
   // Calculate distances
   const distLeftWall = mlpDotX_m; // Distance from left wall (x=0)
   const distRightWall = widthM - mlpDotX_m; // Distance from right wall
-  const distScreen = mlpDotY_m - screenFrontPlaneM; // Distance from screen
-  const distBackWall = lengthM - mlpDotY_m; // Distance from back wall
-  const distFrontWall = mlpDotY_m; // Distance from front wall (y=0)
+  const distScreen = mlpDotY_m - screenFrontPlaneM; // Distance from screen → RSP
+  const distFrontWall = mlpDotY_m; // Distance from front wall → RSP
+  const distRearWall = lengthM - mlpDotY_m; // Distance from RSP → rear wall
+
+  // Pixel positions for secondary rulers
+  const frontWallY_px = (roomRect?.y ?? 0);
+  const rearWallY_px = (roomRect?.y ?? 0) + (roomRect?.height ?? 0);
+
+  // Horizontal offsets so three vertical rulers don't overlap
+  const rulerX_frontWall = mlpX_px - 40; // left of centre
+  const rulerX_screen   = mlpX_px;       // centre (unchanged)
+  const rulerX_rearWall = mlpX_px + 40;  // right of centre
 
 
 
