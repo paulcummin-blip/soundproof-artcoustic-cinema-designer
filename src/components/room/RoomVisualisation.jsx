@@ -795,6 +795,9 @@ const byId = useEntitiesById({
     getCanonicalRole,
     clamp,
     SIDE_ALLOW_OVERHANG,
+    mlp,
+    aimFrontWidesAtMLP,
+    lcrAngleInfo,
   });
 
   // Listen for reset-to-median event
