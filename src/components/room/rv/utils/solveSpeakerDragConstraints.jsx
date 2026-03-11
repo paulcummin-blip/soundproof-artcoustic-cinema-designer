@@ -185,8 +185,12 @@ export function solveSpeakerDragConstraints({
 
     const dimsThis    = getModelDimsM(thisSpeaker.model);
     const dimsPartner = getModelDimsM(partnerSpeaker.model);
-    const xL_side = sideWallX(W, baseSide === 'SL' ? dimsThis : dimsPartner, 'L');
-    const xR_side = sideWallX(W, partnerBaseSide === 'SL' ? dimsThis : dimsPartner, 'R');
+
+    // Compute live yaw for each speaker to get yaw-aware wall projection
+    const yawThis    = getPlanAimDeg({ x: thisSpeaker.position?.x,    y: thisSpeaker.position?.y,    role: thisSpeaker.role    }, null, W, L, false, false, aimSideSurroundsAtMLP, false, lcrAngleInfo);
+    const yawPartner = getPlanAimDeg({ x: partnerSpeaker.position?.x, y: partnerSpeaker.position?.y, role: partnerSpeaker.role }, null, W, L, false, false, aimSideSurroundsAtMLP, false, lcrAngleInfo);
+    const xL_side = sideWallX(W, baseSide === 'SL' ? dimsThis : dimsPartner, 'L', baseSide === 'SL' ? yawThis : yawPartner);
+    const xR_side = sideWallX(W, partnerBaseSide === 'SL' ? dimsThis : dimsPartner, 'R', partnerBaseSide === 'SL' ? yawThis : yawPartner);
 
     const yMin_side   = Number(sideSurroundVisualSpanM?.minY) || 0;
     const yMax_visual = Number(sideSurroundVisualSpanM?.maxY) || 0;
