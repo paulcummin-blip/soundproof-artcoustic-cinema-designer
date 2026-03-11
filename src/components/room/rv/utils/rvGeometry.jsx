@@ -124,7 +124,7 @@ export function resolveSymmetricLCR({ desiredX, isLeft, screenCenterX, leftZone,
  * Half the Y extent of a speaker box projected onto the room-Y axis at yawDeg.
  * (0° = facing front wall; 90° = facing right wall)
  */
-function yHalfExtentM(depthM, widthM, yawDeg) {
+export function yHalfExtentM(depthM, widthM, yawDeg) {
   const rad = (yawDeg * Math.PI) / 180;
   const cosA = Math.abs(Math.cos(rad));
   const sinA = Math.abs(Math.sin(rad));

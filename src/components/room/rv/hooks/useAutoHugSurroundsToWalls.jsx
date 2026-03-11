@@ -73,7 +73,7 @@ export function useAutoHugSurroundsToWalls({
         // Compute the live yaw exactly as the renderer does — this accounts for
         // "aim at MLP" mode and produces the correct rotated half-extent.
         const liveYaw = getPlanAimDeg(
-          spk,
+          { x: spk.position?.x, y: spk.position?.y, role: spk.role },
           mlp || null,
           W,
           L,
