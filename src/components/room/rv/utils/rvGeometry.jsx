@@ -143,7 +143,7 @@ function yHalfExtentM(depthM, widthM, yawDeg) {
  * @param {number} yawDeg - 0° = facing front, 90° = facing right (wall-flat on left wall)
  * @returns {number}
  */
-function xHalfExtentM(depthM, widthM, yawDeg) {
+export function xHalfExtentM(depthM, widthM, yawDeg) {
   const rad = (yawDeg * Math.PI) / 180;
   const cosA = Math.abs(Math.cos(rad));
   const sinA = Math.abs(Math.sin(rad));
