@@ -8,6 +8,17 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarInset } from "@/components/ui/sidebar"; // NEW: Import SidebarInset
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
 
@@ -52,8 +63,6 @@ import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanT
 import AimLoudspeakerPanel from "@/components/roomdesigner/AimLoudspeakerPanel";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
-import ResetConfirmDialog from "@/components/roomdesigner/ResetConfirmDialog";
-import PlanPriceOverlay from "@/components/roomdesigner/PlanPriceOverlay";
 
 // Safe lazy imports that work with both named and default exports
 const RoomDimensions = React.lazy(() =>
@@ -1521,11 +1530,22 @@ function RoomDesignerWithState() {
 
   return (
     <>
-      <ResetConfirmDialog
-        open={showResetConfirm}
-        onOpenChange={setShowResetConfirm}
-        onConfirm={handleResetPositions}
-      />
+      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Room Designer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reset room, seating, screen, speakers and subs back to defaults. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetPositions} className="bg-red-600 hover:bg-red-700">
+              Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
         <style>{`
@@ -1608,8 +1628,6 @@ function RoomDesignerWithState() {
             zoomMode={zoomMode}
             setZoomMode={setZoomMode}
           />
-
-          <PlanPriceOverlay show={showPrices} finalTotal={priceData?.finalTotal} />
 
           {/* Content wrapper below the toolbar; canvas gets pushed down naturally */}
           <div style={{ height: 'calc(100% - 36px)', overflow: 'auto' }}>
