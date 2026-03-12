@@ -304,8 +304,6 @@ function RoomDesignerWithState() {
     }
   }, [isNineBedLayout, appState?.extraSurroundCount, appState?.setExtraSurroundCount]);
 
-  // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
-
   // ⚠️ Hoisted memos so they’re initialized before any effects that depend on them
   // stableScreen now directly depends on _screen from appState
   const stableScreen = useMemo(() => ({
