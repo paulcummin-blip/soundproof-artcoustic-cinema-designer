@@ -397,7 +397,7 @@ function RoomDesignerWithState() {
     if (
       loadState?.phase === "scratch" &&
       !hasProjectId &&
-      seatingConfigEpoch === 0 &&
+      (seatingLoadedEpochRef?.current ?? 0) === 0 &&
       !screenWidthChanged &&
       !screenPlaneChanged &&
       Number.isFinite(appState?.mlpY_m) &&
