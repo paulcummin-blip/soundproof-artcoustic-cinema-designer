@@ -1609,6 +1609,8 @@ function RoomDesignerWithState() {
             setZoomMode={setZoomMode}
           />
 
+          <PlanPriceOverlay show={showPrices} finalTotal={priceData?.finalTotal} />
+
           {/* Content wrapper below the toolbar; canvas gets pushed down naturally */}
           <div style={{ height: 'calc(100% - 36px)', overflow: 'auto' }}>
             <ErrorBoundary name="RoomVisualisation">
