@@ -1521,22 +1521,11 @@ function RoomDesignerWithState() {
 
   return (
     <>
-      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset Room Designer?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will reset room, seating, screen, speakers and subs back to defaults. This can't be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleResetPositions} className="bg-red-600 hover:bg-red-700">
-              Reset
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ResetConfirmDialog
+        open={showResetConfirm}
+        onOpenChange={setShowResetConfirm}
+        onConfirm={handleResetPositions}
+      />
 
       <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
         <style>{`
