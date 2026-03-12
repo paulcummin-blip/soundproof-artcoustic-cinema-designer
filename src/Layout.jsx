@@ -210,14 +210,16 @@ export default function Layout({ children, currentPageName }) {
                 return null;
                 })()}
 
-            <div className="p-4 border-t border-brand-border">
-              <PriceSummary
-                showPrices={priceSummary.showPrices}
-                baseTotal={priceSummary.baseTotal}
-                finalTotal={priceSummary.finalTotal}
-                difficultyMultiplier={priceSummary.difficultyMultiplier}
-              />
-            </div>
+            {priceSummary.showPrices && (
+              <div className="p-4 border-t border-brand-border">
+                <PriceSummary
+                  showPrices={priceSummary.showPrices}
+                  baseTotal={priceSummary.baseTotal}
+                  finalTotal={priceSummary.finalTotal}
+                  difficultyMultiplier={priceSummary.difficultyMultiplier}
+                />
+              </div>
+            )}
           </aside>
 
           <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
