@@ -52,6 +52,8 @@ import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanT
 import AimLoudspeakerPanel from "@/components/roomdesigner/AimLoudspeakerPanel";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
+import ResetConfirmDialog from "@/components/roomdesigner/ResetConfirmDialog";
+import PlanPriceOverlay from "@/components/roomdesigner/PlanPriceOverlay";
 
 // Safe lazy imports that work with both named and default exports
 const RoomDimensions = React.lazy(() =>
