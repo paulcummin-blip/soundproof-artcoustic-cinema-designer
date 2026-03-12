@@ -399,9 +399,7 @@ function RoomDesignerWithState() {
       !hasProjectId &&
       (seatingLoadedEpochRef?.current ?? 0) === 0 &&
       !screenWidthChanged &&
-      !screenPlaneChanged &&
-      Number.isFinite(appState?.mlpY_m) &&
-      Array.isArray(appState?.seatingPositions) && appState.seatingPositions.length > 0
+      !screenPlaneChanged
     ) {
       return;
     }
