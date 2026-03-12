@@ -211,14 +211,12 @@ export default function Layout({ children, currentPageName }) {
                 })()}
 
             <div className="p-4 border-t border-brand-border">
-              {currentPageName === 'RoomDesigner' && (
-                <PriceSummary
-                  showPrices={priceSummary.showPrices}
-                  baseTotal={priceSummary.baseTotal}
-                  finalTotal={priceSummary.finalTotal}
-                  difficultyMultiplier={priceSummary.difficultyMultiplier}
-                />
-              )}
+              <PriceSummary
+                showPrices={priceSummary.showPrices}
+                baseTotal={priceSummary.baseTotal}
+                finalTotal={priceSummary.finalTotal}
+                difficultyMultiplier={priceSummary.difficultyMultiplier}
+              />
             </div>
           </aside>
 
