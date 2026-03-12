@@ -33,12 +33,38 @@ export function useSeatingRebuild({
 
     const isScratch = loadState?.phase === "scratch" && !hasProjectId;
 
+    // Pre-compute rowsAlreadyMatchCurrentCenters (needed by both the initial boot guard and the early-return guard)
+    const rowsAlreadyMatchCurrentCenters = (() => {
+      if (!Array.isArray(appState?.rowCentersM) || appState.rowCentersM.length === 0) return false;
+      if (!currentSeats.length) return false;
+      const byRow = {};
+      currentSeats.forEach(s => {
+        const r = (s.rowNumber ?? 1) - 1;
+        if (byRow[r] === undefined) byRow[r] = s.y;
+      });
+      return appState.rowCentersM.every((centerY, i) => {
+        if (byRow[i] === undefined) return false;
+        return Math.abs(byRow[i] - centerY) <= 0.001;
+      });
+    })();
+
+    // Allow one scratch rebuild on first Free Use boot when seats don't yet match the live centres
+    const shouldRunInitialScratchRebuild =
+      isScratch &&
+      !didUserRequestResetRef.current &&
+      !userHasChangedSeatingSinceLoad &&
+      currentSeats.length > 0 &&
+      Array.isArray(appState?.rowCentersM) &&
+      appState.rowCentersM.length > 0 &&
+      Number.isFinite(appState?.mlpY_m) &&
+      !rowsAlreadyMatchCurrentCenters;
+
     // ── SCRATCH MODE: stable offset-aware rebuild ──────────────────────────────
     // Use floatDepthM as the invariant screen-plane anchor so offset=0 always
     // restores seats to the exact 57.5° boot baseline, regardless of what
     // appState.screenFrontPlaneM has drifted to after speaker placement.
     // This is the single source of truth for Viewing Offset in Free Use mode.
-    if (isScratch && userHasChangedSeatingSinceLoad && !didUserRequestResetRef.current) {
+    if ((isScratch && userHasChangedSeatingSinceLoad && !didUserRequestResetRef.current) || shouldRunInitialScratchRebuild) {
       const setSeats = appState?.setSeatingPositions;
       if (typeof setSeats !== 'function') return;
 
@@ -95,19 +121,7 @@ export function useSeatingRebuild({
 
     // Guard: preserve Free Use starter seating written by useProjectLoader on first scratch load
     // Only skips if the user has not yet changed seating controls AND seats already match current centers
-    const rowsAlreadyMatchCurrentCenters = (() => {
-      if (!Array.isArray(appState?.rowCentersM) || appState.rowCentersM.length === 0) return false;
-      if (!currentSeats.length) return false;
-      const byRow = {};
-      currentSeats.forEach(s => {
-        const r = (s.rowNumber ?? 1) - 1;
-        if (byRow[r] === undefined) byRow[r] = s.y;
-      });
-      return appState.rowCentersM.every((centerY, i) => {
-        if (byRow[i] === undefined) return false;
-        return Math.abs(byRow[i] - centerY) <= 0.001;
-      });
-    })();
+    // (rowsAlreadyMatchCurrentCenters is computed above, before the scratch-mode rebuild block)
     if (
       loadState?.phase === "scratch" &&
       !hasProjectId &&
