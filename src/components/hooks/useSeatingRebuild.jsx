@@ -108,6 +108,40 @@ export function useSeatingRebuild({
         return Math.abs(byRow[i] - centerY) <= 0.001;
       });
     })();
+
+    // NEW: Also verify that current seats match the LIVE 57.5° target row centres.
+    // This prevents stale starter seats from being preserved when the screen plane
+    // is already known but seats haven't been rebuilt yet on first load.
+    const rowsAlreadyMatchLiveTarget = (() => {
+      if (!currentSeats.length) return false;
+      const liveSfpM = Number.isFinite(Number(appState?.screenFrontPlaneM))
+        ? Number(appState.screenFrontPlaneM)
+        : (Number.isFinite(Number(appState?.screen?.screenPlaneY_m)) && Number(appState?.screen?.screenPlaneY_m) > 0
+            ? Number(appState.screen.screenPlaneY_m)
+            : Number(appState?.screen?.floatDepthM) || 0.20);
+      const liveWidthInches = Number(appState?.screen?.visibleWidthInches) || 120;
+      const liveOffsetM = Number(appState?.seatingBlockOffset) || 0;
+      const liveIdealDistM = distanceFor57_5FromWidth(liveWidthInches * 0.0254);
+      const liveBaseY = liveSfpM + liveIdealDistM + liveOffsetM;
+      const liveRowCount = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
+        ? _seatsPerRowByRow.length
+        : Math.max(1, Number(_seatingRows) || 1);
+      const liveLen = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
+      const liveClampY = (y) => Math.max(0.40, Math.min(liveLen - 0.40, y));
+      const liveRawCenters = buildRowCenters(liveBaseY, liveRowCount, Number(_rowSpacingM) || 1.8, _mlpBasis) || [];
+      const liveCenters = liveRawCenters.map((y) => liveClampY(Number(y)));
+      if (liveCenters.length === 0) return false;
+      const byRow = {};
+      currentSeats.forEach(s => {
+        const r = (s.rowNumber ?? 1) - 1;
+        if (byRow[r] === undefined) byRow[r] = s.y;
+      });
+      return liveCenters.every((centerY, i) => {
+        if (byRow[i] === undefined) return false;
+        return Math.abs(byRow[i] - centerY) <= 0.005;
+      });
+    })();
+
     if (
       loadState?.phase === "scratch" &&
       !hasProjectId &&
@@ -116,7 +150,8 @@ export function useSeatingRebuild({
       currentSeats.length > 0 &&
       Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length > 0 &&
       Number.isFinite(appState?.mlpY_m) &&
-      rowsAlreadyMatchCurrentCenters
+      rowsAlreadyMatchCurrentCenters &&
+      rowsAlreadyMatchLiveTarget
     ) {
       return;
     }
