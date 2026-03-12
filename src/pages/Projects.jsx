@@ -72,13 +72,15 @@ function safeContains(hay, needle) {
 }
 
 function safeJson(v) {
-  if (v == null) return null;
-  if (typeof v === "object") return v; // already parsed — no need for try/catch here
-  if (typeof v !== "string") return null;
   try {
-    const s = v.trim();
-    if (!s || s.startsWith("[object ")) return null; // catches "[object Object]" and all variants
-    return JSON.parse(s);
+    if (v == null) return null;
+    if (typeof v === "object") return v; // already parsed
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (!s || s === "[object Object]" || s.startsWith("[object ")) return null;
+      return JSON.parse(s);
+    }
+    return null;
   } catch (_e) { return null; }
 }
 
@@ -180,10 +182,10 @@ export default function ProjectsPage() {
             } catch (mapErr) {
               console.warn('[Projects] Failed to map project:', p?.id, mapErr);
               return {
-                id: p?.id,
-                name: p?.name || "Untitled Project",
-                client: p?.client_name || "",
-                status: p?.project_status || "Prospective",
+                id: p.id,
+                name: p.name || "Untitled Project",
+                client: p.client_name || "",
+                status: p.project_status || "Prospective",
                 createdAt: Date.now(),
               };
             }
