@@ -491,13 +491,17 @@ function RoomDesignerWithState() {
     const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
     const seats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
 
-    // In scratch/Free Use mode with no project, visually lock the dot to the centre/primary seat.
-    // This prevents the dot drifting ahead of the seating row during Viewing Offset changes,
-    // because mlpY_m updates before the seating rebuild has finished moving the seats.
-    if (!isProjectMode && seats.length > 0 && Number.isFinite(roomWidthM)) {
-      // 'all' (average) mode: RSP is the average of all row-centre Y values, which can fall
-      // between rows (even row counts). Compute directly from unique seat Y values rather than
-      // snapping to the nearest primary seat, which would be off-centre.
+    // Always prefer the computed 57.5° MLP Y when available — both Free Use and Project mode.
+    // This ensures the green dot, ruler and Viewing Angle panel are correct on first load
+    // without waiting for a seat rebuild to "sync" them.
+    const mlpY = appState?.mlpY_m;
+    if (Number.isFinite(mlpY)) {
+      return { x: cx, y: mlpY, z: 1.2 };
+    }
+
+    // Fallback: mlpY_m not yet ready — derive position from seat layout instead.
+    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
+      // 'all' (average) mode: average of all row-centre Y values
       if (_mlpBasis === 'all') {
         const uniqueYs = [...new Set(
           seats.map(s => Number(s.y ?? s.position?.y)).filter(y => Number.isFinite(y))
@@ -527,22 +531,9 @@ function RoomDesignerWithState() {
       }
     }
 
-    // Project mode: use stored MLP Y when valid
-    const mlpY = appState?.mlpY_m;
-    if (Number.isFinite(mlpY)) {
-      return { x: cx, y: mlpY, z: 1.2 };
-    }
-
-    // Fallback: lock dot to centre seat while mlpY_m is not ready.
-    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
-      let best = null, bestDx = Infinity;
-      for (const s of seats) { const sx = Number(s?.x ?? s?.position?.x), sy = Number(s?.y ?? s?.position?.y); if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue; const dx = Math.abs(sx - cx); if (dx < bestDx) { bestDx = dx; best = s; } }
-      if (best) { const by = Number(best.y ?? best.position?.y), bz = Number(best.z ?? best.position?.z); if (Number.isFinite(by)) return { x: cx, y: by, z: Number.isFinite(bz) ? bz : 1.2 }; }
-    }
-
     // If no seats yet, keep null so RV can do its own last-resort fallback
     return null;
-  }, [appState?.mlpY_m, appState?.seatingPositions, stableDimensions?.width, isProjectMode]);
+  }, [appState?.mlpY_m, appState?.seatingPositions, stableDimensions?.width, isProjectMode, _mlpBasis]);
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
   const engineSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
