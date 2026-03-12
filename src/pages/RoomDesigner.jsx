@@ -394,16 +394,6 @@ function RoomDesignerWithState() {
 
     lastScreenFrontPlaneForMlpRef.current = screenFrontPlaneM;
 
-    if (
-      loadState?.phase === "scratch" &&
-      !hasProjectId &&
-      (seatingLoadedEpochRef?.current ?? 0) === 0 &&
-      !screenWidthChanged &&
-      !screenPlaneChanged
-    ) {
-      return;
-    }
-
     // 1. Compute ideal distance for 57.5° FOV (base position)
     const idealDistM = distanceFor57_5FromWidth(screenVisibleWidthM);
     const mlpY_base = screenFrontPlaneM + idealDistM;
@@ -411,6 +401,18 @@ function RoomDesignerWithState() {
     // 2. Apply viewing offset to get FIXED MLP position (green dot)
     // Hard rule: zero offset always snaps to exact 57.5° from the live screen plane
     const fixedMlpY = Number(_seatingBlockOffset) === 0 ? (screenFrontPlaneM + idealDistM) : (mlpY_base + viewingOffsetM);
+
+    if (
+      loadState?.phase === "scratch" &&
+      !hasProjectId &&
+      (seatingLoadedEpochRef?.current ?? 0) === 0 &&
+      !screenWidthChanged &&
+      !screenPlaneChanged &&
+      Number.isFinite(appState?.mlpY_m) &&
+      Math.abs(Number(appState.mlpY_m) - fixedMlpY) <= 0.005
+    ) {
+      return;
+    }
     if (SHOW_DEBUG_LOGS && globalThis.__B44_LOGS) console.log('[MLP 57.5° verify]', { screenFrontPlaneM: screenFrontPlaneM.toFixed(3), screenVisibleWidthM: screenVisibleWidthM.toFixed(3), idealDistM: idealDistM.toFixed(3), offset: Number(_seatingBlockOffset), fixedMlpY: fixedMlpY.toFixed(3) });
 
     // 3. Build row centers around the FIXED MLP according to reference mode
