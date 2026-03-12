@@ -137,7 +137,6 @@ function RoomDesignerWithState() {
   const didUserRequestResetRef = useRef(false);
   const lastScreenWidthForMlpRef = useRef(null);
   const lastScreenFrontPlaneForMlpRef = useRef(null);
-  const didInitialLiveScreenSyncRef = useRef(false);
 
   // NEW: Seating config epoch tracking for loaded projects
   const [seatingConfigEpoch, setSeatingConfigEpoch] = useState(0);
@@ -303,6 +302,8 @@ function RoomDesignerWithState() {
       }
     }
   }, [isNineBedLayout, appState?.extraSurroundCount, appState?.setExtraSurroundCount]);
+
+  // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
 
   // ⚠️ Hoisted memos so they’re initialized before any effects that depend on them
   // stableScreen now directly depends on _screen from appState
@@ -481,9 +482,6 @@ function RoomDesignerWithState() {
   _screen?.screenPlaneY_m,
   _screen?.floatDepthM]
   );
-
-  // ONE-SHOT post-init resync: correct RSP once live screen plane is first known in Free Use
-  useEffect(() => { if (didInitialLiveScreenSyncRef.current || resolvedProjectId || !appState?.isHydrated || Number(_seatingBlockOffset) !== 0) return; const sfp = Number(appState?.screenFrontPlaneM); if (!Number.isFinite(sfp) || sfp <= 0) return; const swm = Number(screenVisibleWidthInchesEffective) * 0.0254; if (!Number.isFinite(swm) || swm <= 0) return; const fixedY = sfp + distanceFor57_5FromWidth(swm); const cur = Number(appState?.mlpY_m); if (Number.isFinite(cur) && Math.abs(cur - fixedY) <= 0.005) { didInitialLiveScreenSyncRef.current = true; return; } const len = Number(stableDimensions?.length) || 6.0; const clamp = y => Math.max(0.40, Math.min(len - 0.40, y)); const ctrs = (buildRowCenters?.(fixedY, Number(_seatingRows)||1, Number(_rowSpacingM)||1.8, _mlpBasis)||[]).map(clamp); if (typeof appState?.setRowCentersM === 'function') appState.setRowCentersM(ctrs); if (typeof appState?.setMlpY_m === 'function') appState.setMlpY_m(Math.round(fixedY * 1000) / 1000); didInitialLiveScreenSyncRef.current = true; }, [appState?.isHydrated, appState?.screenFrontPlaneM, resolvedProjectId, _seatingBlockOffset, screenVisibleWidthInchesEffective, appState?.mlpY_m]);
 
   // Use computed MLP as the effective anchor (for backwards compatibility)
   const mlpAnchorEffective = useMemo(() => {
