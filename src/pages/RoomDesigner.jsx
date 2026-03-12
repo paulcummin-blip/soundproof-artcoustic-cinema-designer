@@ -137,6 +137,7 @@ function RoomDesignerWithState() {
   const didUserRequestResetRef = useRef(false);
   const lastScreenWidthForMlpRef = useRef(null);
   const lastScreenFrontPlaneForMlpRef = useRef(null);
+  const didInitialLiveScreenSyncRef = useRef(false);
 
   // NEW: Seating config epoch tracking for loaded projects
   const [seatingConfigEpoch, setSeatingConfigEpoch] = useState(0);
