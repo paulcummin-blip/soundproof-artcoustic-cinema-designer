@@ -1959,6 +1959,7 @@ function RoomDesignerWithState() {
                     setShowPrices={setShowPrices}
                     difficultyMultiplier={difficultyMultiplier}
                     setDifficultyMultiplier={setDifficultyMultiplier}
+                    priceData={priceData}
                   />
               </CollapsiblePanel>
           </div>
