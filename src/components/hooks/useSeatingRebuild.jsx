@@ -123,7 +123,8 @@ export function useSeatingRebuild({
       currentSeats.length > 0 &&
       !userHasChangedSeatingSinceLoad &&
       !didUserRequestResetRef.current &&
-      !(appState?.roomResetEpoch > 0)
+      !(appState?.roomResetEpoch > 0) &&
+      rowsAlreadyMatchCurrentCenters
     ) {
       return;
     }
