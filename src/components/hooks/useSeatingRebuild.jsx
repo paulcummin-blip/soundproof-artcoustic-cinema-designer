@@ -42,11 +42,16 @@ export function useSeatingRebuild({
       const setSeats = appState?.setSeatingPositions;
       if (typeof setSeats !== 'function') return;
 
-      const floatDepthM = Number(appState?.screen?.floatDepthM) || 0.20;
+      const screenFrontPlaneM = Number.isFinite(Number(appState?.screenFrontPlaneM))
+        ? Number(appState.screenFrontPlaneM)
+        : (Number.isFinite(Number(appState?.screen?.screenPlaneY_m)) && Number(appState.screen.screenPlaneY_m) > 0
+            ? Number(appState.screen.screenPlaneY_m)
+            : Number(appState?.screen?.floatDepthM) || 0.20);
+
       const visibleWidthInches = Number(appState?.screen?.visibleWidthInches) || 120;
       const viewingOffsetM = Number(appState?.seatingBlockOffset) || 0;
       const idealDistM = distanceFor57_5FromWidth(visibleWidthInches * 0.0254);
-      const stableBaseY = floatDepthM + idealDistM + viewingOffsetM;
+      const stableBaseY = screenFrontPlaneM + idealDistM + viewingOffsetM;
 
       const list = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
         ? _seatsPerRowByRow
