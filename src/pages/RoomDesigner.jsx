@@ -411,7 +411,9 @@ function RoomDesignerWithState() {
     const mlpY_base = screenFrontPlaneM + idealDistM;
 
     // 2. Apply viewing offset to get FIXED MLP position (green dot)
-    const fixedMlpY = mlpY_base + viewingOffsetM;
+    // Hard rule: zero offset always snaps to exact 57.5° from the live screen plane
+    const fixedMlpY = Number(_seatingBlockOffset) === 0 ? (screenFrontPlaneM + idealDistM) : (mlpY_base + viewingOffsetM);
+    if (SHOW_DEBUG_LOGS && globalThis.__B44_LOGS) console.log('[MLP 57.5° verify]', { screenFrontPlaneM: screenFrontPlaneM.toFixed(3), screenVisibleWidthM: screenVisibleWidthM.toFixed(3), idealDistM: idealDistM.toFixed(3), offset: Number(_seatingBlockOffset), fixedMlpY: fixedMlpY.toFixed(3) });
 
     // 3. Build row centers around the FIXED MLP according to reference mode
     let centersRaw = buildRowCenters?.(fixedMlpY, rows, rowSpacing, mlpReference) || [];
