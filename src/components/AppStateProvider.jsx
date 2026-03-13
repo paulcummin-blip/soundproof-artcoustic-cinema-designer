@@ -924,12 +924,15 @@ function useDesignerState() {
     const layoutKey = layoutNorm.split(" ")[0].split("_")[0];
     const major = parseInt(layoutKey.split(".")[0], 10) || 5;
 
-    // IMPORTANT: one source of truth for 7.x behaviour
-    const useWidesInsteadOfRears =
-      !!speakerSystem?.useWidesInsteadOfRears ||
-      speakerSystem?.sevenBedLayoutType === "wides" ||
-      sevenBedLayoutType === "wides" ||
-      false;
+    // IMPORTANT: one canonical source of truth for 7.x behaviour
+    const resolvedSevenBedLayoutType =
+      (typeof sevenBedLayoutType === "string" && sevenBedLayoutType)
+        ? sevenBedLayoutType
+        : (typeof speakerSystem?.sevenBedLayoutType === "string" && speakerSystem.sevenBedLayoutType)
+          ? speakerSystem.sevenBedLayoutType
+          : "rears";
+
+    const useWidesInsteadOfRears = resolvedSevenBedLayoutType === "wides";
 
     // 7.x chooses rears OR wides, 9.x+ MUST include BOTH
     const showRears = (major >= 9) || (major === 7 && !useWidesInsteadOfRears);
@@ -938,7 +941,6 @@ function useDesignerState() {
     const roles = new Set(["FL", "FC", "FR"]);
     if (major >= 5) { roles.add("SL"); roles.add("SR"); }
     if (showRears) { roles.add("SBL"); roles.add("SBR"); }
-    if (showWides) { roles.add("LW"); roles.add("RW"); }
     if (showWides) { roles.add("LW"); roles.add("RW"); }
 
     // Add overhead channels (from original getSpeakerVisibilityFor)
