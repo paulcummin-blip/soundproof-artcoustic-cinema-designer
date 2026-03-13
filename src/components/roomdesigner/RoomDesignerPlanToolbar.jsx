@@ -14,8 +14,6 @@ export default function RoomDesignerPlanToolbar({
   setOverlays,
   enableFrontWides,
   setEnableFrontWides,
-  freeMoveLcr,
-  setFreeMoveLcr,
   zoomMode,
   setZoomMode,
 }) {
