@@ -550,90 +550,15 @@ function RoomDesignerWithState() {
 
   // ANALYSIS MUST ONLY USE SPEAKERS THAT ARE ACTUALLY "IN THE DRAWING"
   // (VALID POSITION + REAL MODEL + VISIBLE BY LAYOUT RULES)
-  const analysisSpeakers = useMemo(() => {
-    const raw = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-
-    // ANALYSIS IS STRICTER THAN DRAWING:
-    // - VALID POSITION
-    // - REAL MODEL SELECTED (NO "OFF/NONE/BLANK")
-    // - NO REAR-SURROUND "MODEL LAG" EXCEPTION
-    const isAnalysableSpeaker = (spk) => {
-      if (!spk) return false;
-
-      const pos = spk.position;
-      if (
-        !pos ||
-        typeof pos.x !== "number" ||
-        typeof pos.y !== "number" ||
-        !Number.isFinite(pos.x) ||
-        !Number.isFinite(pos.y)
-      ) {
-        return false;
-      }
-
-      const ms = String(spk?.model ?? "").trim().toLowerCase();
-      if (!ms || ms === "off" || ms === "none") return false;
-
-      return true;
-    };
-
-    const afterRenderable = raw.filter(isAnalysableSpeaker);
-
-    // 2) Respect layout visibility (same logic concept as plan)
-    const speakerSystem = appState?.speakerSystem;
-    const sevenBedLayoutType = appState?.sevenBedLayoutType;
-
-    const layoutRaw =
-      speakerSystem?.dolbyLayout ??
-      speakerSystem?.dolbyPreset ??
-      dolbyPreset ??
-      "5.1";
-
-    const layoutKey =
-      (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
-        .toString()
-        .trim()
-        .split(" ")[0]
-        .split("_")[0];
-
-    const useWidesInsteadOfRears =
-      !!speakerSystem?.useWidesInsteadOfRears ||
-      speakerSystem?.sevenBedLayoutType === "wides" ||
-      sevenBedLayoutType === "wides" ||
-      false;
-
-    const allowedRoles = new Set(
-      rolesForLayout({
-        dolbyLayout: layoutKey,
-        useWidesInsteadOfRears: !!useWidesInsteadOfRears,
-      })
-    );
-
-    return afterRenderable.filter((s) => {
-      const canon = safeCanon(s?.role);
-
-      // Always exclude LFE from plan + analysis
-      if (canon === "LFE") return false;
-
-      // Bed surrounds are controlled by layout role visibility
-      if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
-        return allowedRoles.has(canon);
-      }
-
-      // FOR ANALYSIS: IF IT GOT THIS FAR, IT ALREADY HAS A REAL MODEL.
-      // SO WE ONLY APPLY VISIBILITY IF IT IS EXPLICITLY TURNED OFF BY LAYOUT,
-      // BUT WE DO NOT "AUTO-TRUE" JUST BECAUSE A ROLE IS EXPECTED.
-      return appState?.getSpeakerVisibility
-        ? appState.getSpeakerVisibility(s.role, s.model) === true
-        : true;
-    });
-  }, [
+  // Extracted to useAnalysisSpeakers — uses canonical sevenBedLayoutType resolution
+  // so visibility / reconciliation / analysis all agree on 7.x rears vs wides.
+  const analysisSpeakers = useAnalysisSpeakers({
     placedSpeakers,
-    appState?.speakerSystem,
-    appState?.sevenBedLayoutType,
-    appState?.getSpeakerVisibility,
+    speakerSystem: appState?.speakerSystem,
+    sevenBedLayoutType: appState?.sevenBedLayoutType,
+    getSpeakerVisibility: appState?.getSpeakerVisibility,
     dolbyPreset,
-  ]);
+  });
 
   // For "Aim Loudspeaker" depth metrics: only consider speakers active in current layout
   // Parse bed count from Dolby preset (e.g., "5.1" → 5, "7.1" → 7, "9.1" → 9)
