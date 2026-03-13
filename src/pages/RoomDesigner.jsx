@@ -402,8 +402,9 @@ function RoomDesignerWithState() {
     // Hard rule: zero offset always snaps to exact 57.5° from the live screen plane
     const fixedMlpY = Number(_seatingBlockOffset) === 0 ? (screenFrontPlaneM + idealDistM) : (mlpY_base + viewingOffsetM);
 
-    // Mode-agnostic guard: skip if mlpY_m is already correct and no screen params changed
     if (
+      loadState?.phase === "scratch" &&
+      !hasProjectId &&
       (seatingLoadedEpochRef?.current ?? 0) === 0 &&
       !screenWidthChanged &&
       !screenPlaneChanged &&

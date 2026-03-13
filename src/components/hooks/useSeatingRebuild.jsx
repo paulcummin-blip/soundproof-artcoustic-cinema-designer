@@ -119,14 +119,30 @@ export function useSeatingRebuild({
       return;
     }
 
-    // Unified mode-agnostic preserve guard: skip rebuild if derived state already matches live centres
+    // Guard: preserve Free Use starter seating written by useProjectLoader on first scratch load
+    // Only skips if the user has not yet changed seating controls AND seats already match current centers
+    // (rowsAlreadyMatchCurrentCenters is computed above, before the scratch-mode rebuild block)
     if (
+      loadState?.phase === "scratch" &&
+      !hasProjectId &&
       !didUserRequestResetRef.current &&
       !userHasChangedSeatingSinceLoad &&
-      !(appState?.roomResetEpoch > 0) &&
       currentSeats.length > 0 &&
       Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length > 0 &&
       Number.isFinite(appState?.mlpY_m) &&
+      rowsAlreadyMatchCurrentCenters
+    ) {
+      return;
+    }
+
+    const isLoadedProject = loadState?.phase === "loaded" && !!hasProjectId;
+
+    if (
+      isLoadedProject &&
+      currentSeats.length > 0 &&
+      !userHasChangedSeatingSinceLoad &&
+      !didUserRequestResetRef.current &&
+      !(appState?.roomResetEpoch > 0) &&
       rowsAlreadyMatchCurrentCenters
     ) {
       return;
