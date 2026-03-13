@@ -430,7 +430,7 @@ function useDesignerState() {
     (__autosavePayload && typeof __autosavePayload.autoSeatByRP23 === "boolean") ? __autosavePayload.autoSeatByRP23 : true
   ));
   const [roomElements, setRoomElements] = useState(() => (
-    (__autosavePayload && Array.isArray(__autosavePayload.roomElements))
+    (!__isFreeUse && __autosavePayload && Array.isArray(__autosavePayload.roomElements))
       ? normaliseRoomElements(__autosavePayload.roomElements)
       : []
   ));
