@@ -136,11 +136,19 @@ export function useSpeakerReconciliation({
     const is7ChannelBed = normalizedPreset && (normalizedPreset.startsWith('7.1') || normalizedPreset.startsWith('7.2'));
     const is9ChannelBed = normalizedPreset && normalizedPreset.startsWith('9.1');
 
+    // Canonical 7.x layout choice — same priority as AppStateProvider visibleRoles
+    const resolvedSevenBedLayoutType =
+      (typeof _sevenBedLayoutType === "string" && _sevenBedLayoutType)
+        ? _sevenBedLayoutType
+        : (typeof appState?.speakerSystem?.sevenBedLayoutType === "string" && appState.speakerSystem.sevenBedLayoutType)
+          ? appState.speakerSystem.sevenBedLayoutType
+          : "rears";
+
     let expectedRoles = DOLBY_PRESETS[normalizedPreset] || [];
 
     // For 7.x: swap SBL/SBR with LW/RW based on sevenBedLayoutType
     // For 9.x: ALWAYS include BOTH (no swapping)
-    if (is7ChannelBed && _sevenBedLayoutType === 'wides') {
+    if (is7ChannelBed && resolvedSevenBedLayoutType === 'wides') {
       expectedRoles = expectedRoles.map((role) => {
         if (role === 'SBL') return 'LW';
         if (role === 'SBR') return 'RW';
