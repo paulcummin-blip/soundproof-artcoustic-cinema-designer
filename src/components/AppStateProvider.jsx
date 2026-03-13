@@ -1268,7 +1268,7 @@ function useDesignerState() {
       p21EarlyReflectionPreset,
       mlpOverride,
       extraSurroundCount,
-      screenFrontPlaneM,
+      // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
 
@@ -1372,7 +1372,7 @@ function useDesignerState() {
       p21EarlyReflectionPreset,
       mlpOverride,
       extraSurroundCount,
-      screenFrontPlaneM,
+      // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
 
