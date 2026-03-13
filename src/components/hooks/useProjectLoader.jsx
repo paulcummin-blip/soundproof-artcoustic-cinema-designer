@@ -181,10 +181,14 @@ if (appState?.setRoomDims && appState?.roomDims) {
       setSevenBedLayoutType(p?.seven_bed_layout_type || "rears");
     }
 
-    // Hydrate LCR aim mode — always set, default "flat" for new/missing projects
-    if (typeof setLcrAimMode === "function") {
-      const hydratedLcrAimMode = p?.lcr_aim_mode;
-      setLcrAimMode((hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") ? hydratedLcrAimMode : "flat");
+    // Hydrate LCR aim mode (safe/idempotent; no hooks here)
+    const hydratedLcrAimMode = p?.lcr_aim_mode;
+
+    if (
+      (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") &&
+      typeof setLcrAimMode === "function"
+    ) {
+      setLcrAimMode(hydratedLcrAimMode);
     }
 
     const hydratedEnableFrontWides = p?.enable_front_wides ?? false;
@@ -194,17 +198,6 @@ if (appState?.setRoomDims && appState?.roomDims) {
 
     if (typeof setFreeMoveLcr === "function") {
       setFreeMoveLcr(!!p?.free_move_lcr);
-    }
-
-    // Aim toggles: always restore from saved value, default false for new/missing projects
-    if (typeof appState?.setAimFrontWidesAtMLP === "function") {
-      appState.setAimFrontWidesAtMLP(!!p?.aim_front_wides_at_mlp);
-    }
-    if (typeof appState?.setAimSideSurroundsAtMLP === "function") {
-      appState.setAimSideSurroundsAtMLP(!!p?.aim_side_surrounds_at_mlp);
-    }
-    if (typeof appState?.setAimRearSurroundsAtMLP === "function") {
-      appState.setAimRearSurroundsAtMLP(!!p?.aim_rear_surrounds_at_mlp);
     }
 
     // Row spacing + seats per row (correct field names)
@@ -735,12 +728,6 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
       setAutosaveStatus("local");
       // Free Use starter: always apply clean state on scratch boot, overrides any stale autosave
       {
-        // Reset all aim toggles to OFF for new Free Use sessions
-        if (typeof setLcrAimMode === "function") setLcrAimMode("flat");
-        if (typeof appState?.setAimFrontWidesAtMLP === "function") appState.setAimFrontWidesAtMLP(false);
-        if (typeof appState?.setAimSideSurroundsAtMLP === "function") appState.setAimSideSurroundsAtMLP(false);
-        if (typeof appState?.setAimRearSurroundsAtMLP === "function") appState.setAimRearSurroundsAtMLP(false);
-
         const freeUseRoom = { widthM: 4.0, lengthM: 6.0, heightM: 2.4 };
         if (typeof appState?.setRoomDims === "function") {
           appState.setRoomDims(freeUseRoom);
