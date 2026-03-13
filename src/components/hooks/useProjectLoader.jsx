@@ -244,14 +244,12 @@ if (appState?.setRoomDims && appState?.roomDims) {
     }
 
     //
-    // 5) SCREEN FRONT PLANE
+    // 5) SCREEN FRONT PLANE — intentionally NOT restored from storage.
+    // screenFrontPlaneM is a derived value (computed from screen geometry + LCR placement).
+    // Restoring it pins the MLP effect to stale row centres on project open.
+    // The MLP effect will recompute it from live floatDepthM on first render,
+    // exactly as it does in Free Use mode.
     //
-    if (typeof appState?.setScreenFrontPlaneM === "function") {
-      const savedPlaneM = Number(p?.screen_front_plane_m);
-      if (Number.isFinite(savedPlaneM)) {
-        appState.setScreenFrontPlaneM(savedPlaneM);
-      }
-    }
 
     //
     // 6) OVERLAYS
