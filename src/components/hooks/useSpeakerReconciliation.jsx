@@ -222,7 +222,7 @@ export function useSpeakerReconciliation({
       });
 
       // If it's a 7.x bed and the user wants 'wides', transform the seeded speakers
-      if (is7ChannelBed && _sevenBedLayoutType === 'wides') {
+      if (is7ChannelBed && resolvedSevenBedLayoutType === 'wides') {
         seededSpeakers = seededSpeakers.
         filter((s) => s.role !== 'SBL' && s.role !== 'SBR').
         concat([
