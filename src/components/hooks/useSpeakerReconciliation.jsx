@@ -250,7 +250,7 @@ export function useSpeakerReconciliation({
         const major = parseInt(String(dolbyPreset || '').split('.')[0], 10) || 5;
         const is9xLayout = major >= 9;
         // sevenBedLayoutType ONLY applies to 7.x. 9.x always requires BOTH rears AND wides.
-        const useWidesInsteadOfRears = !is9xLayout && _sevenBedLayoutType === 'wides';
+        const useWidesInsteadOfRears = !is9xLayout && resolvedSevenBedLayoutType === 'wides';
 
         const wantsRears = is9xLayout || (major === 7 && !useWidesInsteadOfRears);
         const wantsWides = is9xLayout || (major === 7 && useWidesInsteadOfRears);
