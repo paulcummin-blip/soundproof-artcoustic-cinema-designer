@@ -1013,7 +1013,8 @@ function RoomDesignerWithState() {
     const prev = prevRoomDimsRef.current;
     if (prev && prev.width === W && prev.length === L) return;
     prevRoomDimsRef.current = { width: W, length: L };
-    if (!prev) return;
+    // On first pass (prev === null): still run rescue if any speaker is out of bounds.
+    // This ensures loaded projects get the same correction as interactive Free Use resizes.
     const INSET = 0.01; let anyOutOfBounds = false;
     const rescued = placedSpeakers.map((spk) => { if (!spk.position || !Number.isFinite(spk.position.x) || !Number.isFinite(spk.position.y)) return spk; const x = spk.position.x; const y = spk.position.y; if (!(x < 0 || x > W || y < 0 || y > L)) return spk; anyOutOfBounds = true; return { ...spk, position: { ...spk.position, x: Math.max(INSET, Math.min(W - INSET, x)), y: Math.max(INSET, Math.min(L - INSET, y)) } }; });
     if (anyOutOfBounds) setSpeakers((prev) => preserveSurroundModels(prev, rescued, appState));
