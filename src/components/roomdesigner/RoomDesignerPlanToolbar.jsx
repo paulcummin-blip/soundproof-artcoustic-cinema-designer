@@ -126,15 +126,6 @@ export default function RoomDesignerPlanToolbar({
         }
       </div>
       
-      {/* Free Move (LCR) toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '2px solid #213428', paddingLeft: 12 }}>
-        <label htmlFor="free-move-lcr" style={{ fontSize: 12, color: '#3E4349' }}>Free Move (LCR)</label>
-        <Switch
-          id="free-move-lcr"
-          checked={freeMoveLcr}
-          onCheckedChange={setFreeMoveLcr} />
-      </div>
-
       {/* NEW: 3-state zoom toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
         <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Zoom</span>
