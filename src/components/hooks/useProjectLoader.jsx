@@ -735,6 +735,12 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
       setAutosaveStatus("local");
       // Free Use starter: always apply clean state on scratch boot, overrides any stale autosave
       {
+        // Reset all aim toggles to OFF for new Free Use sessions
+        if (typeof setLcrAimMode === "function") setLcrAimMode("flat");
+        if (typeof appState?.setAimFrontWidesAtMLP === "function") appState.setAimFrontWidesAtMLP(false);
+        if (typeof appState?.setAimSideSurroundsAtMLP === "function") appState.setAimSideSurroundsAtMLP(false);
+        if (typeof appState?.setAimRearSurroundsAtMLP === "function") appState.setAimRearSurroundsAtMLP(false);
+
         const freeUseRoom = { widthM: 4.0, lengthM: 6.0, heightM: 2.4 };
         if (typeof appState?.setRoomDims === "function") {
           appState.setRoomDims(freeUseRoom);
