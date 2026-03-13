@@ -140,6 +140,8 @@ export function useSeatingRebuild({
     if (
       isLoadedProject &&
       currentSeats.length > 0 &&
+      Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length > 0 &&
+      Number.isFinite(appState?.mlpY_m) &&
       !userHasChangedSeatingSinceLoad &&
       !didUserRequestResetRef.current &&
       !(appState?.roomResetEpoch > 0) &&
