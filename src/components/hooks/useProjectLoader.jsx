@@ -181,14 +181,10 @@ if (appState?.setRoomDims && appState?.roomDims) {
       setSevenBedLayoutType(p?.seven_bed_layout_type || "rears");
     }
 
-    // Hydrate LCR aim mode (safe/idempotent; no hooks here)
-    const hydratedLcrAimMode = p?.lcr_aim_mode;
-
-    if (
-      (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") &&
-      typeof setLcrAimMode === "function"
-    ) {
-      setLcrAimMode(hydratedLcrAimMode);
+    // Hydrate LCR aim mode — always set, default "flat" for new/missing projects
+    if (typeof setLcrAimMode === "function") {
+      const hydratedLcrAimMode = p?.lcr_aim_mode;
+      setLcrAimMode((hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") ? hydratedLcrAimMode : "flat");
     }
 
     const hydratedEnableFrontWides = p?.enable_front_wides ?? false;
@@ -198,6 +194,17 @@ if (appState?.setRoomDims && appState?.roomDims) {
 
     if (typeof setFreeMoveLcr === "function") {
       setFreeMoveLcr(!!p?.free_move_lcr);
+    }
+
+    // Aim toggles: always restore from saved value, default false for new/missing projects
+    if (typeof appState?.setAimFrontWidesAtMLP === "function") {
+      appState.setAimFrontWidesAtMLP(!!p?.aim_front_wides_at_mlp);
+    }
+    if (typeof appState?.setAimSideSurroundsAtMLP === "function") {
+      appState.setAimSideSurroundsAtMLP(!!p?.aim_side_surrounds_at_mlp);
+    }
+    if (typeof appState?.setAimRearSurroundsAtMLP === "function") {
+      appState.setAimRearSurroundsAtMLP(!!p?.aim_rear_surrounds_at_mlp);
     }
 
     // Row spacing + seats per row (correct field names)
