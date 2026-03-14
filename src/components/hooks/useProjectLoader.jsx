@@ -147,7 +147,7 @@ if (appState?.setRoomDims && appState?.roomDims) {
     //
     // 2) SCREEN
     //
-    const screenSizeInches = Number(p?.screen_size) || 100;
+    const screenSizeInches = Number(p?.screen_size) || 120;
     const aspectRatio = p?.aspect_ratio || "16:9";
 
     if (typeof setScreen === "function") {
