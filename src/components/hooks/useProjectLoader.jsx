@@ -886,8 +886,8 @@ const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
       // DEBUG: Log what we're about to save
       if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject payload', effectiveProjectId, {
         room: { w: projectData.room_width, l: projectData.room_length, h: projectData.room_height },
-        seating_count: projectData.seating_positions ? JSON.parse(projectData.seating_positions).length : 0,
-        speakers_count: projectData.selected_speakers ? JSON.parse(projectData.selected_speakers).length : 0,
+        seating_count: Array.isArray(projectData.seating_positions) ? projectData.seating_positions.length : 0,
+        speakers_count: Array.isArray(projectData.selected_speakers) ? projectData.selected_speakers.length : 0,
         screen_size: projectData.screen_size,
         dolby: projectData.dolby_config
       });
