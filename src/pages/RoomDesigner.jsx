@@ -528,17 +528,32 @@ function RoomDesignerWithState() {
       }
     }
 
-    // Project mode: use stored MLP Y when valid
+    // Project mode: derive anchor from primary/centre seat first (matches RSP card and Viewing Angle panel)
+    // This ensures the visible dot agrees with the card/panel on first render.
+    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
+      const primarySeat = seats.find(s => s.isPrimary);
+      const candidate = primarySeat || (() => {
+        let best = null; let bestDx = Infinity;
+        for (const s of seats) {
+          const sx = Number(s?.x ?? s?.position?.x);
+          const sy = Number(s?.y ?? s?.position?.y);
+          if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
+          const dx = Math.abs(sx - cx);
+          if (dx < bestDx) { bestDx = dx; best = s; }
+        }
+        return best;
+      })();
+      if (candidate) {
+        const cy = Number(candidate.y ?? candidate.position?.y);
+        const cz = Number(candidate.z ?? candidate.position?.z);
+        if (Number.isFinite(cy)) return { x: cx, y: cy, z: Number.isFinite(cz) ? cz : 1.2 };
+      }
+    }
+
+    // Fallback to stored MLP Y if no usable seats
     const mlpY = appState?.mlpY_m;
     if (Number.isFinite(mlpY)) {
       return { x: cx, y: mlpY, z: 1.2 };
-    }
-
-    // Fallback: lock dot to centre seat while mlpY_m is not ready.
-    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
-      let best = null, bestDx = Infinity;
-      for (const s of seats) { const sx = Number(s?.x ?? s?.position?.x), sy = Number(s?.y ?? s?.position?.y); if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue; const dx = Math.abs(sx - cx); if (dx < bestDx) { bestDx = dx; best = s; } }
-      if (best) { const by = Number(best.y ?? best.position?.y), bz = Number(best.z ?? best.position?.z); if (Number.isFinite(by)) return { x: cx, y: by, z: Number.isFinite(bz) ? bz : 1.2 }; }
     }
 
     // If no seats yet, keep null so RV can do its own last-resort fallback
