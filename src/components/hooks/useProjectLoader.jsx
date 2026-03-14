@@ -74,7 +74,9 @@ appState, // Pass appState directly for setters
   const hydratedRoomDimsProjectIdRef = useRef(null);
 
   const parseMaybe = useCallback((val, fallback) => {
+    if (val == null) return fallback;
     if (Array.isArray(val)) return val;
+    if (typeof val === "object") return val; // plain object from API — return as-is
     if (typeof val === "string" && val.trim()) {
       try {return JSON.parse(val);} catch {/* ignore */}
     }
