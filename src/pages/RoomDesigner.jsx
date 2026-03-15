@@ -1800,6 +1800,7 @@ function RoomDesignerWithState() {
                 setGlobalSurroundModel={appState?.setGlobalSurroundModel}
 
                 allSeatSplMetrics={allSeatSplMetrics}
+                updateGlobalSpl={updateGlobalSplWithProjectSync}
                 frontWideOverlay={frontWideZones}
                 allowExtraSurrounds={isNineBedLayout}
                 extraSurroundCount={isNineBedLayout ? (appState?.extraSurroundCount ?? 0) : 0}
