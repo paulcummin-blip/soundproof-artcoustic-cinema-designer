@@ -2982,10 +2982,7 @@ function SpeakerPlacementImpl(props) {
         <Label htmlFor="system-config" className="text-[#1B1A1A] font-bold text-base block">System Configuration</Label>
         <Select 
           value={effectivePreset} 
-          onValueChange={(v) => { 
-            if (setDolbyConfig) setDolbyConfig(v); 
-            if (onDolbyPresetChange) onDolbyPresetChange(v);
-          }}
+          onValueChange={(v) => { if (setDolbyConfig) setDolbyConfig(v); if (onDolbyPresetChange) onDolbyPresetChange(v); if (props.onImmediateDolbyUpdate) props.onImmediateDolbyUpdate(v); }}
           disabled={disabled}
         >
           <SelectTrigger id="system-config" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
