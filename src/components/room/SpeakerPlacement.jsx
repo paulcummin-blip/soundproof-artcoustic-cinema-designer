@@ -518,29 +518,6 @@ function UnifiedSurroundsConfig({
     lastSurroundModelKeyRef,
   ]);
   
-  // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
-  // This effect was redundant and could conflict with user selections.
-  // useEffect(() => {
-  //   const master = surroundConfig?.value?.master;
-  //   if (!master || master === 'off') return;
-  //
-  //   setSpeakers(prev => {
-  //     let changed = false;
-  //     const next = (Array.isArray(prev) ? prev : []).map(s => {
-  //       const role = String(s?.role || "").toUpperCase();
-  //       const canon = getCanonicalRole(role);
-  //       const isBedSurround = ALL_SURROUND_ROHAS(canon);
-  //       
-  //       if (isBedSurround && !s.model && allowedRoles.has(canon)) {
-  //         changed = true;
-  //         return { ...s, model: master };
-  //       }
-  //       return s;
-  //     });
-  //     return changed ? next : prev;
-  //   });
-  // }, [surroundConfig?.value?.master, setSpeakers, allowedRoles]);
-  
   const surroundChoices = useMemo(() => {
     const byCat = getModelsByCategoryOrdered();
     const surrounds = byCat['SURROUNDS'] || [];
