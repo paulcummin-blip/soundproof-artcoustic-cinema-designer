@@ -1756,6 +1756,7 @@ function RoomDesignerWithState() {
                   
                   <Suspense fallback={<div>Loading...</div>}>
                       <SpeakerPlacement disabled={isFrozen('speakers')}
+                onImmediateDolbyUpdate={(v) => { if (projectIdState) Project.update(projectIdState, { dolby_config: v }); }}
                 dimensions={stableDimensions}
                 sevenBedLayoutType={_sevenBedLayoutType}
                 onSevenBedLayoutTypeChange={setSevenBedLayoutType}
