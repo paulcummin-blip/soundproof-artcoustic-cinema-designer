@@ -209,6 +209,7 @@ export function useSeatingRebuild({
     const spacingX = Number(_seatSpacing) || 0.8;
 
     // 4) Build all seats
+    const prevSeatById = new Map(currentSeats.map(s => [s.id, s]));
     const seats = [];
 
     list.forEach((rawCount, rowIndex) => {
@@ -219,12 +220,17 @@ export function useSeatingRebuild({
       const startX = centerX - totalWidth / 2;
 
       for (let i = 0; i < count; i++) {
+        const seatId = `seat-r${rowIndex + 1}-c${i + 1}`;
+        const prev = prevSeatById.get(seatId);
+
         seats.push({
-          id: `seat-r${rowIndex + 1}-c${i + 1}`,
+          id: seatId,
           x: startX + i * spacingX,
           y,
           z: 1.2,
-          rowNumber: rowIndex + 1
+          rowNumber: rowIndex + 1,
+          isPrimary: prev?.isPrimary || false,
+          isSecondary: prev?.isSecondary || false
         });
       }
     });
