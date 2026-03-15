@@ -594,18 +594,6 @@ function SpeakerPlacementImpl(props) {
     };
   }, [getModelDimsM, WALL_BUFFER_M]);
 
-  // Expose getModelDimsM to window for applyFrontWideMedianPositions helper
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.__GET_SPEAKER_META = getModelDimsM;
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        delete window.__GET_SPEAKER_META;
-      }
-    };
-  }, [getModelDimsM]);
-
   const applyCornerClearance = useCallback((position, role, speakerModel, roomDimensions, zones) => {
   const W = Number(roomDimensions?.width ?? roomDimensions?.widthM) || 0;
   const L = Number(roomDimensions?.length ?? roomDimensions?.lengthM) || 0;
