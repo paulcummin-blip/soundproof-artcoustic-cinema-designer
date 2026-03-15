@@ -916,7 +916,7 @@ function RoomDesignerWithState() {
       setScreen: _setScreen, setSeatingPositions: appState?.setSeatingPositions,
       setRoomElements: appState?.setRoomElements,
       setOverlays: _setOverlays, setDolbyConfig: appState?.setDolbyConfig,
-      setDolbyPreset,
+      setDolbyPreset: _setDolbyPresetBase,
       setSpeakerSystem: store.setSpeakerSystem,
       initWithDefaultsAndRules: initWithDefaultsAndRules,
       placedSpeakers: placedSpeakers,
