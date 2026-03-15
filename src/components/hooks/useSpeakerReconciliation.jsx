@@ -441,8 +441,14 @@ export function useSpeakerReconciliation({
               }
 
               const finalModel = modelFromOverrides || _overheadGlobalModel || seeded.model;
-              if (globalThis.__B44_LOGS) debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
-              nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
+              // Only create overhead speaker object if a real model is available
+              const finalMs = String(finalModel ?? "").trim().toLowerCase();
+              if (!finalMs || finalMs === "off" || finalMs === "none") {
+                if (globalThis.__B44_LOGS) debug(`[Speakers] Skipping overhead ${canonId} — no model assigned`);
+              } else {
+                if (globalThis.__B44_LOGS) debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
+                nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
+              }
             } else {
               if (globalThis.__B44_LOGS) debug(`[Speakers] WARNING: Target overhead ${canonId} not found in seeded speakers!`);
             }
