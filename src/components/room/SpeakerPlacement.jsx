@@ -720,18 +720,6 @@ export const applyLCRModel = applyLcrModel;
 const UnifiedSurroundsConfig = UnifiedSurroundsConfigExtracted;
 const MemoizedUnifiedSurroundsConfig = React.memo(UnifiedSurroundsConfig);
 
-function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset, allSeatSplMetrics, mlpSeat }) {
-  return (
-    <div style={{ marginTop: 8 }}>
-      <OverheadSplStrip
-        allSeatSplMetrics={allSeatSplMetrics}
-        mlpSeat={mlpSeat}
-        dolbyLayout={dolbyPreset}
-      />
-    </div>
-  );
-}
-
 function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
   setSpeakers(prev => {
     const list = Array.isArray(prev) ? prev : [];
