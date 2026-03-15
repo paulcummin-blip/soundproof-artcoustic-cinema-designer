@@ -429,7 +429,6 @@ function UnifiedSurroundsConfig({
 
       const draft = Array.from(byRole.values());
 
-      // Tell SpeakerPlacementImpl to hydrate surround positions centrally (where resetSurroundPositions exists)
       if (needsSurroundResetRef) needsSurroundResetRef.current = true;
       if (lastSurroundModelKeyRef) lastSurroundModelKeyRef.current = modelKey;
 
