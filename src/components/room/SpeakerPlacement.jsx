@@ -22,7 +22,7 @@ import { getLevelColors } from '@/components/utils/rp22Colors';
 import { timeNowMs } from "@/components/utils/timeNow";
 import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
-import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
+import { getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import SurroundSplStrip from '@/components/speakers/SurroundSplStrip';
 
 const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
