@@ -140,7 +140,7 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
 
 function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics }) {
   const appState = useAppState();
-  const { speakerSystem, setScreen, splConfig = {}, updateGlobalSpl, seatingPositions } = appState || {};
+  const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(["FL", "FC", "FR"]), []);
