@@ -125,7 +125,7 @@ function ProjectCard({ project, onDelete }) {
 -            Config: <RenderSafe value={project?.dolby_config ?? 'N/A'} label="project.dolby_config" />
 -          </span>
 +          <span>
-+            Config: {text(project?.dolby_config, 'N/A')}
++            Config: {text(project?.dolby_config ?? project?.dolbyLayout, 'N/A')}
 +          </span>
         </div>
       </CardContent>
