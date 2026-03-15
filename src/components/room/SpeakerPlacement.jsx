@@ -2769,118 +2769,23 @@ function SpeakerPlacementImpl(props) {
         </div>
       </CollapsiblePanel>
 
-      {overheadCount > 0 && (
-        <CollapsiblePanel title="Overhead Channels" defaultOpen={false}>
-          <div className="space-y-3 p-2">
-            <OverheadChannelSelector
-              overheadCount={overheadCount}
-              globalModel={overheadGlobalModel}
-              onGlobalModelChange={setOverheadGlobalModel}
-              frontOverride={overheadFrontOverride}
-              midOverride={overheadMidOverride}
-              rearOverride={overheadRearOverride}
-              onFrontOverrideChange={setOverheadFrontOverride}
-              onMidOverrideChange={setOverheadMidOverride}
-              onRearOverrideChange={setOverheadRearOverride}
-              useFrontGlobal={useFrontGlobal}
-              useMidGlobal={useMidGlobal}
-              useRearGlobal={useRearGlobal}
-              onUseFrontGlobalChange={setUseFrontGlobal}
-              onUseMidGlobalChange={setUseMidGlobal}
-              onUseRearGlobalChange={setUseRearGlobal}
-              disabled={disabled}
-            />
-            
-            <OverheadsSection 
-              placedSpeakers={placedSpeakers} 
-              setSpeakers={setSpeakers} 
-              mlpPoint={mlpPoint} 
-              dolbyPreset={effectivePreset}
-              allSeatSplMetrics={allSeatSplMetrics}
-              mlpSeat={mlpSeat}
-            />
-
-            {/* Amplifier Power (Overheads) */}
-            <div className="space-y-2 mt-4">
-              <Label className="text-xs text-[#625143]">Amplifier Power (Overheads)</Label>
-              <div className="relative">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={overheadsPowerInputValue}
-                  onChange={(e) => {
-                    const newValue = e.target.value;
-                    // Allow only digits while typing
-                    if (newValue !== '' && !/^\d+$/.test(newValue)) return;
-                    
-                    setOverheadsPowerInputValue(newValue);
-                    
-                    if (newValue === '') return;
-                    
-                    const val = parseInt(newValue, 10);
-                    if (Number.isFinite(val) && val >= 1 && val <= 5000) {
-                      updateGlobalSpl?.({ overheadsW: val });
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    if (!Number.isFinite(val) || val < 1 || val > 5000) {
-                      const lastValid = splConfig?.overheadsW || 100;
-                      setOverheadsPowerInputValue(String(lastValid));
-                    } else {
-                      const clamped = Math.max(1, Math.min(5000, val));
-                      setOverheadsPowerInputValue(String(clamped));
-                      if (clamped !== (splConfig?.overheadsW || 100)) {
-                        updateGlobalSpl?.({ overheadsW: clamped });
-                      }
-                    }
-                  }}
-                  disabled={disabled}
-                  className="pr-8"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
-                  W
-                </span>
-              </div>
-            </div>
-
-            {(() => {
-              if (!allSeatSplMetrics) return null;
-
-              // Use synthetic "mlp" entry (green dot), fallback to mlpSeat
-              const mlpMetrics = allSeatSplMetrics.get("mlp");
-              const seatMetrics = mlpMetrics || (mlpSeat ? allSeatSplMetrics.get(mlpSeat.id) : null);
-
-              if (!seatMetrics?.spl?.uppers) return null;
-
-              const overheadTileSplDb = Object.values(seatMetrics.spl.uppers)
-                .map(s => s?.value)
-                .filter(v => Number.isFinite(v))
-                .map(v => Math.ceil(v));
-
-              if (overheadTileSplDb.length === 0) return null;
-
-              const pillBasisDb = Math.min(...overheadTileSplDb);
-              
-              // Use P13-specific mode (independent from P12)
-              const { splConfig } = useAppState() || {};
-              const isMinimumMode = splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode;
-              const thresholds = isMinimumMode ? P13_THRESHOLDS_MIN : P13_THRESHOLDS_REC;
-              
-              const level = computeRP22Level(pillBasisDb, thresholds);
-
-              return (
-                <RP22LevelPill 
-                  parameter="P13" 
-                  level={level} 
-                  label="RP22 P13 (Overheads)"
-                />
-              );
-            })()}
-            </div>
-            </CollapsiblePanel>
-            )}
+      <OverheadChannelsPanel
+        overheadCount={overheadCount}
+        overheadGlobalModel={overheadGlobalModel} setOverheadGlobalModel={setOverheadGlobalModel}
+        overheadFrontOverride={overheadFrontOverride} setOverheadFrontOverride={setOverheadFrontOverride}
+        overheadMidOverride={overheadMidOverride} setOverheadMidOverride={setOverheadMidOverride}
+        overheadRearOverride={overheadRearOverride} setOverheadRearOverride={setOverheadRearOverride}
+        useFrontGlobal={useFrontGlobal} setUseFrontGlobal={setUseFrontGlobal}
+        useMidGlobal={useMidGlobal} setUseMidGlobal={setUseMidGlobal}
+        useRearGlobal={useRearGlobal} setUseRearGlobal={setUseRearGlobal}
+        disabled={disabled}
+        placedSpeakers={placedSpeakers}
+        setSpeakers={setSpeakers}
+        mlpPoint={mlpPoint}
+        effectivePreset={effectivePreset}
+        allSeatSplMetrics={allSeatSplMetrics}
+        mlpSeat={mlpSeat}
+      />
 
       <SubwooferPanel
         appState={appState}
