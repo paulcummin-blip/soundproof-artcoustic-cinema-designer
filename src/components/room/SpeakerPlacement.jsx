@@ -3003,15 +3003,9 @@ function SpeakerPlacementImpl(props) {
       )}
 
       <CollapsiblePanel title="LCR" defaultOpen>
-        <LCRPanel 
-          setSpeakers={setSpeakers} 
-          dimensions={dimensions}
-          lcrAimMode={lcrAimMode}
-          onChangeLcrAimMode={onChangeLcrAimMode}
-          lcrAngleDeg={lcrAngleDeg}
-          mlpPoint={mlpPoint}
-          disabled={disabled}
-          allSeatSplMetrics={allSeatSplMetrics}
+        <LCRPanel setSpeakers={setSpeakers} dimensions={dimensions} lcrAimMode={lcrAimMode}
+          onChangeLcrAimMode={onChangeLcrAimMode} lcrAngleDeg={lcrAngleDeg} mlpPoint={mlpPoint}
+          disabled={disabled} allSeatSplMetrics={allSeatSplMetrics} onP12Computed={props?.onP12Computed}
         />
       </CollapsiblePanel>
 
