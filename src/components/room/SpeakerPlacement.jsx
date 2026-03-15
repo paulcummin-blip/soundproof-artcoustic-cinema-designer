@@ -161,7 +161,7 @@ import {
   useStickyDb, SplBox, SplBoxP13,
 } from './sp/SpSplBoxes';
 
-// --- idempotence helpers -----------------------------------------------------
+// --- idempotence helpers ---
 const EPS = 1e-4;
 const almostEq = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) <= EPS;
 
