@@ -205,8 +205,6 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
     ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers);
   }, [dimensions, setSpeakers, lcrModelOptions]);
 
-  const angled = lcrAimMode === "angled";
-
   return (
     <div className="space-y-2 p-2">
       <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
