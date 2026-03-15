@@ -849,12 +849,6 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
   );
 }
 
-function formatDolbyLabel(key) {
-  const [a = "5", b = "1", c = "0"] = String(key).split(".");
-  const overheads = Number(c) || 0;
-  return overheads > 0 ? `${a}.${b}.${overheads} Dolby Atmos` : `${a}.${b} Surround`;
-}
-
 function SpeakerPlacementImpl(props) {
   const dimensions = props?.dimensions; // legacy alias to prevent ReferenceError
   
