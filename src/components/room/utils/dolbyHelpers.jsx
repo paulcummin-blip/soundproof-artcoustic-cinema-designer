@@ -194,14 +194,15 @@ export function ensureAtmosOverheads({
     const canonId = String(id || "").toUpperCase();
     const existing = existingByRole.get(canonId);
     if (existing) {
-      nextOverheads.push(existing);
+      // Only keep existing overhead if it has a real model
+      const ms = String(existing.model ?? "").trim().toLowerCase();
+      if (ms && ms !== "off" && ms !== "none") {
+        nextOverheads.push(existing);
+      }
       continue;
     }
 
-    const seededSpk = seededOverheadsByRole.get(canonId);
-    if (seededSpk) {
-      nextOverheads.push(seededSpk);
-    }
+    // Don't create new overhead slots — they will be added when a model is selected
   }
 
   let merged = [...bedSpeakers, ...nextOverheads];
