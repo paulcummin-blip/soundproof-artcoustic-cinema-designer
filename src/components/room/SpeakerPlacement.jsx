@@ -1211,7 +1211,7 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
   });
 }
 
-function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics }) {
+function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Computed }) {
   const appState = useAppState();
   const { speakerSystem, setScreen, splConfig = {}, updateGlobalSpl, seatingPositions } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
