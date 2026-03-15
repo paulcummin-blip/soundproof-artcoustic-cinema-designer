@@ -102,7 +102,14 @@ export function useSpeakerReconciliation({
     Array.isArray(placedSpeakers) &&
     placedSpeakers.some((spk) => safeCanon(spk.role || "").startsWith("T"));
 
-    if (hasOverheadTargets && !hasAnyExistingOverheads) {
+    // Only run early overhead ensure if an overhead model is actually selected
+    const hasOverheadModel = !!(
+      _overheadGlobalModel &&
+      String(_overheadGlobalModel).trim().toLowerCase() !== "off" &&
+      String(_overheadGlobalModel).trim().toLowerCase() !== "none"
+    );
+
+    if (hasOverheadTargets && !hasAnyExistingOverheads && hasOverheadModel) {
       setSpeakers((prev) => {
         const base = Array.isArray(prev) && prev.length ? prev : seedSpeakersFromPreset({
           preset: normalizedPreset,
