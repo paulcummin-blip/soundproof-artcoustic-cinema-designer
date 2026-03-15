@@ -539,48 +539,6 @@ function bestMaxSPL1m({ sensitivity_dB_1W1m, max_power_W, excursionMax1m }) {
   return powerCalc;
 }
 
-function getSurroundGroups(dolbyPreset) {
-  const major = Number(String(dolbyPreset || "5.1").split(".")[0]) || 5;
-  const groups = [
-    { key: "wides", label: "Front Wides", roles: ["LW", "RW"], required: false },
-    { key: "sides", label: "Side Surrounds", roles: ["SL", "SR"], required: false },
-    { key: "rears", label: "Rear Surrounds", roles: ["SBL", "SBR"], required: false },
-  ];
-
-  if (major === 5) return groups.map(g => g.key === "sides" ? { ...g, required: true } : { ...g, required: false });
-  if (major === 7) {
-    const wantWides = false;
-    return groups.map(g => {
-      if (g.key === "sides") return { ...g, required: true };
-      if (g.key === "rears") return { ...g, required: !wantWides };
-      if (g.key === "wides") return { ...g, required: wantWides };
-      return g;
-    });
-  }
-  if (major >= 9) return groups.map(g => ({ ...g, required: true }));
-  return groups;
-}
-
-function getOverheadGroups(dolbyPreset) {
-  const parts = String(dolbyPreset || "").split(".");
-  const overheadCount = Number(parts[2] || 0);
-
-  const base = [
-    { key: "oh-front",  label: "Front Overhead",  roles: ["TFL", "TFR"], required: false },
-    { key: "oh-middle", label: "Middle Overhead", roles: ["TL", "TR"],   required: false },
-    { key: "oh-rear",   label: "Rear Overhead",   roles: ["TBL", "TBR"], required: false },
-  ];
-
-  if (overheadCount >= 6) return base.map(g => ({ ...g, required: true }));
-  if (overheadCount === 4) return base.map(g => g.key === "oh-front" || g.key === "oh-rear" ? { ...g, required: true } : { ...g, required: false });
-  if (overheadCount === 2) return base.map(g => g.key === "oh-middle" ? { ...g, required: true } : { ...g, required: false });
-  return base;
-}
-
-const groupHeaderStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", margin: "8px 0" };
-const noteStyle = { fontSize: 12, color: "#8a8e93", marginLeft: 8 };
-const rowStyle = { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 12 };
-
 export function applyLcrModel(placed, model) {
   if (!Array.isArray(placed)) return Array.isArray(placed) ? placed : [];
   return placed.map((spk) => {
