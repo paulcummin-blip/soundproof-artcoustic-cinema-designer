@@ -292,10 +292,6 @@ function rp22P13Level(db) {
   return 4;
 }
 
-function normalizeName(s) {
-  return String(s || "").trim();
-}
-
 function prettyChannel(ch) {
   const m = {
     FL: "Front Left", FR: "Front Right", FC: "Front Center",
