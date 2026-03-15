@@ -38,7 +38,6 @@ function computeRP22Level(splDb, thresholds) {
 
 // RP22 Level Pill Component (P13 only - P12 version lives in LCRPanel.jsx)
 function RP22LevelPill({ parameter, level, label }) {
-  const { getLevelColors } = require('@/components/utils/rp22Colors');
   const colors = getLevelColors(level);
   
   return (
