@@ -5,6 +5,7 @@ import { __b44SigFor, __b44SameSpeakers } from '@/components/utils/speakerEquali
 import UnifiedSurroundsConfigExtracted from './UnifiedSurroundsConfig';
 import SubwooferPanel from './SubwooferPanel';
 import OverheadChannelsPanel from './OverheadChannelsPanel';
+import { useFinalSafetyPass } from './hooks/useFinalSafetyPass';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -17,13 +18,11 @@ import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import { safeNum } from '@/components/utils/splMath';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { safeGroup, safeTable, safeGroupEnd } from "@/components/utils/safeLog";
-import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, displayModelKey } from "@/components/models/speakers/registry";
+import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
 import { getLevelColors } from '@/components/utils/rp22Colors';
-import SurroundsSelector from '../speakers/SurroundsSelector';
-import { calibratedSplAtSeat, euclideanDistance } from "@/components/utils/splMath";
 import { timeNowMs } from "@/components/utils/timeNow";
 import LcrSplCard from '@/components/speakers/LcrSplCard';
-import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
+import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import SurroundSplStrip from '@/components/speakers/SurroundSplStrip';
 
