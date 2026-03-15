@@ -49,7 +49,6 @@ import { safeCanon, mergePreserveOverheads, cloneRoleWithModel, speakersEqual, p
 import { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { useUrlQuery, useSurroundGroupDepths, parseProjectJson, getMlpPoint } from "@/components/roomdesigner/RoomDesignerHelpers";
-import { Project } from "@/entities/Project";
 import { _isNum, _degToRad, _wrap180, _projectHalfExtent, _getDimsM } from "@/components/roomdesigner/utils/speakerDepthHelpers";
 import { useFrontWideZones } from "@/components/hooks/useFrontWideZones";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
