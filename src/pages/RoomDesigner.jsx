@@ -1756,12 +1756,11 @@ function RoomDesignerWithState() {
                   
                   <Suspense fallback={<div>Loading...</div>}>
                       <SpeakerPlacement disabled={isFrozen('speakers')}
-                onImmediateDolbyUpdate={(v) => { if (projectIdState) Project.update(projectIdState, { dolby_config: v }); }}
                 dimensions={stableDimensions}
                 sevenBedLayoutType={_sevenBedLayoutType}
                 onSevenBedLayoutTypeChange={setSevenBedLayoutType}
                 dolbyPreset={dolbyPreset}
-                onDolbyPresetChange={setDolbyPreset}
+                onDolbyPresetChange={(v) => { setDolbyPreset(v); const pid = resolvedProjectId || projectIdState; if (pid) Project.update(pid, { dolby_config: v }); }}
                 lcrAimMode={lcrAimMode}
                 onChangeLcrAimMode={setLcrAimMode}
                 lcrAngleDeg={lcrAngleDeg}
