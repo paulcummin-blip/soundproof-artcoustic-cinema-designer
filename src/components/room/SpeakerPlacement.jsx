@@ -606,44 +606,6 @@ function SpeakerPlacementImpl(props) {
     };
   }, [getModelDimsM]);
 
-  const placeSurroundByRayCast = useCallback((angleDegrees, mlpPoint, roomDimensions) => {
-    const W = Number(roomDimensions?.width ?? roomDimensions?.widthM) || 0;
-    const L = Number(roomDimensions?.length ?? roomDimensions?.lengthM) || 0;
-    const { x: xm, y: ym } = mlpPoint;
-    const a = angleDegrees * (Math.PI / 180);
-    const dx = Math.sin(a);
-    const dy = -Math.cos(a);
-
-    let t = Infinity;
-
-    if (dx < 0) {
-      const tL = (WALL_BUFFER_M - xm) / dx;
-      if (tL > 0) t = Math.min(t, tL);
-    }
-    if (dx > 0) {
-      const tR = (W - WALL_BUFFER_M - xm) / dx;
-      if (tR > 0) t = Math.min(t, tR);
-    }
-    if (dy < 0) {
-      const tF = (WALL_BUFFER_M - ym) / dy;
-      if (tF > 0) t = Math.min(t, tF);
-    }
-    if (dy > 0) {
-      const tB = (L - WALL_BUFFER_M - ym) / dy;
-      if (tB > 0) t = Math.min(t, tB);
-    }
-
-    if (t === Infinity || t <= 0) {
-      return { x: xm, y: ym, z: 1.1 };
-    }
-
-    return {
-      x: xm + dx * t,
-      y: ym + dy * t,
-      z: 1.1
-    };
-  }, []);
-
   const applyCornerClearance = useCallback((position, role, speakerModel, roomDimensions, zones) => {
   const W = Number(roomDimensions?.width ?? roomDimensions?.widthM) || 0;
   const L = Number(roomDimensions?.length ?? roomDimensions?.lengthM) || 0;
