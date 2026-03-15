@@ -189,12 +189,13 @@ export function useSeatingRebuild({
         if (Array.isArray(generated) && generated.length === rowsNeeded) {
           const clamped = generated.map((y) => clampY(Number(y)));
           appState.setRowCentersM(clamped);
+          centers = clamped;
+        } else {
+          return;
         }
-
+      } else {
         return;
       }
-
-      return;
     }
 
     // 3) Basic geometry
