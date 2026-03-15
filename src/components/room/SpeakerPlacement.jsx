@@ -1413,14 +1413,8 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         const thresholds = isMinimumMode ? P12_THRESHOLDS_MIN : P12_THRESHOLDS_REC;
         
         const level = computeRP22Level(pillBasisDb, thresholds);
-
-        return (
-          <RP22LevelPill 
-            parameter="P12" 
-            level={level} 
-            label="RP22 P12"
-          />
-        );
+        onP12Computed?.({ level, mode: splConfig?.radiationMode || 'half-space' });
+        return <RP22LevelPill parameter="P12" level={level} label="RP22 P12" />;
       })()}
     </div>
   );
