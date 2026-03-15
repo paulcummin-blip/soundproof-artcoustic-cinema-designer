@@ -528,38 +528,8 @@ function RoomDesignerWithState() {
       }
     }
 
-    // Project mode: at offset=0, snap to exact 57.5° baseline in appState?.mlpY_m.
-    // At non-zero offset, fall through to seat-derived visual alignment below.
-    if (isProjectMode && Number(_seatingBlockOffset) === 0) {
-      const mlpY = appState?.mlpY_m;
-      if (Number.isFinite(mlpY)) {
-        return { x: cx, y: mlpY, z: 1.2 };
-      }
-    }
-
-    // Project mode: derive anchor from primary/centre seat first (matches RSP card and Viewing Angle panel)
-    // This ensures the visible dot agrees with the card/panel on first render.
-    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
-      const primarySeat = seats.find(s => s.isPrimary);
-      const candidate = primarySeat || (() => {
-        let best = null; let bestDx = Infinity;
-        for (const s of seats) {
-          const sx = Number(s?.x ?? s?.position?.x);
-          const sy = Number(s?.y ?? s?.position?.y);
-          if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
-          const dx = Math.abs(sx - cx);
-          if (dx < bestDx) { bestDx = dx; best = s; }
-        }
-        return best;
-      })();
-      if (candidate) {
-        const cy = Number(candidate.y ?? candidate.position?.y);
-        const cz = Number(candidate.z ?? candidate.position?.z);
-        if (Number.isFinite(cy)) return { x: cx, y: cy, z: Number.isFinite(cz) ? cz : 1.2 };
-      }
-    }
-
-    // Fallback to stored MLP Y if no usable seats
+    // Canonical anchor for both Free Use and saved projects: always use appState?.mlpY_m.
+    // Seat-derived Y must not override during offset changes — mlpY_m is the single source of truth.
     const mlpY = appState?.mlpY_m;
     if (Number.isFinite(mlpY)) {
       return { x: cx, y: mlpY, z: 1.2 };
