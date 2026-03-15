@@ -79,12 +79,6 @@ function buildRoleMap(list) {
   return m;
 }
 
-const degToRad = (deg) => (deg * Math.PI) / 180;
-
-const isValidModel = (m) => {
-  const s = String(m ?? "").trim().toLowerCase();
-  return !!s && s !== "off" && s !== "none";
-};
 
 const SURROUND_BED_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
 const LCR_ROLES = new Set(["FL", "FC", "FR"]);
