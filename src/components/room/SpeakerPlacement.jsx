@@ -3,7 +3,6 @@
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
 import { __b44SigFor, __b44SameSpeakers } from '@/components/utils/speakerEqualityUtils';
 import UnifiedSurroundsConfigExtracted from './UnifiedSurroundsConfig';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
