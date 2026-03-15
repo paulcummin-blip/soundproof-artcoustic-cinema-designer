@@ -400,7 +400,6 @@ function SpeakerPlacementImpl(props) {
     setUseMidGlobal,
     useRearGlobal,
     setUseRearGlobal,
-    enableFrontWides, // <-- FW overlay state
   } = appState;
 
   // CRITICAL: Effective room dimensions - NEVER empty, always has valid numbers
