@@ -86,67 +86,6 @@ const isValidModel = (m) => {
   return !!s && s !== "off" && s !== "none";
 };
 
-// Preserve surround bed models across any position/rotation-only updates
-const preserveSurroundModels = (prevList, nextList, appState) => {
-  const prev = Array.isArray(prevList) ? prevList : [];
-  const next = Array.isArray(nextList) ? nextList : [];
-
-  const surroundCanon = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
-
-  const prevByCanon = new Map();
-  prev.forEach((s) => {
-    prevByCanon.set(getCanonicalRole(s?.role), s);
-  });
-
-  return next.map((s) => {
-    const canon = getCanonicalRole(s?.role);
-    if (!surroundCanon.has(canon)) return s;
-
-    // keep next if already valid
-    if (isValidModel(s?.model)) return s;
-
-    // inherit previous same-role model if valid
-    const pm = prevByCanon.get(canon)?.model;
-    if (isValidModel(pm)) return { ...s, model: pm };
-
-    // inherit global surround model if valid
-    const gm = appState?.globalSurroundModel;
-    if (isValidModel(gm)) return { ...s, model: gm };
-
-    return s;
-  });
-};
-
-function projectToWallFromMLP(mlpX, mlpY, angleDeg, room) {
-  const angle = degToRad(angleDeg);
-  const dx = Math.cos(angle);
-  const dy = Math.sin(angle);
-  const margin = 0.01;
-
-  let t = Infinity;
-  if (dx < 0) t = Math.min(t, (room.left + margin - mlpX) / dx);
-  if (dx > 0) t = Math.min(t, (room.right - margin - mlpX) / dx);
-  if (dy < 0) t = Math.min(t, (room.front + margin - mlpY) / dy);
-  if (dy > 0) t = Math.min(t, (room.back - margin - mlpY) / dy);
-
-  if (!isFinite(t) || t <= 0) {
-    return { x: mlpX, y: mlpY };
-  }
-
-  return { x: mlpX + dx * t, y: mlpY + dy * t };
-}
-
-function ensureSpeaker(spk, role) {
-  return spk && spk.role === role ? spk : { id: `${role}-${Date.now()}`, role };
-}
-
-function yawDegToMLP(spkPos, mlpPos) {
-  const dx = mlpPos.x - spkPos.x;
-  const dy = mlpPos.y - spkPos.y;
-  const yawRad = Math.atan2(dx, dy);
-  return yawRad * 180 / Math.PI;
-}
-
 const SURROUND_BED_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
 const ALL_SURROUND_ROLES = new Set(["SL","SR","SBL","SBR","LW","RW"]);
 const LCR_ROLES = new Set(["FL", "FC", "FR"]);
