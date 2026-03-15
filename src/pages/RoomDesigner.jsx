@@ -1800,8 +1800,13 @@ function RoomDesignerWithState() {
                 setGlobalSurroundModel={appState?.setGlobalSurroundModel}
 
                 allSeatSplMetrics={allSeatSplMetrics}
-                updateGlobalSpl={updateGlobalSplWithProjectSync}
-                frontWideOverlay={frontWideZones}
+                 updateGlobalSpl={updateGlobalSplWithProjectSync}
+                 onP12Computed={(p12) => {
+                   const pid = resolvedProjectId || projectIdState;
+                   if (!pid) return;
+                   Project.update(pid, { spl_config: { ...(appState?.splConfig || {}), p12_mode: p12.mode, p12_level: p12.level } });
+                 }}
+                 frontWideOverlay={frontWideZones}
                 allowExtraSurrounds={isNineBedLayout}
                 extraSurroundCount={isNineBedLayout ? (appState?.extraSurroundCount ?? 0) : 0}
                 onExtraSurroundCountChange={isNineBedLayout ? appState?.setExtraSurroundCount : undefined} />
