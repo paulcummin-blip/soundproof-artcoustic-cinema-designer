@@ -256,7 +256,7 @@ function RoomDesignerWithState() {
 
   // Use AppState dolbyLayout directly (no local state override)
   const dolbyPreset = appState?.dolbyLayout || "5.1";
-  const _setDolbyPresetBase = appState?.setDolbyLayout;
+  const setDolbyPreset = appState?.setDolbyLayout;
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
 
@@ -916,7 +916,7 @@ function RoomDesignerWithState() {
       setScreen: _setScreen, setSeatingPositions: appState?.setSeatingPositions,
       setRoomElements: appState?.setRoomElements,
       setOverlays: _setOverlays, setDolbyConfig: appState?.setDolbyConfig,
-      setDolbyPreset: _setDolbyPresetBase,
+      setDolbyPreset,
       setSpeakerSystem: store.setSpeakerSystem,
       initWithDefaultsAndRules: initWithDefaultsAndRules,
       placedSpeakers: placedSpeakers,
@@ -955,16 +955,6 @@ function RoomDesignerWithState() {
       freeMoveLcr: freeMoveLcr,
       setFreeMoveLcr: setFreeMoveLcr
     });
-
-  // Wrap setDolbyPreset to immediately patch the project record when the user changes layout
-  // (defined here so projectIdState is already declared above via useProjectLoader)
-  const setDolbyPreset = React.useCallback((newLayout) => {
-    if (typeof _setDolbyPresetBase === 'function') _setDolbyPresetBase(newLayout);
-    const pid = resolvedProjectId || projectIdState;
-    if (pid && newLayout && newLayout !== dolbyPreset) {
-      Project.update(pid, { dolby_config: newLayout }).catch(() => {});
-    }
-  }, [_setDolbyPresetBase, resolvedProjectId, projectIdState, dolbyPreset]);
 
   // Called after NewProjectDialog creates the project
   const handleNewProjectCreated = React.useCallback(async (created) => {
