@@ -1211,7 +1211,7 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
   });
 }
 
-function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Computed }) {
+function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics }) {
   const appState = useAppState();
   const { speakerSystem, setScreen, splConfig = {}, updateGlobalSpl, seatingPositions } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
@@ -1413,8 +1413,14 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         const thresholds = isMinimumMode ? P12_THRESHOLDS_MIN : P12_THRESHOLDS_REC;
         
         const level = computeRP22Level(pillBasisDb, thresholds);
-        onP12Computed?.({ level, mode: splConfig?.radiationMode || 'half-space' });
-        return <RP22LevelPill parameter="P12" level={level} label="RP22 P12" />;
+
+        return (
+          <RP22LevelPill 
+            parameter="P12" 
+            level={level} 
+            label="RP22 P12"
+          />
+        );
       })()}
     </div>
   );
@@ -3003,9 +3009,15 @@ function SpeakerPlacementImpl(props) {
       )}
 
       <CollapsiblePanel title="LCR" defaultOpen>
-        <LCRPanel setSpeakers={setSpeakers} dimensions={dimensions} lcrAimMode={lcrAimMode}
-          onChangeLcrAimMode={onChangeLcrAimMode} lcrAngleDeg={lcrAngleDeg} mlpPoint={mlpPoint}
-          disabled={disabled} allSeatSplMetrics={allSeatSplMetrics} onP12Computed={props?.onP12Computed}
+        <LCRPanel 
+          setSpeakers={setSpeakers} 
+          dimensions={dimensions}
+          lcrAimMode={lcrAimMode}
+          onChangeLcrAimMode={onChangeLcrAimMode}
+          lcrAngleDeg={lcrAngleDeg}
+          mlpPoint={mlpPoint}
+          disabled={disabled}
+          allSeatSplMetrics={allSeatSplMetrics}
         />
       </CollapsiblePanel>
 
