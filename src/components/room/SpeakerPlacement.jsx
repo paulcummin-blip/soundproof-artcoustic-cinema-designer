@@ -2806,7 +2806,7 @@ function SpeakerPlacementImpl(props) {
           mlpPoint={mlpPoint}
           disabled={disabled}
           allSeatSplMetrics={allSeatSplMetrics}
-        />
+          updateGlobalSpl={updateGlobalSpl} />
       </CollapsiblePanel>
 
       <CollapsiblePanel title="Surround Channels" defaultOpen={false}>
