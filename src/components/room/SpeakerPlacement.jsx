@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { __b44SigFor, __b44SameSpeakers } from '@/components/utils/speakerEqualityUtils';
 import UnifiedSurroundsConfigExtracted from './UnifiedSurroundsConfig';
 import SubwooferPanel from './SubwooferPanel';
