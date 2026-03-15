@@ -1012,21 +1012,13 @@ function SpeakerPlacementImpl(props) {
   const appState = useAppState() || {};
   const { splConfig = {}, updateGlobalSpl } = appState;
 
-  // Local state for Surrounds and Overheads power inputs
   const [surroundsPowerInputValue, setSurroundsPowerInputValue] = useState(
     String(splConfig?.surroundsW ?? 100)
-  );
-  const [overheadsPowerInputValue, setOverheadsPowerInputValue] = useState(
-    String(splConfig?.overheadsW ?? 100)
   );
 
   useEffect(() => {
     setSurroundsPowerInputValue(String(splConfig?.surroundsW || 100));
   }, [splConfig?.surroundsW]);
-
-  useEffect(() => {
-    setOverheadsPowerInputValue(String(splConfig?.overheadsW || 100));
-  }, [splConfig?.overheadsW]);
   
   // Define dimsSafe early - always exists, always has valid numbers
   const dimsSafe = React.useMemo(() => {
