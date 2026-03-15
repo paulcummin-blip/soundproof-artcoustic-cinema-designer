@@ -16,7 +16,6 @@ import { audioConfigurations } from '../data/audioConfigurations';
 import SevenLayoutSwitcher from './SevenLayoutSwitcher';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
-import { safeGroup, safeTable, safeGroupEnd } from "@/components/utils/safeLog";
 import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { timeNowMs } from "@/components/utils/timeNow";
