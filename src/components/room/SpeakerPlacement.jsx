@@ -1225,8 +1225,8 @@ function SpeakerPlacementImpl(props) {
   
   // SINGLE app-state read (do not call useAppState twice)
   const appState = useAppState() || {};
-  const { splConfig = {}, updateGlobalSpl } = appState;
-
+  const { splConfig = {} } = appState;
+  const updateGlobalSpl = props.updateGlobalSpl || appState.updateGlobalSpl;
   // Local state for Surrounds and Overheads power inputs
   const [surroundsPowerInputValue, setSurroundsPowerInputValue] = useState(
     String(splConfig?.surroundsW ?? 100)
