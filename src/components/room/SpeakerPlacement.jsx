@@ -264,7 +264,6 @@ const isRearByAnyRole = (role) => {
 function applyLcrAim(placedSpeakers, mlpPoint, mode) {
   const speakers = Array.isArray(placedSpeakers) ? [...placedSpeakers] : [];
   if (!mlpPoint) return speakers;
-
   if (mode !== "angled") {
     return speakers.map(s =>
       LCR_ROLES.has(getCanonicalRole(s.role)) ? { ...s, rotation: { x:0, y:0, z:0 } } : s
