@@ -17,6 +17,7 @@ import SevenLayoutSwitcher from './SevenLayoutSwitcher';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
+import { getLevelColors } from '@/components/utils/rp22Colors';
 import { timeNowMs } from "@/components/utils/timeNow";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { getMlpSeat } from "@/components/utils/spl/centralSplEngine";
