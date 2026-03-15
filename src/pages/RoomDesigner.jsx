@@ -528,6 +528,15 @@ function RoomDesignerWithState() {
       }
     }
 
+    // Project mode: at offset=0, snap to exact 57.5° baseline in appState?.mlpY_m.
+    // At non-zero offset, fall through to seat-derived visual alignment below.
+    if (isProjectMode && Number(_seatingBlockOffset) === 0) {
+      const mlpY = appState?.mlpY_m;
+      if (Number.isFinite(mlpY)) {
+        return { x: cx, y: mlpY, z: 1.2 };
+      }
+    }
+
     // Project mode: derive anchor from primary/centre seat first (matches RSP card and Viewing Angle panel)
     // This ensures the visible dot agrees with the card/panel on first render.
     if (seats.length > 0 && Number.isFinite(roomWidthM)) {
