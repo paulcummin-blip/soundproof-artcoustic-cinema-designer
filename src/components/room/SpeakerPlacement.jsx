@@ -383,7 +383,7 @@ function SpeakerPlacementImpl(props) {
 
 
   const {
-    speakerSystem, setSpeakerSystem, seatingPositions, setDolbyConfig, dolbyConfig,
+    speakerSystem, setSpeakerSystem, seatingPositions, setDolbyConfig,
     showToast,
     setUseWidesInsteadOfRears, 
     overheadGlobalModel,
