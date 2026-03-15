@@ -162,9 +162,14 @@ export function useSeatingRebuild({
     );
 
     // 2) Row centre Y positions
-    let centers = Array.isArray(appState?.rowCentersM) ? appState.rowCentersM.slice(0, list.length) : [];
+    // For loaded projects where the user has changed seating since load, always regenerate
+    // from live mlpY_m instead of preferring existing (potentially stale) rowCentersM.
+    const shouldRegenerateFromMlp = isLoadedProject && userHasChangedSeatingSinceLoad;
+    let centers = (!shouldRegenerateFromMlp && Array.isArray(appState?.rowCentersM))
+      ? appState.rowCentersM.slice(0, list.length)
+      : [];
 
-    // If rowCentersM is missing/too short, attempt to generate it from current mlpY_m
+    // If rowCentersM is missing/too short, or we must regenerate, generate from current mlpY_m
     if (centers.length < list.length) {
       const rowsNeeded = list.length;
 
