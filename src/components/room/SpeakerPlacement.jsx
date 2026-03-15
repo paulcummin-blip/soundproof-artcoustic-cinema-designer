@@ -540,8 +540,6 @@ function SpeakerPlacementImpl(props) {
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
-  const lastEffectSigRef = React.useRef(null);
-  const __b44LastApplySigRef = React.useRef(null);
   const __b44LastEffectSigRef = useRef({});
 
   // [B44] Surround reset flow (model selection -> central hydrate)
