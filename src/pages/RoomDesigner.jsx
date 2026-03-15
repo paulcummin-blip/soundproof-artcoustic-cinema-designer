@@ -257,7 +257,16 @@ function RoomDesignerWithState() {
 
   // Use AppState dolbyLayout directly (no local state override)
   const dolbyPreset = appState?.dolbyLayout || "5.1";
-  const setDolbyPreset = appState?.setDolbyLayout;
+  const _setDolbyPresetBase = appState?.setDolbyLayout;
+
+  // Wrap setDolbyPreset to immediately patch the project record when the user changes layout
+  const setDolbyPreset = React.useCallback((newLayout) => {
+    if (typeof _setDolbyPresetBase === 'function') _setDolbyPresetBase(newLayout);
+    const pid = resolvedProjectId || projectIdState;
+    if (pid && newLayout && newLayout !== dolbyPreset) {
+      Project.update(pid, { dolby_config: newLayout }).catch(() => {});
+    }
+  }, [_setDolbyPresetBase, resolvedProjectId, projectIdState, dolbyPreset]);
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
 
