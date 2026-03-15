@@ -242,34 +242,6 @@ function applyLcrAim(placedSpeakers, mlpPoint, mode) {
   });
 }
 
-function rp22P12Level(db) {
-  if (!db || db <= 102) return 1;
-  if (db <= 105) return 2;
-  if (db <= 108) return 3;
-  return 4;
-}
-
-function rp22P13Level(db) {
-  if (!db || db <= 99) return 1;
-  if (db <= 102) return 2;
-  if (db <= 105) return 3;
-  if (db <= 108) return 4;
-  return 4;
-}
-
-function prettyChannel(ch) {
-  const m = {
-    FL: "Front Left", FR: "Front Right", FC: "Front Center",
-    SL: "Side Left", SR: "Side Right",
-    SBL: "Rear Left", SBR: "Rear Right",
-    LW: "Front Wide Left", RW: "Front Wide Right",
-    TFL: "Top Front Left", TFR: "Top Front Right",
-    TL: "Top Middle Left", TR: "Top Middle Right",
-    TBL: "Top Back Left", TBR: "Top Back Right",
-  };
-  return m[String(ch).toUpperCase()] || ch;
-}
-
 function safeLog(label, data) {
   if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
     console.groupCollapsed(label);
