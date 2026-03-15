@@ -154,47 +154,12 @@ function __b44SameSpeakers(a, b) {
   return true;
 }
 
-const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
-const P12_THRESHOLDS_MIN = { L1: 99, L2: 102, L3: 105, L4: 108 };
-const P13_THRESHOLDS_REC = { L1: 99, L2: 102, L3: 105, L4: 108 };
-const P13_THRESHOLDS_MIN = { L1: 96, L2: 99, L3: 102, L4: 105 };
-
-// Helper: compute RP22 level from SPL thresholds
-function computeRP22Level(splDb, thresholds) {
-  if (!Number.isFinite(splDb)) return null;
-  if (splDb >= thresholds.L4) return 4;
-  if (splDb >= thresholds.L3) return 3;
-  if (splDb >= thresholds.L2) return 2;
-  if (splDb >= thresholds.L1) return 1;
-  return 'FAIL';
-}
-
-// RP22 Level Pill Component
-function RP22LevelPill({ parameter, level, label }) {
-  const colors = getLevelColors(level);
-  
-  return (
-    <div 
-      style={{
-        marginTop: 12,
-        padding: '8px 16px',
-        borderRadius: 8,
-        border: `1px solid ${colors.border || '#E6E4DD'}`,
-        background: colors.bg,
-        display: 'inline-block',
-        width: '100%',
-      }}
-    >
-      <div style={{ 
-        fontSize: 13, 
-        fontWeight: 600, 
-        color: colors.text
-      }}>
-        {label}: {typeof level === 'number' && level >= 1 ? `Level ${level}` : 'FAIL'}
-      </div>
-    </div>
-  );
-}
+import {
+  P12_THRESHOLDS_REC, P12_THRESHOLDS_MIN,
+  P13_THRESHOLDS_REC, P13_THRESHOLDS_MIN,
+  computeRP22Level, RP22LevelPill,
+  useStickyDb, SplBox, SplBoxP13,
+} from './sp/SpSplBoxes';
 
 // --- idempotence helpers -----------------------------------------------------
 const EPS = 1e-4;
