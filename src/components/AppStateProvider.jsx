@@ -981,11 +981,9 @@ function useDesignerState() {
     // Never show LFE
     if (canon.startsWith("LFE")) return false;
 
-    // Overheads: must be in the current layout AND have a real model assigned
+    // Overheads must be visible solely based on layout (visibleRoles)
     if (OVERHEAD_CANON_ROLES.has(canon)) {
-      if (!visibleRoles.has(canon)) return false;
-      const ms = String(model ?? "").trim().toLowerCase();
-      return !!(ms && ms !== "off" && ms !== "none");
+      return visibleRoles.has(canon);
     }
 
     // CRITICAL: Extra surrounds (SL2/SR2/SL3/SR3...) are treated as Side Surrounds

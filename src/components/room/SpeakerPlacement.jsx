@@ -154,14 +154,49 @@ function __b44SameSpeakers(a, b) {
   return true;
 }
 
-import {
-  P12_THRESHOLDS_REC, P12_THRESHOLDS_MIN,
-  P13_THRESHOLDS_REC, P13_THRESHOLDS_MIN,
-  computeRP22Level, RP22LevelPill,
-  useStickyDb, SplBox, SplBoxP13,
-} from './sp/SpSplBoxes';
+const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
+const P12_THRESHOLDS_MIN = { L1: 99, L2: 102, L3: 105, L4: 108 };
+const P13_THRESHOLDS_REC = { L1: 99, L2: 102, L3: 105, L4: 108 };
+const P13_THRESHOLDS_MIN = { L1: 96, L2: 99, L3: 102, L4: 105 };
 
-// --- idempotence helpers ---
+// Helper: compute RP22 level from SPL thresholds
+function computeRP22Level(splDb, thresholds) {
+  if (!Number.isFinite(splDb)) return null;
+  if (splDb >= thresholds.L4) return 4;
+  if (splDb >= thresholds.L3) return 3;
+  if (splDb >= thresholds.L2) return 2;
+  if (splDb >= thresholds.L1) return 1;
+  return 'FAIL';
+}
+
+// RP22 Level Pill Component
+function RP22LevelPill({ parameter, level, label }) {
+  const colors = getLevelColors(level);
+  
+  return (
+    <div 
+      style={{
+        marginTop: 12,
+        padding: '8px 16px',
+        borderRadius: 8,
+        border: `1px solid ${colors.border || '#E6E4DD'}`,
+        background: colors.bg,
+        display: 'inline-block',
+        width: '100%',
+      }}
+    >
+      <div style={{ 
+        fontSize: 13, 
+        fontWeight: 600, 
+        color: colors.text
+      }}>
+        {label}: {typeof level === 'number' && level >= 1 ? `Level ${level}` : 'FAIL'}
+      </div>
+    </div>
+  );
+}
+
+// --- idempotence helpers -----------------------------------------------------
 const EPS = 1e-4;
 const almostEq = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) <= EPS;
 
@@ -196,23 +231,260 @@ function speakersEqual(a = [], b = []) {
 }
 
 
-// ---- wall projectors and role helpers (extracted to sub-modules) ----
-import {
-  projectToWallFromMLP_xy,
-  projectToBackWallFromMLP_xy,
-  projectToWallFromMLP,
-} from './sp/SpWallProjectors';
-import {
-  buildRoleMap,
-  isValidModel,
-  preserveSurroundModels,
-  ensureSpeaker,
-  yawDegToMLP,
-  formatDolbyLabel,
-} from './sp/SpRoleHelpers';
-import { Project } from "@/api/entities/Project";
+// ---- robust ray -> wall projector (no MLP fallbacks) -----------------------
+function projectToWallFromMLP_xy(mlp, angleDeg, room) {
+  const a = (angleDeg % 360 + 360) % 360;
+  const rad = (a * Math.PI) / 180;
+  const dx = Math.cos(rad);
+  const dy = Math.sin(rad);
+
+  const EPS_LOCAL = 1e-6;
+  const ts = [];
+
+  if (Math.abs(dx) > EPS_LOCAL) {
+    const tL = (room.left  - mlp.x) / dx;
+    const tR = (room.right - mlp.x) / dx;
+    if (tL > EPS_LOCAL) ts.push({ t: tL, wall: 'L' });
+    if (tR > EPS_LOCAL) ts.push({ t: tR, wall: 'R' });
+  }
+  if (Math.abs(dy) > EPS_LOCAL) {
+    const tF = (room.front - mlp.y) / dy;
+    const tB = (room.back  - mlp.y) / dy;
+    if (tF > EPS_LOCAL) ts.push({ t: tF, wall: 'F' });
+    if (tB > EPS_LOCAL) ts.push({ t: tB, wall: 'B' });
+  }
+
+  if (!ts.length) {
+    return { x: mlp.x, y: room.back, wall: 'B' };
+  }
+
+  ts.sort((a, b) => a.t - b.t);
+  const hit = ts[0];
+  const x = mlp.x + hit.t * dx;
+  const y = mlp.y + hit.t * dy;
+  return { x, y, wall: hit.wall };
+}
+
+// --- NEW: Force rear surrounds to always project to the BACK wall ---------
+function projectToBackWallFromMLP_xy(mlp, angleDeg, room, speakerModel, getModelDimsM, WALL_BUFFER_M) {
+  const rad = (angleDeg * Math.PI) / 180;
+  const dx = Math.cos(rad);
+  const dy = Math.sin(rad);
+
+  // Robust dims: getModelDimsM may return {} or partial values when a model isn't found
+  const rawDims = (() => {
+    try { return getModelDimsM?.(speakerModel); }
+    catch (e) { return null; }
+  })();
+
+  const widthM = Number.isFinite(rawDims?.widthM) ? rawDims.widthM : 0.20;
+  const depthM = Number.isFinite(rawDims?.depthM) ? rawDims.depthM : 0.082;
+
+  const halfShortEdge = Math.min(widthM, depthM) / 2;
+
+  if (globalThis.__B44_LOGS) {
+    console.log('[SP] backWall projector dims', { speakerModel, rawDims, widthM, depthM, halfShortEdge });
+  }
+
+  const backWallY = room.back - (WALL_BUFFER_M + halfShortEdge);
+
+  const EPS = 1e-6;
+  
+  // Check if ray actually intersects back wall (dy must be positive)
+  if (dy < EPS) { // Check if dy is negative or near zero. If so, ray is not pointing towards back.
+    // Ray is horizontal or pointing away from back wall - use generic projector as fallback
+    return projectToWallFromMLP_xy(mlp, angleDeg, room);
+  }
+
+  // Calculate t for back wall intersection
+  const t = (backWallY - mlp.y) / dy;
+
+  // If t is negative or zero, ray points away from back wall - use fallback
+  if (t <= EPS) {
+    return projectToWallFromMLP_xy(mlp, angleDeg, room);
+  }
+
+  // Calculate X at back wall intersection
+  let x = mlp.x + t * dx;
+
+  // Clamp X to stay within room and away from side walls
+  const minX = WALL_BUFFER_M + halfShortEdge;
+  const maxX = room.right - (WALL_BUFFER_M + halfShortEdge);
+  x = Math.max(minX, Math.min(maxX, x));
+
+  return { x, y: backWallY, wall: 'B' };
+}
+
+// --- Canonical role mapping + helpers ---
+const CANONICAL_ROLE_MAP = {
+  // LCR
+  FL: "FL", L: "FL",
+  FC: "FC", C: "FC",
+  FR: "FR", R: "FR",
+  
+  // Side surrounds
+  SL: "SL", LS: "SL",
+  SR: "SR", RS: "SR",
+  
+  // Rear surrounds
+  SBL: "SBL", RL: "SBL", RSL: "SBL", LR: "SBL", LRS: "SBL", BL: "SBL",
+  SBR: "SBR", RR: "SBR", RSR: "SBR", RRS: "SBR", BR: "SBR", RB: "SBR",
+  
+  // Wides
+  LW: "LW", FWL: "LW",
+  RW: "RW", FWR: "RW",
+  
+  // Height / Atmos - Front
+  TFL: "TFL", TF: "TFL",
+  TFR: "TFR",
+  
+  // Height / Atmos - Middle/Side
+  TL: "TL", TML: "TL", TSL: "TL",
+  TR: "TR", TMR: "TR", TSR: "TR",
+  
+  // Height / Atmos - Rear
+  TBL: "TBL", TRL: "TBL",
+  TBR: "TBR", TRR: "TBR",
+  
+  // Up-firing (if used)
+  UFL: "UFL",
+  UFR: "UFR",
+  UBL: "UBL",
+  UBR: "UBR",
+};
+
+// getCanonicalRole is imported from "@/components/utils/surroundRoleMap";
+// function getCanonicalRole(role) {
+//   return CANONICAL_ROLE_MAP[String(role || "").toUpperCase()] || String(role || "").toUpperCase();
+// }
+
+const CANONICAL_TO_ALIASES_MAP = new Map();
+for (const alias in CANONICAL_ROLE_MAP) {
+    const canonical = CANONICAL_ROLE_MAP[alias];
+    if (!CANONICAL_TO_ALIASES_MAP.has(canonical)) {
+        CANONICAL_TO_ALIASES_MAP.set(canonical, new Set());
+    }
+    CANONICAL_TO_ALIASES_MAP.get(canonical).add(alias);
+}
+
+function allAliases(role) {
+    const canonical = getCanonicalRole(role);
+    return Array.from(CANONICAL_TO_ALIASES_MAP.get(canonical) || new Set([String(role || "").toUpperCase()]));
+}
+
+function getByAnyRole(aliases, byRoleMap) {
+    for (const alias of aliases) {
+        const speaker = byRoleMap.get(alias);
+        if (speaker) return speaker;
+    }
+    return null;
+}
+
+function applyModelToAnyRoles(list, preferredRoles, model) {
+  const targets = new Set(preferredRoles.map(getCanonicalRole));
+  return (Array.isArray(list) ? list : []).map(s => {
+    const canon = getCanonicalRole(s.role);
+    return targets.has(canon) ? { ...s, model } : s;
+  });
+}
+
+function applyToAllSurrounds(prev, model) {
+  const BED_SURROUND = new Set(["SL","SR","SBL","SBR","LW","RW"]);
+  return (Array.isArray(prev)? prev: []).map(s => {
+    const canon = getCanonicalRole(s.role);
+    return BED_SURROUND.has(canon) ? { ...s, model } : s;
+  });
+}
+
+function logPlacedSpeakers(message, speakers) {
+  const rows = (speakers || []).map(s => ({
+    roleRaw: s.role,
+    roleCanon: getCanonicalRole(s.role),
+    model: s.model || "(none)"
+  }));
+  safeGroup(message);
+  safeTable(rows);
+  safeGroupEnd();
+}
+
+function buildRoleMap(list) {
+  const m = new Map();
+  (Array.isArray(list) ? list : []).forEach((s) => {
+    const raw = String(s.role || "").toUpperCase();
+    const canon = getCanonicalRole(raw);
+    m.set(raw, s);
+    m.set(canon, s);
+  });
+  return m;
+}
 
 const degToRad = (deg) => (deg * Math.PI) / 180;
+
+const isValidModel = (m) => {
+  const s = String(m ?? "").trim().toLowerCase();
+  return !!s && s !== "off" && s !== "none";
+};
+
+// Preserve surround bed models across any position/rotation-only updates
+const preserveSurroundModels = (prevList, nextList, appState) => {
+  const prev = Array.isArray(prevList) ? prevList : [];
+  const next = Array.isArray(nextList) ? nextList : [];
+
+  const surroundCanon = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
+
+  const prevByCanon = new Map();
+  prev.forEach((s) => {
+    prevByCanon.set(getCanonicalRole(s?.role), s);
+  });
+
+  return next.map((s) => {
+    const canon = getCanonicalRole(s?.role);
+    if (!surroundCanon.has(canon)) return s;
+
+    // keep next if already valid
+    if (isValidModel(s?.model)) return s;
+
+    // inherit previous same-role model if valid
+    const pm = prevByCanon.get(canon)?.model;
+    if (isValidModel(pm)) return { ...s, model: pm };
+
+    // inherit global surround model if valid
+    const gm = appState?.globalSurroundModel;
+    if (isValidModel(gm)) return { ...s, model: gm };
+
+    return s;
+  });
+};
+
+function projectToWallFromMLP(mlpX, mlpY, angleDeg, room) {
+  const angle = degToRad(angleDeg);
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const margin = 0.01;
+
+  let t = Infinity;
+  if (dx < 0) t = Math.min(t, (room.left + margin - mlpX) / dx);
+  if (dx > 0) t = Math.min(t, (room.right - margin - mlpX) / dx);
+  if (dy < 0) t = Math.min(t, (room.front + margin - mlpY) / dy);
+  if (dy > 0) t = Math.min(t, (room.back - margin - mlpY) / dy);
+
+  if (!isFinite(t) || t <= 0) {
+    return { x: mlpX, y: mlpY };
+  }
+
+  return { x: mlpX + dx * t, y: mlpY + dy * t };
+}
+
+function ensureSpeaker(spk, role) {
+  return spk && spk.role === role ? spk : { id: `${role}-${Date.now()}`, role };
+}
+
+function yawDegToMLP(spkPos, mlpPos) {
+  const dx = mlpPos.x - spkPos.x;
+  const dy = mlpPos.y - spkPos.y;
+  const yawRad = Math.atan2(dx, dy);
+  return yawRad * 180 / Math.PI;
+}
 
 const SURROUND_BED_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
 const ALL_SURROUND_ROLES = new Set(["SL","SR","SBL","SBR","LW","RW"]);
@@ -229,6 +501,7 @@ const isRearByAnyRole = (role) => {
 function applyLcrAim(placedSpeakers, mlpPoint, mode) {
   const speakers = Array.isArray(placedSpeakers) ? [...placedSpeakers] : [];
   if (!mlpPoint) return speakers;
+
   if (mode !== "angled") {
     return speakers.map(s =>
       LCR_ROLES.has(getCanonicalRole(s.role)) ? { ...s, rotation: { x:0, y:0, z:0 } } : s
@@ -242,6 +515,131 @@ function applyLcrAim(placedSpeakers, mlpPoint, mode) {
   });
 }
 
+function rp22P12Level(db) {
+  if (!db || db <= 102) return 1;
+  if (db <= 105) return 2;
+  if (db <= 108) return 3;
+  return 4;
+}
+
+function rp22P13Level(db) {
+  if (!db || db <= 99) return 1;
+  if (db <= 102) return 2;
+  if (db <= 105) return 3;
+  if (db <= 108) return 4;
+  return 4;
+}
+
+function normalizeName(s) {
+  return String(s || "").trim();
+}
+
+function prettyChannel(ch) {
+  const m = {
+    FL: "Front Left", FR: "Front Right", FC: "Front Center",
+    SL: "Side Left", SR: "Side Right",
+    SBL: "Rear Left", SBR: "Rear Right",
+    LW: "Front Wide Left", RW: "Front Wide Right",
+    TFL: "Top Front Left", TFR: "Top Front Right",
+    TL: "Top Middle Left", TR: "Top Middle Right",
+    TBL: "Top Back Left", TBR: "Top Back Right",
+  };
+  return m[String(ch).toUpperCase()] || ch;
+}
+
+// Pure helper: compute FW median positions without side effects
+function applyFrontWideMedianPositions(list, dimensions, applyCornerClearance, applyRoomBoundsClamp, getCanonicalRole) {
+  const speakers = Array.isArray(list) ? list : [];
+  if (!speakers.length) return { list: speakers, changed: false };
+
+  const byCanon = new Map();
+  speakers.forEach((s) => {
+    byCanon.set(getCanonicalRole(s.role), s);
+  });
+
+  const FL = byCanon.get("FL");
+  const FR = byCanon.get("FR");
+  const SL = byCanon.get("SL");
+  const SR = byCanon.get("SR");
+
+  // We need all anchors with valid positions
+  const anchorsOk =
+    Number.isFinite(FL?.position?.x) && Number.isFinite(FL?.position?.y) &&
+    Number.isFinite(FR?.position?.x) && Number.isFinite(FR?.position?.y) &&
+    Number.isFinite(SL?.position?.x) && Number.isFinite(SL?.position?.y) &&
+    Number.isFinite(SR?.position?.x) && Number.isFinite(SR?.position?.y);
+
+  if (!anchorsOk) return { list: speakers, changed: false };
+
+  let changed = false;
+
+  // Helper: get hugging center lines (defined in parent scope, we receive via closure or re-implement)
+  const getHugging = (model, dims) => {
+    const WALL_BUFFER_M = 0.01;
+    const meta = typeof window !== 'undefined' && window.__GET_SPEAKER_META 
+      ? window.__GET_SPEAKER_META(model) 
+      : null;
+    
+    const widthM = meta?.widthM || 0.27;
+    const depthM = meta?.depthM || 0.082;
+    const shortEdge = Math.min(widthM, depthM);
+    
+    return {
+      leftWallX: shortEdge / 2 + WALL_BUFFER_M,
+      rightWallX: dims.width - shortEdge / 2 - WALL_BUFFER_M,
+    };
+  };
+
+  const updated = speakers.map((s) => {
+    const canon = getCanonicalRole(s.role);
+    if (canon !== "LW" && canon !== "RW") return s;
+
+    const front = canon === "LW" ? FL : FR;
+    const side  = canon === "LW" ? SL : SR;
+
+    const fx = front.position.x;
+    const fy = front.position.y;
+    const sx = side.position.x;
+    const sy = side.position.y;
+
+    // 1) Median Y (front-back): halfway between front and side surround
+    const medianY = (fy + sy) / 2;
+    const medianX = (fx + sx) / 2;
+
+    // 2) Pin X to the side wall using hugging logic
+    const hugging = getHugging(s.model, dimensions);
+    const sideWallX = canon === "LW" ? hugging.leftWallX : hugging.rightWallX;
+
+    let pos = {
+      x: Number.isFinite(sideWallX) ? sideWallX : medianX,
+      y: medianY,
+      z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
+    };
+
+    // 3) Respect corner clearance and room bounds
+    pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
+    pos = applyRoomBoundsClamp(pos, s.model, dimensions);
+
+    if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
+      return s;
+    }
+
+    const old = s.position || {};
+    const dx = Math.abs((old.x ?? 0) - pos.x);
+    const dy = Math.abs((old.y ?? 0) - pos.y);
+
+    // Avoid tiny float churn
+    if (dx < 0.001 && dy < 0.001) {
+      return s;
+    }
+
+    changed = true;
+    return { ...s, position: pos };
+  });
+
+  return { list: updated, changed };
+}
+
 function safeLog(label, data) {
   if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
     console.groupCollapsed(label);
@@ -250,6 +648,185 @@ function safeLog(label, data) {
   } else if (typeof console !== 'undefined' && typeof console.log === 'function') {
     if (globalThis.__B44_LOGS) console.log(label, data || '');
   }
+}
+
+function bestMaxSPL1m({ sensitivity_dB_1W1m, max_power_W, excursionMax1m }) {
+  const sens = safeNum(sensitivity_dB_1W1m);
+  const maxW = safeNum(max_power_W);
+  const xMax = safeNum(excursionMax1m);
+
+  let powerCalc = 0;
+  if (sens > 0 && maxW > 0) {
+    powerCalc = sens + 10 * Math.log10(maxW);
+  }
+
+  if (xMax > 0 && (xMax < powerCalc || powerCalc === 0)) {
+    return xMax;
+  }
+  return powerCalc;
+}
+
+function useStickyDb(rawValue, opts = {}) {
+  const windowSize = opts.windowSize ?? 9;
+  const alpha = opts.alpha ?? 0.35;
+  const upMargin = opts.upMargin ?? 0.40;
+  const downMargin = opts.downMargin ?? 0.60;
+  const upConsecutive = opts.upConsecutive ?? 2;
+  const downConsecutive = opts.downConsecutive ?? 3;
+
+  const bufRef = useRef([]);
+  const smoothRef = useRef(0);
+  const shownRef = useRef(0);
+  const upCountRef = useRef(0);
+  const downCountRef = useRef(0);
+  const [currentMedian, setCurrentMedian] = useState(0);
+
+  useEffect(() => {
+    const b = bufRef.current;
+    if (Number.isFinite(rawValue)) {
+      b.push(rawValue);
+    }
+    if (b.length > windowSize) {
+      b.shift();
+    }
+
+    const sortedBuffer = b.slice().sort((a, b) => a - b);
+    const n = sortedBuffer.length;
+    let newMedian = 0;
+    if (n > 0) {
+      const mid = Math.floor(n / 2);
+      newMedian = n % 2 ? sortedBuffer[mid] : (sortedBuffer[mid - 1] + sortedBuffer[mid]) / 2;
+    }
+    setCurrentMedian(newMedian);
+  }, [rawValue, windowSize]);
+
+  const smoothed = useMemo(() => {
+    if (!Number.isFinite(rawValue)) {
+        smoothRef.current = 0;
+        return 0;
+    }
+    const prev = smoothRef.current;
+    const next = (prev === 0 && currentMedian === 0) ? 0 : (prev === 0 ? currentMedian : (alpha * currentMedian + (1 - alpha) * prev));
+    smoothRef.current = next;
+    return next;
+  }, [currentMedian, alpha, rawValue]);
+
+  const candidate = useMemo(() => Math.ceil(smoothed), [smoothed]);
+
+  useEffect(() => {
+    const currentShown = shownRef.current;
+
+    if (!Number.isFinite(rawValue) || smoothed === 0) {
+        if (shownRef.current !== 0) shownRef.current = 0;
+        upCountRef.current = 0;
+        downCountRef.current = 0;
+        return;
+    }
+
+    if (smoothed >= (currentShown + 1) + upMargin) {
+      upCountRef.current += 1;
+      if (upCountRef.current >= upConsecutive) {
+        shownRef.current = Math.max(currentShown + 1, candidate);
+        upCountRef.current = 0;
+        downCountRef.current = 0;
+      }
+    } else {
+      upCountRef.current = 0;
+    }
+
+    if (smoothed <= (currentShown - 1) - downMargin) {
+      downCountRef.current += 1;
+      if (downCountRef.current >= downConsecutive) {
+        shownRef.current = Math.min(currentShown - 1, candidate);
+        downCountRef.current = 0;
+        upCountRef.current = 0;
+      }
+    } else {
+      downCountRef.current = 0;
+    }
+
+  }, [smoothed, candidate, upMargin, downMargin, upConsecutive, downConsecutive, rawValue]);
+
+  return shownRef.current;
+}
+
+const splCardStyles = {
+  card: { border: "1px solid #E6E4DD", borderRadius: 12, padding: 16, background: "#fff" },
+  title: { fontSize: 16, lineHeight: "22px", color: "#3E4349", marginBottom: 6 },
+  value: { fontSize: 40, lineHeight: "40px", fontWeight: 700, color: "#1B1A1A" },
+  foot: { fontSize: 12, lineHeight: "16px", color: "#61656B", marginTop: 6 },
+  boldFoot: { fontSize: 12, lineHeight: "16px", color: "#1B1A1A", marginTop: 6, fontWeight: 700 },
+};
+
+export function SplBox({ channel, rawDb }) {
+  const fullDb = useStickyDb(rawDb);
+  const displayDb = Math.max(0, fullDb - 6);
+  const level = rp22P12Level(displayDb);
+
+  return (
+    <div style={splCardStyles.card}>
+      <div style={splCardStyles.title}>{prettyChannel(channel)}</div>
+      <div style={splCardStyles.value}>{displayDb > 0 ? `${displayDb} dB` : '—'}</div>
+      <div style={splCardStyles.foot}>Maximum SPL @ MLP: {fullDb > 0 ? `${fullDb} dB` : '—'}</div>
+      <div style={splCardStyles.boldFoot}>RP22 P12 Level {level > 0 ? level : "—"}</div>
+      <div style={splCardStyles.foot}>
+        12. Screen speakers SPL capability at Reference Seating Position (RSP) (<span style={{ fontWeight: 700 }}>post calibration EQ</span>, within assigned bandwidth)
+        without clipping — dB SPL (C). Thresholds: L1 102, L2 105, L3 108, L4 111
+      </div>
+    </div>
+  );
+}
+
+export function SplBoxP13({ title, rawDbFull }) {
+  const fullDb = useStickyDb(rawDbFull);
+  const displayDb = Math.max(0, fullDb - 6);
+  const level = rp22P13Level(displayDb);
+  return (
+    <div style={splCardStyles.card}>
+      <div style={splCardStyles.title}>{title}</div>
+      <div style={splCardStyles.value}>{displayDb > 0 ? `${displayDb} dB` : '—'}</div>
+      <div style={splCardStyles.foot}>Maximum SPL @ RSP: {fullDb > 0 ? `${fullDb} dB` : '—'}</div>
+      <div style={splCardStyles.boldFoot}>RP22 P13 Level {level > 0 ? level : "—"}</div>
+    </div>
+  );
+}
+
+function getSurroundGroups(dolbyPreset) {
+  const major = Number(String(dolbyPreset || "5.1").split(".")[0]) || 5;
+  const groups = [
+    { key: "wides", label: "Front Wides", roles: ["LW", "RW"], required: false },
+    { key: "sides", label: "Side Surrounds", roles: ["SL", "SR"], required: false },
+    { key: "rears", label: "Rear Surrounds", roles: ["SBL", "SBR"], required: false },
+  ];
+
+  if (major === 5) return groups.map(g => g.key === "sides" ? { ...g, required: true } : { ...g, required: false });
+  if (major === 7) {
+    const wantWides = false;
+    return groups.map(g => {
+      if (g.key === "sides") return { ...g, required: true };
+      if (g.key === "rears") return { ...g, required: !wantWides };
+      if (g.key === "wides") return { ...g, required: wantWides };
+      return g;
+    });
+  }
+  if (major >= 9) return groups.map(g => ({ ...g, required: true }));
+  return groups;
+}
+
+function getOverheadGroups(dolbyPreset) {
+  const parts = String(dolbyPreset || "").split(".");
+  const overheadCount = Number(parts[2] || 0);
+
+  const base = [
+    { key: "oh-front",  label: "Front Overhead",  roles: ["TFL", "TFR"], required: false },
+    { key: "oh-middle", label: "Middle Overhead", roles: ["TL", "TR"],   required: false },
+    { key: "oh-rear",   label: "Rear Overhead",   roles: ["TBL", "TBR"], required: false },
+  ];
+
+  if (overheadCount >= 6) return base.map(g => ({ ...g, required: true }));
+  if (overheadCount === 4) return base.map(g => g.key === "oh-front" || g.key === "oh-rear" ? { ...g, required: true } : { ...g, required: false });
+  if (overheadCount === 2) return base.map(g => g.key === "oh-middle" ? { ...g, required: true } : { ...g, required: false });
+  return base;
 }
 
 const groupHeaderStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", margin: "8px 0" };
@@ -429,6 +1006,7 @@ function UnifiedSurroundsConfig({
 
       const draft = Array.from(byRole.values());
 
+      // Tell SpeakerPlacementImpl to hydrate surround positions centrally (where resetSurroundPositions exists)
       if (needsSurroundResetRef) needsSurroundResetRef.current = true;
       if (lastSurroundModelKeyRef) lastSurroundModelKeyRef.current = modelKey;
 
@@ -516,6 +1094,29 @@ function UnifiedSurroundsConfig({
     needsSurroundResetRef,
     lastSurroundModelKeyRef,
   ]);
+  
+  // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
+  // This effect was redundant and could conflict with user selections.
+  // useEffect(() => {
+  //   const master = surroundConfig?.value?.master;
+  //   if (!master || master === 'off') return;
+  //
+  //   setSpeakers(prev => {
+  //     let changed = false;
+  //     const next = (Array.isArray(prev) ? prev : []).map(s => {
+  //       const role = String(s?.role || "").toUpperCase();
+  //       const canon = getCanonicalRole(role);
+  //       const isBedSurround = ALL_SURROUND_ROHAS(canon);
+  //       
+  //       if (isBedSurround && !s.model && allowedRoles.has(canon)) {
+  //         changed = true;
+  //         return { ...s, model: master };
+  //       }
+  //       return s;
+  //     });
+  //     return changed ? next : prev;
+  //   });
+  // }, [surroundConfig?.value?.master, setSpeakers, allowedRoles]);
   
   const surroundChoices = useMemo(() => {
     const byCat = getModelsByCategoryOrdered();
@@ -823,6 +1424,12 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
       })()}
     </div>
   );
+}
+
+function formatDolbyLabel(key) {
+  const [a = "5", b = "1", c = "0"] = String(key).split(".");
+  const overheads = Number(c) || 0;
+  return overheads > 0 ? `${a}.${b}.${overheads} Dolby Atmos` : `${a}.${b} Surround`;
 }
 
 function SpeakerPlacementImpl(props) {
@@ -2694,6 +3301,7 @@ function SpeakerPlacementImpl(props) {
 
               const pillBasisDb = Math.min(...overheadTileSplDb);
               
+              // Use P13-specific mode (independent from P12)
               const { splConfig } = useAppState() || {};
               const isMinimumMode = splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode;
               const thresholds = isMinimumMode ? P13_THRESHOLDS_MIN : P13_THRESHOLDS_REC;
