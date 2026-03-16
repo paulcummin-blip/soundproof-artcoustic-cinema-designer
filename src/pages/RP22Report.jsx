@@ -18,6 +18,8 @@ import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
+import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectIntoAppState';
+import { base44 } from '@/api/base44Client';
 
 // Extracted child components
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
