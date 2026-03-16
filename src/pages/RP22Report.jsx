@@ -429,6 +429,14 @@ function RP22ReportInner() {
         }
     }, [app?.mlp?.y, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio, stableDimensions.length]);
 
+    const analysisSpeakers = useAnalysisSpeakers({
+        placedSpeakers,
+        speakerSystem: app?.speakerSystem,
+        sevenBedLayoutType: app?.sevenBedLayoutType,
+        getSpeakerVisibility: app?.getSpeakerVisibility,
+        dolbyPreset: reportDolbyLayout,
+    });
+
     const allSeatSplMetrics = React.useMemo(() => {
         if (!hasSeats || !hasSpeakers) return [];
         const getCanonicalRole = (role) => {
