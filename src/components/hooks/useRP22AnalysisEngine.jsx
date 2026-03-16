@@ -698,12 +698,20 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             .filter(g => Math.abs(g.spl - minSplRaw) < 0.001) // Match within 0.001 dB
             .sort((a, b) => a.priority - b.priority)[0]; // Lowest priority wins
           
-          // P13 thresholds (Recommended: 99/102/105/108) - use rounded value
+          // P13 thresholds differ by mode: Minimum vs Recommended (same toggle as P12)
+          const isMinModeP13 = p12Mode !== 'anechoic';
           let level13 = 1;
-          if (minSpl >= 108) level13 = 4;
-          else if (minSpl >= 105) level13 = 3;
-          else if (minSpl >= 102) level13 = 2;
-          else if (minSpl >= 99) level13 = 1;
+          if (isMinModeP13) {
+            if (minSpl >= 105) level13 = 4;
+            else if (minSpl >= 102) level13 = 3;
+            else if (minSpl >= 99)  level13 = 2;
+            else if (minSpl >= 96)  level13 = 1;
+          } else {
+            if (minSpl >= 108) level13 = 4;
+            else if (minSpl >= 105) level13 = 3;
+            else if (minSpl >= 102) level13 = 2;
+            else if (minSpl >= 99)  level13 = 1;
+          }
           
           p13Result = {
             title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
