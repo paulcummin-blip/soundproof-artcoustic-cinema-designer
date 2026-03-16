@@ -281,7 +281,6 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         const level = computeRP22Level(pillBasisDb, thresholds);
 
         const currentMode = isMinimumMode ? 'half-space' : 'anechoic';
-        onP12Update?.(currentMode, level);
 
         return (
           <RP22LevelPill
