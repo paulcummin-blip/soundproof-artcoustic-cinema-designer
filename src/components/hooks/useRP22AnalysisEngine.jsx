@@ -569,41 +569,71 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // RP22 Parameter 12 — Screen speakers SPL at RSP (rounded UP to whole dB)
     const p12CatalogEntry = RP22_CATALOG["12"];
     let p12Result = null;
-    
-    if (seatSplMetrics) {
-      // Use synthetic "mlp" entry (green dot) preferentially, fallback to first primary seat
+
+    // Prefer live app-state P12 result (written by LCRPanel via AppStateProvider)
+    if (p12Level != null) {
+      const normaliseLevel = (v) => {
+        if (v == null) return null;
+        if (typeof v === 'number' && Number.isFinite(v)) return v >= 1 && v <= 4 ? `L${v}` : String(v);
+        if (typeof v === 'string') return v.match(/^L?[1-4]$/i) ? (v.startsWith('L') ? v.toUpperCase() : `L${v}`) : v;
+        return String(v);
+      };
+      p12Result = {
+        title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
+        level: normaliseLevel(p12Level),
+        value: null,
+        formatted: `${normaliseLevel(p12Level)} (${p12Mode === 'anechoic' ? 'Recommended' : 'Minimum'})`,
+        unit: p12CatalogEntry?.unit || "dB SPL (C)",
+        status: "ok",
+        source: "appState",
+        p12Mode: p12Mode ?? null,
+      };
+    }
+
+    // Fallback: derive P12 from live SPL metrics (threshold-based)
+    if (!p12Result && seatSplMetrics) {
       const mlpMetrics = getSeatSplMetrics(seatSplMetrics, "mlp");
-      const seatMetrics = mlpMetrics || (primarySeats.length > 0 
+      const seatMetrics = mlpMetrics || (primarySeats.length > 0
         ? getSeatSplMetrics(seatSplMetrics, primarySeats[0].id || `seat-${primarySeats[0].x}-${primarySeats[0].y}`)
         : null);
-      
+
       if (seatMetrics && seatMetrics.screen) {
         const lSpl = seatMetrics.screen.FL?.value || seatMetrics.screen.L?.value;
         const cSpl = seatMetrics.screen.FC?.value || seatMetrics.screen.C?.value;
         const rSpl = seatMetrics.screen.FR?.value || seatMetrics.screen.R?.value;
-        
+
         if (isNum(lSpl) && isNum(cSpl) && isNum(rSpl)) {
           const minSplRaw = Math.min(lSpl, cSpl, rSpl);
-          const minSpl = Math.ceil(minSplRaw); // Round UP to whole dB
-          
+          const minSpl = Math.ceil(minSplRaw);
+
+          // Thresholds differ by mode: Minimum (half-space) vs Recommended (anechoic)
+          const isMinMode = p12Mode !== 'anechoic';
           let level12 = 1;
-          if (minSpl >= 111) level12 = 4;
-          else if (minSpl >= 108) level12 = 3;
-          else if (minSpl >= 105) level12 = 2;
-          else if (minSpl >= 102) level12 = 1;
-          
+          if (isMinMode) {
+            if (minSpl >= 108) level12 = 4;
+            else if (minSpl >= 105) level12 = 3;
+            else if (minSpl >= 102) level12 = 2;
+            else if (minSpl >= 99)  level12 = 1;
+          } else {
+            if (minSpl >= 111) level12 = 4;
+            else if (minSpl >= 108) level12 = 3;
+            else if (minSpl >= 105) level12 = 2;
+            else if (minSpl >= 102) level12 = 1;
+          }
+
           p12Result = {
             title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
             level: `L${level12}`,
             value: minSpl,
             formatted: `${minSpl} dB`,
             unit: p12CatalogEntry?.unit || "dB SPL (C)",
-            status: "ok"
+            status: "ok",
+            source: "splMetrics",
           };
         }
       }
     }
-    
+
     gradedParameters.primary[12] = p12Result || {
       title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
       level: null,
