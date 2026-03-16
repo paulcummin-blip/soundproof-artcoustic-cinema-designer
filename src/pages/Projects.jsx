@@ -623,7 +623,7 @@ export default function ProjectsPage() {
               {p.target_spl != null && (
                 <div style={{ fontSize: 12, color: BRAND.subtext }}>
                   <span style={{ fontWeight: 600, color: BRAND.text }}>Target SPL: </span>
-                  {splLabelMap[String(p.target_spl)] || `${p.target_spl} dB`}
+                  {`${p.target_spl} dB`}
                   {p.p12_level != null && (
                     <>
                       {' '}— P12 - L{p.p12_level}{' '}
