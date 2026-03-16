@@ -85,6 +85,10 @@ export function serializeProject(input = {}) {
     // Subwoofer config (stored as JSON blobs for now)
     frontSubsCfg = null,
     rearSubsCfg = null,
+
+    // P12 result (from app state, written by LCRPanel)
+    p12Mode = null,
+    p12Level = null,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
