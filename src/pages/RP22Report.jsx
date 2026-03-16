@@ -239,61 +239,36 @@ function RP22ReportInner() {
     const [dbSnapshot, setDbSnapshot] = useState(null);
     const [dbSnapshotErr, setDbSnapshotErr] = useState(null);
 
-    // Parse a JSON string or return native value; fallback on failure
-    const parseJson = (value, fallback) => {
-        if (value == null) return fallback;
-        if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }
-        return value;
-    };
-
-    // Hydration effect: fetch project and populate app state if cfg is missing
+    // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
-        if (!activeProjectId) return;
-        const frontMissing = !app?.frontSubsCfg?.model && !app?.frontSubsCfg?.count;
-        const rearMissing = !app?.rearSubsCfg?.model && !app?.rearSubsCfg?.count;
-        if (!frontMissing && !rearMissing) return;
-
-        fetchProjectById(activeProjectId).then((p) => {
+        if (!activeProjectId || !app) return;
+        base44.entities.Project.filter({ id: activeProjectId }).then((results) => {
+            const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
             if (!p) return;
-            const frontCfg = parseJson(p?.front_subs_cfg ?? p?.frontSubsCfg, null);
-            const rearCfg  = parseJson(p?.rear_subs_cfg  ?? p?.rearSubsCfg,  null);
-            const subs     = parseJson(p?.subwoofers, []);
-            if (frontCfg && app?.setFrontSubsCfg) app.setFrontSubsCfg(frontCfg);
-            if (rearCfg  && app?.setRearSubsCfg)  app.setRearSubsCfg(rearCfg);
-            if (Array.isArray(subs) && subs.length > 0 && app?.setSubwoofers) app.setSubwoofers(subs);
+            hydrateProjectIntoAppState(p, app, {
+                setScreen: app.setScreen,
+                setDolbyConfig: app.setDolbyConfig,
+                setDolbyPreset: app.setDolbyLayout,
+                setSevenBedLayoutType: app.setSevenBedLayoutType,
+                setLcrAimMode: app.setLcrAimMode,
+                setEnableFrontWides: app.setEnableFrontWides,
+                setOverheadGlobalModel: app.setOverheadGlobalModel,
+                setOverheadFrontOverride: app.setOverheadFrontOverride,
+                setOverheadMidOverride: app.setOverheadMidOverride,
+                setOverheadRearOverride: app.setOverheadRearOverride,
+                setUseFrontGlobal: app.setUseFrontGlobal,
+                setUseMidGlobal: app.setUseMidGlobal,
+                setUseRearGlobal: app.setUseRearGlobal,
+                setRowSpacingM: app.setRowSpacingM,
+                setSeatsPerRowByRow: app.setSeatsPerRowByRow,
+                setOverlays: app.setOverlays,
+                setSeatingPositions: app.setSeatingPositions,
+                setRoomElements: app.setRoomElements,
+                setFrontSubsCfg: app.setFrontSubsCfg,
+                setRearSubsCfg: app.setRearSubsCfg,
+                setSpeakerSystem: app.setSpeakerSystem,
+            });
         }).catch(() => {});
-    }, [activeProjectId]);
-
-    useEffect(() => {
-        if (!activeProjectId) {
-            setDbSnapshot({ status: "no active project id" });
-            return;
-        }
-        fetchProjectById(activeProjectId).then((p) => {
-            const frontCfg = parseJson(p?.front_subs_cfg ?? p?.frontSubsCfg, null);
-            const rearCfg  = parseJson(p?.rear_subs_cfg  ?? p?.rearSubsCfg,  null);
-            const snapshot = {
-                id: p?.id ?? null,
-                name: p?.name ?? null,
-                hasSubwoofersField: p ? Object.prototype.hasOwnProperty.call(p, "subwoofers") : false,
-                subwoofersType: Array.isArray(p?.subwoofers) ? "array" : typeof p?.subwoofers,
-                subwoofersLength: Array.isArray(p?.subwoofers) ? p.subwoofers.length : null,
-                subFirst: Array.isArray(p?.subwoofers) && p.subwoofers.length > 0
-                    ? { model: p.subwoofers[0]?.model, group: p.subwoofers[0]?.group, role: p.subwoofers[0]?.role }
-                    : null,
-                front_subs_cfg_present: Object.prototype.hasOwnProperty.call(p || {}, "front_subs_cfg"),
-                rear_subs_cfg_present: Object.prototype.hasOwnProperty.call(p || {}, "rear_subs_cfg"),
-                frontCfgModel: frontCfg?.model ?? null,
-                frontCfgCount: frontCfg?.count ?? null,
-                frontCfgPositionsLen: Array.isArray(frontCfg?.positions) ? frontCfg.positions.length : null,
-                rearCfgModel: rearCfg?.model ?? null,
-                rearCfgCount: rearCfg?.count ?? null,
-                rearCfgPositionsLen: Array.isArray(rearCfg?.positions) ? rearCfg.positions.length : null,
-            };
-            setDbSnapshot(snapshot);
-        }).catch((e) => {
-            setDbSnapshotErr(String(e?.message || e));
-        });
     }, [activeProjectId]);
     // END TEMP DEBUG
     const [printReady, setPrintReady] = useState(false);
