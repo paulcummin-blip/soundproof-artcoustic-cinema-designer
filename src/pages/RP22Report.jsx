@@ -234,10 +234,7 @@ function RP22ReportInner() {
 
     const devMode = false;
 
-    // TEMP DEBUG: remove after sub persistence proven
     const activeProjectId = useActiveProjectId();
-    const [dbSnapshot, setDbSnapshot] = useState(null);
-    const [dbSnapshotErr, setDbSnapshotErr] = useState(null);
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
