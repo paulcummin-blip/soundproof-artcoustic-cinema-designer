@@ -329,7 +329,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, p21EarlyReflectionPreset, screen, visiblePlanSpeakers, dolbyLayout, p12Mode, p12Level }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -569,71 +569,41 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // RP22 Parameter 12 — Screen speakers SPL at RSP (rounded UP to whole dB)
     const p12CatalogEntry = RP22_CATALOG["12"];
     let p12Result = null;
-
-    // Prefer live app-state P12 result (written by LCRPanel via AppStateProvider)
-    if (p12Level != null) {
-      const normaliseLevel = (v) => {
-        if (v == null) return null;
-        if (typeof v === 'number' && Number.isFinite(v)) return v >= 1 && v <= 4 ? `L${v}` : String(v);
-        if (typeof v === 'string') return v.match(/^L?[1-4]$/i) ? (v.startsWith('L') ? v.toUpperCase() : `L${v}`) : v;
-        return String(v);
-      };
-      p12Result = {
-        title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
-        level: normaliseLevel(p12Level),
-        value: null,
-        formatted: `${normaliseLevel(p12Level)} (${p12Mode === 'anechoic' ? 'Recommended' : 'Minimum'})`,
-        unit: p12CatalogEntry?.unit || "dB SPL (C)",
-        status: "ok",
-        source: "appState",
-        p12Mode: p12Mode ?? null,
-      };
-    }
-
-    // Fallback: derive P12 from live SPL metrics (threshold-based)
-    if (!p12Result && seatSplMetrics) {
+    
+    if (seatSplMetrics) {
+      // Use synthetic "mlp" entry (green dot) preferentially, fallback to first primary seat
       const mlpMetrics = getSeatSplMetrics(seatSplMetrics, "mlp");
-      const seatMetrics = mlpMetrics || (primarySeats.length > 0
+      const seatMetrics = mlpMetrics || (primarySeats.length > 0 
         ? getSeatSplMetrics(seatSplMetrics, primarySeats[0].id || `seat-${primarySeats[0].x}-${primarySeats[0].y}`)
         : null);
-
+      
       if (seatMetrics && seatMetrics.screen) {
         const lSpl = seatMetrics.screen.FL?.value || seatMetrics.screen.L?.value;
         const cSpl = seatMetrics.screen.FC?.value || seatMetrics.screen.C?.value;
         const rSpl = seatMetrics.screen.FR?.value || seatMetrics.screen.R?.value;
-
+        
         if (isNum(lSpl) && isNum(cSpl) && isNum(rSpl)) {
           const minSplRaw = Math.min(lSpl, cSpl, rSpl);
-          const minSpl = Math.ceil(minSplRaw);
-
-          // Thresholds differ by mode: Minimum (half-space) vs Recommended (anechoic)
-          const isMinMode = p12Mode !== 'anechoic';
+          const minSpl = Math.ceil(minSplRaw); // Round UP to whole dB
+          
           let level12 = 1;
-          if (isMinMode) {
-            if (minSpl >= 108) level12 = 4;
-            else if (minSpl >= 105) level12 = 3;
-            else if (minSpl >= 102) level12 = 2;
-            else if (minSpl >= 99)  level12 = 1;
-          } else {
-            if (minSpl >= 111) level12 = 4;
-            else if (minSpl >= 108) level12 = 3;
-            else if (minSpl >= 105) level12 = 2;
-            else if (minSpl >= 102) level12 = 1;
-          }
-
+          if (minSpl >= 111) level12 = 4;
+          else if (minSpl >= 108) level12 = 3;
+          else if (minSpl >= 105) level12 = 2;
+          else if (minSpl >= 102) level12 = 1;
+          
           p12Result = {
             title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
             level: `L${level12}`,
             value: minSpl,
             formatted: `${minSpl} dB`,
             unit: p12CatalogEntry?.unit || "dB SPL (C)",
-            status: "ok",
-            source: "splMetrics",
+            status: "ok"
           };
         }
       }
     }
-
+    
     gradedParameters.primary[12] = p12Result || {
       title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
       level: null,
@@ -698,20 +668,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             .filter(g => Math.abs(g.spl - minSplRaw) < 0.001) // Match within 0.001 dB
             .sort((a, b) => a.priority - b.priority)[0]; // Lowest priority wins
           
-          // P13 thresholds differ by mode: Minimum vs Recommended (same toggle as P12)
-          const isMinModeP13 = p12Mode !== 'anechoic';
+          // P13 thresholds (Recommended: 99/102/105/108) - use rounded value
           let level13 = 1;
-          if (isMinModeP13) {
-            if (minSpl >= 105) level13 = 4;
-            else if (minSpl >= 102) level13 = 3;
-            else if (minSpl >= 99)  level13 = 2;
-            else if (minSpl >= 96)  level13 = 1;
-          } else {
-            if (minSpl >= 108) level13 = 4;
-            else if (minSpl >= 105) level13 = 3;
-            else if (minSpl >= 102) level13 = 2;
-            else if (minSpl >= 99)  level13 = 1;
-          }
+          if (minSpl >= 108) level13 = 4;
+          else if (minSpl >= 105) level13 = 3;
+          else if (minSpl >= 102) level13 = 2;
+          else if (minSpl >= 99) level13 = 1;
           
           p13Result = {
             title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
@@ -790,9 +752,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return m ? Number(m[1]) : null;
     };
 
-    // Authoritative layout selector — prefer live dolbyLayout passed from RP22Report/RoomDesigner
+    // Authoritative layout selector
     const layoutStr =
-      dolbyLayout ||
       aimState?.speakerSystem?.layout ||
       overheadState?.speakerSystem?.layout ||
       aimState?.speakerSystem?.format ||
@@ -1266,10 +1227,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     aimState?.aimSideSurroundsAtMLP,
     aimState?.aimRearSurroundsAtMLP,
     p15ConstructionLevel,
-    p21EarlyReflectionPreset,
-    dolbyLayout,
-    p12Mode,
-    p12Level,
     screen?.mountMode,
     screen?.floatDepthM,
   ]);

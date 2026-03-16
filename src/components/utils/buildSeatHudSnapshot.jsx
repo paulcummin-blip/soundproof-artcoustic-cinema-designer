@@ -223,10 +223,31 @@ export function buildSeatHudSnapshot({
     return r.startsWith('T'); // TFL, TFR, TML, etc
   });
 
-  // P9, P10, P16, P17 are all computed locally below (same path as live HUD).
-  // Do NOT pull P9/P17 from analysisResult.seatMetrics — those are calculated
-  // by different functions (computeUpperVerticalAnglesForSeat / computeP17ForAllSeats)
-  // that use different angle conventions. Local computation matches live HUD exactly.
+  // Pull per-seat RP22 metrics from analysisResult (single source of truth)
+  const seatMetrics = analysisResult?.seatMetrics?.get?.(seat.id);
+  if (seatMetrics) {
+    if (seatMetrics.p9) {
+      data.rp22.p9 = seatMetrics.p9;
+      
+      // Build compact explanation from structured gap data
+      if (seatMetrics.p9.details?.gaps?.length) {
+        const lines = seatMetrics.p9.details.gaps.map(
+          g => `${g.pair} ${g.deg.toFixed(0)}°`
+        );
+        
+        const worst = seatMetrics.p9.details.worst;
+        if (worst) {
+          data.rp22.p9Detail = `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°)`;
+        } else {
+          data.rp22.p9Detail = lines.join(', ');
+        }
+      }
+    }
+    if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
+    // P16 is computed locally below (skip analysisResult)
+    if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
+    if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
+  }
 
   // P9: Set N/A if no overheads
   if (!hasOverheads && !data.rp22.p9.value) {

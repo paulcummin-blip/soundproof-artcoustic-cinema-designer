@@ -484,11 +484,7 @@ function RP22ReportInner() {
         seatSplMetrics: allSeatSplMetrics,
         overheadState: { globalModel: app?.overheadGlobalModel, frontOverride: app?.overheadFrontOverride, midOverride: app?.overheadMidOverride, rearOverride: app?.overheadRearOverride, useFrontGlobal: app?.useFrontGlobal ?? true, useMidGlobal: app?.useMidGlobal ?? true, useRearGlobal: app?.useRearGlobal ?? true, aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
         aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
-        p15ConstructionLevel: app?.p15ConstructionLevel,
-        p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
-        dolbyLayout: reportDolbyLayout,
-        p12Mode: app?.p12Mode,
-        p12Level: app?.p12Level,
+        p15ConstructionLevel: app?.p15ConstructionLevel
     });
 
     const reportSeatHudById = React.useMemo(() => {
@@ -521,7 +517,6 @@ function RP22ReportInner() {
                     lcrAngleInfo, analysisResult: analysisResult || {},
                     seatingPositions: seats, splConfig: app?.splConfig || {},
                     sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
-                    overlaysForRendering: { enableFrontWides: app?.enableFrontWides ?? false, FRONT_WIDE: app?.overlays?.FRONT_WIDE ?? false },
                 });
                 if (snapshot) out[seat.id] = snapshot;
             } catch (e) { console.warn(`[RP22Report] HUD failed for seat ${seat.id}:`, e); }
