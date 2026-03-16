@@ -1305,6 +1305,7 @@ function SpeakerPlacementImpl(props) {
           mlpPoint={mlpPoint}
           disabled={disabled}
           allSeatSplMetrics={allSeatSplMetrics}
+          onP12Update={props?.onP12Update}
         />
       </CollapsiblePanel>
 
