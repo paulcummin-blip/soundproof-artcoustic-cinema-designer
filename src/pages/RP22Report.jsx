@@ -25,6 +25,8 @@ import ReportHeader from '../components/report/ReportHeader';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ReportSeatParametersCard from '../components/report/ReportSeatParametersCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
+import SightlineGraphic from '../components/report/SightlineGraphic';
+import { fovForDistance } from '../components/utils/screenMetrics';
 
 // --- Plan capture helpers (kept here since they close over state setters) ---
 const MIN_EXPORT_BBOX_PX = 200;
