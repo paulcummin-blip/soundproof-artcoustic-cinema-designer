@@ -33,8 +33,20 @@ export function useSeatHoverLogic({
 
   // Seat hover handlers
   const handleSeatClick = useCallback((seat) => {
-    setHoveredSeat(prev => (prev === seat.id ? null : seat));
-  }, []);
+    if (!seat?.id) return;
+    const currentPinnedId = appState?.hudPinnedSeatId || hudPinnedSeatId || null;
+    const isAlreadyPinned = !!currentPinnedId && String(currentPinnedId) === String(seat.id);
+
+    if (isAlreadyPinned) {
+      // Unpin
+      if (typeof setHudPinnedSeatId === 'function') setHudPinnedSeatId(null);
+      setHoveredSeat(null);
+    } else {
+      // Pin this seat
+      if (typeof setHudPinnedSeatId === 'function') setHudPinnedSeatId(seat.id);
+      setHoveredSeat(seat);
+    }
+  }, [appState?.hudPinnedSeatId, hudPinnedSeatId, setHudPinnedSeatId]);
 
   const handleSeatMouseEnter = useCallback((seat) => {
     if (!hudPinnedSeatId) setHoveredSeat(seat);
