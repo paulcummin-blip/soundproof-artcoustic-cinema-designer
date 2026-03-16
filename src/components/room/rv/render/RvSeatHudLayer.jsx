@@ -12,6 +12,7 @@ export default function RvSeatHudLayer({
   setHudHiddenWhenPinned,
   hudHiddenWhenPinned,
   renderLevelBadge,
+  isHudPinned,
 }) {
   if (exportMode === 'clean') return null;
 
@@ -31,6 +32,7 @@ export default function RvSeatHudLayer({
       renderLevelBadge={renderLevelBadge}
       splPowerW={splPowerW}
       splRadiationMode={splRadiationMode}
+      isHudPinned={isHudPinned}
     />
   );
 }
