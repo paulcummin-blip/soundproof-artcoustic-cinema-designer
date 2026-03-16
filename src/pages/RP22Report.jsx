@@ -458,7 +458,7 @@ function RP22ReportInner() {
     }, [seats, placedSpeakers, primarySeatingPosition, app?.splConfig, app?.getEffectiveSplInputs, hasSeats, hasSpeakers]);
 
     const analysisResult = useRP22AnalysisEngine({
-        placedSpeakers, seatingPositions: seats, primarySeatingPosition,
+        placedSpeakers, visiblePlanSpeakers: analysisSpeakers, seatingPositions: seats, primarySeatingPosition,
         dimensions: stableDimensions, mlpBasis,
         sevenBedLayoutType: app?.sevenBedLayoutType,
         extraSurroundCount: app?.extraSurroundCount,
