@@ -1764,7 +1764,7 @@ function RoomDesignerWithState() {
                 sevenBedLayoutType={_sevenBedLayoutType}
                 onSevenBedLayoutTypeChange={setSevenBedLayoutType}
                 dolbyPreset={dolbyPreset}
-                onDolbyPresetChange={(v) => { setDolbyPreset(v); const pid = resolvedProjectId || projectIdState; if (pid) Project.update(pid, { dolby_config: v }); }}
+                onDolbyPresetChange={setDolbyPreset}
                 lcrAimMode={lcrAimMode}
                 onChangeLcrAimMode={setLcrAimMode}
                 lcrAngleDeg={lcrAngleDeg}
