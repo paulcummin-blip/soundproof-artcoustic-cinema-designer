@@ -640,6 +640,106 @@ function RP22ReportInner() {
         return Object.keys(rows).map(Number).sort((a, b) => a - b).map(rowNum => ({ rowNum, seats: rows[rowNum] }));
     }, [seatLevelCounts]);
 
+    // ── Sightline page derived data ──────────────────────────────────────────
+    const projector = React.useMemo(() => {
+        return (app?.roomElements || []).find(el => el.type === 'projector');
+    }, [app?.roomElements]);
+
+    const canRenderSightlinePage = React.useMemo(() => {
+        if (!projector) return false;
+        const proj = Number.isFinite(projector.x_lens_m) && Number.isFinite(projector.y_lens_m) && Number.isFinite(projector.z_lens_m);
+        const scr  = Number.isFinite(app?.screenFrontPlaneM) && Number.isFinite(app?.screen?.visibleWidthInches) && Number(app?.screen?.visibleWidthInches) > 0;
+        const seat = (app?.seatingPositions?.length || 0) > 0;
+        const room = Number.isFinite(app?.roomDims?.heightM) && Number(app?.roomDims?.heightM) > 0;
+        return proj && scr && seat && room;
+    }, [projector, app?.screenFrontPlaneM, app?.screen?.visibleWidthInches, app?.seatingPositions, app?.roomDims?.heightM]);
+
+    const sightlineScreenMetrics = React.useMemo(() => {
+        if (!canRenderSightlinePage) return null;
+        const visibleWidthInches = Number(app?.screen?.visibleWidthInches || 0);
+        const aspectRatio = app?.screen?.aspectRatio || '16:9';
+        const { viewWm, viewHm, overallWm, overallHm } = resolveScreenMetricsSnapshot() || {};
+        const resolvedViewWm = viewWm ?? (visibleWidthInches * 0.0254);
+        const resolvedViewHm = viewHm ?? (resolvedViewWm * (aspectRatio === '16:9' ? 9/16 : 1/2.35));
+        const resolvedOverallWm = overallWm ?? (resolvedViewWm + 0.16);
+        const resolvedOverallHm = overallHm ?? (resolvedViewHm + 0.16);
+        const heightFromFloor = Number(app?.screen?.heightFromFloorM ?? app?.screenHeight ?? 0.5);
+        return {
+            screenFrontPlaneY: app?.screenFrontPlaneM,
+            screenWidthM:      resolvedViewWm,
+            screenHeightM:     resolvedViewHm,
+            screenTotalWidthM: resolvedOverallWm,
+            screenTotalHeightM: resolvedOverallHm,
+            screenBottomHeightM: heightFromFloor,
+            screenCenterHeightM: heightFromFloor + resolvedViewHm / 2,
+            screenTopHeightM:    heightFromFloor + resolvedViewHm,
+        };
+    }, [canRenderSightlinePage, app?.screen, app?.screenFrontPlaneM, app?.screenHeight, resolveScreenMetricsSnapshot]);
+
+    const rowCentralSeats = React.useMemo(() => {
+        if (!canRenderSightlinePage) return [];
+        const grouped = {};
+        (app?.seatingPositions || []).forEach(seat => {
+            const row = seat.rowNumber || 1;
+            if (!grouped[row]) grouped[row] = [];
+            grouped[row].push(seat);
+        });
+        const roomCentreX = stableDimensions.width / 2;
+        return Object.keys(grouped)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .map(rowNum => {
+                const rowSeats = grouped[rowNum];
+                // 1. prefer isPrimary
+                const primary = rowSeats.filter(s => s.isPrimary);
+                const candidates = primary.length ? primary : rowSeats;
+                // 2. closest to room centreline, tie-break on id string sort
+                return candidates
+                    .slice()
+                    .sort((a, b) => {
+                        const da = Math.abs(a.x - roomCentreX);
+                        const db = Math.abs(b.x - roomCentreX);
+                        if (Math.abs(da - db) > 0.001) return da - db;
+                        return String(a.id || '').localeCompare(String(b.id || ''));
+                    })[0];
+            })
+            .filter(Boolean);
+    }, [canRenderSightlinePage, app?.seatingPositions, stableDimensions.width]);
+
+    const sightlineRowData = React.useMemo(() => {
+        if (!canRenderSightlinePage || !sightlineScreenMetrics || !rowCentralSeats.length) return [];
+        const { screenFrontPlaneY, screenBottomHeightM, screenTopHeightM, screenWidthM } = sightlineScreenMetrics;
+        const aspectRatio = app?.screen?.aspectRatio || '16:9';
+        return rowCentralSeats.map(seat => {
+            const eyeY = seat.y;
+            const eyeZ = Number.isFinite(seat.z) ? seat.z : 1.2;
+            const viewingDistanceM = Math.abs(eyeY - screenFrontPlaneY);
+            const horizontalViewingAngleDeg = viewingDistanceM > 0
+                ? 2 * Math.atan((screenWidthM / 2) / viewingDistanceM) * (180 / Math.PI)
+                : 0;
+            const verticalAngleToTopDeg    = viewingDistanceM > 0 ? Math.atan2(screenTopHeightM    - eyeZ, viewingDistanceM) * (180 / Math.PI) : 0;
+            const verticalAngleToBottomDeg = viewingDistanceM > 0 ? Math.atan2(screenBottomHeightM - eyeZ, viewingDistanceM) * (180 / Math.PI) : 0;
+            const totalVerticalAngleDeg    = verticalAngleToTopDeg - verticalAngleToBottomDeg;
+            const seatHud = reportSeatHudById?.[seat.id];
+            const rp23 = seatHud?.rp23;
+            const complianceNote = rp23?.level
+                ? `RP23 H: ${rp23.formatted || `${(horizontalViewingAngleDeg).toFixed(1)}°`} (${rp23.level})`
+                : '—';
+            return {
+                rowNumber: seat.rowNumber || 1,
+                seatId:    seat.id,
+                eyeY, eyeZ,
+                viewingDistanceM,
+                horizontalViewingAngleDeg,
+                verticalAngleToTopDeg,
+                verticalAngleToBottomDeg,
+                totalVerticalAngleDeg,
+                complianceNote,
+            };
+        });
+    }, [canRenderSightlinePage, sightlineScreenMetrics, rowCentralSeats, app?.screen?.aspectRatio, reportSeatHudById]);
+    // ── end sightline data ───────────────────────────────────────────────────
+
     const systemSummary = React.useMemo(() => {
         const summary = { lcr: [], surrounds: [], overheads: [], subs: [] };
         const normalizeModel = (model) => (!model || model === 'off' || model === 'none') ? null : String(model).trim();
