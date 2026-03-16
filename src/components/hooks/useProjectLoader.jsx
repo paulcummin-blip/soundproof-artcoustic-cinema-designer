@@ -884,7 +884,9 @@ const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
         useMidGlobal,
         useRearGlobal,
         screenFrontPlaneM: appState.screenFrontPlaneM,
-        splConfig: appState.splConfig
+        splConfig: appState.splConfig,
+        p12Mode: appState.p12Mode,
+        p12Level: appState.p12Level,
       });
 
       // DEBUG: Log what we're about to save
