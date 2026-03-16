@@ -1449,20 +1449,8 @@ function RoomDesignerWithState() {
   // Subwoofer sync extracted to useSubwooferSync hook
   useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rearSubsCfg });
 
-  // Wrapped updateGlobalSpl: mirrors radiationMode changes immediately into the project record
   const updateGlobalSplWithProjectSync = (patch) => {
     appState?.updateGlobalSpl?.(patch);
-    if (patch?.radiationMode) {
-      const pid = resolvedProjectId || projectIdState;
-      if (pid) {
-        Project.update(pid, {
-          spl_config: {
-            ...(appState?.splConfig || {}),
-            radiationMode: patch.radiationMode
-          }
-        });
-      }
-    }
   };
 
   return (
