@@ -107,6 +107,7 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
 }
 
 export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Update }) {
+  const lastP12SentRef = React.useRef(null);
   const appState = useAppState();
   const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
