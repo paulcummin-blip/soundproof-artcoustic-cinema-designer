@@ -1089,6 +1089,7 @@ const byId = useEntitiesById({
     seatingPositions,
     appState,
     hudPinnedSeatId,
+    setHudPinnedSeatId,
     placedSpeakers,
     widthM,
     lengthM,
