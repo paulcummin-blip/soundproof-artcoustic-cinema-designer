@@ -81,7 +81,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
   };
 
   const updateElement = (id, field, value) => {
-    const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m']);
+    const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m', 'x_lens_m', 'y_lens_m', 'z_lens_m', 'body_width_m', 'body_height_m', 'body_depth_m']);
     const parsed = numberFields.has(field) ? parseFloat(value) : value;
 
     const next = (elements || []).map(el => {
