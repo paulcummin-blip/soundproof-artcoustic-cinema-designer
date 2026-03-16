@@ -521,6 +521,7 @@ function RP22ReportInner() {
                     lcrAngleInfo, analysisResult: analysisResult || {},
                     seatingPositions: seats, splConfig: app?.splConfig || {},
                     sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
+                    overlaysForRendering: { enableFrontWides: app?.enableFrontWides ?? false, FRONT_WIDE: app?.overlays?.FRONT_WIDE ?? false },
                 });
                 if (snapshot) out[seat.id] = snapshot;
             } catch (e) { console.warn(`[RP22Report] HUD failed for seat ${seat.id}:`, e); }
