@@ -5,6 +5,7 @@ export function useSeatHoverLogic({
   seatingPositions,
   appState,
   hudPinnedSeatId,
+  setHudPinnedSeatId,
   placedSpeakers,
   widthM,
   lengthM,
