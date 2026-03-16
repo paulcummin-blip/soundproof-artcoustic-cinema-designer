@@ -4,6 +4,7 @@ import { Project } from "@/entities/Project";
 import { serializeProject } from "@/components/utils/serializeProject";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
+import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 
 // Hook to encapsulate project loading, saving, and state management
 export function useProjectLoader(
