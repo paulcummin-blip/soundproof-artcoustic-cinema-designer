@@ -228,6 +228,8 @@ function RP22ReportInner() {
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
 
+    const devMode = false;
+
     // TEMP DEBUG: remove after sub persistence proven
     const activeProjectId = useActiveProjectId();
     const [dbSnapshot, setDbSnapshot] = useState(null);
@@ -693,66 +695,68 @@ function RP22ReportInner() {
             <ReportPrintStyles />
 
             <div className="screen-only">
-                {/* TEMP DEBUG: remove after sub persistence proven */}
-                <div className="print:hidden mb-4 p-3 border border-gray-300 rounded text-xs text-gray-600 bg-gray-50 max-w-2xl font-mono">
-                    <div className="font-bold text-gray-700 mb-1">DB Snapshot</div>
-                    {dbSnapshotErr && <div className="text-red-500">Error: {dbSnapshotErr}</div>}
-                    {dbSnapshot ? (
-                        <ul className="space-y-0.5">
-                            <li>Active project id: <strong>{activeProjectId || "—"}</strong></li>
-                            <li>Project name: <strong>{dbSnapshot.name ?? "—"}</strong></li>
-                            <li>subwoofers field: <strong>{dbSnapshot.hasSubwoofersField ? "present" : "missing"}</strong></li>
-                            <li>subwoofers type: <strong>{dbSnapshot.subwoofersType ?? "—"}</strong></li>
-                            <li>subwoofers length: <strong>{dbSnapshot.subwoofersLength ?? "—"}</strong></li>
-                            {dbSnapshot.subFirst && (
-                                <li>first sub — model: <strong>{dbSnapshot.subFirst.model}</strong>, group: <strong>{dbSnapshot.subFirst.group}</strong>, role: <strong>{dbSnapshot.subFirst.role}</strong></li>
-                            )}
-                            <li>front_subs_cfg present: <strong>{dbSnapshot.front_subs_cfg_present ? "yes" : "no"}</strong></li>
-                            <li>front_subs_cfg model: <strong>{dbSnapshot.frontCfgModel ?? "—"}</strong></li>
-                            <li>front_subs_cfg count: <strong>{dbSnapshot.frontCfgCount ?? "—"}</strong></li>
-                            <li>front_subs_cfg positions length: <strong>{dbSnapshot.frontCfgPositionsLen ?? "—"}</strong></li>
-                            <li>rear_subs_cfg present: <strong>{dbSnapshot.rear_subs_cfg_present ? "yes" : "no"}</strong></li>
-                            <li>rear_subs_cfg model: <strong>{dbSnapshot.rearCfgModel ?? "—"}</strong></li>
-                            <li>rear_subs_cfg count: <strong>{dbSnapshot.rearCfgCount ?? "—"}</strong></li>
-                            <li>rear_subs_cfg positions length: <strong>{dbSnapshot.rearCfgPositionsLen ?? "—"}</strong></li>
-                            {dbSnapshot.status && <li>status: <strong>{dbSnapshot.status}</strong></li>}
-                        </ul>
-                    ) : !dbSnapshotErr ? (
-                        <div>Loading…</div>
-                    ) : null}
-                </div>
-                {/* END TEMP DEBUG */}
+                {devMode && (
+                    <>
+                        {/* TEMP DEBUG: DB Snapshot */}
+                        <div className="print:hidden mb-4 p-3 border border-gray-300 rounded text-xs text-gray-600 bg-gray-50 max-w-2xl font-mono">
+                            <div className="font-bold text-gray-700 mb-1">DB Snapshot</div>
+                            {dbSnapshotErr && <div className="text-red-500">Error: {dbSnapshotErr}</div>}
+                            {dbSnapshot ? (
+                                <ul className="space-y-0.5">
+                                    <li>Active project id: <strong>{activeProjectId || "—"}</strong></li>
+                                    <li>Project name: <strong>{dbSnapshot.name ?? "—"}</strong></li>
+                                    <li>subwoofers field: <strong>{dbSnapshot.hasSubwoofersField ? "present" : "missing"}</strong></li>
+                                    <li>subwoofers type: <strong>{dbSnapshot.subwoofersType ?? "—"}</strong></li>
+                                    <li>subwoofers length: <strong>{dbSnapshot.subwoofersLength ?? "—"}</strong></li>
+                                    {dbSnapshot.subFirst && (
+                                        <li>first sub — model: <strong>{dbSnapshot.subFirst.model}</strong>, group: <strong>{dbSnapshot.subFirst.group}</strong>, role: <strong>{dbSnapshot.subFirst.role}</strong></li>
+                                    )}
+                                    <li>front_subs_cfg present: <strong>{dbSnapshot.front_subs_cfg_present ? "yes" : "no"}</strong></li>
+                                    <li>front_subs_cfg model: <strong>{dbSnapshot.frontCfgModel ?? "—"}</strong></li>
+                                    <li>front_subs_cfg count: <strong>{dbSnapshot.frontCfgCount ?? "—"}</strong></li>
+                                    <li>front_subs_cfg positions length: <strong>{dbSnapshot.frontCfgPositionsLen ?? "—"}</strong></li>
+                                    <li>rear_subs_cfg present: <strong>{dbSnapshot.rear_subs_cfg_present ? "yes" : "no"}</strong></li>
+                                    <li>rear_subs_cfg model: <strong>{dbSnapshot.rearCfgModel ?? "—"}</strong></li>
+                                    <li>rear_subs_cfg count: <strong>{dbSnapshot.rearCfgCount ?? "—"}</strong></li>
+                                    <li>rear_subs_cfg positions length: <strong>{dbSnapshot.rearCfgPositionsLen ?? "—"}</strong></li>
+                                    {dbSnapshot.status && <li>status: <strong>{dbSnapshot.status}</strong></li>}
+                                </ul>
+                            ) : !dbSnapshotErr ? (
+                                <div>Loading…</div>
+                            ) : null}
+                        </div>
 
-                {/* TEMP DEBUG: Live AppState snapshot */}
-                <div className="print:hidden mb-4 p-3 border border-blue-300 rounded text-xs text-gray-600 bg-blue-50 max-w-2xl font-mono">
-                    <div className="font-bold text-blue-700 mb-1">Live State Snapshot (AppState)</div>
-                    {(() => {
-                        const fCfg = app?.frontSubsCfg;
-                        const rCfg = app?.rearSubsCfg;
-                        const derivedSubs = (() => {
-                            try {
-                                const result = deriveSubwoofersFromCfg(fCfg, rCfg, app?.roomDims, null);
-                                return Array.isArray(result) ? result.length : "not array";
-                            } catch { return "error"; }
-                        })();
-                        return (
-                            <ul className="space-y-0.5">
-                                <li>activeProjectId: <strong>{activeProjectId || "—"}</strong></li>
-                                <li>frontSubsCfg present: <strong>{fCfg ? "yes" : "no"}</strong></li>
-                                <li>frontSubsCfg model: <strong>{fCfg?.model ?? "—"}</strong></li>
-                                <li>frontSubsCfg count: <strong>{fCfg?.count ?? "—"}</strong></li>
-                                <li>frontSubsCfg positions length: <strong>{Array.isArray(fCfg?.positions) ? fCfg.positions.length : "—"}</strong></li>
-                                <li>rearSubsCfg present: <strong>{rCfg ? "yes" : "no"}</strong></li>
-                                <li>rearSubsCfg model: <strong>{rCfg?.model ?? "—"}</strong></li>
-                                <li>rearSubsCfg count: <strong>{rCfg?.count ?? "—"}</strong></li>
-                                <li>rearSubsCfg positions length: <strong>{Array.isArray(rCfg?.positions) ? rCfg.positions.length : "—"}</strong></li>
-                                <li>app.subwoofers length: <strong>{Array.isArray(app?.subwoofers) ? app.subwoofers.length : "not array"}</strong></li>
-                                <li>derived subs from cfg length: <strong>{derivedSubs}</strong></li>
-                            </ul>
-                        );
-                    })()}
-                </div>
-                {/* END TEMP DEBUG: Live AppState snapshot */}
+                        {/* TEMP DEBUG: Live AppState snapshot */}
+                        <div className="print:hidden mb-4 p-3 border border-blue-300 rounded text-xs text-gray-600 bg-blue-50 max-w-2xl font-mono">
+                            <div className="font-bold text-blue-700 mb-1">Live State Snapshot (AppState)</div>
+                            {(() => {
+                                const fCfg = app?.frontSubsCfg;
+                                const rCfg = app?.rearSubsCfg;
+                                const derivedSubs = (() => {
+                                    try {
+                                        const result = deriveSubwoofersFromCfg(fCfg, rCfg, app?.roomDims, null);
+                                        return Array.isArray(result) ? result.length : "not array";
+                                    } catch { return "error"; }
+                                })();
+                                return (
+                                    <ul className="space-y-0.5">
+                                        <li>activeProjectId: <strong>{activeProjectId || "—"}</strong></li>
+                                        <li>frontSubsCfg present: <strong>{fCfg ? "yes" : "no"}</strong></li>
+                                        <li>frontSubsCfg model: <strong>{fCfg?.model ?? "—"}</strong></li>
+                                        <li>frontSubsCfg count: <strong>{fCfg?.count ?? "—"}</strong></li>
+                                        <li>frontSubsCfg positions length: <strong>{Array.isArray(fCfg?.positions) ? fCfg.positions.length : "—"}</strong></li>
+                                        <li>rearSubsCfg present: <strong>{rCfg ? "yes" : "no"}</strong></li>
+                                        <li>rearSubsCfg model: <strong>{rCfg?.model ?? "—"}</strong></li>
+                                        <li>rearSubsCfg count: <strong>{rCfg?.count ?? "—"}</strong></li>
+                                        <li>rearSubsCfg positions length: <strong>{Array.isArray(rCfg?.positions) ? rCfg.positions.length : "—"}</strong></li>
+                                        <li>app.subwoofers length: <strong>{Array.isArray(app?.subwoofers) ? app.subwoofers.length : "not array"}</strong></li>
+                                        <li>derived subs from cfg length: <strong>{derivedSubs}</strong></li>
+                                    </ul>
+                                );
+                            })()}
+                        </div>
+                    </>
+                )}
 
                 <ReportHiddenCaptures
                     app={app}
