@@ -1178,7 +1178,6 @@ function RP22ReportInner() {
                                 </div>
                             </div>
                         </section>
-                    </div>
 
                         {/* ── Sightlines & Viewing Angles (final page) ── */}
                         {canRenderSightlinePage && sightlineScreenMetrics && sightlineRowData.length > 0 && (
