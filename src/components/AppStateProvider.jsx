@@ -67,6 +67,14 @@ function normaliseRoomElements(list) {
       // keep BOTH id styles so any renderer/export code will find one
       const label = (el.label ?? el.__label ?? "").toString();
 
+      // projector-specific fields (preserved as-is if present, left undefined if absent)
+      const x_lens_m = Number.isFinite(Number(el?.x_lens_m)) ? Number(el.x_lens_m) : undefined;
+      const y_lens_m = Number.isFinite(Number(el?.y_lens_m)) ? Number(el.y_lens_m) : undefined;
+      const z_lens_m = Number.isFinite(Number(el?.z_lens_m)) ? Number(el.z_lens_m) : undefined;
+      const body_width_m = Number.isFinite(Number(el?.body_width_m)) ? Number(el.body_width_m) : undefined;
+      const body_height_m = Number.isFinite(Number(el?.body_height_m)) ? Number(el.body_height_m) : undefined;
+      const body_depth_m = Number.isFinite(Number(el?.body_depth_m)) ? Number(el.body_depth_m) : undefined;
+
       return {
         ...el,
         id,
@@ -78,6 +86,13 @@ function normaliseRoomElements(list) {
         pos_m,
         label,
         __label: label,
+        // projector fields: only written when defined, undefined fields are stripped by spread
+        ...(x_lens_m !== undefined && { x_lens_m }),
+        ...(y_lens_m !== undefined && { y_lens_m }),
+        ...(z_lens_m !== undefined && { z_lens_m }),
+        ...(body_width_m !== undefined && { body_width_m }),
+        ...(body_height_m !== undefined && { body_height_m }),
+        ...(body_depth_m !== undefined && { body_depth_m }),
       };
     });
 }
