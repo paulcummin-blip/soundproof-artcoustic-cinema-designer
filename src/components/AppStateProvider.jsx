@@ -1849,6 +1849,10 @@ function useDesignerState() {
     extraSurroundCount,
     setExtraSurroundCount,
     seatSnapshotBySeatId,
+    p12Mode,
+    setP12Mode,
+    p12Level,
+    setP12Level,
   ]);
 
   // Export p21 setter as convenience (same pattern as p15)
