@@ -574,7 +574,9 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
         useMidGlobal,
         useRearGlobal,
         screenFrontPlaneM: appState.screenFrontPlaneM,
-        splConfig: appState.splConfig
+        splConfig: appState.splConfig,
+        p12Mode: appState.p12Mode,
+        p12Level: appState.p12Level,
       });
 
       // IMPORTANT: autosave must never rename a project
