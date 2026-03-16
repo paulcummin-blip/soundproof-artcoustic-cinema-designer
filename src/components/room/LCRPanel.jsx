@@ -130,6 +130,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
+  const [p12State, setP12State] = React.useState({ mode: null, level: null });
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
