@@ -267,7 +267,7 @@ function RP22ReportInner() {
             });
         }).catch(() => {});
     }, [activeProjectId]);
-    // END TEMP DEBUG
+
     const [printReady, setPrintReady] = useState(false);
     const [debugPlanCapture, setDebugPlanCapture] = useState(false);
     const printLockRef = React.useRef(false);
