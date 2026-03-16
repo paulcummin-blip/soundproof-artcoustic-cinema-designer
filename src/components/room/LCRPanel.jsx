@@ -283,6 +283,11 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
         const currentMode = isMinimumMode ? 'half-space' : 'anechoic';
 
+        if (p12State.mode !== currentMode || p12State.level !== level) {
+          // schedule state update outside render via timeout to avoid setState-in-render
+          setTimeout(() => setP12State({ mode: currentMode, level }), 0);
+        }
+
         return (
           <RP22LevelPill
             parameter="P12"
