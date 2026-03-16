@@ -198,7 +198,11 @@ export function serializeProject(input = {}) {
     use_mid_global: !!useMidGlobal,
     use_rear_global: !!useRearGlobal,
 
-    // SPL config
-    spl_config: asObject(splConfig),
+    // SPL config (merged with current P12 result if available)
+    spl_config: {
+      ...asObject(splConfig),
+      ...(p12Mode != null ? { p12_mode: p12Mode } : {}),
+      ...(p12Level != null ? { p12_level: p12Level } : {}),
+    },
   };
 }
