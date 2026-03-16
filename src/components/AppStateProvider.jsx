@@ -1182,44 +1182,41 @@ function useDesignerState() {
       if (p.seatingPositions) setSeatingPositions(normaliseSeatingPositions(p.seatingPositions, p.roomDims || p.roomDimensions || roomDims || null));
       if (p.screen) setScreen(p.screen);
 
-      // FREE-USE GUARD: in free-use mode, never restore speaker/config state from autosave.
-      // Only room dims, screen, and seating are restored above.
-      if (!__isFreeUse) {
-        if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
-        // Restore sub configs explicitly (even if count = 0)
-        if (Object.prototype.hasOwnProperty.call(p, "frontSubsCfg")) {
-          setFrontSubsCfg(p.frontSubsCfg || {
-            model: "SUB2-12",
-            count: 0,
-            positions: [],
-            tuning: []
-          });
-        }
-        if (Object.prototype.hasOwnProperty.call(p, "rearSubsCfg")) {
-          setRearSubsCfg(p.rearSubsCfg || {
-            model: "SUB2-12",
-            count: 0,
-            positions: [],
-            tuning: []
-          });
-        }
-        if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
-        if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
-        if (p.globalSurroundModel) _setGlobalSurroundModel(stripSurroundSuffix(p.globalSurroundModel));
-        if (p.overheadGlobalModel) setOverheadGlobalModel(p.overheadGlobalModel);
-        if (p.overheadFrontOverride) setOverheadFrontOverride(p.overheadFrontOverride);
-        if (p.overheadMidOverride) setOverheadMidOverride(p.overheadMidOverride);
-        if (p.overheadRearOverride) setOverheadRearOverride(p.overheadRearOverride);
-        if (typeof p.useFrontGlobal === "boolean") setUseFrontGlobal(p.useFrontGlobal);
-        if (typeof p.useMidGlobal === "boolean") setUseMidGlobal(p.useMidGlobal);
-        if (typeof p.useRearGlobal === "boolean") setUseRearGlobal(p.useRearGlobal);
-        if (typeof p.aimFrontWidesAtMLP === "boolean") setAimFrontWidesAtMLP(p.aimFrontWidesAtMLP);
-        if (typeof p.aimSideSurroundsAtMLP === "boolean") setAimSideSurroundsAtMLP(p.aimSideSurroundsAtMLP);
-        if (typeof p.aimRearSurroundsAtMLP === "boolean") setAimRearSurroundsAtMLP(p.aimRearSurroundsAtMLP);
-        if (typeof p.lcrAimMode === "string") setLcrAimMode(p.lcrAimMode);
-        if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
-        if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
+      // Restore speaker/config state from autosave for all modes (saved project and free-run).
+      if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
+      // Restore sub configs explicitly (even if count = 0)
+      if (Object.prototype.hasOwnProperty.call(p, "frontSubsCfg")) {
+        setFrontSubsCfg(p.frontSubsCfg || {
+          model: "SUB2-12",
+          count: 0,
+          positions: [],
+          tuning: []
+        });
       }
+      if (Object.prototype.hasOwnProperty.call(p, "rearSubsCfg")) {
+        setRearSubsCfg(p.rearSubsCfg || {
+          model: "SUB2-12",
+          count: 0,
+          positions: [],
+          tuning: []
+        });
+      }
+      if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
+      if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
+      if (p.globalSurroundModel) _setGlobalSurroundModel(stripSurroundSuffix(p.globalSurroundModel));
+      if (p.overheadGlobalModel) setOverheadGlobalModel(p.overheadGlobalModel);
+      if (p.overheadFrontOverride) setOverheadFrontOverride(p.overheadFrontOverride);
+      if (p.overheadMidOverride) setOverheadMidOverride(p.overheadMidOverride);
+      if (p.overheadRearOverride) setOverheadRearOverride(p.overheadRearOverride);
+      if (typeof p.useFrontGlobal === "boolean") setUseFrontGlobal(p.useFrontGlobal);
+      if (typeof p.useMidGlobal === "boolean") setUseMidGlobal(p.useMidGlobal);
+      if (typeof p.useRearGlobal === "boolean") setUseRearGlobal(p.useRearGlobal);
+      if (typeof p.aimFrontWidesAtMLP === "boolean") setAimFrontWidesAtMLP(p.aimFrontWidesAtMLP);
+      if (typeof p.aimSideSurroundsAtMLP === "boolean") setAimSideSurroundsAtMLP(p.aimSideSurroundsAtMLP);
+      if (typeof p.aimRearSurroundsAtMLP === "boolean") setAimRearSurroundsAtMLP(p.aimRearSurroundsAtMLP);
+      if (typeof p.lcrAimMode === "string") setLcrAimMode(p.lcrAimMode);
+      if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
+      if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
 
       setAutosaveMeta(getAutosaveMeta());
       
