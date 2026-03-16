@@ -107,7 +107,6 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
 }
 
 export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Update }) {
-  const lastP12SentRef = React.useRef(null);
   const appState = useAppState();
   const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
@@ -130,7 +129,6 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
-  const [p12State, setP12State] = React.useState({ mode: null, level: null });
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
@@ -139,14 +137,6 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   useEffect(() => {
     setLcrPowerInputValue(String(splConfig?.lcrW || 100));
   }, [splConfig?.lcrW]);
-
-  React.useEffect(() => {
-    if (!onP12Update || !p12State.mode || p12State.level === null) return;
-    const sig = `${p12State.mode}|${p12State.level}`;
-    if (lastP12SentRef.current === sig) return;
-    lastP12SentRef.current = sig;
-    onP12Update(p12State.mode, p12State.level);
-  }, [onP12Update, p12State.mode, p12State.level]);
 
   const handleLcrPowerChange = useCallback((e) => {
     const newValue = e.target.value;
@@ -290,11 +280,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         const level = computeRP22Level(pillBasisDb, thresholds);
 
         const currentMode = isMinimumMode ? 'half-space' : 'anechoic';
-
-        if (p12State.mode !== currentMode || p12State.level !== level) {
-          // schedule state update outside render via timeout to avoid setState-in-render
-          setTimeout(() => setP12State({ mode: currentMode, level }), 0);
-        }
+        onP12Update?.(currentMode, level);
 
         return (
           <RP22LevelPill
