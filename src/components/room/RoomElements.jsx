@@ -41,50 +41,40 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
   const addProjector = () => {
     const elementCount = (elements || []).length;
 
-    // Try to centre on the rear wall, with 0.10m buffer from the wall (rear wall),
-    // and store a ceiling mount height with 0.05m buffer from ceiling.
-    // If room dims aren't available here, fall back safely.
+    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
     const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
     const roomH = Number(roomDims?.heightM ?? roomDims?.height ?? 2.4) || 2.4;
 
-    const projD = 0.517; // depth into room (m)
-    const projH = 0.210; // height (m)
+    // Sensible defaults for a ceiling-mounted projector
+    const bodyW = 0.46;   // body width (m)
+    const bodyH = 0.21;   // body height (m)
+    const bodyD = 0.517;  // body depth front-to-back (m)
 
-    // Centre the projector block on the room width
-    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
-    const projW = 0.46; // 460mm
-
-    // Ensure centre of block sits on room centreline
-    const centredX = roomW > 0
-      ? (roomW / 2) - (projW / 2)
-      : 0;
+    // Lens centre: horizontally centred, near rear of room, close to ceiling
+    const lensX = roomW > 0 ? roomW / 2 : 0;
+    const lensY = roomL > 0 ? Math.max(0, roomL - 0.15) : 0; // 150mm from rear wall
+    const lensZ = Math.max(0, roomH - 0.05 - bodyH / 2);     // near ceiling, lens at body centre height
 
     const newElement = {
       id: makeId(),
       type: 'projector',
-
-      // Placement (start on rear wall)
       wall: 'rear',
-
-      // Plan footprint (top-down rectangle)
-      length_m: projW,
-      thickness_m: projD,
-
-      // Position along the wall (front/rear => distance from LEFT wall)
-      pos_m: centredX,
-
-      // Distance from wall (metres)
-      wall_offset_m: 0.10,
-
-      // Vertical placement (store bottom height from floor)
-      // Ceiling buffer 0.05m: bottom = ceiling - buffer - projector height
-      z_m: Math.max(0, roomH - 0.05 - projH),
-
-      // Keep the physical height stored for later sightline work
-      height_m: projH,
-
-      // UI
       label: 'Projector',
+
+      // Formal projector fields
+      x_lens_m: lensX,
+      y_lens_m: lensY,
+      z_lens_m: lensZ,
+      body_width_m: bodyW,
+      body_height_m: bodyH,
+      body_depth_m: bodyD,
+
+      // Legacy plan-view fields kept for RV rendering compatibility
+      length_m: bodyW,
+      thickness_m: bodyD,
+      pos_m: roomW > 0 ? (roomW / 2) - (bodyW / 2) : 0,
+      wall_offset_m: 0.10,
+      height_m: bodyH,
     };
 
     onChange([...(elements || []), newElement]);
