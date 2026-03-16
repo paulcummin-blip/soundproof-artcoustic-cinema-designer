@@ -348,6 +348,7 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
     if (!isHudPinned) {
       setHudPinnedOffsetPx(null);
       setHudHiddenWhenPinned(false);
+      setHudBasePosPx(null); // allow auto-position on next hover
     }
   }, [isHudPinned]);
 
