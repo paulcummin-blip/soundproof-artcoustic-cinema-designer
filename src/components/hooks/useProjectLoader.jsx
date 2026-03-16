@@ -89,15 +89,20 @@ appState, // Pass appState directly for setters
 
     // DEBUG: Log what we're loading
     if (globalThis.__B44_LOGS) console.log('[RD] hydrateFromProject', {
-      id: p.id,
-      name: p.name,
-      client_name: p.client_name,
-      roomDims: p.roomDims,
-      room_width: p.room_width,
-      room_length: p.room_length,
-      room_height: p.room_height,
+      id: p.id, name: p.name,
       seating_positions: typeof p.seating_positions === 'string' ? p.seating_positions.slice(0, 200) : p.seating_positions,
       selected_speakers: typeof p.selected_speakers === 'string' ? p.selected_speakers.slice(0, 200) : p.selected_speakers
+    });
+
+    hydrateProjectIntoAppState(p, appState, {
+      setScreen, setDolbyConfig, setDolbyPreset: setDolbyPreset,
+      setSevenBedLayoutType, setLcrAimMode, setEnableFrontWides, setFreeMoveLcr,
+      setOverheadGlobalModel, setOverheadFrontOverride, setOverheadMidOverride, setOverheadRearOverride,
+      setUseFrontGlobal, setUseMidGlobal, setUseRearGlobal,
+      setRowSpacingM, setSeatsPerRowByRow,
+      setOverlays, setSeatingPositions, setRoomElements,
+      setFrontSubsCfg, setRearSubsCfg,
+      setSelectedSpeakersByRole, setSpeakerNodes, setSpeakerSystem,
     });
 
     //
