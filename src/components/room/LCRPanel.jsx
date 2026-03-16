@@ -127,6 +127,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     return '';
   }, [getByRole, LCR_CANONICAL_ROLES, lcrModelOptions]);
 
+  const lastP12SentRef = React.useRef(null);
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
 
