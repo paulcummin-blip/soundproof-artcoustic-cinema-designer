@@ -160,6 +160,10 @@ export default function ProjectsPage() {
                 createdAt: Number.isFinite(new Date(p.created_date).getTime())
                   ? new Date(p.created_date).getTime()
                   : Date.now(),
+                spl_config: (() => { return safeJson(p.spl_config) || {}; })(),
+                p12_mode: (() => { const c = safeJson(p.spl_config) || {}; return c.p12_mode || null; })(),
+                p12_level: (() => { const c = safeJson(p.spl_config) || {}; return c.p12_level ?? null; })(),
+                target_spl: (() => { const c = safeJson(p.spl_config) || {}; return p.target_spl ?? c.target_spl ?? null; })(),
                 lcrModel: (() => {
                   try {
                     const obj = safeJson(p.selected_speakers_by_role);
@@ -620,6 +624,16 @@ export default function ProjectsPage() {
                 <div style={{ fontSize: 12, color: BRAND.subtext }}>
                   <span style={{ fontWeight: 600, color: BRAND.text }}>Target SPL: </span>
                   {splLabelMap[String(p.target_spl)] || `${p.target_spl} dB`}
+                  {p.p12_level != null && (
+                    <>
+                      {' '}— P12 - L{p.p12_level}{' '}
+                      {p.p12_mode === 'half-space'
+                        ? 'Minimum'
+                        : p.p12_mode === 'anechoic'
+                          ? 'Recommended'
+                          : ''}
+                    </>
+                  )}
                 </div>
               )}
             </div>
