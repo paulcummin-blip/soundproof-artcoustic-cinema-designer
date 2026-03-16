@@ -1456,10 +1456,10 @@ function RoomDesignerWithState() {
       const pid = resolvedProjectId || projectIdState;
       if (pid) {
         Project.update(pid, {
-          spl_config: JSON.stringify({
+          spl_config: {
             ...(appState?.splConfig || {}),
             radiationMode: patch.radiationMode
-          })
+          }
         });
       }
     }
@@ -1809,11 +1809,11 @@ function RoomDesignerWithState() {
                   const pid = resolvedProjectId || projectIdState;
                   if (pid) {
                     Project.update(pid, {
-                      spl_config: JSON.stringify({
+                      spl_config: {
                         ...(appState?.splConfig || {}),
                         p12_mode: mode,
                         p12_level: level
-                      })
+                      }
                     });
                   }
                 }} />
