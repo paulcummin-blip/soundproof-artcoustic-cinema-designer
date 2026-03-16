@@ -140,6 +140,14 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     setLcrPowerInputValue(String(splConfig?.lcrW || 100));
   }, [splConfig?.lcrW]);
 
+  React.useEffect(() => {
+    if (!onP12Update || !p12State.mode || p12State.level === null) return;
+    const sig = `${p12State.mode}|${p12State.level}`;
+    if (lastP12SentRef.current === sig) return;
+    lastP12SentRef.current = sig;
+    onP12Update(p12State.mode, p12State.level);
+  }, [onP12Update, p12State.mode, p12State.level]);
+
   const handleLcrPowerChange = useCallback((e) => {
     const newValue = e.target.value;
     if (newValue !== '' && !/^\d+$/.test(newValue)) return;
