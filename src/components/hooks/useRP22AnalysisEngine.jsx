@@ -752,8 +752,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return m ? Number(m[1]) : null;
     };
 
-    // Authoritative layout selector
+    // Authoritative layout selector — prefer live dolbyLayout passed from RP22Report/RoomDesigner
     const layoutStr =
+      dolbyLayout ||
       aimState?.speakerSystem?.layout ||
       overheadState?.speakerSystem?.layout ||
       aimState?.speakerSystem?.format ||
