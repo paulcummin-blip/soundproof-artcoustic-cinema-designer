@@ -582,6 +582,9 @@ function useDesignerState() {
     (__autosavePayload && __autosavePayload.p21EarlyReflectionPreset) ? __autosavePayload.p21EarlyReflectionPreset : 'l3'
   ));
 
+  const [p12Mode, setP12Mode] = useState(null);
+  const [p12Level, setP12Level] = useState(null);
+
   const setP21EarlyReflectionPresetSafe = useCallback((next) => {
     const allowed = new Set(["l1", "l2", "l3", "l4"]);
     const v = allowed.has(next) ? next : "l2";
