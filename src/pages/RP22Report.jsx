@@ -1179,6 +1179,36 @@ function RP22ReportInner() {
                             </div>
                         </section>
                     </div>
+
+                        {/* ── Sightlines & Viewing Angles (final page) ── */}
+                        {canRenderSightlinePage && sightlineScreenMetrics && sightlineRowData.length > 0 && (
+                            <section id="pdf-sightlines" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                <SightlineGraphic
+                                    projectName={app?.projectName || ''}
+                                    clientName={app?.clientName || ''}
+                                    roomWidthM={stableDimensions.width}
+                                    roomLengthM={stableDimensions.length}
+                                    roomHeightM={stableDimensions.height}
+                                    screenWidthM={sightlineScreenMetrics.screenWidthM}
+                                    screenHeightM={sightlineScreenMetrics.screenHeightM}
+                                    screenTotalWidthM={sightlineScreenMetrics.screenTotalWidthM}
+                                    screenTotalHeightM={sightlineScreenMetrics.screenTotalHeightM}
+                                    screenFrontPlaneY={sightlineScreenMetrics.screenFrontPlaneY}
+                                    screenCenterHeightM={sightlineScreenMetrics.screenCenterHeightM}
+                                    screenBottomHeightM={sightlineScreenMetrics.screenBottomHeightM}
+                                    screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
+                                    projectorLensX={projector?.x_lens_m}
+                                    projectorLensY={projector?.y_lens_m}
+                                    projectorLensZ={projector?.z_lens_m}
+                                    projectorBodyWidth={projector?.body_width_m}
+                                    projectorBodyHeight={projector?.body_height_m}
+                                    projectorBodyDepth={projector?.body_depth_m}
+                                    rowData={sightlineRowData}
+                                    dolbyConfig={app?.dolbyConfig || app?.dolbyLayout || ''}
+                                />
+                            </section>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
