@@ -1768,6 +1768,10 @@ function useDesignerState() {
     mlp,
     seatSnapshotBySeatId,
     setSeatSnapshotBySeatId,
+    p12Mode,
+    setP12Mode,
+    p12Level,
+    setP12Level,
     };
   }, [
     dimensions, setDimensions,
