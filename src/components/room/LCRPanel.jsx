@@ -128,6 +128,37 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   }, [getByRole, LCR_CANONICAL_ROLES, lcrModelOptions]);
 
   const lastP12SentRef = React.useRef(null);
+
+  // Compute P12 values at component scope so the effect can depend on them
+  const p12Computed = useMemo(() => {
+    if (!allSeatSplMetrics) return null;
+    const mlpMetrics = allSeatSplMetrics.get('mlp');
+    const seatMetrics = mlpMetrics || (() => {
+      const mlp = getMlpSeat(seatingPositions || []);
+      return mlp ? allSeatSplMetrics.get(mlp.id) : null;
+    })();
+    if (!seatMetrics?.spl?.screen) return null;
+    const lcrTileSplDb = ['FL', 'FC', 'FR']
+      .map(role => seatMetrics.spl.screen[role]?.value)
+      .filter(v => Number.isFinite(v))
+      .map(v => Math.ceil(v));
+    if (lcrTileSplDb.length === 0) return null;
+    const pillBasisDb = Math.min(...lcrTileSplDb);
+    const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
+    const thresholds = isMinimumMode ? P12_THRESHOLDS_MIN : P12_THRESHOLDS_REC;
+    const level = computeRP22Level(pillBasisDb, thresholds);
+    const currentMode = isMinimumMode ? 'half-space' : 'anechoic';
+    return { level, currentMode };
+  }, [allSeatSplMetrics, seatingPositions, splConfig?.radiationMode]);
+
+  useEffect(() => {
+    if (!onP12Update || !p12Computed) return;
+    const sig = `${p12Computed.currentMode}|${p12Computed.level}`;
+    if (lastP12SentRef.current === sig) return;
+    lastP12SentRef.current = sig;
+    onP12Update(p12Computed.currentMode, p12Computed.level);
+  }, [onP12Update, p12Computed]);
+
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
 
