@@ -151,13 +151,15 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     return { level, currentMode };
   }, [allSeatSplMetrics, seatingPositions, splConfig?.radiationMode]);
 
+  // Write P12 result into app state (picked up by the normal save path via splConfig)
   useEffect(() => {
-    if (!onP12Update || !p12Computed) return;
+    if (!p12Computed) return;
     const sig = `${p12Computed.currentMode}|${p12Computed.level}`;
     if (lastP12SentRef.current === sig) return;
     lastP12SentRef.current = sig;
-    onP12Update(p12Computed.currentMode, p12Computed.level);
-  }, [onP12Update, p12Computed]);
+    appState?.setP12Mode?.(p12Computed.currentMode);
+    appState?.setP12Level?.(p12Computed.level);
+  }, [p12Computed, appState?.setP12Mode, appState?.setP12Level]);
 
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
