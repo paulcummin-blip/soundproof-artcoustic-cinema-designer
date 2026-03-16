@@ -288,39 +288,13 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         </div>
       </div>
 
-      {(() => {
-        if (!allSeatSplMetrics) return null;
-
-        const mlpMetrics = allSeatSplMetrics.get('mlp');
-        const seatMetrics = mlpMetrics || (() => {
-          const mlp = getMlpSeat(seatingPositions || []);
-          return mlp ? allSeatSplMetrics.get(mlp.id) : null;
-        })();
-
-        if (!seatMetrics?.spl?.screen) return null;
-
-        const lcrTileSplDb = ['FL', 'FC', 'FR']
-          .map(role => seatMetrics.spl.screen[role]?.value)
-          .filter(v => Number.isFinite(v))
-          .map(v => Math.ceil(v));
-
-        if (lcrTileSplDb.length === 0) return null;
-
-        const pillBasisDb = Math.min(...lcrTileSplDb);
-        const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
-        const thresholds = isMinimumMode ? P12_THRESHOLDS_MIN : P12_THRESHOLDS_REC;
-        const level = computeRP22Level(pillBasisDb, thresholds);
-
-        const currentMode = isMinimumMode ? 'half-space' : 'anechoic';
-
-        return (
-          <RP22LevelPill
-            parameter="P12"
-            level={level}
-            label="RP22 P12"
-          />
-        );
-      })()}
+      {p12Computed && (
+        <RP22LevelPill
+          parameter="P12"
+          level={p12Computed.level}
+          label="RP22 P12"
+        />
+      )}
     </div>
   );
 }
