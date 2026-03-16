@@ -121,6 +121,7 @@ export default function RvPlanCanvas({
   setHudHiddenWhenPinned,
   hudHiddenWhenPinned,
   renderLevelBadge,
+  isHudPinned,
   speakerTooltip,
   hudPosition,  // canvas-pixel position of the HUD card (hudBasePosPx from parent)
   // Speaker layer props
