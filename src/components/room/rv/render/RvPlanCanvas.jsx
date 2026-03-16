@@ -484,6 +484,7 @@ export default function RvPlanCanvas({
           setHudHiddenWhenPinned={setHudHiddenWhenPinned}
           hudHiddenWhenPinned={hudHiddenWhenPinned}
           renderLevelBadge={renderLevelBadge}
+          isHudPinned={isHudPinned}
         />
 
         {/* SPEAKER TOOLTIP - Light style, non-interfering */}
