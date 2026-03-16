@@ -1802,6 +1802,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       setHudHiddenWhenPinned={setHudHiddenWhenPinned}
       hudHiddenWhenPinned={hudHiddenWhenPinned}
       renderLevelBadge={renderLevelBadge}
+      isHudPinned={isHudPinned}
       speakerTooltip={speakerTooltip}
       hudPosition={hudBasePosPx}
     />
