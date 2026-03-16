@@ -1266,6 +1266,10 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     aimState?.aimSideSurroundsAtMLP,
     aimState?.aimRearSurroundsAtMLP,
     p15ConstructionLevel,
+    p21EarlyReflectionPreset,
+    dolbyLayout,
+    p12Mode,
+    p12Level,
     screen?.mountMode,
     screen?.floatDepthM,
   ]);
