@@ -232,8 +232,6 @@ function RP22ReportInner() {
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
 
-    const devMode = false;
-
     const activeProjectId = useActiveProjectId();
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
