@@ -1804,7 +1804,19 @@ function RoomDesignerWithState() {
                 frontWideOverlay={frontWideZones}
                 allowExtraSurrounds={isNineBedLayout}
                 extraSurroundCount={isNineBedLayout ? (appState?.extraSurroundCount ?? 0) : 0}
-                onExtraSurroundCountChange={isNineBedLayout ? appState?.setExtraSurroundCount : undefined} />
+                onExtraSurroundCountChange={isNineBedLayout ? appState?.setExtraSurroundCount : undefined}
+                onP12Update={(mode, level) => {
+                  const pid = resolvedProjectId || projectIdState;
+                  if (pid) {
+                    Project.update(pid, {
+                      spl_config: {
+                        ...(appState?.splConfig || {}),
+                        p12_mode: mode,
+                        p12_level: level
+                      }
+                    });
+                  }
+                }} />
 
                  </Suspense>
                   
