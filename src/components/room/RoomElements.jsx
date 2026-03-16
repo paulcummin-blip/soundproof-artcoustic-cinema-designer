@@ -217,7 +217,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
               {/* PROJECTOR LAYOUT */}
               {element?.type === 'projector' ? (
                 <>
-                  {/* Row 1: Label only */}
+                  {/* Row 1: Label */}
                   <div className="mb-3">
                     <Label className="text-[#3E4349]">Label</Label>
                     <Input
@@ -229,69 +229,81 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     />
                   </div>
 
-                  {/* Row 2: X + Y */}
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  {/* Row 2: Lens position */}
+                  <div className="text-[10px] font-semibold mb-1" style={{ color: '#625143', letterSpacing: 0.3 }}>LENS CENTRE (m)</div>
+                  <div className="grid grid-cols-3 gap-3 mb-3">
                     <div>
-                      <Label className="text-[#3E4349]">X Position (m)</Label>
+                      <Label className="text-[#3E4349]">Lens X (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.pos_m) ? element.pos_m : 0}
-                        onChange={(e) => updateElement(element.id, 'pos_m', e.target.value)}
+                        value={Number.isFinite(element?.x_lens_m) ? element.x_lens_m : ''}
+                        onChange={(e) => updateElement(element.id, 'x_lens_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                        placeholder="—"
                       />
-                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
-                        Measured from Left wall.
-                      </div>
+                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>From left wall</div>
                     </div>
-
                     <div>
-                      <Label className="text-[#3E4349]">Y Position (m)</Label>
+                      <Label className="text-[#3E4349]">Lens Y (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.wall_offset_m) ? element.wall_offset_m : 0.10}
-                        onChange={(e) => updateElement(element.id, 'wall_offset_m', e.target.value)}
+                        value={Number.isFinite(element?.y_lens_m) ? element.y_lens_m : ''}
+                        onChange={(e) => updateElement(element.id, 'y_lens_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                        placeholder="—"
                       />
-                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
-                        Distance from rear wall into the room.
-                      </div>
+                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>From front wall</div>
+                    </div>
+                    <div>
+                      <Label className="text-[#3E4349]">Lens Z (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={Number.isFinite(element?.z_lens_m) ? element.z_lens_m : ''}
+                        onChange={(e) => updateElement(element.id, 'z_lens_m', e.target.value)}
+                        className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                        placeholder="—"
+                      />
+                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>Height from floor</div>
                     </div>
                   </div>
 
-                  {/* Row 3: Width / Depth / Height on one line */}
+                  {/* Row 3: Body dimensions */}
+                  <div className="text-[10px] font-semibold mb-1" style={{ color: '#625143', letterSpacing: 0.3 }}>BODY DIMENSIONS (m)</div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <Label className="text-[#3E4349]">Width (m)</Label>
+                      <Label className="text-[#3E4349]">Body Width (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.length_m) ? element.length_m : 0.46}
-                        onChange={(e) => updateElement(element.id, 'length_m', e.target.value)}
+                        value={Number.isFinite(element?.body_width_m) ? element.body_width_m : ''}
+                        onChange={(e) => updateElement(element.id, 'body_width_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                        placeholder="—"
                       />
                     </div>
-
                     <div>
-                      <Label className="text-[#3E4349]">Depth (m)</Label>
+                      <Label className="text-[#3E4349]">Body Height (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.thickness_m) ? element.thickness_m : 0.517}
-                        onChange={(e) => updateElement(element.id, 'thickness_m', e.target.value)}
+                        value={Number.isFinite(element?.body_height_m) ? element.body_height_m : ''}
+                        onChange={(e) => updateElement(element.id, 'body_height_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                        placeholder="—"
                       />
                     </div>
-
                     <div>
-                      <Label className="text-[#3E4349]">Height (m)</Label>
+                      <Label className="text-[#3E4349]">Body Depth (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.height_m) ? element.height_m : 0.21}
-                        onChange={(e) => updateElement(element.id, 'height_m', e.target.value)}
+                        value={Number.isFinite(element?.body_depth_m) ? element.body_depth_m : ''}
+                        onChange={(e) => updateElement(element.id, 'body_depth_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                        placeholder="—"
                       />
                     </div>
                   </div>
