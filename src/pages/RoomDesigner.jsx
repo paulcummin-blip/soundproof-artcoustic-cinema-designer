@@ -1809,11 +1809,11 @@ function RoomDesignerWithState() {
                   const pid = resolvedProjectId || projectIdState;
                   if (pid) {
                     Project.update(pid, {
-                      spl_config: {
+                      spl_config: JSON.stringify({
                         ...(appState?.splConfig || {}),
                         p12_mode: mode,
                         p12_level: level
-                      }
+                      })
                     });
                   }
                 }} />
