@@ -924,6 +924,7 @@ function RP22ReportInner() {
                         </CardContent>
                     </Card>
 
+
                     <ReportSeatParametersCard
                         seats={seats}
                         hasSeats={hasSeats}
