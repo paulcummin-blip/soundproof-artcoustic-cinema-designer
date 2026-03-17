@@ -2,7 +2,6 @@
 
 import React from "react";
 import RP22ZonesOverlay from "@/components/room/RP22ZonesOverlay";
-import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
 import { renderOverheadBandsSVG } from "@/components/room/utils/overheadZones";
 
 export default function RvZonesAndOverlays({
@@ -24,14 +23,6 @@ export default function RvZonesAndOverlays({
   overheadZones,
   getCanonicalRole,
   scale,
-
-  // Front subs
-  frontSubs,
-  handleMouseDown,
-  handleMouseMove,
-  handleMouseUp,
-  dragging,
-  draggedItemId,
 
   // Front wides (optional if you still render them here)
   frontWideZones,
