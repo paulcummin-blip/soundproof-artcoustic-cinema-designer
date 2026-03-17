@@ -1832,6 +1832,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       showMlpRuler={showMlpRuler}
       draftFrontSubsRef={draftFrontSubsRef}
       draftRearSubsRef={draftRearSubsRef}
+      isHoldingSubDraftAfterReleaseRef={isHoldingSubDraftAfterReleaseRef}
       frontSubs={safeFrontSubs}
       rearSubs={safeRearSubs}
       frontSubsCfg={frontSubsCfg}
