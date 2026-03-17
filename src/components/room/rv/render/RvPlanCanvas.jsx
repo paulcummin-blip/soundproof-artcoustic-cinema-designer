@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { hasPos } from "@/components/room/rv/RenderPrimitives";
 import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import SvgDefs from "@/components/room/SvgDefs";
