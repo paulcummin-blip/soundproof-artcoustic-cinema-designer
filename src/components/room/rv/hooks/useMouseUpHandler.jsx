@@ -36,40 +36,40 @@ export function useMouseUpHandler({
       isDraggingRef.current = false;
     }
 
-    // Commit draft sub positions if sub was being dragged
-    if (isDraggingSubRef.current) {
-      // Cancel idle timer
-      if (idleCommitTimerRef.current) {
-        clearTimeout(idleCommitTimerRef.current);
-        idleCommitTimerRef.current = null;
-      }
+    // Commit draft sub positions if sub was being dragged (BEFORE clearing drag state)
+     if (isDraggingSubRef.current) {
+       // Cancel idle timer
+       if (idleCommitTimerRef.current) {
+         clearTimeout(idleCommitTimerRef.current);
+         idleCommitTimerRef.current = null;
+       }
 
-      // Commit final positions
-      commitDraftSubPositions();
+       // Commit final positions immediately on release
+       commitDraftSubPositions();
 
-      // Signal BassResponse that dragging ended
-      if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
-        window.__B44_setIsDraggingSub(false);
-      }
+       // Signal BassResponse that dragging ended
+       if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
+         window.__B44_setIsDraggingSub(false);
+       }
 
-      isDraggingSubRef.current = false;
-      draftFrontSubsRef.current = null;
-      draftRearSubsRef.current = null;
-    }
+       isDraggingSubRef.current = false;
+       draftFrontSubsRef.current = null;
+       draftRearSubsRef.current = null;
+     }
 
-    // Release pointer capture
-    if (dragType === 'speaker' && e?.target) {
-      try {
-        if (typeof e.target.releasePointerCapture === 'function' && e.pointerId) {
-          e.target.releasePointerCapture(e.pointerId);
-        }
-      } catch (err) {
-        // Ignore release errors
-      }
-    }
+     // Release pointer capture
+     if (dragType === 'speaker' && e?.target) {
+       try {
+         if (typeof e.target.releasePointerCapture === 'function' && e.pointerId) {
+           e.target.releasePointerCapture(e.pointerId);
+         }
+       } catch (err) {
+         // Ignore release errors
+       }
+     }
 
-    // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
-    if (dragType === 'speaker' && draggedItemId) {
+     // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
+     if (dragType === 'speaker' && draggedItemId) {
       const spk = byId.get(draggedItemId);
       if (spk) {
         const canonicalRole = getCanonicalRole(spk.role);
