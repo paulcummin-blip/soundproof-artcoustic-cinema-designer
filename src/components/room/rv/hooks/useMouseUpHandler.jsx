@@ -53,8 +53,8 @@ export function useMouseUpHandler({
        }
 
        isDraggingSubRef.current = false;
-       draftFrontSubsRef.current = null;
-       draftRearSubsRef.current = null;
+       // DO NOT clear draft refs yet — let the next render use committed state first
+       // They will be cleared after dragging state is set to false
      }
 
      // Release pointer capture
