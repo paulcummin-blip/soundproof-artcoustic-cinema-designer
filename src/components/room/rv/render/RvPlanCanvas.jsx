@@ -357,18 +357,8 @@ export default function RvPlanCanvas({
                 }));
               };
 
-              // subDragTick is declared as a dependency so React re-evaluates these
-              // arrays on every drag tick, guaranteeing the mutated draft refs are read fresh.
-              // eslint-disable-next-line react-hooks/exhaustive-deps
-              const frontLive = React.useMemo(
-                () => (dragging && Array.isArray(draftFrontSubsRef.current)) ? draftFrontSubsRef.current : frontSubs,
-                [dragging, frontSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
-              );
-              // eslint-disable-next-line react-hooks/exhaustive-deps
-              const rearLive = React.useMemo(
-                () => (dragging && Array.isArray(draftRearSubsRef.current)) ? draftRearSubsRef.current : rearSubs,
-                [dragging, rearSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
-              );
+              // frontLive / rearLive are computed via useMemo at component body level above,
+              // keyed off subDragTick so they refresh on every drag move.
 
               const frontFallbackLine = isExportDims && (!Array.isArray(frontLive) || frontLive.length === 0)
                 ? buildFallbackLine(frontSubsCfg?.count, frontSubsCfg?.model, "front")
