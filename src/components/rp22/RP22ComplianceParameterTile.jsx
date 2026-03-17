@@ -27,11 +27,15 @@ const fmtIneq = (dir) => {
  *   lvl            — level string ("L1"…"L4", "FAIL", "—")
  *   seatPillGrid   — optional ReactNode for seat-scoped per-seat pill grids
  */
+// Pill zone min-height: supports up to 3 seat rows (each ~28px pill + 6px gap) with breathing room
+const PILL_ZONE_MIN_HEIGHT = 110;
+
 export default function RP22ComplianceParameterTile({ param, achievedValue, lvl, seatPillGrid }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
 
   return (
-    <div style={card}>
+    <div style={{ ...card, display: "flex", flexDirection: "column", minHeight: 280 }}>
+      {/* ── Section 1: Title / description / scope / achieved ── */}
       <div style={head}>
         <div style={title}>
           {param.id}. {param.title}
@@ -49,13 +53,12 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
         </div>
       </div>
 
-      <div style={body}>
-        <div style={{ ...row, marginTop: 0 }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <span style={{ fontSize: 12, color: "#625143" }}>
-              {isSeatScope ? "Per-seat levels" : "Level"}
-            </span>
-          </div>
+      {/* ── Section 2: Pill zone (fixed min-height, grows for more rows) ── */}
+      <div style={{ padding: "8px 12px 0 12px", minHeight: PILL_ZONE_MIN_HEIGHT, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <span style={{ fontSize: 12, color: "#625143" }}>
+            {isSeatScope ? "Per-seat levels" : "Level"}
+          </span>
           {isSeatScope ? (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               {seatPillGrid ?? null}
@@ -64,9 +67,11 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
             <RP22GradingPill level={lvl} />
           )}
         </div>
+      </div>
 
-        {/* Thresholds grid */}
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #F0EFEA" }}>
+      {/* ── Section 3: Threshold row — always pushed to bottom ── */}
+      <div style={{ ...body, marginTop: "auto", paddingTop: 0 }}>
+        <div style={{ paddingTop: 8, borderTop: "1px solid #F0EFEA" }}>
           <div
             style={{
               display: "grid",
