@@ -1,6 +1,6 @@
 // components/report/RP22ReportParameterGrid.jsx
 // 3-column grid of exact Compliance Report tiles for the RP22 Report page.
-import React from "react";
+import React, { useMemo, useCallback } from "react";
 import RP22ComplianceParameterTile from "@/components/rp22/RP22ComplianceParameterTile";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
