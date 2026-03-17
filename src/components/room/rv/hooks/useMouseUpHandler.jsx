@@ -146,6 +146,11 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
+    // Clear draft refs only after dragging is set to false
+    // This ensures the next render uses committed frontSubs/rearSubs, not stale draft refs
+    draftFrontSubsRef.current = null;
+    draftRearSubsRef.current = null;
+
   }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
 
   return { handleMouseUp };
