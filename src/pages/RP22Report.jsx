@@ -824,9 +824,8 @@ function RP22ReportInner() {
                         analysisResult={analysisResult}
                     />
 
-                    {/* RP23 — Horizontal Viewing Angle card */}
+                    {/* ── Report assumptions + RP23 row ── */}
                     {(() => {
-                        // Build one representative seat per row (same logic as seatCountsByRow)
                         const rowMap = {};
                         seats.forEach(s => {
                             const match = s.id?.match(/^seat-r(\d+)-c(\d+)$/);
@@ -836,73 +835,70 @@ function RP22ReportInner() {
                         });
                         const rp23Rows = Object.keys(rowMap).map(Number).sort((a, b) => a - b).map(rowNum => {
                             const rowSeats = rowMap[rowNum];
-                            // Pick the central (primary) seat for each row
                             const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
                             const snap = reportSeatHudById?.[primary?.id];
                             return { rowNum, rp23: snap?.rp23 || null };
                         }).filter(r => r.rp23);
-                        if (!rp23Rows.length) return null;
                         return (
-                            <div className="grid grid-cols-[auto_1fr] gap-10">
-                                {/* ── Report assumptions block ── */}
-                                <div style={{ width: '340px' }}>
-                                    <Card className="bg-[#FFFFFF] border-[#DCDBD6] h-full">
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-[#1B1A1A] font-header">Report assumptions</CardTitle>
-                                            <p className="text-xs text-[#625143] mt-1">Manual estimates for non-calculated parameters</p>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            {/* P15 */}
-                                            <div>
-                                                <div className="text-xs font-semibold text-[#1B1A1A] mb-1">P15 — Background noise floor</div>
-                                                <select
-                                                    className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                                    value={app?.p15ConstructionLevel || 'standard'}
-                                                    onChange={e => app?.setP15ConstructionLevel?.(e.target.value)}
-                                                >
-                                                    <option value="standard">Standard domestic room (NCB 26 · L1)</option>
-                                                    <option value="purpose-built">Purpose-built home cinema (NCB 22 · L2)</option>
-                                                    <option value="reference">Reference-grade isolated room (NCB 18 · L3)</option>
-                                                    <option value="studio">Studio / screening-room grade (NCB 15 · L4)</option>
-                                                </select>
-                                            </div>
-                                            {/* P21 */}
-                                            <div>
-                                                <div className="text-xs font-semibold text-[#1B1A1A] mb-1">P21 — Early reflections</div>
-                                                <select
-                                                    className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                                    value={app?.p21EarlyReflectionPreset || 'l2'}
-                                                    onChange={e => app?.setP21EarlyReflectionPreset?.(e.target.value)}
-                                                >
-                                                    <option value="l1">No estimate / untreated room (L1)</option>
-                                                    <option value="l2">Moderately live room (−8 dB · L2)</option>
-                                                    <option value="l3">Well-balanced treated room (−10 dB · L3)</option>
-                                                    <option value="l4">Heavily optimised room (−12 dB · L4)</option>
-                                                </select>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                            <div className="flex gap-6 items-stretch">
+                                {/* ── Report assumptions block — always visible ── */}
+                                <div style={{ width: '340px', flexShrink: 0 }}>
+                                    <div style={{ background: '#FFFFFF', border: '1px solid #DCDBD6', borderRadius: 8, padding: '16px', height: '100%' }}>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: '#1B1A1A', marginBottom: 4 }}>Report assumptions</div>
+                                        <div style={{ fontSize: 12, color: '#625143', marginBottom: 16 }}>Manual estimates for non-calculated parameters</div>
+                                        {/* P15 */}
+                                        <div style={{ marginBottom: 14 }}>
+                                            <div style={{ fontSize: 12, fontWeight: 600, color: '#1B1A1A', marginBottom: 6 }}>P15 — Background noise floor</div>
+                                            <select
+                                                style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A' }}
+                                                value={app?.p15ConstructionLevel || 'standard'}
+                                                onChange={e => app?.setP15ConstructionLevel?.(e.target.value)}
+                                            >
+                                                <option value="standard">Standard domestic room (NCB 26 · L1)</option>
+                                                <option value="purpose-built">Purpose-built home cinema (NCB 22 · L2)</option>
+                                                <option value="reference">Reference-grade isolated room (NCB 18 · L3)</option>
+                                                <option value="studio">Studio / screening-room grade (NCB 15 · L4)</option>
+                                            </select>
+                                        </div>
+                                        {/* P21 */}
+                                        <div>
+                                            <div style={{ fontSize: 12, fontWeight: 600, color: '#1B1A1A', marginBottom: 6 }}>P21 — Early reflections</div>
+                                            <select
+                                                style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A' }}
+                                                value={app?.p21EarlyReflectionPreset || 'l2'}
+                                                onChange={e => app?.setP21EarlyReflectionPreset?.(e.target.value)}
+                                            >
+                                                <option value="l1">No estimate / untreated room (L1)</option>
+                                                <option value="l2">Moderately live room (−8 dB · L2)</option>
+                                                <option value="l3">Well-balanced treated room (−10 dB · L3)</option>
+                                                <option value="l4">Heavily optimised room (−12 dB · L4)</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="justify-self-end" style={{ width: '696px' }}>
-                                    <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
-                                            <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                {rp23Rows.map(({ rowNum, rp23 }) => (
-                                                    <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
-                                                        <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
-                                                            <RP22GradingPill level={rp23.level || '—'} />
+                                {/* ── RP23 card — only when data exists ── */}
+                                <div style={{ flex: 1 }}>
+                                    {rp23Rows.length > 0 && (
+                                        <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
+                                                <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-2">
+                                                    {rp23Rows.map(({ rowNum, rp23 }) => (
+                                                        <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
+                                                            <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
+                                                                <RP22GradingPill level={rp23.level || '—'} />
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                                    ))}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
                                 </div>
                             </div>
                         );
