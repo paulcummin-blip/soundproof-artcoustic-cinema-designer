@@ -24,7 +24,6 @@ import { base44 } from '@/api/base44Client';
 
 // Extracted child components
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
-import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import ReportHeader from '../components/report/ReportHeader';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ReportSeatParametersCard from '../components/report/ReportSeatParametersCard';
@@ -826,10 +825,25 @@ function RP22ReportInner() {
 
                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                         <CardHeader>
-                            <CardTitle className="text-[#1B1A1A] font-header">RP22 Parameters</CardTitle>
+                            <CardTitle className="text-[#1B1A1A] font-header">RP22 Parameters (Room)</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <RP22ReportParameterGrid analysisResult={analysisResult} app={app} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+                                {orderedParams.map(param => (
+                                    <ParameterCard
+                                        key={param.id}
+                                        parameter={param}
+                                        roomResult={getRoomResult(param.id)}
+                                        seatResults={getSeatResults(param.id)}
+                                        systemConfig={param.id === 2 ? p2SystemConfig : null}
+                                        p15ConstructionLevel={app?.p15ConstructionLevel}
+                                        onP15ConstructionLevelChange={app?.setP15ConstructionLevel}
+                                        p21EarlyReflectionPreset={app?.p21EarlyReflectionPreset}
+                                        onP21EarlyReflectionPresetChange={app?.setP21EarlyReflectionPreset}
+                                        displayedLevel={getDisplayedRoomLevel(param.id)}
+                                    />
+                                ))}
+                            </div>
                         </CardContent>
                     </Card>
 
