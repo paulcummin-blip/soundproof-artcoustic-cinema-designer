@@ -16,6 +16,7 @@ export function useSubDragHandler({
   getModelDimsM,
   draggedSubTypeRef,
   draggedSubWallRef,
+  dragOffsetRoomRef,
   draftFrontSubsRef,
   draftRearSubsRef,
   setSubDragTick,
@@ -46,6 +47,13 @@ export function useSubDragHandler({
 
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
 
+    // Apply pointer-to-sub offset captured at drag start so the sub moves
+    // relative to where it was clicked, not snapping its centre to the pointer.
+    const offsetX = dragOffsetRoomRef?.current?.x ?? 0;
+    const offsetY = dragOffsetRoomRef?.current?.y ?? 0;
+    const anchoredX = rawX + offsetX;
+    const anchoredY = rawY + offsetY;
+
     // Robust dimension resolution with safe defaults
     const dims = getModelDimsM(sub.model);
     const w = (Number.isFinite(dims.widthM) && dims.widthM > 0) ? dims.widthM : 0.50;
@@ -54,8 +62,8 @@ export function useSubDragHandler({
     const halfD = d / 2;
     const EPS = 0.01;
 
-    let finalX = rawX;
-    let finalY = rawY;
+    let finalX = anchoredX;
+    let finalY = anchoredY;
 
     // Pin to wall using center-safe positioning (account for sub depth/width)
     if (wall === 'front') {
