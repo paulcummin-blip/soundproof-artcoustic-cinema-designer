@@ -160,35 +160,32 @@ export function useMouseDownHandler({
         isDraggingSubRef.current = true;
         // Build a "seed" list for dragging.
         // If live arrays are empty (common when only fallback is drawn), seed from cfg.
-        const seedFront =
-          (Array.isArray(frontSubs) && frontSubs.length > 0)
-            ? frontSubs
-            : Array.from({ length: Number(frontSubsCfg?.count || 0) }, (_, idx) => {
-                const xFromCfg = frontSubsCfg?.positions?.[idx]?.x;
+        // Always normalise IDs to canonical format: front-sub-${idx} / rear-sub-${idx}
+        // so that useSubDragHandler can reliably extract subIndex via regex.
+        const normaliseSubs = (subs, group, cfg, defaultY) =>
+          (Array.isArray(subs) && subs.length > 0)
+            ? subs.map((s, idx) => ({
+                ...s,
+                id: `${group}-sub-${idx}`,
+                position: s.position ? { ...s.position } : { x: widthM / 2, y: defaultY, z: 0 },
+                _subType: group,
+              }))
+            : Array.from({ length: Number(cfg?.count || 0) }, (_, idx) => {
+                const xFromCfg = cfg?.positions?.[idx]?.x;
+                const yFromCfg = cfg?.positions?.[idx]?.y;
                 const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+                const y = Number.isFinite(yFromCfg) ? yFromCfg : defaultY;
                 return {
-                  id: `front-sub-${idx}`,
-                  model: frontSubsCfg?.model || "SUB2-12",
-                  role: `SUBF${idx + 1}`,
-                  position: { x, y: 0, z: 0 },
-                  _subType: "front",
+                  id: `${group}-sub-${idx}`,
+                  model: cfg?.model || "SUB2-12",
+                  role: group === 'front' ? `SUBF${idx + 1}` : `SUBR${idx + 1}`,
+                  position: { x, y, z: 0 },
+                  _subType: group,
                 };
               });
 
-        const seedRear =
-          (Array.isArray(rearSubs) && rearSubs.length > 0)
-            ? rearSubs
-            : Array.from({ length: Number(rearSubsCfg?.count || 0) }, (_, idx) => {
-                const xFromCfg = rearSubsCfg?.positions?.[idx]?.x;
-                const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
-                return {
-                  id: `rear-sub-${idx}`,
-                  model: rearSubsCfg?.model || "SUB2-12",
-                  role: `SUBR${idx + 1}`,
-                  position: { x, y: lengthM, z: 0 },
-                  _subType: "rear",
-                };
-              });
+        const seedFront = normaliseSubs(frontSubs, 'front', frontSubsCfg, 0);
+        const seedRear  = normaliseSubs(rearSubs,  'rear',  rearSubsCfg,  lengthM);
 
         draftFrontSubsRef.current = seedFront.map(s => ({ ...s, position: { ...s.position } }));
         draftRearSubsRef.current = seedRear.map(s => ({ ...s, position: { ...s.position } }));
