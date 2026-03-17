@@ -844,7 +844,45 @@ function RP22ReportInner() {
                         if (!rp23Rows.length) return null;
                         return (
                             <div className="grid grid-cols-[auto_1fr] gap-10">
-                                <div style={{ width: '340px' }} />
+                                {/* ── Report assumptions block ── */}
+                                <div style={{ width: '340px' }}>
+                                    <Card className="bg-[#FFFFFF] border-[#DCDBD6] h-full">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-[#1B1A1A] font-header">Report assumptions</CardTitle>
+                                            <p className="text-xs text-[#625143] mt-1">Manual estimates for non-calculated parameters</p>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            {/* P15 */}
+                                            <div>
+                                                <div className="text-xs font-semibold text-[#1B1A1A] mb-1">P15 — Background noise floor</div>
+                                                <select
+                                                    className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
+                                                    value={app?.p15ConstructionLevel || 'standard'}
+                                                    onChange={e => app?.setP15ConstructionLevel?.(e.target.value)}
+                                                >
+                                                    <option value="standard">Standard domestic room (NCB 26 · L1)</option>
+                                                    <option value="purpose-built">Purpose-built home cinema (NCB 22 · L2)</option>
+                                                    <option value="reference">Reference-grade isolated room (NCB 18 · L3)</option>
+                                                    <option value="studio">Studio / screening-room grade (NCB 15 · L4)</option>
+                                                </select>
+                                            </div>
+                                            {/* P21 */}
+                                            <div>
+                                                <div className="text-xs font-semibold text-[#1B1A1A] mb-1">P21 — Early reflections</div>
+                                                <select
+                                                    className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
+                                                    value={app?.p21EarlyReflectionPreset || 'l2'}
+                                                    onChange={e => app?.setP21EarlyReflectionPreset?.(e.target.value)}
+                                                >
+                                                    <option value="l1">No estimate / untreated room (L1)</option>
+                                                    <option value="l2">Moderately live room (−8 dB · L2)</option>
+                                                    <option value="l3">Well-balanced treated room (−10 dB · L3)</option>
+                                                    <option value="l4">Heavily optimised room (−12 dB · L4)</option>
+                                                </select>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
                                 <div className="justify-self-end" style={{ width: '696px' }}>
                                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                                         <CardHeader className="pb-2">
