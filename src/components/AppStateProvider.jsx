@@ -455,7 +455,8 @@ function useDesignerState() {
       model: "SUB2-12",
       count: 0,
       positions: [],
-      tuning: []
+      tuning: [],
+      orientation: "vertical"
     }
   ));
   const [rearSubsCfg, setRearSubsCfg] = useState(() => (
@@ -463,7 +464,8 @@ function useDesignerState() {
       model: "SUB2-12",
       count: 0,
       positions: [],
-      tuning: []
+      tuning: [],
+      orientation: "vertical"
     }
   ));
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
@@ -1190,7 +1192,8 @@ function useDesignerState() {
           model: "SUB2-12",
           count: 0,
           positions: [],
-          tuning: []
+          tuning: [],
+          orientation: "vertical"
         });
       }
       if (Object.prototype.hasOwnProperty.call(p, "rearSubsCfg")) {
@@ -1198,7 +1201,8 @@ function useDesignerState() {
           model: "SUB2-12",
           count: 0,
           positions: [],
-          tuning: []
+          tuning: [],
+          orientation: "vertical"
         });
       }
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
@@ -1348,16 +1352,20 @@ function useDesignerState() {
       speakerSystem,
       // Ensure sub configs are always serialised explicitly
       frontSubsCfg: {
+        ...frontSubsCfg,
         model: frontSubsCfg?.model || "SUB2-12",
         count: Number(frontSubsCfg?.count) || 0,
         positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
-        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : []
+        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : [],
+        orientation: frontSubsCfg?.orientation || "vertical"
       },
       rearSubsCfg: {
+        ...rearSubsCfg,
         model: rearSubsCfg?.model || "SUB2-12",
         count: Number(rearSubsCfg?.count) || 0,
         positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
-        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : []
+        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : [],
+        orientation: rearSubsCfg?.orientation || "vertical"
       },
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
@@ -1454,7 +1462,8 @@ function useDesignerState() {
           model: "SUB2-12",
           count: 0,
           positions: [],
-          tuning: []
+          tuning: [],
+          orientation: "vertical"
         });
       }
 
@@ -1463,7 +1472,8 @@ function useDesignerState() {
           model: "SUB2-12",
           count: 0,
           positions: [],
-          tuning: []
+          tuning: [],
+          orientation: "vertical"
         });
       }
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
@@ -1500,16 +1510,20 @@ function useDesignerState() {
       speakerSystem,
       // Ensure sub configs are always serialised explicitly
       frontSubsCfg: {
+        ...frontSubsCfg,
         model: frontSubsCfg?.model || "SUB2-12",
         count: Number(frontSubsCfg?.count) || 0,
         positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
-        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : []
+        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : [],
+        orientation: frontSubsCfg?.orientation || "vertical"
       },
       rearSubsCfg: {
+        ...rearSubsCfg,
         model: rearSubsCfg?.model || "SUB2-12",
         count: Number(rearSubsCfg?.count) || 0,
         positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
-        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : []
+        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : [],
+        orientation: rearSubsCfg?.orientation || "vertical"
       },
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
@@ -1623,13 +1637,15 @@ function useDesignerState() {
       model: "SUB2-12",
       count: 0,
       positions: [],
-      tuning: []
+      tuning: [],
+      orientation: "vertical"
     });
     setRearSubsCfg({
       model: "SUB2-12",
       count: 0,
       positions: [],
-      tuning: []
+      tuning: [],
+      orientation: "vertical"
     });
 
     // Layout/Config
