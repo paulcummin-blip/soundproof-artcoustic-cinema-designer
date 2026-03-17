@@ -224,7 +224,7 @@ export function displayModelKey(modelKey = "") {
 }
 
 // PRIMARY ACCESSOR — RETURNS METRICS IN METRES, WITH PLAN SHAPE HINTS
-export function getSpeakerModelMeta(modelName) {
+export function getSpeakerModelMeta(modelName, orientation) {
   const key = normaliseModelKey(modelName);
   const hit =
     MODELS.find(m => m.key === key) ||
@@ -283,11 +283,21 @@ export function getSpeakerModelMeta(modelName) {
     };
   }
 
+  // SUB4-12 orientation handling: swap width and height for horizontal
+  let widthM = mmToM(hit.widthMm);
+  let heightM = mmToM(hit.heightMm);
+  const depthM = mmToM(hit.depthMm);
+  
+  if (hit.key === "sub4-12" && orientation === "horizontal") {
+    // Swap width and height for horizontal orientation
+    [widthM, heightM] = [heightM, widthM];
+  }
+
   return {
     round: false,
-    widthM: mmToM(hit.widthMm),
-    heightM: mmToM(hit.heightMm),
-    depthM: mmToM(hit.depthMm),
+    widthM,
+    heightM,
+    depthM,
     key: hit.key,
     label: hit.label,
     category: hit.category,
