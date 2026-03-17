@@ -68,7 +68,7 @@ export function useSubDragHandler({
     // Pin to wall using center-safe positioning (account for sub depth/width)
     if (wall === 'front') {
       finalY = halfD + EPS;
-      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, anchoredX));
+      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
     } else if (wall === 'rear') {
       // Rear-specific corner-safe clamping
       const minX = halfW + EPS;
@@ -76,7 +76,7 @@ export function useSubDragHandler({
       const rearPinnedY = lengthM - halfD - EPS;
 
       finalY = rearPinnedY;
-      finalX = Math.max(minX, Math.min(maxX, anchoredX));
+      finalX = Math.max(minX, Math.min(maxX, rawX));
 
       // Safety: if finalX is invalid, fallback to previous or center
       if (!Number.isFinite(finalX)) {
@@ -85,10 +85,10 @@ export function useSubDragHandler({
       }
     } else if (wall === 'left') {
       finalX = halfW + EPS;
-      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, anchoredY));
+      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
     } else if (wall === 'right') {
       finalX = widthM - halfW - EPS;
-      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, anchoredY));
+      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
     }
 
     // Final validation: never write invalid positions
