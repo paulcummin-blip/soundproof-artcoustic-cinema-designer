@@ -1031,7 +1031,8 @@ const byId = useEntitiesById({
   // Sub drag — delegated to hook (instantiated here so commitDraftSubPositions is in scope)
   const { handleSubDrag } = useSubDragHandler({
     byId, canvasToRoom, widthM, lengthM, getModelDimsM,
-    draggedSubTypeRef, draggedSubWallRef, draftFrontSubsRef, draftRearSubsRef,
+    draggedSubTypeRef, draggedSubWallRef, dragOffsetRoomRef,
+    draftFrontSubsRef, draftRearSubsRef,
     setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
   });
 
