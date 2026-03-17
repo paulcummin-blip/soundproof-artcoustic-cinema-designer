@@ -174,7 +174,23 @@ export function serializeProject(input = {}) {
     enable_front_wides: !!enableFrontWides,
 
     // Speakers & subs
-    selected_speakers: asArray(placedSpeakers),
+    // Audit: ensure each placed speaker retains id, role, model, position.x/y/z
+    selected_speakers: asArray(placedSpeakers).map((spk) => {
+      if (!spk || typeof spk !== 'object') return spk;
+      const pos = spk.position || {};
+      return {
+        ...spk,
+        id: spk.id ?? spk.role ?? '',
+        role: spk.role ?? '',
+        model: spk.model ?? '',
+        position: {
+          ...pos,
+          x: typeof pos.x === 'number' ? pos.x : 0,
+          y: typeof pos.y === 'number' ? pos.y : 0,
+          z: typeof pos.z === 'number' ? pos.z : 0,
+        },
+      };
+    }),
     selected_speakers_by_role: asObject(selectedSpeakersByRole),
     spl_speaker_nodes: asArray(speakerNodes),
     room_elements: asArray(roomElements),
