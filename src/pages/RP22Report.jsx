@@ -866,7 +866,7 @@ function RP22ReportInner() {
                                             <select
                                                 style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A' }}
                                                 value={app?.p21EarlyReflectionPreset || 'l2'}
-                                                onChange={e => app?.setP21EarlyReflectionPreset?.(e.target.value)}
+                                                onChange={e => app?.setP21EarlyReflectionPresetSafe?.(e.target.value)}
                                             >
                                                 <option value="l1">No estimate / untreated room (L1)</option>
                                                 <option value="l2">Moderately live room (−8 dB · L2)</option>
