@@ -125,9 +125,33 @@ export function useMouseDownHandler({
           y: seatY - cursorRoom.y
         };
       } else if (type === "sub" && target.position) {
+        // Detect wall first so we can align the Y offset with the first drag frame.
+        // On front/rear walls, Y is pinned by useSubDragHandler (finalY = halfD+EPS or
+        // lengthM-halfD-EPS), so the Y offset must be 0 to avoid a first-frame jump.
+        // On left/right walls, X is pinned and Y is free, so Y offset is meaningful.
+        const _sx = target.position.x;
+        const _sy = target.position.y;
+        const _threshold = 0.05;
+        let _detectedWall = null;
+        if (Math.abs(_sy) < _threshold) _detectedWall = 'front';
+        else if (Math.abs(_sy - lengthM) < _threshold) _detectedWall = 'rear';
+        else if (Math.abs(_sx) < _threshold) _detectedWall = 'left';
+        else if (Math.abs(_sx - widthM) < _threshold) _detectedWall = 'right';
+        else {
+          const _dF = _sy, _dR = lengthM - _sy, _dL = _sx, _dRt = widthM - _sx;
+          const _min = Math.min(_dF, _dR, _dL, _dRt);
+          if (_min === _dF) _detectedWall = 'front';
+          else if (_min === _dR) _detectedWall = 'rear';
+          else if (_min === _dL) _detectedWall = 'left';
+          else _detectedWall = 'right';
+        }
+
+        const _yIsPinned = _detectedWall === 'front' || _detectedWall === 'rear';
+        const _xIsPinned = _detectedWall === 'left' || _detectedWall === 'right';
+
         dragOffsetRoomRef.current = {
-          x: target.position.x - cursorRoom.x,
-          y: target.position.y - cursorRoom.y
+          x: _xIsPinned ? 0 : (target.position.x - cursorRoom.x),
+          y: _yIsPinned ? 0 : (target.position.y - cursorRoom.y),
         };
         // Detect and store which wall this sub is on
         const x = target.position.x;
