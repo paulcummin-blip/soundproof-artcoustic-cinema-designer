@@ -312,7 +312,7 @@ export default function RvPlanCanvas({
               lengthM={lengthM}
             />
 
-            {/* Layer 8: Rear Subwoofers (live + export fallback) */}
+            {/* Layer 8: Subwoofers (Front & Rear) - Unified render path */}
             {(() => {
               const isExportDims = exportMode === "dimensions";
 
@@ -351,9 +351,6 @@ export default function RvPlanCanvas({
                 }));
               };
 
-              // frontLive / rearLive are computed via useMemo at component body level above,
-              // keyed off subDragTick so they refresh on every drag move.
-
               const frontFallbackLine = isExportDims && (!Array.isArray(frontLive) || frontLive.length === 0)
                 ? buildFallbackLine(frontSubsCfg?.count, frontSubsCfg?.model, "front")
                 : frontLive;
@@ -364,14 +361,12 @@ export default function RvPlanCanvas({
 
               const renderSubGroup = (subArray, layerName) => {
                 if (!Array.isArray(subArray) || subArray.length === 0) return null;
-                // Determine group prefix: "front-subwoofers" -> "front", "rear-subwoofers" -> "rear"
                 const groupPrefix = layerName.replace("-subwoofers", "");
                 return (
                   <g data-layer={layerName}>
                     {subArray.map((sub, i) => {
                       if (!hasPos(sub)) return null;
                       const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model);
-                      // Always use canonical format: front-sub-0, rear-sub-1, etc.
                       const subId = `${groupPrefix}-sub-${i}`;
                       const [cx, cy] = toPx(sub.position.x, sub.position.y);
                       const w = subWm * scale;
@@ -417,6 +412,19 @@ export default function RvPlanCanvas({
                             height={d}
                             fill="transparent"
                             pointerEvents="all"
+                          />
+                          <rect
+                            x={cx - w / 2}
+                            y={cy - d / 2}
+                            width={w}
+                            height={d}
+                            rx={0}
+                            ry={0}
+                            fill="#1a1a1a"
+                            stroke="none"
+                            strokeWidth={0}
+                            opacity={0.8}
+                            pointerEvents="none"
                           />
                         </g>
                       );
