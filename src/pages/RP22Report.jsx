@@ -935,7 +935,7 @@ function RP22ReportInner() {
                                         <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
                                             Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6mm', paddingTop: '1mm', paddingBottom: '1mm', fontSize: '110%' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
                                             {['L4', 'L3', 'L2', 'L1'].map(lvl => {
                                                 const maxRoom = Math.max(roomLevelCounts.L4, roomLevelCounts.L3, roomLevelCounts.L2, roomLevelCounts.L1);
                                                 return <div key={lvl} style={{ transform: roomLevelCounts[lvl] === maxRoom ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}><RP22GradingPill level={lvl} count={roomLevelCounts[lvl]} /></div>;
