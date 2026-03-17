@@ -68,21 +68,22 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                         appState.setFrontSubsCfg(prev => ({ ...prev, orientation: "vertical" }));
                       }
                     }}
-                    className={`px-3 py-1 text-[12px] rounded border ${
+                    className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
                       (frontSubsCfg?.orientation ?? "vertical") === "vertical"
                         ? "bg-[#213428] text-white border-[#213428]"
                         : "bg-white text-[#213428] border-[#DCDBD6]"
                     }`}
-                  >
-                    Vertical
-                  </button>
-                  <button
+                    >
+                     Vertical
+                    </button>
+                    <button
+                     type="button"
                     onClick={() => {
                       if (appState?.setFrontSubsCfg) {
                         appState.setFrontSubsCfg(prev => ({ ...prev, orientation: "horizontal" }));
                       }
                     }}
-                    className={`px-3 py-1 text-[12px] rounded border ${
+                    className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
                       (frontSubsCfg?.orientation ?? "vertical") === "horizontal"
                         ? "bg-[#213428] text-white border-[#213428]"
                         : "bg-white text-[#213428] border-[#DCDBD6]"
@@ -161,28 +162,29 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                         appState.setRearSubsCfg(prev => ({ ...prev, orientation: "vertical" }));
                       }
                     }}
-                    className={`px-3 py-1 text-[12px] rounded border ${
+                    className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
                       (rearSubsCfg?.orientation ?? "vertical") === "vertical"
                         ? "bg-[#213428] text-white border-[#213428]"
                         : "bg-white text-[#213428] border-[#DCDBD6]"
                     }`}
-                  >
-                    Vertical
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (appState?.setRearSubsCfg) {
-                        appState.setRearSubsCfg(prev => ({ ...prev, orientation: "horizontal" }));
-                      }
-                    }}
-                    className={`px-3 py-1 text-[12px] rounded border ${
-                      (rearSubsCfg?.orientation ?? "vertical") === "horizontal"
-                        ? "bg-[#213428] text-white border-[#213428]"
-                        : "bg-white text-[#213428] border-[#DCDBD6]"
-                    }`}
-                  >
-                    Horizontal
-                  </button>
+                    >
+                     Vertical
+                    </button>
+                    <button
+                     type="button"
+                     onClick={() => {
+                       if (appState?.setRearSubsCfg) {
+                         appState.setRearSubsCfg(prev => ({ ...prev, orientation: "horizontal" }));
+                       }
+                     }}
+                     className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
+                       (rearSubsCfg?.orientation ?? "vertical") === "horizontal"
+                         ? "bg-[#213428] text-white border-[#213428]"
+                         : "bg-white text-[#213428] border-[#DCDBD6]"
+                     }`}
+                    >
+                     Horizontal
+                    </button>
                 </div>
               </div>
             )}
