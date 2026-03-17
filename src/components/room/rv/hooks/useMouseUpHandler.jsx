@@ -29,6 +29,8 @@ export function useMouseUpHandler({
   widthM,
   getModelDimsM,
   commitDraftSubPositions,
+  _lastValidDraftFrontSubsRef,
+  _lastValidDraftRearSubsRef,
 }) {
   const handleMouseUp = useCallback((e) => {
     // Signal to RoomDesigner that dragging ended
@@ -46,6 +48,21 @@ export function useMouseUpHandler({
 
        // Commit final positions immediately on release
        commitDraftSubPositions();
+
+       // Snapshot final draft positions into held refs before clearing drafts
+       if (draftFrontSubsRef.current) {
+         _lastValidDraftFrontSubsRef.current = draftFrontSubsRef.current.map(s => ({
+           ...s,
+           position: { ...s.position }
+         }));
+       }
+
+       if (draftRearSubsRef.current) {
+         _lastValidDraftRearSubsRef.current = draftRearSubsRef.current.map(s => ({
+           ...s,
+           position: { ...s.position }
+         }));
+       }
 
        // Signal BassResponse that dragging ended
        if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {

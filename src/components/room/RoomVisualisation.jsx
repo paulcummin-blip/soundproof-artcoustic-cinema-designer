@@ -304,6 +304,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const draftRearSubsRef = useRef(null);
   const isDraggingSubRef = useRef(false);
   const idleCommitTimerRef = useRef(null);
+  const _lastValidDraftFrontSubsRef = useRef(null);
+  const _lastValidDraftRearSubsRef = useRef(null);
   // Absolute HUD position in canvas pixels (top-left of the HUD card)
 const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const planBoundsRef = useRef(null);
@@ -467,6 +469,36 @@ const onHudHeaderMouseDown = useCallback((event) => {
   const safeVal = useCallback((v, unit = '') => {
     return Number.isFinite(v) ? `${v.toFixed(1)}${unit}` : '—';
   }, []);
+
+  // Equality check for subwoofer arrays during held-draft transition
+  const areSubsEffectivelyEqual = useCallback((arr1, arr2, epsilon = EPS_M) => {
+    const a = arr1 || [];
+    const b = arr2 || [];
+
+    if (a.length !== b.length) return false;
+
+    for (let i = 0; i < a.length; i++) {
+      const s1 = a[i];
+      const s2 = b[i];
+      if (!s1?.position || !s2?.position) return false;
+      if (Math.abs(s1.position.x - s2.position.x) > epsilon) return false;
+      if (Math.abs(s1.position.y - s2.position.y) > epsilon) return false;
+    }
+    return true;
+  }, [EPS_M]);
+
+  // Clear held draft refs when committed state has caught up
+  useEffect(() => {
+    if (_lastValidDraftFrontSubsRef.current &&
+        areSubsEffectivelyEqual(_lastValidDraftFrontSubsRef.current, frontSubs)) {
+      _lastValidDraftFrontSubsRef.current = null;
+    }
+
+    if (_lastValidDraftRearSubsRef.current &&
+        areSubsEffectivelyEqual(_lastValidDraftRearSubsRef.current, rearSubs)) {
+      _lastValidDraftRearSubsRef.current = null;
+    }
+  }, [frontSubs, rearSubs, areSubsEffectivelyEqual]);
 
   // 4. HOOKS AND DERIVED STATE
   // Effect to cache the default position of side surrounds when they are first added
@@ -1068,6 +1100,7 @@ const byId = useEntitiesById({
     draggedSubWallRef, draggedSubTypeRef, draftFrontSubsRef, draftRearSubsRef, idleCommitTimerRef,
     isDraggingRef: props.isDraggingRef,
     widthM, getModelDimsM, commitDraftSubPositions,
+    _lastValidDraftFrontSubsRef, _lastValidDraftRearSubsRef,
   });
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
@@ -1814,6 +1847,8 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
 
       hudPosition={hudBasePosPx}
       subDragTick={subDragTick}
+      lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
+      lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
     />
   );
 });
