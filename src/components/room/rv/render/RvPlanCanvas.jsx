@@ -125,6 +125,8 @@ export default function RvPlanCanvas({
   speakerTooltip,
   hudPosition,  // canvas-pixel position of the HUD card (hudBasePosPx from parent)
   subDragTick,  // incremented on every sub draft update — forces re-read of draft refs
+  lastValidDraftFrontSubs,
+  lastValidDraftRearSubs,
   // Speaker layer props
   aimAtMLP,
   aimFrontWidesAtMLP,
