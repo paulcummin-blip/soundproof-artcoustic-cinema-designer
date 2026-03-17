@@ -304,7 +304,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const draftRearSubsRef = useRef(null);
   const isDraggingSubRef = useRef(false);
   const idleCommitTimerRef = useRef(null);
-  const isHoldingSubDraftAfterReleaseRef = useRef(false);
   // Absolute HUD position in canvas pixels (top-left of the HUD card)
 const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const planBoundsRef = useRef(null);
@@ -1017,64 +1016,6 @@ const byId = useEntitiesById({
 
   const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom });
 
-  // Check if committed sub positions match the last draft positions
-  const doSubPositionsMatch = useCallback(() => {
-    const TOLERANCE_M = 0.001;
-    
-    // Compare front subs
-    const frontDraft = draftFrontSubsRef.current;
-    const frontCommitted = safeFrontSubs;
-    
-    if (!frontDraft || !frontCommitted) {
-      const frontEmpty = (!frontDraft || frontDraft.length === 0) && (!frontCommitted || frontCommitted.length === 0);
-      if (!frontEmpty) return false;
-    } else if (frontDraft.length !== frontCommitted.length) {
-      return false;
-    } else {
-      for (let i = 0; i < frontDraft.length; i++) {
-        const d = frontDraft[i];
-        const c = frontCommitted[i];
-        if (Math.abs((d.position?.x || 0) - (c.position?.x || 0)) > TOLERANCE_M ||
-            Math.abs((d.position?.y || 0) - (c.position?.y || 0)) > TOLERANCE_M) {
-          return false;
-        }
-      }
-    }
-    
-    // Compare rear subs
-    const rearDraft = draftRearSubsRef.current;
-    const rearCommitted = safeRearSubs;
-    
-    if (!rearDraft || !rearCommitted) {
-      const rearEmpty = (!rearDraft || rearDraft.length === 0) && (!rearCommitted || rearCommitted.length === 0);
-      if (!rearEmpty) return false;
-    } else if (rearDraft.length !== rearCommitted.length) {
-      return false;
-    } else {
-      for (let i = 0; i < rearDraft.length; i++) {
-        const d = rearDraft[i];
-        const c = rearCommitted[i];
-        if (Math.abs((d.position?.x || 0) - (c.position?.x || 0)) > TOLERANCE_M ||
-            Math.abs((d.position?.y || 0) - (c.position?.y || 0)) > TOLERANCE_M) {
-          return false;
-        }
-      }
-    }
-    
-    return true;
-  }, [safeFrontSubs, safeRearSubs]);
-
-  // Effect: End the release hold once positions match
-  useEffect(() => {
-    if (!isHoldingSubDraftAfterReleaseRef.current) return;
-    
-    if (doSubPositionsMatch()) {
-      isHoldingSubDraftAfterReleaseRef.current = false;
-      draftFrontSubsRef.current = null;
-      draftRearSubsRef.current = null;
-    }
-  }, [doSubPositionsMatch]);
-
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
     if (draftFrontSubsRef.current && onSetFrontSubs) {
@@ -1127,7 +1068,6 @@ const byId = useEntitiesById({
     draggedSubWallRef, draggedSubTypeRef, draftFrontSubsRef, draftRearSubsRef, idleCommitTimerRef,
     isDraggingRef: props.isDraggingRef,
     widthM, getModelDimsM, commitDraftSubPositions,
-    isHoldingSubDraftAfterReleaseRef,
   });
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
@@ -1832,7 +1772,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       showMlpRuler={showMlpRuler}
       draftFrontSubsRef={draftFrontSubsRef}
       draftRearSubsRef={draftRearSubsRef}
-      isHoldingSubDraftAfterReleaseRef={isHoldingSubDraftAfterReleaseRef}
       frontSubs={safeFrontSubs}
       rearSubs={safeRearSubs}
       frontSubsCfg={frontSubsCfg}

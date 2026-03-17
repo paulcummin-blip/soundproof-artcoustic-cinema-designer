@@ -29,7 +29,6 @@ export function useMouseUpHandler({
   widthM,
   getModelDimsM,
   commitDraftSubPositions,
-  isHoldingSubDraftAfterReleaseRef,
 }) {
   const handleMouseUp = useCallback((e) => {
     // Signal to RoomDesigner that dragging ended
@@ -54,8 +53,8 @@ export function useMouseUpHandler({
        }
 
        isDraggingSubRef.current = false;
-       // Activate release hold: keep draft refs alive until committed positions match
-       isHoldingSubDraftAfterReleaseRef.current = true;
+       draftFrontSubsRef.current = null;
+       draftRearSubsRef.current = null;
      }
 
      // Release pointer capture
@@ -147,7 +146,7 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isHoldingSubDraftAfterReleaseRef]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
 
   return { handleMouseUp };
 }

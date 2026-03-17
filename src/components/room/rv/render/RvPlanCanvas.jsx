@@ -91,7 +91,6 @@ export default function RvPlanCanvas({
 
   draftFrontSubsRef,
   draftRearSubsRef,
-  isHoldingSubDraftAfterReleaseRef,
   frontSubs,
   rearSubs,
   frontSubsCfg,
@@ -141,12 +140,12 @@ export default function RvPlanCanvas({
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const frontLive = useMemo(
-    () => ((dragging || isHoldingSubDraftAfterReleaseRef?.current) && Array.isArray(draftFrontSubsRef.current)) ? draftFrontSubsRef.current : frontSubs,
+    () => (dragging && Array.isArray(draftFrontSubsRef.current)) ? draftFrontSubsRef.current : frontSubs,
     [dragging, frontSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rearLive = useMemo(
-    () => ((dragging || isHoldingSubDraftAfterReleaseRef?.current) && Array.isArray(draftRearSubsRef.current)) ? draftRearSubsRef.current : rearSubs,
+    () => (dragging && Array.isArray(draftRearSubsRef.current)) ? draftRearSubsRef.current : rearSubs,
     [dragging, rearSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
