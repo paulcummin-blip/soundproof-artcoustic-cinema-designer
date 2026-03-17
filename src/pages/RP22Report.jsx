@@ -852,7 +852,7 @@ function RP22ReportInner() {
                                             <select
                                                 style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A' }}
                                                 value={app?.p15ConstructionLevel || 'standard'}
-                                                onChange={e => app?.setP15ConstructionLevel?.(e.target.value)}
+                                                onChange={e => app?.setP15ConstructionLevelSafe?.(e.target.value)}
                                             >
                                                 <option value="standard">Standard domestic room (NCB 26 · L1)</option>
                                                 <option value="purpose-built">Purpose-built home cinema (NCB 22 · L2)</option>
