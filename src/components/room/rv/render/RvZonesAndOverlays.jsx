@@ -105,19 +105,6 @@ export default function RvZonesAndOverlays({
 
       {/* Overhead Zones / Bands */}
       {OverheadsBands}
-
-      {/* Subwoofers */}
-      <FrontSubsLayer
-        frontSubs={frontSubs}
-        toPx={toPx}
-        getModelDimsM={getModelDimsM}
-        scale={scale}
-        onSubPointerDown={(e, id) => handleMouseDown(e, id, "sub")}
-        onSubPointerMove={handleMouseMove}
-        onSubPointerUp={handleMouseUp}
-        dragging={dragging}
-        draggedItemId={draggedItemId}
-      />
-    </>
-  );
-}
+      </>
+      );
+      }
