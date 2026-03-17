@@ -304,8 +304,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const draftRearSubsRef = useRef(null);
   const isDraggingSubRef = useRef(false);
   const idleCommitTimerRef = useRef(null);
-  const _lastValidDraftFrontSubsRef = useRef(null);
-  const _lastValidDraftRearSubsRef = useRef(null);
   // Absolute HUD position in canvas pixels (top-left of the HUD card)
 const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const planBoundsRef = useRef(null);
@@ -359,16 +357,6 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
       setHudPinnedOffsetPx({ x: 24, y: 24 });
     }
   }, [isHudPinned, hudPinnedOffsetPx]);
-
-  // Clear held draft refs once committed state catches up
-  useEffect(() => {
-    if (_lastValidDraftFrontSubsRef.current && areSubsEffectivelyEqual(_lastValidDraftFrontSubsRef.current, frontSubs)) {
-      _lastValidDraftFrontSubsRef.current = null;
-    }
-    if (_lastValidDraftRearSubsRef.current && areSubsEffectivelyEqual(_lastValidDraftRearSubsRef.current, rearSubs)) {
-      _lastValidDraftRearSubsRef.current = null;
-    }
-  }, [frontSubs, rearSubs, areSubsEffectivelyEqual]);
 
   // ---------------------------------------------------------------------------
   // HELPER FUNCTIONS (declare early to avoid TDZ)
@@ -479,27 +467,6 @@ const onHudHeaderMouseDown = useCallback((event) => {
   const safeVal = useCallback((v, unit = '') => {
     return Number.isFinite(v) ? `${v.toFixed(1)}${unit}` : '—';
   }, []);
-
-  // Helper: check if two sub arrays have matching positions (within tolerance)
-  const areSubsEffectivelyEqual = useCallback((arr1, arr2, epsilon = EPS_M) => {
-    const effectiveArr1 = arr1 || [];
-    const effectiveArr2 = arr2 || [];
-
-    if (effectiveArr1.length !== effectiveArr2.length) return false;
-
-    for (let i = 0; i < effectiveArr1.length; i++) {
-      const s1 = effectiveArr1[i];
-      const s2 = effectiveArr2[i];
-
-      if (!s1?.position || !s2?.position) return false;
-
-      if (Math.abs(s1.position.x - s2.position.x) > epsilon ||
-          Math.abs(s1.position.y - s2.position.y) > epsilon) {
-        return false;
-      }
-    }
-    return true;
-  }, [EPS_M]);
 
   // 4. HOOKS AND DERIVED STATE
   // Effect to cache the default position of side surrounds when they are first added
@@ -1101,7 +1068,6 @@ const byId = useEntitiesById({
     draggedSubWallRef, draggedSubTypeRef, draftFrontSubsRef, draftRearSubsRef, idleCommitTimerRef,
     isDraggingRef: props.isDraggingRef,
     widthM, getModelDimsM, commitDraftSubPositions,
-    _lastValidDraftFrontSubsRef, _lastValidDraftRearSubsRef,
   });
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
@@ -1806,8 +1772,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       showMlpRuler={showMlpRuler}
       draftFrontSubsRef={draftFrontSubsRef}
       draftRearSubsRef={draftRearSubsRef}
-      lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
-      lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
       frontSubs={safeFrontSubs}
       rearSubs={safeRearSubs}
       frontSubsCfg={frontSubsCfg}
