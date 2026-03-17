@@ -91,6 +91,8 @@ export default function RvPlanCanvas({
 
   draftFrontSubsRef,
   draftRearSubsRef,
+  lastValidDraftFrontSubs,
+  lastValidDraftRearSubs,
   frontSubs,
   rearSubs,
   frontSubsCfg,
@@ -138,15 +140,24 @@ export default function RvPlanCanvas({
 }) {
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
+  // Render priority: active draft → held last-valid draft → committed subs
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const frontLive = useMemo(
-    () => (dragging && Array.isArray(draftFrontSubsRef.current)) ? draftFrontSubsRef.current : frontSubs,
-    [dragging, frontSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
+    () => {
+      if (dragging && Array.isArray(draftFrontSubsRef.current)) return draftFrontSubsRef.current;
+      if (lastValidDraftFrontSubs) return lastValidDraftFrontSubs;
+      return frontSubs;
+    },
+    [dragging, draftFrontSubsRef, lastValidDraftFrontSubs, frontSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rearLive = useMemo(
-    () => (dragging && Array.isArray(draftRearSubsRef.current)) ? draftRearSubsRef.current : rearSubs,
-    [dragging, rearSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
+    () => {
+      if (dragging && Array.isArray(draftRearSubsRef.current)) return draftRearSubsRef.current;
+      if (lastValidDraftRearSubs) return lastValidDraftRearSubs;
+      return rearSubs;
+    },
+    [dragging, draftRearSubsRef, lastValidDraftRearSubs, rearSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   return (
