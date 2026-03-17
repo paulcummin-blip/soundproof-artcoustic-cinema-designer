@@ -52,5 +52,5 @@ export default function RP22GradingPill({ level = 4, count, children, style }) {
     minWidth: '40px',
   };
 
-  return <span style={styleBase}>{label}</span>;
+  return <span style={{ ...styleBase, ...style }}>{label}</span>;
 }
