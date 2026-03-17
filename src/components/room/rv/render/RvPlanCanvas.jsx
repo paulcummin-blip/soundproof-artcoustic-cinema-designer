@@ -354,62 +354,72 @@ export default function RvPlanCanvas({
                 ? buildFallbackLine(rearSubsCfg?.count, rearSubsCfg?.model, "rear")
                 : rearLive;
 
-              return Array.isArray(rearFallbackLine) && rearFallbackLine.length > 0 ? (
-                <g data-layer="rear-subwoofers">
-                  {rearFallbackLine.map((sub, i) => {
-                    if (!hasPos(sub)) return null;
-                    const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model);
-                    const subId = sub.id || `rear-sub-${i}`;
-                    const [cx, cy] = toPx(sub.position.x, sub.position.y);
-                    const w = subWm * scale;
-                    const d = subDm * scale;
+              const renderSubGroup = (subArray, layerName) => {
+                if (!Array.isArray(subArray) || subArray.length === 0) return null;
+                return (
+                  <g data-layer={layerName}>
+                    {subArray.map((sub, i) => {
+                      if (!hasPos(sub)) return null;
+                      const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model);
+                      const subId = sub.id || `${layerName}-${i}`;
+                      const [cx, cy] = toPx(sub.position.x, sub.position.y);
+                      const w = subWm * scale;
+                      const d = subDm * scale;
 
-                    const handlePointerDown = (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
-                      handleMouseDown(e, subId, "sub");
-                    };
+                      const handlePointerDown = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+                        handleMouseDown(e, subId, "sub");
+                      };
 
-                    const handlePointerMove = (e) => {
-                      if (!dragging || draggedItemId !== subId) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleMouseMove(e);
-                    };
+                      const handlePointerMove = (e) => {
+                        if (!dragging || draggedItemId !== subId) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleMouseMove(e);
+                      };
 
-                    const handlePointerUp = (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
-                      handleMouseUp(e);
-                    };
+                      const handlePointerUp = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+                        handleMouseUp(e);
+                      };
 
-                    return (
-                      <g
-                        key={subId}
-                        style={{
-                          cursor: dragging && draggedItemId === subId ? "grabbing" : "grab",
-                          pointerEvents: "all"
-                        }}
-                        onPointerDown={handlePointerDown}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerCancel={handlePointerUp}
-                      >
-                        <rect
-                          x={cx - w / 2}
-                          y={cy - d / 2}
-                          width={w}
-                          height={d}
-                          fill="transparent"
-                          pointerEvents="all"
-                        />
-                      </g>
-                    );
-                  })}
-                </g>
-              ) : null;
+                      return (
+                        <g
+                          key={subId}
+                          style={{
+                            cursor: dragging && draggedItemId === subId ? "grabbing" : "grab",
+                            pointerEvents: "all"
+                          }}
+                          onPointerDown={handlePointerDown}
+                          onPointerMove={handlePointerMove}
+                          onPointerUp={handlePointerUp}
+                          onPointerCancel={handlePointerUp}
+                        >
+                          <rect
+                            x={cx - w / 2}
+                            y={cy - d / 2}
+                            width={w}
+                            height={d}
+                            fill="transparent"
+                            pointerEvents="all"
+                          />
+                        </g>
+                      );
+                    })}
+                  </g>
+                );
+              };
+
+              return (
+                <>
+                  {renderSubGroup(frontFallbackLine, "front-subwoofers")}
+                  {renderSubGroup(rearFallbackLine, "rear-subwoofers")}
+                </>
+              );
             })()}
 
             {/* Layer 9: Draggable Seating Positions */}

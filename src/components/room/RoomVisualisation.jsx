@@ -1019,11 +1019,11 @@ const byId = useEntitiesById({
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
     if (draftFrontSubsRef.current && onSetFrontSubs) {
-      const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x }));
+      const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
       onSetFrontSubs(prev => ({ ...prev, positions }));
     }
     if (draftRearSubsRef.current && onSetRearSubs) {
-      const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x }));
+      const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
       onSetRearSubs(prev => ({ ...prev, positions }));
     }
   }, [onSetFrontSubs, onSetRearSubs]);
