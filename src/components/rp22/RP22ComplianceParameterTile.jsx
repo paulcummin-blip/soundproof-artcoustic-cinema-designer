@@ -35,8 +35,8 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
 
   return (
     <div style={{ ...card, display: "flex", flexDirection: "column", minHeight: 380 }}>
-      {/* ── Section 1: Title / description / scope / achieved ── */}
-      <div style={head}>
+      {/* ── Section A: Title / description / scope / achieved — fixed min-height so Section B always starts at same Y ── */}
+      <div style={{ ...head, minHeight: 160 }}>
         <div style={title}>
           {param.id}. {param.title}
         </div>
