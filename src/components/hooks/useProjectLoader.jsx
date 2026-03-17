@@ -206,9 +206,10 @@ appState, // Pass appState directly for setters
     const AUTOSAVE_INTERVAL_MS = 10_000;
     const AUTOSAVE_DEBOUNCE_MS = 1_200;
 
-    // --- refs (created once) ---
-    if (!globalThis.__rdAutosaveRefs) {
-      globalThis.__rdAutosaveRefs = {
+    // --- refs (keyed per project so stale sigs from a previous project don't bleed in) ---
+    const refKey = `__rdAutosaveRefs_${effectiveProjectId}`;
+    if (!globalThis[refKey]) {
+      globalThis[refKey] = {
         dirty: false,
         inFlight: false,
         lastSavedSig: "",
@@ -217,7 +218,7 @@ appState, // Pass appState directly for setters
         debounceId: null,
       };
     }
-    const r = globalThis.__rdAutosaveRefs;
+    const r = globalThis[refKey];
 
     const buildProjectData = () => {
       const liveFrontSubsCfg = appState?.frontSubsCfg ?? frontSubsCfg;
