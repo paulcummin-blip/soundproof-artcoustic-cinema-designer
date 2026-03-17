@@ -629,24 +629,18 @@ const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
       }
 
       if (savedProject) {
-        // DEBUG: Log what came back from save
         if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject result', {
-          projectIdState,
-          effectiveProjectId,
-          savedId: savedProject?.id,
-          name: savedProject?.name,
-          client_name: savedProject?.client_name
+          projectIdState, effectiveProjectId, savedId: savedProject?.id,
         });
 
-        // DEBUG: One-shot reload to verify we can read back what we wrote
-        if (effectiveProjectId && typeof loadProject === 'function') {
-          if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject -> reloading project after save', { effectiveProjectId });
-          try {
-            await loadProject(undefined, effectiveProjectId);
-          } catch (e) {
-            if (globalThis.__B44_LOGS) console.error('[RD] reload after save failed', e);
-          }
-        }
+        // Stamp the saved signature NOW (before any reload that re-hydrates state)
+        // so the autosave effect does not see the post-hydration state as dirty.
+        const savedSig = (() => { try { return JSON.stringify(projectData); } catch { return ""; } })();
+        const savedRefKey = `__rdAutosaveRefs_${effectiveProjectId}`;
+        if (!globalThis[savedRefKey]) globalThis[savedRefKey] = { dirty: false, inFlight: false, lastSavedSig: "", lastSaveAt: 0, intervalId: null, debounceId: null };
+        globalThis[savedRefKey].lastSavedSig = savedSig;
+        globalThis[savedRefKey].lastSaveAt = Date.now();
+        globalThis[savedRefKey].dirty = false;
 
         setAutosaveStatus("saved");
         return { success: true };
