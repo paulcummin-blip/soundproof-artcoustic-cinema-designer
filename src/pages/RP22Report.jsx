@@ -877,7 +877,7 @@ function RP22ReportInner() {
                                     </div>
                                 </div>
                                 {/* ── RP23 card — only when data exists ── */}
-                                <div style={{ flex: 1 }}>
+                                <div className="col-span-1">
                                     {rp23Rows.length > 0 && (
                                         <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                                             <CardHeader className="pb-2">
