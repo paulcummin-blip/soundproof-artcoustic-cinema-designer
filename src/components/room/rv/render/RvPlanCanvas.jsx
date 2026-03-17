@@ -143,25 +143,39 @@ export default function RvPlanCanvas({
   // Three-tier priority: active draft > held last-valid draft > committed state
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const frontLive = useMemo(() => {
+    let subs;
     if (dragging && Array.isArray(draftFrontSubsRef.current)) {
-      return draftFrontSubsRef.current;
+      subs = draftFrontSubsRef.current;
+    } else if (lastValidDraftFrontSubs) {
+      subs = lastValidDraftFrontSubs;
+    } else {
+      subs = frontSubs;
     }
-    if (lastValidDraftFrontSubs) {
-      return lastValidDraftFrontSubs;
-    }
-    return frontSubs;
-  }, [dragging, draftFrontSubsRef, lastValidDraftFrontSubs, frontSubs, subDragTick]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Enrich with model and orientation from frontSubsCfg
+    return Array.isArray(subs) ? subs.map(sub => ({
+      ...sub,
+      model: frontSubsCfg?.model,
+      orientation: frontSubsCfg?.orientation ?? "vertical"
+    })) : subs;
+  }, [dragging, draftFrontSubsRef, lastValidDraftFrontSubs, frontSubs, frontSubsCfg, subDragTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rearLive = useMemo(() => {
+    let subs;
     if (dragging && Array.isArray(draftRearSubsRef.current)) {
-      return draftRearSubsRef.current;
+      subs = draftRearSubsRef.current;
+    } else if (lastValidDraftRearSubs) {
+      subs = lastValidDraftRearSubs;
+    } else {
+      subs = rearSubs;
     }
-    if (lastValidDraftRearSubs) {
-      return lastValidDraftRearSubs;
-    }
-    return rearSubs;
-  }, [dragging, draftRearSubsRef, lastValidDraftRearSubs, rearSubs, subDragTick]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Enrich with model and orientation from rearSubsCfg
+    return Array.isArray(subs) ? subs.map(sub => ({
+      ...sub,
+      model: rearSubsCfg?.model,
+      orientation: rearSubsCfg?.orientation ?? "vertical"
+    })) : subs;
+  }, [dragging, draftRearSubsRef, lastValidDraftRearSubs, rearSubs, rearSubsCfg, subDragTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
