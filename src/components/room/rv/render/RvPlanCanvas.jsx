@@ -379,8 +379,8 @@ export default function RvPlanCanvas({
                 return (
                   <g data-layer={layerName}>
                     {subArray.map((sub, i) => {
-                      if (!hasPos(sub)) return null;
-                      const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model);
+                       if (!hasPos(sub)) return null;
+                       const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model, sub.orientation ?? "vertical");
                       const subId = `${groupPrefix}-sub-${i}`;
                       const [cx, cy] = toPx(sub.position.x, sub.position.y);
                       const w = subWm * scale;
