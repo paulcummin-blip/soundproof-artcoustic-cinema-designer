@@ -208,22 +208,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const BOTTOM_GUTTER_PX = 220; // ensures bottom speaker dimension lanes never clip
 
   const getModelDimsM = useCallback((modelName, orientation = "vertical") => {
-    const meta = getSpeakerModelMeta?.(modelName);
-    
-    // SUB4-12 horizontal: swap width/depth dimensions
-    if (modelName === "SUB4-12" && orientation === "horizontal") {
-      return {
-        widthM:    1.7,
-        heightM:   0.44,
-        depthM:    0.44,
-        diameterM: Number(meta?.diameterM) || 0.27,
-        round:     !!meta?.round,
-        notFound:  !meta,
-        sensitivity:           meta?.sensitivity || 87,
-        impedance:             meta?.impedance || 8,
-        sensitivity_dB_1w1m:   meta?.sensitivity_dB_1w1m || meta?.sensitivity || 87,
-      };
-    }
+    const meta = getSpeakerModelMeta?.(modelName, orientation);
     
     return {
       widthM:    Number(meta?.widthM)    || 0.27,
