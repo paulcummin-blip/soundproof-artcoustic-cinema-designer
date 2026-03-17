@@ -825,8 +825,9 @@ function RP22ReportInner() {
                         analysisResult={analysisResult}
                     />
 
-                    {/* RP23 card — below seat summary, left-aligned with seat cards, width = 2 seat boxes */}
+                    {/* RP23 Horizontal Viewing Angle summary */}
                     {(() => {
+                        // Group seats by rowNumber, pick the primary/centre seat per row
                         const rowGroups = {};
                         seats.forEach(s => {
                             const r = s.rowNumber || 1;
@@ -840,29 +841,25 @@ function RP22ReportInner() {
                             const candidates = primary.length ? primary : rowSeats;
                             const rep = candidates.slice().sort((a, b) => Math.abs(a.x - roomCentreX) - Math.abs(b.x - roomCentreX))[0];
                             const snap = rep ? reportSeatHudById?.[rep.id] : null;
-                            return { rowNum, rp23: snap?.rp23 || null };
+                            return { rowNum, rep, rp23: snap?.rp23 || null };
                         });
                         if (!rowEntries.length) return null;
-                        // 2 seat boxes (340px each) + 1 gap (16px) = 696px, left-aligned with seat cards column
                         return (
-                            <div className="grid grid-cols-[auto_1fr] gap-10 items-start">
-                                <div style={{ width: 340 }} />{/* spacer matching Room parameters column */}
-                                <div className="justify-self-end">
-                                    <div style={{ border: "2px solid #213428", borderRadius: 8, padding: "16px 20px", background: "#fff", width: 696 }}>
-                                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1B1A1A", fontFamily: "Futura PT Light, Century Gothic, sans-serif", marginBottom: 4 }}>
-                                            RP23 — Horizontal Viewing Angle
-                                        </div>
-                                        <div style={{ fontSize: 11, color: "#625143", marginBottom: 10 }}>Representative seat per row · target range 50°–65° (L4)</div>
-                                        {rowEntries.map(({ rowNum, rp23 }) => (
-                                            <div key={rowNum} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-                                                <span style={{ fontSize: 12, color: "#3E4349" }}>Row {rowNum}</span>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1B1A1A" }}>{rp23?.formatted || "—"}</span>
-                                                    <RP22GradingPill level={rp23?.level || "—"} />
-                                                </div>
+                            <div style={{ border: "1px solid #DCDBD6", background: "#fff", borderRadius: 8, marginBottom: 0 }}>
+                                <div style={{ padding: "12px 12px 0 12px" }}>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>RP23 — Horizontal Viewing Angle</div>
+                                    <div style={{ fontSize: 12, color: "#625143", marginTop: 4 }}>Representative seat per row · target range 48°–67° (L4)</div>
+                                </div>
+                                <div style={{ padding: "8px 12px 12px 12px" }}>
+                                    {rowEntries.map(({ rowNum, rp23 }) => (
+                                        <div key={rowNum} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                                            <span style={{ fontSize: 12, color: "#3E4349" }}>Row {rowNum}</span>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                <span style={{ fontSize: 13, fontWeight: 600, color: "#1B1A1A" }}>{rp23?.formatted || "—"}</span>
+                                                <RP22GradingPill level={rp23?.level || "—"} />
                                             </div>
-                                        ))}
-                                    </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         );
@@ -936,7 +933,7 @@ function RP22ReportInner() {
                                         <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
                                             Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6mm', paddingTop: '1mm', paddingBottom: '1mm', fontSize: '110%' }}>
                                             {['L4', 'L3', 'L2', 'L1'].map(lvl => {
                                                 const maxRoom = Math.max(roomLevelCounts.L4, roomLevelCounts.L3, roomLevelCounts.L2, roomLevelCounts.L1);
                                                 return <div key={lvl} style={{ transform: roomLevelCounts[lvl] === maxRoom ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}><RP22GradingPill level={lvl} count={roomLevelCounts[lvl]} /></div>;
