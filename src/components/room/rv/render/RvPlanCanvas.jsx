@@ -285,12 +285,6 @@ export default function RvPlanCanvas({
               overheadZones={overheadZones}
               getCanonicalRole={getCanonicalRole}
               scale={scale}
-              frontSubs={frontSubs}
-              handleMouseDown={handleMouseDown}
-              handleMouseMove={handleMouseMove}
-              handleMouseUp={handleMouseUp}
-              dragging={dragging}
-              draggedItemId={draggedItemId}
               frontWideZones={frontWideZones}
               meterToCanvasX={meterToCanvasX}
               meterToCanvasY={meterToCanvasY}
