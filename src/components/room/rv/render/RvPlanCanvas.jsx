@@ -356,12 +356,15 @@ export default function RvPlanCanvas({
 
               const renderSubGroup = (subArray, layerName) => {
                 if (!Array.isArray(subArray) || subArray.length === 0) return null;
+                // Determine group prefix: "front-subwoofers" -> "front", "rear-subwoofers" -> "rear"
+                const groupPrefix = layerName.replace("-subwoofers", "");
                 return (
                   <g data-layer={layerName}>
                     {subArray.map((sub, i) => {
                       if (!hasPos(sub)) return null;
                       const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model);
-                      const subId = sub.id || `${layerName}-${i}`;
+                      // Always use canonical format: front-sub-0, rear-sub-1, etc.
+                      const subId = `${groupPrefix}-sub-${i}`;
                       const [cx, cy] = toPx(sub.position.x, sub.position.y);
                       const w = subWm * scale;
                       const d = subDm * scale;

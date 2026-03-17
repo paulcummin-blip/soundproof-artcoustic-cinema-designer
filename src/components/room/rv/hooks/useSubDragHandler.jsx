@@ -23,10 +23,21 @@ export function useSubDragHandler({
   commitDraftSubPositions,
 }) {
   const handleSubDrag = useCallback((subId, newCanvasPos) => {
-    const sub = byId.get(subId);
-    if (!sub) return;
+    // subId is canonical: "front-sub-0", "rear-sub-1", etc.
+    // byId may not contain these generated IDs, so resolve subType and subIndex directly.
+    const mId = String(subId).match(/^(front|rear)-sub-(\d+)$/);
+    if (!mId) return;
 
-    const subType = draggedSubTypeRef.current || sub._subType;
+    const subType = mId[1]; // "front" or "rear"
+    const subIndex = Number(mId[2]);
+
+    // Still attempt byId for position/model data; fall back to draft array entry
+    const sub = byId.get(subId) || (
+      subType === 'front'
+        ? draftFrontSubsRef.current?.[subIndex]
+        : draftRearSubsRef.current?.[subIndex]
+    );
+    if (!sub) return;
     const draftArray = subType === 'front' ? draftFrontSubsRef.current : draftRearSubsRef.current;
     if (!draftArray) return;
 
@@ -77,9 +88,7 @@ export function useSubDragHandler({
       return;
     }
 
-    // Update ONLY draft positions (no state setter during drag)
-    const m = String(subId).match(/-(\d+)$/);
-    const subIndex = m ? Number(m[1]) : 0;
+    // subIndex already resolved above from canonical ID
     const subInDraft = draftArray[subIndex];
 
     if (subInDraft) {
