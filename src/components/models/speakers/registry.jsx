@@ -224,7 +224,7 @@ export function displayModelKey(modelKey = "") {
 }
 
 // PRIMARY ACCESSOR — RETURNS METRICS IN METRES, WITH PLAN SHAPE HINTS
-export function getSpeakerModelMeta(modelName, orientation = "vertical") {
+export function getSpeakerModelMeta(modelName) {
   const key = normaliseModelKey(modelName);
   const hit =
     MODELS.find(m => m.key === key) ||
@@ -283,22 +283,11 @@ export function getSpeakerModelMeta(modelName, orientation = "vertical") {
     };
   }
 
-  // SUB4-12 horizontal orientation: swap width and depth for plan view footprint
-  let widthDim = mmToM(hit.widthMm);
-  let heightDim = mmToM(hit.heightMm);
-  let depthDim = mmToM(hit.depthMm);
-
-  if (key === "sub4-12" && orientation === "horizontal") {
-    widthDim = 1.7;
-    heightDim = 0.44;
-    depthDim = 0.44;
-  }
-
   return {
     round: false,
-    widthM: widthDim,
-    heightM: heightDim,
-    depthM: depthDim,
+    widthM: mmToM(hit.widthMm),
+    heightM: mmToM(hit.heightMm),
+    depthM: mmToM(hit.depthMm),
     key: hit.key,
     label: hit.label,
     category: hit.category,
