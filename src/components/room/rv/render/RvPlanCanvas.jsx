@@ -91,6 +91,7 @@ export default function RvPlanCanvas({
 
   draftFrontSubsRef,
   draftRearSubsRef,
+  isHoldingSubDraftAfterReleaseRef,
   frontSubs,
   rearSubs,
   frontSubsCfg,
