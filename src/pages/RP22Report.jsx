@@ -845,7 +845,8 @@ function RP22ReportInner() {
                         });
                         if (!rowEntries.length) return null;
                         return (
-                            <div style={{ border: "1px solid #DCDBD6", background: "#fff", borderRadius: 8, marginBottom: 0 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0 }}>
+                            <div style={{ gridColumn: "span 2", border: "1px solid #DCDBD6", background: "#fff", borderRadius: 8, marginBottom: 0 }}>
                                 <div style={{ padding: "12px 12px 0 12px" }}>
                                     <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>RP23 — Horizontal Viewing Angle</div>
                                     <div style={{ fontSize: 12, color: "#625143", marginTop: 4 }}>Representative seat per row · target range 48°–67° (L4)</div>
@@ -861,6 +862,7 @@ function RP22ReportInner() {
                                         </div>
                                     ))}
                                 </div>
+                            </div>
                             </div>
                         );
                     })()}
