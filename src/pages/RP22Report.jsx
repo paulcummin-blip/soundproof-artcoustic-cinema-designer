@@ -824,6 +824,52 @@ function RP22ReportInner() {
                         analysisResult={analysisResult}
                     />
 
+                    {/* RP23 — Horizontal Viewing Angle card */}
+                    {(() => {
+                        // Build one representative seat per row (same logic as seatCountsByRow)
+                        const rowMap = {};
+                        seats.forEach(s => {
+                            const match = s.id?.match(/^seat-r(\d+)-c(\d+)$/);
+                            const rowNum = match ? parseInt(match[1], 10) : (s.rowNumber || 1);
+                            if (!rowMap[rowNum]) rowMap[rowNum] = [];
+                            rowMap[rowNum].push(s);
+                        });
+                        const rp23Rows = Object.keys(rowMap).map(Number).sort((a, b) => a - b).map(rowNum => {
+                            const rowSeats = rowMap[rowNum];
+                            // Pick the central (primary) seat for each row
+                            const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
+                            const snap = reportSeatHudById?.[primary?.id];
+                            return { rowNum, rp23: snap?.rp23 || null };
+                        }).filter(r => r.rp23);
+                        if (!rp23Rows.length) return null;
+                        return (
+                            <div className="grid grid-cols-[auto_1fr] gap-10">
+                                <div />
+                                <div style={{ width: '696px' }}>
+                                    <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
+                                            <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {rp23Rows.map(({ rowNum, rp23 }) => (
+                                                    <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
+                                                        <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
+                                                            <RP22GradingPill level={rp23.level || '—'} />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                         <CardHeader>
                             <CardTitle className="text-[#1B1A1A] font-header">RP22 Parameters</CardTitle>
