@@ -1692,6 +1692,12 @@ const svgHSafe = (Number(svgH) || Math.max(1, Number(roomRect?.height) || 800)) 
 const idsGrid = (ids && ids.grid) ? ids.grid : 'b44_grid_fallback';
 const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
 
+  // Derive frontSubs and rearSubs: empty array when config is inactive
+  const frontSubsActive = Array.isArray(frontSubs) && Number(frontSubsCfg?.count) > 0 && frontSubsCfg?.model;
+  const rearSubsActive = Array.isArray(rearSubs) && Number(rearSubsCfg?.count) > 0 && rearSubsCfg?.model;
+  const safeFrontSubs = frontSubsActive ? frontSubs : [];
+  const safeRearSubs = rearSubsActive ? rearSubs : [];
+
   return (
     <RvPlanCanvas
       svgRef={svgRef}
@@ -1766,8 +1772,8 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       showMlpRuler={showMlpRuler}
       draftFrontSubsRef={draftFrontSubsRef}
       draftRearSubsRef={draftRearSubsRef}
-      frontSubs={frontSubs}
-      rearSubs={rearSubs}
+      frontSubs={safeFrontSubs}
+      rearSubs={safeRearSubs}
       frontSubsCfg={frontSubsCfg}
       rearSubsCfg={rearSubsCfg}
       handleMouseDown={handleMouseDown}
