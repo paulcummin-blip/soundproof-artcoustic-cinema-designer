@@ -823,42 +823,50 @@ function RP22ReportInner() {
                         roomLevelCounts={roomLevelCounts}
                         seatCountsByRow={seatCountsByRow}
                         analysisResult={analysisResult}
-                        rp23Slot={(() => {
-                            const rowGroups = {};
-                            seats.forEach(s => {
-                                const r = s.rowNumber || 1;
-                                if (!rowGroups[r]) rowGroups[r] = [];
-                                rowGroups[r].push(s);
-                            });
-                            const roomCentreX = stableDimensions.width / 2;
-                            const rowEntries = Object.keys(rowGroups).map(Number).sort((a, b) => a - b).map(rowNum => {
-                                const rowSeats = rowGroups[rowNum];
-                                const primary = rowSeats.filter(s => s.isPrimary);
-                                const candidates = primary.length ? primary : rowSeats;
-                                const rep = candidates.slice().sort((a, b) => Math.abs(a.x - roomCentreX) - Math.abs(b.x - roomCentreX))[0];
-                                const snap = rep ? reportSeatHudById?.[rep.id] : null;
-                                return { rowNum, rp23: snap?.rp23 || null };
-                            });
-                            if (!rowEntries.length) return null;
-                            return (
-                                <div style={{ border: "2px solid #213428", borderRadius: 8, padding: "16px 20px", background: "#fff", minWidth: 340 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1B1A1A", fontFamily: "Futura PT Light, Century Gothic, sans-serif", marginBottom: 4 }}>
-                                        RP23 — Horizontal Viewing Angle
-                                    </div>
-                                    <div style={{ fontSize: 11, color: "#625143", marginBottom: 10 }}>Representative seat per row · target range 50°–65° (L4)</div>
-                                    {rowEntries.map(({ rowNum, rp23 }) => (
-                                        <div key={rowNum} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-                                            <span style={{ fontSize: 12, color: "#3E4349" }}>Row {rowNum}</span>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                <span style={{ fontSize: 13, fontWeight: 600, color: "#1B1A1A" }}>{rp23?.formatted || "—"}</span>
-                                                <RP22GradingPill level={rp23?.level || "—"} />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            );
-                        })()}
                     />
+
+                    {/* RP23 card — below seat summary, left-aligned with seat cards, width = 2 seat boxes */}
+                    {(() => {
+                        const rowGroups = {};
+                        seats.forEach(s => {
+                            const r = s.rowNumber || 1;
+                            if (!rowGroups[r]) rowGroups[r] = [];
+                            rowGroups[r].push(s);
+                        });
+                        const roomCentreX = stableDimensions.width / 2;
+                        const rowEntries = Object.keys(rowGroups).map(Number).sort((a, b) => a - b).map(rowNum => {
+                            const rowSeats = rowGroups[rowNum];
+                            const primary = rowSeats.filter(s => s.isPrimary);
+                            const candidates = primary.length ? primary : rowSeats;
+                            const rep = candidates.slice().sort((a, b) => Math.abs(a.x - roomCentreX) - Math.abs(b.x - roomCentreX))[0];
+                            const snap = rep ? reportSeatHudById?.[rep.id] : null;
+                            return { rowNum, rp23: snap?.rp23 || null };
+                        });
+                        if (!rowEntries.length) return null;
+                        // 2 seat boxes (340px each) + 1 gap (16px) = 696px, left-aligned with seat cards column
+                        return (
+                            <div className="grid grid-cols-[auto_1fr] gap-10 items-start">
+                                <div style={{ width: 340 }} />{/* spacer matching Room parameters column */}
+                                <div className="justify-self-end">
+                                    <div style={{ border: "2px solid #213428", borderRadius: 8, padding: "16px 20px", background: "#fff", width: 696 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1B1A1A", fontFamily: "Futura PT Light, Century Gothic, sans-serif", marginBottom: 4 }}>
+                                            RP23 — Horizontal Viewing Angle
+                                        </div>
+                                        <div style={{ fontSize: 11, color: "#625143", marginBottom: 10 }}>Representative seat per row · target range 50°–65° (L4)</div>
+                                        {rowEntries.map(({ rowNum, rp23 }) => (
+                                            <div key={rowNum} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                                                <span style={{ fontSize: 12, color: "#3E4349" }}>Row {rowNum}</span>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1B1A1A" }}>{rp23?.formatted || "—"}</span>
+                                                    <RP22GradingPill level={rp23?.level || "—"} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                         <CardHeader>
