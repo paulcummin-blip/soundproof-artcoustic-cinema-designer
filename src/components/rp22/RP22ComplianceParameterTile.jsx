@@ -34,7 +34,7 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
 
   return (
-    <div style={{ ...card, display: "flex", flexDirection: "column", minHeight: 280 }}>
+    <div style={{ ...card, display: "flex", flexDirection: "column", minHeight: 380 }}>
       {/* ── Section 1: Title / description / scope / achieved ── */}
       <div style={head}>
         <div style={title}>
