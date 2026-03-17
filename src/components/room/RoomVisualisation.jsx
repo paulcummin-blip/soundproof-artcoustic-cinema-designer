@@ -1036,15 +1036,6 @@ const byId = useEntitiesById({
     setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
   });
 
-  // Clear draft refs AFTER drag state and frontSubsCfg have updated
-  // This ensures frontLive uses the committed state, not stale draft refs
-  useEffect(() => {
-    if (!dragging && !isDraggingSubRef.current) {
-      draftFrontSubsRef.current = null;
-      draftRearSubsRef.current = null;
-    }
-  }, [dragging]);
-
   // Mouse handling — delegated to extracted hook
   const { handleMouseMove } = useRoomCanvasMouseMove({
     dragging,
