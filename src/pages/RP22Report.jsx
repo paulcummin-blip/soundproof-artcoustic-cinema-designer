@@ -840,9 +840,9 @@ function RP22ReportInner() {
                             return { rowNum, rp23: snap?.rp23 || null };
                         }).filter(r => r.rp23);
                         return (
-                            <div className="flex gap-6 items-stretch">
+                            <div className="grid grid-cols-3 gap-6">
                                 {/* ── Report assumptions block — always visible ── */}
-                                <div style={{ width: '340px', flexShrink: 0 }}>
+                                <div className="col-span-2">
                                     <div style={{ background: '#FFFFFF', border: '1px solid #DCDBD6', borderRadius: 8, padding: '16px', height: '100%' }}>
                                         <div style={{ fontSize: 15, fontWeight: 700, color: '#1B1A1A', marginBottom: 4 }}>Report assumptions</div>
                                         <div style={{ fontSize: 12, color: '#625143', marginBottom: 16 }}>Manual estimates for non-calculated parameters</div>
