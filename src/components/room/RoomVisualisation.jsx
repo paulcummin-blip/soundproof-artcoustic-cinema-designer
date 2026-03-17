@@ -1807,6 +1807,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       speakerTooltip={speakerTooltip}
 
       hudPosition={hudBasePosPx}
+      subDragTick={subDragTick}
     />
   );
 });
