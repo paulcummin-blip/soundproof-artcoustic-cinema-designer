@@ -113,6 +113,13 @@ export default function ReportCountsDashboard({
                     ))}
                 </div>
             </div>
+
+            {rp23Slot && (
+                <>
+                    <div />{/* empty left cell to keep alignment */}
+                    <div className="justify-self-end mt-4">{rp23Slot}</div>
+                </>
+            )}
         </div>
     );
 }
