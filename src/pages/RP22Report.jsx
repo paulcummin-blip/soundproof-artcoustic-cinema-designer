@@ -461,6 +461,7 @@ function RP22ReportInner() {
     const analysisResult = useRP22AnalysisEngine({
         placedSpeakers, visiblePlanSpeakers: analysisSpeakers, seatingPositions: seats, primarySeatingPosition,
         dimensions: stableDimensions, mlpBasis,
+        mlpPointOverride: primarySeatingPosition,
         sevenBedLayoutType: app?.sevenBedLayoutType,
         extraSurroundCount: app?.extraSurroundCount,
         seatSplMetrics: allSeatSplMetrics,
