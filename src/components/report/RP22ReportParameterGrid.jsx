@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { rp22Parameters } from '../data/rp22Parameters';
 import ParameterCard from './ParameterCard';
 
