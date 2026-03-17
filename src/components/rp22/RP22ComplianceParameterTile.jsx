@@ -61,7 +61,17 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
               {seatPillGrid ?? null}
             </div>
           ) : (
-            <RP22GradingPill level={lvl} />
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 64,
+              height: 28,
+              boxSizing: "border-box",
+              flexShrink: 0,
+            }}>
+              <RP22GradingPill level={lvl} />
+            </div>
           )}
         </div>
 
