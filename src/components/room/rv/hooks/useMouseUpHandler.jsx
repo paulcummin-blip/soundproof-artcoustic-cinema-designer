@@ -55,7 +55,8 @@ export function useMouseUpHandler({
        // CRITICAL: DO NOT clear draft refs or isDraggingSubRef here.
        // Keep them alive for the next render cycle so frontLive continues using draft positions
        // until the committed state propagates. The refs are cleared in RoomVisualisation's useEffect.
-       return;
+       isDraggingSubRef.current = false;
+       // draftFrontSubsRef.current and draftRearSubsRef.current stay alive until dragging=false propagates
      }
 
      // Release pointer capture
