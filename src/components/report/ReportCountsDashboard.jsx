@@ -7,6 +7,7 @@ export default function ReportCountsDashboard({
     roomLevelCounts,
     seatCountsByRow,
     analysisResult,
+    rp23Slot,
 }) {
     return (
         <div className="grid grid-cols-[auto_1fr] gap-10 items-start mt-8">
