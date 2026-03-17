@@ -844,8 +844,8 @@ function RP22ReportInner() {
                         if (!rp23Rows.length) return null;
                         return (
                             <div className="grid grid-cols-[auto_1fr] gap-10">
-                                <div />
-                                <div style={{ width: '696px' }}>
+                                <div style={{ width: '340px' }} />
+                                <div className="justify-self-end" style={{ width: '696px' }}>
                                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
