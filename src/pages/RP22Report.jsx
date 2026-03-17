@@ -24,6 +24,7 @@ import { base44 } from '@/api/base44Client';
 
 // Extracted child components
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
+import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import ReportHeader from '../components/report/ReportHeader';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ReportSeatParametersCard from '../components/report/ReportSeatParametersCard';
