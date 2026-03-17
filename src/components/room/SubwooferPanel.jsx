@@ -57,6 +57,42 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               </div>
             </div>
 
+            {frontSubsCfg?.model === "SUB4-12" && (
+              <div className="col-span-12 mt-3 flex items-center gap-3">
+                <label className="text-[12px] text-[#625143]">Orientation</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (appState?.setFrontSubsCfg) {
+                        appState.setFrontSubsCfg(prev => ({ ...prev, orientation: "vertical" }));
+                      }
+                    }}
+                    className={`px-3 py-1 text-[12px] rounded border ${
+                      (frontSubsCfg?.orientation ?? "vertical") === "vertical"
+                        ? "bg-[#213428] text-white border-[#213428]"
+                        : "bg-white text-[#213428] border-[#DCDBD6]"
+                    }`}
+                  >
+                    Vertical
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (appState?.setFrontSubsCfg) {
+                        appState.setFrontSubsCfg(prev => ({ ...prev, orientation: "horizontal" }));
+                      }
+                    }}
+                    className={`px-3 py-1 text-[12px] rounded border ${
+                      (frontSubsCfg?.orientation ?? "vertical") === "horizontal"
+                        ? "bg-[#213428] text-white border-[#213428]"
+                        : "bg-white text-[#213428] border-[#DCDBD6]"
+                    }`}
+                  >
+                    Horizontal
+                  </button>
+                </div>
+              </div>
+            )}
+
             {subWarnings?.front?.length > 0 && (
               <div className="mt-2 text-xs px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">
                 {subWarnings.front[0]}
@@ -112,6 +148,42 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 </Select>
               </div>
             </div>
+
+            {rearSubsCfg?.model === "SUB4-12" && (
+              <div className="col-span-12 mt-3 flex items-center gap-3">
+                <label className="text-[12px] text-[#625143]">Orientation</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (appState?.setRearSubsCfg) {
+                        appState.setRearSubsCfg(prev => ({ ...prev, orientation: "vertical" }));
+                      }
+                    }}
+                    className={`px-3 py-1 text-[12px] rounded border ${
+                      (rearSubsCfg?.orientation ?? "vertical") === "vertical"
+                        ? "bg-[#213428] text-white border-[#213428]"
+                        : "bg-white text-[#213428] border-[#DCDBD6]"
+                    }`}
+                  >
+                    Vertical
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (appState?.setRearSubsCfg) {
+                        appState.setRearSubsCfg(prev => ({ ...prev, orientation: "horizontal" }));
+                      }
+                    }}
+                    className={`px-3 py-1 text-[12px] rounded border ${
+                      (rearSubsCfg?.orientation ?? "vertical") === "horizontal"
+                        ? "bg-[#213428] text-white border-[#213428]"
+                        : "bg-white text-[#213428] border-[#DCDBD6]"
+                    }`}
+                  >
+                    Horizontal
+                  </button>
+                </div>
+              </div>
+            )}
 
             {subWarnings?.rear?.length > 0 && (
               <div className="mt-2 text-xs px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">
