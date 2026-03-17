@@ -36,9 +36,9 @@ export function useMouseUpHandler({
       isDraggingRef.current = false;
     }
 
-    // Commit draft sub positions if sub was being dragged (BEFORE clearing drag state)
+    // Commit draft sub positions if sub was being dragged
      if (isDraggingSubRef.current) {
-       // Cancel idle timer
+       // Cancel idle timer immediately
        if (idleCommitTimerRef.current) {
          clearTimeout(idleCommitTimerRef.current);
          idleCommitTimerRef.current = null;
@@ -52,9 +52,10 @@ export function useMouseUpHandler({
          window.__B44_setIsDraggingSub(false);
        }
 
-       isDraggingSubRef.current = false;
-       draftFrontSubsRef.current = null;
-       draftRearSubsRef.current = null;
+       // CRITICAL: DO NOT clear draft refs or isDraggingSubRef here.
+       // Keep them alive for the next render cycle so frontLive continues using draft positions
+       // until the committed state propagates. The refs are cleared in RoomVisualisation's useEffect.
+       return;
      }
 
      // Release pointer capture
