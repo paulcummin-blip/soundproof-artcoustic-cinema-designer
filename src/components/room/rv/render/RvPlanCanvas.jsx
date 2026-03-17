@@ -136,6 +136,19 @@ export default function RvPlanCanvas({
   handleIconMove,
   handleIconLeave,
 }) {
+  // Hoisted here (component body) so useMemo follows Rules of Hooks.
+  // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const frontLive = useMemo(
+    () => (dragging && Array.isArray(draftFrontSubsRef.current)) ? draftFrontSubsRef.current : frontSubs,
+    [dragging, frontSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rearLive = useMemo(
+    () => (dragging && Array.isArray(draftRearSubsRef.current)) ? draftRearSubsRef.current : rearSubs,
+    [dragging, rearSubs, subDragTick] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   return (
     <div
       ref={(el) => {
