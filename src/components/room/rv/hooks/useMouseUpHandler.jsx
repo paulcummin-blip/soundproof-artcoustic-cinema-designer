@@ -53,8 +53,8 @@ export function useMouseUpHandler({
        }
 
        isDraggingSubRef.current = false;
-       // DO NOT clear draft refs yet — let the next render use committed state first
-       // They will be cleared after dragging state is set to false
+       draftFrontSubsRef.current = null;
+       draftRearSubsRef.current = null;
      }
 
      // Release pointer capture
@@ -145,11 +145,6 @@ export function useMouseUpHandler({
     dragOffsetRoomRef.current = { x: 0, y: 0 };
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
-
-    // Clear draft refs only after dragging is set to false
-    // This ensures the next render uses committed frontSubs/rearSubs, not stale draft refs
-    draftFrontSubsRef.current = null;
-    draftRearSubsRef.current = null;
 
   }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
 
