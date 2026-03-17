@@ -29,6 +29,8 @@ export function useMouseUpHandler({
   widthM,
   getModelDimsM,
   commitDraftSubPositions,
+  _lastValidDraftFrontSubsRef,
+  _lastValidDraftRearSubsRef,
 }) {
   const handleMouseUp = useCallback((e) => {
     // Signal to RoomDesigner that dragging ended
@@ -46,6 +48,14 @@ export function useMouseUpHandler({
 
        // Commit final positions immediately on release
        commitDraftSubPositions();
+
+       // SNAPSHOT: capture final draft positions for held-state render transition
+       if (draftFrontSubsRef.current) {
+         _lastValidDraftFrontSubsRef.current = draftFrontSubsRef.current.map(s => ({ ...s, position: { ...s.position } }));
+       }
+       if (draftRearSubsRef.current) {
+         _lastValidDraftRearSubsRef.current = draftRearSubsRef.current.map(s => ({ ...s, position: { ...s.position } }));
+       }
 
        // Signal BassResponse that dragging ended
        if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
@@ -146,7 +156,7 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, _lastValidDraftFrontSubsRef, _lastValidDraftRearSubsRef]);
 
   return { handleMouseUp };
 }
