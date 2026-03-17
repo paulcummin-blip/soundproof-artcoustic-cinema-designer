@@ -1,6 +1,6 @@
 import { getLevelColors } from '@/components/utils/rp22Colors';
 
-export default function RP22GradingPill({ level = 4, count, children, style }) {
+export default function RP22GradingPill({ level = 4, count, children }) {
   // Normalize level to safe value
   const normalizeLevel = (lvl) => {
     if (typeof lvl === 'number') {
