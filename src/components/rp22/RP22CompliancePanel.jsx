@@ -256,7 +256,7 @@ const RP22_PARAMS = [
   {
     id: 17,
     title: "Seat-to-seat FR variance across all wide/surround/upper speakers (500 Hz–16 kHz, 1-oct smoothing)",
-    scope: "Room",
+    scope: "Seat",
     short: "Similarity across seats for wide/surround/upper; consider alignment, off-axis (H&V), room.",
     unit: "± dB",
     thresholds: { direction: "<=", L1: null, L2: null, L3: 3, L4: 1.5 },
