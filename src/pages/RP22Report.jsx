@@ -876,7 +876,13 @@ function RP22ReportInner() {
 
                     <div className="border-b border-[#E6E4DD]" />
 
-                    <ProjectDetailsCard project={projectDetails} />
+                    <ProjectDetailsCard
+                        project={frontPageProjectDetails}
+                        extraItems={frontPageProjectDetails?.extraItems || []}
+                        title={`Project details — System Configuration — ${exportSystemConfiguration || '—'}`}
+                        subtitle=""
+                        hideProjectId={true}
+                    />
 
                     <ReportCountsDashboard
                         roomLevelCounts={roomLevelCounts}

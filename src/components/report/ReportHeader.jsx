@@ -32,18 +32,6 @@ export default function ReportHeader({
 }) {
     const navigate = useNavigate();
 
-    const systemConfigLabel = (() => {
-        const dolbyPreset = app?.dolbyLayout || "5.1";
-        const base = String(dolbyPreset).split(" ")[0];
-        const parts = base.split(".");
-        const bed = parts[0] || "5";
-        const heights = parts[2] || "";
-        const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
-        const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
-        const totalSubs = frontCount + rearCount;
-        return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-    })();
-
     const urlProjectId = typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('projectId')
         : null;
@@ -124,9 +112,6 @@ export default function ReportHeader({
         <div className="flex items-start justify-between gap-4 mb-6">
             <div className="flex-1">
                 <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
-                <div className="text-base text-[#3E4349] mt-1">
-                    System: {systemConfigLabel}
-                </div>
             </div>
             <div className="flex gap-3 items-center">
                 <Button
