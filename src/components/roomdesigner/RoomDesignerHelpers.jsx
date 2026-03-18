@@ -13,7 +13,7 @@ export function useUrlQuery() {
   React.useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      setProjectId(params.get("project"));
+      setProjectId(params.get("projectId") || params.get("project"));
     } catch {
       setProjectId(null);
     }
