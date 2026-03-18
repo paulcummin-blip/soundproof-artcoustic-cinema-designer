@@ -241,10 +241,6 @@ appState, // Pass appState directly for setters
         sevenBedLayoutType,
         frontSubsCfg: liveFrontSubsCfg,
         rearSubsCfg: liveRearSubsCfg,
-        subwoofers:
-  (Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0)
-    ? appState.subwoofers
-    : deriveSubwoofersFromCfg(liveFrontSubsCfg, liveRearSubsCfg, appState?.roomDims, stableDimensions),
         lcrAimMode,
         enableFrontWides,
         free_move_lcr: !!freeMoveLcr,
@@ -552,10 +548,6 @@ const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
         sevenBedLayoutType,
         frontSubsCfg: liveFrontSubsCfg,
         rearSubsCfg: liveRearSubsCfg,
-        subwoofers:
-  (Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0)
-    ? appState.subwoofers
-    : deriveSubwoofersFromCfg(liveFrontSubsCfg, liveRearSubsCfg, appState?.roomDims, stableDimensions),
         lcrAimMode,
         enableFrontWides,
         overheadGlobalModel,
