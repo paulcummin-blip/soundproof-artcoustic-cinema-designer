@@ -47,7 +47,7 @@ export default function ReportHeader({
     const urlProjectId = typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('projectId')
         : null;
-    const activeProjectId = app?.activeProjectId || urlProjectId || null;
+    const activeProjectId = urlProjectId || null;
 
     const handleBackToProject = () => {
         if (!activeProjectId) return;
