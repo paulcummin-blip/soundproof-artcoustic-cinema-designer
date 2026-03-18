@@ -826,7 +826,6 @@ function RP22ReportInner() {
             ...projectDetails,
             extraItems: [
                 { label: 'Date', value: exportDateLabel },
-                { label: 'System / Configuration', value: exportSystemConfiguration },
             ],
         };
     }, [projectDetails, exportDateLabel, exportSystemConfiguration]);
@@ -1008,16 +1007,17 @@ function RP22ReportInner() {
                                         <ProjectDetailsCard
                                             project={frontPageProjectDetails}
                                             extraItems={frontPageProjectDetails?.extraItems || []}
-                                            title="Project details"
+                                            title={`Project details  –  System Configuration  –  ${exportSystemConfiguration || '—'}`}
                                             subtitle=""
                                             className="bg-[#FBFAF8] border-[#D9D5CE] shadow-none rounded-[10px]"
                                             contentClassName="p-[8mm]"
                                             headerClassName="mb-[3mm]"
                                             titleClassName="text-[15pt] font-bold leading-none text-[#1B1A1A]"
                                             subtitleClassName="hidden"
-                                            gridClassName="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3"
+                                            gridClassName="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-2"
                                             labelClassName="text-[10px] font-medium uppercase tracking-[0.06em] leading-none text-[#625143]"
                                             valueClassName="mt-0.5 truncate text-[12px] font-medium leading-tight text-[#1B1A1A]"
+                                            hideProjectId={true}
                                         />
                                     </div>
                                 </div>

@@ -26,13 +26,14 @@ export default function ProjectDetailsCard({
   itemClassName = 'min-w-0',
   labelClassName = 'text-[11px] font-medium uppercase tracking-[0.08em] text-[#625143]',
   valueClassName = 'mt-1 truncate text-sm font-medium text-[#1B1A1A]',
+  hideProjectId = false,
 }) {
   if (!project) return null;
 
   const items = [
     { label: 'Project name', value: project.name || '—' },
     { label: 'Client name', value: project.client_name || '—' },
-    { label: 'Project ID', value: project.id || '—' },
+    ...(!hideProjectId ? [{ label: 'Project ID', value: project.id || '—' }] : []),
     { label: 'Last updated', value: formatDate(project.updated_date) },
     ...extraItems,
   ];
