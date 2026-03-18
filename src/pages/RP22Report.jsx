@@ -806,6 +806,31 @@ function RP22ReportInner() {
         analysisResult,
     };
 
+    const exportSystemConfiguration = React.useMemo(() => {
+        const dolbyPreset = app?.dolbyLayout || "5.1";
+        const base = String(dolbyPreset).split(" ")[0];
+        const parts = base.split(".");
+        const bed = parts[0] || "5";
+        const heights = parts[2] || "";
+        const totalSubs = Number(app?.frontSubsCfg?.count ?? 0) + Number(app?.rearSubsCfg?.count ?? 0);
+        return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+    }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
+
+    const exportDateLabel = React.useMemo(() => {
+        return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    }, []);
+
+    const frontPageProjectDetails = React.useMemo(() => {
+        if (!projectDetails) return null;
+        return {
+            ...projectDetails,
+            extraItems: [
+                { label: 'Date', value: exportDateLabel },
+                { label: 'System / Configuration', value: exportSystemConfiguration },
+            ],
+        };
+    }, [projectDetails, exportDateLabel, exportSystemConfiguration]);
+
     const planEnabled = true;
 
     return (
@@ -968,29 +993,26 @@ function RP22ReportInner() {
                     <div className="print-container rp22-report">
                         <section id="pdf-cover">
                             <div className="print-page-break-after print-summary">
-                                <div style={{ maxWidth: "460px", margin: "0 auto 13mm auto", textAlign: "center" }}>
+                                <div style={{ maxWidth: '185mm', margin: '0 auto 13mm auto', textAlign: 'center' }}>
                                     <img
                                         src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
                                         alt="SoundProof"
                                         style={{ width: "100%", height: "auto", marginBottom: "8mm" }}
                                     />
+
+                                    <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '8mm' }}>
+                                        <ProjectDetailsCard
+                                            project={frontPageProjectDetails}
+                                            extraItems={frontPageProjectDetails?.extraItems || []}
+                                            subtitle="Current saved project linked to this report export."
+                                            className="bg-transparent border-0 shadow-none"
+                                            contentClassName="p-0"
+                                            gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                                        />
+                                    </div>
+
                                     <div style={{ fontSize: '26pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.2, marginBottom: '3mm' }}>
                                         RP22 Compliance Report
-                                    </div>
-                                    <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.4 }}>
-                                        {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                        <span style={{ margin: '0 8px', color: '#DCDBD6' }}>•</span>
-                                        <span style={{ color: '#625143' }}>
-                                            System: {(() => {
-                                                const dolbyPreset = app?.dolbyLayout || "5.1";
-                                                const base = String(dolbyPreset).split(" ")[0];
-                                                const parts = base.split(".");
-                                                const bed = parts[0] || "5";
-                                                const heights = parts[2] || "";
-                                                const totalSubs = Number(app?.frontSubsCfg?.count ?? 0) + Number(app?.rearSubsCfg?.count ?? 0);
-                                                return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-                                            })()}
-                                        </span>
                                     </div>
                                 </div>
 
