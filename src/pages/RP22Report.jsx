@@ -1184,9 +1184,6 @@ function RP22ReportInner() {
                                         </div>
                                     </div>
 
-                                    <div style={{ marginTop: '2mm', fontSize: '8.5pt', color: '#625143', textAlign: 'center' }}>
-                                        Generated from current Room Designer configuration and live analysis state.
-                                    </div>
                                 </div>
                             </div>
                         </section>
