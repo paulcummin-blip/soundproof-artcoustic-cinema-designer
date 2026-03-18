@@ -131,18 +131,6 @@ export default function ReportHeader({
                     Back to Project
                 </Button>
 
-                <label className="flex items-center gap-2 text-sm text-[#3E4349] cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={debugPlanCapture}
-                        onChange={(e) => setDebugPlanCapture(e.target.checked)}
-                        className="w-4 h-4 cursor-pointer"
-                    />
-                    <span style={{ fontFamily: "Futura PT Light, Century Gothic, sans-serif" }}>
-                        Plan debug overlay
-                    </span>
-                </label>
-
                 <Button
                     type="button"
                     onClick={handleExportPDF}
