@@ -1,6 +1,7 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { FileText, Download } from 'lucide-react';
+import { ArrowLeft, FileText, Download } from 'lucide-react';
 import { generateSVG, generateDXF, downloadTextFile } from '../utils/cadExport';
 
 export default function ReportHeader({
@@ -29,6 +30,8 @@ export default function ReportHeader({
     setPlanSpeakerDimsImageDataUrl,
     setIsPrinting,
 }) {
+    const navigate = useNavigate();
+
     const systemConfigLabel = (() => {
         const dolbyPreset = app?.dolbyLayout || "5.1";
         const base = String(dolbyPreset).split(" ")[0];
@@ -40,6 +43,16 @@ export default function ReportHeader({
         const totalSubs = frontCount + rearCount;
         return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
     })();
+
+    const urlProjectId = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('projectId')
+        : null;
+    const activeProjectId = app?.activeProjectId || urlProjectId || null;
+
+    const handleBackToProject = () => {
+        if (!activeProjectId) return;
+        navigate(`/RoomDesigner?projectId=${activeProjectId}`);
+    };
 
     const handleExportPDF = () => {
         if (exportGuardRef.current.active) return;
@@ -116,6 +129,23 @@ export default function ReportHeader({
                 </div>
             </div>
             <div className="flex gap-3 items-center">
+                <Button
+                    type="button"
+                    onClick={handleBackToProject}
+                    disabled={!activeProjectId}
+                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                    style={{
+                        fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                        backgroundColor: "#F9F8F6",
+                        borderColor: "#213428",
+                        color: "#213428",
+                        opacity: 1,
+                    }}
+                >
+                    <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#213428" }} />
+                    Back to Project
+                </Button>
+
                 <label className="flex items-center gap-2 text-sm text-[#3E4349] cursor-pointer">
                     <input
                         type="checkbox"
