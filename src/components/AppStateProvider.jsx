@@ -1493,6 +1493,7 @@ function useDesignerState() {
       if (typeof p.autoSeatByRP23 === "boolean") setAutoSeatByRP23(p.autoSeatByRP23);
       if (typeof p.seatingBlockOffset === "number") setSeatingBlockOffset(p.seatingBlockOffset);
       if (Array.isArray(p.roomElements)) setRoomElements(normaliseRoomElements(p.roomElements));
+      if (p.overlays) setOverlays(p.overlays);
 
       setAutosaveMeta(getAutosaveMeta());
       return true;
