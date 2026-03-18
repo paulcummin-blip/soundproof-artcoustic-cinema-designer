@@ -84,6 +84,15 @@ appState, // Pass appState directly for setters
     return fallback;
   }, []);
 
+  const activeProjectId = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("projectId") || params.get("project") || params.get("id") || projectIdFromUrl || null;
+    } catch {
+      return projectIdFromUrl || null;
+    }
+  })();
+
   const hydrateFromProject = useCallback((p) => {
     if (!p) return;
 
@@ -118,7 +127,7 @@ appState, // Pass appState directly for setters
 
 
   const loadProject = useCallback(async (signal, idOverride) => {
-    const id = idOverride || projectIdFromUrl || projectIdState;
+    const id = idOverride || activeProjectId || projectIdState;
     if (!id) return;
     setLoadState({ phase: "loading", error: null, name: null });
     try {
@@ -182,16 +191,16 @@ appState, // Pass appState directly for setters
 
   useEffect(() => {
     // Update the ref whenever loadState changes
-    const isCurrentlyHydrating = loadState.phase === "loading" || projectIdFromUrl && loadState.phase !== "loaded" && loadState.phase !== "error";
+    const isCurrentlyHydrating = loadState.phase === "loading" || activeProjectId && loadState.phase !== "loaded" && loadState.phase !== "error";
     isHydratingRef.current = isCurrentlyHydrating;
-  }, [loadState.phase, projectIdFromUrl]);
+  }, [loadState.phase, activeProjectId]);
 
 
   // Auto-save ONLY for an existing project.
   // Quiet autosave: mark dirty on changes, then commit at most every 10s (and also on short pauses).
   useEffect(() => {
-    const effectiveProjectId = projectIdState || projectIdFromUrl || null;
-    if (!effectiveProjectId || !isProjectMode) {
+    const effectiveProjectId = activeProjectId || projectIdState || null;
+    if (!effectiveProjectId) {
       // Scratch mode: stay as "local", never touch backend
       setAutosaveStatus("local");
       return;
@@ -396,16 +405,18 @@ appState, // Pass appState directly for setters
     // CRITICAL: Wait for AppStateProvider to finish autosave restore before applying defaults
     if (!appState?.isHydrated) return;
 
+    const effectiveProjectId = activeProjectId || projectIdState || null;
+
     // Derive current boot target key
-    const currentTargetKey = !isProjectMode
-      ? "scratch"
-      : "project:" + (projectIdFromUrl || projectIdState || "");
+    const currentTargetKey = effectiveProjectId
+      ? "project:" + effectiveProjectId
+      : "scratch";
 
     // Already booted for this exact target? Do nothing.
     if (lastBootTargetRef.current === currentTargetKey) return;
 
     // Scratch mode: skip backend load entirely, ensure state reflects local draft
-    if (!isProjectMode) {
+    if (!effectiveProjectId) {
       setLoadState({ phase: "scratch" });
       setAutosaveStatus("local");
       // Free Use starter: always apply clean state on scratch boot, overrides any stale autosave
@@ -464,29 +475,9 @@ appState, // Pass appState directly for setters
     const controller = new AbortController();
 
     try {
-      if (projectIdFromUrl || projectIdState) {
-        // We have a real project (from URL or from session) – load it once per target.
-        const idToLoad = projectIdFromUrl || projectIdState;
-        if (idToLoad) {
-          lastBootTargetRef.current = currentTargetKey;
-          setProjectIdState(idToLoad);
-          loadProject(controller.signal, idToLoad);
-        }
-      } else {
-        // No project at all – this is a fresh, local-only design.
-        // Only initialise defaults if nothing has been laid out yet.
-        const hasSpeakers =
-        Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
-        const hasSeats =
-        Array.isArray(seatingPositions) && seatingPositions.length > 0;
-
-        if (!hasSpeakers && !hasSeats && appState?.roomDims) {
-          lastBootTargetRef.current = currentTargetKey;
-          if (typeof initWithDefaultsAndRules === "function") {
-            initWithDefaultsAndRules();
-          }
-        }
-      }
+      lastBootTargetRef.current = currentTargetKey;
+      setProjectIdState(effectiveProjectId);
+      loadProject(controller.signal, effectiveProjectId);
     } catch (e) {
       if (globalThis.__B44_LOGS) console.error("[RoomDesigner] boot init error:", e);
     }
@@ -494,8 +485,7 @@ appState, // Pass appState directly for setters
     return () => controller.abort();
   }, [
   appState?.isHydrated,
-  isProjectMode,
-  projectIdFromUrl,
+  activeProjectId,
   projectIdState,
   appState?.roomDims,
   initWithDefaultsAndRules,
