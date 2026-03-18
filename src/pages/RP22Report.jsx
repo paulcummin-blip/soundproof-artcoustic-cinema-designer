@@ -1079,12 +1079,12 @@ function RP22ReportInner() {
                                             return (
                                                 <div style={{ display: 'flex', gap: '8mm' }}>
                                                     <div style={{ flex: 1 }}>
-                                                        <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>Screen size — {choiceLabel}</div>
+                                                        <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>Screen size — {choiceLabel ? choiceLabel.replace(/"\s+/, '” width - ') + ' ratio' : 'Not specified'}</div>
                                                         <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
                                                             <div><strong>Viewable area</strong></div>
-                                                            {hasViewable ? <div>{fmtCm(viewWm)} × {fmtCm(viewHm)} cm ({fmtIn(viewWm)}" × {fmtIn(viewHm)}")</div> : <div>Not specified</div>}
+                                                            {hasViewable ? <div>{fmtCm(viewWm)} × {fmtCm(viewHm)} cm</div> : <div>Not specified</div>}
                                                             <div style={{ marginTop: '2.5mm' }}><strong>Overall with border</strong></div>
-                                                            {hasOverall ? <div>{fmtCm(overallWm)} × {fmtCm(overallHm)} cm ({fmtIn(overallWm)}" × {fmtIn(overallHm)}")</div> : <div>Not specified</div>}
+                                                            {hasOverall ? <div>{fmtCm(overallWm)} × {fmtCm(overallHm)} cm</div> : <div>Not specified</div>}
                                                         </div>
                                                     </div>
                                                     <div style={{ flex: 1 }}>
@@ -1093,7 +1093,7 @@ function RP22ReportInner() {
                                                             <div><strong>Horizontal viewing angle:</strong> {hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}</div>
                                                             <div><strong>Vertical viewing angle:</strong> {hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}</div>
                                                             <div style={{ marginTop: '2.5mm' }}><strong>Distance from front wall</strong></div>
-                                                            {hasWallDist ? <div>{Math.round(wallDistM * 100)} cm ({(wallDistM * 39.3701).toFixed(1)}")</div> : <div>Not specified</div>}
+                                                            {hasWallDist ? <div>{Math.round(wallDistM * 100)} cm</div> : <div>Not specified</div>}
                                                         </div>
                                                     </div>
                                                 </div>
