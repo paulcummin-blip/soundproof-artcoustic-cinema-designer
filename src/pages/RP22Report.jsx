@@ -17,6 +17,7 @@ import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
 import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectIntoAppState';
 import { useAnalysisSpeakers } from '@/components/hooks/useAnalysisSpeakers';
+import { useSubwooferSync } from '@/components/hooks/useSubwooferSync';
 import { base44 } from '@/api/base44Client';
 
 // Extracted child components
@@ -351,6 +352,22 @@ function RP22ReportInner() {
 
     useEffect(() => { setExportDebug(d => ({ ...d, isPrinting, printReady })); }, [isPrinting, printReady]);
 
+    const safeArray = (v) => (Array.isArray(v) ? v : []);
+    const safeObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+
+    const roomDims = app?.roomDims || {};
+    const screen = app?.screen || {};
+    const dolbyLayout = app?.dolbyLayout || "5.1";
+    const frontSubsCfg = safeObj(app?.frontSubsCfg);
+    const rearSubsCfg = safeObj(app?.rearSubsCfg);
+    const stableDimensions = React.useMemo(() => ({
+        width: Number(roomDims?.widthM) || 4.5,
+        length: Number(roomDims?.lengthM) || 6.0,
+        height: Number(roomDims?.heightM) || 2.4
+    }), [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
+
+    useSubwooferSync({ appState: app, stableDimensions, frontSubsCfg, rearSubsCfg });
+
     if (!app) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -362,17 +379,9 @@ function RP22ReportInner() {
         );
     }
 
-    const safeArray = (v) => (Array.isArray(v) ? v : []);
-    const safeObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
-
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
-    const roomDims = app?.roomDims || {};
-    const screen = app?.screen || {};
-    const dolbyLayout = app?.dolbyLayout || "5.1";
     const mlpBasis = app?.mlpBasis || "front";
-    const frontSubsCfg = safeObj(app?.frontSubsCfg);
-    const rearSubsCfg = safeObj(app?.rearSubsCfg);
     const hasSeats = seats.length > 0;
     const hasSpeakers = placedSpeakers.length > 0;
 
@@ -395,12 +404,6 @@ function RP22ReportInner() {
         const ratioTxt = ratio ? ratio : "";
         return [inchesTxt, ratioTxt].filter(Boolean).join(" ") || "Not specified";
     };
-
-    const stableDimensions = React.useMemo(() => ({
-        width: Number(roomDims?.widthM) || 4.5,
-        length: Number(roomDims?.lengthM) || 6.0,
-        height: Number(roomDims?.heightM) || 2.4
-    }), [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
     const primarySeatingPosition = app?.mlp || null;
 
