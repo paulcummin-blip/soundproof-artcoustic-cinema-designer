@@ -223,7 +223,7 @@ function RoomDesignerWithState() {
   const activeProjectId = sessionActiveProjectId || initialProjectIdFromUrl;
 
   // Don't block render - allow local-only mode
-  const showLocalHint = !activeProjectId;
+  const showLocalHint = !isProjectMode;
 
   // Fetch existing projects for the "Save to Project" dropdown (name + id only)
   useEffect(() => {
