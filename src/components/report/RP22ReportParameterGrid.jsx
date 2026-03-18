@@ -172,6 +172,17 @@ export default function RP22ReportParameterGrid({
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
     if (!metric) return "—";
+    if (pid === 17) {
+      const parts = [];
+      if (metric.worstRole) parts.push(String(metric.worstRole));
+      const details = [];
+      if (Number.isFinite(metric.worstAngleDeg)) details.push(`${Math.round(metric.worstAngleDeg)}°`);
+      if (Number.isFinite(metric.worstLossDb)) details.push(`${Number(metric.worstLossDb).toFixed(1)} dB`);
+      if (details.length > 0) {
+        return parts.length > 0 ? `${parts.join(" ")} (${details.join(" / ")})` : details.join(" / ");
+      }
+      return parts.length > 0 ? parts.join(" ") : "—";
+    }
     if (metric.formatted) return metric.formatted;
     if (metric.hudLabel) return metric.hudLabel;
     const paramDef = RP22_PARAMS.find(p => p.id === pid);
