@@ -203,8 +203,8 @@ appState, // Pass appState directly for setters
       return;
     }
 
-    const AUTOSAVE_INTERVAL_MS = 10_000;
-    const AUTOSAVE_DEBOUNCE_MS = 1_200;
+    const AUTOSAVE_INTERVAL_MS = 30_000;
+    const AUTOSAVE_DEBOUNCE_MS = 1_000;
 
     // --- refs (keyed per project so stale sigs from a previous project don't bleed in) ---
     const refKey = `__rdAutosaveRefs_${effectiveProjectId}`;
