@@ -99,7 +99,8 @@ export default function RoomDesignerHeader({
 
           <Button
             size="sm"
-            variant="brand"
+            variant="secondary"
+            className="font-semibold border-[#213428] text-[#213428]"
             onClick={handleRP22ReportClick}
             disabled={!projectIdState || loadState.phase !== "loaded"}
           >
