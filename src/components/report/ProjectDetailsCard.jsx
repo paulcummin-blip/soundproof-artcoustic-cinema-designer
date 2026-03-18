@@ -19,7 +19,13 @@ export default function ProjectDetailsCard({
   subtitle = 'Current saved project linked to this report.',
   className = 'bg-white border-[#DCDBD6]',
   contentClassName = 'p-4 md:p-5',
+  headerClassName = 'mb-3',
+  titleClassName = 'text-sm font-semibold text-[#1B1A1A]',
+  subtitleClassName = 'text-xs text-[#625143] mt-1',
   gridClassName = 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4',
+  itemClassName = 'min-w-0',
+  labelClassName = 'text-[11px] font-medium uppercase tracking-[0.08em] text-[#625143]',
+  valueClassName = 'mt-1 truncate text-sm font-medium text-[#1B1A1A]',
 }) {
   if (!project) return null;
 
@@ -34,18 +40,18 @@ export default function ProjectDetailsCard({
   return (
     <Card className={className}>
       <CardContent className={contentClassName}>
-        <div className="mb-3">
-          <div className="text-sm font-semibold text-[#1B1A1A]">{title}</div>
-          <div className="text-xs text-[#625143] mt-1">{subtitle}</div>
+        <div className={headerClassName}>
+          <div className={titleClassName}>{title}</div>
+          <div className={subtitleClassName}>{subtitle}</div>
         </div>
 
         <div className={gridClassName}>
           {items.map((item) => (
-            <div key={item.label} className="min-w-0">
-              <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#625143]">
+            <div key={item.label} className={itemClassName}>
+              <div className={labelClassName}>
                 {item.label}
               </div>
-              <div className="mt-1 truncate text-sm font-medium text-[#1B1A1A]">
+              <div className={valueClassName}>
                 {item.value}
               </div>
             </div>

@@ -4,6 +4,18 @@ import RP22GradingPill from '../ui/RP22GradingPill';
 import SeatComplianceSummary from './SeatComplianceSummary';
 import { formatSeatLabel } from '../utils/seatLabel';
 
+const formatMetricMeters = (value) => {
+    const match = String(value || '').match(/-?\d+(?:\.\d+)?/);
+    if (!match) return null;
+    return `${Number(match[0]).toFixed(2)} m`;
+};
+
+const getSeatWallContextLine = (position) => {
+    const matches = String(position || '').match(/-?\d+(?:\.\d+)?(?=m)/g);
+    if (!matches || matches.length < 2) return null;
+    return `SW ${Number(matches[0]).toFixed(2)} m · FW ${Number(matches[1]).toFixed(2)} m`;
+};
+
 export default function ReportSeatParametersCard({
     seats,
     hasSeats,
@@ -45,6 +57,13 @@ export default function ReportSeatParametersCard({
                         const isRsp = seatId === rspSeatId;
                         const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
                         const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
+                        const screenDistance = formatMetricMeters(tooltipData?.distanceToScreen);
+                        const rspDistance = formatMetricMeters(tooltipData?.distanceToMLP);
+                        const seatDistanceLine = [
+                            screenDistance ? `Screen ${screenDistance}` : null,
+                            rspDistance ? `RSP ${rspDistance}` : null,
+                        ].filter(Boolean).join(' · ');
+                        const seatWallContextLine = getSeatWallContextLine(tooltipData?.position);
 
                         return (
                             <div
@@ -71,17 +90,12 @@ export default function ReportSeatParametersCard({
                                             <RP22GradingPill level={rp23?.level || '—'} />
                                         </div>
 
-                                        <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1">
-                                            {tooltipData?.position && (
-                                                <div><span className="font-medium">Position: </span>{tooltipData.position}</div>
-                                            )}
-                                            {tooltipData?.distanceToScreen && (
-                                                <div>Distance to Screen: {tooltipData.distanceToScreen}</div>
-                                            )}
-                                            {tooltipData?.distanceToMLP && (
-                                                <div>Distance to RSP: {tooltipData.distanceToMLP}</div>
-                                            )}
-                                        </div>
+                                        {(seatDistanceLine || seatWallContextLine) && (
+                                            <div className="space-y-0.5 text-[11px] leading-tight text-[#625143]">
+                                                {seatDistanceLine && <div>{seatDistanceLine}</div>}
+                                                {seatWallContextLine && <div>{seatWallContextLine}</div>}
+                                            </div>
+                                        )}
 
                                         {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
                                             const metric = getRp22Metric(key);

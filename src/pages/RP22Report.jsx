@@ -1000,14 +1000,19 @@ function RP22ReportInner() {
                                         style={{ width: "100%", height: "auto", marginBottom: "8mm" }}
                                     />
 
-                                    <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '8mm' }}>
+                                    <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '6mm' }}>
                                         <ProjectDetailsCard
                                             project={frontPageProjectDetails}
                                             extraItems={frontPageProjectDetails?.extraItems || []}
                                             subtitle="Current saved project linked to this report export."
                                             className="bg-transparent border-0 shadow-none"
                                             contentClassName="p-0"
-                                            gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                                            headerClassName="mb-2"
+                                            titleClassName="text-[13px] font-semibold leading-none text-[#1B1A1A]"
+                                            subtitleClassName="mt-0.5 text-[10px] leading-tight text-[#625143]"
+                                            gridClassName="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3"
+                                            labelClassName="text-[10px] font-medium uppercase tracking-[0.06em] leading-none text-[#625143]"
+                                            valueClassName="mt-0.5 truncate text-[12px] font-medium leading-tight text-[#1B1A1A]"
                                         />
                                     </div>
 
