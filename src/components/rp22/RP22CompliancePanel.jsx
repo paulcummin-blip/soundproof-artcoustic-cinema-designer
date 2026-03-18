@@ -260,7 +260,6 @@ const RP22_PARAMS = [
     short: "Similarity across seats for wide/surround/upper; consider alignment, off-axis (H&V), room.",
     unit: "± dB",
     thresholds: { direction: "<=", L1: null, L2: null, L3: 3, L4: 1.5 },
-    valueFromAnalysis: (a) => a?.p17_swUpperVariance_dB,
   },
   {
     id: 18,
