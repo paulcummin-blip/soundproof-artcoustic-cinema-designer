@@ -992,7 +992,7 @@ function RP22ReportInner() {
                     <div className="print-container rp22-report">
                         <section id="pdf-cover">
                             <div className="print-page-break-after print-summary">
-                                <div style={{ maxWidth: '185mm', margin: '0 auto 2mm auto', textAlign: 'center' }}
+                                <div style={{ maxWidth: '185mm', margin: '0 auto 2mm auto', textAlign: 'center' }}>
                                     <img
                                         src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
                                         alt="SoundProof"

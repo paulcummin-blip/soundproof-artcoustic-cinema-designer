@@ -154,7 +154,6 @@ export default function ProjectsPage() {
                 roomWidth: p.room_width || null,
                 roomHeight: p.room_height || null,
                 dolby_config: p.dolby_config || null,
-                target_spl: p.target_spl ?? null,
                 amplifier_power: p.amplifier_power ?? null,
                 notes: p.notes || "",
                 createdAt: Number.isFinite(new Date(p.created_date).getTime())
