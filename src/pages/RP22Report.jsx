@@ -26,7 +26,6 @@ import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGri
 import ReportHeader from '../components/report/ReportHeader';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
-import ReportSeatParametersCard from '../components/report/ReportSeatParametersCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
 import { fovForDistance } from '../components/utils/screenMetrics';
@@ -800,15 +799,6 @@ function RP22ReportInner() {
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
     };
 
-    const seatParametersCardProps = {
-        seats,
-        hasSeats,
-        reportSeatHudById,
-        app,
-        rspSeatId,
-        analysisResult,
-    };
-
     const exportSystemConfiguration = React.useMemo(() => {
         const dolbyPreset = app?.dolbyLayout || "5.1";
         const base = String(dolbyPreset).split(" ")[0];
@@ -1037,15 +1027,6 @@ function RP22ReportInner() {
                         </CardContent>
                     </Card>
 
-
-                    <ReportSeatParametersCard
-                        seats={seats}
-                        hasSeats={hasSeats}
-                        reportSeatHudById={reportSeatHudById}
-                        app={app}
-                        rspSeatId={rspSeatId}
-                        analysisResult={analysisResult}
-                    />
                 </div>
             </div>
 
@@ -1211,12 +1192,6 @@ function RP22ReportInner() {
                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
                                 <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
                                 <RP22ReportParameterGrid {...parameterGridProps} />
-                            </div>
-                        </section>
-
-                        <section id="pdf-seat-parameters">
-                            <div className="print-page-break-before" style={{ marginTop: 18 }}>
-                                <ReportSeatParametersCard {...seatParametersCardProps} />
                             </div>
                         </section>
 
