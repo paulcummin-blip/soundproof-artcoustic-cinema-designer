@@ -259,13 +259,14 @@ export default function RP22ReportParameterGrid({
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
       {RP22_PARAMS.map(param => (
-        <RP22ComplianceParameterTile
-          key={param.id}
-          param={param}
-          achievedValue={getHudValueForParam(param)}
-          lvl={getHudLevelForParam(param)}
-          seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
-        />
+        <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
+          <RP22ComplianceParameterTile
+            param={param}
+            achievedValue={getHudValueForParam(param)}
+            lvl={getHudLevelForParam(param)}
+            seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
+          />
+        </div>
       ))}
     </div>
   );

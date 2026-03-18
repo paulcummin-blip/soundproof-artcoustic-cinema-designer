@@ -47,8 +47,13 @@ export default function ReportSeatParametersCard({
                         const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
 
                         return (
-                            <div key={seatId} className="flex flex-col h-full" data-seat-index={seatIdx}>
-                                <Card className="border-[#E6E4DD]">
+                            <div
+                                key={seatId}
+                                className="rp22-card-wrap print-avoid-break flex flex-col h-full"
+                                data-seat-index={seatIdx}
+                                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                            >
+                                <Card className="rp22-seat-card border-[#E6E4DD]">
                                     <CardHeader className="pb-2">
                                         <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                             {formatSeatLabel(seatId)}{' '}

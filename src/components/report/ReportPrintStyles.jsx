@@ -287,14 +287,18 @@ export default function ReportPrintStyles() {
                 }
 
                 .rp22-report .rp22-card-wrap {
+                    display: block !important;
+                    width: 100% !important;
                     break-inside: avoid !important;
                     page-break-inside: avoid !important;
+                    -webkit-column-break-inside: avoid !important;
                 }
 
                 .rp22-report .rp22-param-card,
                 .rp22-report .rp22-seat-card {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                    -webkit-column-break-inside: avoid !important;
                 }
 
                 .rp22-report .rp22-break-avoid {
