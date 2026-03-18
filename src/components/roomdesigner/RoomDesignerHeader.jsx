@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Save, RotateCcw, ChevronDown, FolderOpen } from "lucide-react";
+import { Save, RotateCcw, ChevronDown, FolderOpen, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +37,14 @@ export default function RoomDesignerHeader({
   onSaveToExistingProject,
   existingProjects,
 }) {
+  const navigate = useNavigate();
   const [overwriteCandidate, setOverwriteCandidate] = useState(null); // { id, name }
+
+  const handleRP22ReportClick = () => {
+    if (projectIdState) {
+      navigate(`/RP22Report?projectId=${projectIdState}`);
+    }
+  };
 
   const handleExistingProjectClick = (project) => {
     setOverwriteCandidate({ id: project.id, name: project.name });
@@ -87,6 +95,16 @@ export default function RoomDesignerHeader({
             className={!isProjectMode ? "border-amber-400 text-amber-700 bg-amber-50" : ""}
           >
             Free Use
+          </Button>
+
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleRP22ReportClick}
+            disabled={!projectIdState || loadState.phase !== "loaded"}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            RP22 Report
           </Button>
 
           <DropdownMenu>
