@@ -77,8 +77,15 @@ export default function ReportHiddenCaptures({
         floatDepthM: screenFrontPlaneM ?? (Number(screen?.floatDepthM) || 0),
     };
 
-    const frontSubsForExport = buildSubsForExport(app?.frontSubsCfg, 'front', app?.roomDims);
-    const rearSubsForExport = buildSubsForExport(app?.rearSubsCfg, 'rear', app?.roomDims);
+    const allLiveSubs = Array.isArray(app?.subwoofers) ? app.subwoofers : [];
+    const frontSubsForExport = allLiveSubs.filter((sub) => sub?.group === 'front');
+    const rearSubsForExport = allLiveSubs.filter((sub) => sub?.group === 'rear');
+
+    const liveOverlays = {
+        ...(app?.overlays || {}),
+        FRONT_WIDE: app?.overlays?.FRONT_WIDE,
+        enableFrontWides: app?.enableFrontWides,
+    };
 
     const commonProps = {
         placedSpeakers,
@@ -108,7 +115,13 @@ export default function ReportHiddenCaptures({
             <div data-plan-capture style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     {...commonProps}
-                    overlays={{ ROOM_DIMS: true, EXPORT_ROW_FRONT_DIST: true, EXPORT_RSP_LABEL: true, EXPORT_CEILING_LABEL: true }}
+                    overlays={{
+                        ...liveOverlays,
+                        ROOM_DIMS: true,
+                        EXPORT_ROW_FRONT_DIST: true,
+                        EXPORT_RSP_LABEL: true,
+                        EXPORT_CEILING_LABEL: true,
+                    }}
                     speakerPositionsView="off"
                     showMlpRuler={false}
                 />
@@ -118,7 +131,9 @@ export default function ReportHiddenCaptures({
             <div data-plan-capture-dims style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     {...commonProps}
-                    overlays={{}}
+                    overlays={{
+                        ...liveOverlays,
+                    }}
                     speakerPositionsView="off"
                     showMlpRuler={true}
                 />
@@ -128,7 +143,9 @@ export default function ReportHiddenCaptures({
             <div data-plan-capture-speaker-dims style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     {...commonProps}
-                    overlays={{}}
+                    overlays={{
+                        ...liveOverlays,
+                    }}
                     speakerPositionsView="plan"
                     showMlpRuler={false}
                 />
