@@ -126,9 +126,9 @@ function RoomDesignerWithState() {
   // Only resolve from explicit URL param — session state is for display only.
   // Generic /RoomDesigner (no ?project=) must open as Free Use, not re-attach a stale project.
   const baseResolvedId = initialProjectIdFromUrl || null;
-  const resolvedProjectId = userProjectOverride === "free"
-    ? null
-    : (userProjectOverride || baseResolvedId);
+  const resolvedProjectId = baseResolvedId
+    ? baseResolvedId
+    : (userProjectOverride === "free" ? null : (userProjectOverride || null));
   const isProjectMode = !!resolvedProjectId;
 
   // NEW: Refs for speaker rescue on room resize
