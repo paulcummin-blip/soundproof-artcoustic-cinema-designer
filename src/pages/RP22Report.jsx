@@ -27,6 +27,7 @@ import ReportPrintStyles from '../components/report/ReportPrintStyles';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import ReportHeader from '../components/report/ReportHeader';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
+import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportSeatParametersCard from '../components/report/ReportSeatParametersCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
@@ -233,15 +234,31 @@ function RP22ReportInner() {
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
+    const [projectDetails, setProjectDetails] = useState(null);
 
     const activeProjectId = useActiveProjectId();
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
-        if (!activeProjectId || !app) return;
+        if (!activeProjectId || !app) {
+            setProjectDetails(null);
+            return;
+        }
         base44.entities.Project.filter({ id: activeProjectId }).then((results) => {
             const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
-            if (!p) return;
+            if (!p) {
+                setProjectDetails(null);
+                return;
+            }
+            setProjectDetails({
+                id: p.id,
+                name: p.name,
+                client_name: p.client_name,
+                project_status: p.project_status,
+                notes: p.notes,
+                created_date: p.created_date,
+                updated_date: p.updated_date,
+            });
             hydrateProjectIntoAppState(p, app, {
                 setScreen: app.setScreen,
                 setDolbyConfig: app.setDolbyConfig,
@@ -265,8 +282,10 @@ function RP22ReportInner() {
                 setRearSubsCfg: app.setRearSubsCfg,
                 setSpeakerSystem: app.setSpeakerSystem,
             });
-        }).catch(() => {});
-    }, [activeProjectId]);
+        }).catch(() => {
+            setProjectDetails(null);
+        });
+    }, [activeProjectId, app]);
 
     const [printReady, setPrintReady] = useState(false);
     const [debugPlanCapture, setDebugPlanCapture] = useState(false);
@@ -817,6 +836,8 @@ function RP22ReportInner() {
                     />
 
                     <div className="border-b border-[#E6E4DD]" />
+
+                    <ProjectDetailsCard project={projectDetails} />
 
                     <ReportCountsDashboard
                         roomLevelCounts={roomLevelCounts}
