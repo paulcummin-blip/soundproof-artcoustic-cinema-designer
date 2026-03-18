@@ -833,6 +833,60 @@ function RP22ReportInner() {
         };
     }, [projectDetails, exportDateLabel, exportSystemConfiguration]);
 
+    const coverBoxStyle = {
+        border: '1.5px solid #D9D5CE',
+        borderRadius: '10px',
+        padding: '8mm 10mm',
+        background: '#FBFAF8',
+        width: '100%',
+        boxShadow: 'none',
+    };
+
+    const coverBoxTitleStyle = {
+        fontSize: '15pt',
+        fontWeight: 700,
+        color: '#1B1A1A',
+        marginBottom: '4mm',
+        textAlign: 'center',
+        lineHeight: 1.15,
+    };
+
+    const coverBoxSubtitleStyle = {
+        fontSize: '10pt',
+        color: '#3E4349',
+        marginBottom: '4mm',
+        textAlign: 'center',
+        lineHeight: 1.35,
+    };
+
+    const coverSectionTitleStyle = {
+        fontWeight: 600,
+        fontSize: '11pt',
+        color: '#1B1A1A',
+        marginBottom: '3mm',
+        lineHeight: 1.2,
+    };
+
+    const coverLabelValueRowStyle = {
+        display: 'grid',
+        gridTemplateColumns: '32mm 1fr',
+        columnGap: '4mm',
+        alignItems: 'baseline',
+    };
+
+    const coverLabelStyle = {
+        fontSize: '10pt',
+        fontWeight: 600,
+        color: '#1B1A1A',
+        lineHeight: 1.35,
+    };
+
+    const coverValueStyle = {
+        fontSize: '10pt',
+        color: '#3E4349',
+        lineHeight: 1.35,
+    };
+
     const planEnabled = true;
 
     return (
@@ -1021,22 +1075,22 @@ function RP22ReportInner() {
                                             extraItems={frontPageProjectDetails?.extraItems || []}
                                             title={`Project details  –  System Configuration  –  ${exportSystemConfiguration || '—'}`}
                                             subtitle=""
-                                            className="bg-[#FBFAF8] border-[#D9D5CE] shadow-none rounded-[10px]"
-                                            contentClassName="p-[8mm]"
-                                            headerClassName="mb-[3mm]"
-                                            titleClassName="text-[15pt] font-bold leading-none text-[#1B1A1A]"
+                                            className="bg-[#FBFAF8] border-[1.5px] border-[#D9D5CE] shadow-none rounded-[10px]"
+                                            contentClassName="px-[10mm] py-[8mm]"
+                                            headerClassName="mb-[4mm]"
+                                            titleClassName="text-center text-[15pt] font-bold leading-[1.15] text-[#1B1A1A]"
                                             subtitleClassName="hidden"
-                                            gridClassName="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-2"
-                                            labelClassName="text-[10px] font-medium uppercase tracking-[0.06em] leading-none text-[#625143]"
-                                            valueClassName="mt-0.5 truncate text-[12px] font-medium leading-tight text-[#1B1A1A]"
+                                            gridClassName="grid grid-cols-2 gap-x-[8mm] gap-y-[3mm] lg:grid-cols-2"
+                                            labelClassName="text-[10px] font-medium uppercase tracking-[0.06em] leading-[1.1] text-[#625143]"
+                                            valueClassName="mt-[1mm] truncate text-[12px] font-medium leading-[1.3] text-[#1B1A1A]"
                                             hideProjectId={true}
                                         />
                                     </div>
                                     {/* Room + Seat parameters */}
-                                    <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '8mm 10mm', background: '#FBFAF8', width: '100%' }} className="print-avoid-break rp22-cover-card">
+                                    <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
                                         <div style={{ display: 'flex', alignItems: 'stretch', gap: '8mm' }}>
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
+                                                <div style={coverBoxTitleStyle}>
                                                     Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6mm', paddingTop: '1mm', paddingBottom: '1mm', fontSize: '110%' }}>
@@ -1050,7 +1104,7 @@ function RP22ReportInner() {
                                             <div style={{ width: '1px', background: '#EEEAE3', alignSelf: 'stretch' }} />
 
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
+                                                <div style={coverBoxTitleStyle}>
                                                     Seat parameters ({seats?.length || 0} seats)
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
@@ -1065,8 +1119,8 @@ function RP22ReportInner() {
                                     </div>
 
                                     {/* Screen & Viewing Geometry */}
-                                    <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '8mm 10mm', background: '#FBFAF8', width: '100%' }} className="print-avoid-break rp22-cover-card">
-                                        <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>Screen &amp; Viewing Geometry</div>
+                                    <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
+                                        <div style={coverBoxTitleStyle}>Screen &amp; Viewing Geometry</div>
                                         {(() => {
                                             const snap = screenMetricsForPrint;
                                             const viewWm = Number(snap?.viewWm); const viewHm = Number(snap?.viewHm);
@@ -1080,23 +1134,35 @@ function RP22ReportInner() {
                                             const hasWallDist = Number.isFinite(wallDistM) && wallDistM >= 0;
                                             const fmtCm = (m) => `${Math.round(m * 100)}`; const fmtIn = (m) => `${(m * 39.3701).toFixed(1)}`;
                                             return (
-                                                <div style={{ display: 'flex', gap: '8mm' }}>
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>Screen size — {choiceLabel ? choiceLabel.replace(/"\s+/, '” width - ') + ' ratio' : 'Not specified'}</div>
-                                                        <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
-                                                            <div><strong>Viewable area</strong></div>
-                                                            {hasViewable ? <div>{fmtCm(viewWm)} × {fmtCm(viewHm)} cm</div> : <div>Not specified</div>}
-                                                            <div style={{ marginTop: '2.5mm' }}><strong>Overall with border</strong></div>
-                                                            {hasOverall ? <div>{fmtCm(overallWm)} × {fmtCm(overallHm)} cm</div> : <div>Not specified</div>}
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: '8mm', rowGap: '4mm' }}>
+                                                    <div>
+                                                        <div style={coverSectionTitleStyle}>Screen size — {choiceLabel ? choiceLabel.replace(/"\s+/, '” width - ') + ' ratio' : 'Not specified'}</div>
+                                                        <div style={{ display: 'grid', rowGap: '2.5mm' }}>
+                                                            <div style={coverLabelValueRowStyle}>
+                                                                <div style={coverLabelStyle}>Viewable area</div>
+                                                                {hasViewable ? <div style={coverValueStyle}>{fmtCm(viewWm)} × {fmtCm(viewHm)} cm</div> : <div style={coverValueStyle}>Not specified</div>}
+                                                            </div>
+                                                            <div style={coverLabelValueRowStyle}>
+                                                                <div style={coverLabelStyle}>Overall with border</div>
+                                                                {hasOverall ? <div style={coverValueStyle}>{fmtCm(overallWm)} × {fmtCm(overallHm)} cm</div> : <div style={coverValueStyle}>Not specified</div>}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>Viewing geometry</div>
-                                                        <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
-                                                            <div><strong>Horizontal viewing angle:</strong> {hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}</div>
-                                                            <div><strong>Vertical viewing angle:</strong> {hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}</div>
-                                                            <div style={{ marginTop: '2.5mm' }}><strong>Distance from front wall</strong></div>
-                                                            {hasWallDist ? <div>{Math.round(wallDistM * 100)} cm</div> : <div>Not specified</div>}
+                                                    <div>
+                                                        <div style={coverSectionTitleStyle}>Viewing geometry</div>
+                                                        <div style={{ display: 'grid', rowGap: '2.5mm' }}>
+                                                            <div style={coverLabelValueRowStyle}>
+                                                                <div style={coverLabelStyle}>Horizontal viewing angle</div>
+                                                                <div style={coverValueStyle}>{hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}</div>
+                                                            </div>
+                                                            <div style={coverLabelValueRowStyle}>
+                                                                <div style={coverLabelStyle}>Vertical viewing angle</div>
+                                                                <div style={coverValueStyle}>{hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}</div>
+                                                            </div>
+                                                            <div style={coverLabelValueRowStyle}>
+                                                                <div style={coverLabelStyle}>Distance from front wall</div>
+                                                                <div style={coverValueStyle}>{hasWallDist ? `${Math.round(wallDistM * 100)} cm` : "Not specified"}</div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1105,14 +1171,14 @@ function RP22ReportInner() {
                                     </div>
 
                                     {/* System Summary */}
-                                    <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '8mm 10mm', background: '#FBFAF8', width: '100%' }} className="print-avoid-break rp22-cover-card">
-                                        <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>System summary</div>
-                                        <div style={{ fontSize: '10pt', color: '#3E4349', marginBottom: '5mm', textAlign: 'center' }}>Selected loudspeaker models</div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4mm' }}>
+                                    <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
+                                        <div style={coverBoxTitleStyle}>System summary</div>
+                                        <div style={coverBoxSubtitleStyle}>Selected loudspeaker models</div>
+                                        <div style={{ display: 'grid', rowGap: '4mm' }}>
                                             {[['LCR', systemSummary.lcr], ['Surrounds', systemSummary.surrounds], ['Overheads', systemSummary.overheads], ['Subwoofers', systemSummary.subs]].map(([label, models], i, arr) => (
-                                                <div key={label} style={{ display: 'flex', paddingBottom: i < arr.length - 1 ? '4mm' : 0, borderBottom: i < arr.length - 1 ? '1px solid #EEEAE3' : 'none' }}>
-                                                    <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>{label}</div>
-                                                    <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>{models.join(', ')}</div>
+                                                <div key={label} style={{ display: 'grid', gridTemplateColumns: '32mm 1fr', columnGap: '6mm', alignItems: 'start', paddingBottom: i < arr.length - 1 ? '4mm' : 0, borderBottom: i < arr.length - 1 ? '1px solid #EEEAE3' : 'none' }}>
+                                                    <div style={{ fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A', lineHeight: 1.3 }}>{label}</div>
+                                                    <div style={{ fontSize: '11.5pt', color: '#3E4349', lineHeight: 1.3 }}>{models.join(', ')}</div>
                                                 </div>
                                             ))}
                                         </div>
