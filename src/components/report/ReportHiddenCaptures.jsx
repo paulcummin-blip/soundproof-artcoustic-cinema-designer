@@ -96,6 +96,8 @@ export default function ReportHiddenCaptures({
         dolbyLayout,
         frontSubs: frontSubsForExport,
         rearSubs: rearSubsForExport,
+        frontSubsCfg: app?.frontSubsCfg,
+        rearSubsCfg: app?.rearSubsCfg,
         roomElements: app?.roomElements || [],
         exportMode: "dimensions",
         exportWidthPx: 1200,
