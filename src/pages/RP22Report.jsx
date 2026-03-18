@@ -1000,17 +1000,18 @@ function RP22ReportInner() {
                                         style={{ width: "100%", height: "auto", marginBottom: "8mm" }}
                                     />
 
-                                    <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '6mm' }}>
+                                    <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '6mm', textAlign: 'left' }}>
                                         <ProjectDetailsCard
                                             project={frontPageProjectDetails}
                                             extraItems={frontPageProjectDetails?.extraItems || []}
-                                            subtitle="Current saved project linked to this report export."
-                                            className="bg-transparent border-0 shadow-none"
-                                            contentClassName="p-0"
-                                            headerClassName="mb-2"
-                                            titleClassName="text-[13px] font-semibold leading-none text-[#1B1A1A]"
-                                            subtitleClassName="mt-0.5 text-[10px] leading-tight text-[#625143]"
-                                            gridClassName="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3"
+                                            title="Project details"
+                                            subtitle=""
+                                            className="bg-[#FBFAF8] border-[#D9D5CE] shadow-none rounded-[10px]"
+                                            contentClassName="p-[8mm]"
+                                            headerClassName="mb-[3mm]"
+                                            titleClassName="text-[15pt] font-bold leading-none text-[#1B1A1A]"
+                                            subtitleClassName="hidden"
+                                            gridClassName="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3"
                                             labelClassName="text-[10px] font-medium uppercase tracking-[0.06em] leading-none text-[#625143]"
                                             valueClassName="mt-0.5 truncate text-[12px] font-medium leading-tight text-[#1B1A1A]"
                                         />
@@ -1022,30 +1023,35 @@ function RP22ReportInner() {
                                 </div>
 
                                 <div className="rp22-cover-stack" style={{ maxWidth: '185mm', margin: '0 auto 0', display: 'flex', flexDirection: 'column', gap: '2mm' }}>
-                                    {/* Room parameters */}
-                                    <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '9mm 12mm', background: '#FBFAF8', width: '100%', minHeight: '34mm' }} className="print-avoid-break rp22-cover-card">
-                                        <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
-                                            Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6mm', paddingTop: '1mm', paddingBottom: '1mm', fontSize: '110%' }}>
-                                            {['L4', 'L3', 'L2', 'L1'].map(lvl => {
-                                                const maxRoom = Math.max(roomLevelCounts.L4, roomLevelCounts.L3, roomLevelCounts.L2, roomLevelCounts.L1);
-                                                return <div key={lvl} style={{ transform: roomLevelCounts[lvl] === maxRoom ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}><RP22GradingPill level={lvl} count={roomLevelCounts[lvl]} /></div>;
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* Seat parameters */}
+                                    {/* Room + Seat parameters */}
                                     <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '8mm 10mm', background: '#FBFAF8', width: '100%' }} className="print-avoid-break rp22-cover-card">
-                                        <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
-                                            Seat parameters ({seats?.length || 0} seats)
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
-                                            {(() => {
-                                                const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
-                                                (seatLevelCounts || []).forEach(s => { agg.L4 += s.counts?.L4 || 0; agg.L3 += s.counts?.L3 || 0; agg.L2 += s.counts?.L2 || 0; agg.L1 += s.counts?.L1 || 0; });
-                                                return ['L4', 'L3', 'L2', 'L1'].map(lvl => <RP22GradingPill key={lvl} level={lvl} count={agg[lvl]} />);
-                                            })()}
+                                        <div style={{ display: 'flex', alignItems: 'stretch', gap: '8mm' }}>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
+                                                    Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6mm', paddingTop: '1mm', paddingBottom: '1mm', fontSize: '110%' }}>
+                                                    {['L4', 'L3', 'L2', 'L1'].map(lvl => {
+                                                        const maxRoom = Math.max(roomLevelCounts.L4, roomLevelCounts.L3, roomLevelCounts.L2, roomLevelCounts.L1);
+                                                        return <div key={lvl} style={{ transform: roomLevelCounts[lvl] === maxRoom ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}><RP22GradingPill level={lvl} count={roomLevelCounts[lvl]} /></div>;
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            <div style={{ width: '1px', background: '#EEEAE3', alignSelf: 'stretch' }} />
+
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
+                                                    Seat parameters ({seats?.length || 0} seats)
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
+                                                    {(() => {
+                                                        const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
+                                                        (seatLevelCounts || []).forEach(s => { agg.L4 += s.counts?.L4 || 0; agg.L3 += s.counts?.L3 || 0; agg.L2 += s.counts?.L2 || 0; agg.L1 += s.counts?.L1 || 0; });
+                                                        return ['L4', 'L3', 'L2', 'L1'].map(lvl => <RP22GradingPill key={lvl} level={lvl} count={agg[lvl]} />);
+                                                    })()}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
