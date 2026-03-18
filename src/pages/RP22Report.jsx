@@ -1000,6 +1000,10 @@ function RP22ReportInner() {
                                         style={{ width: "100%", height: "auto", marginBottom: "8mm" }}
                                     />
 
+                                    <div style={{ fontSize: '26pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.2, marginBottom: '3mm' }}>
+                                        RP22 Compliance Report
+                                    </div>
+
                                     <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '6mm', textAlign: 'left' }}>
                                         <ProjectDetailsCard
                                             project={frontPageProjectDetails}
@@ -1015,10 +1019,6 @@ function RP22ReportInner() {
                                             labelClassName="text-[10px] font-medium uppercase tracking-[0.06em] leading-none text-[#625143]"
                                             valueClassName="mt-0.5 truncate text-[12px] font-medium leading-tight text-[#1B1A1A]"
                                         />
-                                    </div>
-
-                                    <div style={{ fontSize: '26pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.2, marginBottom: '3mm' }}>
-                                        RP22 Compliance Report
                                     </div>
                                 </div>
 
