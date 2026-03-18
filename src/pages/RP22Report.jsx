@@ -240,16 +240,14 @@ function RP22ReportInner() {
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
-        if (!activeProjectId || !app) {
+        if (!activeProjectId) {
             setProjectDetails(null);
             return;
         }
+        if (!app) return;
         base44.entities.Project.filter({ id: activeProjectId }).then((results) => {
             const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
-            if (!p) {
-                setProjectDetails(null);
-                return;
-            }
+            if (!p) return;
             setProjectDetails({
                 id: p.id,
                 name: p.name,
@@ -282,9 +280,7 @@ function RP22ReportInner() {
                 setRearSubsCfg: app.setRearSubsCfg,
                 setSpeakerSystem: app.setSpeakerSystem,
             });
-        }).catch(() => {
-            setProjectDetails(null);
-        });
+        }).catch(() => {});
     }, [activeProjectId, app]);
 
     const [printReady, setPrintReady] = useState(false);
