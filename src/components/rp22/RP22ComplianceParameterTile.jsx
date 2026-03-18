@@ -24,14 +24,13 @@ const fmtIneq = (dir) => {
  * Props:
  *   param          — { id, title, short, scope, unit, thresholds }
  *   achievedValue  — string to display as the achieved value
- *   achievedDetail — optional secondary line under achieved value
  *   lvl            — level string ("L1"…"L4", "FAIL", "—")
  *   seatPillGrid   — optional ReactNode for seat-scoped per-seat pill grids
  */
 // Pill zone min-height: supports up to 3 seat rows (each ~28px pill + 6px gap) with breathing room
 const PILL_ZONE_MIN_HEIGHT = 110;
 
-export default function RP22ComplianceParameterTile({ param, achievedValue, achievedDetail, lvl, seatPillGrid }) {
+export default function RP22ComplianceParameterTile({ param, achievedValue, lvl, seatPillGrid }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
 
   return (
@@ -52,11 +51,6 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, achi
           {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
           <span style={{ color: "#213428" }}>{achievedValue}</span>
         </div>
-        {achievedDetail ? (
-          <div style={{ fontSize: 11, color: "#625143", marginTop: 4, fontWeight: 500 }}>
-            {achievedDetail}
-          </div>
-        ) : null}
       </div>
 
       {/* ── Section 2: Pill zone (fixed min-height, grows for more rows) ── */}

@@ -172,7 +172,6 @@ export default function RP22ReportParameterGrid({
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
     if (!metric) return "—";
-    if (pid === 17 && metric.worstGroup) return metric.worstGroup;
     if (metric.formatted) return metric.formatted;
     if (metric.hudLabel) return metric.hudLabel;
     const paramDef = RP22_PARAMS.find(p => p.id === pid);
@@ -180,27 +179,6 @@ export default function RP22ReportParameterGrid({
     if (Number.isFinite(n)) return formatMetricFallback(n, paramDef?.unit || "");
     return "—";
   }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId]);
-
-  const getHudDetailForParam = React.useCallback((param) => {
-    const pid = Number(param?.id);
-    if (pid !== 17) return null;
-    const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
-    const metric = snap?.rp22?.p17;
-    if (!metric) return null;
-
-    const parts = [];
-    if (metric.worstRole) parts.push(metric.worstRole);
-
-    const detailBits = [];
-    if (Number.isFinite(metric.worstAngleDeg)) detailBits.push(`${Math.round(metric.worstAngleDeg)}°`);
-    if (Number.isFinite(metric.worstLossDb)) detailBits.push(`${metric.worstLossDb.toFixed(1)} dB`);
-
-    if (detailBits.length) {
-      parts.push(`(${detailBits.join(" / ")})`);
-    }
-
-    return parts.length ? `Worst: ${parts.join(" ")}` : null;
-  }, [seatSnapshotsById, lockedSeatId, mlpSeatId]);
 
   /* ----- Per-seat pill grid for seat-scoped params ----- */
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
@@ -274,7 +252,6 @@ export default function RP22ReportParameterGrid({
           key={param.id}
           param={param}
           achievedValue={getHudValueForParam(param)}
-          achievedDetail={getHudDetailForParam(param)}
           lvl={getHudLevelForParam(param)}
           seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
         />

@@ -81,26 +81,13 @@ export default function ReportSeatParametersCard({
                                         {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
                                             const metric = getRp22Metric(key);
                                             const paramNum = parseInt(key.substring(1));
-                                            const p17MainLabel = key === 'p17'
-                                                ? (metric?.worstGroup || metric?.formatted || metric?.hudLabel || '—')
-                                                : (metric ? (metric.formatted || metric.hudLabel || '—') : '—');
-                                            const p17DetailBits = [];
-                                            if (metric?.worstRole) p17DetailBits.push(metric.worstRole);
-                                            const p17ParenBits = [];
-                                            if (Number.isFinite(metric?.worstAngleDeg)) p17ParenBits.push(`${Math.round(metric.worstAngleDeg)}°`);
-                                            if (Number.isFinite(metric?.worstLossDb)) p17ParenBits.push(`${metric.worstLossDb.toFixed(1)} dB`);
-                                            const p17Detail = key === 'p17'
-                                                ? (p17DetailBits.length || p17ParenBits.length
-                                                    ? `Worst: ${p17DetailBits.join(' ')}${p17ParenBits.length ? ` (${p17ParenBits.join(' / ')})` : ''}`
-                                                    : null)
-                                                : null;
                                             return (
                                                 <div key={key}>
                                                     <div className="flex items-baseline justify-between">
                                                         <div className="flex items-baseline gap-2">
                                                             <span className="font-normal text-[#3E4349]">P{paramNum}:</span>
                                                             <span className="text-sm font-bold text-[#1B1A1A]">
-                                                                {p17MainLabel}
+                                                                {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
                                                             </span>
                                                         </div>
                                                         <RP22GradingPill
@@ -114,9 +101,9 @@ export default function ReportSeatParametersCard({
                                                             ).join(', ')}
                                                         </div>
                                                     )}
-                                                    {p17Detail && (
+                                                    {metric && key === 'p17' && metric.worstRole && (
                                                         <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                            {p17Detail}
+                                                            Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                         </div>
                                                     )}
                                                 </div>
