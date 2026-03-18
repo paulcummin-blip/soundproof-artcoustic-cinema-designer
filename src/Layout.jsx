@@ -15,7 +15,6 @@ import {
   Calculator,
   Layers3,
   Database,
-  FileText,
   Settings
 } from "lucide-react";
 
@@ -31,7 +30,6 @@ import PriceSummary from "@/components/pricing/PriceSummary";
 const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3 },
   { title: "Room Designer", url: "/RoomDesigner", icon: Home },
-  { title: "RP22 Report", url: "/RP22Report", icon: FileText },
   { title: "SPL Calculator", url: "/SPLCalculator", icon: Calculator },
 ];
 
