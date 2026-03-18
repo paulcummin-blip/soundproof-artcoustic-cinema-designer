@@ -998,7 +998,7 @@ function RP22ReportInner() {
                     <div className="print-container rp22-report">
                         <section id="pdf-cover">
                             <div className="print-page-break-after print-summary">
-                                <div style={{ maxWidth: '185mm', margin: '0 auto 2mm auto', textAlign: 'center' }}>
+                                <div style={{ maxWidth: '185mm', margin: '0 auto 0 auto', textAlign: 'center' }}>
                                     <img
                                         src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
                                         alt="SoundProof"
@@ -1009,6 +1009,9 @@ function RP22ReportInner() {
                                         RP22 Compliance Report
                                     </div>
 
+                                </div>
+
+                                <div className="rp22-cover-stack" style={{ maxWidth: '185mm', margin: '0 auto 0', display: 'flex', flexDirection: 'column', gap: '2mm' }}>
                                     <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '0', textAlign: 'left' }}>
                                         <ProjectDetailsCard
                                             project={frontPageProjectDetails}
@@ -1026,9 +1029,6 @@ function RP22ReportInner() {
                                             hideProjectId={true}
                                         />
                                     </div>
-                                </div>
-
-                                <div className="rp22-cover-stack" style={{ maxWidth: '185mm', margin: '0 auto 0', display: 'flex', flexDirection: 'column', gap: '2mm' }}>
                                     {/* Room + Seat parameters */}
                                     <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '8mm 10mm', background: '#FBFAF8', width: '100%' }} className="print-avoid-break rp22-cover-card">
                                         <div style={{ display: 'flex', alignItems: 'stretch', gap: '8mm' }}>
