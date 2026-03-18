@@ -135,9 +135,9 @@ export default function RoomDesignerHeader({
           {isProjectMode && loadState.phase === "loading" && <div className="text-xs text-gray-500 inline-flex items-center gap-2"> Loading project... </div>}
           {isProjectMode && loadState.phase === "loaded" && <div className="text-xs text-gray-600 inline-flex items-center gap-2"> Loaded "{loadState.name}" </div>}
           {isProjectMode && loadState.phase === "error" && <div className="text-xs text-red-600 inline-flex items-center gap-2"> Error: {loadState.error} <Button size="xs" variant="outline" className="ml-2 h-6 px-2" onClick={() => {const ctrl = new AbortController();reloadProject(ctrl.signal);}}><RotateCcw className="w-3 h-3 mr-1" /> Retry</Button> </div>}
-          {isProjectMode && autosaveStatus === "saving" && <span className="text-gray-500">Saving…</span>}
-          {isProjectMode && autosaveStatus === "saved" && <span className="text-[#3E4349]">All changes saved</span>}
-          {isProjectMode && autosaveStatus === "dirty" && <span className="text-amber-600">Pending changes…</span>}
+          {isProjectMode && autosaveStatus === "saving" && <span className="text-gray-500 font-medium">Saving...</span>}
+          {isProjectMode && autosaveStatus === "saved" && <span className="text-green-700 font-medium">Saved</span>}
+          {isProjectMode && autosaveStatus === "dirty" && <span className="text-amber-600 font-medium">Pending changes...</span>}
           {isProjectMode && autosaveStatus === "hydrating" && <span>Loading project data...</span>}
           {isProjectMode && projectIdState && (
             <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
