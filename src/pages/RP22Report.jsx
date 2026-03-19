@@ -628,14 +628,14 @@ function RP22ReportInner() {
                 const metric = getRp22Metric(key);
                 if (!metric) return;
                 const rawLevel = metric.level;
-                const rawLevelNorm = rawLevel == null ? '' : String(rawLevel).trim().toUpperCase();
-                if (rawLevel == null || rawLevel === '—' || rawLevelNorm === 'NOT CALCULATED' || rawLevelNorm === 'N/A') return;
+                const lvl = normalizeLvl(rawLevel);
+                const isFail = String(rawLevel ?? '').trim().toUpperCase() === 'FAIL';
+                if (!lvl && !isFail) return;
                 activeCount += 1;
-                if (String(rawLevel).trim().toUpperCase() === 'FAIL') {
+                if (isFail) {
                     failCount += 1;
                 } else {
-                    const lvl = normalizeLvl(rawLevel);
-                    if (lvl) counts[lvl] += 1;
+                    counts[lvl] += 1;
                 }
             });
             return { seatId, counts, activeCount, failCount, total: 9 };
