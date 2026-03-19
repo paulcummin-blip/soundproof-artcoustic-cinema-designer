@@ -646,12 +646,12 @@ function RP22ReportInner() {
 
     const seatCountsByRow = React.useMemo(() => {
         const rows = {};
-        seatLevelCounts.forEach(({ seatId, counts, total }) => {
+        seatLevelCounts.forEach(({ seatId, counts, activeCount, failCount, total }) => {
             const match = seatId.match(/^seat-r(\d+)-c(\d+)$/);
             const rowNum = match ? parseInt(match[1], 10) : 0;
             const seatNum = match ? parseInt(match[2], 10) : Number.MAX_SAFE_INTEGER;
             if (!rows[rowNum]) rows[rowNum] = [];
-            rows[rowNum].push({ seatId, counts, total, seatNum });
+            rows[rowNum].push({ seatId, counts, activeCount, failCount, total, seatNum });
         });
         Object.keys(rows).forEach(rowNum => { rows[rowNum].sort((a, b) => a.seatNum - b.seatNum); });
         return Object.keys(rows).map(Number).sort((a, b) => a - b).map(rowNum => ({ rowNum, seats: rows[rowNum] }));
