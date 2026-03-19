@@ -138,10 +138,18 @@ export function getPlanAimDeg(
     default: {
       if (/^SL\d+$/.test(role)) {
         if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
+        const distToRear  = lengthM - (speaker.y ?? 0);
+        const distToLeft  = speaker.x ?? 0;
+        const distToRight = widthM - (speaker.x ?? 0);
+        if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
         return 90;
       }
       if (/^SR\d+$/.test(role)) {
         if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
+        const distToRear  = lengthM - (speaker.y ?? 0);
+        const distToLeft  = speaker.x ?? 0;
+        const distToRight = widthM - (speaker.x ?? 0);
+        if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
         return -90;
       }
       return 0;
