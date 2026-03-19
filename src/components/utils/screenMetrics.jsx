@@ -1,4 +1,3 @@
-
 export const M_PER_IN = 0.0254;
 
 export const RP23 = {
@@ -55,5 +54,5 @@ export function rp23LevelForAngle(angleDeg) {
 }
 
 export function clampViewingOffset(offset) {
-  return Math.max(-2.0, Math.min(2.0, Number(offset) || 0));
+  return Number(offset) || 0;
 }
