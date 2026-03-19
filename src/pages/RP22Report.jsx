@@ -628,7 +628,8 @@ function RP22ReportInner() {
                 const metric = getRp22Metric(key);
                 if (!metric) return;
                 const rawLevel = metric.level;
-                if (rawLevel == null || rawLevel === '—') return;
+                const rawLevelNorm = rawLevel == null ? '' : String(rawLevel).trim().toUpperCase();
+                if (rawLevel == null || rawLevel === '—' || rawLevelNorm === 'NOT CALCULATED' || rawLevelNorm === 'N/A') return;
                 activeCount += 1;
                 if (String(rawLevel).trim().toUpperCase() === 'FAIL') {
                     failCount += 1;
