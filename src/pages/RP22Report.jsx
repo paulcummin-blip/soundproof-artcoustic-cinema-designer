@@ -632,7 +632,7 @@ function RP22ReportInner() {
         if (!next.length && lastSeatLevelCountsRef.current.length) return lastSeatLevelCountsRef.current;
         lastSeatLevelCountsRef.current = next;
         return next;
-    }, [reportSeatHudById, app?.seatSnapshotBySeatId, app?.seatMetricsById, seats]);
+    }, [analysisResult, reportSeatHudById, app?.seatSnapshotBySeatId, app?.seatMetricsById, seats]);
 
     const seatCountsByRow = React.useMemo(() => {
         const rows = {};
