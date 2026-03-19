@@ -610,6 +610,8 @@ function RP22ReportInner() {
         };
         const next = seatIds.map(seatId => {
             const counts = { L1: 0, L2: 0, L3: 0, L4: 0 };
+            let activeCount = 0;
+            let failCount = 0;
             const seatAnalysisResult = analysisResult?.perSeatRp22?.[seatId]?.rp22 || {};
             const getRp22Metric = (key) => {
                 const n = parseInt(String(key).replace("p", ""), 10);
@@ -625,10 +627,17 @@ function RP22ReportInner() {
             ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
                 const metric = getRp22Metric(key);
                 if (!metric) return;
-                const lvl = normalizeLvl(metric.level);
-                if (lvl) counts[lvl] += 1;
+                const rawLevel = metric.level;
+                if (rawLevel == null || rawLevel === '—') return;
+                activeCount += 1;
+                if (String(rawLevel).toUpperCase() === 'FAIL') {
+                    failCount += 1;
+                } else {
+                    const lvl = normalizeLvl(rawLevel);
+                    if (lvl) counts[lvl] += 1;
+                }
             });
-            return { seatId, counts, total: 9 };
+            return { seatId, counts, total: 9, activeCount, failCount };
         });
         if (!next.length && lastSeatLevelCountsRef.current.length) return lastSeatLevelCountsRef.current;
         lastSeatLevelCountsRef.current = next;

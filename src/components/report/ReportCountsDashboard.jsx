@@ -65,7 +65,7 @@ export default function ReportCountsDashboard({
                 <div className="flex gap-4">
                     {seatCountsByRow.map(({ rowNum, seats }) => (
                         <div key={rowNum} className="flex flex-col gap-4">
-                            {seats.map(({ seatId, counts }) => {
+                            {seats.map(({ seatId, counts, activeCount, failCount }) => {
                                 const isPrimary = analysisResult?.perSeatRp22?.[seatId]?.isPrimary === true;
                                 return (
                                     <div
@@ -74,9 +74,15 @@ export default function ReportCountsDashboard({
                                             isPrimary ? 'border-[3px] border-[#213428]' : 'border-2 border-[#213428]'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2 mb-2">
+                                        <div className="flex items-center justify-between gap-2 mb-2">
                                             <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                                 {formatSeatLabel(seatId)}
+                                            </div>
+                                            <div className="flex items-center gap-3 text-xs text-[#625143]">
+                                                <span>Active: {activeCount ?? 0}</span>
+                                                {(failCount ?? 0) > 0 && (
+                                                    <span className="font-semibold text-[#8B2500]">Fail: {failCount}</span>
+                                                )}
                                             </div>
                                         </div>
                                         {(() => {
