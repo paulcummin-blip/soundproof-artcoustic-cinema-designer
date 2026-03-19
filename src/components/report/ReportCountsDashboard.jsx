@@ -7,6 +7,8 @@ export default function ReportCountsDashboard({
     roomLevelCounts,
     seatCountsByRow,
     analysisResult,
+    totalRoomParameters,
+    totalSeatParameters,
 }) {
     return (
         <div className="grid grid-cols-[auto_1fr] gap-10 items-start mt-8">
@@ -17,7 +19,7 @@ export default function ReportCountsDashboard({
                     <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                         Room parameters
                     </div>
-                    <span className="text-sm text-gray-500">({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})</span>
+                    <span className="text-sm text-gray-500">({totalRoomParameters})</span>
                 </div>
                 <div className="border-2 border-[#213428] rounded-lg px-5 py-4 bg-white w-[340px] min-h-[100px] flex flex-col justify-center">
                     <div className="flex justify-center items-center mt-1 px-1">
@@ -57,7 +59,7 @@ export default function ReportCountsDashboard({
                     <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                         Seat parameters
                     </div>
-                    <span className="text-sm text-gray-500">(10)</span>
+                    <span className="text-sm text-gray-500">({totalSeatParameters})</span>
                 </div>
 
                 <div className="flex gap-4">

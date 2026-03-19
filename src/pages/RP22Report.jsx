@@ -942,6 +942,8 @@ function RP22ReportInner() {
                         roomLevelCounts={roomLevelCounts}
                         seatCountsByRow={seatCountsByRow}
                         analysisResult={analysisResult}
+                        totalRoomParameters={roomScopedParamCount}
+                        totalSeatParameters={seatScopedParamCount}
                     />
 
                     {/* ── Report assumptions + RP23 row + RP22 Parameters — all inside one card so widths match ── */}
