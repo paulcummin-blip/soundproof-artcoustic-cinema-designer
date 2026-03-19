@@ -217,40 +217,49 @@ export function buildSeatHudSnapshot({
     p20: { valueDb: null, level: '—', formatted: 'Not Calculated' },
   };
 
+  const engineSeatId = seat.id || `seat-${seatX}-${seatY}`;
+  const engineSeatRp22 = analysisResult?.perSeatRp22?.[engineSeatId]?.rp22 || null;
+
+  if (engineSeatRp22) {
+    const seatScopedParamMap = {
+      1: 'p1',
+      4: 'p4',
+      5: 'p5',
+      6: 'p6',
+      9: 'p9',
+      10: 'p10',
+      16: 'p16',
+      17: 'p17',
+      20: 'p20',
+    };
+
+    Object.entries(seatScopedParamMap).forEach(([paramNumber, paramKey]) => {
+      const metric = engineSeatRp22?.[paramNumber];
+      if (metric) data.rp22[paramKey] = metric;
+    });
+  }
+
   // Detect if overheads exist (for P9/P10 applicability)
   const hasOverheads = placedSpeakers.some(s => {
     const r = getCanonicalRole(s.role);
     return r.startsWith('T'); // TFL, TFR, TML, etc
   });
 
-  // Pull per-seat RP22 metrics from analysisResult (single source of truth)
-  const seatMetrics = analysisResult?.seatMetrics?.get?.(seat.id);
-  if (seatMetrics) {
-    if (seatMetrics.p9) {
-      data.rp22.p9 = seatMetrics.p9;
-      
-      // Build compact explanation from structured gap data
-      if (seatMetrics.p9.details?.gaps?.length) {
-        const lines = seatMetrics.p9.details.gaps.map(
-          g => `${g.pair} ${g.deg.toFixed(0)}°`
-        );
-        
-        const worst = seatMetrics.p9.details.worst;
-        if (worst) {
-          data.rp22.p9Detail = `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°)`;
-        } else {
-          data.rp22.p9Detail = lines.join(', ');
-        }
-      }
+  if (data.rp22.p9?.details?.gaps?.length) {
+    const lines = data.rp22.p9.details.gaps.map(
+      g => `${g.pair} ${g.deg.toFixed(0)}°`
+    );
+
+    const worst = data.rp22.p9.details.worst;
+    if (worst) {
+      data.rp22.p9Detail = `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°)`;
+    } else {
+      data.rp22.p9Detail = lines.join(', ');
     }
-    if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
-    // P16 is computed locally below (skip analysisResult)
-    if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
-    if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
   }
 
   // P9: Set N/A if no overheads
-  if (!hasOverheads && !data.rp22.p9.value) {
+  if (!engineSeatRp22?.[9] && !hasOverheads && !data.rp22.p9.value) {
     data.rp22.p9 = {
       value: null,
       formatted: 'Not Calculated',
@@ -259,7 +268,7 @@ export function buildSeatHudSnapshot({
   }
 
   // ALWAYS compute P16 locally using LIVE plan-view yaw logic (matches icon rotation)
-  {
+  if (!engineSeatRp22?.[16]) {
     const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
 
     const lcrSpeakers = (placedSpeakers || []).filter(sp => {
@@ -397,7 +406,7 @@ export function buildSeatHudSnapshot({
   }
 
   // ALWAYS compute P17 locally using LIVE plan-view yaw logic (matches icon rotation)
-  {
+  if (!engineSeatRp22?.[17]) {
     const extraSurroundPattern = /^(SL|SR)\d+$/;
 
     // Front Wides are only valid if they are actually enabled by the current layout/toggles.
@@ -702,7 +711,7 @@ export function buildSeatHudSnapshot({
   };
 
   // HUD-local P10 – Maximum SPL difference between upper speakers
-  {
+  if (!engineSeatRp22?.[10]) {
     if (!hasOverheads) {
       data.rp22.p10 = {
         value: null,
@@ -773,7 +782,7 @@ export function buildSeatHudSnapshot({
   const seatPos = { x: seatX, y: seatY, z: seatZ };
 
   // --- Compute P1: Nearest boundary distance ---
-  if (Number.isFinite(seatX) && Number.isFinite(seatY)) {
+  if (!engineSeatRp22?.[1] && Number.isFinite(seatX) && Number.isFinite(seatY)) {
     const isCenterlineX = seatX < 0 || (
       Array.isArray(seatingPositions) && 
       seatingPositions.some(s => Number(s?.x) < 0)
@@ -803,7 +812,7 @@ export function buildSeatHudSnapshot({
   }
 
   // --- Compute P4: Max SPL difference between screen speakers ---
-  if (placedLCR.length >= 2 && seatSplData?.screen) {
+  if (!engineSeatRp22?.[4] && placedLCR.length >= 2 && seatSplData?.screen) {
     const lcrSplValues = Object.values(seatSplData.screen)
       .map(s => s.value)
       .filter(Number.isFinite);
@@ -824,7 +833,7 @@ export function buildSeatHudSnapshot({
   }
 
   // --- P5: Max horizontal gap between adjacent surrounds/wides (NO WRAP, MATCH PLAN OVERLAY) ---
-  {
+  if (!engineSeatRp22?.[5]) {
     const extraSurroundPattern = /^(SL|SR)\d+$/;
 
     const p5Speakers = (placedSpeakers || []).filter(s => {
@@ -957,7 +966,7 @@ export function buildSeatHudSnapshot({
   }
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
-  if (placedSur.length >= 2 && seatSplData?.surrounds) {
+  if (!engineSeatRp22?.[6] && placedSur.length >= 2 && seatSplData?.surrounds) {
     const surSplValues = Object.values(seatSplData.surrounds)
       .map(s => s.value)
       .filter(Number.isFinite);
