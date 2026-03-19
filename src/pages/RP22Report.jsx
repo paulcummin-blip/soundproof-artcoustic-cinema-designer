@@ -605,12 +605,7 @@ function RP22ReportInner() {
         const normalizeLvl = (rawLevel) => {
             if (rawLevel == null) return null;
             if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) { if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`; return null; }
-            if (typeof rawLevel === "string") {
-                const clean = rawLevel.trim().toUpperCase();
-                const m = clean.match(/^L([1-4])$/);
-                if (m) return `L${m[1]}`;
-                if (clean === "FAIL") return "L1";
-            }
+            if (typeof rawLevel === "string") { const m = rawLevel.trim().match(/^L([1-4])$/i); if (m) return `L${m[1]}`; }
             return null;
         };
         const next = seatIds.map(seatId => {
