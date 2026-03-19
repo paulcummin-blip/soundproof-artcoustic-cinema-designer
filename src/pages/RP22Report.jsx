@@ -489,7 +489,36 @@ function RP22ReportInner() {
         const out = {};
         const list = safeArray(seats);
         const aimAtMLP = app?.aimAtMLP ?? false;
-...
+        const lcrAngleInfo = { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
+        if (aimAtMLP && primarySeatingPosition) {
+            const mlpTarget = { x: primarySeatingPosition.x, y: primarySeatingPosition.y };
+            const flSpeaker = placedSpeakers?.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FL' || c === 'L') && s?.position; });
+            const frSpeaker = placedSpeakers?.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FR' || c === 'R') && s?.position; });
+            if (flSpeaker?.position && Number.isFinite(mlpTarget.x)) lcrAngleInfo.L = safeYawToMLP(flSpeaker.position, mlpTarget);
+            if (frSpeaker?.position && Number.isFinite(mlpTarget.x)) lcrAngleInfo.R = safeYawToMLP(frSpeaker.position, mlpTarget);
+            const avg = (Math.abs(lcrAngleInfo.L) + Math.abs(lcrAngleInfo.R)) / 2;
+            lcrAngleInfo.averageAngle = Number.isFinite(avg) ? avg : 0;
+            lcrAngleInfo.maxAbs = Math.max(Math.abs(lcrAngleInfo.L), Math.abs(lcrAngleInfo.R));
+        }
+        for (let i = 0; i < list.length; i++) {
+            const seat = list[i];
+            if (!seat?.id) continue;
+            try {
+                const snapshot = buildSeatHudSnapshot({
+                    seat, placedSpeakers, widthM: stableDimensions.width, lengthM: stableDimensions.length, heightM: stableDimensions.height,
+                    screenFrontPlaneM: app?.screenFrontPlaneM ?? (app?.screen?.frontPlaneYm || 0),
+                    screen, mlp: primarySeatingPosition || { x: stableDimensions.width / 2, y: stableDimensions.length * 0.58, z: 1.2 },
+                    allSeatSplMetrics, aimAtMLP,
+                    aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP ?? false,
+                    aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP ?? false,
+                    aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP ?? false,
+                    lcrAngleInfo, analysisResult: analysisResult || {},
+                    seatingPositions: seats, splConfig: app?.splConfig || {},
+                    sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
+                });
+                if (snapshot) out[seat.id] = snapshot;
+            } catch (e) { console.warn(`[RP22Report] HUD failed for seat ${seat.id}:`, e); }
+        }
         return out;
     }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout]);
 
