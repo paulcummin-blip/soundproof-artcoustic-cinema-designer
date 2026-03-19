@@ -61,7 +61,15 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
   const innerAngles = Array.isArray(backArcAngles) ? backArcAngles.slice() : [];
   if (!innerAngles.length) return null;
 
-  const maxGap = Math.max(...innerAngles);
+  // P5 RP22 rule: only adjacent visible gaps, never the wraparound remainder.
+  // computeBackArc may include the large return angle as the last/largest entry.
+  // If there are ≥2 angles, remove the single largest before taking the max.
+  const p5CandidateAngles =
+    innerAngles.length >= 2
+      ? innerAngles.slice().sort((a, b) => a - b).slice(0, -1) // drop the single largest
+      : innerAngles;
+
+  const maxGap = Math.max(...p5CandidateAngles);
 
   const p5CatalogEntry = RP22_CATALOG["5"];
   const lvlP5 = p5CatalogEntry.levels;
