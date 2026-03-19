@@ -616,12 +616,17 @@ function RP22ReportInner() {
                 if (!Number.isFinite(n)) return null;
                 return seatAnalysisResult[n] ?? null;
             };
-            ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
+            ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p17', 'p20'].forEach(key => {
                 const metric = getRp22Metric(key);
                 if (!metric) return;
                 const lvl = normalizeLvl(metric.level);
                 if (lvl) counts[lvl] += 1;
             });
+            const p16Metric = seatAnalysisResult[16] ?? seatAnalysisResult['16'] ?? null;
+            if (p16Metric) {
+                const lvl = normalizeLvl(p16Metric.level);
+                if (lvl) counts[lvl] += 1;
+            }
             return { seatId, counts, total: 9 };
         });
         if (!next.length && lastSeatLevelCountsRef.current.length) return lastSeatLevelCountsRef.current;
