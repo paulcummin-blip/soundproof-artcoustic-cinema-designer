@@ -1024,6 +1024,32 @@ function RP22ReportInner() {
                                                                 </div>
                                                             ))}
                                                         </div>
+                                                        <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #E8E6E1' }}>
+                                                            <div style={{
+                                                                display: 'grid',
+                                                                gridTemplateColumns: 'repeat(4, 1fr)',
+                                                                textAlign: 'center',
+                                                                fontSize: 12,
+                                                                color: '#6F6B64'
+                                                            }}>
+                                                                <div>
+                                                                    <div style={{ fontWeight: 600 }}>L4</div>
+                                                                    <div>50°–65°</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontWeight: 600 }}>L3</div>
+                                                                    <div>45°–70°</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontWeight: 600 }}>L2</div>
+                                                                    <div>40°–80°</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontWeight: 600 }}>L1</div>
+                                                                    <div>33°–90°</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </CardContent>
                                                 </Card>
                                             )}
