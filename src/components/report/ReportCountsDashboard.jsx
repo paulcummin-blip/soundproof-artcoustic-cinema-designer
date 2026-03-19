@@ -65,7 +65,7 @@ export default function ReportCountsDashboard({
                 <div className="flex gap-4">
                     {seatCountsByRow.map(({ rowNum, seats }) => (
                         <div key={rowNum} className="flex flex-col gap-4">
-                            {seats.map(({ seatId, counts, activeCount, failCount }) => {
+                            {seats.map(({ seatId, counts, activeCount, failCount }) => { // activeCount and failCount are siblings of counts
                                 const isPrimary = analysisResult?.perSeatRp22?.[seatId]?.isPrimary === true;
                                 return (
                                     <div

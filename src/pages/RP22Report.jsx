@@ -630,14 +630,14 @@ function RP22ReportInner() {
                 const rawLevel = metric.level;
                 if (rawLevel == null || rawLevel === '—') return;
                 activeCount += 1;
-                if (String(rawLevel).toUpperCase() === 'FAIL') {
+                if (String(rawLevel).trim().toUpperCase() === 'FAIL') {
                     failCount += 1;
                 } else {
                     const lvl = normalizeLvl(rawLevel);
                     if (lvl) counts[lvl] += 1;
                 }
             });
-            return { seatId, counts, total: 9, activeCount, failCount };
+            return { seatId, counts, activeCount, failCount, total: 9 };
         });
         if (!next.length && lastSeatLevelCountsRef.current.length) return lastSeatLevelCountsRef.current;
         lastSeatLevelCountsRef.current = next;
