@@ -556,6 +556,18 @@ export default function SeatHud({
                   {role}: {formatDb(spl.value)}
                 </div>
               ))}
+              {/* TEMP P6 DEBUG */}
+              {(() => {
+                const surroundEntries = Object.entries(tooltipData?.splAtSeat?.surrounds || {});
+                const parts = surroundEntries.map(([role, data]) =>
+                  `${role}: ${Number.isFinite(data?.value) ? data.value.toFixed(1) : '—'}`
+                );
+                return (
+                  <div style={{ fontSize: 9, color: '#aaa', paddingLeft: 8, fontFamily: 'monospace', marginTop: 2 }}>
+                    P6 debug: count={surroundEntries.length}{parts.length > 0 ? ' | ' + parts.join(' | ') : ''}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
