@@ -521,10 +521,19 @@ function RP22ReportInner() {
         return out;
     }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout]);
 
+    const seatScopedParamNumbers = React.useMemo(() => new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]), []);
+
+    const roomScopedParamCount = React.useMemo(() => {
+        return rp22Parameters.filter(p => !seatScopedParamNumbers.has(p.number)).length;
+    }, [seatScopedParamNumbers]);
+
+    const seatScopedParamCount = React.useMemo(() => {
+        return rp22Parameters.filter(p => seatScopedParamNumbers.has(p.number)).length;
+    }, [seatScopedParamNumbers]);
+
     const orderedParams = React.useMemo(() => {
-        const perSeatParams = new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]);
-        return [...rp22Parameters].filter(p => !perSeatParams.has(p.number)).sort((a, b) => a.id - b.id);
-    }, []);
+        return [...rp22Parameters].filter(p => !seatScopedParamNumbers.has(p.number)).sort((a, b) => a.id - b.id);
+    }, [seatScopedParamNumbers]);
 
     const p2SystemConfig = React.useMemo(() => {
         const dolbyPreset = app?.dolbyLayout || "5.1";
@@ -1070,7 +1079,7 @@ function RP22ReportInner() {
                                         <div style={{ display: 'flex', alignItems: 'stretch', gap: '8mm' }}>
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={coverBoxTitleStyle}>
-                                                    Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                                                    Room parameters ({roomScopedParamCount})
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6mm', paddingTop: '1mm', paddingBottom: '1mm', fontSize: '110%' }}>
                                                     {['L4', 'L3', 'L2', 'L1'].map(lvl => {
@@ -1084,7 +1093,7 @@ function RP22ReportInner() {
 
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={coverBoxTitleStyle}>
-                                                    Seat parameters ({seats?.length || 0} seats)
+                                                    Seat parameters ({seatScopedParamCount})
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
                                                     {(() => {
