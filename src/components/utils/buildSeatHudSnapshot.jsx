@@ -966,14 +966,20 @@ export function buildSeatHudSnapshot({
   }
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
-  if (!engineSeatRp22?.[6]) {
+  const engineP6 = engineSeatRp22?.[6];
+
+  if (engineP6 && Number.isFinite(engineP6.valueDb)) {
+    // Use engine result only if it contains a real numeric value
+    data.rp22.p6 = engineP6;
+  } else {
+    // Fallback to local calculation from live SPL data
     const surSplValues = Object.values(seatSplData?.surrounds || {})
       .map(s => s?.value)
       .filter(Number.isFinite);
 
     const p6ValueDb = maxPairwiseDelta(surSplValues);
+
     if (Number.isFinite(p6ValueDb)) {
-      // OPTION B: always round DOWN to nearest integer BEFORE grading and display
       const p6FloorDb = Math.floor(p6ValueDb);
 
       let level = '—';
@@ -984,16 +990,16 @@ export function buildSeatHudSnapshot({
       else level = 'FAIL';
 
       data.rp22.p6 = {
-        valueDb: p6ValueDb,                 // keep raw value for any future deep-dive
-        valueDbFloor: p6FloorDb,            // explicit floored value (for consistency/debug)
+        valueDb: p6ValueDb,
+        valueDbFloor: p6FloorDb,
         level,
-        formatted: `${p6FloorDb} dB`        // DISPLAY MUST MATCH GRADE INPUT
+        formatted: `${p6FloorDb} dB`
+      };
+    } else {
+      data.rp22.p6 = {
+        ...notCalculatedHud(),
       };
     }
-  } else {
-    data.rp22.p6 = {
-      ...notCalculatedHud(),
-    };
   }
 
   // Legacy bridge
