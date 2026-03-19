@@ -511,7 +511,7 @@ function RP22ReportInner() {
                     aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP ?? false,
                     aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP ?? false,
                     aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP ?? false,
-                    lcrAngleInfo, analysisResult: analysisResult,
+                    lcrAngleInfo, analysisResult: analysisResult || {},
                     seatingPositions: seats, splConfig: app?.splConfig || {},
                     sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
                 });
