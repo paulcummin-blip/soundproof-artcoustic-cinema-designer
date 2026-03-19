@@ -28,6 +28,7 @@ import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
+import RP23ViewingAngleSummary from '../components/report/RP23ViewingAngleSummary';
 import { fovForDistance } from '../components/utils/screenMetrics';
 
 // --- Plan capture helpers (kept here since they close over state setters) ---
@@ -488,38 +489,29 @@ function RP22ReportInner() {
         const out = {};
         const list = safeArray(seats);
         const aimAtMLP = app?.aimAtMLP ?? false;
-        const lcrAngleInfo = { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
-        if (aimAtMLP && primarySeatingPosition) {
-            const mlpTarget = { x: primarySeatingPosition.x, y: primarySeatingPosition.y };
-            const flSpeaker = placedSpeakers?.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FL' || c === 'L') && s?.position; });
-            const frSpeaker = placedSpeakers?.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FR' || c === 'R') && s?.position; });
-            if (flSpeaker?.position && Number.isFinite(mlpTarget.x)) lcrAngleInfo.L = safeYawToMLP(flSpeaker.position, mlpTarget);
-            if (frSpeaker?.position && Number.isFinite(mlpTarget.x)) lcrAngleInfo.R = safeYawToMLP(frSpeaker.position, mlpTarget);
-            const avg = (Math.abs(lcrAngleInfo.L) + Math.abs(lcrAngleInfo.R)) / 2;
-            lcrAngleInfo.averageAngle = Number.isFinite(avg) ? avg : 0;
-            lcrAngleInfo.maxAbs = Math.max(Math.abs(lcrAngleInfo.L), Math.abs(lcrAngleInfo.R));
-        }
-        for (let i = 0; i < list.length; i++) {
-            const seat = list[i];
-            if (!seat?.id) continue;
-            try {
-                const snapshot = buildSeatHudSnapshot({
-                    seat, placedSpeakers, widthM: stableDimensions.width, lengthM: stableDimensions.length, heightM: stableDimensions.height,
-                    screenFrontPlaneM: app?.screenFrontPlaneM ?? (app?.screen?.frontPlaneYm || 0),
-                    screen, mlp: primarySeatingPosition || { x: stableDimensions.width / 2, y: stableDimensions.length * 0.58, z: 1.2 },
-                    allSeatSplMetrics, aimAtMLP,
-                    aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP ?? false,
-                    aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP ?? false,
-                    aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP ?? false,
-                    lcrAngleInfo, analysisResult: analysisResult || {},
-                    seatingPositions: seats, splConfig: app?.splConfig || {},
-                    sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
-                });
-                if (snapshot) out[seat.id] = snapshot;
-            } catch (e) { console.warn(`[RP22Report] HUD failed for seat ${seat.id}:`, e); }
-        }
+...
         return out;
     }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout]);
+
+    const rp23Rows = React.useMemo(() => {
+        const rowMap = {};
+        seats.forEach(s => {
+            const match = s.id?.match(/^seat-r(\d+)-c(\d+)$/);
+            const rowNum = match ? parseInt(match[1], 10) : (s.rowNumber || 1);
+            if (!rowMap[rowNum]) rowMap[rowNum] = [];
+            rowMap[rowNum].push(s);
+        });
+        return Object.keys(rowMap)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .map(rowNum => {
+                const rowSeats = rowMap[rowNum];
+                const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
+                const snap = reportSeatHudById?.[primary?.id];
+                return { rowNum, rp23: snap?.rp23 || null };
+            })
+            .filter(r => r.rp23);
+    }, [seats, reportSeatHudById]);
 
     const seatScopedParamNumbers = React.useMemo(() => new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]), []);
 
@@ -1006,27 +998,7 @@ function RP22ReportInner() {
                                         </div>
                                         {/* ── RP23 card — 1 col ── */}
                                         <div>
-                                            {rp23Rows.length > 0 && (
-                                                <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
-                                                    <CardHeader className="pb-2">
-                                                        <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
-                                                        <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
-                                                    </CardHeader>
-                                                    <CardContent>
-                                                        <div className="space-y-2">
-                                                            {rp23Rows.map(({ rowNum, rp23 }) => (
-                                                                <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
-                                                                    <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
-                                                                    <div className="flex items-center gap-3">
-                                                                        <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
-                                                                        <RP22GradingPill level={rp23.level || '—'} />
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            )}
+                                            <RP23ViewingAngleSummary rp23Rows={rp23Rows} />
                                         </div>
                                     </div>
                                 );
@@ -1174,6 +1146,7 @@ function RP22ReportInner() {
                                         analysisResult={analysisResult}
                                         totalRoomParameters={roomScopedParamCount}
                                         totalSeatParameters={seatScopedParamCount}
+                                        rp23Rows={rp23Rows}
                                     />
                                 </div>
                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
