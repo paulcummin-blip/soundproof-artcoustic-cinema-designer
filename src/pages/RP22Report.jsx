@@ -1176,6 +1176,29 @@ function RP22ReportInner() {
                                         totalSeatParameters={seatScopedParamCount}
                                     />
                                 </div>
+                                {rp23Rows && rp23Rows.length > 0 && (
+                                    <div className="print-avoid-break" style={{ marginBottom: 24 }}>
+                                        <Card className="rp22-parameter-card-cover flex-1 w-full border-[1.5px] border-[#D9D5CE] bg-[#FBFAF8] text-[#1B1A1A] rounded-[10px]">
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
+                                                <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-2">
+                                                    {rp23Rows.map(({ rowNum, rp23 }) => (
+                                                        <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
+                                                            <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
+                                                                <RP22GradingPill level={rp23.level || '—'} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )}
                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
                                 <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
                                 <RP22ReportParameterGrid {...parameterGridProps} />
