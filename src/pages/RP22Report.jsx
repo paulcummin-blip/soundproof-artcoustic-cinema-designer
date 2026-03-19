@@ -644,6 +644,22 @@ function RP22ReportInner() {
         return Object.keys(rows).map(Number).sort((a, b) => a - b).map(rowNum => ({ rowNum, seats: rows[rowNum] }));
     }, [seatLevelCounts]);
 
+    const rp23Rows = React.useMemo(() => {
+        const rowMap = {};
+        seats.forEach(s => {
+            const match = s.id?.match(/^seat-r(\d+)-c(\d+)$/);
+            const rowNum = match ? parseInt(match[1], 10) : (s.rowNumber || 1);
+            if (!rowMap[rowNum]) rowMap[rowNum] = [];
+            rowMap[rowNum].push(s);
+        });
+        return Object.keys(rowMap).map(Number).sort((a, b) => a - b).map(rowNum => {
+            const rowSeats = rowMap[rowNum];
+            const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
+            const snap = reportSeatHudById?.[primary?.id];
+            return { rowNum, rp23: snap?.rp23 || null };
+        }).filter(r => r.rp23);
+    }, [seats, reportSeatHudById]);
+
     // ── Sightline page derived data ──────────────────────────────────────────
     const projector = React.useMemo(() => {
         return (app?.roomElements || []).find(el => el.type === 'projector');
@@ -954,19 +970,6 @@ function RP22ReportInner() {
                         <CardContent className="space-y-6">
                             {/* Assumptions + RP23 row — same inner width as the grid below */}
                             {(() => {
-                                const rowMap = {};
-                                seats.forEach(s => {
-                                    const match = s.id?.match(/^seat-r(\d+)-c(\d+)$/);
-                                    const rowNum = match ? parseInt(match[1], 10) : (s.rowNumber || 1);
-                                    if (!rowMap[rowNum]) rowMap[rowNum] = [];
-                                    rowMap[rowNum].push(s);
-                                });
-                                const rp23Rows = Object.keys(rowMap).map(Number).sort((a, b) => a - b).map(rowNum => {
-                                    const rowSeats = rowMap[rowNum];
-                                    const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
-                                    const snap = reportSeatHudById?.[primary?.id];
-                                    return { rowNum, rp23: snap?.rp23 || null };
-                                }).filter(r => r.rp23);
                                 return (
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                                         {/* ── Report assumptions block — 2 cols ── */}
