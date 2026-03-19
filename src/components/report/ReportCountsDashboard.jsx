@@ -2,7 +2,6 @@ import React from 'react';
 import { Home, User } from 'lucide-react';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { formatSeatLabel } from '../utils/seatLabel';
-import RP23ViewingAngleSummary from './RP23ViewingAngleSummary';
 
 export default function ReportCountsDashboard({
     roomLevelCounts,
@@ -10,54 +9,47 @@ export default function ReportCountsDashboard({
     analysisResult,
     totalRoomParameters,
     totalSeatParameters,
-    rp23Rows,
 }) {
     return (
         <div className="grid grid-cols-[auto_1fr] gap-10 items-start mt-8">
             {/* Left: Room count box */}
-            <div className="justify-self-start flex flex-col gap-4">
-                <div>
-                    <div className="flex items-center gap-2 mb-3">
-                        <Home className="w-4 h-4 text-[#213428]" />
-                        <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                            Room parameters
-                        </div>
-                        <span className="text-sm text-gray-500">({totalRoomParameters})</span>
+            <div className="justify-self-start">
+                <div className="flex items-center gap-2 mb-3">
+                    <Home className="w-4 h-4 text-[#213428]" />
+                    <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                        Room parameters
                     </div>
-                    <div className="border-2 border-[#213428] rounded-lg px-5 py-4 bg-white w-[340px] min-h-[100px] flex flex-col justify-center">
-                        <div className="flex justify-center items-center mt-1 px-1">
-                            {(() => {
-                                const l4 = Number(roomLevelCounts?.L4 ?? 0);
-                                const l3 = Number(roomLevelCounts?.L3 ?? 0);
-                                const l2 = Number(roomLevelCounts?.L2 ?? 0);
-                                const l1 = Number(roomLevelCounts?.L1 ?? 0);
-                                const maxRoom = Math.max(l4, l3, l2, l1);
-                                const isMax = (v) => v === maxRoom;
+                    <span className="text-sm text-gray-500">({totalRoomParameters})</span>
+                </div>
+                <div className="border-2 border-[#213428] rounded-lg px-5 py-4 bg-white w-[340px] min-h-[100px] flex flex-col justify-center">
+                    <div className="flex justify-center items-center mt-1 px-1">
+                        {(() => {
+                            const l4 = Number(roomLevelCounts?.L4 ?? 0);
+                            const l3 = Number(roomLevelCounts?.L3 ?? 0);
+                            const l2 = Number(roomLevelCounts?.L2 ?? 0);
+                            const l1 = Number(roomLevelCounts?.L1 ?? 0);
+                            const maxRoom = Math.max(l4, l3, l2, l1);
+                            const isMax = (v) => v === maxRoom;
 
-                                return (
-                                    <div className="flex gap-3 items-center justify-center">
-                                        <div style={{ transform: isMax(l4) ? 'scale(1.25)' : 'scale(1)', transformOrigin: 'center' }}>
-                                            <RP22GradingPill level="L4" count={l4} />
-                                        </div>
-                                        <div style={{ transform: isMax(l3) ? 'scale(1.25)' : 'scale(1)', transformOrigin: 'center' }}>
-                                            <RP22GradingPill level="L3" count={l3} />
-                                        </div>
-                                        <div style={{ transform: isMax(l2) ? 'scale(1.25)' : 'scale(1)', transformOrigin: 'center' }}>
-                                            <RP22GradingPill level="L2" count={l2} />
-                                        </div>
-                                        <div style={{ transform: isMax(l1) ? 'scale(1.25)' : 'scale(1)', transformOrigin: 'center' }}>
-                                            <RP22GradingPill level="L1" count={l1} />
-                                        </div>
+                            return (
+                                <div className="flex gap-3 items-center justify-center">
+                                    <div style={{ transform: isMax(l4) ? 'scale(1.25)' : 'scale(1)', transformOrigin: 'center' }}>
+                                        <RP22GradingPill level="L4" count={l4} />
                                     </div>
-                                );
-                            })()}
-                        </div>
+                                    <div style={{ transform: isMax(l3) ? 'scale(1.25)' : 'scale(1)', transformOrigin: 'center' }}>
+                                        <RP22GradingPill level="L3" count={l3} />
+                                    </div>
+                                    <div style={{ transform: isMax(l2) ? 'scale(1.25)' : 'scale(1)', transformOrigin: 'center' }}>
+                                        <RP22GradingPill level="L2" count={l2} />
+                                    </div>
+                                    <div style={{ transform: isMax(l1) ? 'scale(1.25)' : 'scale(1)', transformOrigin: 'center' }}>
+                                        <RP22GradingPill level="L1" count={l1} />
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
-
-                {Array.isArray(rp23Rows) && rp23Rows.length > 0 && (
-                    <RP23ViewingAngleSummary rp23Rows={rp23Rows} className="w-[340px]" />
-                )}
             </div>
 
             {/* Right: Seat parameters section */}

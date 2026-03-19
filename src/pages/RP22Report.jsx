@@ -28,7 +28,6 @@ import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
-import RP23ViewingAngleSummary from '../components/report/RP23ViewingAngleSummary';
 import { fovForDistance } from '../components/utils/screenMetrics';
 
 // --- Plan capture helpers (kept here since they close over state setters) ---
@@ -522,26 +521,6 @@ function RP22ReportInner() {
         return out;
     }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout]);
 
-    const rp23Rows = React.useMemo(() => {
-        const rowMap = {};
-        seats.forEach(s => {
-            const match = s.id?.match(/^seat-r(\d+)-c(\d+)$/);
-            const rowNum = match ? parseInt(match[1], 10) : (s.rowNumber || 1);
-            if (!rowMap[rowNum]) rowMap[rowNum] = [];
-            rowMap[rowNum].push(s);
-        });
-        return Object.keys(rowMap)
-            .map(Number)
-            .sort((a, b) => a - b)
-            .map(rowNum => {
-                const rowSeats = rowMap[rowNum];
-                const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
-                const snap = reportSeatHudById?.[primary?.id];
-                return { rowNum, rp23: snap?.rp23 || null };
-            })
-            .filter(r => r.rp23);
-    }, [seats, reportSeatHudById]);
-
     const seatScopedParamNumbers = React.useMemo(() => new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]), []);
 
     const roomScopedParamCount = React.useMemo(() => {
@@ -974,47 +953,84 @@ function RP22ReportInner() {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {/* Assumptions + RP23 row — same inner width as the grid below */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                                {/* ── Report assumptions block — 2 cols ── */}
-                                <div style={{ gridColumn: 'span 2' }}>
-                                    <div style={{ background: '#FFFFFF', border: '1px solid #DCDBD6', borderRadius: 8, padding: '16px' }}>
-                                        <div style={{ fontSize: 15, fontWeight: 700, color: '#1B1A1A', marginBottom: 4 }}>Report assumptions</div>
-                                        <div style={{ fontSize: 12, color: '#625143', marginBottom: 16 }}>Manual estimates for non-calculated parameters</div>
-                                        {/* P15 */}
-                                        <div style={{ marginBottom: 14 }}>
-                                            <div style={{ fontSize: 12, fontWeight: 600, color: '#1B1A1A', marginBottom: 6 }}>P15 — Background noise floor</div>
-                                            <select
-                                                style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A', cursor: 'pointer', position: 'relative', zIndex: 1 }}
-                                                value={app?.p15ConstructionLevel || 'standard'}
-                                                onChange={e => app?.setP15ConstructionLevelSafe?.(e.target.value)}
-                                            >
-                                                <option value="standard">Standard domestic room (NCB 26 · L1)</option>
-                                                <option value="purpose-built">Purpose-built home cinema (NCB 22 · L2)</option>
-                                                <option value="reference">Reference-grade isolated room (NCB 18 · L3)</option>
-                                                <option value="studio">Studio / screening-room grade (NCB 15 · L4)</option>
-                                            </select>
+                            {(() => {
+                                const rowMap = {};
+                                seats.forEach(s => {
+                                    const match = s.id?.match(/^seat-r(\d+)-c(\d+)$/);
+                                    const rowNum = match ? parseInt(match[1], 10) : (s.rowNumber || 1);
+                                    if (!rowMap[rowNum]) rowMap[rowNum] = [];
+                                    rowMap[rowNum].push(s);
+                                });
+                                const rp23Rows = Object.keys(rowMap).map(Number).sort((a, b) => a - b).map(rowNum => {
+                                    const rowSeats = rowMap[rowNum];
+                                    const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
+                                    const snap = reportSeatHudById?.[primary?.id];
+                                    return { rowNum, rp23: snap?.rp23 || null };
+                                }).filter(r => r.rp23);
+                                return (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                                        {/* ── Report assumptions block — 2 cols ── */}
+                                        <div style={{ gridColumn: 'span 2' }}>
+                                            <div style={{ background: '#FFFFFF', border: '1px solid #DCDBD6', borderRadius: 8, padding: '16px' }}>
+                                                <div style={{ fontSize: 15, fontWeight: 700, color: '#1B1A1A', marginBottom: 4 }}>Report assumptions</div>
+                                                <div style={{ fontSize: 12, color: '#625143', marginBottom: 16 }}>Manual estimates for non-calculated parameters</div>
+                                                {/* P15 */}
+                                                <div style={{ marginBottom: 14 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1B1A1A', marginBottom: 6 }}>P15 — Background noise floor</div>
+                                                    <select
+                                                        style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A', cursor: 'pointer', position: 'relative', zIndex: 1 }}
+                                                        value={app?.p15ConstructionLevel || 'standard'}
+                                                        onChange={e => app?.setP15ConstructionLevelSafe?.(e.target.value)}
+                                                    >
+                                                        <option value="standard">Standard domestic room (NCB 26 · L1)</option>
+                                                        <option value="purpose-built">Purpose-built home cinema (NCB 22 · L2)</option>
+                                                        <option value="reference">Reference-grade isolated room (NCB 18 · L3)</option>
+                                                        <option value="studio">Studio / screening-room grade (NCB 15 · L4)</option>
+                                                    </select>
+                                                </div>
+                                                {/* P21 */}
+                                                <div>
+                                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1B1A1A', marginBottom: 6 }}>P21 — Early reflections</div>
+                                                    <select
+                                                        style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A', cursor: 'pointer', position: 'relative', zIndex: 1 }}
+                                                        value={app?.p21EarlyReflectionPreset || 'l2'}
+                                                        onChange={e => app?.setP21EarlyReflectionPresetSafe?.(e.target.value)}
+                                                    >
+                                                        <option value="l1">No estimate / untreated room (L1)</option>
+                                                        <option value="l2">Moderately live room (−8 dB · L2)</option>
+                                                        <option value="l3">Well-balanced treated room (−10 dB · L3)</option>
+                                                        <option value="l4">Heavily optimised room (−12 dB · L4)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
                                         </div>
-                                        {/* P21 */}
+                                        {/* ── RP23 card — 1 col ── */}
                                         <div>
-                                            <div style={{ fontSize: 12, fontWeight: 600, color: '#1B1A1A', marginBottom: 6 }}>P21 — Early reflections</div>
-                                            <select
-                                                style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #DCDBD6', borderRadius: 6, background: '#fff', color: '#1B1A1A', cursor: 'pointer', position: 'relative', zIndex: 1 }}
-                                                value={app?.p21EarlyReflectionPreset || 'l2'}
-                                                onChange={e => app?.setP21EarlyReflectionPresetSafe?.(e.target.value)}
-                                            >
-                                                <option value="l1">No estimate / untreated room (L1)</option>
-                                                <option value="l2">Moderately live room (−8 dB · L2)</option>
-                                                <option value="l3">Well-balanced treated room (−10 dB · L3)</option>
-                                                <option value="l4">Heavily optimised room (−12 dB · L4)</option>
-                                            </select>
+                                            {rp23Rows.length > 0 && (
+                                                <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
+                                                    <CardHeader className="pb-2">
+                                                        <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
+                                                        <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
+                                                    </CardHeader>
+                                                    <CardContent>
+                                                        <div className="space-y-2">
+                                                            {rp23Rows.map(({ rowNum, rp23 }) => (
+                                                                <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
+                                                                    <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
+                                                                        <RP22GradingPill level={rp23.level || '—'} />
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            )}
                                         </div>
                                     </div>
-                                </div>
-                                {/* ── RP23 card — 1 col ── */}
-                                <div>
-                                    <RP23ViewingAngleSummary rp23Rows={rp23Rows} />
-                                </div>
-                            </div>
+                                );
+                            })()}
 
                             <RP22ReportParameterGrid {...parameterGridProps} />
                         </CardContent>
@@ -1158,7 +1174,6 @@ function RP22ReportInner() {
                                         analysisResult={analysisResult}
                                         totalRoomParameters={roomScopedParamCount}
                                         totalSeatParameters={seatScopedParamCount}
-                                        rp23Rows={rp23Rows}
                                     />
                                 </div>
                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
