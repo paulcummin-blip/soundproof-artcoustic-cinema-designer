@@ -85,6 +85,10 @@ export default function ReportCountsDashboard({
                                                 )}
                                             </div>
                                         </div>
+                                        {/* DEBUG TEMP */}
+                                        <div style={{ fontSize: 9, color: '#999', marginBottom: 4, fontFamily: 'monospace' }}>
+                                            A:{activeCount} F:{failCount} L4:{counts?.L4} L3:{counts?.L3} L2:{counts?.L2} L1:{counts?.L1}
+                                        </div>
                                         {(() => {
                                             const maxSeat = Math.max(
                                                 Number(counts?.L4 ?? 0),
