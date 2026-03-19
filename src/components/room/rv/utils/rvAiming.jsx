@@ -68,6 +68,19 @@ export function getPlanAimDeg(
 
   const role = getCanonicalRole ? getCanonicalRole(speaker.role) : (speaker.role ?? '').toUpperCase();
 
+  const getSideOrRearWallFlatYaw = (resolvedRole) => {
+    const x = Number(speaker?.x ?? speaker?.position?.x ?? 0);
+    const y = Number(speaker?.y ?? speaker?.position?.y ?? 0);
+    const distToRear = lengthM - y;
+    const distToLeft = x;
+    const distToRight = widthM - x;
+
+    if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
+    if (/^SL\d*$/.test(resolvedRole)) return 90;
+    if (/^SR\d*$/.test(resolvedRole)) return -90;
+    return 0;
+  };
+
   switch (role) {
     // ── LCR front ──────────────────────────────────────────────────────────
     case 'FL':
@@ -96,11 +109,11 @@ export function getPlanAimDeg(
     // ── Side surrounds ─────────────────────────────────────────────────────
     case 'SL':
       if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      return 90; // face inward (right)
+      return getSideOrRearWallFlatYaw(role);
 
     case 'SR':
       if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      return -90; // face inward (left)
+      return getSideOrRearWallFlatYaw(role);
 
     // ── Rear surrounds ─────────────────────────────────────────────────────
     case 'SBL': {
@@ -128,11 +141,11 @@ export function getPlanAimDeg(
     default: {
       if (/^SL\d+$/.test(role)) {
         if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-        return 90;
+        return getSideOrRearWallFlatYaw(role);
       }
       if (/^SR\d+$/.test(role)) {
         if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-        return -90;
+        return getSideOrRearWallFlatYaw(role);
       }
       return 0;
     }
