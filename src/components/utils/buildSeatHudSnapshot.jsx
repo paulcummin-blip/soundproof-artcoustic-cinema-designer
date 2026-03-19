@@ -812,24 +812,24 @@ export function buildSeatHudSnapshot({
   }
 
   // --- Compute P4: Max SPL difference between screen speakers ---
-  if (!engineSeatRp22?.[4] && placedLCR.length >= 2 && seatSplData?.screen) {
-    const lcrSplValues = Object.values(seatSplData.screen)
-      .map(s => s.value)
+  if (!engineSeatRp22?.[4]) {
+    const lcrSplValues = Object.values(seatSplData?.screen || {})
+      .map(s => s?.value)
       .filter(Number.isFinite);
-    
+
     const valueDb = maxPairwiseDelta(lcrSplValues);
-    
+
     if (Number.isFinite(valueDb)) {
       data.rp22.p4 = {
         valueDb,
         level: rp22LevelForP4(valueDb),
         formatted: `${floorDeg(valueDb) || 0} dB`
       };
+    } else {
+      data.rp22.p4 = {
+        ...notCalculatedHud(),
+      };
     }
-  } else {
-    data.rp22.p4 = {
-      ...notCalculatedHud(),
-    };
   }
 
   // --- P5: Max horizontal gap between adjacent surrounds/wides (NO WRAP, MATCH PLAN OVERLAY) ---
