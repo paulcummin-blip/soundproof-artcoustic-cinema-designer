@@ -94,23 +94,13 @@ export function getPlanAimDeg(
       return -90; // wall-flat right
 
     // ── Side surrounds ─────────────────────────────────────────────────────
-    case 'SL': {
+    case 'SL':
       if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      const distToRear  = lengthM - (speaker.y ?? 0);
-      const distToLeft  = speaker.x ?? 0;
-      const distToRight = widthM - (speaker.x ?? 0);
-      if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
-      return 90; // wall-flat left side
-    }
+      return 90; // face inward (right)
 
-    case 'SR': {
+    case 'SR':
       if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      const distToRear  = lengthM - (speaker.y ?? 0);
-      const distToLeft  = speaker.x ?? 0;
-      const distToRight = widthM - (speaker.x ?? 0);
-      if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
-      return -90; // wall-flat right side
-    }
+      return -90; // face inward (left)
 
     // ── Rear surrounds ─────────────────────────────────────────────────────
     case 'SBL': {
@@ -138,18 +128,10 @@ export function getPlanAimDeg(
     default: {
       if (/^SL\d+$/.test(role)) {
         if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-        const distToRear  = lengthM - (speaker.y ?? 0);
-        const distToLeft  = speaker.x ?? 0;
-        const distToRight = widthM - (speaker.x ?? 0);
-        if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
         return 90;
       }
       if (/^SR\d+$/.test(role)) {
         if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-        const distToRear  = lengthM - (speaker.y ?? 0);
-        const distToLeft  = speaker.x ?? 0;
-        const distToRight = widthM - (speaker.x ?? 0);
-        if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
         return -90;
       }
       return 0;
