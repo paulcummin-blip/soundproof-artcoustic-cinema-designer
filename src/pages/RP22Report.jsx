@@ -1076,37 +1076,6 @@ function RP22ReportInner() {
                                             hideProjectId={true}
                                         />
                                     </div>
-                                    {/* Room + Seat parameters */}
-                                    <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
-                                        <div style={{ display: 'flex', alignItems: 'stretch', gap: '8mm' }}>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={coverBoxTitleStyle}>
-                                                    Room parameters ({roomScopedParamCount})
-                                                </div>
-                                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6mm', paddingTop: '1mm', paddingBottom: '1mm', fontSize: '110%' }}>
-                                                    {['L4', 'L3', 'L2', 'L1'].map(lvl => {
-                                                        const maxRoom = Math.max(roomLevelCounts.L4, roomLevelCounts.L3, roomLevelCounts.L2, roomLevelCounts.L1);
-                                                        return <div key={lvl} style={{ transform: roomLevelCounts[lvl] === maxRoom ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}><RP22GradingPill level={lvl} count={roomLevelCounts[lvl]} /></div>;
-                                                    })}
-                                                </div>
-                                            </div>
-
-                                            <div style={{ width: '1px', background: '#EEEAE3', alignSelf: 'stretch' }} />
-
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={coverBoxTitleStyle}>
-                                                    Seat parameters ({seatScopedParamCount})
-                                                </div>
-                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
-                                                    {(() => {
-                                                        const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
-                                                        (seatLevelCounts || []).forEach(s => { agg.L4 += s.counts?.L4 || 0; agg.L3 += s.counts?.L3 || 0; agg.L2 += s.counts?.L2 || 0; agg.L1 += s.counts?.L1 || 0; });
-                                                        return ['L4', 'L3', 'L2', 'L1'].map(lvl => <RP22GradingPill key={lvl} level={lvl} count={agg[lvl]} />);
-                                                    })()}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
 
                                     {/* Screen & Viewing Geometry */}
                                     <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
