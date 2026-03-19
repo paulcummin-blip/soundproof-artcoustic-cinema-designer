@@ -609,15 +609,13 @@ function RP22ReportInner() {
                 if (!Number.isFinite(n)) return null;
                 return rp22Hud[key] ?? rp22Hud[`p${n}`] ?? rp22Hud[n] ?? rp22Hud[String(n)] ?? null;
             };
-            const lvl23 = normalizeLvl(rp23?.level);
-            if (lvl23) counts[lvl23] += 1;
             ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
                 const metric = getRp22Metric(key);
                 if (!metric) return;
                 const lvl = normalizeLvl(metric.level);
                 if (lvl) counts[lvl] += 1;
             });
-            return { seatId, counts, total: 10 };
+            return { seatId, counts, total: 9 };
         });
         if (!next.length && lastSeatLevelCountsRef.current.length) return lastSeatLevelCountsRef.current;
         lastSeatLevelCountsRef.current = next;
