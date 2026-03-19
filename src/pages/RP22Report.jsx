@@ -1198,6 +1198,15 @@ function RP22ReportInner() {
 
                         <section id="pdf-room-parameters">
                             <div>
+                                <div className="print-avoid-break" style={{ marginBottom: 24 }}>
+                                    <ReportCountsDashboard
+                                        roomLevelCounts={roomLevelCounts}
+                                        seatCountsByRow={seatCountsByRow}
+                                        analysisResult={analysisResult}
+                                        totalRoomParameters={roomScopedParamCount}
+                                        totalSeatParameters={seatScopedParamCount}
+                                    />
+                                </div>
                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
                                 <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
                                 <RP22ReportParameterGrid {...parameterGridProps} />
