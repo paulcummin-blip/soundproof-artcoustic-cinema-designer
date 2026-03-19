@@ -612,17 +612,9 @@ function RP22ReportInner() {
             const counts = { L1: 0, L2: 0, L3: 0, L4: 0 };
             let activeCount = 0;
             let failCount = 0;
-            const seatAnalysisResult = analysisResult?.perSeatRp22?.[seatId]?.rp22 || {};
+            const seatHudRp22 = reportSeatHudById?.[seatId]?.rp22 || {};
             const getRp22Metric = (key) => {
-                const n = parseInt(String(key).replace("p", ""), 10);
-                if (!Number.isFinite(n)) return null;
-
-                return (
-                    seatAnalysisResult[n] ??
-                    seatAnalysisResult[String(n)] ??
-                    seatAnalysisResult[key] ??
-                    null
-                );
+                return seatHudRp22[key] ?? null;
             };
             ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
                 const metric = getRp22Metric(key);
