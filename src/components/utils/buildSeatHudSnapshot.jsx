@@ -966,9 +966,9 @@ export function buildSeatHudSnapshot({
   }
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
-  if (!engineSeatRp22?.[6] && placedSur.length >= 2 && seatSplData?.surrounds) {
-    const surSplValues = Object.values(seatSplData.surrounds)
-      .map(s => s.value)
+  if (!engineSeatRp22?.[6]) {
+    const surSplValues = Object.values(seatSplData?.surrounds || {})
+      .map(s => s?.value)
       .filter(Number.isFinite);
 
     const p6ValueDb = maxPairwiseDelta(surSplValues);
