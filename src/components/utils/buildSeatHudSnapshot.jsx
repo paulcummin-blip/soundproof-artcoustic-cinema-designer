@@ -955,9 +955,7 @@ export function buildSeatHudSnapshot({
               formatted: `${gapFloor}°`,
               level,
               // optional: show what pair generated the max gap when HUD is pinned
-              debugLine: maxPair
-                ? `${maxPair.from.canon}→${maxPair.to.canon} = ${Math.floor(maxPair.gapDeg + 1e-9)}°`
-                : undefined,
+              debugLine: `max=${Math.floor(maxGap + 1e-9)}° | ${items.map(item => `${item.canon}[a=${Math.floor(item.a + 1e-9)}°,t=${Math.floor(item.theta + 1e-9)}°]`).join(' | ')}`,
             };
           }
         }
