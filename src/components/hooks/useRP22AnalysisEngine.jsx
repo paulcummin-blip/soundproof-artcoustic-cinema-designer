@@ -905,43 +905,46 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P5 - Max horizontal gap between adjacent surrounds (no wrap)
+      // P5 - Max horizontal gap between adjacent surrounds (no wrap, RP22-correct)
       {
-        const surroundRoles = ['SL', 'SR', 'SBL', 'SBR'];
+        const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
         const allSurrounds = speakersWithResolvedOverheads.filter(s => {
           const r = getCanonicalRole(s.role);
           return (
-            surroundRoles.includes(r) &&
+            surroundRoles.has(r) &&
             s.position &&
             Number.isFinite(s.position.x) &&
             Number.isFinite(s.position.y)
           );
         });
 
-        if (allSurrounds.length >= 2 && mlp && isNum(mlp.x) && isNum(mlp.y)) {
-          const azimuthDeg = (p) => {
-            const dx = p.x - seat.x;
-            const dy = p.y - seat.y;
-            return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
-          };
+        if (allSurrounds.length >= 2) {
+          const items = [];
+          for (const s of allSurrounds) {
+            const dx = s.position.x - seat.x;
+            const dy = s.position.y - seat.y;
+            const rad = Math.atan2(dx, -dy);
+            let a = rad * (180 / Math.PI);
+            if (a > 180) a -= 360;
+            if (a <= -180) a += 360;
+            const theta = (a + 360) % 360;
+            items.push({ role: getCanonicalRole(s.role), theta });
+          }
+          items.sort((a, b) => a.theta - b.theta);
 
-          const azimuths = allSurrounds
-            .map(s => ({ role: getCanonicalRole(s.role), az: azimuthDeg(s.position) }))
-            .sort((a, b) => a.az - b.az);
-
-          const gaps = [];
-          for (let i = 0; i < azimuths.length - 1; i++) {
-            gaps.push(azimuths[i + 1].az - azimuths[i].az);
+          const adjGaps = [];
+          for (let i = 0; i < items.length - 1; i++) {
+            adjGaps.push(items[i + 1].theta - items[i].theta);
           }
 
-          if (gaps.length > 0) {
-            const maxGap = Math.max(...gaps);
-            
+          if (adjGaps.length > 0) {
+            const maxGap = Math.max(...adjGaps);
+
             let level5 = 1;
-            if (maxGap <= 80) level5 = 4;
-            else if (maxGap <= 100) level5 = 3;
-            else if (maxGap <= 120) level5 = 2;
-            
+            if (maxGap <= 50) level5 = 4;
+            else if (maxGap <= 60) level5 = 3;
+            else if (maxGap <= 80) level5 = 2;
+
             metrics.p5 = {
               valueDeg: maxGap,
               level: level5,
