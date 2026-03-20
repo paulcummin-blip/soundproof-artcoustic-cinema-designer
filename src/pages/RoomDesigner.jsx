@@ -156,7 +156,10 @@ function RoomDesignerWithState() {
     const dims = {
       width: Number(_roomDims?.widthM) || 4.5,
       length: Number(_roomDims?.lengthM) || 6.0,
-      height: Number(_roomDims?.heightM) || 2.8
+      height: Number(_roomDims?.heightM) || 2.8,
+      widthM: Number(_roomDims?.widthM) || 4.5,
+      lengthM: Number(_roomDims?.lengthM) || 6.0,
+      heightM: Number(_roomDims?.heightM) || 2.8,
     };
 
     if (globalThis.__B44_LOGS) {
