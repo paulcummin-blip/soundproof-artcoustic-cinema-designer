@@ -93,7 +93,7 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
     level: level5,
     value: Number(maxGap.toFixed(1)),
     unit: p5CatalogEntry.unit,
-    gaps: innerAngles,
+    gaps: adjGaps,
     note: "Back-arc gaps (MLP)"
   };
 }
