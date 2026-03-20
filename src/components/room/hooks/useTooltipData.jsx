@@ -58,6 +58,8 @@ export function useTooltipData({
       })
       .join('|');
 
+    const seatId = effectiveHoveredSeat?.id;
+
     const layout = dolbyLayout || '5.1';
     const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
     const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
@@ -76,7 +78,6 @@ export function useTooltipData({
 
     const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|${sevenBedMode}|${rp22Fingerprint}`;
 
-    const seatId = effectiveHoveredSeat?.id;
     const isPinnedSeat = !!seatId && !!pinnedSeatId && String(seatId) === String(pinnedSeatId);
 
     const snapshotArgs = {
