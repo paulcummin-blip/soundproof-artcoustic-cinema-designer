@@ -143,7 +143,7 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
 
       // Elevation from seat to row center
       const dz = avgZ - seatZ;
-      const dy = Math.abs(avgY - seatY);
+      const dy = avgY - seatY;
       const elevDeg = Math.atan2(dz, dy) * 180 / Math.PI;
 
       // Build role label
@@ -180,7 +180,10 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
 
     // Compute adjacent row gaps
     for (let i = 1; i < rowData.length; i++) {
-      const gap = Math.abs(rowData[i].elevDeg - rowData[i - 1].elevDeg);
+      const a = rowData[i - 1].elevDeg;
+      const b = rowData[i].elevDeg;
+      const gap = Math.abs(b - a);
+
       allGaps.push({
         pair: `${rowData[i - 1].roleLabel} ↔ ${rowData[i].roleLabel}`,
         deg: gap,
