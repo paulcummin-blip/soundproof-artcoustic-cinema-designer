@@ -56,20 +56,29 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
 
   if (surrounds.length < 2) return null;
 
-  // Use CW back-arc gaps (drop the front wrap)
-  const { backArcAngles } = computeBackArc(surrounds, mlp);
-  const innerAngles = Array.isArray(backArcAngles) ? backArcAngles.slice() : [];
-  if (!innerAngles.length) return null;
+  // P5 RP22 rule: adjacent visible gaps only, no wraparound.
+  // Use the same no-wrap azimuth logic as the HUD/drawing path.
+  const items = [];
+  for (const s of surrounds) {
+    const dx = s.position.x - mlp.x;
+    const dy = s.position.y - mlp.y;
+    const rad = Math.atan2(dx, -dy);
+    let a = rad * (180 / Math.PI);
+    if (a > 180) a -= 360;
+    if (a <= -180) a += 360;
+    const theta = (a + 360) % 360;
+    items.push({ role: s.role, theta });
+  }
+  items.sort((a, b) => a.theta - b.theta);
 
-  // P5 RP22 rule: only adjacent visible gaps, never the wraparound remainder.
-  // computeBackArc may include the large return angle as the last/largest entry.
-  // If there are ≥2 angles, remove the single largest before taking the max.
-  const p5CandidateAngles =
-    innerAngles.length >= 2
-      ? innerAngles.slice().sort((a, b) => a - b).slice(0, -1) // drop the single largest
-      : innerAngles;
+  const adjGaps = [];
+  for (let i = 0; i < items.length - 1; i++) {
+    adjGaps.push(items[i + 1].theta - items[i].theta);
+  }
 
-  const maxGap = Math.max(...p5CandidateAngles);
+  if (!adjGaps.length) return null;
+
+  const maxGap = Math.max(...adjGaps);
 
   const p5CatalogEntry = RP22_CATALOG["5"];
   const lvlP5 = p5CatalogEntry.levels;
