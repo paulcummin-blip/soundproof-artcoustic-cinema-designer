@@ -67,7 +67,14 @@ export function useTooltipData({
       || (appState?.speakerSystem?.useWidesInsteadOfRears ? 'wides' : '')
       || 'rears'
     ).toLowerCase();
-    const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|${sevenBedMode}`;
+    const seatRp22 = seatId ? analysisResult?.perSeatRp22?.[seatId]?.rp22 : null;
+    const rp22Fingerprint = [
+      seatRp22?.[9]?.formatted || '',
+      seatRp22?.[9]?.details?.worst?.deg ?? '',
+      seatRp22?.[10]?.formatted || '',
+    ].join('|');
+
+    const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|${sevenBedMode}|${rp22Fingerprint}`;
 
     const seatId = effectiveHoveredSeat?.id;
     const isPinnedSeat = !!seatId && !!pinnedSeatId && String(seatId) === String(pinnedSeatId);
