@@ -141,8 +141,9 @@ appState, // Pass appState directly for setters
       setProjectNameState(p?.name || "Project"); // Update internal projectName state
       setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
 
-      // Stamp the loaded signature so the autosave effect does not see the
-      // freshly hydrated state as dirty before the user makes any edits.
+      // Stamp the loaded signature using the same serializeProject() shape that
+      // autosave/manual save compare against, so the autosave effect does not
+      // falsely mark the freshly loaded project as dirty.
       const loadedId = p?.id || id;
       if (loadedId) {
         const loadedRefKey = `__rdAutosaveRefs_${loadedId}`;
@@ -154,8 +155,77 @@ appState, // Pass appState directly for setters
           };
         }
         const rLoad = globalThis[loadedRefKey];
+
+        // Parse entity fields exactly as hydrateProjectIntoAppState does,
+        // then feed them into serializeProject() so the sig format matches autosave.
+        const _parseMaybe = (val, fallback) => {
+          if (val == null) return fallback;
+          if (Array.isArray(val) || (typeof val === "object")) return val;
+          if (typeof val === "string" && val.trim()) { try { return JSON.parse(val); } catch { /* */ } }
+          return fallback;
+        };
+        let loadedRoomDims = { widthM: 4.5, lengthM: 6.0, heightM: 2.4 };
+        if (p?.roomDims) {
+          try {
+            const rd = JSON.parse(p.roomDims);
+            loadedRoomDims = { widthM: Number(rd?.widthM ?? rd?.width) || 4.5, lengthM: Number(rd?.lengthM ?? rd?.length) || 6.0, heightM: Number(rd?.heightM ?? rd?.height) || 2.4 };
+          } catch { loadedRoomDims = { widthM: Number(p?.room_width) || 4.5, lengthM: Number(p?.room_length) || 6.0, heightM: Number(p?.room_height) || 2.4 }; }
+        } else {
+          loadedRoomDims = { widthM: Number(p?.room_width) || 4.5, lengthM: Number(p?.room_length) || 6.0, heightM: Number(p?.room_height) || 2.4 };
+        }
+        const loadedScreen = {
+          visibleWidthInches: Number(p?.screen_size) || 120,
+          aspectRatio: p?.aspect_ratio || "16:9",
+          manualMode: !!p?.manual_dimensions,
+          manualWidthM: Number(p?.manual_width_m) || 0,
+          manualHeightM: Number(p?.manual_height_m) || 0,
+          mountMode: p?.screen_mount_mode || "floating",
+          floatDepthM: Number(p?.float_depth_m) || 0.2,
+          showScreenPlane: !!p?.show_screen_plane,
+          showCavity: !!p?.show_cavity,
+          speakerClearanceM: Number(p?.speaker_clearance_m) || 0.02,
+          heightFromFloorM: typeof p?.screen_height_from_floor === "number" ? p.screen_height_from_floor : 0.5,
+        };
+        const loadedFrontSubsCfg = _parseMaybe(p?.front_subs_cfg ?? p?.frontSubsCfg, null);
+        const loadedRearSubsCfg  = _parseMaybe(p?.rear_subs_cfg  ?? p?.rearSubsCfg,  null);
+        const loadedProjectData = serializeProject({
+          name: p?.name || "Untitled Room",
+          roomDims: loadedRoomDims,
+          dimensions: loadedRoomDims,
+          screen: loadedScreen,
+          seatingPositions: _parseMaybe(p?.seating_positions, []),
+          seatsPerRowByRow: _parseMaybe(p?.seats_per_row_by_row, []),
+          rowSpacingM: Number(p?.row_spacing_m) || 1.8,
+          placedSpeakers: _parseMaybe(p?.selected_speakers, []),
+          roomElements: _parseMaybe(p?.room_elements, []),
+          selectedSpeakersByRole: _parseMaybe(p?.selected_speakers_by_role, {}),
+          speakerNodes: _parseMaybe(p?.spl_speaker_nodes, []),
+          dolbyLayout: p?.dolby_config || "5.1",
+          overlays: _parseMaybe(p?.overlays, {}),
+          frozenTabs: _parseMaybe(p?.frozen_tabs, {}),
+          sevenBedLayoutType: p?.seven_bed_layout_type || "rears",
+          frontSubsCfg: loadedFrontSubsCfg,
+          rearSubsCfg: loadedRearSubsCfg,
+          lcrAimMode: p?.lcr_aim_mode || "angled",
+          enableFrontWides: !!p?.enable_front_wides,
+          free_move_lcr: !!p?.free_move_lcr,
+          overheadGlobalModel: p?.overhead_global_model || null,
+          overheadFrontOverride: p?.overhead_front_override || null,
+          overheadMidOverride: p?.overhead_mid_override || null,
+          overheadRearOverride: p?.overhead_rear_override || null,
+          useFrontGlobal: typeof p?.use_front_global === "boolean" ? p.use_front_global : true,
+          useMidGlobal: typeof p?.use_mid_global === "boolean" ? p.use_mid_global : true,
+          useRearGlobal: typeof p?.use_rear_global === "boolean" ? p.use_rear_global : true,
+          screenFrontPlaneM: Number(p?.screen_front_plane_m) || 0,
+          splConfig: _parseMaybe(p?.spl_config, null),
+          p12Mode: p?.spl_config?.p12_mode ?? null,
+          p12Level: p?.spl_config?.p12_level ?? null,
+        });
+        delete loadedProjectData.name;
+        delete loadedProjectData.client_name;
+
         let loadedSig = "";
-        try { loadedSig = JSON.stringify(p); } catch { loadedSig = ""; }
+        try { loadedSig = JSON.stringify(loadedProjectData); } catch { loadedSig = ""; }
         rLoad.lastSavedSig = loadedSig;
         rLoad.lastQueuedSig = loadedSig;
         rLoad.dirty = false;
