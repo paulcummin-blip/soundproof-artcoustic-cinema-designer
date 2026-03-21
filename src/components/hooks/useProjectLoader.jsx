@@ -656,9 +656,6 @@ const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
         // Stamp the saved signature NOW (before any reload that re-hydrates state)
         // so the autosave effect does not see the post-hydration state as dirty.
         const savedSig = (() => { try { return JSON.stringify(projectData); } catch { return ""; } })();
-        const savedRefKey = `__rdAutosaveRefs_${effectiveProjectId}`;
-        if (!globalThis[savedRefKey]) globalThis[savedRefKey] = { dirty: false, inFlight: false, lastSavedSig: "", lastQueuedSig: "", lastSaveAt: 0, intervalId: null, debounceId: null, saveToken: 0 };
-        const rMS = globalThis[savedRefKey];
         // Bump the token so any autosave that was in-flight before this point
         // will see r.saveToken !== myToken after its own await and abort its stamp.
         rMS.saveToken = (rMS.saveToken || 0) + 1;
@@ -666,7 +663,6 @@ const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
         rMS.lastQueuedSig = savedSig;
         rMS.lastSaveAt = Date.now();
         rMS.dirty = false;
-        rMS.inFlight = false;
 
         setAutosaveStatus("saved");
         return { success: true };
@@ -679,6 +675,8 @@ const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
       setAutosaveStatus("error");
       if (globalThis.__B44_LOGS) console.error("Error during manual save:", e);
       return { success: false, error: e.message || String(e) };
+    } finally {
+      rMS.inFlight = false;
     }
   }, [
   projectIdState,
