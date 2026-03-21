@@ -313,6 +313,7 @@ appState, // Pass appState directly for setters
         }
 
         r.lastSavedSig = sig;
+        r.lastQueuedSig = sig;
         r.lastSaveAt = Date.now();
         r.dirty = false;
         setAutosaveStatus("saved");
