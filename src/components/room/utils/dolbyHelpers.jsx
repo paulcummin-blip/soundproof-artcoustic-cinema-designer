@@ -194,7 +194,20 @@ export function ensureAtmosOverheads({
     const canonId = String(id || "").toUpperCase();
     const existing = existingByRole.get(canonId);
     if (existing) {
-      nextOverheads.push(existing);
+      const seededSpk = seededOverheadsByRole.get(canonId);
+      const nextZ = seededSpk?.position?.z;
+
+      if (Number.isFinite(nextZ)) {
+        nextOverheads.push({
+          ...existing,
+          position: {
+            ...(existing.position || {}),
+            z: nextZ,
+          },
+        });
+      } else {
+        nextOverheads.push(existing);
+      }
       continue;
     }
 
