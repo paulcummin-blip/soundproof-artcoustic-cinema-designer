@@ -135,11 +135,32 @@ appState, // Pass appState directly for setters
       const projects = await Project.filter({ id }, '-updated_date', 1);
 
       if (Array.isArray(projects) && projects.length) {
-        const p = projects[0] || null;
-        if (globalThis.__B44_LOGS) console.log('[RD] loadProject result', { projectIdState, id: p?.id, name: p?.name });
-        hydrateFromProject(p);
-        setProjectNameState(p?.name || "Project"); // Update internal projectName state
-        setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
+      const p = projects[0] || null;
+      if (globalThis.__B44_LOGS) console.log('[RD] loadProject result', { projectIdState, id: p?.id, name: p?.name });
+      hydrateFromProject(p);
+      setProjectNameState(p?.name || "Project"); // Update internal projectName state
+      setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
+
+      // Stamp the loaded signature so the autosave effect does not see the
+      // freshly hydrated state as dirty before the user makes any edits.
+      const loadedId = p?.id || id;
+      if (loadedId) {
+        const loadedRefKey = `__rdAutosaveRefs_${loadedId}`;
+        if (!globalThis[loadedRefKey]) {
+          globalThis[loadedRefKey] = {
+            dirty: false, inFlight: false,
+            lastSavedSig: "", lastQueuedSig: "",
+            lastSaveAt: 0, intervalId: null, debounceId: null, saveToken: 0,
+          };
+        }
+        const rLoad = globalThis[loadedRefKey];
+        let loadedSig = "";
+        try { loadedSig = JSON.stringify(p); } catch { loadedSig = ""; }
+        rLoad.lastSavedSig = loadedSig;
+        rLoad.lastQueuedSig = loadedSig;
+        rLoad.dirty = false;
+        // preserve saveToken if already set by a prior save in this session
+      }
       } else {
         // Project not found in cloud; keeping id so user can still save into it
         if (globalThis.__B44_LOGS) console.log('[RoomDesigner] Project not found in cloud; keeping id so user can continue working.');
