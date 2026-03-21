@@ -289,12 +289,6 @@ appState, // Pass appState directly for setters
       // Only save when dirty, and avoid overlapping writes
       if (!r.dirty || r.inFlight) return;
 
-      // Enforce "no-noise" cadence
-      const now = Date.now();
-      if (r.lastSaveAt && (now - r.lastSaveAt) < AUTOSAVE_INTERVAL_MS) {
-        return;
-      }
-
       r.inFlight = true;
       setAutosaveStatus("saving");
 
