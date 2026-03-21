@@ -222,6 +222,7 @@ appState, // Pass appState directly for setters
         dirty: false,
         inFlight: false,
         lastSavedSig: "",
+        lastQueuedSig: "",
         lastSaveAt: 0,
         intervalId: null,
         debounceId: null,
