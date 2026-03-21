@@ -200,6 +200,20 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     appState.setSplConfig(splCfg || defaultSplConfig);
   }
 
+  // 10b) P12 mode/level (stored inside spl_config on the entity)
+  if (typeof appState?.setP12Mode === "function") {
+    appState.setP12Mode(p?.spl_config?.p12_mode ?? null);
+  }
+  if (typeof appState?.setP12Level === "function") {
+    appState.setP12Level(p?.spl_config?.p12_level ?? null);
+  }
+
+  // 10c) screenFrontPlaneM — restore persisted value so signature matches on first autosave tick
+  if (typeof appState?.setScreenFrontPlaneM === "function") {
+    const sfp = Number(p?.screen_front_plane_m);
+    appState.setScreenFrontPlaneM(Number.isFinite(sfp) ? sfp : 0);
+  }
+
   // 11) PLACED SPEAKERS
   const loadedSpeakers = (() => {
     const v1 = parseMaybe(p?.selected_speakers, null);
