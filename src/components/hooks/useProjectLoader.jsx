@@ -216,7 +216,7 @@ appState, // Pass appState directly for setters
           useFrontGlobal: typeof p?.use_front_global === "boolean" ? p.use_front_global : true,
           useMidGlobal: typeof p?.use_mid_global === "boolean" ? p.use_mid_global : true,
           useRearGlobal: typeof p?.use_rear_global === "boolean" ? p.use_rear_global : true,
-          screenFrontPlaneM: Number(p?.screen_front_plane_m) || 0,
+          screenFrontPlaneM: (() => { const v = Number(p?.screen_front_plane_m); return Number.isFinite(v) ? v : 0; })(),
           splConfig: _parseMaybe(p?.spl_config, null),
           p12Mode: p?.spl_config?.p12_mode ?? null,
           p12Level: p?.spl_config?.p12_level ?? null,
