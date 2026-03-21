@@ -226,6 +226,7 @@ appState, // Pass appState directly for setters
         lastSaveAt: 0,
         intervalId: null,
         debounceId: null,
+        saveToken: 0, // incremented by any save that wins; stale completions check this before stamping
       };
     }
     const r = globalThis[refKey];
