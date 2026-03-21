@@ -98,7 +98,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       manualMode: !!p?.manual_dimensions,
       manualWidthM: Number(p?.manual_width_m) || 0,
       manualHeightM: Number(p?.manual_height_m) || 0,
-      mountMode: "floating",
+      mountMode: p?.screen_mount_mode || "floating",
       floatDepthM: Number(p?.float_depth_m) || 0.2,
       showScreenPlane: !!p?.show_screen_plane,
       showCavity: !!p?.show_cavity,

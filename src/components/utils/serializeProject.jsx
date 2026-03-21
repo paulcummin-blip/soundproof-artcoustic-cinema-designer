@@ -155,7 +155,7 @@ export function serializeProject(input = {}) {
     manual_width_m: manualWidthM,
     manual_height_m: manualHeightM,
     screen_height_from_floor: screenHeightFromFloorM,
-    screen_mount_mode: "floating",
+    screen_mount_mode: screen?.mountMode || "floating",
     float_depth_m: floatDepthM,
     show_screen_plane: showScreenPlane,
     show_cavity: showCavity,
