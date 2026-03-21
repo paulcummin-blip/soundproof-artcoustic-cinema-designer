@@ -522,6 +522,29 @@ appState, // Pass appState directly for setters
     // 2) id from URL query (?project=...)
     const effectiveProjectId = projectIdState || projectIdFromUrl || null;
 
+    // Reuse the same per-project bucket as autosave so we share the inFlight lock
+    const savedRefKey = `__rdAutosaveRefs_${effectiveProjectId}`;
+    if (!globalThis[savedRefKey]) {
+      globalThis[savedRefKey] = {
+        dirty: false,
+        inFlight: false,
+        lastSavedSig: "",
+        lastQueuedSig: "",
+        lastSaveAt: 0,
+        intervalId: null,
+        debounceId: null,
+        saveToken: 0,
+      };
+    }
+    const rMS = globalThis[savedRefKey];
+
+    // Block if autosave already owns the lock
+    if (rMS.inFlight) {
+      setAutosaveStatus("saving");
+      return { success: false, error: "Save already in progress." };
+    }
+    rMS.inFlight = true;
+
     try {
       // DEBUG: Capture pre-save snapshot
       const debugSnapshot = {
