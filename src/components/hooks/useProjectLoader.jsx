@@ -634,10 +634,16 @@ const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
         // so the autosave effect does not see the post-hydration state as dirty.
         const savedSig = (() => { try { return JSON.stringify(projectData); } catch { return ""; } })();
         const savedRefKey = `__rdAutosaveRefs_${effectiveProjectId}`;
-        if (!globalThis[savedRefKey]) globalThis[savedRefKey] = { dirty: false, inFlight: false, lastSavedSig: "", lastSaveAt: 0, intervalId: null, debounceId: null };
-        globalThis[savedRefKey].lastSavedSig = savedSig;
-        globalThis[savedRefKey].lastSaveAt = Date.now();
-        globalThis[savedRefKey].dirty = false;
+        if (!globalThis[savedRefKey]) globalThis[savedRefKey] = { dirty: false, inFlight: false, lastSavedSig: "", lastQueuedSig: "", lastSaveAt: 0, intervalId: null, debounceId: null, saveToken: 0 };
+        const rMS = globalThis[savedRefKey];
+        // Bump the token so any autosave that was in-flight before this point
+        // will see r.saveToken !== myToken after its own await and abort its stamp.
+        rMS.saveToken = (rMS.saveToken || 0) + 1;
+        rMS.lastSavedSig = savedSig;
+        rMS.lastQueuedSig = savedSig;
+        rMS.lastSaveAt = Date.now();
+        rMS.dirty = false;
+        rMS.inFlight = false;
 
         setAutosaveStatus("saved");
         return { success: true };
