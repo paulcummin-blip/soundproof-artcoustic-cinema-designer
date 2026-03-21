@@ -43,7 +43,6 @@ export function useSpeakerReconciliation({
     if (
       loadState?.phase === "loaded" &&
       hasProjectId &&
-      !presetChanged &&
       !didUserRequestResetRef.current &&
       !resetEpochChanged
     ) {
