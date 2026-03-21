@@ -325,44 +325,39 @@ appState, // Pass appState directly for setters
       }
     };
 
-    // Mark dirty (but only if the serialised payload changed)
+    // Compute signature once — used to decide whether to queue a new debounce
+    let currentSig = "";
     try {
-      const sig = computeSig(buildProjectData());
-      if (sig !== r.lastSavedSig) {
-        r.dirty = true;
-        setAutosaveStatus("dirty");
-      } else {
-        // If we're already in sync, keep it calm
-        if (!r.inFlight) setAutosaveStatus("saved");
-        r.dirty = false;
-      }
+      currentSig = computeSig(buildProjectData());
     } catch {
-      // If build fails for any reason, stay dirty (but do not crash)
-      r.dirty = true;
-      setAutosaveStatus("dirty");
+      currentSig = String(Date.now()); // treat as changed if build fails
     }
 
-    // Debounce: save soon after a pause, but still obey the 10s cadence inside trySaveNow()
-    if (r.debounceId) clearTimeout(r.debounceId);
-    r.debounceId = setTimeout(() => {
-      void trySaveNow();
-    }, AUTOSAVE_DEBOUNCE_MS);
+    if (currentSig === r.lastSavedSig) {
+      // Already in sync — no need to queue anything
+      if (!r.inFlight) setAutosaveStatus("saved");
+      r.dirty = false;
+    } else if (currentSig !== r.lastQueuedSig) {
+      // Payload has changed AND differs from what is already queued — reschedule
+      r.dirty = true;
+      r.lastQueuedSig = currentSig;
+      setAutosaveStatus("dirty");
+      if (r.debounceId) clearTimeout(r.debounceId);
+      r.debounceId = setTimeout(() => {
+        void trySaveNow();
+      }, AUTOSAVE_DEBOUNCE_MS);
+    }
+    // else: payload changed but matches what is already queued — leave the pending debounce alone
 
-    // Interval: ensure we commit at least every 10 seconds while dirty
+    // Interval: ensure we commit at least every 30 seconds while dirty
     if (!r.intervalId) {
       r.intervalId = setInterval(() => {
         void trySaveNow();
       }, AUTOSAVE_INTERVAL_MS);
     }
 
-    return () => {
-      if (r.debounceId) {
-        clearTimeout(r.debounceId);
-        r.debounceId = null;
-      }
-      // NOTE: we intentionally keep the interval alive for this mounted RoomDesigner instance
-      // It will be naturally cleared when the page unmounts (full navigation / remount).
-    };
+    // No cleanup of debounceId here — intentional.
+    // Clearing it on every effect re-run was the root cause of the self-cancellation bug.
   }, [
   projectIdState,
   projectIdFromUrl,
