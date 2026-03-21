@@ -356,8 +356,21 @@ appState, // Pass appState directly for setters
       }, AUTOSAVE_INTERVAL_MS);
     }
 
-    // No cleanup of debounceId here — intentional.
-    // Clearing it on every effect re-run was the root cause of the self-cancellation bug.
+    // Cleanup: clear the interval and debounce for THIS project bucket when the effect
+    // re-runs (project switch, scratch transition) or the component unmounts.
+    // This prevents stale intervals from a previous effectiveProjectId continuing to
+    // call trySaveNow() — and therefore Project.update() and setAutosaveStatus() —
+    // against the wrong project or after the component is gone.
+    return () => {
+      if (r.intervalId) {
+        clearInterval(r.intervalId);
+        r.intervalId = null;
+      }
+      if (r.debounceId) {
+        clearTimeout(r.debounceId);
+        r.debounceId = null;
+      }
+    };
   }, [
   projectIdState,
   projectIdFromUrl,
