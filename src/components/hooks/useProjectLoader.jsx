@@ -336,6 +336,9 @@ appState, // Pass appState directly for setters
         // If a manual save completed while we were awaiting, its token bump means
         // our result is now stale — do not overwrite the newer stamped state.
         if (r.saveToken !== myToken) {
+          // Do not stamp old state, but resolve the badge to the correct calm
+          // state based on what the winning save already recorded in the bucket.
+          setAutosaveStatus(r.dirty ? "dirty" : "saved");
           return;
         }
 
