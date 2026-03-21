@@ -294,6 +294,10 @@ appState, // Pass appState directly for setters
       r.inFlight = true;
       setAutosaveStatus("saving");
 
+      // Capture the token BEFORE the await so we can detect if a manual save
+      // completed while this autosave was in flight and already incremented it.
+      const myToken = r.saveToken;
+
       try {
         const data = buildProjectData();
         const sig = computeSig(data);
@@ -307,6 +311,12 @@ appState, // Pass appState directly for setters
         }
 
         await Project.update(effectiveProjectId, data);
+
+        // If a manual save completed while we were awaiting, its token bump means
+        // our result is now stale — do not overwrite the newer stamped state.
+        if (r.saveToken !== myToken) {
+          return;
+        }
 
         // Ensure our local state keeps the id we just wrote to
         if (!projectIdState) {
