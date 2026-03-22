@@ -265,6 +265,10 @@ export default function UnifiedSurroundsConfig({
     ];
   }, [getModelsByCategoryOrdered]);
 
+  const surroundOverrideChoices = useMemo(() => {
+    return surroundChoices.filter(c => c.value !== 'off');
+  }, [surroundChoices]);
+
   return (
     <div className="space-y-3 p-2">
       <SurroundsSelector
