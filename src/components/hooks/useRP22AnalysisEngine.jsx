@@ -954,36 +954,70 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P6 - Surround SPL delta
+      // P6 - Surround SPL consistency, normalised to RSP (MLP seat)
+      // Correct formula: max(abs((SPL_i_seat - SPL_i_rsp) - (SPL_j_seat - SPL_j_rsp)))
       if (seatSplMetrics) {
         const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
-        if (seatSpl?.surrounds) {
-          const surSplValues = Object.values(seatSpl.surrounds)
-            .map(s => s.value)
-            .filter(isNum);
+        const rspSpl  = getSeatSplMetrics(seatSplMetrics, "mlp");
 
-          if (surSplValues.length >= 2) {
-            let maxDelta = 0;
-            for (let i = 0; i < surSplValues.length; i++) {
-              for (let j = i + 1; j < surSplValues.length; j++) {
-                const delta = Math.abs(surSplValues[i] - surSplValues[j]);
-                if (delta > maxDelta) maxDelta = delta;
+        if (seatSpl?.surrounds && rspSpl?.surrounds) {
+          const P6_ROLES = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'];
+
+          // Build normalised values for roles present in BOTH seat and RSP
+          const normalizedByRole = {};
+          const seatByRole       = {};
+          const rspByRole        = {};
+
+          for (const role of P6_ROLES) {
+            const seatVal = seatSpl.surrounds[role]?.value;
+            const rspVal  = rspSpl.surrounds[role]?.value;
+            if (isNum(seatVal) && isNum(rspVal)) {
+              normalizedByRole[role] = seatVal - rspVal;
+              seatByRole[role]       = seatVal;
+              rspByRole[role]        = rspVal;
+            }
+          }
+
+          const rolesUsed      = Object.keys(normalizedByRole);
+          const normValues     = Object.values(normalizedByRole);
+
+          if (normValues.length >= 2) {
+            let maxDeltaRaw = 0;
+            for (let i = 0; i < normValues.length; i++) {
+              for (let j = i + 1; j < normValues.length; j++) {
+                const delta = Math.abs(normValues[i] - normValues[j]);
+                if (delta > maxDeltaRaw) maxDeltaRaw = delta;
               }
             }
 
-            if (isNum(maxDelta)) {
-              let level6 = 1;
-              if (maxDelta <= 2) level6 = 4;
-              else if (maxDelta <= 4) level6 = 3;
-              else if (maxDelta <= 6) level6 = 2;
-              else if (maxDelta <= 10) level6 = 1;
+            // Grade from raw float — do NOT floor/round before grading
+            let level6 = 1;
+            if      (maxDeltaRaw <= 2)  level6 = 4;
+            else if (maxDeltaRaw <= 4)  level6 = 3;
+            else if (maxDeltaRaw <= 6)  level6 = 2;
+            else if (maxDeltaRaw <= 10) level6 = 1;
 
-              metrics.p6 = {
-                valueDb: maxDelta,
+            if (globalThis.__B44_LOGS) {
+              console.log('[RP22 P6 normalized]', {
+                seatId,
+                rolesUsed,
+                normalizedByRole,
+                maxDeltaRaw,
                 level: level6,
-                formatted: `${Math.floor(maxDelta)} dB`
-              };
+              });
             }
+
+            metrics.p6 = {
+              valueDb:         maxDeltaRaw,
+              level:           level6,
+              formatted:       `${Math.floor(maxDeltaRaw)} dB`,
+              // Debug payload
+              rolesUsed,
+              normalizedByRole,
+              rspByRole,
+              seatByRole,
+              maxDeltaRaw,
+            };
           }
         }
       }
