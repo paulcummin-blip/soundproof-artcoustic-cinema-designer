@@ -78,13 +78,34 @@ export default function UnifiedSurroundsConfig({
     modelKey = normaliseModelKey(modelKey);
     const modelKeyLower = modelKey.toLowerCase();
 
+    // Resolve per-group override models (normalised, falling back to global)
+    const resolveGroupModel = (groupVal, groupOverride) => {
+      if (!groupOverride) return modelKey; // use global
+      const raw = String(groupVal || "").trim();
+      const norm = normaliseModelKey(raw);
+      const lower = norm.toLowerCase();
+      if (!norm || lower === "off" || lower === "none") return modelKey;
+      return norm;
+    };
+
+    const sideModel = resolveGroupModel(safeConfig.value.side, safeConfig.override.side);
+    const rearModel = resolveGroupModel(safeConfig.value.rear, safeConfig.override.rear);
+    const wideModel = resolveGroupModel(safeConfig.value.wide, safeConfig.override.wide);
+
+    // Role -> resolved model
+    const roleModelMap = {
+      SL: sideModel, SR: sideModel,
+      SBL: rearModel, SBR: rearModel,
+      LW: wideModel, RW: wideModel,
+    };
+
     const cleanModelKey = modelKey && modelKey.endsWith("_s") ? modelKey.slice(0, -2) : modelKey;
     if (app && typeof app.setGlobalSurroundModel === "function") {
       app.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : cleanModelKey);
     }
 
     if (globalThis.__B44_LOGS) {
-      console.log("[SP handleSurroundModelChange]", { modelKey, effectivePreset, useWides });
+      console.log("[SP handleSurroundModelChange]", { modelKey, sideModel, rearModel, wideModel, effectivePreset, useWides });
     }
 
     setSpeakers((prev) => {
@@ -140,10 +161,12 @@ export default function UnifiedSurroundsConfig({
         return result;
       }
 
+      // Apply resolved per-role models (overrides take effect here)
       for (const role of layoutRoles) {
         const s = byRole.get(role);
         if (!s) continue;
-        byRole.set(role, { ...s, model: modelKey });
+        const resolvedModel = roleModelMap[role] || modelKey;
+        byRole.set(role, { ...s, model: resolvedModel });
       }
 
       const draft = Array.from(byRole.values());
