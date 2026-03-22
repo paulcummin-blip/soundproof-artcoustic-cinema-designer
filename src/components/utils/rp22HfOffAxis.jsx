@@ -331,33 +331,19 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   // Ensure the speaker is always above the listener
   const speakerZ = Math.max(earZ + 0.01, speakerZRaw);
 
-  // Calculate angle assuming speaker aims at RSP (green dot)
-  let rawAngleDeg;
-  
-  // Build aim vector (speaker → RSP) and seat vector (speaker → seat)
-  let _dbgSpk, _dbgSeat, _dbgRsp, _dbgAimVec, _dbgSeatVec;
-  if (rspPos && isNum(rspPos.x) && isNum(rspPos.y)) {
-    const spk = spkXYZ({ position: speakerPos }, roomHeightM);
-    const seat = seatXYZ(seatPos);
-    const rsp = { x: Number(rspPos.x), y: Number(rspPos.y), z: Number(rspPos.z ?? 1.2) };
+  // Overhead speakers are ceiling-mounted. Default acoustic axis is straight DOWN.
+  // rawAngleDeg = angle between the straight-down axis (0,0,-1) and the speaker→seat vector.
+  const spk = spkXYZ({ position: speakerPos }, roomHeightM);
+  const seat = seatXYZ(seatPos);
 
-    const aimVec = { x: rsp.x - spk.x, y: rsp.y - spk.y, z: rsp.z - spk.z };
-    const seatVec = { x: seat.x - spk.x, y: seat.y - spk.y, z: seat.z - spk.z };
+  // Straight-down axis (unit vector pointing downward from ceiling)
+  const downAxis = { x: 0, y: 0, z: -1 };
 
-    _dbgSpk = spk; _dbgSeat = seat; _dbgRsp = rsp;
-    _dbgAimVec = aimVec; _dbgSeatVec = seatVec;
+  // Vector from speaker to seat (not normalised yet — angleBetweenDeg normalises internally)
+  const seatVec = { x: seat.x - spk.x, y: seat.y - spk.y, z: seat.z - spk.z };
 
-    const ang = angleBetweenDeg(aimVec, seatVec);
-    rawAngleDeg = Number.isFinite(ang) ? ang : 0;
-  } else {
-    // Fallback: straight down method
-    const horizontalDist = Math.hypot(
-      Number(seatPos.x) - Number(speakerPos.x),
-      Number(seatPos.y) - Number(speakerPos.y)
-    );
-    const verticalDist = speakerZ - earZ;
-    rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
-  }
+  const ang = angleBetweenDeg(downAxis, seatVec);
+  const rawAngleDeg = Number.isFinite(ang) ? ang : 0;
 
   // Get model metadata for aim offset and dispersion
   const meta = getSpeakerModelMeta(modelKey);
