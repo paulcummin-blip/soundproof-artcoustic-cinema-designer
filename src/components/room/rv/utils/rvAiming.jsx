@@ -69,88 +69,37 @@ export function getPlanAimDeg(
 
   const role = getCanonicalRole ? getCanonicalRole(speaker.role) : (speaker.role ?? '').toUpperCase();
 
-  const getSideOrRearWallFlatYaw = (resolvedRole) => {
-    const x = Number(speaker?.x ?? speaker?.position?.x ?? 0);
-    const y = Number(speaker?.y ?? speaker?.position?.y ?? 0);
-    const distToRear = lengthM - y;
-    const distToLeft = x;
-    const distToRight = widthM - x;
+  // ── LCR: handled locally (not surround logic) ─────────────────────────────
+  if (role === 'FL' || role === 'L') {
+    if (aimLeftRightAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
+    return lcrAngleInfo?.L ?? 0;
+  }
+  if (role === 'FC' || role === 'C') return 0;
+  if (role === 'FR' || role === 'R') {
+    if (aimLeftRightAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
+    return lcrAngleInfo?.R ?? 0;
+  }
 
-    if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
-    if (/^SL\d*$/.test(resolvedRole)) return 90;
-    if (/^SR\d*$/.test(resolvedRole)) return -90;
-    return 0;
+  // ── Surrounds / Wides: delegate to single source of truth ─────────────────
+  // Build a minimal appState-like object from the individual toggle booleans
+  const appState = {
+    aimFrontWidesAtMLP:    aimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP: aimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP: aimRearSurroundsAtMLP,
   };
 
-  switch (role) {
-    // ── LCR front ──────────────────────────────────────────────────────────
-    case 'FL':
-    case 'L':
-      if (aimLeftRightAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      return lcrAngleInfo?.L ?? 0;
+  // Normalise speaker position so resolveSpeakerYaw can read it as .position
+  const speakerWithPos = {
+    ...speaker,
+    position: speaker.position ?? { x: speaker.x, y: speaker.y },
+  };
 
-    case 'FC':
-    case 'C':
-      return 0;
-
-    case 'FR':
-    case 'R':
-      if (aimLeftRightAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      return lcrAngleInfo?.R ?? 0;
-
-    // ── Front wides ────────────────────────────────────────────────────────
-    case 'LW':
-      if (aimFrontWidesAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      return 90; // wall-flat left
-
-    case 'RW':
-      if (aimFrontWidesAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      return -90; // wall-flat right
-
-    // ── Side surrounds ─────────────────────────────────────────────────────
-    case 'SL':
-      if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      return getSideOrRearWallFlatYaw(role);
-
-    case 'SR':
-      if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      return getSideOrRearWallFlatYaw(role);
-
-    // ── Rear surrounds ─────────────────────────────────────────────────────
-    case 'SBL': {
-      if (aimRearSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      // Choose orientation based on nearest wall
-      const distToRear  = lengthM - (speaker.y ?? 0);
-      const distToLeft  = speaker.x ?? 0;
-      const distToRight = widthM - (speaker.x ?? 0);
-      if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
-      if (distToLeft <= distToRight) return 90;
-      return -90;
-    }
-
-    case 'SBR': {
-      if (aimRearSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-      const distToRear  = lengthM - (speaker.y ?? 0);
-      const distToLeft  = speaker.x ?? 0;
-      const distToRight = widthM - (speaker.x ?? 0);
-      if (distToRear <= distToLeft && distToRear <= distToRight) return 180;
-      if (distToRight <= distToLeft) return -90;
-      return 90;
-    }
-
-    // ── Extra side surrounds (SL2/SR2, SL3/SR3…) ──────────────────────────
-    default: {
-      if (/^SL\d+$/.test(role)) {
-        if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-        return getSideOrRearWallFlatYaw(role);
-      }
-      if (/^SR\d+$/.test(role)) {
-        if (aimSideSurroundsAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
-        return getSideOrRearWallFlatYaw(role);
-      }
-      return 0;
-    }
-  }
+  return resolveSpeakerYaw({
+    speaker: speakerWithPos,
+    mlpPos: mlp,
+    appState,
+    getCanonicalRole,
+  });
 }
 
 // ─── Simple yaw resolver ──────────────────────────────────────────────────────
