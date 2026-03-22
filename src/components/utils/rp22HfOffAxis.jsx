@@ -335,6 +335,7 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   let rawAngleDeg;
   
   // Build aim vector (speaker → RSP) and seat vector (speaker → seat)
+  let _dbgSpk, _dbgSeat, _dbgRsp, _dbgAimVec, _dbgSeatVec;
   if (rspPos && isNum(rspPos.x) && isNum(rspPos.y)) {
     const spk = spkXYZ({ position: speakerPos }, roomHeightM);
     const seat = seatXYZ(seatPos);
@@ -342,6 +343,9 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
 
     const aimVec = { x: rsp.x - spk.x, y: rsp.y - spk.y, z: rsp.z - spk.z };
     const seatVec = { x: seat.x - spk.x, y: seat.y - spk.y, z: seat.z - spk.z };
+
+    _dbgSpk = spk; _dbgSeat = seat; _dbgRsp = rsp;
+    _dbgAimVec = aimVec; _dbgSeatVec = seatVec;
 
     const ang = angleBetweenDeg(aimVec, seatVec);
     rawAngleDeg = Number.isFinite(ang) ? ang : 0;

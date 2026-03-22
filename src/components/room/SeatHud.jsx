@@ -428,6 +428,21 @@ export default function SeatHud({
                         'none'}
                     </div>
                   )}
+                  {/* TEMP GEO PROBE: worst overhead speaker full coordinate dump */}
+                  {(() => {
+                    const worst = metric.worstRole
+                      ? metric.perSpeaker.find(s => s.role === metric.worstRole)
+                      : metric.perSpeaker.find(s => s.debug?.speakerX != null);
+                    const d = worst?.debug;
+                    if (!d || d.speakerX == null) return null;
+                    const f2 = v => Number.isFinite(v) ? v.toFixed(2) : '?';
+                    const f1 = v => Number.isFinite(v) ? v.toFixed(1) : '?';
+                    return (
+                      <div style={{ fontSize: 9, color: '#aaa', paddingLeft: 16, paddingTop: 2, fontFamily: 'monospace' }}>
+                        {worst.role}: roomH={f2(d.roomHeightMUsed)}, earZ={f2(d.earHeightMUsed)}, spk=({f2(d.speakerX)},{f2(d.speakerY)},{f2(d.speakerZUsed)}), seat=({f2(d.seatX)},{f2(d.seatY)},{f2(d.seatZUsed)}), rsp=({f2(d.rspX)},{f2(d.rspY)},{f2(d.rspZUsed)}), raw={f1(d.rawAngleDeg)}, aim={f1(d.aimOffsetDeg)}, eff={f1(d.effectiveAngleDeg)}
+                      </div>
+                    );
+                  })()}
                   {metric.p17HasNaAngles && (
                     <div
                       style={{
