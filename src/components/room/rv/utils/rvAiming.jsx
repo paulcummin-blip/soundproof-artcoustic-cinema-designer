@@ -8,6 +8,7 @@
 // safeYawToMLP lives in RenderPrimitives; getCanonicalRole in surroundRoleMap.
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
+import { resolveSpeakerYaw } from '@/components/utils/speakerAimResolver';
 
 // ─── Low-level helpers ────────────────────────────────────────────────────────
 

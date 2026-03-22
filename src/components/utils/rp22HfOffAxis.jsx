@@ -6,6 +6,7 @@
 // between the speaker's front axis and the seat direction.
 
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
+import { resolveSpeakerYaw } from "@/components/utils/speakerAimResolver";
 
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
 const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC"]);
