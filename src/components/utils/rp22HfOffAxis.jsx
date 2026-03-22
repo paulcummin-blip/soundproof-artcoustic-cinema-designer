@@ -98,10 +98,14 @@ const shortestAngleDeg = (aDeg, bDeg) => {
   return Math.abs(d);
 };
 
-// Helper: convert full included angle to half-angle (±off-axis), rounded up
+// Helper: pass through the registry dispersion value unchanged.
+// IMPORTANT: Registry dispersion values (minus1p5dB, minus3dB, minus5dB) are ALREADY
+// stored as half-angle off-axis limits (±degrees from centre line).
+// They must NOT be divided by 2 again — do not halve them.
+// e.g. registry value 30 → threshold 30°, NOT 15°.
 function halfDispersionDeg(fullDeg) {
   if (!Number.isFinite(fullDeg)) return null;
-  return Math.ceil(fullDeg / 2);
+  return Math.ceil(fullDeg); // no division — value is already a half-angle
 }
 
 // Centralized angle → HF loss mapping using new RP22 thresholds
