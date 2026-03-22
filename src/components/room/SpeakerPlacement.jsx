@@ -569,6 +569,20 @@ function SpeakerPlacementImpl(props) {
     };
   });
 
+  // Sync non-overridden group values to master whenever master changes
+  useEffect(() => {
+    const master = surroundConfig?.value?.master;
+    if (!master || master === 'off') return;
+    setSurroundConfig(prev => {
+      const next = { ...prev, value: { ...prev.value } };
+      let changed = false;
+      if (!prev.override.side && prev.value.side !== master) { next.value.side = master; changed = true; }
+      if (!prev.override.rear && prev.value.rear !== master) { next.value.rear = master; changed = true; }
+      if (!prev.override.wide && prev.value.wide !== master) { next.value.wide = master; changed = true; }
+      return changed ? next : prev;
+    });
+  }, [surroundConfig?.value?.master]);
+
   // Input signature ref for idempotence
   const lastSurroundResetSigRef = React.useRef(null);
 
