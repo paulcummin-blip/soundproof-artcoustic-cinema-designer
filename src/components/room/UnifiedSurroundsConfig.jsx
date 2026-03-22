@@ -274,6 +274,7 @@ export default function UnifiedSurroundsConfig({
       <SurroundsSelector
         layout={dolbyPreset}
         choices={surroundChoices}
+        overrideChoices={surroundOverrideChoices}
         value={surroundConfig.value}
         override={surroundConfig.override}
         onChange={handleSurroundModelChange}
