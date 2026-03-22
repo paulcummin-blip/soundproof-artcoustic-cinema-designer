@@ -171,9 +171,39 @@ const classifyP16 = (lossDb) => {
   return 4;                      // ≤1.5 dB
 };
 
+// Helper: compute raw lossDb for one LCR speaker at a given seat point
+function computeLcrLossAtPoint(spk, point, mlpPos) {
+  if (!point || !isNum(point.x) || !isNum(point.y)) return null;
+  const pos = spk.position;
+
+  const seatAzDeg = yawFromToPlan(pos, point);
+  if (!isNum(seatAzDeg)) return null;
+
+  const aimDegRaw =
+    (isNum(spk?.yaw) ? spk.yaw : null) ??
+    (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y) ? yawFromToPlan(pos, mlpPos) : null) ??
+    0;
+
+  const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDegRaw);
+  const offAxisDeg = Math.abs(offAxisRaw);
+  if (!isNum(offAxisDeg)) return null;
+
+  const angleDeg = quantiseAngleDown(offAxisDeg, 0.5);
+  const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
+  const lossFromAngle = mapAngleToHfLossDb(angleDeg, meta);
+
+  if (lossFromAngle == null) {
+    return { lossDb: 5.0, angleDeg, isBeyondLcrLimit: true };
+  }
+  return { lossDb: lossFromAngle, angleDeg, isBeyondLcrLimit: false };
+}
+
 export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos = null) {
   if (!seat || !isNum(seat.x) || !isNum(seat.y)) return null;
   if (!Array.isArray(allSpeakers) || !allSpeakers.length) return null;
+
+  // RSP is mlpPos; if not provided fall back to the seat itself (RSP → 0 dB)
+  const rspPoint = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? mlpPos : seat;
 
   // 1) Pick LCR speakers that have valid positions
   const lcrSpeakers = allSpeakers.filter((spk) => {
@@ -190,64 +220,45 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
   if (!lcrSpeakers.length) return null;
 
   const perSpeaker = {};
-  let worstLossDb = -Infinity;
+  let worstDelta = -Infinity;
   let worstRole = null;
 
-  // 2) Evaluate each LCR for this seat
+  // 2) Evaluate each LCR: compute loss at seat AND at RSP, take delta
   for (const spk of lcrSpeakers) {
     const role = String(spk.role || "").toUpperCase();
-    const pos = spk.position;
 
-    // Direction from speaker → seat (PLAN-VIEW CONVENTION)
-    const seatAzDeg = yawFromToPlan(pos, seat);
-    if (!isNum(seatAzDeg)) continue;
+    const atSeat = computeLcrLossAtPoint(spk, seat, mlpPos);
+    if (!atSeat) continue;
 
-    // Aim direction: use stored yaw if present, otherwise compute aim to MLP, fallback to 0°
-    const aimDegRaw =
-      (isNum(spk?.yaw) ? spk.yaw : null) ??
-      (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y) ? yawFromToPlan(pos, mlpPos) : null) ??
-      0;
+    const atRsp = computeLcrLossAtPoint(spk, rspPoint, mlpPos);
+    if (!atRsp) continue;
 
-    // True off-axis angle = shortest arc between seat direction and aim direction
-    const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDegRaw);
-    const offAxisDeg = Math.abs(offAxisRaw);
-    if (!isNum(offAxisDeg)) continue;
+    // RSP-normalised delta (line where delta is calculated for P16)
+    const delta = Math.abs(atSeat.lossDb - atRsp.lossDb);
 
-    const angleDeg = quantiseAngleDown(offAxisDeg, 0.5);
-
-    // Get model metadata for dispersion
-    const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
-
-    // Use new centralized mapping with model-specific dispersion
-    const lossFromAngle = mapAngleToHfLossDb(angleDeg, meta);
-    let lossDb;
-    let isBeyondLcrLimit = false;
-
-    if (lossFromAngle == null) {
-      // Angle beyond model's −5 dB window: this is a fail for P16
-      lossDb = 5.0;
-      isBeyondLcrLimit = true;
-    } else {
-      lossDb = lossFromAngle;
-    }
+    const isBeyondLcrLimit = atSeat.isBeyondLcrLimit || atRsp.isBeyondLcrLimit;
 
     perSpeaker[role] = {
-      angleDeg,
-      lossDb: Number(lossDb.toFixed(1)),
+      angleDeg: atSeat.angleDeg,
+      lossDb: Number(delta.toFixed(1)),         // normalised delta, not absolute
       isBeyondLcrLimit,
+      // Temporary debug fields
+      lossAtSeat: Number(atSeat.lossDb.toFixed(1)),
+      lossAtRsp: Number(atRsp.lossDb.toFixed(1)),
+      normalizedDelta: Number(delta.toFixed(1)),
     };
 
-    if (lossDb > worstLossDb) {
-      worstLossDb = lossDb;
+    if (delta > worstDelta) {
+      worstDelta = delta;
       worstRole = role;
     }
   }
 
-  if (!worstRole || !isNum(worstLossDb)) return null;
+  if (!worstRole || !isNum(worstDelta) || worstDelta === -Infinity) return null;
 
-  const value = Number(worstLossDb.toFixed(1));
+  const value = Number(worstDelta.toFixed(1));
 
-  // Check if any LCR exceeds 55° off-axis
+  // Check if any LCR exceeds 55° off-axis (at the current seat)
   const hasLcrBeyondLimit = Object.values(perSpeaker).some(
     (spk) => spk.isBeyondLcrLimit === true
   );
@@ -275,7 +286,7 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
       },
     },
   };
-  }
+}
 
 // --- P17 HELPERS ---
 
