@@ -7,6 +7,7 @@ import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 export default function SurroundsSelector({
   layout,
   choices,
+  overrideChoices,
   value,
   override,
   onChange,
@@ -16,6 +17,8 @@ export default function SurroundsSelector({
   onExtraSurroundCountChange,
   allowExtraSurrounds
 }) {
+  // Fall back to full choices if overrideChoices not provided
+  const filteredOverrideChoices = overrideChoices || choices;
   const [showSurroundOverrides, setShowSurroundOverrides] = React.useState(false);
 
   const rolesReady = Array.isArray(activeRoles) && activeRoles.length > 0;
