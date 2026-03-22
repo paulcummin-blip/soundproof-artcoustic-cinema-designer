@@ -420,35 +420,33 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
     offAxisDeg: effectiveAngleDeg,  // effective angle for P17 scoring
     rawAngleDeg: rawAngleDeg,       // geometric angle for display
     lossDb,
-    // Debug data for verification
+    // Debug data — straight-down axis model
     debug: {
       modelKey,
-      rawAngleDeg,
-      aimOffsetDeg,
-      effectiveAngleDeg,
+      rawAngleDeg,        // angle between straight-down axis and speaker→seat vector
+      aimOffsetDeg,       // built-in scalar tilt reduction (5° or 20°)
+      effectiveAngleDeg,  // rawAngleDeg - aimOffsetDeg (clamped to 0)
       dispersionWindows: meta?.dispersion?.horizontal ? {
         minus1p5dB: meta.dispersion.horizontal.minus1p5dB ?? meta.dispersion.horizontal.minus1p5 ?? null,
         minus3dB: meta.dispersion.horizontal.minus3dB ?? meta.dispersion.horizontal.minus3 ?? null,
         minus5dB: meta.dispersion.horizontal.minus5dB ?? meta.dispersion.horizontal.minus5 ?? null,
       } : null,
-      // TEMP GEO PROBE
+      // Geometry inputs
       roomHeightMUsed: roomHeightM,
       earHeightMUsed: earZ,
-      speakerX: _dbgSpk?.x,
-      speakerY: _dbgSpk?.y,
-      speakerZUsed: _dbgSpk?.z,
-      seatX: _dbgSeat?.x,
-      seatY: _dbgSeat?.y,
-      seatZUsed: _dbgSeat?.z,
-      rspX: _dbgRsp?.x,
-      rspY: _dbgRsp?.y,
-      rspZUsed: _dbgRsp?.z,
-      aimVecX: _dbgAimVec?.x,
-      aimVecY: _dbgAimVec?.y,
-      aimVecZ: _dbgAimVec?.z,
-      seatVecX: _dbgSeatVec?.x,
-      seatVecY: _dbgSeatVec?.y,
-      seatVecZ: _dbgSeatVec?.z,
+      speakerX: spk.x,
+      speakerY: spk.y,
+      speakerZUsed: spk.z,
+      seatX: seat.x,
+      seatY: seat.y,
+      seatZUsed: seat.z,
+      // Axis vectors used
+      downAxisX: 0,
+      downAxisY: 0,
+      downAxisZ: -1,
+      seatVecX: seatVec.x,
+      seatVecY: seatVec.y,
+      seatVecZ: seatVec.z,
     },
   };
 }
