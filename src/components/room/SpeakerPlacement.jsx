@@ -564,7 +564,7 @@ function SpeakerPlacementImpl(props) {
       : savedModel;
     const master = cleanedModel && cleanedModel !== 'off' && cleanedModel !== 'none' ? cleanedModel : "off";
     return {
-      value: { master, side: "off", rear: "off", wide: "off" },
+      value: { master, side: master, rear: master, wide: master },
       override: { side: false, rear: false, wide: false },
     };
   });
