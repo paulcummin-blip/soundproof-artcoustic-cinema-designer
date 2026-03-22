@@ -212,13 +212,14 @@ export default function UnifiedSurroundsConfig({
 
             if (existing && hasFiniteXY(existing.position)) return;
 
+            // Use the resolved rearModel for SBL/SBR (not the global master)
             const x = Math.max(0.01, Math.min(W - 0.01, W * xFrac));
             const fixed = {
               ...(existing || {}),
               id: existing?.id || `${canon.toLowerCase()}-${timeNowMs()}`,
               role: canon,
               label: canon,
-              model: existing?.model || modelKey,
+              model: existing?.model || rearModel || modelKey,
               position: { x, y: backY, z: earZ },
               rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
               draggable: true,
