@@ -512,8 +512,11 @@ const getEffectiveYawDeg = (speaker, seatPos, mlpPos, appState, getCanonicalRole
   }
 
   if (isRear) {
-    // Rear Surrounds: back wall = 0 (if you later add wall-detection here, mirror RV logic)
-    return 0;
+    // Rear Surrounds: default to aiming at MLP (physically correct for cinema layout)
+    const yawToMlp = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y))
+      ? angleFromTo(speaker?.position, mlpPos)
+      : null;
+    return isNum(yawToMlp) ? yawToMlp : 0;
   }
 
   return 0;
