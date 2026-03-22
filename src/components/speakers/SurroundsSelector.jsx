@@ -36,6 +36,7 @@ export default function SurroundsSelector({
   // Default to true Off unless the stored value is a real model
   const isReal = (m) => !!m && m !== '(none)' && m !== 'off' && m !== 'none';
   const masterModel = isReal(value?.master) ? value.master : 'off';
+  // For override rows: use the stored group value; fall back to master if still "off"
   const sideModel   = isReal(value?.side)   ? value.side   : masterModel;
   const rearModel   = isReal(value?.rear)   ? value.rear   : masterModel;
   const wideModel   = isReal(value?.wide)   ? value.wide   : masterModel;
