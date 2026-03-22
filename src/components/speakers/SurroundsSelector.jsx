@@ -191,20 +191,20 @@ export default function SurroundsSelector({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                      {(choices || []).map((choice) => (
-                        <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
-                          {choice.label}
-                        </SelectItem>
-                      ))}
+                     {(filteredOverrideChoices || []).map((choice) => (
+                       <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
+                         {choice.label}
+                       </SelectItem>
+                     ))}
                     </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="text-xs text-[#625143] italic">Using: {getModelLabel(masterModel)}</div>
-                )}
-              </div>
-            )}
+                    </Select>
+                    ) : (
+                    <div className="text-xs text-[#625143] italic">Using: {getModelLabel(masterModel)}</div>
+                    )}
+                    </div>
+                    )}
 
-            {/* Rear Surrounds */}
+                    {/* Rear Surrounds */}
             {showRears && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
