@@ -469,58 +469,11 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   };
 }
 
-// CRITICAL: Get effective yaw using same logic as plan view (matches icon rotation)
-// IMPORTANT: When an Aim toggle is ON, it MUST override any persisted yaw/rotation,
-// otherwise P17 will stay "stuck" at the stored wall-flat angle.
+// CRITICAL: Single source of truth for effective yaw — delegates to resolveSpeakerYaw.
+// Both plan-view (getPlanAimDeg) and P17 (computeSurroundLikeHfLoss) call this path,
+// guaranteeing identical aim for the same speaker object.
 const getEffectiveYawDeg = (speaker, seatPos, mlpPos, appState, getCanonicalRole) => {
-  const canon = canonRole(speaker?.role, getCanonicalRole);
-
-  const aimFrontWides = !!appState?.aimFrontWidesAtMLP;
-  const aimSideSur = !!appState?.aimSideSurroundsAtMLP;
-  const aimRearSur = !!appState?.aimRearSurroundsAtMLP;
-
-  const isFW = canon === "LW" || canon === "RW";
-  const isSide = canon === "SL" || canon === "SR";
-  const isRear = canon === "SBL" || canon === "SBR";
-
-  const groupAimOn =
-    (isFW && aimFrontWides) ||
-    (isSide && aimSideSur) ||
-    (isRear && aimRearSur);
-
-  // 1) Aim toggle ON → speaker is physically aimed at the MLP (matches plan-view icon rotation)
-  if (groupAimOn) {
-    const target = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? mlpPos : seatPos;
-    const yawToTarget = angleFromTo(speaker?.position, target);
-    return isNum(yawToTarget) ? yawToTarget : 0;
-  }
-
-  // 2) Aim toggle OFF → use persisted yaw if present (manual toe-in)
-  if (isNum(speaker?.yaw)) return Number(speaker.yaw);
-  if (isNum(speaker?.rotationDeg)) return Number(speaker.rotationDeg);
-  if (isNum(speaker?.rotation_deg)) return Number(speaker.rotation_deg);
-  if (isNum(speaker?.rotation?.y)) return Number(speaker.rotation.y);
-
-  // 3) No manual yaw → wall-flat defaults (MUST match RoomVisualisation "YAW CALCULATION" block)
-  if (isFW) {
-    // Front Wides: LW = -90, RW = +90
-    return canon === "LW" ? -90 : +90;
-  }
-
-  if (isSide) {
-    // Side Surrounds: SL = +90, SR = -90
-    return canon === "SL" ? +90 : -90;
-  }
-
-  if (isRear) {
-    // Rear Surrounds: default to aiming at MLP (physically correct for cinema layout)
-    const yawToMlp = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y))
-      ? angleFromTo(speaker?.position, mlpPos)
-      : null;
-    return isNum(yawToMlp) ? yawToMlp : 0;
-  }
-
-  return 0;
+  return resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole });
 };
 
 // Unified helper: compute HF loss for one non-LCR speaker at one seat
