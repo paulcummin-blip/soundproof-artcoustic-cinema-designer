@@ -289,33 +289,7 @@ export default function SeatHud({
                     <RP22GradingPill level={normalizeLevel(metric.level)} />
                     </div>
 
-                    {/* P9 detail */}
-                    {key === 'p9' && tooltipData.rp22.p9Detail && (
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: '#999',
-                          paddingLeft: 16,
-                          paddingBottom: 3,
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {(() => {
-                          const s = String(tooltipData.rp22.p9Detail || '');
-                          const m = s.match(/\(worst:\s*([0-9.]+)°\)/);
-                          if (!m) return s;
-                          const worst = m[1];
-                          const parts = s.split(`(worst: ${worst}°)`);
-                          return (
-                            <>
-                              {parts[0]}
-                              (worst: <span style={{ fontWeight: 700 }}>{worst}°</span>)
-                              {parts[1] || ''}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
+
 
                     {/* P16 debug info */}
               {key === 'p16' && metric?.perSpeaker && metric.perSpeaker.length > 0 && (
