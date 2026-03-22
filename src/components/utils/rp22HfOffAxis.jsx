@@ -300,16 +300,18 @@ function getOverheadTiltDeg(modelKey) {
 
 
 /**
- * Compute vertical off-axis angle for an overhead speaker relative to the listener.
+ * Compute vertical off-axis angle for a ceiling-mounted overhead speaker relative to the listener.
  *
- * - speakerPos: { x, y, z? }  (z will be ignored if roomHeightM is provided)
- * - seatPos: { x, y }
- * - rspPos: { x, y } RSP/MLP position (green dot) - speaker aims here
+ * Physical model: overhead speakers are mounted in the ceiling and face straight DOWN by default.
+ * rawAngleDeg = angle between the straight-down axis (0,0,-1) and the speaker→seat vector.
+ * effectiveAngleDeg = rawAngleDeg - builtInTiltDeg (scalar reduction; floor at 0).
+ *
+ * - speakerPos: { x, y, z? }  (z overridden by roomHeightM if provided)
+ * - seatPos: { x, y, z? }
+ * - rspPos: unused (kept in signature for call-site compatibility)
  * - earHeightM: listener ear height in metres
  * - modelKey: string used to look up built-in tilt and dispersion
  * - roomHeightM: current room ceiling height (if finite, overrides speakerPos.z)
- *
- * Returns: effective off-axis angle (raw - aim offset) and predicted HF loss using model dispersion.
  */
 function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, modelKey, roomHeightM) {
   if (!seatPos || !speakerPos) {
