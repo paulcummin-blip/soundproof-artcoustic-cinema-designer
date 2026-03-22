@@ -660,22 +660,30 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     .filter(s => s && s.role && s.model && isFinitePos(s.position))
     .filter(s => !EXCLUDE_LCR.has(String(s.role).toUpperCase()));
 
-  // [B44 DEBUG] Log speakers entering P17 analysis
-  if (globalThis.__B44_RV_DEBUG === true) {
-    console.groupCollapsed("[P17 DEBUG] Speakers entering analysis");
-    console.log("Total speakers (raw):", speakers.length);
-    console.log("Total speakers (visible):", visibleSpeakers.length);
-    console.table(visibleSpeakers.map(s => ({
-      role: s.role,
-      canonicalRole: String(s.role || "").toUpperCase(),
-      model: s.model || "—",
-      hasPosition: hasPos(s),
-      posX: s.position?.x?.toFixed(3) || "—",
-      posY: s.position?.y?.toFixed(3) || "—",
-    })));
-    console.log("SURROUND_ROLES allowlist:", Array.from(SURROUND_ROLES));
-    console.log("OVERHEAD_ROLES allowlist:", Array.from(OVERHEAD_ROLES));
-    console.groupEnd();
+  // RSP point — use mlpPos if valid, otherwise no normalization is possible
+  const rspPoint = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? mlpPos : null;
+  // RSP ear height: use standard 1.2 m (mlpPos.z if provided)
+  const rspEarHeightM = (rspPoint && isNum(rspPoint.z)) ? rspPoint.z : 1.2;
+
+  // Pre-compute loss at RSP for every eligible speaker (once, outside seat loop)
+  const lossAtRspBySpeakerRole = new Map();
+  if (rspPoint) {
+    const rspSeatArg = { x: rspPoint.x, y: rspPoint.y, z: rspEarHeightM };
+    for (const spk of p17Speakers) {
+      const result = computeSurroundLikeHfLoss({
+        speaker: spk,
+        seat: rspSeatArg,
+        mlpPos,
+        earHeightM: rspEarHeightM,
+        modelMeta: spk.model ? modelIndex(spk.model) : null,
+        roomHeightM,
+        appState,
+        getCanonicalRole,
+      });
+      if (result) {
+        lossAtRspBySpeakerRole.set(spk, result);
+      }
+    }
   }
 
   const perSeat = {};
@@ -690,19 +698,16 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         ? seat.earHeightM
         : (Number(seatPos.z) && Number.isFinite(seatPos.z) ? seatPos.z : 1.2);
 
-    let maxAbsLossDb = -Infinity;
+    let maxDelta = -Infinity;
     let worstRole = null;
     let worstAngleDeg = -Infinity;
     let worstLossDb = null;
     const perSpeaker = [];
     let p17HasNaAngles = false;
 
-    // [B44 DEBUG] Track which speakers enter the per-seat loop
-    const speakersProcessed = [];
-
     // Loop over ONLY speakers in the drawing (p17Speakers filtered above)
     for (const spk of p17Speakers) {
-      const result = computeSurroundLikeHfLoss({
+      const resultAtSeat = computeSurroundLikeHfLoss({
         speaker: spk,
         seat: { x: seatPos.x || seat.x, y: seatPos.y || seat.y, z: seatPos.z || seat.z },
         mlpPos,
@@ -713,77 +718,71 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         getCanonicalRole,
       });
 
-      // [B44 DEBUG] Track processing result
-      if (globalThis.__B44_RV_DEBUG === true) {
-        speakersProcessed.push({
-          role: spk.role,
-          processed: !!result,
-          reason: result ? "OK" : "filtered by computeSurroundLikeHfLoss"
-        });
-      }
+      if (!resultAtSeat) continue;
 
-      if (!result) continue;
+      // Get pre-computed RSP loss for this speaker
+      const resultAtRsp = lossAtRspBySpeakerRole.get(spk);
+      // If RSP result is not available, fall back to using seat result as RSP (delta = 0)
+      const rspLossDb = resultAtRsp ? resultAtRsp.lossDb : resultAtSeat.lossDb;
 
-      // Track if any speaker is beyond 41°
-      if (result.isBeyondNonLcrLimit) {
+      // RSP-normalised delta (line where delta is calculated for P17)
+      const delta = Math.abs(resultAtSeat.lossDb - rspLossDb);
+
+      // isBeyondNonLcrLimit: flag from the seat result (used for N/A display)
+      const isBeyondNonLcrLimit = resultAtSeat.isBeyondNonLcrLimit || false;
+      if (isBeyondNonLcrLimit) {
         p17HasNaAngles = true;
       }
 
-      // Collect per-speaker data
+      // Collect per-speaker data — lossDb is now the normalised delta
       perSpeaker.push({
-        role: result.role,
-        angleDeg: result.offAxisDeg,
-        rawAngleDeg: result.rawAngleDeg ?? result.offAxisDeg, // for overhead display
-        lossDb: result.lossDb,
-        isBeyondNonLcrLimit: result.isBeyondNonLcrLimit || false,
-        debug: result.debug, // Pass through debug data for HUD display
+        role: resultAtSeat.role,
+        angleDeg: resultAtSeat.offAxisDeg,
+        rawAngleDeg: resultAtSeat.rawAngleDeg ?? resultAtSeat.offAxisDeg,
+        lossDb: Number(delta.toFixed(1)),             // normalised delta, not absolute
+        isBeyondNonLcrLimit,
+        debug: resultAtSeat.debug,
+        // Temporary debug fields
+        lossAtSeat: Number(resultAtSeat.lossDb.toFixed(1)),
+        lossAtRsp: Number(rspLossDb.toFixed(1)),
+        normalizedDelta: Number(delta.toFixed(1)),
       });
 
-      // Track worst loss: highest dB loss; if tie, largest angle
+      // Track worst delta: highest delta; if tie, largest angle
       if (
-        result.lossDb > maxAbsLossDb ||
-        (
-          result.lossDb === maxAbsLossDb &&
-          result.offAxisDeg > worstAngleDeg
-        )
+        delta > maxDelta ||
+        (delta === maxDelta && resultAtSeat.offAxisDeg > worstAngleDeg)
       ) {
-        maxAbsLossDb = result.lossDb;
-        worstRole = result.role;
-        worstAngleDeg = result.offAxisDeg;
-        worstLossDb = result.lossDb;
+        maxDelta = delta;
+        worstRole = resultAtSeat.role;
+        worstAngleDeg = resultAtSeat.offAxisDeg;
+        worstLossDb = delta;
       }
 
       // Store in debug if provided
       if (debug && debug.perSpeaker) {
-        if (!debug.perSpeaker[result.role]) {
-          debug.perSpeaker[result.role] = {};
+        if (!debug.perSpeaker[resultAtSeat.role]) {
+          debug.perSpeaker[resultAtSeat.role] = {};
         }
-        debug.perSpeaker[result.role].p17 = {
-          offAxisDeg: result.offAxisDeg,
-          lossDb: result.lossDb,
-          isBeyondNonLcrLimit: result.isBeyondNonLcrLimit || false,
+        debug.perSpeaker[resultAtSeat.role].p17 = {
+          offAxisDeg: resultAtSeat.offAxisDeg,
+          lossDb: delta,
+          isBeyondNonLcrLimit,
         };
       }
     }
 
-    // [B44 DEBUG] Log processing results for this seat
-    if (globalThis.__B44_RV_DEBUG === true && seatId === seats[0]?.id) {
-      console.groupCollapsed(`[P17 DEBUG] Seat ${seatId} processing`);
-      console.table(speakersProcessed);
-      console.log("perSpeaker results:", perSpeaker);
-      console.groupEnd();
-    }
-
-    if (!isNum(maxAbsLossDb) || maxAbsLossDb === -Infinity) {
+    // Guard: if no valid speakers processed, return null for this seat
+    if (maxDelta === -Infinity) {
       perSeat[seatId] = null;
       continue;
     }
 
     perSeat[seatId] = {
-      p17Db: Number(maxAbsLossDb.toFixed(1)),
+      p17Db: Number(Math.max(0, maxDelta).toFixed(1)),  // clamp to 0 (RSP yields 0.0 dB)
       worstRole,
-      worstAngleDeg: worstAngleDeg !== null ? Number(worstAngleDeg.toFixed(1)) : null,
-      worstLossDb: worstLossDb !== null ? Number(worstLossDb.toFixed(1)) : null,
+      worstAngleDeg: isNum(worstAngleDeg) ? Number(worstAngleDeg.toFixed(1)) : null,
+      worstLossDb: isNum(worstLossDb) ? Number(worstLossDb.toFixed(1)) : null,
       perSpeaker,
       p17HasNaAngles,
     };
