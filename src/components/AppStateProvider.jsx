@@ -643,29 +643,11 @@ function useDesignerState() {
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
+    // Only update the global state reference — per-role model assignment is handled
+    // by handleSurroundModelChange in UnifiedSurroundsConfig, which writes individual
+    // models (sideModel / rearModel / wideModel) directly onto placedSpeakers.
+    // Mass-syncing all SL/SR/SBL/SBR/LW/RW here would overwrite per-role overrides.
     _setGlobalSurroundModel(model);
-
-    // Immediately write the chosen model onto existing main surround speaker objects
-    // so they become renderable without waiting for reconciliation.
-    // Uses the raw `model` value (e.g. evolve-2-1_s) so the registry key resolves correctly.
-    const ms = String(model ?? '').trim().toLowerCase();
-    const isOff = !ms || ms === 'off' || ms === 'none';
-    const speakerModel = isOff ? 'off' : model;
-    const SURROUND_SYNC_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-
-    _setSpeakerSystem((prev) => {
-      const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
-      let changed = false;
-      const next = current.map((spk) => {
-        const canon = safeCanonRole(spk?.role);
-        if (!SURROUND_SYNC_ROLES.has(canon)) return spk; // leave LCR, overheads, subs, extras untouched
-        if ((spk.model ?? 'off') === speakerModel) return spk; // already correct, no-op
-        changed = true;
-        return { ...spk, model: speakerModel }; // only model changes; position/rotation/positionSource preserved
-      });
-      if (!changed) return prev;
-      return { ...prev, placedSpeakers: next };
-    });
   }, []);
 
   const setSpeakerSystem = useCallback(
