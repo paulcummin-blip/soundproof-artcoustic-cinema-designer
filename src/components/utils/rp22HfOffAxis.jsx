@@ -9,8 +9,16 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 import { resolveSpeakerYaw } from "@/components/utils/speakerAimResolver";
 
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
-const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC"]);
-const SURROUND_ROLES = new Set(["SL", "SR", "SBL", "SBR"]);
+const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC", "TRL", "TRR"]);
+const SURROUND_ROLES = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
+
+// Returns true for any bed-layer surround/wide role, including numbered variants (SL2, SR2, SL3, SR3...)
+const isBedLayerSurround = (role) => {
+  if (SURROUND_ROLES.has(role)) return true;
+  if (/^SL\d+$/.test(role)) return true;
+  if (/^SR\d+$/.test(role)) return true;
+  return false;
+};
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
