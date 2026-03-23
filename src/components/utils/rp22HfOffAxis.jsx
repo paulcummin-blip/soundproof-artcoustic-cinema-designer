@@ -630,7 +630,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     }
 
     // [DIAGNOSTIC] For bed-layer surrounds: expose calculation inputs for HUD debug readout
-    const isBedDebugRole = role === "LW" || role === "RW" || role === "SBL" || role === "SBR" || role === "SL" || role === "SR";
+    const isBedDebugRole = isBedLayerSurround(role);
     const diagnosticDebug = isBedDebugRole ? {
       seatAzDeg,
       aimDegRaw: referenceDeg,   // kept as aimDegRaw for HUD compat (now = wall-normal or manual)
