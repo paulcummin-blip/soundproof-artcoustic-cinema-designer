@@ -117,6 +117,34 @@ function halfDispersionDeg(fullDeg) {
   return Math.ceil(fullDeg); // no division — value is already a half-angle
 }
 
+// Continuous (interpolated) HF loss estimate for P16 delta comparison only.
+// Returns a smooth dB value between 0–5 dB; not a coarse bucket.
+// Uses the same dispersion thresholds as mapAngleToHfLossDb.
+function continuousHfLossDb(angleDeg, modelMeta = null) {
+  const a = Math.abs(Number(angleDeg) || 0);
+
+  // Resolve thresholds from model or fall back to generic RP22 implied points
+  let p0 = 0, p1 = 28, p2 = 41, p3 = 55;
+  let l0 = 0, l1 = 1.5, l2 = 3.0, l3 = 5.0;
+
+  if (modelMeta?.dispersion?.horizontal) {
+    const disp = modelMeta.dispersion.horizontal;
+    const m1p5 = halfDispersionDeg(disp.minus1p5dB ?? disp.minus1p5);
+    const m3   = halfDispersionDeg(disp.minus3dB ?? disp.minus3);
+    const m5   = halfDispersionDeg(disp.minus5dB ?? disp.minus5);
+    if (m1p5 != null && m3 != null && m5 != null) {
+      p1 = m1p5; p2 = m3; p3 = m5;
+    }
+  }
+
+  // Linear interpolation between the four knot points
+  if (a <= p0) return l0;
+  if (a <= p1) return l0 + (l1 - l0) * (a - p0) / (p1 - p0);
+  if (a <= p2) return l1 + (l2 - l1) * (a - p1) / (p2 - p1);
+  if (a <= p3) return l2 + (l3 - l2) * (a - p2) / (p3 - p2);
+  return l3; // beyond −5 dB window: cap at 5.0 dB
+}
+
 // Centralized angle → HF loss mapping using new RP22 thresholds
 // Uses model-specific dispersion if available, otherwise defaults to generic thresholds
 function mapAngleToHfLossDb(angleDeg, modelMeta = null) {
