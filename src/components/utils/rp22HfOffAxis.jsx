@@ -572,7 +572,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       const mlpYaw = isNum(mlpPos?.x) && isNum(mlpPos?.y) ? angleFromTo(pos, mlpPos) : null;
       referenceDeg = isNum(mlpYaw) ? mlpYaw : 180;
     } else {
-      referenceDeg = WALL_NORMAL[role] ?? 0;
+      referenceDeg = getWallNormal(role);
     }
 
     // Manual rotation override — only when user explicitly aimed the speaker
