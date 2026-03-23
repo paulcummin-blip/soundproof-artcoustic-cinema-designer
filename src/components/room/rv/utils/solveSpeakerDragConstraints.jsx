@@ -106,14 +106,15 @@ export function solveSpeakerDragConstraints({
     const frontWallY = 0.01;
 
     if (canonicalRole === 'FC') {
-      const currentX = spk.position?.x ?? centerX_m;
-      const currentY = spk.position?.y ?? frontWallY;
-      if (Math.abs(centerX_m - currentX) > 0.001 || Math.abs(frontWallY - currentY) > 0.001) {
-        finalPositions.push({
-          id: speakerId,
-          position: { ...(spk.position || {}), x: centerX_m, y: frontWallY },
-          positionSource: 'user',
-        });
+      // Always force FC to centre X and front wall Y — never preserve stale y
+      finalPositions.push({
+        id: speakerId,
+        position: { ...(spk.position || {}), x: centerX_m, y: frontWallY },
+        positionSource: 'user',
+      });
+      // Safety pass: ensure no stale y survives
+      for (const fp of finalPositions) {
+        if (fp.position && fp.position.y !== frontWallY) fp.position = { ...fp.position, y: frontWallY };
       }
       return { finalPositions, additionalUpdates };
     }
