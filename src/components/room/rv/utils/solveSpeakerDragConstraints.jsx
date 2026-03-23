@@ -158,11 +158,11 @@ export function solveSpeakerDragConstraints({
     const flSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
     const frSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FR');
 
-    if (flSpk && Math.abs((flSpk.position?.x ?? 0) - finalLeftX) > 0.001) {
-      finalPositions.push({ id: flSpk.id, position: { ...(flSpk.position || {}), x: finalLeftX }, positionSource: 'user' });
+    if (flSpk && (Math.abs((flSpk.position?.x ?? 0) - finalLeftX) > 0.001 || Math.abs((flSpk.position?.y ?? 0) - frontWallY) > 0.001)) {
+      finalPositions.push({ id: flSpk.id, position: { ...(flSpk.position || {}), x: finalLeftX, y: frontWallY }, positionSource: 'user' });
     }
-    if (frSpk && Math.abs((frSpk.position?.x ?? 0) - finalRightX) > 0.001) {
-      finalPositions.push({ id: frSpk.id, position: { ...(frSpk.position || {}), x: finalRightX }, positionSource: 'user' });
+    if (frSpk && (Math.abs((frSpk.position?.x ?? 0) - finalRightX) > 0.001 || Math.abs((frSpk.position?.y ?? 0) - frontWallY) > 0.001)) {
+      finalPositions.push({ id: frSpk.id, position: { ...(frSpk.position || {}), x: finalRightX, y: frontWallY }, positionSource: 'user' });
     }
     return { finalPositions, additionalUpdates };
   }
