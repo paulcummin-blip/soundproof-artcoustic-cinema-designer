@@ -557,6 +557,14 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       SBR:  180,
     };
 
+    // Resolve wall-normal for numbered surrounds (SL2, SR2, SL3... inherit from SL/SR)
+    const getWallNormal = (r) => {
+      if (r in WALL_NORMAL) return WALL_NORMAL[r];
+      if (/^SL\d+$/.test(r)) return -90; // side-left numbered → same as SL
+      if (/^SR\d+$/.test(r)) return  90; // side-right numbered → same as SR
+      return 0;
+    };
+
     // Default reference: physical wall-normal, but SBL/SBR respect the aim toggle
     let referenceDeg;
     if ((role === 'SBL' || role === 'SBR') && appState?.aimRearSurroundsAtMLP) {
