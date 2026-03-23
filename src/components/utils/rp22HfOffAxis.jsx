@@ -546,16 +546,23 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       SBR:  0,
     };
 
-    // Default reference: physical wall-normal
-    let referenceDeg = WALL_NORMAL[role] ?? 0;
+    // Default reference: physical wall-normal, but SBL/SBR respect the aim toggle
+    let referenceDeg;
+    if ((role === 'SBL' || role === 'SBR') && appState?.aimRearSurroundsAtMLP) {
+      // Toggle ON: aim at MLP/RSP
+      const mlpYaw = isNum(mlpPos?.x) && isNum(mlpPos?.y) ? angleFromTo(pos, mlpPos) : null;
+      referenceDeg = isNum(mlpYaw) ? mlpYaw : 0;
+    } else {
+      referenceDeg = WALL_NORMAL[role] ?? 0;
+    }
 
-    // Manual rotation override — only when the user explicitly placed/rotated this speaker
+    // Manual rotation override — only when user explicitly aimed the speaker
+    // (rotation?.y excluded — it's an unreliable default object field)
     if (speaker.positionSource === 'user') {
       const manualYaw =
         (isNum(speaker.yaw)          ? speaker.yaw          : null) ??
         (isNum(speaker.rotationDeg)  ? speaker.rotationDeg  : null) ??
-        (isNum(speaker.rotation_deg) ? speaker.rotation_deg : null) ??
-        (isNum(speaker.rotation?.y)  ? speaker.rotation.y   : null);
+        (isNum(speaker.rotation_deg) ? speaker.rotation_deg : null);
       if (manualYaw != null) {
         referenceDeg = manualYaw;
       }
