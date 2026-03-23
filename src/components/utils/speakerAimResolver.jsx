@@ -71,9 +71,9 @@ export function resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole 
 
   // ─── 3. Role-based defaults ───────────────────────────────────────────────
 
-  // Rear surrounds: ALWAYS aim at MLP when no explicit override
+  // Rear surrounds: flat to wall (0°) unless aim toggle is ON
   if (isRear) {
-    if (hasValidMlp) {
+    if (aimRear && hasValidMlp) {
       const y = _yawFromTo(pos, mlpPos);
       return isNum(y) ? y : 0;
     }
