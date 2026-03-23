@@ -103,14 +103,15 @@ export function solveSpeakerDragConstraints({
 
   // ── 1. LCR ────────────────────────────────────────────────────────────────
   if (['FL', 'FC', 'FR'].includes(canonicalRole)) {
+    const frontWallY = 0.01;
+
     if (canonicalRole === 'FC') {
-      const rawRoomPos = canvasToRoom(newCanvasPos);
-      const newY = rawRoomPos.y;
-      const currentY = spk.position?.y ?? newY;
-      if (Math.abs(newY - currentY) > 0.001) {
+      const currentX = spk.position?.x ?? centerX_m;
+      const currentY = spk.position?.y ?? frontWallY;
+      if (Math.abs(centerX_m - currentX) > 0.001 || Math.abs(frontWallY - currentY) > 0.001) {
         finalPositions.push({
           id: speakerId,
-          position: { ...(spk.position || {}), x: centerX_m, y: newY },
+          position: { ...(spk.position || {}), x: centerX_m, y: frontWallY },
           positionSource: 'user',
         });
       }
