@@ -248,7 +248,7 @@ function computeLcrLossAtPoint(spk, point, mlpPos, lcrAimMode) {
   return { lossDb: lossFromAngle, continuousLossDb, angleDeg, isBeyondLcrLimit: false, seatAzDeg, aimDegRaw, offAxisRaw: offAxisDeg };
 }
 
-export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos = null) {
+export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos = null, lcrAimMode = 'flat') {
   if (!seat || !isNum(seat.x) || !isNum(seat.y)) return null;
   if (!Array.isArray(allSpeakers) || !allSpeakers.length) return null;
 
