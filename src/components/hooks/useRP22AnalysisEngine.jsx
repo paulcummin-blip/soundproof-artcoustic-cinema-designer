@@ -800,11 +800,23 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       allowedP17Roles.add("RW");
     }
 
+    // Dynamically include any numbered side-surround roles that actually exist
+    // in the drawing with real models (SL2, SR2, SL3, SR3, etc.)
+    for (const spk of speakersWithResolvedOverheads) {
+      if (!hasRealModel(spk)) continue;
+      const r = String(spk.role || "").toUpperCase();
+      if (/^SL\d+$/.test(r) || /^SR\d+$/.test(r)) {
+        allowedP17Roles.add(r);
+      }
+    }
+
     // Overheads are always part of P17 (when present)
     allowedP17Roles.add("TFL");
     allowedP17Roles.add("TFR");
     allowedP17Roles.add("TML");
     allowedP17Roles.add("TMR");
+    allowedP17Roles.add("TRL");
+    allowedP17Roles.add("TRR");
     allowedP17Roles.add("TBL");
     allowedP17Roles.add("TBR");
     allowedP17Roles.add("TFC");
