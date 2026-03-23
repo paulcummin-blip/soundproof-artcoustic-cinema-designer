@@ -305,11 +305,14 @@ export default function SeatHud({
                 >
                   {Object.entries(metric.debug.perSpeaker).map(([role, sp]) => {
                     const isWorst = role === String(metric.debug?.worst?.role);
-                    const angle = Number.isFinite(sp?.angleDeg) ? sp.angleDeg : '—';
-                    const seat = Number.isFinite(sp?.continuousLossAtSeat) ? sp.continuousLossAtSeat.toFixed(2) : '—';
-                    const rsp  = Number.isFinite(sp?.continuousLossAtRsp)  ? sp.continuousLossAtRsp.toFixed(2)  : '—';
-                    const delta = Number.isFinite(sp?.normalizedDelta) ? sp.normalizedDelta.toFixed(1) : '—';
-                    const text = `${role} ${angle}° | seat ${seat} dB | rsp ${rsp} dB | delta ${delta} dB`;
+                    const seatAz  = Number.isFinite(sp?.seatAzDeg)          ? sp.seatAzDeg.toFixed(1)          : '—';
+                    const aim     = Number.isFinite(sp?.aimDegRaw)           ? sp.aimDegRaw.toFixed(1)           : '—';
+                    const offAxis = Number.isFinite(sp?.offAxisRaw)          ? sp.offAxisRaw.toFixed(1)          : '—';
+                    const angle   = Number.isFinite(sp?.angleDeg)            ? sp.angleDeg                       : '—';
+                    const seat    = Number.isFinite(sp?.continuousLossAtSeat) ? sp.continuousLossAtSeat.toFixed(2) : '—';
+                    const rsp     = Number.isFinite(sp?.continuousLossAtRsp)  ? sp.continuousLossAtRsp.toFixed(2)  : '—';
+                    const delta   = Number.isFinite(sp?.normalizedDelta)      ? sp.normalizedDelta.toFixed(1)      : '—';
+                    const text = `${role} seatAz=${seatAz} aim=${aim} offAxis=${offAxis} angle=${angle} | seat ${seat} dB | rsp ${rsp} dB | delta ${delta} dB`;
                     return (
                       <div key={role} style={{ fontWeight: isWorst ? 700 : 400, color: isWorst ? '#1B1A1A' : '#999' }}>
                         {text}
