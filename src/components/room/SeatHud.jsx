@@ -395,20 +395,14 @@ export default function SeatHud({
                       N/A = &gt;41° off-axis; RP22 Level 2 limit
                     </div>
                   )}
-                  {/* LW/RW Debug Readout */}
+                  {/* Bed-layer surround debug readout (SBL, SBR, SL, SR, LW, RW) */}
                   {(() => {
-                    const lwData = metric.perSpeaker.find(s => s.role === 'LW');
-                    const rwData = metric.perSpeaker.find(s => s.role === 'RW');
-                    const hasDebug = (lwData?.debug || rwData?.debug);
-                    
-                    if (!hasDebug) return null;
-                    
+                    const BED_DEBUG_ROLES = ['SBL', 'SBR', 'SL', 'SR', 'LW', 'RW'];
+                    const debugSpeakers = metric.perSpeaker.filter(s => BED_DEBUG_ROLES.includes(s.role) && s.debug);
+                    if (!debugSpeakers.length) return null;
+
                     const formatDbgVal = (v) => Number.isFinite(v) ? v.toFixed(1) : '—';
-                    const formatFlags = (flags) => {
-                      if (!flags) return 'FW:—,SS:—,RS:—';
-                      return `FW:${flags.aimFrontWidesAtMLP ? 'Y' : 'N'},SS:${flags.aimSideSurroundsAtMLP ? 'Y' : 'N'},RS:${flags.aimRearSurroundsAtMLP ? 'Y' : 'N'}`;
-                    };
-                    
+
                     return (
                       <div
                         style={{
@@ -420,16 +414,11 @@ export default function SeatHud({
                           lineHeight: 1.5,
                         }}
                       >
-                        {lwData?.debug && (
-                          <div>
-                            LW dbg: seatAz={formatDbgVal(lwData.debug.seatAzDeg)} aim={formatDbgVal(lwData.debug.aimDegRaw)} offAxis={formatDbgVal(lwData.debug.offAxisDegComputed)} canon={lwData.debug.canonRoleUsed || '—'} flags={formatFlags(lwData.debug.aimFlagsSeen)}
+                        {debugSpeakers.map(s => (
+                          <div key={s.role}>
+                            {s.role} dbg: seatAz={formatDbgVal(s.debug.seatAzDeg)} aim={formatDbgVal(s.debug.aimDegRaw)} offAxis={formatDbgVal(s.debug.offAxisDegComputed)}
                           </div>
-                        )}
-                        {rwData?.debug && (
-                          <div>
-                            RW dbg: seatAz={formatDbgVal(rwData.debug.seatAzDeg)} aim={formatDbgVal(rwData.debug.aimDegRaw)} offAxis={formatDbgVal(rwData.debug.offAxisDegComputed)} canon={rwData.debug.canonRoleUsed || '—'} flags={formatFlags(rwData.debug.aimFlagsSeen)}
-                          </div>
-                        )}
+                        ))}
                       </div>
                     );
                   })()}

@@ -579,9 +579,9 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       });
     }
 
-    // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs
-    const isLwRw = role === "LW" || role === "RW";
-    const diagnosticDebug = isLwRw ? {
+    // [DIAGNOSTIC] For bed-layer surrounds: expose all calculation inputs
+    const isBedDebugRole = role === "LW" || role === "RW" || role === "SBL" || role === "SBR" || role === "SL" || role === "SR";
+    const diagnosticDebug = isBedDebugRole ? {
       seatAzDeg,
       aimDegRaw,
       offAxisDegComputed: offAxis,
