@@ -529,16 +529,40 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       debug: vert.debug, // Pass through debug data
     };
   } 
-  // Bed-layer surrounds/wides: use horizontal off-axis WITH EFFECTIVE YAW
+  // Bed-layer surrounds/wides: use physical wall-normal as the reference axis
   else if (SURROUND_ROLES.has(role)) {
-    // Compute yaws (SIGNED headings, -180..+180) - both using same convention
+    // Seat azimuth from speaker position (signed heading, -180..+180)
     const seatAzDeg = angleFromTo(pos, seat);
     if (!isNum(seatAzDeg)) return null;
 
-    const aimDegRaw = getEffectiveYawDeg(speaker, seat, mlpPos, appState, getCanonicalRole);
+    // Physical wall-normal on-axis direction per role (degrees, same convention as angleFromTo)
+    // 0° = into room (+Y), clockwise positive
+    const WALL_NORMAL = {
+      SL:  90,
+      SR: -90,
+      LW: -90,
+      RW:  90,
+      SBL:  0,
+      SBR:  0,
+    };
+
+    // Default reference: physical wall-normal
+    let referenceDeg = WALL_NORMAL[role] ?? 0;
+
+    // Manual rotation override — only when the user explicitly placed/rotated this speaker
+    if (speaker.positionSource === 'user') {
+      const manualYaw =
+        (isNum(speaker.yaw)          ? speaker.yaw          : null) ??
+        (isNum(speaker.rotationDeg)  ? speaker.rotationDeg  : null) ??
+        (isNum(speaker.rotation_deg) ? speaker.rotation_deg : null) ??
+        (isNum(speaker.rotation?.y)  ? speaker.rotation.y   : null);
+      if (manualYaw != null) {
+        referenceDeg = manualYaw;
+      }
+    }
 
     // Off-axis magnitude (0..180)
-    const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDegRaw);
+    const offAxisRaw = shortestAngleDeg(seatAzDeg, referenceDeg);
     if (!isNum(offAxisRaw)) return null;
 
     // Floor DOWN to integer degrees for display + stability
@@ -573,24 +597,20 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     if (globalThis.__B44_RV_DEBUG === true) {
       console.log("[P17 SURROUND]", role, {
         seatAzDeg,
-        aimDegRaw,
+        referenceDeg,
         offAxis,
         lossDb,
       });
     }
 
-    // [DIAGNOSTIC] For bed-layer surrounds: expose all calculation inputs
+    // [DIAGNOSTIC] For bed-layer surrounds: expose calculation inputs for HUD debug readout
     const isBedDebugRole = role === "LW" || role === "RW" || role === "SBL" || role === "SBR" || role === "SL" || role === "SR";
     const diagnosticDebug = isBedDebugRole ? {
       seatAzDeg,
-      aimDegRaw,
+      aimDegRaw: referenceDeg,   // kept as aimDegRaw for HUD compat (now = wall-normal or manual)
       offAxisDegComputed: offAxis,
+      referenceDeg,
       canonRoleUsed: role,
-      aimFlagsSeen: {
-        aimFrontWidesAtMLP: !!appState?.aimFrontWidesAtMLP,
-        aimSideSurroundsAtMLP: !!appState?.aimSideSurroundsAtMLP,
-        aimRearSurroundsAtMLP: !!appState?.aimRearSurroundsAtMLP,
-      }
     } : undefined;
 
     return {
