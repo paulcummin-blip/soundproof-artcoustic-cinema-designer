@@ -159,11 +159,16 @@ export function solveSpeakerDragConstraints({
     const flSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
     const frSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FR');
 
-    if (flSpk && (Math.abs((flSpk.position?.x ?? 0) - finalLeftX) > 0.001 || Math.abs((flSpk.position?.y ?? 0) - frontWallY) > 0.001)) {
+    // Always write FL and FR — never skip to avoid stale y surviving
+    if (flSpk) {
       finalPositions.push({ id: flSpk.id, position: { ...(flSpk.position || {}), x: finalLeftX, y: frontWallY }, positionSource: 'user' });
     }
-    if (frSpk && (Math.abs((frSpk.position?.x ?? 0) - finalRightX) > 0.001 || Math.abs((frSpk.position?.y ?? 0) - frontWallY) > 0.001)) {
+    if (frSpk) {
       finalPositions.push({ id: frSpk.id, position: { ...(frSpk.position || {}), x: finalRightX, y: frontWallY }, positionSource: 'user' });
+    }
+    // Safety pass: force y = frontWallY on every LCR entry regardless of how it was built
+    for (const fp of finalPositions) {
+      if (fp.position && fp.position.y !== frontWallY) fp.position = { ...fp.position, y: frontWallY };
     }
     return { finalPositions, additionalUpdates };
   }
