@@ -538,7 +538,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     };
   } 
   // Bed-layer surrounds/wides: use physical wall-normal as the reference axis
-  else if (SURROUND_ROLES.has(role)) {
+  else if (isBedLayerSurround(role)) {
     // Seat azimuth from speaker position (signed heading, -180..+180)
     const seatAzDeg = angleFromTo(pos, seat);
     if (!isNum(seatAzDeg)) return null;
