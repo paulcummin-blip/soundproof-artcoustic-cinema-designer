@@ -292,24 +292,28 @@ export default function SeatHud({
 
 
                     {/* P16 debug info */}
-              {key === 'p16' && metric?.perSpeaker && metric.perSpeaker.length > 0 && (
+              {key === 'p16' && metric?.debug?.perSpeaker && Object.keys(metric.debug.perSpeaker).length > 0 && (
                 <div
                   style={{
                     fontSize: 10,
                     color: '#999',
                     paddingLeft: 16,
                     paddingBottom: 3,
-                    lineHeight: 1.4,
+                    lineHeight: 1.6,
+                    fontFamily: 'monospace',
                   }}
                 >
-                  {metric.perSpeaker.map((sp, idx) => {
-                    const isWorst = String(sp.role) === String(metric.worstRole);
-                    const text = `${sp.role} ${sp.angleDeg}° / ${sp.lossLabel}`;
+                  {Object.entries(metric.debug.perSpeaker).map(([role, sp]) => {
+                    const isWorst = role === String(metric.debug?.worst?.role);
+                    const angle = Number.isFinite(sp?.angleDeg) ? sp.angleDeg : '—';
+                    const seat = Number.isFinite(sp?.continuousLossAtSeat) ? sp.continuousLossAtSeat.toFixed(2) : '—';
+                    const rsp  = Number.isFinite(sp?.continuousLossAtRsp)  ? sp.continuousLossAtRsp.toFixed(2)  : '—';
+                    const delta = Number.isFinite(sp?.normalizedDelta) ? sp.normalizedDelta.toFixed(1) : '—';
+                    const text = `${role} ${angle}° | seat ${seat} dB | rsp ${rsp} dB | delta ${delta} dB`;
                     return (
-                      <span key={`${sp.role}-${idx}`}>
-                        {idx > 0 ? ', ' : ''}
-                        <span style={{ fontWeight: isWorst ? 700 : 400 }}>{text}</span>
-                      </span>
+                      <div key={role} style={{ fontWeight: isWorst ? 700 : 400, color: isWorst ? '#1B1A1A' : '#999' }}>
+                        {text}
+                      </div>
                     );
                   })}
                 </div>
