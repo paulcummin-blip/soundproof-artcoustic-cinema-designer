@@ -554,7 +554,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     if ((role === 'SBL' || role === 'SBR') && appState?.aimRearSurroundsAtMLP) {
       // Toggle ON: aim at MLP/RSP
       const mlpYaw = isNum(mlpPos?.x) && isNum(mlpPos?.y) ? angleFromTo(pos, mlpPos) : null;
-      referenceDeg = isNum(mlpYaw) ? mlpYaw : 0;
+      referenceDeg = isNum(mlpYaw) ? mlpYaw : 180;
     } else {
       referenceDeg = WALL_NORMAL[role] ?? 0;
     }
