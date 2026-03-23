@@ -1109,7 +1109,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
       // P16 – LCR horizontal off-axis HF loss (RP22 Param 16)
       {
-        const p16 = computeP16ForSeat(seat, safeSpeakers.filter(hasRealModel), getSpeakerModelMeta, mlp);
+        const lcrAimMode = aimState?.lcrAimMode || overheadState?.lcrAimMode || 'flat';
+        const p16 = computeP16ForSeat(seat, safeSpeakers.filter(hasRealModel), getSpeakerModelMeta, mlp, lcrAimMode);
 
         if (p16) {
           // Add note if any LCR is beyond 55°
