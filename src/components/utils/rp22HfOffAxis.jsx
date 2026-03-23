@@ -277,10 +277,10 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
   for (const spk of lcrSpeakers) {
     const role = String(spk.role || "").toUpperCase();
 
-    const atSeat = computeLcrLossAtPoint(spk, seat, mlpPos);
+    const atSeat = computeLcrLossAtPoint(spk, seat, mlpPos, lcrAimMode);
     if (!atSeat) continue;
 
-    const atRsp = computeLcrLossAtPoint(spk, rspPoint, mlpPos);
+    const atRsp = computeLcrLossAtPoint(spk, rspPoint, mlpPos, lcrAimMode);
     if (!atRsp) continue;
 
     // RSP-normalised delta — use continuous interpolated values, not coarse buckets.
