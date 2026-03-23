@@ -209,17 +209,29 @@ const classifyP16 = (lossDb) => {
 };
 
 // Helper: compute raw lossDb for one LCR speaker at a given seat point
-function computeLcrLossAtPoint(spk, point, mlpPos) {
+// lcrAimMode: 'flat' (default) → all LCR aim straight ahead (0°)
+//             'angled'         → FL/FR aim at mlpPos; FC always 0°
+function computeLcrLossAtPoint(spk, point, mlpPos, lcrAimMode) {
   if (!point || !isNum(point.x) || !isNum(point.y)) return null;
   const pos = spk.position;
 
   const seatAzDeg = yawFromToPlan(pos, point);
   if (!isNum(seatAzDeg)) return null;
 
-  const aimDegRaw =
-    (isNum(spk?.yaw) ? spk.yaw : null) ??
-    (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y) ? yawFromToPlan(pos, mlpPos) : null) ??
-    0;
+  // Resolve LCR aim from live mode — never use stale spk.yaw for P16
+  const role = String(spk.role || '').toUpperCase();
+  const isFC = role === 'FC' || role === 'C';
+  let aimDegRaw;
+  if (isFC) {
+    // Center always fires straight ahead
+    aimDegRaw = 0;
+  } else if (lcrAimMode === 'angled' && mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) {
+    // FL/FR aimed at RSP when toggle is on
+    aimDegRaw = yawFromToPlan(pos, mlpPos) ?? 0;
+  } else {
+    // Flat-to-wall: fire straight ahead
+    aimDegRaw = 0;
+  }
 
   const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDegRaw);
   const offAxisDeg = Math.abs(offAxisRaw);
