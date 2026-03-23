@@ -289,7 +289,12 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
       normalizedDelta: Number(delta.toFixed(1)),
     };
 
-    if (delta > worstDelta) {
+    const isBetter =
+      delta > worstDelta ||
+      (delta === worstDelta && atSeat.angleDeg > (perSpeaker[worstRole]?.angleDeg ?? -Infinity)) ||
+      (delta === worstDelta && atSeat.angleDeg === (perSpeaker[worstRole]?.angleDeg ?? -Infinity) && atSeat.continuousLossDb > (perSpeaker[worstRole]?.continuousLossAtSeat ?? -Infinity));
+
+    if (isBetter) {
       worstDelta = delta;
       worstRole = role;
     }
