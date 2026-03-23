@@ -271,18 +271,21 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
     const atRsp = computeLcrLossAtPoint(spk, rspPoint, mlpPos);
     if (!atRsp) continue;
 
-    // RSP-normalised delta (line where delta is calculated for P16)
-    const delta = Math.abs(atSeat.lossDb - atRsp.lossDb);
+    // RSP-normalised delta — use continuous interpolated values, not coarse buckets.
+    // This prevents P16 collapsing to 0.0 dB when seat and RSP share the same bucket.
+    const delta = Math.abs(atSeat.continuousLossDb - atRsp.continuousLossDb);
 
     const isBeyondLcrLimit = atSeat.isBeyondLcrLimit || atRsp.isBeyondLcrLimit;
 
     perSpeaker[role] = {
       angleDeg: atSeat.angleDeg,
-      lossDb: Number(delta.toFixed(1)),         // normalised delta, not absolute
+      lossDb: Number(delta.toFixed(1)),         // normalised delta (continuous)
       isBeyondLcrLimit,
-      // Temporary debug fields
+      // Debug fields
       lossAtSeat: Number(atSeat.lossDb.toFixed(1)),
       lossAtRsp: Number(atRsp.lossDb.toFixed(1)),
+      continuousLossAtSeat: Number(atSeat.continuousLossDb.toFixed(2)),
+      continuousLossAtRsp: Number(atRsp.continuousLossDb.toFixed(2)),
       normalizedDelta: Number(delta.toFixed(1)),
     };
 
