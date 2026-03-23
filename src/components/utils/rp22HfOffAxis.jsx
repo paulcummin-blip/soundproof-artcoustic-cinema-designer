@@ -231,9 +231,9 @@ function computeLcrLossAtPoint(spk, point, mlpPos) {
   const continuousLossDb = continuousHfLossDb(offAxisDeg, meta); // uses raw angle, not quantised
 
   if (lossFromAngle == null) {
-    return { lossDb: 5.0, continuousLossDb, angleDeg, isBeyondLcrLimit: true };
+    return { lossDb: 5.0, continuousLossDb, angleDeg, isBeyondLcrLimit: true, seatAzDeg, aimDegRaw, offAxisRaw: offAxisDeg };
   }
-  return { lossDb: lossFromAngle, continuousLossDb, angleDeg, isBeyondLcrLimit: false };
+  return { lossDb: lossFromAngle, continuousLossDb, angleDeg, isBeyondLcrLimit: false, seatAzDeg, aimDegRaw, offAxisRaw: offAxisDeg };
 }
 
 export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos = null) {
