@@ -416,7 +416,7 @@ export default function SeatHud({
                       >
                         {debugSpeakers.map(s => (
                           <div key={s.role}>
-                            {s.role} dbg: seatAz={formatDbgVal(s.debug.seatAzDeg)} aim={formatDbgVal(s.debug.aimDegRaw)} offAxis={formatDbgVal(s.debug.offAxisDegComputed)}
+                            {s.role} dbg: seatAz={formatDbgVal(s.debug.seatAzDeg)} ref={formatDbgVal(s.debug.referenceDeg ?? s.debug.aimDegRaw)} offAxis={formatDbgVal(s.debug.offAxisDegComputed)}
                           </div>
                         ))}
                       </div>
