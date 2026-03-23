@@ -57,7 +57,7 @@ export default function RvSpeakerLayer({
         const isAuto      = speaker.positionSource !== 'user';
         const isLeftWall  = isAuto && (role === 'LW' || /^SL\d*$/.test(role));
         const isRightWall = isAuto && (role === 'RW' || /^SR\d*$/.test(role));
-        const isRearWall  = isAuto && (role === 'SBL' || role === 'SBR');
+        const isRearWall  = (role === 'SBL' || role === 'SBR');
 
         let canvasX, canvasY;
 
