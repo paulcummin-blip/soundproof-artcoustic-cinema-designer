@@ -287,6 +287,10 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
       continuousLossAtSeat: Number(atSeat.continuousLossDb.toFixed(2)),
       continuousLossAtRsp: Number(atRsp.continuousLossDb.toFixed(2)),
       normalizedDelta: Number(delta.toFixed(1)),
+      // Aim debug fields
+      seatAzDeg: Number(isNum(atSeat.seatAzDeg) ? atSeat.seatAzDeg.toFixed(1) : 0),
+      aimDegRaw: Number(isNum(atSeat.aimDegRaw) ? atSeat.aimDegRaw.toFixed(1) : 0),
+      offAxisRaw: Number(isNum(atSeat.offAxisRaw) ? atSeat.offAxisRaw.toFixed(1) : 0),
     };
 
     const isBetter =
