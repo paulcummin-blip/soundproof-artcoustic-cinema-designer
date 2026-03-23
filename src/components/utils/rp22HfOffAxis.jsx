@@ -228,11 +228,12 @@ function computeLcrLossAtPoint(spk, point, mlpPos) {
   const angleDeg = quantiseAngleDown(offAxisDeg, 0.5);
   const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
   const lossFromAngle = mapAngleToHfLossDb(angleDeg, meta);
+  const continuousLossDb = continuousHfLossDb(offAxisDeg, meta); // uses raw angle, not quantised
 
   if (lossFromAngle == null) {
-    return { lossDb: 5.0, angleDeg, isBeyondLcrLimit: true };
+    return { lossDb: 5.0, continuousLossDb, angleDeg, isBeyondLcrLimit: true };
   }
-  return { lossDb: lossFromAngle, angleDeg, isBeyondLcrLimit: false };
+  return { lossDb: lossFromAngle, continuousLossDb, angleDeg, isBeyondLcrLimit: false };
 }
 
 export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos = null) {
