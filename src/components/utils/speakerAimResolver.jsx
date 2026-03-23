@@ -50,11 +50,14 @@ export function resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole 
   const isRear = canon === 'SBL' || canon === 'SBR';
 
   // ─── 1. Manual rotation (ONLY when user explicitly placed the speaker) ────
+  // NOTE: rotation?.y is intentionally excluded — it is often a default { x:0, y:0, z:0 }
+  // object field and is not reliable evidence of intentional manual aim.
+  // Only standalone yaw / rotationDeg / rotation_deg fields are trusted.
   if (speaker.positionSource === 'user') {
     if (isNum(speaker.yaw))          return Number(speaker.yaw);
     if (isNum(speaker.rotationDeg))  return Number(speaker.rotationDeg);
     if (isNum(speaker.rotation_deg)) return Number(speaker.rotation_deg);
-    if (isNum(speaker.rotation?.y))  return Number(speaker.rotation.y);
+    // Fall through to role-based defaults if no real manual aim field exists
   }
 
   // ─── 2. Aim-at-MLP toggles ────────────────────────────────────────────────
