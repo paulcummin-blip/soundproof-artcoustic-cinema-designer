@@ -537,13 +537,16 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
 
     // Physical wall-normal on-axis direction per role (degrees, same convention as angleFromTo)
     // 0° = into room (+Y), clockwise positive
+    // Left-wall speakers face +X  → -90°
+    // Right-wall speakers face -X → +90°
+    // Rear-wall speakers face -Y  → 180°
     const WALL_NORMAL = {
-      SL:  90,
-      SR: -90,
-      LW: -90,
-      RW:  90,
-      SBL:  0,
-      SBR:  0,
+      SL:  -90,
+      SR:   90,
+      LW:  -90,
+      RW:   90,
+      SBL:  180,
+      SBR:  180,
     };
 
     // Default reference: physical wall-normal, but SBL/SBR respect the aim toggle
