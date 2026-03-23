@@ -765,12 +765,13 @@ function useDesignerState() {
           ? ((slY + srY) / 2) + 1.00 + offsetM
           : (Number(roomDims?.lengthM) || 6.0) * 0.65 + offsetM;
         
-        // CRITICAL: reuse existing speaker if present (preserves user-dragged position)
+        // CRITICAL: if speaker already exists, preserve it exactly — do not overwrite position,
+        // positionSource, or rotation fields. Only seed a new speaker if the role is missing.
         const existingSL = existing.find(s => String(s.role).toUpperCase() === roleSL);
         const existingSR = existing.find(s => String(s.role).toUpperCase() === roleSR);
         
-        // SL speaker (left) - reuse if exists, otherwise create new (always spawn on side wall)
-        nextExtras.push(existingSL ? { ...existingSL } : {
+        // SL speaker (left) — keep existing untouched, only create if missing
+        nextExtras.push(existingSL || {
           id: `${roleSL.toLowerCase()}-${timeNowMs() + pairIndex * 2}`,
           role: roleSL,
           model: modelKey && modelKey !== 'off' ? modelKey : undefined,
@@ -780,8 +781,8 @@ function useDesignerState() {
           positionSource: 'auto',
         });
         
-        // SR speaker (right) - reuse if exists, otherwise create new (always spawn on side wall)
-        nextExtras.push(existingSR ? { ...existingSR } : {
+        // SR speaker (right) — keep existing untouched, only create if missing
+        nextExtras.push(existingSR || {
           id: `${roleSR.toLowerCase()}-${timeNowMs() + pairIndex * 2 + 1}`,
           role: roleSR,
           model: modelKey && modelKey !== 'off' ? modelKey : undefined,

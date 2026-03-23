@@ -50,41 +50,9 @@ export default function RvSpeakerLayer({
           lcrAngleInfo,
         );
 
-        // For wall-mounted surrounds: derive the render-center from the live yaw + fixed wall edge.
-        // This ensures the icon never crosses the wall regardless of stored position lag,
-        // and visually rotates around the wall-facing rear edge.
-        const WALL_GAP_M = 0.01;
-        const isAuto      = speaker.positionSource !== 'user';
-        const isLeftWall  = isAuto && (role === 'LW' || /^SL\d*$/.test(role));
-        const isRightWall = isAuto && (role === 'RW' || /^SR\d*$/.test(role));
-        const isRearWall  = (role === 'SBL' || role === 'SBR');
-
-        let canvasX, canvasY;
-
-        if (isLeftWall || isRightWall || isRearWall) {
-          const yawRad = yawDeg * Math.PI / 180;
-          const sinA = Math.abs(Math.sin(yawRad));
-          const cosA = Math.abs(Math.cos(yawRad));
-          // Half-extent of the rotated box projected onto each axis
-          const hxPx = (speakerDepthM * sinA + speakerWidthM * cosA) / 2 * scale;
-          const hyPx = (speakerDepthM * cosA + speakerWidthM * sinA) / 2 * scale;
-
-          if (isLeftWall) {
-            const [wX, wY] = toPx(WALL_GAP_M, speaker.position.y);
-            canvasX = wX + hxPx;
-            canvasY = wY;
-          } else if (isRightWall) {
-            const [wX, wY] = toPx(widthM - WALL_GAP_M, speaker.position.y);
-            canvasX = wX - hxPx;
-            canvasY = wY;
-          } else { // isRearWall
-            const [wX, wY] = toPx(speaker.position.x, lengthM - WALL_GAP_M);
-            canvasX = wX;
-            canvasY = wY - hyPx;
-          }
-        } else {
-          [canvasX, canvasY] = toPx(speaker.position.x, speaker.position.y);
-        }
+        // Always render from the stored position — no wall-offset overrides.
+        // yawDeg is used for icon rotation only.
+        const [canvasX, canvasY] = toPx(speaker.position.x, speaker.position.y);
 
         const onMouseDown = bedLayerSpeakerMouseDownHandler
           ? (e) => bedLayerSpeakerMouseDownHandler(e, speaker.id)
