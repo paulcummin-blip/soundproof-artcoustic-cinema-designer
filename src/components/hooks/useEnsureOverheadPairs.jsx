@@ -20,6 +20,13 @@ export function useEnsureOverheadPairs({
   dolbyConfiguration,
   placedSpeakers,
   setPlacedSpeakers,
+  overheadGlobalModel = null,
+  overheadFrontOverride = null,
+  overheadMidOverride = null,
+  overheadRearOverride = null,
+  useFrontGlobal = true,
+  useMidGlobal = true,
+  useRearGlobal = true,
   useWidesInsteadOfRears = false,
   isDragging = false
 }) {
@@ -33,6 +40,39 @@ export function useEnsureOverheadPairs({
     
     // Guard: invalid speakers array
     if (!Array.isArray(placedSpeakers)) return;
+
+    const resolveOverheadModelForRole = (role) => {
+      const r = String(role || '').toUpperCase();
+      if (!r.startsWith('T')) return null;
+
+      let zone = null;
+
+      if (['TFL', 'TFR', 'TFC'].includes(r)) zone = 'front';
+      else if (['TL', 'TR', 'TML', 'TMR'].includes(r)) zone = 'mid';
+      else if (['TBL', 'TBR', 'TBC', 'TRL', 'TRR', 'TRC'].includes(r)) zone = 'rear';
+
+      if (!zone) return overheadGlobalModel || null;
+
+      if (zone === 'front') {
+        return useFrontGlobal
+          ? (overheadGlobalModel || null)
+          : (overheadFrontOverride || overheadGlobalModel || null);
+      }
+
+      if (zone === 'mid') {
+        return useMidGlobal
+          ? (overheadGlobalModel || null)
+          : (overheadMidOverride || overheadGlobalModel || null);
+      }
+
+      if (zone === 'rear') {
+        return useRearGlobal
+          ? (overheadGlobalModel || null)
+          : (overheadRearOverride || overheadGlobalModel || null);
+      }
+
+      return overheadGlobalModel || null;
+    };
 
     // 1. Determine required overhead roles from visibility logic
     const visibleRolesSet = getSpeakerVisibilityFor(dolbyConfiguration, useWidesInsteadOfRears);
