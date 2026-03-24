@@ -1342,7 +1342,7 @@ function RP22ReportInner() {
                                     projectorBodyHeight={projector?.body_height_m}
                                     projectorBodyDepth={projector?.body_depth_m}
                                     rowData={sightlineRowData}
-                                    dolbyConfig={app?.dolbyConfig || app?.dolbyLayout || ''}
+                                    dolbyConfig={exportSystemConfiguration || ''}
                                 />
                             </section>
                         )}

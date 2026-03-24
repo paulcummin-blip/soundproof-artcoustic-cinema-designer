@@ -88,12 +88,12 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
   // Projector body
   const { projectorLensX, projectorLensY, projectorLensZ,
           projectorBodyWidth, projectorBodyHeight, projectorBodyDepth } = projector;
-  const halfBD = (projectorBodyDepth || 0.3) / 2;
-  const halfBH = (projectorBodyHeight || 0.12) / 2;
-  const pbFront = projectorLensY - halfBD;
-  const pbRear  = projectorLensY + halfBD;
-  const pbBot   = projectorLensZ - halfBH;
-  const pbTop   = projectorLensZ + halfBH;
+  const bodyDepth  = projectorBodyDepth  || 0.3;
+  const bodyHeight = projectorBodyHeight || 0.12;
+  const pbFront = projectorLensY;
+  const pbRear  = projectorLensY + bodyDepth;
+  const pbBot   = projectorLensZ - bodyHeight / 2;
+  const pbTop   = projectorLensZ + bodyHeight / 2;
 
   // Colours for rows
   const rowColors = ['#213428','#625143','#3E4349','#B45309','#1B1A1A'];
@@ -309,7 +309,7 @@ export default function SightlineGraphic({
     : null;
 
   const screenInches = screenWidthM
-    ? `${(screenWidthM / 0.0254).toFixed(0)}" viewable`
+    ? `${(screenWidthM / 0.0254).toFixed(0)}" width`
     : null;
 
   const room  = { roomLengthM, roomHeightM };
