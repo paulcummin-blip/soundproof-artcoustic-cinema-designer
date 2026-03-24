@@ -1256,12 +1256,14 @@ useEffect(() => {
     const fcCurrentX = Number(fcSpeaker?.position?.x);
 
     // Only snap if currently outside the allowed zone (i.e. still at hardcoded seed)
-    // Never snap a speaker the user has manually positioned.
-    const flNeedsSnap = flSpeaker && flSpeaker.positionSource !== 'user' && Number.isFinite(flCurrentX) &&
+    // Never snap a speaker that has ever been user-positioned (positionSource === 'user').
+    const isUserPositioned = (s) => s?.positionSource === 'user';
+
+    const flNeedsSnap = flSpeaker && !isUserPositioned(flSpeaker) && Number.isFinite(flCurrentX) &&
       (flCurrentX < flClamp.minX - EPS || flCurrentX > flClamp.maxX + EPS);
-    const frNeedsSnap = frSpeaker && frSpeaker.positionSource !== 'user' && Number.isFinite(frCurrentX) &&
+    const frNeedsSnap = frSpeaker && !isUserPositioned(frSpeaker) && Number.isFinite(frCurrentX) &&
       (frCurrentX < frClamp.minX - EPS || frCurrentX > frClamp.maxX + EPS);
-    const fcNeedsSnap = fcSpeaker && fcSpeaker.positionSource !== 'user' && Number.isFinite(fcCurrentX) &&
+    const fcNeedsSnap = fcSpeaker && !isUserPositioned(fcSpeaker) && Number.isFinite(fcCurrentX) &&
       Math.abs(fcCurrentX - centerX_m) > EPS_M;
 
     if (!flNeedsSnap && !frNeedsSnap && !fcNeedsSnap) return;
@@ -1294,7 +1296,8 @@ useEffect(() => {
     lcrAngleInfo,
   });
 
-  // [FC_CENTERLINE_LOCK] — Enforce FC always at room centerline
+  // [FC_CENTERLINE_LOCK] — Enforce FC X = room centerline only. Never moves other fields.
+  // Skips user-positioned FC so drag result is never overwritten.
   useEffect(() => {
     if (isAnyDraggingRef.current) return; // Skip while drag is active
     if (!placedSpeakers?.length || !onSetSpeakers) return;
@@ -1302,14 +1305,12 @@ useEffect(() => {
     let needsFix = false;
     const next = placedSpeakers.map(sp => {
       const role = getCanonicalRole(sp.role);
-      if (role === 'FC') {
+      if (role === 'FC' && sp.positionSource !== 'user') {
         const x = Number(sp.position?.x);
         if (!Number.isFinite(x) || Math.abs(x - centerX_m) > EPS_M) {
           needsFix = true;
-          return {
-            ...sp,
-            position: { ...sp.position, x: centerX_m }
-          };
+          // Surgical: only fix position.x, preserve everything else exactly
+          return { ...sp, position: { ...sp.position, x: centerX_m } };
         }
       }
       return sp;
@@ -1593,18 +1594,34 @@ useEffect(() => {
     const Cmodel = speakers.C || "";
     const Rmodel = speakers.R || "";
 
-    // Build or merge FL/FC/FR entries; keep all other speakers/subs as-is
+    // SAFE SEEDER: never overwrite existing LCR speakers.
+    // Only fills in missing roles or missing models on existing speakers.
     onSetSpeakers((prev = []) => {
-      // Filter out existing LCR speakers using canonical roles for robustness
-      const keep = prev.filter(s => !["FL", "FC", "FR"].includes(getCanonicalRole(s.role)));
+      const seedMap = {
+        FL: { id: "auto-fl", role: "FL", model: Lmodel, position: { x: Lpos.x, y: Lpos.y } },
+        FC: { id: "auto-fc", role: "FC", model: Cmodel, position: { x: Cpos.x, y: Cpos.y } },
+        FR: { id: "auto-fr", role: "FR", model: Rmodel, position: { x: Rpos.x, y: Rpos.y } },
+      };
 
-      const next = [
-        { id: "auto-fl", role: "FL", model: Lmodel, position: { x: Lpos.x, y: Lpos.y } },
-        { id: "auto-fc", role: "FC", model: Cmodel, position: { x: Cpos.x, y: Cpos.y } },
-        { id: "auto-fr", role: "FR", model: Rmodel, position: { x: Rpos.x, y: Rpos.y } },
-      ];
+      let changed = false;
+      const next = prev.map(s => {
+        const role = getCanonicalRole(s.role);
+        if (!seedMap[role]) return s;
+        // Role already exists — only backfill a missing model, never touch position/id/yaw/positionSource
+        const seed = seedMap[role];
+        delete seedMap[role]; // mark as handled
+        if (!s.model && seed.model) {
+          changed = true;
+          return { ...s, model: seed.model };
+        }
+        return s;
+      });
 
-      return [...keep, ...next];
+      // Seed roles that did not exist at all
+      const missing = Object.values(seedMap);
+      if (missing.length > 0) changed = true;
+
+      return changed ? [...next, ...missing] : prev;
     });
   }, [onSetSpeakers, widthM, lengthM, getCanonicalRole]); // Use new widthM, lengthM
 
