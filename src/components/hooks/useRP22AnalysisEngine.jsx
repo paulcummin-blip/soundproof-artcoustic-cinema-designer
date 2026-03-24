@@ -83,9 +83,9 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
   const p5CatalogEntry = RP22_CATALOG["5"];
   const lvlP5 = p5CatalogEntry.levels;
   let level5 = 1;
-  if (lvlP5.L4 != null && maxGap <= lvlP5.L4) level5 = 4;
-  else if (lvlP5.L3 != null && maxGap <= lvlP5.L3) level5 = 3;
-  else if (lvlP5.L2 != null && maxGap <= lvlP5.L2) level5 = 2;
+  if (lvlP5.L4 != null && maxGap <= lvlP5.L4) level5 = 4;   // <= 50 = L4
+  else if (lvlP5.L3 != null && maxGap <= lvlP5.L3) level5 = 3; // <= 60 = L3
+  else if (lvlP5.L2 != null && maxGap <= lvlP5.L2) level5 = 2; // <= 80 = L2
 
   return {
     number: 5,
