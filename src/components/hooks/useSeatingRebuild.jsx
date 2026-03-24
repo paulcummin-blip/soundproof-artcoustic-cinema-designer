@@ -117,7 +117,7 @@ export function useSeatingRebuild({
             id: `seat-r${rowIndex + 1}-c${i + 1}`,
             x: startX + i * spacingX,
             y,
-            z: 1.2,
+            z: getRowZ(rowIndex),
             rowNumber: rowIndex + 1,
           });
         }
