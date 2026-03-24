@@ -160,6 +160,8 @@ appState, // Pass appState directly for setters
       setOverlays, setSeatingPositions, setRoomElements,
       setFrontSubsCfg, setRearSubsCfg,
       setSelectedSpeakersByRole, setSpeakerNodes, setSpeakerSystem,
+      setGlobalSurroundModel,
+      setExtraSurroundCount,
     });
   }, [
   appState?.setRoomDims,

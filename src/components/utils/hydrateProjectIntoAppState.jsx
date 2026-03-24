@@ -63,6 +63,8 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     setSpeakerNodes,
     setSpeakerSystem,
     setFreeMoveLcr,
+    setGlobalSurroundModel,
+    setExtraSurroundCount,
   } = setters;
 
   // 1) ROOM DIMS
@@ -118,6 +120,15 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   }
   if (typeof setEnableFrontWides === "function") setEnableFrontWides(p?.enable_front_wides ?? false);
   if (typeof setFreeMoveLcr === "function") setFreeMoveLcr(!!p?.free_move_lcr);
+
+  if (typeof setGlobalSurroundModel === "function") {
+    setGlobalSurroundModel(p?.global_surround_model || null);
+  }
+
+  if (typeof setExtraSurroundCount === "function") {
+    const nextExtraCount = Number(p?.extra_surround_count);
+    setExtraSurroundCount(Number.isFinite(nextExtraCount) ? nextExtraCount : 0);
+  }
 
   const rowSpacing = Number(p?.row_spacing_m) || 1.8;
   if (typeof setRowSpacingM === "function") setRowSpacingM(rowSpacing);

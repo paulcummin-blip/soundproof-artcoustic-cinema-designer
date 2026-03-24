@@ -65,6 +65,8 @@ export function serializeProject(input = {}) {
     selectedSpeakersByRole = {},
     speakerNodes = [],
     splConfig = { globalPowerW: 100, globalEqHeadroomDb: 0, perRole: {} },
+    globalSurroundModel = null,
+    extraSurroundCount = 0,
 
     // Front wides / bed layout
     enableFrontWides = false,
@@ -172,6 +174,8 @@ export function serializeProject(input = {}) {
     seven_bed_layout_type: sevenBedLayoutType,
     lcr_aim_mode: lcrAimMode,
     enable_front_wides: !!enableFrontWides,
+    global_surround_model: globalSurroundModel,
+    extra_surround_count: Number.isFinite(Number(extraSurroundCount)) ? Number(extraSurroundCount) : 0,
 
     // Speakers & subs
     // Audit: ensure each placed speaker retains id, role, model, position.x/y/z
