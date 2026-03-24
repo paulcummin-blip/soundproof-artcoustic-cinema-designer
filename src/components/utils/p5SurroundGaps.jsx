@@ -114,8 +114,8 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
  */
 export function rp22LevelForP5(gapDeg) {
   if (!Number.isFinite(gapDeg)) return '—';
-  if (gapDeg <= 45) return 'L4';
+  if (gapDeg <= 50) return 'L4';
   if (gapDeg <= 60) return 'L3';
-  if (gapDeg <= 90) return 'L2';
+  if (gapDeg <= 80) return 'L2';
   return 'L1';
 }
