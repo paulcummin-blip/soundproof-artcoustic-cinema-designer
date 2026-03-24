@@ -371,47 +371,11 @@ appState, // Pass appState directly for setters
     const r = globalThis[refKey];
 
     const buildProjectData = () => {
-      const liveFrontSubsCfg = appState?.frontSubsCfg ?? frontSubsCfg;
-      const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
-      const projectData = serializeProject({
-        name: projectNameState,
-        roomDims: appState.roomDims,
-        dimensions: appState.roomDims, // legacy fields
-        screen,
-        seatingPositions: appState?.seatingPositions || seatingPositions || [],
-        seatsPerRowByRow,
-        rowSpacingM,
-        placedSpeakers: appState?.speakerSystem?.placedSpeakers || placedSpeakers || [],
-        roomElements,
-        selectedSpeakersByRole: appState.selectedSpeakersByRole,
-        speakerNodes: appState.speakerNodes,
-        dolbyLayout: dolbyPreset,
-        overlays,
-        frozenTabs,
-        sevenBedLayoutType,
-        frontSubsCfg: liveFrontSubsCfg,
-        rearSubsCfg: liveRearSubsCfg,
-        lcrAimMode,
-        enableFrontWides,
-        free_move_lcr: !!freeMoveLcr,
-        overheadGlobalModel,
-        overheadFrontOverride,
-        overheadMidOverride,
-        overheadRearOverride,
-        useFrontGlobal,
-        useMidGlobal,
-        useRearGlobal,
-        screenFrontPlaneM: appState.screenFrontPlaneM,
-        splConfig: appState.splConfig,
-        p12Mode: appState.p12Mode,
-        p12Level: appState.p12Level,
-      });
-
-      // IMPORTANT: autosave must never rename a project
-      delete projectData.name;
-      delete projectData.client_name;
-
-      return projectData;
+      const data = buildSharedProjectPayload();
+      // Autosave must never rename a project
+      delete data.name;
+      delete data.client_name;
+      return data;
     };
 
     const computeSig = (data) => {
