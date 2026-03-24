@@ -814,7 +814,7 @@ function useDesignerState() {
       
       return { ...prev, placedSpeakers: nextPlaced };
     });
-  }, [extraSurroundCount, globalSurroundModel, speakerSystem?.placedSpeakers, roomDims?.widthM, roomDims?.lengthM, setSpeakerSystem]);
+  }, [isHydrated, extraSurroundCount, globalSurroundModel, speakerSystem?.placedSpeakers, roomDims?.widthM, roomDims?.lengthM, setSpeakerSystem]);
 
   const [splConfig, setSplConfig] = useState(() => {
       const autosaveConfig = __autosavePayload?.splConfig || {};
