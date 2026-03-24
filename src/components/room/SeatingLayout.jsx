@@ -89,7 +89,9 @@ export default function SeatingLayout({
   screen,
   dimensions,
   showMlpRuler = false,
-  onShowMlpRulerChange
+  onShowMlpRulerChange,
+  rowEarHeights = [],
+  onRowEarHeightsChange,
 }) {
   // Build rowsArray purely from props (parent is the source of truth)
   const rowsArray = React.useMemo(() => {
