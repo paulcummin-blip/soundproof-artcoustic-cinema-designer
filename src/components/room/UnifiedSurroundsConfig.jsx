@@ -118,11 +118,13 @@ export default function UnifiedSurroundsConfig({
         useWidesInsteadOfRears: useWidesInsteadOfRearsForThisLayout,
       }).filter((r) => ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r));
 
+      // Build byRole map — reuse existing objects EXACTLY (preserve position, positionSource, rotation, yaw)
       const byRole = new Map();
       for (const s of Array.isArray(prev) ? prev : []) {
-        byRole.set(getCanonicalRole(s.role), { ...s });
+        byRole.set(getCanonicalRole(s.role), s); // NOTE: no spread — keep original reference
       }
 
+      // Only create a new stub for roles that truly do not exist yet
       for (const role of layoutRoles) {
         if (!byRole.has(role)) {
           byRole.set(role, {
@@ -137,21 +139,22 @@ export default function UnifiedSurroundsConfig({
         }
       }
 
+      // Remove roles not expected by the current layout
       for (const role of ["SL", "SR", "SBL", "SBR", "LW", "RW"]) {
         if (!layoutRoles.includes(role)) byRole.delete(role);
       }
 
       if (!modelKey || modelKeyLower === "off" || modelKeyLower === "none") {
-        for (const role of layoutRoles) {
-          const s = byRole.get(role);
-          if (!s) continue;
-          byRole.set(role, { ...s, model: null });
-        }
+        // OFF path: only clear model, never touch positions
+        const result = Array.from(byRole.values()).map(s => {
+          const canon = getCanonicalRole(s.role);
+          if (!["SL","SR","SBL","SBR","LW","RW"].includes(canon)) return s;
+          return { ...s, model: null };
+        });
 
         if (needsSurroundResetRef) needsSurroundResetRef.current = false;
         if (lastSurroundModelKeyRef) lastSurroundModelKeyRef.current = null;
 
-        const result = Array.from(byRole.values());
         if (globalThis.__B44_LOGS) {
           console.log("[SP] Surrounds OFF -> kept stubs:", result
             .filter(s => ["SL","SR","SBL","SBR","LW","RW"].includes(getCanonicalRole(s.role)))
@@ -161,26 +164,26 @@ export default function UnifiedSurroundsConfig({
         return result;
       }
 
-      // Apply resolved per-role models (overrides take effect here)
-      for (const role of layoutRoles) {
-        const s = byRole.get(role);
-        if (!s) continue;
-        const resolvedModel = roleModelMap[role] || modelKey;
-        byRole.set(role, { ...s, model: resolvedModel });
-      }
-
-      const draft = Array.from(byRole.values());
+      // ON path: only update model on existing speakers, keep all other fields intact
+      const draft = Array.from(byRole.values()).map(s => {
+        const canon = getCanonicalRole(s.role);
+        if (!layoutRoles.includes(canon)) return s;
+        const resolvedModel = roleModelMap[canon] || modelKey;
+        // Spread only to update model — position, positionSource, rotation, yaw are preserved
+        return { ...s, model: resolvedModel };
+      });
 
       if (needsSurroundResetRef) needsSurroundResetRef.current = true;
       if (lastSurroundModelKeyRef) lastSurroundModelKeyRef.current = modelKey;
 
       if (globalThis.__B44_LOGS) {
-        console.log("[SP] Surrounds ON -> draft (positions will be hydrated centrally):", draft
+        console.log("[SP] Surrounds ON -> draft:", draft
           .filter(s => ["SL","SR","SBL","SBR","LW","RW"].includes(getCanonicalRole(s.role)))
-          .map(s => ({ role: s.role, model: s.model }))
+          .map(s => ({ role: s.role, model: s.model, pos: s.position }))
         );
       }
 
+      // Single hydration pass — resetSurroundPositions only seeds roles with no valid position
       const hydrated = resetSurroundPositions(
         effectivePreset,
         mlpPoint,
@@ -189,60 +192,8 @@ export default function UnifiedSurroundsConfig({
         modelKey
       );
 
-      const useWidesInsteadOfRears = sevenBedLayoutType === "wides";
-      const expectsRears = (layoutMajor >= 9) || (layoutMajor === 7 && !useWidesInsteadOfRears);
-
-      const list0 = Array.isArray(hydrated) && hydrated.length ? hydrated : draft;
-      const byCanon0 = new Map(list0.map(s => [getCanonicalRole(s?.role), s]));
-
-      const hasFiniteXY = (p) =>
-        !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
-
-      if (expectsRears) {
-        const W = Number(dimensions?.width ?? dimensions?.widthM) || 0;
-        const L = Number(dimensions?.length ?? dimensions?.lengthM) || 0;
-        const earZ = 1.1;
-
-        if (W > 0 && L > 0) {
-          const backY = Math.max(0.01, L - 0.10);
-
-          const ensureRear = (role, xFrac) => {
-            const canon = role;
-            const existing = byCanon0.get(canon);
-
-            if (existing && hasFiniteXY(existing.position)) return;
-
-            // Use the resolved rearModel for SBL/SBR (not the global master)
-            const x = Math.max(0.01, Math.min(W - 0.01, W * xFrac));
-            const fixed = {
-              ...(existing || {}),
-              id: existing?.id || `${canon.toLowerCase()}-${timeNowMs()}`,
-              role: canon,
-              label: canon,
-              model: existing?.model || rearModel || modelKey,
-              position: { x, y: backY, z: earZ },
-              rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
-              draggable: true,
-            };
-
-            byCanon0.set(canon, fixed);
-          };
-
-          ensureRear('SBL', 0.25);
-          ensureRear('SBR', 0.75);
-        }
-      }
-
-      const hydratedWithRears = Array.from(byCanon0.values());
-
-      if (globalThis.__B44_LOGS) {
-        console.log('[SP] Rear rescue check:', hydratedWithRears
-          .filter(s => ['SBL','SBR'].includes(getCanonicalRole(s.role)))
-          .map(s => ({ role: s.role, model: s.model, pos: s.position }))
-        );
-      }
-
-      return hydratedWithRears;
+      // Return hydrated list directly — no second rescue pass
+      return Array.isArray(hydrated) && hydrated.length ? hydrated : draft;
     });
   }, [
     app,
