@@ -207,11 +207,13 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
       {/* Axis labels */}
       {/* Floor */}
       <text x={rx1 - 4} y={ry0 - 4} fontSize={6} fill={PALETTE.subLabel} textAnchor="end">Floor</text>
+      {/* Ceiling label — top edge of room box is the ceiling */}
+      <text x={rx1 - 4} y={ry1 + 8} fontSize={6} fill={PALETTE.subLabel} textAnchor="end">Ceiling</text>
       {/* Screen label */}
       <text x={toX(screenFrontPlaneY)} y={ry1 - 4} fontSize={6} fill={PALETTE.screenFrame} textAnchor="middle">Screen</text>
-      {/* Projector label */}
+      {/* Projector label — shifted above body top to avoid overlap with dim line */}
       {Number.isFinite(projectorLensY) && (
-        <text x={toX(projectorLensY)} y={toY(projectorLensZ) - 10} fontSize={6} fill={PALETTE.beam} textAnchor="middle">Projector</text>
+        <text x={toX(projectorLensY)} y={toY(pbTop) - 14} fontSize={6} fill={PALETTE.beam} textAnchor="middle">Projector</text>
       )}
       {/* Room length annotation */}
       <text x={(rx0 + rx1) / 2} y={ry0 + 10} fontSize={6} fill={PALETTE.subLabel} textAnchor="middle">
@@ -222,6 +224,47 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
         transform={`rotate(-90, ${rx0 + 10}, ${(ry0 + ry1) / 2})`}>
         H: {roomHeightM.toFixed(2)} m
       </text>
+
+      {/* ── Projector height dimension line ── */}
+      {Number.isFinite(projectorLensY) && Number.isFinite(projectorLensZ) && (() => {
+        const dimX = toX(pbRear) + 10;   // just to the right of projector body
+        const floorSvgY = ry0;           // SVG y of floor
+        const lensSvgY  = toY(projectorLensZ);
+        const topSvgY   = toY(pbTop);
+        const ceilSvgY  = ry1;
+        const ceilingClearance = roomHeightM - pbTop;
+        return (
+          <g>
+            {/* Vertical dimension line: floor → lens */}
+            <line x1={dimX} y1={floorSvgY} x2={dimX} y2={lensSvgY}
+              stroke={PALETTE.projector} strokeWidth={0.6} fill="none" opacity={0.7} strokeDasharray="3 2" />
+            {/* Tick at floor */}
+            <line x1={dimX - 3} y1={floorSvgY} x2={dimX + 3} y2={floorSvgY}
+              stroke={PALETTE.projector} strokeWidth={0.7} fill="none" opacity={0.7} />
+            {/* Tick at lens */}
+            <line x1={dimX - 3} y1={lensSvgY} x2={dimX + 3} y2={lensSvgY}
+              stroke={PALETTE.projector} strokeWidth={0.7} fill="none" opacity={0.7} />
+            {/* Lens height label */}
+            <text x={dimX + 5} y={lensSvgY - 2} fontSize={6} fill={PALETTE.projector} textAnchor="start">
+              Lens: {projectorLensZ.toFixed(2)} m
+            </text>
+
+            {/* Vertical dim line: projector top → ceiling */}
+            <line x1={dimX} y1={topSvgY} x2={dimX} y2={ceilSvgY}
+              stroke={PALETTE.subLabel} strokeWidth={0.6} fill="none" opacity={0.6} strokeDasharray="3 2" />
+            {/* Tick at projector top */}
+            <line x1={dimX - 3} y1={topSvgY} x2={dimX + 3} y2={topSvgY}
+              stroke={PALETTE.subLabel} strokeWidth={0.7} fill="none" opacity={0.7} />
+            {/* Tick at ceiling */}
+            <line x1={dimX - 3} y1={ceilSvgY} x2={dimX + 3} y2={ceilSvgY}
+              stroke={PALETTE.subLabel} strokeWidth={0.7} fill="none" opacity={0.7} />
+            {/* Clearance label — midpoint between projector top and ceiling */}
+            <text x={dimX + 5} y={(topSvgY + ceilSvgY) / 2 + 2} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">
+              Clr: {ceilingClearance.toFixed(2)} m
+            </text>
+          </g>
+        );
+      })()}
     </svg>
   );
 }
