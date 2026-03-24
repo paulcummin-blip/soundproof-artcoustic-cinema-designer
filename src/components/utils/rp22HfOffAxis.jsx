@@ -118,8 +118,11 @@ function halfDispersionDeg(fullDeg) {
 }
 
 // Continuous (interpolated) HF loss estimate for P16 delta comparison only.
-// Returns a smooth dB value between 0–5 dB; not a coarse bucket.
-// Uses the same dispersion thresholds as mapAngleToHfLossDb.
+// Returns a smooth dB value that continues rising beyond the -5 dB window.
+// Uses the same dispersion thresholds as mapAngleToHfLossDb for the inner knots,
+// then extends with a linear tail so seat-to-seat deltas remain meaningful
+// when both the seat and RSP are outside the nominal coverage window.
+// Hard ceiling: 12.0 dB (avoids absurd values while preserving relative ordering).
 function continuousHfLossDb(angleDeg, modelMeta = null) {
   const a = Math.abs(Number(angleDeg) || 0);
 
@@ -137,12 +140,18 @@ function continuousHfLossDb(angleDeg, modelMeta = null) {
     }
   }
 
-  // Linear interpolation between the four knot points
+  // Linear interpolation between the four inner knot points
   if (a <= p0) return l0;
   if (a <= p1) return l0 + (l1 - l0) * (a - p0) / (p1 - p0);
   if (a <= p2) return l1 + (l2 - l1) * (a - p1) / (p2 - p1);
   if (a <= p3) return l2 + (l3 - l2) * (a - p2) / (p3 - p2);
-  return l3; // beyond −5 dB window: cap at 5.0 dB
+
+  // Beyond the -5 dB window: continue rising with a linear tail.
+  // Slope is derived from the final segment (p2→p3) so the curve is continuous
+  // and doesn't flatten abruptly. Clamped at 12.0 dB.
+  const tailSlope = (l3 - l2) / Math.max(1, p3 - p2); // dB per degree
+  const tailLoss = l3 + tailSlope * (a - p3);
+  return Math.min(12.0, tailLoss);
 }
 
 // Centralized angle → HF loss mapping using new RP22 thresholds
