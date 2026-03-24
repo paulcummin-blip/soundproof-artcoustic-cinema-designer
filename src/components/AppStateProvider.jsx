@@ -563,7 +563,7 @@ function useDesignerState() {
   const [globalSurroundModel, _setGlobalSurroundModel] = useState(() => (
     (!__isFreeUse && __autosavePayload && __autosavePayload.globalSurroundModel) ? stripSurroundSuffix(__autosavePayload.globalSurroundModel) : null
   ));
-  const [isHydrated, setIsHydrated] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
   const [roomResetEpoch, setRoomResetEpoch] = useState(0);
   const [seatMetricsById, setSeatMetricsById] = useState(() => (
@@ -1150,7 +1150,18 @@ function useDesignerState() {
 
     // Only restore if the current state looks "empty"
     const hasAlready = Array.isArray(seatingPositions) && seatingPositions.length > 0;
-    const hasSpk = Array.isArray(speakerSystem?.placedSpeakers) && speakerSystem.placedSpeakers.length > 0;
+    const hasSpk =
+      Array.isArray(speakerSystem?.placedSpeakers) &&
+      speakerSystem.placedSpeakers.length > 0 &&
+      speakerSystem.placedSpeakers.every(
+        s =>
+          s &&
+          s.model &&
+          s.model !== 'off' &&
+          s.position &&
+          Number.isFinite(s.position?.x) &&
+          Number.isFinite(s.position?.y)
+      );
 
     if (hasAlready || hasSpk) {
       setIsHydrated(true);

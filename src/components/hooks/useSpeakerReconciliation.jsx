@@ -194,6 +194,11 @@ export function useSpeakerReconciliation({
       noSpeakers
     );
 
+    // Prevent reseed during transient / invalid state
+    if (!placedSpeakers || placedSpeakers.length === 0) {
+      return;
+    }
+
     if (!hasCorrectRoles || noSpeakers) {
       // GUARD: For Atmos layouts with existing bed speakers, don't full-reseed
       const parts = String(normalizedPreset || '').split('.');
