@@ -420,29 +420,23 @@ function RP22ReportInner() {
 
     const resolveScreenMetricsSnapshot = React.useCallback(() => {
         try {
-            const mlpY_m = app?.mlp?.y ?? stableDimensions.length * 0.58;
-            const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
+            // Always use the live screen object as source of truth — never fall back to a default aspect
             const visibleWidthInches = Number(app?.screen?.visibleWidthInches);
-            const aspectRatio = app?.screen?.aspectRatio ?? "16:9";
-            if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(visibleWidthInches) || visibleWidthInches <= 0) {
-                return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, horizontalDeg: null, verticalDeg: null, wallDistM: null, wallCm: null, wallIn: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
+            const aspectRatio = app?.screen?.aspectRatio || "16:9"; // only fallback if truly missing
+            if (!Number.isFinite(visibleWidthInches) || visibleWidthInches <= 0) {
+                return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, wallDistM: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
             }
             const { viewWm, viewHm, overallWm, overallHm } = computeScreenMetrics(visibleWidthInches, aspectRatio);
-            const horizDeg = calculateViewingAngle({ y: mlpY_m }, visibleWidthInches, aspectRatio, { y: screenFrontPlaneM });
-            const viewerDistance = Math.abs(mlpY_m - screenFrontPlaneM);
-            const verticalDeg = viewerDistance > 0 ? (2 * Math.atan(viewHm / (2 * viewerDistance)) * (180 / Math.PI)) : 0;
+            const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
             return {
                 ok: true, viewWm, viewHm, overallWm, overallHm,
-                horizontalDeg: horizDeg ?? 0, verticalDeg,
-                wallDistM: screenFrontPlaneM,
-                wallCm: (screenFrontPlaneM * 100).toFixed(0),
-                wallIn: (screenFrontPlaneM * 39.3701).toFixed(1),
+                wallDistM: Number.isFinite(screenFrontPlaneM) ? screenFrontPlaneM : null,
                 screenChoiceLabel: formatScreenChoiceLabel(app?.screen)
             };
         } catch {
-            return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, horizontalDeg: null, verticalDeg: null, wallDistM: null, wallCm: null, wallIn: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
+            return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, wallDistM: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
         }
-    }, [app?.mlp?.y, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio, stableDimensions.length]);
+    }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio]);
 
     const analysisSpeakers = useAnalysisSpeakers({
         placedSpeakers,
