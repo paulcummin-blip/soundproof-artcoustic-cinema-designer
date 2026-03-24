@@ -441,6 +441,12 @@ function useDesignerState() {
   const [mlpBasis, setMlpBasis] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.mlpBasis === "string") ? __autosavePayload.mlpBasis : "front"
   ));
+  const [rowEarHeights, setRowEarHeights] = useState(() => {
+    if (__autosavePayload && Array.isArray(__autosavePayload.rowEarHeights) && __autosavePayload.rowEarHeights.length > 0) {
+      return __autosavePayload.rowEarHeights;
+    }
+    return [1.2, 1.5, 1.8];
+  });
   const [autoSeatByRP23, setAutoSeatByRP23] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.autoSeatByRP23 === "boolean") ? __autosavePayload.autoSeatByRP23 : true
   ));
