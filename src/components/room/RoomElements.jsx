@@ -53,7 +53,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     // Lens centre: horizontally centred, near rear of room, close to ceiling
     const lensX = roomW > 0 ? roomW / 2 : 0;
     const lensY = roomL > 0 ? Math.max(0, roomL - 0.15) : 0; // 150mm from rear wall
-    const lensZ = Math.max(0, roomH - 0.05 - bodyH / 2);     // near ceiling, lens at body centre height
+    const lensZ = Math.max(0, roomH - 0.10 - bodyH / 2);     // near ceiling, 0.10 m clearance (matches updateElement clamp)
 
     const newElement = {
       id: makeId(),

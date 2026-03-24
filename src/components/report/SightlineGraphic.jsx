@@ -207,8 +207,8 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
       {/* Axis labels */}
       {/* Floor */}
       <text x={rx1 - 4} y={ry0 - 4} fontSize={6} fill={PALETTE.subLabel} textAnchor="end">Floor</text>
-      {/* Ceiling label — top edge of room box is the ceiling */}
-      <text x={rx1 - 4} y={ry1 + 8} fontSize={6} fill={PALETTE.subLabel} textAnchor="end">Ceiling</text>
+      {/* Ceiling label — top edge of room box is the ceiling, placed at left edge to avoid projector area */}
+      <text x={rx0 + 4} y={ry1 + 8} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">Ceiling</text>
       {/* Screen label */}
       <text x={toX(screenFrontPlaneY)} y={ry1 - 4} fontSize={6} fill={PALETTE.screenFrame} textAnchor="middle">Screen</text>
       {/* Projector label — shifted above body top to avoid overlap with dim line */}
@@ -261,6 +261,10 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
             {/* Clearance label — midpoint between projector top and ceiling */}
             <text x={dimX + 5} y={(topSvgY + ceilSvgY) / 2 + 2} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">
               Clr: {ceilingClearance.toFixed(2)} m
+            </text>
+            {/* Ceiling height label — near the top tick */}
+            <text x={dimX + 5} y={ceilSvgY - 2} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">
+              Ceiling: {roomHeightM.toFixed(2)} m
             </text>
           </g>
         );
