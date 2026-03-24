@@ -663,22 +663,6 @@ appState, // Pass appState directly for setters
         screen_size: projectData.screen_size,
         dolby: projectData.dolby_config
       });
-      if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject payload', {
-        debugSnapshot,
-        projectDataPreview: {
-          effectiveProjectId,
-          name: projectData.name,
-          room_width: projectData.room_width,
-          room_length: projectData.room_length,
-          room_height: projectData.room_height,
-          seating_positions: typeof projectData.seating_positions === 'string' ?
-          projectData.seating_positions.slice(0, 200) :
-          projectData.seating_positions,
-          selected_speakers: typeof projectData.selected_speakers === 'string' ?
-          projectData.selected_speakers.slice(0, 200) :
-          projectData.selected_speakers
-        }
-      });
 
       let savedProject;
 
