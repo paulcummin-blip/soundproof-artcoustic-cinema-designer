@@ -919,51 +919,25 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
 
       // P5 - Max horizontal gap between adjacent surrounds (no wrap, RP22-correct)
+      // Uses shared utility: computeSurroundRingGaps + rp22LevelForP5 (single source of truth)
       {
-        const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-        const allSurrounds = speakersWithResolvedOverheads.filter(s => {
-          const r = getCanonicalRole(s.role);
-          return (
-            surroundRoles.has(r) &&
-            s.position &&
-            Number.isFinite(s.position.x) &&
-            Number.isFinite(s.position.y)
-          );
+        const p5Result = computeSurroundRingGaps({
+          seat,
+          speakers: speakersWithResolvedOverheads,
+          getCanonicalRole,
         });
 
-        if (allSurrounds.length >= 2) {
-          const items = [];
-          for (const s of allSurrounds) {
-            const dx = s.position.x - seat.x;
-            const dy = s.position.y - seat.y;
-            const rad = Math.atan2(dx, -dy);
-            let a = rad * (180 / Math.PI);
-            if (a > 180) a -= 360;
-            if (a <= -180) a += 360;
-            const theta = (a + 360) % 360;
-            items.push({ role: getCanonicalRole(s.role), theta });
-          }
-          items.sort((a, b) => a.theta - b.theta);
+        if (Number.isFinite(p5Result.worstGapDeg)) {
+          const maxGap = p5Result.worstGapDeg;
+          const levelStr = rp22LevelForP5(maxGap); // 'L4'|'L3'|'L2'|'L1'
+          // Convert 'L4' -> 4, 'L3' -> 3, etc. for engine numeric format
+          const level5 = levelStr === '—' ? 1 : Number(levelStr.replace('L', ''));
 
-          const adjGaps = [];
-          for (let i = 0; i < items.length - 1; i++) {
-            adjGaps.push(items[i + 1].theta - items[i].theta);
-          }
-
-          if (adjGaps.length > 0) {
-            const maxGap = Math.max(...adjGaps);
-
-            let level5 = 1;
-            if (maxGap <= 50) level5 = 4;
-            else if (maxGap <= 60) level5 = 3;
-            else if (maxGap <= 80) level5 = 2;
-
-            metrics.p5 = {
-              valueDeg: maxGap,
-              level: level5,
-              formatted: `${Math.floor(maxGap)}°`
-            };
-          }
+          metrics.p5 = {
+            valueDeg: maxGap,
+            level: level5,
+            formatted: `${Math.floor(maxGap)}°`
+          };
         }
       }
 
