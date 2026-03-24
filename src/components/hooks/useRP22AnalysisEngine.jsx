@@ -441,13 +441,13 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     }
 
     // Detailed Param 5 (pairs list and stats) using CW back-arc gaps (wrap omitted)
-    const surroundRegex = /^(LS|RS|LSS|RSS|LRS|RRS|LW|RW|SL|SR|SBL|SBR|LR|RR|FWL|FWR)$/i;
+    // Uses isEligibleP5Surround to match the per-seat grader — includes SL2/SR2/SL3/SR3...
     const mlpSrc = primarySeats.length ? primarySeats : seatsWithRoles;
     const mlp = pickMLP(mlpBasis, mlpSrc);
     const speakersForP5Detail = Array.isArray(visiblePlanSpeakers) ? visiblePlanSpeakers : safeSpeakers;
 
     const surrounds = speakersForP5Detail
-      .filter(s => surroundRegex.test(String(s.role)))
+      .filter(s => isEligibleP5Surround(String(s.role)))
       .filter(s => isNum(s?.position?.x) && isNum(s?.position?.y))
       .filter(hasRealModel) // CRITICAL: NO MODEL = NO SPEAKER (NO GHOSTS)
       .map(s => ({
