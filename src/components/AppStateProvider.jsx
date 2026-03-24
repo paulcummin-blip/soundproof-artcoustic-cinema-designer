@@ -1266,6 +1266,7 @@ function useDesignerState() {
       if (typeof p.lcrAimMode === "string") setLcrAimMode(p.lcrAimMode);
       if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
       if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
+      if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
 
       setAutosaveMeta(getAutosaveMeta());
       
@@ -1543,6 +1544,7 @@ function useDesignerState() {
       if (typeof p.seatingBlockOffset === "number") setSeatingBlockOffset(p.seatingBlockOffset);
       if (Array.isArray(p.roomElements)) setRoomElements(normaliseRoomElements(p.roomElements));
       if (p.overlays) setOverlays(p.overlays);
+      if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
 
       setAutosaveMeta(getAutosaveMeta());
       return true;
