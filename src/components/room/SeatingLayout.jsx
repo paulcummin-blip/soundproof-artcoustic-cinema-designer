@@ -431,6 +431,11 @@ export default function SeatingLayout({
                       seatSpacing,
                       rowSpacingM
                     });
+
+                    // Append default height for the new row
+                    const currentHeights = rowEarHeights.length ? [...rowEarHeights] : rowsArray.map((_, j) => getEarHeightForRow(j + 1));
+                    currentHeights.push(getEarHeightForRow(next.length));
+                    onRowEarHeightsChange?.(currentHeights);
                   }}>
 
               Add Row
