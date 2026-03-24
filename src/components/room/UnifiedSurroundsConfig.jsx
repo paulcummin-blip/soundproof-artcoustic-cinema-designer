@@ -202,7 +202,8 @@ export default function UnifiedSurroundsConfig({
     effectivePreset,
     useWides,
     mlpPoint,
-    dimensions,
+    dimsSafe,
+    resetSurroundPositions,
     needsSurroundResetRef,
     lastSurroundModelKeyRef,
   ]);
