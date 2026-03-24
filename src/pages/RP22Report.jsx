@@ -769,7 +769,9 @@ function RP22ReportInner() {
             if (cat) byCategory[cat][model] = (byCategory[cat][model] || 0) + 1;
         });
         Object.keys(byCategory).forEach(cat => {
-            const models = Object.entries(byCategory[cat]).map(([k, count]) => { const name = getDisplayName(k) || k; return count > 1 ? `${name} × ${count}` : name; }).sort();
+            const models = Object.entries(byCategory[cat])
+              .map(([name, count]) => count > 1 ? `${name} × ${count}` : name)
+              .sort();
             summary[cat] = models.length > 0 ? models : ['None specified'];
         });
         const frontSubs = frontSubsCfg?.count || 0;
