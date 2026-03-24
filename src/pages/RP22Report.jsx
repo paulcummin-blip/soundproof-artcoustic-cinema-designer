@@ -777,6 +777,8 @@ function RP22ReportInner() {
                 verticalAngleToBottomDeg,
                 totalVerticalAngleDeg,
                 complianceNote,
+                rp23Level: rp23?.level ?? null,
+                rp23Formatted: rp23?.formatted ?? null,
             };
         });
     }, [canRenderSightlinePage, sightlineScreenMetrics, rowCentralSeats, app?.screen?.aspectRatio, reportSeatHudById]);
