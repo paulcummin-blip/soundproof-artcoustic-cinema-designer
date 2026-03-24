@@ -48,10 +48,9 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
     return null;
   }
 
-  // Bed-layer surrounds including wides/sides/rears
-  const surroundRegex = /^(LS|RS|LSS|RSS|LRS|RRS|LW|RW|SL|SR|SBL|SBR|LR|RR|FWL|FWR)$/i;
+  // Bed-layer surrounds including wides/sides/rears + extra surrounds (SL2/SR2...)
   const surrounds = speakers
-    .filter(s => surroundRegex.test(String(s.role)))
+    .filter(s => isEligibleP5Surround(String(s.role)))
     .map(s => ({ id: s.id || s.role, role: s.role, position: s.position }))
     .filter(s => isNum(s?.position?.x) && isNum(s?.position?.y));
 
