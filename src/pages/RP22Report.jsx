@@ -1181,13 +1181,17 @@ function RP22ReportInner() {
                                                     const hAngle = dist > 0 ? 2 * Math.atan((scrW / 2) / dist) * (180 / Math.PI) : 0;
                                                     const vTop = dist > 0 ? Math.atan2(scrTop - eyeZ, dist) * (180 / Math.PI) : 0;
                                                     const vBot = dist > 0 ? Math.atan2(scrBottom - eyeZ, dist) * (180 / Math.PI) : 0;
+                                                    const fbSeatHud = reportSeatHudById?.[seat.id];
+                                                    const fbRp23 = fbSeatHud?.rp23;
                                                     return {
                                                         rowNumber: seat.rowNumber || 1,
                                                         viewingDistanceM: dist,
                                                         horizontalViewingAngleDeg: hAngle,
                                                         totalVerticalAngleDeg: vTop - vBot,
+                                                        rp23Level: fbRp23?.level ?? null,
+                                                        rp23Formatted: fbRp23?.formatted ?? null,
                                                     };
-                                                });
+                                                    });
 
                                             return (
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: '8mm', rowGap: '4mm' }}>
