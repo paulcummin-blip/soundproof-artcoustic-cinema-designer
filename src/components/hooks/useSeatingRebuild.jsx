@@ -271,5 +271,6 @@ export function useSeatingRebuild({
     appState?.seatingBlockOffset,
     appState?.screen?.floatDepthM,
     appState?.screen?.visibleWidthInches,
+    _rowEarHeights,
   ]);
 }
