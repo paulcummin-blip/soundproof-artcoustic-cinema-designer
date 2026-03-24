@@ -569,6 +569,31 @@ function SpeakerPlacementImpl(props) {
     };
   });
 
+  // Rehydrate local surroundConfig when appState.globalSurroundModel is restored
+  // (covers the case where the provider restores it after this component already mounted)
+  useEffect(() => {
+    const savedModel = appState?.globalSurroundModel;
+    const cleaned = savedModel && savedModel.endsWith && savedModel.endsWith("_s")
+      ? savedModel.slice(0, -2)
+      : savedModel;
+    const master = cleaned && cleaned !== 'off' && cleaned !== 'none' ? cleaned : "off";
+
+    setSurroundConfig(prev => {
+      if (prev.value.master === master) return prev; // nothing changed — no loop
+      return {
+        ...prev,
+        value: {
+          master,
+          side:  prev.override.side  ? prev.value.side  : master,
+          rear:  prev.override.rear  ? prev.value.rear  : master,
+          wide:  prev.override.wide  ? prev.value.wide  : master,
+        },
+        // preserve existing override flags exactly
+        override: prev.override,
+      };
+    });
+  }, [appState?.globalSurroundModel]);
+
   // Sync non-overridden group values to master whenever master changes
   useEffect(() => {
     const master = surroundConfig?.value?.master;

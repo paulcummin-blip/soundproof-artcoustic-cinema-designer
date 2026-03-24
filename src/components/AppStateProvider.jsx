@@ -701,6 +701,11 @@ function useDesignerState() {
   // TRUE IDEMPOTENCE: only update when speakersShallowEqual detects a real change.
   // Preserves user-dragged positions for existing extra surround speakers.
   useEffect(() => {
+    // HYDRATION GUARD: do not run until autosave restore has completed.
+    // Without this, the effect fires while extraSurroundCount is still 0 and
+    // deletes saved SL2/SR2/... speakers before they can be restored.
+    if (!isHydrated) return;
+
     const count = extraSurroundCount || 0;
     
     // Always keep modelKey aligned to the current surround model
