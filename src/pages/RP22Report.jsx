@@ -29,6 +29,45 @@ import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
 import { fovForDistance } from '../components/utils/screenMetrics';
+import { getLevelColors } from '../components/utils/rp22Colors';
+
+// Local print-only pill — exact same visual spec as RP22GradingPill
+function PrintRp23Pill({ level }) {
+    const normalizeLevel = (lvl) => {
+        if (typeof lvl === 'number') return Math.max(0, Math.min(4, lvl));
+        const str = String(lvl || '').toUpperCase();
+        if (str === 'L1') return 1;
+        if (str === 'L2') return 2;
+        if (str === 'L3') return 3;
+        if (str === 'L4') return 4;
+        if (str === 'FAIL') return 0;
+        return -1;
+    };
+    const n = normalizeLevel(level);
+    const label = n === -1 ? '—' : n === 0 ? 'FAIL' : `L${n}`;
+    const colors = (n === -1 || n <= 0)
+        ? { bg: '#F3F4F6', border: '#E5E7EB', text: '#9CA3AF' }
+        : getLevelColors(n);
+    const safeColors = { bg: colors?.bg || '#F3F4F6', border: colors?.border || '#E5E7EB', text: colors?.text || '#9CA3AF' };
+    return (
+        <span style={{
+            border: `1px solid ${safeColors.border}`,
+            borderRadius: '6px',
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: 600,
+            lineHeight: 1.2,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            background: safeColors.bg,
+            color: safeColors.text,
+            whiteSpace: 'nowrap',
+            minWidth: '40px',
+        }}>{label}</span>
+    );
+}
 
 // --- Plan capture helpers (kept here since they close over state setters) ---
 const MIN_EXPORT_BBOX_PX = 200;
