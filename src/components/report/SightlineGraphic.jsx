@@ -68,7 +68,7 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
     screenWidthM, screenHeightM, screenTotalHeightM, screenTotalWidthM,
   } = screen;
 
-  const { toX, toY } = makeTransform({ roomLengthM, roomHeightM, svgW, svgH, pad });
+  const { toX, toY, scale } = makeTransform({ roomLengthM, roomHeightM, svgW, svgH, pad });
 
   // Room corners
   const rx0 = toX(0), ry0 = toY(0);
