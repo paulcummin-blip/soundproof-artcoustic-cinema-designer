@@ -1201,6 +1201,7 @@ function RoomDesignerWithState() {
     appState, resolvedProjectId, projectIdState, loadState, seatingConfigEpoch,
     seatingLoadedEpochRef, didUserRequestResetRef, _seatsPerRowByRow, _seatingRows,
     _seatsPerRow, _seatSpacing, _rowSpacingM, _mlpBasis, stableDimensions,
+    _rowEarHeights: appState?.rowEarHeights,
   });
 
   // Manual seating generation - single source of truth
