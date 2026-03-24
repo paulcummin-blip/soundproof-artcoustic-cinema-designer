@@ -652,50 +652,8 @@ appState, // Pass appState directly for setters
     rMS.inFlight = true;
 
     try {
-      // DEBUG: Capture pre-save snapshot
-      const debugSnapshot = {
-        projectIdState,
-        projectIdFromUrl,
-        effectiveProjectId,
-        projectNameState,
-        roomDims: appState.roomDims,
-        seatingCount: Array.isArray(seatingPositions) ? seatingPositions.length : null,
-        placedSpeakerCount: Array.isArray(placedSpeakers) ? placedSpeakers.length : null
-      };
-const liveFrontSubsCfg = appState?.frontSubsCfg ?? frontSubsCfg;
-const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
-      const projectData = serializeProject({
-        name: projectNameState,
-        roomDims: appState.roomDims,
-        dimensions: appState.roomDims, // Use appState.roomDims directly (serializeProject needs legacy fields)
-        screen,
-        seatingPositions: appState?.seatingPositions || seatingPositions || [],
-        seatsPerRowByRow,
-        rowSpacingM,
-        placedSpeakers: appState?.speakerSystem?.placedSpeakers || placedSpeakers || [],
-        roomElements,
-        selectedSpeakersByRole: appState.selectedSpeakersByRole,
-        speakerNodes: appState.speakerNodes,
-        dolbyLayout: dolbyPreset,
-        overlays,
-        frozenTabs,
-        sevenBedLayoutType,
-        frontSubsCfg: liveFrontSubsCfg,
-        rearSubsCfg: liveRearSubsCfg,
-        lcrAimMode,
-        enableFrontWides,
-        overheadGlobalModel,
-        overheadFrontOverride,
-        overheadMidOverride,
-        overheadRearOverride,
-        useFrontGlobal,
-        useMidGlobal,
-        useRearGlobal,
-        screenFrontPlaneM: appState.screenFrontPlaneM,
-        splConfig: appState.splConfig,
-        p12Mode: appState.p12Mode,
-        p12Level: appState.p12Level,
-      });
+      // Use shared payload builder — identical shape to autosave so signatures always match.
+      const projectData = buildSharedProjectPayload();
 
       // DEBUG: Log what we're about to save
       if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject payload', effectiveProjectId, {
