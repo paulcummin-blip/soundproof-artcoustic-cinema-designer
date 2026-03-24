@@ -927,15 +927,19 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         });
 
         if (Number.isFinite(p5Result.worstGapDeg)) {
-          const maxGap = p5Result.worstGapDeg;
-          const levelStr = rp22LevelForP5(maxGap); // 'L4'|'L3'|'L2'|'L1'
-          // Convert 'L4' -> 4, 'L3' -> 3, etc. for engine numeric format
+          const rawGap = p5Result.worstGapDeg;
+
+          // RP22 requirement: ALWAYS round DOWN (floor)
+          const flooredGap = Math.floor(rawGap);
+
+          // Use floored value for BOTH scoring and display
+          const levelStr = rp22LevelForP5(flooredGap);
           const level5 = levelStr === '—' ? 1 : Number(levelStr.replace('L', ''));
 
           metrics.p5 = {
-            valueDeg: maxGap,
+            valueDeg: flooredGap,
             level: level5,
-            formatted: `${Math.floor(maxGap)}°`
+            formatted: `${flooredGap}°`
           };
         }
       }
