@@ -58,6 +58,9 @@ export default function RvRp22AnglesOverlay({
     segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2, gapDeg });
   }
 
+  // Identify the true worst gap (same logic as scoring in useRP22AnalysisEngine)
+  const worstGapDeg = segments.length > 0 ? Math.max(...segments.map(s => s.gapDeg)) : null;
+
   const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
   const labelGroup = [];
 
@@ -67,8 +70,10 @@ export default function RvRp22AnglesOverlay({
     const midTheta = (currentTheta + nextTheta) / 2;
     const rawMid = midTheta;
     const midNorm = ((midTheta + 180) % 360) - 180;
+    const isWorstGap = Number.isFinite(worstGapDeg) && gapDeg === worstGapDeg;
 
-    if (Math.abs(midNorm) < 60) return;
+    // Show the worst gap regardless of position; skip non-worst front gaps
+    if (!isWorstGap && Math.abs(midNorm) < 60) return;
 
     const deg = gapDeg;
     if (!Number.isFinite(deg) || deg <= 0) return;
@@ -76,18 +81,21 @@ export default function RvRp22AnglesOverlay({
     const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
     const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
 
+    const lineColor = isWorstGap ? "#e85" : "#888";
+    const lineOpacity = isWorstGap ? "0.9" : "0.6";
+
     labelGroup.push(
       <line
         key={`rp22-angle-line1-${idx}`}
         x1={x1} y1={y1} x2={seatPx[0]} y2={seatPx[1]}
-        stroke="#888" strokeWidth="1" opacity="0.6"
+        stroke={lineColor} strokeWidth="1" opacity={lineOpacity}
       />
     );
     labelGroup.push(
       <line
         key={`rp22-angle-line2-${idx}`}
         x1={x2} y1={y2} x2={seatPx[0]} y2={seatPx[1]}
-        stroke="#888" strokeWidth="1" opacity="0.6"
+        stroke={lineColor} strokeWidth="1" opacity={lineOpacity}
       />
     );
 
@@ -104,7 +112,7 @@ export default function RvRp22AnglesOverlay({
       <text
         key={`rp22-angle-text-${idx}`}
         x={px} y={py}
-        fill="#666" fontSize="11"
+        fill={isWorstGap ? "#e85" : "#666"} fontSize={isWorstGap ? "12" : "11"} fontWeight={isWorstGap ? "bold" : "normal"}
         textAnchor="middle" dominantBaseline="middle"
       >
         {text}

@@ -4,6 +4,7 @@ import { degreesBetweenVectors } from '../utils/geometryUtils';
 import { pickMLP } from '../utils/seatingUtils';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import { computeBackArc, param5LevelFromGap } from "@/components/utils/RP22Geometry";
+import { computeSurroundRingGaps, rp22LevelForP5 } from "@/components/utils/p5SurroundGaps";
 import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
