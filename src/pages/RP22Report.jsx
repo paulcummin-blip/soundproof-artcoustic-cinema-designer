@@ -1211,24 +1211,46 @@ function RP22ReportInner() {
                                                     <div>
                                                         <div style={coverSectionTitleStyle}>Viewing geometry — per row</div>
                                                         {rowGeo.length > 0 ? (
-                                                            <div style={{ display: 'grid', rowGap: '3mm' }}>
-                                                                {rowGeo.map(row => (
-                                                                    <div key={row.rowNumber} style={{ paddingBottom: '2mm', borderBottom: '1px solid #F0EFEA' }}>
-                                                                        <div style={{ ...coverLabelStyle, marginBottom: '1.5mm' }}>Row {row.rowNumber}</div>
-                                                                        <div style={coverLabelValueRowStyle}>
-                                                                            <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Horizontal angle</div>
-                                                                            <div style={coverValueStyle}>{Number.isFinite(row.horizontalViewingAngleDeg) ? `${row.horizontalViewingAngleDeg.toFixed(1)}°` : '—'}</div>
-                                                                        </div>
-                                                                        <div style={coverLabelValueRowStyle}>
-                                                                            <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Vertical angle</div>
-                                                                            <div style={coverValueStyle}>{Number.isFinite(row.totalVerticalAngleDeg) ? `${row.totalVerticalAngleDeg.toFixed(1)}°` : '—'}</div>
-                                                                        </div>
-                                                                        <div style={coverLabelValueRowStyle}>
-                                                                            <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Distance from wall</div>
-                                                                            <div style={coverValueStyle}>{Number.isFinite(row.viewingDistanceM) ? `${Math.round(row.viewingDistanceM * 100)} cm` : '—'}</div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
+                                                            <div>
+                                                                <div style={{ display: 'grid', rowGap: '3mm' }}>
+                                                                    {rowGeo.map(row => {
+                                                                        const rp23AngleStr = row.rp23Formatted
+                                                                            || (Number.isFinite(row.horizontalViewingAngleDeg) ? `${row.horizontalViewingAngleDeg.toFixed(1)}°` : '—');
+                                                                        return (
+                                                                            <div key={row.rowNumber} style={{ paddingBottom: '2mm', borderBottom: '1px solid #F0EFEA', display: 'grid', gridTemplateColumns: '1fr auto', columnGap: '6mm', alignItems: 'start' }}>
+                                                                                {/* Left: existing geometry values */}
+                                                                                <div>
+                                                                                    <div style={{ ...coverLabelStyle, marginBottom: '1.5mm' }}>Row {row.rowNumber}</div>
+                                                                                    <div style={coverLabelValueRowStyle}>
+                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Horizontal angle</div>
+                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.horizontalViewingAngleDeg) ? `${row.horizontalViewingAngleDeg.toFixed(1)}°` : '—'}</div>
+                                                                                    </div>
+                                                                                    <div style={coverLabelValueRowStyle}>
+                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Vertical angle</div>
+                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.totalVerticalAngleDeg) ? `${row.totalVerticalAngleDeg.toFixed(1)}°` : '—'}</div>
+                                                                                    </div>
+                                                                                    <div style={coverLabelValueRowStyle}>
+                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Distance from wall</div>
+                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.viewingDistanceM) ? `${Math.round(row.viewingDistanceM * 100)} cm` : '—'}</div>
+                                                                                    </div>
+                                                                                </div>
+                                                                                {/* Right: RP23 block */}
+                                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '28mm' }}>
+                                                                                    <div style={{ fontSize: '8pt', fontWeight: 600, color: '#625143', marginBottom: '2mm', textAlign: 'center', whiteSpace: 'nowrap' }}>RP23 viewing angle</div>
+                                                                                    <div style={{ fontSize: '10pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '2mm', textAlign: 'center' }}>{rp23AngleStr}</div>
+                                                                                    <PrintRp23Pill level={row.rp23Level} />
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                                {/* RP23 reference ranges */}
+                                                                <div style={{ marginTop: '4mm', paddingTop: '3mm', borderTop: '1px solid #E8E6E1', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontSize: '9pt', color: '#6F6B64' }}>
+                                                                    <div><div style={{ fontWeight: 600 }}>L4</div><div>50°–65°</div></div>
+                                                                    <div><div style={{ fontWeight: 600 }}>L3</div><div>45°–70°</div></div>
+                                                                    <div><div style={{ fontWeight: 600 }}>L2</div><div>40°–80°</div></div>
+                                                                    <div><div style={{ fontWeight: 600 }}>L1</div><div>33°–90°</div></div>
+                                                                </div>
                                                             </div>
                                                         ) : (
                                                             <div style={coverValueStyle}>Not specified</div>
