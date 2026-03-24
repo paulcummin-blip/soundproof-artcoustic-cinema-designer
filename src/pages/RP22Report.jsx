@@ -418,11 +418,12 @@ function RP22ReportInner() {
         return (minDist <= 0.05) ? closestSeat : null;
     }, [seats, app?.mlp]);
 
+    // resolveScreenMetricsSnapshot — always reads from the live screen object.
+    // Used by ReportHeader to snapshot metrics at print time.
     const resolveScreenMetricsSnapshot = React.useCallback(() => {
         try {
-            // Always use the live screen object as source of truth — never fall back to a default aspect
             const visibleWidthInches = Number(app?.screen?.visibleWidthInches);
-            const aspectRatio = app?.screen?.aspectRatio || "16:9"; // only fallback if truly missing
+            const aspectRatio = app?.screen?.aspectRatio || "16:9";
             if (!Number.isFinite(visibleWidthInches) || visibleWidthInches <= 0) {
                 return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, wallDistM: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
             }
@@ -681,7 +682,7 @@ function RP22ReportInner() {
     }, [canRenderSightlinePage, app?.screen, app?.screenFrontPlaneM, app?.screenHeight, resolveScreenMetricsSnapshot]);
 
     const rowCentralSeats = React.useMemo(() => {
-        if (!canRenderSightlinePage) return [];
+        // Used both for sightline page AND for cover box row geometry fallback
         const grouped = {};
         (app?.seatingPositions || []).forEach(seat => {
             const row = seat.rowNumber || 1;
@@ -694,10 +695,8 @@ function RP22ReportInner() {
             .sort((a, b) => a - b)
             .map(rowNum => {
                 const rowSeats = grouped[rowNum];
-                // 1. prefer isPrimary
                 const primary = rowSeats.filter(s => s.isPrimary);
                 const candidates = primary.length ? primary : rowSeats;
-                // 2. closest to room centreline, tie-break on id string sort
                 return candidates
                     .slice()
                     .sort((a, b) => {
@@ -708,7 +707,7 @@ function RP22ReportInner() {
                     })[0];
             })
             .filter(Boolean);
-    }, [canRenderSightlinePage, app?.seatingPositions, stableDimensions.width]);
+    }, [app?.seatingPositions, stableDimensions.width]);
 
     const sightlineRowData = React.useMemo(() => {
         if (!canRenderSightlinePage || !sightlineScreenMetrics || !rowCentralSeats.length) return [];
@@ -1107,21 +1106,46 @@ function RP22ReportInner() {
                                     <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
                                         <div style={coverBoxTitleStyle}>Screen &amp; Viewing Geometry</div>
                                         {(() => {
-                                            const snap = screenMetricsForPrint;
-                                            const viewWm = Number(snap?.viewWm); const viewHm = Number(snap?.viewHm);
-                                            const overallWm = Number(snap?.overallWm); const overallHm = Number(snap?.overallHm);
-                                            const horizontalDeg = Number(snap?.horizontalDeg); const verticalDeg = Number(snap?.verticalDeg);
-                                            const wallDistM = Number(snap?.wallDistM);
-                                            const choiceLabel = String(snap?.screenChoiceLabel || formatScreenChoiceLabel(screen) || "Not specified");
+                                            // Screen dims — always from live screen object, never from a stale snapshot
+                                            const liveWidthIn = Number(app?.screen?.visibleWidthInches);
+                                            const liveAspect = app?.screen?.aspectRatio || "16:9";
+                                            const { viewWm, viewHm, overallWm, overallHm } = (Number.isFinite(liveWidthIn) && liveWidthIn > 0)
+                                                ? computeScreenMetrics(liveWidthIn, liveAspect)
+                                                : { viewWm: null, viewHm: null, overallWm: null, overallHm: null };
+                                            const choiceLabel = formatScreenChoiceLabel(app?.screen) || "Not specified";
                                             const hasViewable = Number.isFinite(viewWm) && viewWm > 0 && Number.isFinite(viewHm) && viewHm > 0;
                                             const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;
-                                            const hasAngles = Number.isFinite(horizontalDeg) && Number.isFinite(verticalDeg);
-                                            const hasWallDist = Number.isFinite(wallDistM) && wallDistM >= 0;
-                                            const fmtCm = (m) => `${Math.round(m * 100)}`; const fmtIn = (m) => `${(m * 39.3701).toFixed(1)}`;
+                                            const fmtCm = (m) => `${Math.round(m * 100)}`;
+
+                                            // Per-row geometry — prefer sightlineRowData (already computed with projector context),
+                                            // fall back to building from rowCentralSeats when sightline data is not available.
+                                            const screenFrontM = app?.screenFrontPlaneM ?? null;
+                                            const rowGeo = sightlineRowData.length > 0
+                                                ? sightlineRowData
+                                                : rowCentralSeats.map(seat => {
+                                                    const eyeY = seat.y;
+                                                    const eyeZ = Number.isFinite(seat.z) ? seat.z : 1.2;
+                                                    const screenY = Number.isFinite(screenFrontM) ? screenFrontM : 0;
+                                                    const dist = Math.abs(eyeY - screenY);
+                                                    const scrW = viewWm || 0;
+                                                    const scrH = viewHm || 0;
+                                                    const scrBottom = Number(app?.screen?.heightFromFloorM ?? app?.screenHeight ?? 0.5);
+                                                    const scrTop = scrBottom + scrH;
+                                                    const hAngle = dist > 0 ? 2 * Math.atan((scrW / 2) / dist) * (180 / Math.PI) : 0;
+                                                    const vTop = dist > 0 ? Math.atan2(scrTop - eyeZ, dist) * (180 / Math.PI) : 0;
+                                                    const vBot = dist > 0 ? Math.atan2(scrBottom - eyeZ, dist) * (180 / Math.PI) : 0;
+                                                    return {
+                                                        rowNumber: seat.rowNumber || 1,
+                                                        viewingDistanceM: dist,
+                                                        horizontalViewingAngleDeg: hAngle,
+                                                        totalVerticalAngleDeg: vTop - vBot,
+                                                    };
+                                                });
+
                                             return (
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: '8mm', rowGap: '4mm' }}>
                                                     <div>
-                                                        <div style={coverSectionTitleStyle}>Screen size — {choiceLabel ? choiceLabel.replace(/"\s+/, '” width - ') + ' ratio' : 'Not specified'}</div>
+                                                        <div style={coverSectionTitleStyle}>Screen size — {choiceLabel}</div>
                                                         <div style={{ display: 'grid', rowGap: '2.5mm' }}>
                                                             <div style={coverLabelValueRowStyle}>
                                                                 <div style={coverLabelStyle}>Viewable area</div>
@@ -1134,21 +1158,30 @@ function RP22ReportInner() {
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <div style={coverSectionTitleStyle}>Viewing geometry</div>
-                                                        <div style={{ display: 'grid', rowGap: '2.5mm' }}>
-                                                            <div style={coverLabelValueRowStyle}>
-                                                                <div style={coverLabelStyle}>Horizontal viewing angle</div>
-                                                                <div style={coverValueStyle}>{hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}</div>
+                                                        <div style={coverSectionTitleStyle}>Viewing geometry — per row</div>
+                                                        {rowGeo.length > 0 ? (
+                                                            <div style={{ display: 'grid', rowGap: '3mm' }}>
+                                                                {rowGeo.map(row => (
+                                                                    <div key={row.rowNumber} style={{ paddingBottom: '2mm', borderBottom: '1px solid #F0EFEA' }}>
+                                                                        <div style={{ ...coverLabelStyle, marginBottom: '1.5mm' }}>Row {row.rowNumber}</div>
+                                                                        <div style={coverLabelValueRowStyle}>
+                                                                            <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Horizontal angle</div>
+                                                                            <div style={coverValueStyle}>{Number.isFinite(row.horizontalViewingAngleDeg) ? `${row.horizontalViewingAngleDeg.toFixed(1)}°` : '—'}</div>
+                                                                        </div>
+                                                                        <div style={coverLabelValueRowStyle}>
+                                                                            <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Vertical angle</div>
+                                                                            <div style={coverValueStyle}>{Number.isFinite(row.totalVerticalAngleDeg) ? `${row.totalVerticalAngleDeg.toFixed(1)}°` : '—'}</div>
+                                                                        </div>
+                                                                        <div style={coverLabelValueRowStyle}>
+                                                                            <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Distance from wall</div>
+                                                                            <div style={coverValueStyle}>{Number.isFinite(row.viewingDistanceM) ? `${Math.round(row.viewingDistanceM * 100)} cm` : '—'}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
                                                             </div>
-                                                            <div style={coverLabelValueRowStyle}>
-                                                                <div style={coverLabelStyle}>Vertical viewing angle</div>
-                                                                <div style={coverValueStyle}>{hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}</div>
-                                                            </div>
-                                                            <div style={coverLabelValueRowStyle}>
-                                                                <div style={coverLabelStyle}>Distance from front wall</div>
-                                                                <div style={coverValueStyle}>{hasWallDist ? `${Math.round(wallDistM * 100)} cm` : "Not specified"}</div>
-                                                            </div>
-                                                        </div>
+                                                        ) : (
+                                                            <div style={coverValueStyle}>Not specified</div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );
