@@ -1735,7 +1735,9 @@ function RoomDesignerWithState() {
                   dimensions={stableDimensions}
                   shiftSeatsToMaintainAngle={visualisationRef.current?.shiftSeatsToMaintainAngle}
                   showMlpRuler={showMlpRuler}
-                  onShowMlpRulerChange={setShowMlpRuler} />
+                  onShowMlpRulerChange={setShowMlpRuler}
+                  rowEarHeights={appState?.rowEarHeights || []}
+                  onRowEarHeightsChange={appState?.setRowEarHeights} />
 
                   </Suspense>
               </CollapsiblePanel>
