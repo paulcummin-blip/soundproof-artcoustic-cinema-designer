@@ -754,7 +754,11 @@ function RP22ReportInner() {
         const aspectRatio = app?.screen?.aspectRatio || '16:9';
         return rowCentralSeats.map(seat => {
             const eyeY = seat.y;
-            const eyeZ = Number.isFinite(seat.z) ? seat.z : 1.2;
+            const rowNum = seat.rowNumber || 1;
+            // Use per-row ear heights matching SeatingLayout's getEarHeightForRow defaults.
+            // seat.z defaults to 1.2 for every row, so we apply the intended staggered heights here.
+            const defaultEarHeight = rowNum === 1 ? 1.2 : rowNum === 2 ? 1.5 : rowNum === 3 ? 1.8 : 1.2 + (rowNum - 1) * 0.3;
+            const eyeZ = Number.isFinite(seat.z) && seat.z !== 1.2 ? seat.z : defaultEarHeight;
             const viewingDistanceM = Math.abs(eyeY - screenFrontPlaneY);
             const horizontalViewingAngleDeg = viewingDistanceM > 0
                 ? 2 * Math.atan((screenWidthM / 2) / viewingDistanceM) * (180 / Math.PI)
