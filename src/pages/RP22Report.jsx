@@ -1342,6 +1342,29 @@ function RP22ReportInner() {
                                 />
                             </section>
                         )}
+
+                        {/* ── RP22 Performance Levels note — always the final printed element ── */}
+                        <div style={{
+                            marginTop: '12mm',
+                            paddingTop: '6mm',
+                            borderTop: '1px solid #D9D5CE',
+                            breakInside: 'avoid',
+                            pageBreakInside: 'avoid',
+                            WebkitColumnBreakInside: 'avoid',
+                            fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif',
+                            fontSize: '9pt',
+                            color: '#3E4349',
+                            lineHeight: 1.6,
+                            textAlign: 'left',
+                            width: '100%',
+                        }}>
+                            <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '9pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
+                            <div><strong>Level 1</strong> – The minimum level of performance necessary to convey basic artistic intent.</div>
+                            <div><strong>Level 2</strong> – A higher level of performance that more accurately conveys artistic intent.</div>
+                            <div><strong>Level 3</strong> – Meets or exceeds reference commercial cinema exhibition standards.</div>
+                            <div><strong>Level 4</strong> – The maximum level of achievable performance across every parameter.</div>
+                            <div style={{ marginTop: '2mm' }}>Performance levels apply to both individual seating positions as well as the room, with parameters therein attributed to one or the other.</div>
+                        </div>
                     </div>
                 </div>
             </div>
