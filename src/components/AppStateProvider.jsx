@@ -697,6 +697,43 @@ function useDesignerState() {
     []
   );
 
+  // --- OVERHEAD MODEL SYNC EFFECT — keeps placedSpeakers in sync with overhead state ---
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const global = overheadGlobalModel;
+    if (!global) return; // No global model selected — nothing to sync
+
+    const resolveForRole = (role) => {
+      const r = String(role || '').toUpperCase();
+      if (!r.startsWith('T')) return null;
+      let zone = null;
+      if (['TFL', 'TFR', 'TFC'].includes(r)) zone = 'front';
+      else if (['TL', 'TR', 'TML', 'TMR'].includes(r)) zone = 'mid';
+      else if (['TBL', 'TBR', 'TBC', 'TRL', 'TRR', 'TRC'].includes(r)) zone = 'rear';
+      if (!zone) return global || null;
+      if (zone === 'front') return useFrontGlobal ? global : (overheadFrontOverride || global);
+      if (zone === 'mid') return useMidGlobal ? global : (overheadMidOverride || global);
+      if (zone === 'rear') return useRearGlobal ? global : (overheadRearOverride || global);
+      return global || null;
+    };
+
+    setSpeakerSystem(prev => {
+      const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
+      let changed = false;
+      const next = current.map(spk => {
+        const role = String(spk?.role || '').toUpperCase();
+        if (!role.startsWith('T')) return spk;
+        const resolved = resolveForRole(role);
+        if (!resolved || spk.model === resolved) return spk;
+        changed = true;
+        return { ...spk, model: resolved };
+      });
+      if (!changed) return prev;
+      return { ...prev, placedSpeakers: next };
+    });
+  }, [isHydrated, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, setSpeakerSystem]);
+
   // --- EXTRA SURROUNDS SYNC EFFECT (promoted to real speakers with canonical roles SL2/SR2...) ---
   // TRUE IDEMPOTENCE: only update when speakersShallowEqual detects a real change.
   // Preserves user-dragged positions for existing extra surround speakers.
