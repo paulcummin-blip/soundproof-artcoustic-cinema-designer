@@ -756,8 +756,9 @@ function RP22ReportInner() {
         const byCategory = { lcr: {}, surrounds: {}, overheads: {} };
         activeSpeakers.forEach(spk => {
             const role = String(spk?.role || '').toUpperCase();
-            const model = normalizeModel(spk?.model);
-            if (!model) return;
+            const modelKey = normalizeModel(spk?.model);
+            if (!modelKey) return;
+            const model = getDisplayName(modelKey) || modelKey;
             let cat = null;
             if (['FL', 'FC', 'FR', 'L', 'C', 'R'].includes(role)) cat = 'lcr';
             else if (
