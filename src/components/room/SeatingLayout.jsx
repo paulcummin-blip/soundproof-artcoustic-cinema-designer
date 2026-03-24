@@ -397,6 +397,11 @@ export default function SeatingLayout({
                       seatSpacing,
                       rowSpacingM
                     });
+
+                    // Trim rowEarHeights to match
+                    const currentHeights = rowEarHeights.length ? [...rowEarHeights] : rowsArray.map((_, j) => getEarHeightForRow(j + 1));
+                    const nextHeights = currentHeights.filter((_, j) => j !== idx);
+                    onRowEarHeightsChange?.(nextHeights);
                   }}>
 
                 Remove
