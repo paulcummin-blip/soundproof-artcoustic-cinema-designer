@@ -646,6 +646,17 @@ function SpeakerPlacementImpl(props) {
       const byCanon = new Map();
       list.forEach(s => byCanon.set(getCanonicalRole(s?.role), s));
 
+      // Rear-validity helper: only treat an existing SBL/SBR position as good if
+      // it is genuinely near the rear wall and on the correct room half.
+      const isValidRearPos = (canonRole, pos) => {
+        if (canonRole !== 'SBL' && canonRole !== 'SBR') return true; // non-rears: always pass
+        if (!Number.isFinite(pos?.x) || !Number.isFinite(pos?.y)) return false;
+        if (pos.y < L - 0.30) return false; // too far from rear wall
+        if (canonRole === 'SBL' && pos.x >= W * 0.5) return false; // SBL must be left half
+        if (canonRole === 'SBR' && pos.x <= W * 0.5) return false; // SBR must be right half
+        return true;
+      };
+
       const ensure = (canonRole, xFrac, yVal) => {
         const existing = byCanon.get(canonRole);
         if (!existing) return;
@@ -657,7 +668,8 @@ function SpeakerPlacementImpl(props) {
 
         const finalModel = speakerModelOn ? existing.model : normKey;
 
-        if (hasXY(existing) && speakerModelOn) return;
+        // For SBL/SBR, also require that the existing position is genuinely rear-valid
+        if (hasXY(existing) && speakerModelOn && isValidRearPos(canonRole, existing.position)) return;
 
         const x = clamp(W * xFrac, INSET, W - INSET);
         const y = clamp(yVal, INSET, L - INSET);
