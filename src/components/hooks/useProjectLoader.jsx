@@ -74,6 +74,54 @@ appState, // Pass appState directly for setters
   const [autosaveStatus, setAutosaveStatus] = useState(isProjectMode ? "idle" : "local");
   const hydratedRoomDimsProjectIdRef = useRef(null);
 
+  // SHARED PAYLOAD BUILDER — single source of truth for both autosave and manual save.
+  // Both paths must use this function so their signatures are always identical.
+  const buildSharedProjectPayload = useCallback(() => {
+    const liveFrontSubsCfg = appState?.frontSubsCfg ?? frontSubsCfg;
+    const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
+    const projectData = serializeProject({
+      name: projectNameState,
+      roomDims: appState.roomDims,
+      dimensions: appState.roomDims,
+      screen,
+      seatingPositions: appState?.seatingPositions || seatingPositions || [],
+      seatsPerRowByRow,
+      rowSpacingM,
+      placedSpeakers: appState?.speakerSystem?.placedSpeakers || placedSpeakers || [],
+      roomElements,
+      selectedSpeakersByRole: appState.selectedSpeakersByRole,
+      speakerNodes: appState.speakerNodes,
+      dolbyLayout: dolbyPreset,
+      overlays,
+      frozenTabs,
+      sevenBedLayoutType,
+      frontSubsCfg: liveFrontSubsCfg,
+      rearSubsCfg: liveRearSubsCfg,
+      lcrAimMode,
+      enableFrontWides,
+      free_move_lcr: !!freeMoveLcr,
+      overheadGlobalModel,
+      overheadFrontOverride,
+      overheadMidOverride,
+      overheadRearOverride,
+      useFrontGlobal,
+      useMidGlobal,
+      useRearGlobal,
+      screenFrontPlaneM: appState.screenFrontPlaneM,
+      splConfig: appState.splConfig,
+      p12Mode: appState.p12Mode,
+      p12Level: appState.p12Level,
+    });
+    return projectData;
+  }, [
+    projectNameState, appState, frontSubsCfg, rearSubsCfg, screen,
+    seatingPositions, seatsPerRowByRow, rowSpacingM, placedSpeakers,
+    roomElements, dolbyPreset, overlays, frozenTabs, sevenBedLayoutType,
+    lcrAimMode, enableFrontWides, freeMoveLcr,
+    overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
+    useFrontGlobal, useMidGlobal, useRearGlobal,
+  ]);
+
   const parseMaybe = useCallback((val, fallback) => {
     if (val == null) return fallback;
     if (Array.isArray(val)) return val;
