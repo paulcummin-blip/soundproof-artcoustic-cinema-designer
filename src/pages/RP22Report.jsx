@@ -760,7 +760,10 @@ function RP22ReportInner() {
             if (!model) return;
             let cat = null;
             if (['FL', 'FC', 'FR', 'L', 'C', 'R'].includes(role)) cat = 'lcr';
-            else if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'LS', 'RS', 'LR', 'RR', 'FWL', 'FWR'].includes(role)) cat = 'surrounds';
+            else if (
+              ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'LS', 'RS', 'LR', 'RR', 'FWL', 'FWR'].includes(role) ||
+              /^(SL|SR)\d+$/.test(role)
+            ) cat = 'surrounds';
             else if (role.startsWith('T') || role.startsWith('U')) cat = 'overheads';
             if (cat) byCategory[cat][model] = (byCategory[cat][model] || 0) + 1;
         });
