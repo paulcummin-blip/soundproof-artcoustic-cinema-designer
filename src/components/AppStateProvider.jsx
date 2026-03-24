@@ -1860,6 +1860,7 @@ function useDesignerState() {
     seatSpacing, setSeatSpacing, 
     rowSpacingM, setRowSpacingM,
     mlpBasis, setMlpBasis, autoSeatByRP23, setAutoSeatByRP23,
+    rowEarHeights, setRowEarHeights,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     subWarnings, setSubWarnings, 
