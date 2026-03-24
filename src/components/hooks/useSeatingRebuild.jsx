@@ -235,7 +235,7 @@ export function useSeatingRebuild({
           id: seatId,
           x: startX + i * spacingX,
           y,
-          z: 1.2,
+          z: getRowZ(rowIndex),
           rowNumber: rowIndex + 1,
           isPrimary: prev?.isPrimary || false,
           isSecondary: prev?.isSecondary || false
