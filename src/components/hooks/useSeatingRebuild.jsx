@@ -20,7 +20,15 @@ export function useSeatingRebuild({
   _rowSpacingM,
   _mlpBasis,
   stableDimensions,
+  _rowEarHeights,
 }) {
+  // Helper: get ear height for a 1-based row index, falling back to step pattern
+  const getRowZ = (rowIndex) => {
+    const h = _rowEarHeights?.[rowIndex];
+    if (Number.isFinite(h) && h > 0) return h;
+    // default pattern: row1=1.2, row2=1.5, row3=1.8, ...
+    return 1.2 + rowIndex * 0.3;
+  };
   useEffect(() => {
     // CRITICAL: Wait for autosave hydration
     if (!appState?.isHydrated) return;
