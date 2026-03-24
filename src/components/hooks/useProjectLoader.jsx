@@ -727,36 +727,10 @@ appState, // Pass appState directly for setters
       rMS.inFlight = false;
     }
   }, [
+  buildSharedProjectPayload,
   projectIdState,
   projectIdFromUrl,
-  projectNameState,
-  dolbyPreset,
-  screen,
-  seatingPositions,
-  placedSpeakers,
-  roomElements,
-  overlays,
-  frozenTabs,
-  sevenBedLayoutType,
-  frontSubsCfg,
-  rearSubsCfg,
-  lcrAimMode,
-  enableFrontWides,
-  appState.roomDims,
-  appState.selectedSpeakersByRole,
-  appState.speakerNodes,
-  overheadGlobalModel,
-  overheadFrontOverride,
-  overheadMidOverride,
-  overheadRearOverride,
-  useFrontGlobal,
-  useMidGlobal,
-  useRearGlobal,
-  rowSpacingM,
-  appState.screenFrontPlaneM,
-  seatsPerRowByRow,
-  appState.splConfig,
-  freeMoveLcr]
+  isProjectMode]
   );
 
   return {
