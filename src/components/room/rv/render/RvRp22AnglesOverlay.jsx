@@ -72,8 +72,7 @@ export default function RvRp22AnglesOverlay({
     const midNorm = ((midTheta + 180) % 360) - 180;
     const isWorstGap = Number.isFinite(worstGapDeg) && gapDeg === worstGapDeg;
 
-    // Show the worst gap regardless of position; skip non-worst front gaps
-    if (!isWorstGap && Math.abs(midNorm) < 60) return;
+    // Show all valid P5 gaps (including Front Wide-related segments near the front wall)
 
     const deg = gapDeg;
     if (!Number.isFinite(deg) || deg <= 0) return;
