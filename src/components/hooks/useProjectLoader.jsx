@@ -61,6 +61,11 @@ appState, // Pass appState directly for setters
   // NEW: Free Move LCR
   freeMoveLcr,
   setFreeMoveLcr,
+  // NEW: Bed-layer surround persistence
+  globalSurroundModel,
+  setGlobalSurroundModel,
+  extraSurroundCount,
+  setExtraSurroundCount,
   // stableDimensions alias (needed in save/autosave buildProjectData)
   stableDimensions,
   // Explicit mode: true = real saved project, false = local draft
@@ -100,6 +105,8 @@ appState, // Pass appState directly for setters
       lcrAimMode,
       enableFrontWides,
       free_move_lcr: !!freeMoveLcr,
+      globalSurroundModel: appState?.globalSurroundModel ?? globalSurroundModel,
+      extraSurroundCount: appState?.extraSurroundCount ?? extraSurroundCount,
       overheadGlobalModel,
       overheadFrontOverride,
       overheadMidOverride,
