@@ -633,9 +633,13 @@ const byId = useEntitiesById({
 
   const aspect = `${Math.max(0.1, widthM)} / ${Math.max(0.1, lengthM)}`;
 
-  // ANGLE HELPERS — always aim at the current green-dot MLP (no other logic changed)
+  // ANGLE HELPERS — lcrAimMode is the single source of truth for LCR yaw.
+  // lcrAimMode === 'angled' → compute yaw to green dot / RSP
+  // lcrAimMode === 'flat'   → zero angles (wall-flat rendering)
+  const lcrAimAngled = appState?.lcrAimMode === 'angled';
+
   const lcrAngleInfo = useMemo(() => {
-    if (!aimAtMLP) return { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
+    if (!lcrAimAngled) return { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
 
     // Use the green dot as the live MLP target
     const mlpTarget = { x: mlpDotX_m, y: mlpDotY_m };
@@ -651,7 +655,7 @@ const byId = useEntitiesById({
     const maxAbs = Math.max(Math.abs(angleL), Math.abs(angleR));
 
     return { L: angleL, R: angleR, averageAngle, maxAbs };
-  }, [aimAtMLP, placedSpeakers, mlpDotX_m, mlpDotY_m, getCanonicalRole]);
+  }, [lcrAimAngled, placedSpeakers, mlpDotX_m, mlpDotY_m, getCanonicalRole]);
 
   // Report LCR angle to parent (guarded - only when rounded value changes)
   const lastReportedLcrAngleRef = useRef(null);

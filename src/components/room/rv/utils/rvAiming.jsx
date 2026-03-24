@@ -69,14 +69,15 @@ export function getPlanAimDeg(
 
   const role = getCanonicalRole ? getCanonicalRole(speaker.role) : (speaker.role ?? '').toUpperCase();
 
-  // ── LCR: handled locally (not surround logic) ─────────────────────────────
+  // ── LCR: single source of truth — lcrAngleInfo already encodes the mode.
+  // lcrAngleInfo.L / .R are 0 when mode is flat, and computed when mode is angled.
+  // aimLeftRightAtMLP is kept for callers that pass it, but LCR yaw is authoritative
+  // from lcrAngleInfo only — never mix with a separate local toggle.
   if (role === 'FL' || role === 'L') {
-    if (aimLeftRightAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
     return lcrAngleInfo?.L ?? 0;
   }
   if (role === 'FC' || role === 'C') return 0;
   if (role === 'FR' || role === 'R') {
-    if (aimLeftRightAtMLP && mlp) return getAimingYawDeg(speaker, mlp);
     return lcrAngleInfo?.R ?? 0;
   }
 

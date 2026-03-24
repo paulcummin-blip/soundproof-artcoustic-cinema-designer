@@ -469,7 +469,10 @@ function useDesignerState() {
     }
   ));
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
-  const [aimAtMLP, setAimAtMLP] = useState(true);
+  // LCR aim is derived exclusively from lcrAimMode — not a separate independent flag.
+  // aimAtMLP is kept for non-LCR callers (surrounds, overheads) and defaults to false
+  // so it does not independently influence LCR yaw.
+  const [aimAtMLP, setAimAtMLP] = useState(false);
   const [overheadOffsetM, setOverheadOffsetM] = useState(0);
   const [overheadMode, setOverheadMode] = useState("optimised");
   const [rowTarget, setRowTarget] = useState("front");
