@@ -266,6 +266,8 @@ appState, // Pass appState directly for setters
           lcrAimMode: p?.lcr_aim_mode || "angled",
           enableFrontWides: !!p?.enable_front_wides,
           free_move_lcr: !!p?.free_move_lcr,
+          globalSurroundModel: p?.global_surround_model || null,
+          extraSurroundCount: Number(p?.extra_surround_count) || 0,
           overheadGlobalModel: p?.overhead_global_model || null,
           overheadFrontOverride: p?.overhead_front_override || null,
           overheadMidOverride: p?.overhead_mid_override || null,
@@ -527,7 +529,9 @@ appState, // Pass appState directly for setters
   appState.screenFrontPlaneM,
   seatsPerRowByRow,
   appState.splConfig,
-  freeMoveLcr]
+  freeMoveLcr,
+  appState?.globalSurroundModel,
+  appState?.extraSurroundCount]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults

@@ -956,7 +956,11 @@ function RoomDesignerWithState() {
       seatsPerRowByRow: _seatsPerRowByRow,
       setSeatsPerRowByRow: _setSeatsPerRowByRow,
       freeMoveLcr: freeMoveLcr,
-      setFreeMoveLcr: setFreeMoveLcr
+      setFreeMoveLcr: setFreeMoveLcr,
+      globalSurroundModel: appState?.globalSurroundModel,
+      setGlobalSurroundModel: appState?.setGlobalSurroundModel,
+      extraSurroundCount: appState?.extraSurroundCount,
+      setExtraSurroundCount: appState?.setExtraSurroundCount,
     });
 
   // Called after NewProjectDialog creates the project
