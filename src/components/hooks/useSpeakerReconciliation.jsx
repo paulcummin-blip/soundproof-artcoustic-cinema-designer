@@ -101,7 +101,19 @@ export function useSpeakerReconciliation({
     Array.isArray(placedSpeakers) &&
     placedSpeakers.some((spk) => safeCanon(spk.role || "").startsWith("T"));
 
-    if (hasOverheadTargets && !hasAnyExistingOverheads) {
+    // GATE: Only auto-create overheads when they are explicitly enabled.
+    // An overhead model being selected (overheadGlobalModel) is the source-of-truth
+    // signal that the user has intentionally activated overheads.
+    // Without this gate, any unrelated speaker-state change (e.g. selecting an LCR model)
+    // on a preset with height channels (e.g. 9.1.6) would auto-create TFL/TFR/etc.
+    const isValidModel = (m) => { const s = String(m ?? '').trim().toLowerCase(); return !!s && s !== 'off' && s !== 'none'; };
+    const overheadsIntentionallyEnabled =
+      isValidModel(_overheadGlobalModel) ||
+      isValidModel(_overheadFrontOverride) ||
+      isValidModel(_overheadMidOverride) ||
+      isValidModel(_overheadRearOverride);
+
+    if (hasOverheadTargets && !hasAnyExistingOverheads && overheadsIntentionallyEnabled) {
       setSpeakers((prev) => {
         const base = Array.isArray(prev) && prev.length ? prev : seedSpeakersFromPreset({
           preset: normalizedPreset,
