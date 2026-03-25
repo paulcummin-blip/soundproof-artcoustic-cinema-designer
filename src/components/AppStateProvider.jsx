@@ -1824,6 +1824,7 @@ function useDesignerState() {
     globalSurroundModel,
     setGlobalSurroundModel,
     isHydrated,
+    setProjectHydrationReady,
     perSeatMetrics,
     setPerSeatMetricsForSeat,
     seatMetricsById,
