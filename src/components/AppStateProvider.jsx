@@ -757,6 +757,9 @@ function useDesignerState() {
     // and delete saved SL2/SR2/... speakers before project data is applied.
     if (!isHydrated || !isProjectHydrationReady) return;
 
+    // Prevent running before model is ready (fixes load-order bug)
+    if (!globalSurroundModel || globalSurroundModel === 'off') return;
+
     const count = extraSurroundCount || 0;
     
     // Always keep modelKey aligned to the current surround model
