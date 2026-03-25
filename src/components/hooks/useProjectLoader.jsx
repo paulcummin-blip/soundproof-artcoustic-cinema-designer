@@ -186,6 +186,7 @@ appState, // Pass appState directly for setters
   const loadProject = useCallback(async (signal, idOverride) => {
     const id = idOverride || activeProjectId || projectIdState;
     if (!id) return;
+    appState?.setProjectHydrationReady?.(false);
     setLoadState({ phase: "loading", error: null, name: null });
     try {
       // AbortController signal is not directly supported by the SDK, but the operation is fast.
@@ -316,6 +317,8 @@ appState, // Pass appState directly for setters
       window.__APP_DEBUG.push(`[RoomDesigner] Project load error: ${errMsg}`);
       if (globalThis.__B44_LOGS) console.error("[RoomDesigner] Failed to load project:", err);
       setLoadState({ phase: "error", error: errMsg, name: null });
+    } finally {
+      appState?.setProjectHydrationReady?.(true);
     }
   }, [projectIdState, hydrateFromProject, setProjectNameState]);
 
@@ -551,6 +554,7 @@ appState, // Pass appState directly for setters
 
     // Scratch mode: skip backend load entirely, ensure state reflects local draft
     if (!effectiveProjectId) {
+      appState?.setProjectHydrationReady?.(true);
       setLoadState({ phase: "scratch" });
       setAutosaveStatus("local");
       // Free Use starter: always apply clean state on scratch boot, overrides any stale autosave

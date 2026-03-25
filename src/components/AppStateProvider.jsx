@@ -570,6 +570,7 @@ function useDesignerState() {
     (!__isFreeUse && __autosavePayload && __autosavePayload.globalSurroundModel) ? stripSurroundSuffix(__autosavePayload.globalSurroundModel) : null
   ));
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isProjectHydrationReady, setProjectHydrationReady] = useState(() => __isFreeUse);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
   const [roomResetEpoch, setRoomResetEpoch] = useState(0);
   const [seatMetricsById, setSeatMetricsById] = useState(() => (
@@ -744,10 +745,11 @@ function useDesignerState() {
   // TRUE IDEMPOTENCE: only update when speakersShallowEqual detects a real change.
   // Preserves user-dragged positions for existing extra surround speakers.
   useEffect(() => {
-    // HYDRATION GUARD: do not run until autosave restore has completed.
-    // Without this, the effect fires while extraSurroundCount is still 0 and
-    // deletes saved SL2/SR2/... speakers before they can be restored.
-    if (!isHydrated) return;
+    // HYDRATION GUARD: do not run until autosave restore has completed
+    // and any saved-project hydration has finished.
+    // Without this, the effect can fire while extraSurroundCount is still 0
+    // and delete saved SL2/SR2/... speakers before project data is applied.
+    if (!isHydrated || !isProjectHydrationReady) return;
 
     const count = extraSurroundCount || 0;
     
@@ -857,7 +859,7 @@ function useDesignerState() {
       
       return { ...prev, placedSpeakers: nextPlaced };
     });
-  }, [isHydrated, extraSurroundCount, globalSurroundModel, speakerSystem?.placedSpeakers, roomDims?.widthM, roomDims?.lengthM, setSpeakerSystem]);
+  }, [isHydrated, isProjectHydrationReady, extraSurroundCount, globalSurroundModel, speakerSystem?.placedSpeakers, roomDims?.widthM, roomDims?.lengthM, setSpeakerSystem]);
 
   const [splConfig, setSplConfig] = useState(() => {
       const autosaveConfig = __autosavePayload?.splConfig || {};
