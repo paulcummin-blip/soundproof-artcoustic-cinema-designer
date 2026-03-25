@@ -292,22 +292,26 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
     const atRsp = computeLcrLossAtPoint(spk, rspPoint, mlpPos, lcrAimMode);
     if (!atRsp) continue;
 
-    // RSP-normalised delta — use continuous interpolated values, not coarse buckets.
-    // This prevents P16 collapsing to 0.0 dB when seat and RSP share the same bucket.
-    const delta = Math.abs(atSeat.continuousLossDb - atRsp.continuousLossDb);
+    // Stricter P16 comparison: keep the RSP delta term, but retain part of the
+    // seat's absolute off-axis loss so outer seats do not collapse too easily.
+    const seatLoss = Number(atSeat.continuousLossDb) || 0;
+    const rspLoss = Number(atRsp.continuousLossDb) || 0;
+    const normalizedDelta = Math.abs(seatLoss - rspLoss);
+    const delta = normalizedDelta + (seatLoss * 0.5);
 
     const isBeyondLcrLimit = atSeat.isBeyondLcrLimit || atRsp.isBeyondLcrLimit;
 
     perSpeaker[role] = {
       angleDeg: atSeat.angleDeg,
-      lossDb: Number(delta.toFixed(1)),         // normalised delta (continuous)
+      lossDb: Number(delta.toFixed(1)),         // weighted seat-vs-RSP delta
       isBeyondLcrLimit,
       // Debug fields
-      lossAtSeat: Number(atSeat.lossDb.toFixed(1)),
-      lossAtRsp: Number(atRsp.lossDb.toFixed(1)),
+      lossAtSeat: Number(seatLoss.toFixed(2)),
+      lossAtRsp: Number(rspLoss.toFixed(2)),
       continuousLossAtSeat: Number(atSeat.continuousLossDb.toFixed(2)),
       continuousLossAtRsp: Number(atRsp.continuousLossDb.toFixed(2)),
-      normalizedDelta: Number(delta.toFixed(1)),
+      normalizedDelta: Number(normalizedDelta.toFixed(1)),
+      weightedDelta: Number(delta.toFixed(1)),
       // Aim debug fields
       seatAzDeg: Number(isNum(atSeat.seatAzDeg) ? atSeat.seatAzDeg.toFixed(1) : 0),
       aimDegRaw: Number(isNum(atSeat.aimDegRaw) ? atSeat.aimDegRaw.toFixed(1) : 0),
