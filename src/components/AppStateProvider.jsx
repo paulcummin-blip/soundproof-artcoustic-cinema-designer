@@ -741,10 +741,15 @@ function useDesignerState() {
     });
   }, [isHydrated, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, setSpeakerSystem]);
 
+  const prevProjectHydrationReadyRef = useRef(isProjectHydrationReady);
+
   // --- EXTRA SURROUNDS SYNC EFFECT (promoted to real speakers with canonical roles SL2/SR2...) ---
   // TRUE IDEMPOTENCE: only update when speakersShallowEqual detects a real change.
   // Preserves user-dragged positions for existing extra surround speakers.
   useEffect(() => {
+    const didJustFinishProjectHydration = !prevProjectHydrationReadyRef.current && isProjectHydrationReady;
+    prevProjectHydrationReadyRef.current = isProjectHydrationReady;
+
     // HYDRATION GUARD: do not run until autosave restore has completed
     // and any saved-project hydration has finished.
     // Without this, the effect can fire while extraSurroundCount is still 0
@@ -793,6 +798,7 @@ function useDesignerState() {
       
       // If count is 0, remove all extras
       if (count === 0) {
+        if (didJustFinishProjectHydration && existing.length > 0) return prev;
         if (existing.length === 0) return prev; // Already clean
         const nextPlaced = nonExtras;
         
