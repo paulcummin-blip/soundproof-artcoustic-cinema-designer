@@ -50,7 +50,6 @@ import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFro
 import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
 import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers";
 import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements";
-import ExtraSurroundDebugPanel from "@/components/debug/ExtraSurroundDebugPanel";
 import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM";
 import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect";
 import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler";
@@ -1755,13 +1754,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
   const safeRearSubs = rearSubsActive ? rearSubs : [];
 
   return (
-    <>
-      <ExtraSurroundDebugPanel
-        extraSurroundCount={appState?.extraSurroundCount}
-        globalSurroundModel={appState?.globalSurroundModel}
-        placedSpeakers={placedSpeakers}
-        visiblePlanSpeakers={visiblePlanSpeakers}
-      />
       <RvPlanCanvas
         svgRef={svgRef}
         planBoundsRef={planBoundsRef}
@@ -1879,6 +1871,5 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
       />
-    </>
   );
 });
