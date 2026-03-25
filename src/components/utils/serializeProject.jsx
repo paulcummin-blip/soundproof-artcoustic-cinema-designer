@@ -48,6 +48,12 @@ export function serializeProject(input = {}) {
     seatingPositions = [],
     seatsPerRowByRow = [],
     rowSpacingM = 1.8,
+    seatingRows = 1,
+    seatsPerRow = 1,
+    seatSpacing = 0.6,
+    mlpBasis = "middle",
+    seatingBlockOffset = 0,
+    rowEarHeights = [],
 
     // Speakers / subs / elements
     placedSpeakers = [],
@@ -168,6 +174,12 @@ export function serializeProject(input = {}) {
     seating_positions: asArray(seatingPositions),
     row_spacing_m: Number(rowSpacingM) || 1.8,
     seats_per_row_by_row: asArray(seatsPerRowByRow),
+    seating_rows: Number(seatingRows) || 1,
+    seats_per_row: Number(seatsPerRow) || 1,
+    seat_spacing: Number(seatSpacing) || 0.6,
+    mlp_basis: typeof mlpBasis === "string" ? mlpBasis : "middle",
+    seating_block_offset: Number(seatingBlockOffset) || 0,
+    row_ear_heights: asArray(rowEarHeights),
 
     // Dolby / bed layout
     dolby_config: dolbyLayout || "5.1",

@@ -54,6 +54,12 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     setUseRearGlobal,
     setRowSpacingM,
     setSeatsPerRowByRow,
+    setSeatingRows,
+    setSeatsPerRow,
+    setSeatSpacing,
+    setMlpBasis,
+    setSeatingBlockOffset,
+    setRowEarHeights,
     setOverlays,
     setSeatingPositions,
     setRoomElements,
@@ -137,6 +143,23 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   if (Array.isArray(seatsPerRowByRowData) && typeof setSeatsPerRowByRow === "function") {
     setSeatsPerRowByRow(seatsPerRowByRowData);
   }
+
+  const seatingRows = Number(p?.seating_rows);
+  if (Number.isFinite(seatingRows) && typeof setSeatingRows === "function") setSeatingRows(seatingRows);
+
+  const seatsPerRow = Number(p?.seats_per_row);
+  if (Number.isFinite(seatsPerRow) && typeof setSeatsPerRow === "function") setSeatsPerRow(seatsPerRow);
+
+  const seatSpacing = Number(p?.seat_spacing);
+  if (Number.isFinite(seatSpacing) && typeof setSeatSpacing === "function") setSeatSpacing(seatSpacing);
+
+  if (typeof p?.mlp_basis === "string" && typeof setMlpBasis === "function") setMlpBasis(p.mlp_basis);
+
+  const seatingBlockOffset = Number(p?.seating_block_offset);
+  if (Number.isFinite(seatingBlockOffset) && typeof setSeatingBlockOffset === "function") setSeatingBlockOffset(seatingBlockOffset);
+
+  const rowEarHeights = parseMaybe(p?.row_ear_heights, []);
+  if (Array.isArray(rowEarHeights) && typeof setRowEarHeights === "function") setRowEarHeights(rowEarHeights);
 
   // 4) OVERHEAD CONFIG
   if (typeof setOverheadGlobalModel === "function") setOverheadGlobalModel(p?.overhead_global_model || null);
