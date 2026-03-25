@@ -243,8 +243,8 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
             {/* Tick at lens */}
             <line x1={dimX - 3} y1={lensSvgY} x2={dimX + 3} y2={lensSvgY}
               stroke={PALETTE.projector} strokeWidth={0.7} fill="none" opacity={0.7} />
-            {/* Lens height label — 9px above the lens tick */}
-            <text x={dimX + 5} y={lensSvgY - 9} fontSize={6} fill={PALETTE.projector} textAnchor="start">
+            {/* Lens height label — 4px below the lens tick for downward spacing */}
+            <text x={dimX + 5} y={lensSvgY + 10} fontSize={6} fill={PALETTE.projector} textAnchor="start">
               Lens: {projectorLensZ.toFixed(2)} m
             </text>
 
@@ -355,7 +355,7 @@ export default function SightlineGraphic({
     : null;
 
   const screenInches = screenWidthM
-    ? `${(screenWidthM / 0.0254).toFixed(0)}" width`
+    ? `${(screenWidthM / 0.0254).toFixed(0)}" width (${screenWidthM.toFixed(2)} m)`
     : null;
 
   const room  = { roomLengthM, roomHeightM };
