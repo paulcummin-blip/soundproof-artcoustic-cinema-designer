@@ -62,24 +62,30 @@ export default function UnifiedSurroundsConfig({
       return str.endsWith('_s') ? str.slice(0, -2) : str;
     };
 
-    const normalizeUiModel = (value) => {
-      const stripped = stripSurroundSuffix(value);
-      const normalized = normaliseModelKey(stripped);
-      const cleaned = stripSurroundSuffix(normalized);
-      const lower = cleaned.toLowerCase();
-      return cleaned && lower !== 'off' && lower !== 'none' ? cleaned : null;
+    const surroundChoiceKeys = new Set(
+      ((getModelsByCategoryOrdered()?.SURROUNDS) || []).map((item) => item.key)
+    );
+
+    const normalizeSurroundChoiceModel = (value) => {
+      const normalized = normaliseModelKey(String(value || '').trim());
+      const lower = normalized.toLowerCase();
+      if (!normalized || lower === 'off' || lower === 'none') return null;
+      if (surroundChoiceKeys.has(normalized)) return normalized;
+
+      const fallbackKey = `${stripSurroundSuffix(normalized)}_s`;
+      return surroundChoiceKeys.has(fallbackKey) ? fallbackKey : null;
     };
 
-    let restoredMaster = normalizeUiModel(app?.globalSurroundModel);
+    let restoredMaster = normalizeSurroundChoiceModel(app?.globalSurroundModel);
 
     if (!restoredMaster) {
       const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
       const inferred = (Array.isArray(placedSpeakers) ? placedSpeakers : []).find((speaker) => {
         const role = getCanonicalRole(speaker?.role);
-        const model = normalizeUiModel(speaker?.model);
+        const model = normalizeSurroundChoiceModel(speaker?.model);
         return surroundRoles.has(role) && !!model;
       });
-      restoredMaster = normalizeUiModel(inferred?.model);
+      restoredMaster = normalizeSurroundChoiceModel(inferred?.model);
     }
 
     if (!restoredMaster) return;
