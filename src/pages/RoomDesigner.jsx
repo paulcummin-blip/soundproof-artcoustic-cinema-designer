@@ -662,7 +662,9 @@ function RoomDesignerWithState() {
       for (const sp of speakersToProcess) {
         const role = safeCanon(sp?.role); if (!role || !matchRole(role)) continue;
         const pos = sp?.position || {}; if (!_isNum(pos.x) || !_isNum(pos.y)) continue;
-        const { widthM: wM, depthM: dM } = _getDimsM(getModelMeta(sp));
+        const meta = getModelMeta(sp);
+        const wM = _isNum(meta?.widthM) ? meta.widthM : 0.27;
+        const dM = _isNum(meta?.depthM) ? meta.depthM : 0.082;
         const wall = (role === "LW" || /^SL\d*$/.test(role)) ? "LEFT" : (role === "RW" || /^SR\d*$/.test(role)) ? "RIGHT" : isRearSurroundRole(role) ? "BACK" : null;
         if (!wall) continue;
         const d = _hingeIntrusionM(wM, dM, _hingeAngleDegFromWall(wall, getYawDegForRole(sp)));
