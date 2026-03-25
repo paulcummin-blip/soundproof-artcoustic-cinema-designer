@@ -99,9 +99,8 @@ export default function UnifiedSurroundsConfig({
       LW: wideModel, RW: wideModel,
     };
 
-    const cleanModelKey = modelKey && modelKey.endsWith("_s") ? modelKey.slice(0, -2) : modelKey;
     if (app && typeof app.setGlobalSurroundModel === "function") {
-      app.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : cleanModelKey);
+      app.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : modelKey);
     }
 
     if (globalThis.__B44_LOGS) {
