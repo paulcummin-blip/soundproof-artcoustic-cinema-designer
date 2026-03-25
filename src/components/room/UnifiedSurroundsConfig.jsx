@@ -56,6 +56,65 @@ export default function UnifiedSurroundsConfig({
     typeof onExtraSurroundCountChange === "function" ? onExtraSurroundCountChange : () => {};
   const safeAllowExtraSurrounds = !!allowExtraSurrounds;
 
+  React.useEffect(() => {
+    const stripSurroundSuffix = (value) => {
+      const str = String(value || '').trim();
+      return str.endsWith('_s') ? str.slice(0, -2) : str;
+    };
+
+    const normalizeUiModel = (value) => {
+      const stripped = stripSurroundSuffix(value);
+      const normalized = normaliseModelKey(stripped);
+      const cleaned = stripSurroundSuffix(normalized);
+      const lower = cleaned.toLowerCase();
+      return cleaned && lower !== 'off' && lower !== 'none' ? cleaned : null;
+    };
+
+    let restoredMaster = normalizeUiModel(app?.globalSurroundModel);
+
+    if (!restoredMaster) {
+      const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+      const inferred = (Array.isArray(placedSpeakers) ? placedSpeakers : []).find((speaker) => {
+        const role = getCanonicalRole(speaker?.role);
+        const model = normalizeUiModel(speaker?.model);
+        return surroundRoles.has(role) && !!model;
+      });
+      restoredMaster = normalizeUiModel(inferred?.model);
+    }
+
+    if (!restoredMaster) return;
+
+    setSurroundConfig((prev) => {
+      const currentMaster = String(prev?.value?.master || 'off');
+      const nextMaster = restoredMaster;
+
+      if (currentMaster === nextMaster) return prev;
+
+      const next = {
+        ...prev,
+        value: {
+          ...prev.value,
+          master: nextMaster,
+        },
+        override: {
+          ...prev.override,
+        },
+      };
+
+      if (!prev?.override?.side && (prev?.value?.side === currentMaster || prev?.value?.side === 'off')) {
+        next.value.side = nextMaster;
+      }
+      if (!prev?.override?.rear && (prev?.value?.rear === currentMaster || prev?.value?.rear === 'off')) {
+        next.value.rear = nextMaster;
+      }
+      if (!prev?.override?.wide && (prev?.value?.wide === currentMaster || prev?.value?.wide === 'off')) {
+        next.value.wide = nextMaster;
+      }
+
+      return next;
+    });
+  }, [app?.globalSurroundModel, placedSpeakers, setSurroundConfig]);
+
   const handleSurroundModelChange = useCallback((config) => {
     const safeConfig = {
       value: {
