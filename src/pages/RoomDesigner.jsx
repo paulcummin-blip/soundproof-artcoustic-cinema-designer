@@ -299,33 +299,33 @@ function RoomDesignerWithState() {
   
   // NEW: Auto-reset extra surrounds count when layout doesn't allow them (idempotent)
   const didSkipInitialLoadedExtraSurroundResetRef = useRef(false);
+  const prevIsNineBedLayoutRef = useRef(isNineBedLayout);
 
   useEffect(() => {
+    const wasNineBedLayout = prevIsNineBedLayoutRef.current;
+    prevIsNineBedLayoutRef.current = isNineBedLayout;
+
     if (isNineBedLayout) {
       didSkipInitialLoadedExtraSurroundResetRef.current = true;
       return;
     }
 
-    const hasLoadedExtraSurroundSpeakers = Array.isArray(appState?.speakerSystem?.placedSpeakers) &&
-      appState.speakerSystem.placedSpeakers.some((speaker) => /^(SL|SR)\d+$/.test(safeCanon(speaker?.role)));
-
-    if (!didSkipInitialLoadedExtraSurroundResetRef.current && resolvedProjectId && hasLoadedExtraSurroundSpeakers) {
+    if (!didSkipInitialLoadedExtraSurroundResetRef.current && resolvedProjectId) {
       didSkipInitialLoadedExtraSurroundResetRef.current = true;
       return;
     }
 
     didSkipInitialLoadedExtraSurroundResetRef.current = true;
 
-    // Only force reset when the control is not allowed
-    if ((appState?.extraSurroundCount ?? 0) !== 0) {
+    // Only force reset after a real allowed -> disallowed layout change
+    if (wasNineBedLayout && (appState?.extraSurroundCount ?? 0) !== 0) {
       appState?.setExtraSurroundCount?.(0);
     }
   }, [
     isNineBedLayout,
     resolvedProjectId,
     appState?.extraSurroundCount,
-    appState?.setExtraSurroundCount,
-    appState?.speakerSystem?.placedSpeakers
+    appState?.setExtraSurroundCount
   ]);
 
   // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
