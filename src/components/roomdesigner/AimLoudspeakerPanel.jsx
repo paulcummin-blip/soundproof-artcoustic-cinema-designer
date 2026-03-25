@@ -13,14 +13,11 @@ export default function AimLoudspeakerPanel({
   const _isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
   return (
-    <details className="mt-4 mb-4 px-4">
+    <div className="mt-4 mb-4 px-4">
       <div className="rounded-lg bg-[#F8F8F7] px-3 py-3">
-        <summary className="cursor-pointer text-sm font-semibold text-gray-700 list-none flex items-center justify-between">
+        <div className="text-sm font-semibold text-gray-700">
           <span className="text-[#625143]">Loudspeaker Aiming</span>
-          <svg className="w-4 h-4 transition-transform" style={{ transform: 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </summary>
+        </div>
         <div className="space-y-2 mt-3">
           <div className="flex items-center justify-between">
             <Label htmlFor="aim-lcr" className="text-sm">Left / Right</Label>
@@ -72,6 +69,6 @@ export default function AimLoudspeakerPanel({
           </div>
         </div>
       </div>
-    </details>
+    </div>
   );
 }
