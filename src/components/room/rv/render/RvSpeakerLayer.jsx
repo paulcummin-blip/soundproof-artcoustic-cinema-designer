@@ -2,7 +2,7 @@ import React from "react";
 import { SpeakerIcon, isRenderableSpeaker, getSpeakerDims } from "@/components/room/rv/RenderPrimitives";
 import { getCanonicalRole as defaultGetCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
-import { sideWallX } from "@/components/room/rv/utils/rvGeometry";
+import { sideWallX, rearWallY } from "@/components/room/rv/utils/rvGeometry";
 
 /**
  * RvSpeakerLayer — renders all bed-layer draggable speaker icons onto the SVG canvas.
