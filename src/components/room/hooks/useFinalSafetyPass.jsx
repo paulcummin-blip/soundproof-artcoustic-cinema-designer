@@ -75,7 +75,12 @@ export function useFinalSafetyPass({
         speakers = speakers.map(s => {
           const canon = getCanonicalRole(s.role);
           if (canon === 'SBL' || canon === 'SBR') {
-            if (s.position) { changed = true; return { ...s, position: null }; }
+            const modelKey = String(s?.model || '').trim().toLowerCase();
+            const hasValidModel = !!modelKey && modelKey !== 'off' && modelKey !== 'none';
+            const hasValidPosition = !!s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
+            if (!hasValidModel || !hasValidPosition) {
+              if (s.position) { changed = true; return { ...s, position: null }; }
+            }
           }
           return s;
         });
