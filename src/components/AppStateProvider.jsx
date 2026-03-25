@@ -6,6 +6,7 @@ import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 
 // --- SEATING POSITIONS NORMALISER ---
 const normaliseSeatingPositions = (seats, roomDims) => {
@@ -759,7 +760,13 @@ function useDesignerState() {
     const count = extraSurroundCount || 0;
     
     // Always keep modelKey aligned to the current surround model
-    const modelKey = globalSurroundModel || "off";
+    const modelKey = (() => {
+      const rawModel = String(globalSurroundModel || '').trim();
+      if (!rawModel) return 'off';
+      const resolved = resolveSurroundModel(rawModel, 'SL');
+      const resolvedLower = String(resolved || '').trim().toLowerCase();
+      return (!resolvedLower || resolvedLower === 'off' || resolvedLower === 'none') ? 'off' : resolved;
+    })();
     
     // 1cm wall buffer (single source of truth for ALL surrounds)
     const WALL_BUFFER_M = 0.01;
@@ -839,8 +846,11 @@ function useDesignerState() {
         const existingSL = existing.find(s => String(s.role).toUpperCase() === roleSL);
         const existingSR = existing.find(s => String(s.role).toUpperCase() === roleSR);
         
-        // SL speaker (left) — keep existing untouched, only create if missing
-        nextExtras.push(existingSL || {
+        // SL speaker (left) — preserve placement state, but keep model synced to current surround model
+        nextExtras.push(existingSL ? {
+          ...existingSL,
+          model: modelKey && modelKey !== 'off' ? modelKey : undefined,
+        } : {
           id: `${roleSL.toLowerCase()}-${timeNowMs() + pairIndex * 2}`,
           role: roleSL,
           model: modelKey && modelKey !== 'off' ? modelKey : undefined,
@@ -850,8 +860,11 @@ function useDesignerState() {
           positionSource: 'auto',
         });
         
-        // SR speaker (right) — keep existing untouched, only create if missing
-        nextExtras.push(existingSR || {
+        // SR speaker (right) — preserve placement state, but keep model synced to current surround model
+        nextExtras.push(existingSR ? {
+          ...existingSR,
+          model: modelKey && modelKey !== 'off' ? modelKey : undefined,
+        } : {
           id: `${roleSR.toLowerCase()}-${timeNowMs() + pairIndex * 2 + 1}`,
           role: roleSR,
           model: modelKey && modelKey !== 'off' ? modelKey : undefined,
