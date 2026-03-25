@@ -788,6 +788,11 @@ function useDesignerState() {
     const srX = Number.isFinite(srSpeaker?.position?.x) ? srSpeaker.position.x : _computedSrX;
 
     // Inject extra speakers directly into placedSpeakers array
+    console.log('[EXTRA sync start]', {
+      extraSurroundCount,
+      globalSurroundModel,
+      roles: Array.isArray(speakerSystem?.placedSpeakers) ? speakerSystem.placedSpeakers.map(s => String(s?.role)) : []
+    });
     setSpeakerSystem(prev => {
       const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
       
@@ -802,6 +807,11 @@ function useDesignerState() {
         if (existing.length === 0) return prev; // Already clean
         const nextPlaced = nonExtras;
         
+        console.log('[EXTRA sync remove]', {
+          existing: existing.map(s => String(s?.role)),
+          nonExtras: nonExtras.map(s => String(s?.role))
+        });
+
         // Use speakersShallowEqual for true idempotence
         if (speakersShallowEqual(current, nextPlaced)) return prev;
         return { ...prev, placedSpeakers: nextPlaced };
@@ -854,6 +864,11 @@ function useDesignerState() {
       
       // Build final speaker list
       const nextPlaced = [...nonExtras, ...nextExtras];
+
+      console.log('[EXTRA sync add/check]', {
+        nextExtras: nextExtras.map(s => String(s?.role)),
+        nextPlaced: nextPlaced.map(s => String(s?.role))
+      });
       
       // IDEMPOTENCE CHECK: use speakersShallowEqual for robust comparison
       if (speakersShallowEqual(current, nextPlaced)) {

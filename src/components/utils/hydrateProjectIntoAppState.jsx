@@ -258,6 +258,11 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   })();
 
   if (typeof setSpeakerSystem === "function") {
+    console.log('[HYDRATE speakers]', {
+      extra_surround_count: p?.extra_surround_count,
+      global_surround_model: p?.global_surround_model,
+      roles: Array.isArray(loadedSpeakers) ? loadedSpeakers.map(s => String(s?.role)) : null
+    });
     setSpeakerSystem((prev) => ({
       ...(prev || {}),
       placedSpeakers: Array.isArray(loadedSpeakers) ? loadedSpeakers : [],
