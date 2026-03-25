@@ -207,8 +207,7 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
       {/* Axis labels */}
       {/* Floor */}
       <text x={rx1 - 4} y={ry0 - 4} fontSize={6} fill={PALETTE.subLabel} textAnchor="end">Floor</text>
-      {/* Ceiling label — top edge of room box is the ceiling, placed at left edge to avoid projector area */}
-      <text x={rx0 + 4} y={ry1 + 8} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">Ceiling</text>
+      {/* Left ceiling label removed — ceiling is labelled near projector annotations instead */}
       {/* Screen label */}
       <text x={toX(screenFrontPlaneY)} y={ry1 - 4} fontSize={6} fill={PALETTE.screenFrame} textAnchor="middle">Screen</text>
       {/* Projector label — shifted above body top to avoid overlap with dim line */}
@@ -219,10 +218,10 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
       <text x={(rx0 + rx1) / 2} y={ry0 + 10} fontSize={6} fill={PALETTE.subLabel} textAnchor="middle">
         Room depth: {roomLengthM.toFixed(2)} m
       </text>
-      {/* Room height annotation */}
+      {/* Screen height annotation — rotated label on left side */}
       <text x={rx0 + 10} y={(ry0 + ry1) / 2} fontSize={6} fill={PALETTE.subLabel} textAnchor="middle"
         transform={`rotate(-90, ${rx0 + 10}, ${(ry0 + ry1) / 2})`}>
-        H: {roomHeightM.toFixed(2)} m
+        Screen: {Number.isFinite(screenHeightM) ? screenHeightM.toFixed(2) : (vImgTop - vImgBottom).toFixed(2)} m
       </text>
 
       {/* ── Projector height dimension line ── */}
@@ -244,8 +243,8 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
             {/* Tick at lens */}
             <line x1={dimX - 3} y1={lensSvgY} x2={dimX + 3} y2={lensSvgY}
               stroke={PALETTE.projector} strokeWidth={0.7} fill="none" opacity={0.7} />
-            {/* Lens height label */}
-            <text x={dimX + 5} y={lensSvgY - 2} fontSize={6} fill={PALETTE.projector} textAnchor="start">
+            {/* Lens height label — 9px above the lens tick */}
+            <text x={dimX + 5} y={lensSvgY - 9} fontSize={6} fill={PALETTE.projector} textAnchor="start">
               Lens: {projectorLensZ.toFixed(2)} m
             </text>
 
@@ -258,12 +257,12 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
             {/* Tick at ceiling */}
             <line x1={dimX - 3} y1={ceilSvgY} x2={dimX + 3} y2={ceilSvgY}
               stroke={PALETTE.subLabel} strokeWidth={0.7} fill="none" opacity={0.7} />
-            {/* Clearance label — midpoint between projector top and ceiling */}
-            <text x={dimX + 5} y={(topSvgY + ceilSvgY) / 2 + 2} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">
+            {/* Clearance label — midpoint between projector top and ceiling, shifted up 4px for spacing */}
+            <text x={dimX + 5} y={(topSvgY + ceilSvgY) / 2 - 4} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">
               Clr: {ceilingClearance.toFixed(2)} m
             </text>
-            {/* Ceiling height label — near the top tick */}
-            <text x={dimX + 5} y={ceilSvgY - 2} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">
+            {/* Ceiling height label — 9px above the ceiling tick */}
+            <text x={dimX + 5} y={ceilSvgY - 9} fontSize={6} fill={PALETTE.subLabel} textAnchor="start">
               Ceiling: {roomHeightM.toFixed(2)} m
             </text>
           </g>
