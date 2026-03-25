@@ -2,6 +2,7 @@ import React from "react";
 import { SpeakerIcon, isRenderableSpeaker, getSpeakerDims } from "@/components/room/rv/RenderPrimitives";
 import { getCanonicalRole as defaultGetCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
+import { sideWallX } from "@/components/room/rv/utils/rvGeometry";
 
 /**
  * RvSpeakerLayer — renders all bed-layer draggable speaker icons onto the SVG canvas.
@@ -55,6 +56,8 @@ export default function RvSpeakerLayer({
         // by the yaw-projected half-depth so the cabinet stays flush to the front wall
         // regardless of rotation angle.
         const LCR_ROLES = ['FL', 'FC', 'FR'];
+        const isLeftSideSurround = role === 'SL' || /^SL\d+$/.test(role);
+        const isRightSideSurround = role === 'SR' || /^SR\d+$/.test(role);
         const FRONT_WALL_GAP_M = 0.01; // matches frontWallY in drag solver
 
         let renderX = speaker.position.x;
@@ -62,16 +65,22 @@ export default function RvSpeakerLayer({
 
         if (LCR_ROLES.includes(role)) {
           const yawRad = (yawDeg || 0) * (Math.PI / 180);
-          // Projected half-depth along Y (into the room) for a rotated rectangle
           const halfDepth = speakerDepthM / 2;
           const halfWidth = speakerWidthM / 2;
           const projectedHalfExtentY =
             halfDepth * Math.abs(Math.cos(yawRad)) +
             halfWidth * Math.abs(Math.sin(yawRad));
-          // Rear edge is at FRONT_WALL_GAP_M; centre is that far + projectedHalfExtentY into the room
+
           renderY = FRONT_WALL_GAP_M + projectedHalfExtentY;
-          // X stays as stored (symmetric drag already handles this correctly)
           renderX = speaker.position.x;
+        } else if (isLeftSideSurround || isRightSideSurround) {
+          renderX = sideWallX(
+            widthM,
+            { widthM: speakerWidthM, depthM: speakerDepthM },
+            isLeftSideSurround ? 'L' : 'R',
+            yawDeg || 0
+          );
+          renderY = speaker.position.y;
         }
 
         const [canvasX, canvasY] = toPx(renderX, renderY);
