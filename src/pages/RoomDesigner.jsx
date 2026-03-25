@@ -297,7 +297,7 @@ function RoomDesignerWithState() {
   const lastPresetRef = React.useRef(dolbyPreset);
   useEffect(() => {lastPresetRef.current = dolbyPreset;}, [dolbyPreset]);
   
-  // NEW: Auto-reset extra surrounds count when layout doesn't allow them (idempotent)
+  // NEW: Auto-reset extra surrounds count only after a real 9-bed -> non-9-bed transition
   const didSkipInitialLoadedExtraSurroundResetRef = useRef(false);
   const prevIsNineBedLayoutRef = useRef(isNineBedLayout);
 
@@ -305,25 +305,27 @@ function RoomDesignerWithState() {
     const wasNineBedLayout = prevIsNineBedLayoutRef.current;
     prevIsNineBedLayoutRef.current = isNineBedLayout;
 
+    // Never reset on the first pass after mount / reopen.
+    if (!didSkipInitialLoadedExtraSurroundResetRef.current) {
+      didSkipInitialLoadedExtraSurroundResetRef.current = true;
+      return;
+    }
+
+    // Only react to a real layout transition, not to loaded extraSurroundCount changes.
+    if (wasNineBedLayout === isNineBedLayout) {
+      return;
+    }
+
     if (isNineBedLayout) {
-      didSkipInitialLoadedExtraSurroundResetRef.current = true;
       return;
     }
 
-    if (!didSkipInitialLoadedExtraSurroundResetRef.current && resolvedProjectId) {
-      didSkipInitialLoadedExtraSurroundResetRef.current = true;
-      return;
-    }
-
-    didSkipInitialLoadedExtraSurroundResetRef.current = true;
-
-    // Only force reset after a real allowed -> disallowed layout change
+    // Only force reset after a real allowed -> disallowed layout change.
     if (wasNineBedLayout && (appState?.extraSurroundCount ?? 0) !== 0) {
       appState?.setExtraSurroundCount?.(0);
     }
   }, [
     isNineBedLayout,
-    resolvedProjectId,
     appState?.extraSurroundCount,
     appState?.setExtraSurroundCount
   ]);
