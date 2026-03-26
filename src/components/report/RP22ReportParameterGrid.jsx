@@ -272,7 +272,9 @@ export default function RP22ReportParameterGrid({
           <div key={`row-${rowObj.row}`} style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "min-content", justifyContent: "end", gap: 6 }}>
             {rowObj.seats.map(seat => {
               const snap = getSnapshotForSeat(seat);
-              const lvl = snap?.rp22?.[pKey]?.level || "—";
+              const metric = snap?.rp22?.[pKey];
+              const display = getMetricDisplayState(metric);
+              const lvl = display.text === 'N/A' ? 'N/A' : (metric?.level || "—");
               const isPrimary = !!seat?.isPrimary;
               return (
                 <span

@@ -274,6 +274,9 @@ export default function SeatHud({
             return String(level);
           };
 
+          const metricText = fmt(metric);
+          const pillLevel = metricText === 'N/A' ? 'N/A' : normalizeLevel(metric.level);
+
           return (
             <div key={key}>
               <div
@@ -293,7 +296,7 @@ export default function SeatHud({
                     }}
                     onMouseEnter={() => {
                       if (isHudPinned) {
-                        setHoveredParam({ key: key.toUpperCase(), level: normalizeLevel(metric.level) });
+                        setHoveredParam({ key: key.toUpperCase(), level: pillLevel });
                       }
                     }}
                     onMouseLeave={() => {
@@ -312,7 +315,7 @@ export default function SeatHud({
                     `: ${metric.formatted || '—'}`
                     )}
                     </span>
-                    <RP22GradingPill level={normalizeLevel(metric.level)} />
+                    <RP22GradingPill level={pillLevel} />
                     </div>
 
 
