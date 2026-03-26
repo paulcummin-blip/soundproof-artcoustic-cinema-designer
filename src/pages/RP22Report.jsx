@@ -298,8 +298,14 @@ function RP22ReportInner() {
             return;
         }
 
-        setReportHydrating(true);
-        setReportReadyProjectId(null);
+        if (reportReadyProjectId === effectiveProjectId && reportHydrating === false) {
+            return;
+        }
+
+        if (reportReadyProjectId !== effectiveProjectId) {
+            setReportHydrating(true);
+            setReportReadyProjectId(null);
+        }
 
         base44.entities.Project.filter({ id: effectiveProjectId }).then((results) => {
             if (cancelled) return;
@@ -354,7 +360,7 @@ function RP22ReportInner() {
         return () => {
             cancelled = true;
         };
-    }, [effectiveProjectId, app]);
+    }, [effectiveProjectId]);
 
     const [printReady, setPrintReady] = useState(false);
     const [debugPlanCapture, setDebugPlanCapture] = useState(false);
