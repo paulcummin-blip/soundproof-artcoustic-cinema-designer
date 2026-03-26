@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAppState } from '../components/AppStateProvider';
 // TEMP DEBUG: remove after sub persistence proven
 import { useActiveProjectId } from '@/components/state/project-session';
@@ -274,6 +275,9 @@ function RP22ReportInner() {
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
 
+    const { projectId: routeProjectId } = useParams();
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
     const activeProjectId = useActiveProjectId();
     const effectiveProjectId =
         routeProjectId ||
