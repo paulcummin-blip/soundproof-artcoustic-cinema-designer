@@ -275,6 +275,11 @@ function RP22ReportInner() {
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
 
     const activeProjectId = useActiveProjectId();
+    const effectiveProjectId =
+        routeProjectId ||
+        searchParams.get("projectId") ||
+        searchParams.get("id") ||
+        activeProjectId;
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
@@ -282,7 +287,7 @@ function RP22ReportInner() {
 
         if (!app) return;
 
-        if (!activeProjectId) {
+        if (!effectiveProjectId) {
             setProjectDetails(null);
             setReportHydrating(false);
             setReportReadyProjectId(null);
@@ -292,7 +297,7 @@ function RP22ReportInner() {
         setReportHydrating(true);
         setReportReadyProjectId(null);
 
-        base44.entities.Project.filter({ id: activeProjectId }).then((results) => {
+        base44.entities.Project.filter({ id: effectiveProjectId }).then((results) => {
             if (cancelled) return;
             const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
             if (!p) {
@@ -345,7 +350,7 @@ function RP22ReportInner() {
         return () => {
             cancelled = true;
         };
-    }, [activeProjectId, app]);
+    }, [effectiveProjectId, app]);
 
     const [printReady, setPrintReady] = useState(false);
     const [debugPlanCapture, setDebugPlanCapture] = useState(false);
@@ -384,14 +389,14 @@ function RP22ReportInner() {
 
     // Mark printReady when all captures are done
     useEffect(() => {
-        if (!isPrinting || reportHydrating || !activeProjectId || reportReadyProjectId !== activeProjectId) return;
+        if (!isPrinting || reportHydrating || !effectiveProjectId || reportReadyProjectId !== effectiveProjectId) return;
         if (planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null) {
             setExportDebug(d => ({ ...d, printReady: true }));
             setPrintReady(true);
             setExportStatus("Capture complete — preparing print…");
             if (exportTimeoutRef.current) { clearTimeout(exportTimeoutRef.current); exportTimeoutRef.current = null; }
         }
-    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, reportHydrating, activeProjectId, reportReadyProjectId]);
+    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, reportHydrating, effectiveProjectId, reportReadyProjectId]);
 
     // Trigger print when ready
     useEffect(() => {
@@ -515,7 +520,7 @@ function RP22ReportInner() {
         }
     }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio]);
 
-    const showLoadingReport = reportHydrating || (activeProjectId && reportReadyProjectId !== activeProjectId);
+    const showLoadingReport = reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId);
 
     const analysisSpeakers = useAnalysisSpeakers({
         placedSpeakers,
@@ -1025,7 +1030,7 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (activeProjectId && reportReadyProjectId !== activeProjectId)}
+                        exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId)}
                     />
 
                     <div className="border-b border-[#E6E4DD]" />
