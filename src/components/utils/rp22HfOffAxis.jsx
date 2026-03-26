@@ -727,7 +727,8 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
 
   const p17Speakers = (speakers || [])
     .filter(s => s && s.role && s.model && isFinitePos(s.position))
-    .filter(s => !EXCLUDE_LCR.has(String(s.role).toUpperCase()));
+    .filter(s => !EXCLUDE_LCR.has(String(s.role).toUpperCase()))
+    .filter(s => !allowedP17Roles || allowedP17Roles.has(canonRole(s.role, getCanonicalRole)));
 
   // RSP point — use mlpPos if valid, otherwise no normalization is possible
   const rspPoint = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? mlpPos : null;
@@ -791,11 +792,11 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
 
       // Get pre-computed RSP loss for this speaker
       const resultAtRsp = lossAtRspBySpeakerRole.get(spk);
-      // If RSP result is not available, fall back to using seat result as RSP (delta = 0)
-      const rspLossDb = resultAtRsp ? resultAtRsp.lossDb : resultAtSeat.lossDb;
 
-      // RSP-normalised delta (line where delta is calculated for P17)
-      const delta = Math.abs(resultAtSeat.lossDb - rspLossDb);
+      const seatLoss = Number(resultAtSeat.lossDb) || 0;
+      const rspLoss = Number(resultAtRsp ? resultAtRsp.lossDb : resultAtSeat.lossDb) || 0;
+      const normalizedDelta = Math.abs(seatLoss - rspLoss);
+      const delta = normalizedDelta + (seatLoss * 0.5);
 
       // isBeyondNonLcrLimit: flag from the seat result (used for N/A display)
       const isBeyondNonLcrLimit = resultAtSeat.isBeyondNonLcrLimit || false;
@@ -803,18 +804,18 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         p17HasNaAngles = true;
       }
 
-      // Collect per-speaker data — lossDb is now the normalised delta
+      // Collect per-speaker data — lossDb is now the weighted delta
       perSpeaker.push({
         role: resultAtSeat.role,
         angleDeg: resultAtSeat.offAxisDeg,
         rawAngleDeg: resultAtSeat.rawAngleDeg ?? resultAtSeat.offAxisDeg,
-        lossDb: Number(delta.toFixed(1)),             // normalised delta, not absolute
+        lossDb: Number(delta.toFixed(1)),
         isBeyondNonLcrLimit,
         debug: resultAtSeat.debug,
-        // Temporary debug fields
-        lossAtSeat: Number(resultAtSeat.lossDb.toFixed(1)),
-        lossAtRsp: Number(rspLossDb.toFixed(1)),
-        normalizedDelta: Number(delta.toFixed(1)),
+        lossAtSeat: Number(seatLoss.toFixed(1)),
+        lossAtRsp: Number(rspLoss.toFixed(1)),
+        normalizedDelta: Number(normalizedDelta.toFixed(1)),
+        weightedDelta: Number(delta.toFixed(1)),
       });
 
       // Track worst delta: highest delta; if tie, largest angle
