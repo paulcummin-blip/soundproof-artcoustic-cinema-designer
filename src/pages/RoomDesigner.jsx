@@ -754,6 +754,7 @@ function RoomDesignerWithState() {
       getSpeakerVisibility: appState?.getSpeakerVisibility,
     },
     aimState: {
+      lcrAimMode: appState?.lcrAimMode,
       aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
