@@ -515,6 +515,8 @@ function RP22ReportInner() {
         }
     }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio]);
 
+    const showLoadingReport = reportHydrating || (activeProjectId && reportReadyProjectId !== activeProjectId);
+
     const analysisSpeakers = useAnalysisSpeakers({
         placedSpeakers,
         speakerSystem: app?.speakerSystem,
@@ -867,20 +869,6 @@ function RP22ReportInner() {
         return summary;
     }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility]);
 
-    if (reportHydrating || (activeProjectId && reportReadyProjectId !== activeProjectId)) {
-        return (
-            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
-                <Card className="max-w-xl mx-auto w-full">
-                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">RP22 Compliance Report</CardTitle></CardHeader>
-                    <CardContent className="text-center py-10">
-                        <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                        <p className="text-[#3E4349]">Loading report…</p>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -987,7 +975,17 @@ function RP22ReportInner() {
 
     const planEnabled = true;
 
-    return (
+    return showLoadingReport ? (
+        <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
+            <Card className="max-w-xl mx-auto w-full">
+                <CardHeader><CardTitle className="text-[#1B1A1A] font-header">RP22 Compliance Report</CardTitle></CardHeader>
+                <CardContent className="text-center py-10">
+                    <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-[#3E4349]">Loading report…</p>
+                </CardContent>
+            </Card>
+        </div>
+    ) : (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <ReportPrintStyles />
 
