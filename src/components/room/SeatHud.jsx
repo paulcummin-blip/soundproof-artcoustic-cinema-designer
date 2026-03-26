@@ -30,8 +30,34 @@ export default function SeatHud({
   const fmt = (v) => {
     if (v == null) return "—";
     if (typeof v === "object" && "formatted" in v) {
-      // If the formatted value is a SPL reading (ends with " dB"), reformat it
       const formatted = v.formatted ?? "—";
+      const level = v.level;
+      const hasRealValue = Object.keys(v).some((key) => (
+        key !== 'formatted' &&
+        key !== 'level' &&
+        key !== 'hudLabel' &&
+        key !== 'notes' &&
+        key !== 'debug' &&
+        key !== 'details' &&
+        key !== 'perSpeaker' &&
+        key !== 'worstRole' &&
+        key !== 'worstAngleDeg' &&
+        key !== 'worstLossDb' &&
+        key !== 'worstLossLabel' &&
+        key !== 'worstGroup' &&
+        key !== 'p17HasNaAngles' &&
+        v[key] != null
+      ));
+
+      if (formatted === '—') {
+        return hasRealValue ? 'Not Calculated' : 'N/A';
+      }
+
+      if (formatted === 'Not Calculated' && !hasRealValue && (level === '—' || level == null)) {
+        return 'N/A';
+      }
+
+      // If the formatted value is a SPL reading (ends with " dB"), reformat it
       if (typeof formatted === 'string' && formatted.includes(' dB')) {
         const numMatch = formatted.match(/^([-\d.]+)\s*dB/);
         if (numMatch) {
