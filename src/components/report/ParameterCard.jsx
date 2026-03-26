@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
@@ -19,11 +19,18 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
     const hasSeatData = Array.isArray(seatResults) && seatResults.length > 0;
 
     const formatValue = (val) => {
-        if (val === null || val === undefined) return '—';
+        if (val === null || val === undefined) return 'Not Calculated';
         if (typeof val === 'number' && Number.isFinite(val)) {
             return parameter.unit ? `${val.toFixed(1)} ${parameter.unit}` : val.toFixed(1);
         }
         return String(val);
+    };
+
+    const getDisplayText = ({ formattedValue, rawValue, fallback = 'Not Calculated' }) => {
+        if (formattedValue === '—') return 'N/A';
+        if (formattedValue != null && formattedValue !== '') return String(formattedValue);
+        if (rawValue != null && rawValue !== undefined) return formatValue(rawValue);
+        return fallback;
     };
 
     // Level badge helper
@@ -294,7 +301,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     className="text-sm font-bold"
                                     style={{ color: (level === 'FAIL' || level === 'fail') ? '#A7302F' : '#213428' }}
                                 >
-                                    {formatted || (roomResult?.status === 'no_data' ? '—' : (level === 'FAIL' || level === 'fail') ? 'Outside permitted zone tolerance' : 'Achieved')}
+                                    {formatted || (roomResult?.status === 'no_data' ? 'Not Calculated' : (level === 'FAIL' || level === 'fail') ? 'Outside permitted zone tolerance' : 'Achieved')}
                                 </span>
                                 {renderLevelBadge(level || '—')}
                             </div>
