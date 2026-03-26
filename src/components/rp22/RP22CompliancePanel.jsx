@@ -1,5 +1,5 @@
 // components/rp22/RP22CompliancePanel.jsx
-import React from "react";
+import React, { useMemo, useCallback } from "react";
 import { computeScreenMetrics } from "@/components/utils/screenMetrics";
 import { renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
@@ -96,6 +96,37 @@ const chip = {
   fontSize: 12,
   fontWeight: 600,
   fontVariantNumeric: "tabular-nums",
+};
+
+const getMetricDisplayState = (metric) => {
+  if (!metric || typeof metric !== "object") return { text: "Not Calculated", level: "—" };
+
+  const hasRealValue = Object.keys(metric).some((key) => (
+    key !== 'formatted' &&
+    key !== 'level' &&
+    key !== 'hudLabel' &&
+    key !== 'notes' &&
+    key !== 'debug' &&
+    key !== 'details' &&
+    key !== 'perSpeaker' &&
+    key !== 'worstRole' &&
+    key !== 'worstAngleDeg' &&
+    key !== 'worstLossDb' &&
+    key !== 'worstLossLabel' &&
+    key !== 'worstGroup' &&
+    key !== 'p17HasNaAngles' &&
+    metric[key] != null
+  ));
+
+  const formatted = metric.formatted;
+  const level = metric.level;
+
+  if (formatted === '—') return { text: hasRealValue ? 'Not Calculated' : 'N/A', level };
+  if (formatted === 'Not Calculated' && !hasRealValue && (level === '—' || level == null)) return { text: 'N/A', level };
+  if (formatted) return { text: formatted, level };
+  if (metric.hudLabel) return { text: metric.hudLabel, level };
+
+  return { text: hasRealValue ? 'Not Calculated' : 'N/A', level };
 };
 
 // Small tokens
@@ -644,7 +675,8 @@ export default function RP22CompliancePanel({
         null;
 
       const key = `p${pid}`;
-      return snap?.rp22?.[key]?.level || "—";
+      const metric = snap?.rp22?.[key];
+      return getMetricDisplayState(metric).level || "—";
     }
 
     return "—";
@@ -721,19 +753,32 @@ export default function RP22CompliancePanel({
 
       const key = `p${pid}`;
       const metric = snap?.rp22?.[key];
-      if (!metric) return "—";
-      
-      // Priority: formatted > hudLabel > value+unit
-      if (metric.formatted) return metric.formatted;
-      if (metric.hudLabel) return metric.hudLabel;
-      
+      if (!metric) return "Not Calculated";
+
+      if (pid === 17) {
+        const display = getMetricDisplayState(metric);
+        if (display.text === 'N/A' || display.text === 'Not Calculated') return display.text;
+        const parts = [];
+        if (metric.worstRole) parts.push(String(metric.worstRole));
+        const details = [];
+        if (Number.isFinite(metric.worstAngleDeg)) details.push(`${Math.round(metric.worstAngleDeg)}°`);
+        if (Number.isFinite(metric.worstLossDb)) details.push(`${Number(metric.worstLossDb).toFixed(1)} dB`);
+        if (details.length > 0) {
+          return parts.length > 0 ? `${parts.join(" ")} (${details.join(" / ")})` : details.join(" / ");
+        }
+        return parts.length > 0 ? parts.join(" ") : display.text;
+      }
+
+      const display = getMetricDisplayState(metric);
+      if (display.text && display.text !== '—') return display.text;
+
       const param = RP22_PARAMS.find(p => p.id === pid);
       const unit = param?.unit || "";
 
       const n = getMetricNumericValue(metric);
       if (Number.isFinite(n)) return formatMetricFallback(n, unit);
       
-      return "—";
+      return "Not Calculated";
     }
 
     return "—";

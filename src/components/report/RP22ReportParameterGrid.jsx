@@ -50,6 +50,37 @@ const formatMetricFallback = (n, unit) => {
   return `${n.toFixed(2)} ${u}`.trim();
 };
 
+const getMetricDisplayState = (metric) => {
+  if (!metric || typeof metric !== "object") return { text: "Not Calculated", level: "—" };
+
+  const hasRealValue = Object.keys(metric).some((key) => (
+    key !== 'formatted' &&
+    key !== 'level' &&
+    key !== 'hudLabel' &&
+    key !== 'notes' &&
+    key !== 'debug' &&
+    key !== 'details' &&
+    key !== 'perSpeaker' &&
+    key !== 'worstRole' &&
+    key !== 'worstAngleDeg' &&
+    key !== 'worstLossDb' &&
+    key !== 'worstLossLabel' &&
+    key !== 'worstGroup' &&
+    key !== 'p17HasNaAngles' &&
+    metric[key] != null
+  ));
+
+  const formatted = metric.formatted;
+  const level = metric.level;
+
+  if (formatted === '—') return { text: hasRealValue ? 'Not Calculated' : 'N/A', level };
+  if (formatted === 'Not Calculated' && !hasRealValue && (level === '—' || level == null)) return { text: 'N/A', level };
+  if (formatted) return { text: formatted, level };
+  if (metric.hudLabel) return { text: metric.hudLabel, level };
+
+  return { text: hasRealValue ? 'Not Calculated' : 'N/A', level };
+};
+
 /**
  * Props:
  *   analysisResult      — from useRP22AnalysisEngine
@@ -132,7 +163,8 @@ export default function RP22ReportParameterGrid({
 
     // Seat scope
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
-    return snap?.rp22?.[`p${pid}`]?.level || "—";
+    const metric = snap?.rp22?.[`p${pid}`];
+    return getMetricDisplayState(metric).level || "—";
   }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId]);
 
   /* ----- getHudValueForParam (exact logic from RP22CompliancePanel) ----- */
@@ -171,8 +203,10 @@ export default function RP22ReportParameterGrid({
     // Seat scope
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
-    if (!metric) return "—";
+    if (!metric) return "Not Calculated";
     if (pid === 17) {
+      const display = getMetricDisplayState(metric);
+      if (display.text === 'N/A' || display.text === 'Not Calculated') return display.text;
       const parts = [];
       if (metric.worstRole) parts.push(String(metric.worstRole));
       const details = [];
@@ -181,14 +215,14 @@ export default function RP22ReportParameterGrid({
       if (details.length > 0) {
         return parts.length > 0 ? `${parts.join(" ")} (${details.join(" / ")})` : details.join(" / ");
       }
-      return parts.length > 0 ? parts.join(" ") : "—";
+      return parts.length > 0 ? parts.join(" ") : display.text;
     }
-    if (metric.formatted) return metric.formatted;
-    if (metric.hudLabel) return metric.hudLabel;
+    const display = getMetricDisplayState(metric);
+    if (display.text && display.text !== '—') return display.text;
     const paramDef = RP22_PARAMS.find(p => p.id === pid);
     const n = getMetricNumericValue(metric);
     if (Number.isFinite(n)) return formatMetricFallback(n, paramDef?.unit || "");
-    return "—";
+    return "Not Calculated";
   }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId]);
 
   /* ----- Per-seat pill grid for seat-scoped params ----- */

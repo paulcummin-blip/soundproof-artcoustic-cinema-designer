@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAppState } from '../components/AppStateProvider';
 // TEMP DEBUG: remove after sub persistence proven
 import { useActiveProjectId } from '@/components/state/project-session';
@@ -271,19 +271,36 @@ function RP22ReportInner() {
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
     const [projectDetails, setProjectDetails] = useState(null);
+    const [reportHydrating, setReportHydrating] = useState(true);
+    const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
 
     const activeProjectId = useActiveProjectId();
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
+        let cancelled = false;
+
+        if (!app) return;
+
         if (!activeProjectId) {
             setProjectDetails(null);
+            setReportHydrating(false);
+            setReportReadyProjectId(null);
             return;
         }
-        if (!app) return;
+
+        setReportHydrating(true);
+        setReportReadyProjectId(null);
+
         base44.entities.Project.filter({ id: activeProjectId }).then((results) => {
+            if (cancelled) return;
             const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
-            if (!p) return;
+            if (!p) {
+                setProjectDetails(null);
+                setReportHydrating(false);
+                setReportReadyProjectId(null);
+                return;
+            }
             setProjectDetails({
                 id: p.id,
                 name: p.name,
@@ -316,7 +333,18 @@ function RP22ReportInner() {
                 setRearSubsCfg: app.setRearSubsCfg,
                 setSpeakerSystem: app.setSpeakerSystem,
             });
-        }).catch(() => {});
+            setReportReadyProjectId(p.id);
+            setReportHydrating(false);
+        }).catch(() => {
+            if (cancelled) return;
+            setProjectDetails(null);
+            setReportHydrating(false);
+            setReportReadyProjectId(null);
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [activeProjectId, app]);
 
     const [printReady, setPrintReady] = useState(false);
@@ -356,14 +384,14 @@ function RP22ReportInner() {
 
     // Mark printReady when all captures are done
     useEffect(() => {
-        if (!isPrinting) return;
+        if (!isPrinting || reportHydrating || !activeProjectId || reportReadyProjectId !== activeProjectId) return;
         if (planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null) {
             setExportDebug(d => ({ ...d, printReady: true }));
             setPrintReady(true);
             setExportStatus("Capture complete — preparing print…");
             if (exportTimeoutRef.current) { clearTimeout(exportTimeoutRef.current); exportTimeoutRef.current = null; }
         }
-    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl]);
+    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, reportHydrating, activeProjectId, reportReadyProjectId]);
 
     // Trigger print when ready
     useEffect(() => {
@@ -389,6 +417,15 @@ function RP22ReportInner() {
     }, [isPrinting, printReady, hasPrintedOnce]);
 
     useEffect(() => { setExportDebug(d => ({ ...d, isPrinting, printReady })); }, [isPrinting, printReady]);
+
+    useEffect(() => {
+        if (!reportHydrating) return;
+        setPrintReady(false);
+        setHasPrintedOnce(false);
+        setPlanImageDataUrl(null);
+        setPlanDimsImageDataUrl(null);
+        setPlanSpeakerDimsImageDataUrl(null);
+    }, [reportHydrating]);
 
     const safeArray = (v) => (Array.isArray(v) ? v : []);
     const safeObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
@@ -830,6 +867,20 @@ function RP22ReportInner() {
         return summary;
     }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility]);
 
+    if (reportHydrating || (activeProjectId && reportReadyProjectId !== activeProjectId)) {
+        return (
+            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
+                <Card className="max-w-xl mx-auto w-full">
+                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">RP22 Compliance Report</CardTitle></CardHeader>
+                    <CardContent className="text-center py-10">
+                        <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                        <p className="text-[#3E4349]">Loading report…</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -976,6 +1027,7 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
+                        exportDisabled={reportHydrating || (activeProjectId && reportReadyProjectId !== activeProjectId)}
                     />
 
                     <div className="border-b border-[#E6E4DD]" />
