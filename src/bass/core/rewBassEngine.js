@@ -148,7 +148,7 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
   const tau = rt60 / 13.815;
   const qSabine = 2 * Math.PI * f0 * tau;
 
-  return Math.max(5, Math.min(80, qSabine));
+  return Math.max(1, Math.min(80, qSabine));
 }
 
 function modeShapeValueLocal(mode, x, y, z, roomDims) {
