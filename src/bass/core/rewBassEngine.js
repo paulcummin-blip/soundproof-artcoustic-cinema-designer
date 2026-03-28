@@ -93,6 +93,93 @@ function normalizeSurfaceAbsorption(surfaceAbsorption) {
   };
 }
 
+function computeRoomModesLocal({ widthM, lengthM, heightM, fMax, c }) {
+  const modes = [];
+  const nMax = Math.ceil((fMax / c) * 2 * Math.max(widthM, lengthM, heightM)) + 5;
+
+  for (let nx = 0; nx <= nMax; nx += 1) {
+    for (let ny = 0; ny <= nMax; ny += 1) {
+      for (let nz = 0; nz <= nMax; nz += 1) {
+        if (nx === 0 && ny === 0 && nz === 0) continue;
+
+        const freq = (c / 2) * Math.sqrt(
+          Math.pow(nx / widthM, 2) +
+          Math.pow(ny / lengthM, 2) +
+          Math.pow(nz / heightM, 2)
+        );
+
+        if (!Number.isFinite(freq) || freq <= 0 || freq > fMax) continue;
+
+        const activeAxes = (nx > 0 ? 1 : 0) + (ny > 0 ? 1 : 0) + (nz > 0 ? 1 : 0);
+        let type = 'oblique';
+        if (activeAxes === 1) type = 'axial';
+        else if (activeAxes === 2) type = 'tangential';
+
+        modes.push({ nx, ny, nz, freq, type });
+      }
+    }
+  }
+
+  return modes.sort((a, b) => a.freq - b.freq);
+}
+
+function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
+  const widthM = Number(roomDims?.widthM) || 1;
+  const lengthM = Number(roomDims?.lengthM) || 1;
+  const heightM = Number(roomDims?.heightM) || 1;
+  const volume = widthM * lengthM * heightM;
+
+  const surfaceFloor = lengthM * widthM;
+  const surfaceCeiling = lengthM * widthM;
+  const surfaceFront = widthM * heightM;
+  const surfaceBack = widthM * heightM;
+  const surfaceLeft = lengthM * heightM;
+  const surfaceRight = lengthM * heightM;
+
+  const absorptionArea =
+    surfaceFloor * (surfaceAbsorption?.floor ?? 0.3) +
+    surfaceCeiling * (surfaceAbsorption?.ceiling ?? 0.3) +
+    surfaceFront * (surfaceAbsorption?.front ?? 0.3) +
+    surfaceBack * (surfaceAbsorption?.back ?? 0.3) +
+    surfaceLeft * (surfaceAbsorption?.left ?? 0.3) +
+    surfaceRight * (surfaceAbsorption?.right ?? 0.3);
+
+  const rt60 = 0.161 * volume / Math.max(absorptionArea, 1e-6);
+  const tau = rt60 / 13.815;
+  const qSabine = 2 * Math.PI * f0 * tau;
+
+  return Math.max(5, Math.min(80, qSabine));
+}
+
+function modeShapeValueLocal(mode, x, y, z, roomDims) {
+  const widthM = Math.max(1e-6, Number(roomDims?.widthM) || 0);
+  const lengthM = Math.max(1e-6, Number(roomDims?.lengthM) || 0);
+  const heightM = Math.max(1e-6, Number(roomDims?.heightM) || 0);
+
+  const shapeX = mode.nx > 0 ? Math.cos(mode.nx * Math.PI * x / widthM) : 1;
+  const shapeY = mode.ny > 0 ? Math.cos(mode.ny * Math.PI * y / lengthM) : 1;
+  const shapeZ = mode.nz > 0 ? Math.cos(mode.nz * Math.PI * z / heightM) : 1;
+
+  return shapeX * shapeY * shapeZ;
+}
+
+function modalContributionLocal(frequencyHz, modeFrequencyHz, qValue, coupling, gain = 0.25) {
+  const angularFrequency = 2 * Math.PI * frequencyHz;
+  const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
+  const bandwidth = modalAngularFrequency / qValue;
+  const deltaFrequency = angularFrequency - modalAngularFrequency;
+
+  const denominator = Math.sqrt(deltaFrequency * deltaFrequency + bandwidth * bandwidth);
+  const resonanceMagnitude = bandwidth / denominator;
+  const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
+  const scaledMagnitude = gain * coupling * resonanceMagnitude;
+
+  return {
+    real: scaledMagnitude * Math.cos(resonancePhase),
+    imag: scaledMagnitude * Math.sin(resonancePhase),
+  };
+}
+
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);
@@ -118,6 +205,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   }
 
   const enableReflections = options?.enableReflections === true;
+  const enableModes = options?.enableModes === true;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
@@ -136,7 +224,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     throw new Error('subProductCurve must be a non-empty array of { hz, db }.');
   }
 
-  const freqsHz = buildFrequencyAxis(options?.freqMinHz, options?.freqMaxHz);
+  const freqMinHz = options?.freqMinHz;
+  const freqMaxHz = options?.freqMaxHz;
+  const freqsHz = buildFrequencyAxis(freqMinHz, freqMaxHz);
 
   const imageSources = enableReflections ? [
     { x: -source.x, y: source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.left) },
@@ -146,6 +236,23 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     { x: source.x, y: source.y, z: -source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.floor) },
     { x: source.x, y: source.y, z: 2 * heightM - source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.ceiling) },
   ] : [];
+
+  const modes = enableModes
+    ? computeRoomModesLocal({
+        widthM,
+        lengthM,
+        heightM,
+        fMax: freqMaxHz,
+        c: SPEED_OF_SOUND_MPS,
+      }).map((mode) => ({
+        ...mode,
+        qValue: estimateModeQLocal({
+          roomDims: { widthM, lengthM, heightM },
+          surfaceAbsorption,
+          f0: mode.freq,
+        }),
+      }))
+    : [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
@@ -188,14 +295,34 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       sumIm += imageAmplitude * Math.sin(imageTotalPhase);
     });
 
-    // Coherent pressure summation
+    // Optional modal contributions
+    if (enableModes) {
+      modes.forEach((mode) => {
+        const bandwidthHz = mode.freq / mode.qValue;
+        if (Math.abs(frequencyHz - mode.freq) > 3 * bandwidthHz) {
+          return;
+        }
+
+        const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
+        const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
+        const combinedCoupling = sourceCoupling * receiverCoupling;
+
+        if (Math.abs(combinedCoupling) < 1e-6) {
+          return;
+        }
+
+        const modalContribution = modalContributionLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling);
+        sumRe += modalContribution.real;
+        sumIm += modalContribution.imag;
+      });
+    }
+
     return {
       re: sumRe,
       im: sumIm,
     };
   });
 
-  // SPL conversion
   const splDbRaw = complexPressure.map(({ re, im }) => {
     const magnitude = Math.sqrt(re * re + im * im);
     return 20 * Math.log10(magnitude);
