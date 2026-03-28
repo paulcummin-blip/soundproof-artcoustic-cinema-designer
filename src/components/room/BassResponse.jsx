@@ -180,7 +180,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           sub,
           subCurve,
           {
-            enableReflections: false,
+            enableReflections: true,
             freqMinHz: 20,
             freqMaxHz: 200,
             smoothing: 'none',
