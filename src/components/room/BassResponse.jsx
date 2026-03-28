@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useAppState } from "../AppStateProvider";
 import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
+import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
+import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import { computeRoomModesResponse } from "@/components/utils/roomModesEngine";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import { Label } from "@/components/ui/label";
@@ -38,6 +40,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
   const [absorptionPct, setAbsorptionPct] = useState(30);
   const [roomDamping, setRoomDamping] = useState(20);
+  const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(false);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -130,26 +133,87 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (hasNoSeats || hasNoSubs || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
       return { seatResponses: {}, metrics: null, audit: null };
     }
-    
-    return simulateBassAtSeats({
-      roomDims: {
-        widthM: roomDims.widthM,
-        lengthM: roomDims.lengthM,
-        heightM: roomDims.heightM
-      },
-      seats: seatingPositions,
-      subs: subsForSimulation,
-      splConfig: {
-        globalPowerW: splConfig?.globalPowerW ?? 100,
-        globalEqHeadroomDb: splConfig?.globalEqHeadroomDb ?? 0,
-        radiationMode: splConfig?.radiationMode ?? 'half-space',
-        modesEnabled: true,
-        roomDamping,
-        sbirEnabled: true
-      },
-      options: {}
+
+    if (!useRewCoreTestMode) {
+      return simulateBassAtSeats({
+        roomDims: {
+          widthM: roomDims.widthM,
+          lengthM: roomDims.lengthM,
+          heightM: roomDims.heightM
+        },
+        seats: seatingPositions,
+        subs: subsForSimulation,
+        splConfig: {
+          globalPowerW: splConfig?.globalPowerW ?? 100,
+          globalEqHeadroomDb: splConfig?.globalEqHeadroomDb ?? 0,
+          radiationMode: splConfig?.radiationMode ?? 'half-space',
+          modesEnabled: true,
+          roomDamping,
+          sbirEnabled: true
+        },
+        options: {}
+      });
+    }
+
+    const seatResponses = {};
+
+    seatingPositions.forEach((seat) => {
+      const seatId = seat.id || `${seat.x}-${seat.y}`;
+      let sumSplDbRaw = null;
+      let freqsHz = null;
+
+      subsForSimulation.forEach((sub) => {
+        const subCurve = getSubwooferCurve(sub.modelKey);
+        if (!subCurve || subCurve.length === 0) return;
+
+        const rewResult = simulateBassResponseRewCore(
+          {
+            widthM: roomDims.widthM,
+            lengthM: roomDims.lengthM,
+            heightM: roomDims.heightM,
+          },
+          {
+            x: seat.x,
+            y: seat.y,
+            z: Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2,
+          },
+          sub,
+          subCurve,
+          {
+            enableReflections: false,
+            freqMinHz: 20,
+            freqMaxHz: 200,
+            smoothing: 'none',
+          }
+        );
+
+        if (!freqsHz) {
+          freqsHz = rewResult.freqsHz;
+          sumSplDbRaw = rewResult.splDbRaw.map((value) => (Number.isFinite(value) ? Math.pow(10, value / 20) : 0));
+        } else {
+          rewResult.splDbRaw.forEach((value, index) => {
+            if (Number.isFinite(value)) {
+              sumSplDbRaw[index] += Math.pow(10, value / 20);
+            }
+          });
+        }
+      });
+
+      if (freqsHz && sumSplDbRaw) {
+        seatResponses[seatId] = {
+          freqsHz,
+          splDb: sumSplDbRaw.map((value) => 20 * Math.log10(Math.max(value, 1e-10))),
+          nulls: { count: 0, worstDb: 0, nulls: [] },
+        };
+      }
     });
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs]);
+
+    return {
+      seatResponses,
+      metrics: null,
+      audit: null,
+    };
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode]);
 
   // Find MLP seat for display
   const selectedSeat = useMemo(() => {
@@ -419,6 +483,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
+        <Badge className={useRewCoreTestMode ? "bg-[#213428] text-white border-[#213428]" : "bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]"}>
+          Engine: {useRewCoreTestMode ? "REW Core Test" : "Live Engine"}
+        </Badge>
       </div>
       
       {(subWarnings?.front?.length > 0 || subWarnings?.rear?.length > 0) && (
@@ -432,9 +499,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response at {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
+            <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
           </div>
         </div>
 
@@ -580,7 +651,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       </div>
 
       {/* Per-seat detail cards */}
-      {Object.keys(simulationResults.seatResponses).length > 0 && (
+      {!useRewCoreTestMode && Object.keys(simulationResults.seatResponses).length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {Object.entries(simulationResults.seatResponses).map(([seatId, response]) => {
             const seat = seatingPositions.find(s => (s.id || `${s.x}-${s.y}`) === seatId);
