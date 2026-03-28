@@ -73,6 +73,19 @@ function normalizeSubTuning(tuning) {
   };
 }
 
+function normalizeSurfaceAbsorption(surfaceAbsorption) {
+  const defaultCoefficient = 0.3;
+
+  return {
+    front: Number.isFinite(Number(surfaceAbsorption?.front)) ? Number(surfaceAbsorption.front) : defaultCoefficient,
+    back: Number.isFinite(Number(surfaceAbsorption?.back)) ? Number(surfaceAbsorption.back) : defaultCoefficient,
+    left: Number.isFinite(Number(surfaceAbsorption?.left)) ? Number(surfaceAbsorption.left) : defaultCoefficient,
+    right: Number.isFinite(Number(surfaceAbsorption?.right)) ? Number(surfaceAbsorption.right) : defaultCoefficient,
+    floor: Number.isFinite(Number(surfaceAbsorption?.floor)) ? Number(surfaceAbsorption.floor) : defaultCoefficient,
+    ceiling: Number.isFinite(Number(surfaceAbsorption?.ceiling)) ? Number(surfaceAbsorption.ceiling) : defaultCoefficient,
+  };
+}
+
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);
@@ -94,8 +107,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
   const smoothing = options?.smoothing ?? 'none';
   if (smoothing !== 'none') {
-    throw new Error('Milestone 1a supports only smoothing: "none".');
+    throw new Error('Milestone 1b supports only smoothing: "none".');
   }
+
+  const enableReflections = options?.enableReflections === true;
+  const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
     throw new Error('roomDims must include finite widthM, lengthM, and heightM values.');
@@ -115,29 +131,60 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
   const freqsHz = buildFrequencyAxis(options?.freqMinHz, options?.freqMaxHz);
 
-  const dx = source.x - seat.x;
-  const dy = source.y - seat.y;
-  const dz = source.z - seat.z;
-  const distanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(dx * dx + dy * dy + dz * dz));
+  const imageSources = enableReflections ? [
+    { x: -source.x, y: source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.left) },
+    { x: 2 * widthM - source.x, y: source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.right) },
+    { x: source.x, y: -source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.front) },
+    { x: source.x, y: 2 * lengthM - source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.back) },
+    { x: source.x, y: source.y, z: -source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.floor) },
+    { x: source.x, y: source.y, z: 2 * heightM - source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.ceiling) },
+  ] : [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
+    let sumRe = 0;
+    let sumIm = 0;
 
-    // Direct-path magnitude calculation
+    // Direct path
+    const dx = source.x - seat.x;
+    const dy = source.y - seat.y;
+    const dz = source.z - seat.z;
+    const distanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(dx * dx + dy * dy + dz * dz));
+
     const distanceLossDb = -20 * Math.log10(distanceM / 1);
     const totalMagnitudeDb = curveDb + distanceLossDb + source.tuning.gainDb;
     const amplitude = Math.pow(10, totalMagnitudeDb / 20);
 
-    // Direct-path phase calculation
     const timeOfFlightPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
     const delayPhase = -2 * Math.PI * frequencyHz * (source.tuning.delayMs / 1000);
     const polarityPhase = source.tuning.polarity === 180 ? Math.PI : 0;
     const totalPhase = timeOfFlightPhase + delayPhase + polarityPhase;
 
-    // Complex pressure output
+    sumRe += amplitude * Math.cos(totalPhase);
+    sumIm += amplitude * Math.sin(totalPhase);
+
+    // First-order reflections
+    imageSources.forEach((imageSource) => {
+      const imageDx = imageSource.x - seat.x;
+      const imageDy = imageSource.y - seat.y;
+      const imageDz = imageSource.z - seat.z;
+      const imageDistanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(imageDx * imageDx + imageDy * imageDy + imageDz * imageDz));
+
+      const imageDistanceLossDb = -20 * Math.log10(imageDistanceM / 1);
+      const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
+      const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
+
+      const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
+      const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
+
+      sumRe += imageAmplitude * Math.cos(imageTotalPhase);
+      sumIm += imageAmplitude * Math.sin(imageTotalPhase);
+    });
+
+    // Coherent pressure summation
     return {
-      re: amplitude * Math.cos(totalPhase),
-      im: amplitude * Math.sin(totalPhase),
+      re: sumRe,
+      im: sumIm,
     };
   });
 
