@@ -295,6 +295,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       sumIm += imageAmplitude * Math.sin(imageTotalPhase);
     });
 
+    const preModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+
     // Optional modal contributions
     if (enableModes) {
       modes.forEach((mode) => {
@@ -311,7 +313,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           return;
         }
 
-        const modalContribution = modalContributionLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling, amplitude);
+        const modalContribution = modalContributionLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling, preModalMagnitude);
         sumRe += modalContribution.real;
         sumIm += modalContribution.imag;
       });
