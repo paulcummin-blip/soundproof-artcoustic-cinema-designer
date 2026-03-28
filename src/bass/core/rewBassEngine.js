@@ -75,14 +75,21 @@ function normalizeSubTuning(tuning) {
 
 function normalizeSurfaceAbsorption(surfaceAbsorption) {
   const defaultCoefficient = 0.3;
+  const clampAbsorption = (value) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return defaultCoefficient;
+    }
+    return Math.max(0, Math.min(0.95, numericValue));
+  };
 
   return {
-    front: Number.isFinite(Number(surfaceAbsorption?.front)) ? Number(surfaceAbsorption.front) : defaultCoefficient,
-    back: Number.isFinite(Number(surfaceAbsorption?.back)) ? Number(surfaceAbsorption.back) : defaultCoefficient,
-    left: Number.isFinite(Number(surfaceAbsorption?.left)) ? Number(surfaceAbsorption.left) : defaultCoefficient,
-    right: Number.isFinite(Number(surfaceAbsorption?.right)) ? Number(surfaceAbsorption.right) : defaultCoefficient,
-    floor: Number.isFinite(Number(surfaceAbsorption?.floor)) ? Number(surfaceAbsorption.floor) : defaultCoefficient,
-    ceiling: Number.isFinite(Number(surfaceAbsorption?.ceiling)) ? Number(surfaceAbsorption.ceiling) : defaultCoefficient,
+    front: clampAbsorption(surfaceAbsorption?.front),
+    back: clampAbsorption(surfaceAbsorption?.back),
+    left: clampAbsorption(surfaceAbsorption?.left),
+    right: clampAbsorption(surfaceAbsorption?.right),
+    floor: clampAbsorption(surfaceAbsorption?.floor),
+    ceiling: clampAbsorption(surfaceAbsorption?.ceiling),
   };
 }
 
