@@ -254,6 +254,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       }))
     : [];
 
+  // __B44_STEP_DEBUG__ temporary probe — remove after diagnosis
+  const __b44StepDebug = globalThis.__B44_REW_STEP_DEBUG === true;
+
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
     let sumRe = 0;
@@ -296,6 +299,45 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     });
 
     const preModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+
+    // __B44_STEP_DEBUG__ temporary probe — remove after diagnosis
+    if (__b44StepDebug && frequencyHz >= 45 && frequencyHz <= 55) {
+      console.log('[REW_STEP_DEBUG]', JSON.stringify({
+        frequencyHz,
+        curveDb,
+        direct: {
+          amplitude,
+          totalPhase,
+          re: amplitude * Math.cos(totalPhase),
+          im: amplitude * Math.sin(totalPhase),
+        },
+        reflections: imageSources.map((imageSource) => {
+          const imageDx = imageSource.x - seat.x;
+          const imageDy = imageSource.y - seat.y;
+          const imageDz = imageSource.z - seat.z;
+          const imageDistanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(imageDx * imageDx + imageDy * imageDy + imageDz * imageDz));
+          const imageDistanceLossDb = -20 * Math.log10(imageDistanceM / 1);
+          const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
+          const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
+          const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
+          const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
+          return {
+            reflectionCoefficient: imageSource.reflectionCoefficient,
+            imageDistanceM,
+            imageAmplitude,
+            imageTotalPhase,
+            re: imageAmplitude * Math.cos(imageTotalPhase),
+            im: imageAmplitude * Math.sin(imageTotalPhase),
+          };
+        }),
+        summedBeforeModes: {
+          sumRe,
+          sumIm,
+          preModalMagnitude,
+        },
+      }));
+    }
+    // __B44_STEP_DEBUG__ end
 
     // Optional modal contributions
     if (enableModes) {
