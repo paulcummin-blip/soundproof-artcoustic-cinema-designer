@@ -20,6 +20,35 @@ export default function RvRoomElementsLayer({
   const LABEL_INSET_M = 0.10;   // 10cm inside the room
 
   const normalizeElement = (el) => {
+    // --- PROJECTOR: dedicated branch ---
+    if (el?.type === 'projector') {
+      const bodyW = Number(el?.body_width_m) || Number(el?.length_m) || 0.46;
+      const bodyD = Number(el?.body_depth_m) || Number(el?.thickness_m) || 0.517;
+      const lensX = Number.isFinite(Number(el?.x_lens_m)) ? Number(el.x_lens_m) : (Number(el?.pos_m) || 0) + bodyW / 2;
+      const lensY = Number.isFinite(Number(el?.y_lens_m)) ? Number(el.y_lens_m) : null;
+
+      // For rear-wall rendering: rectM.y = lengthM - T - offsetM
+      // We want the body front edge at lensY - bodyD/2 (body centred on lens Y in plan)
+      // So: offsetM = lengthM - (lensY - bodyD/2) - bodyD
+      //             = lengthM - lensY - bodyD/2
+      // We'll pass lensY as a special field and compute offsetM in the render block.
+      // The body left edge in X is lensX - bodyW/2.
+      const posM = lensX - bodyW / 2; // left edge of body in room X coords
+      const label = String(el?.label || '').trim();
+
+      return {
+        ...el,
+        wall: 'rear',
+        __lengthM: bodyW,
+        __thicknessM: bodyD,
+        __posM: posM,
+        __offsetM: 0,          // unused for projector; lensY is used below
+        __lensY: lensY,        // carry lensY so rectM.y can be computed correctly
+        __label: label,
+      };
+    }
+
+    // --- GENERIC elements ---
     const wallRaw = String(el?.wall || el?.side || 'front').toLowerCase();
     const wall =
       wallRaw === 'back' ? 'rear' :
@@ -157,7 +186,13 @@ export default function RvRoomElementsLayer({
         if (e.wall === 'front') {
           rectM = { x: p, y: offset, w: L, h: T };
         } else if (e.wall === 'rear') {
-          rectM = { x: p, y: lengthM - T - offset, w: L, h: T };
+          // Projector: position body so it is centred on lensY in plan view
+          if (element?.type === 'projector' && Number.isFinite(e.__lensY)) {
+            const bodyFrontY = e.__lensY - T / 2;
+            rectM = { x: p, y: bodyFrontY, w: L, h: T };
+          } else {
+            rectM = { x: p, y: lengthM - T - offset, w: L, h: T };
+          }
         } else if (e.wall === 'left') {
           rectM = { x: offset, y: p, w: T, h: L };
         } else if (e.wall === 'right') {
