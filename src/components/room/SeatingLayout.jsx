@@ -257,7 +257,7 @@ export default function SeatingLayout({
         </div>
         }
 
-      {rowCount > 1 &&
+      {rowCount >= 1 &&
         <div className="space-y-2">
           <Label className="text-sm font-medium flex items-center gap-2" style={{ color: '#625143' }}>
             <Ruler className="w-4 h-4" />
