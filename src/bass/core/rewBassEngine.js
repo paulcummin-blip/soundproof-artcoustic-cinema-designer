@@ -301,9 +301,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     if (enableModes) {
       modes.forEach((mode) => {
         const bandwidthHz = mode.freq / mode.qValue;
-        if (Math.abs(frequencyHz - mode.freq) > 3 * bandwidthHz) {
+        const df = Math.abs(frequencyHz - mode.freq);
+        const normalized = df / (3 * bandwidthHz);
+
+        if (normalized >= 1) {
           return;
         }
+
+        const weight = 0.5 * (1 + Math.cos(Math.PI * normalized));
 
         const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
         const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
@@ -314,8 +319,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         }
 
         const modalContribution = modalContributionLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling, preModalMagnitude);
-        sumRe += modalContribution.real;
-        sumIm += modalContribution.imag;
+        sumRe += weight * modalContribution.real;
+        sumIm += weight * modalContribution.imag;
       });
     }
 
