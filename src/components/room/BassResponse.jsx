@@ -159,7 +159,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     seatingPositions.forEach((seat) => {
       const seatId = seat.id || `${seat.x}-${seat.y}`;
-      let sumSplDbRaw = null;
+      let sumRe = null;
+      let sumIm = null;
       let freqsHz = null;
 
       subsForSimulation.forEach((sub) => {
@@ -191,20 +192,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         if (!freqsHz) {
           freqsHz = rewResult.freqsHz;
-          sumSplDbRaw = rewResult.splDbRaw.map((value) => (Number.isFinite(value) ? Math.pow(10, value / 20) : 0));
+          sumRe = rewResult.complexPressure.map(cp => cp.re);
+          sumIm = rewResult.complexPressure.map(cp => cp.im);
         } else {
-          rewResult.splDbRaw.forEach((value, index) => {
-            if (Number.isFinite(value)) {
-              sumSplDbRaw[index] += Math.pow(10, value / 20);
+          rewResult.complexPressure.forEach((cp, index) => {
+            if (Number.isFinite(cp.re) && Number.isFinite(cp.im)) {
+              sumRe[index] += cp.re;
+              sumIm[index] += cp.im;
             }
           });
         }
       });
 
-      if (freqsHz && sumSplDbRaw) {
+      if (freqsHz && sumRe && sumIm) {
         seatResponses[seatId] = {
           freqsHz,
-          splDb: sumSplDbRaw.map((value) => 20 * Math.log10(Math.max(value, 1e-10))),
+          splDb: sumRe.map((re, index) => {
+            const im = sumIm[index];
+            const magnitude = Math.sqrt(re * re + im * im);
+            return 20 * Math.log10(Math.max(magnitude, 1e-10));
+          }),
           nulls: { count: 0, worstDb: 0, nulls: [] },
         };
       }
