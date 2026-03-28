@@ -1,5 +1,5 @@
 const SPEED_OF_SOUND_MPS = 343;
-const MIN_DISTANCE_M = 0.5;
+const MIN_DISTANCE_M = 0.01;
 
 // Frequency axis generation
 function buildFrequencyAxis(freqMinHz, freqMaxHz) {
@@ -7,8 +7,18 @@ function buildFrequencyAxis(freqMinHz, freqMaxHz) {
   const maxHz = Math.max(minHz, Number(freqMaxHz) || 200);
   const freqsHz = [];
 
-  for (let hz = minHz; hz <= maxHz; hz += 1) {
+  const octaves = Math.log2(maxHz / minHz);
+  const pointsPerOctave = 24;
+  const totalPoints = Math.ceil(octaves * pointsPerOctave);
+
+  for (let index = 0; index <= totalPoints; index += 1) {
+    const hz = minHz * Math.pow(2, index / pointsPerOctave);
+    if (hz > maxHz) break;
     freqsHz.push(hz);
+  }
+
+  if (freqsHz[freqsHz.length - 1] !== maxHz) {
+    freqsHz.push(maxHz);
   }
 
   return freqsHz;
