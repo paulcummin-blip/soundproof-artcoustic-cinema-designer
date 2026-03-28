@@ -163,7 +163,7 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
   return shapeX * shapeY * shapeZ;
 }
 
-function modalContributionLocal(frequencyHz, modeFrequencyHz, qValue, coupling, gain = 0.25) {
+function modalContributionLocal(frequencyHz, modeFrequencyHz, qValue, coupling, sourceAmplitudeLinear) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
   const bandwidth = modalAngularFrequency / qValue;
@@ -172,7 +172,7 @@ function modalContributionLocal(frequencyHz, modeFrequencyHz, qValue, coupling, 
   const denominator = Math.sqrt(deltaFrequency * deltaFrequency + bandwidth * bandwidth);
   const resonanceMagnitude = bandwidth / denominator;
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
-  const scaledMagnitude = gain * coupling * resonanceMagnitude;
+  const scaledMagnitude = sourceAmplitudeLinear * coupling * resonanceMagnitude;
 
   return {
     real: scaledMagnitude * Math.cos(resonancePhase),
@@ -311,7 +311,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           return;
         }
 
-        const modalContribution = modalContributionLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling);
+        const modalContribution = modalContributionLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling, amplitude);
         sumRe += modalContribution.real;
         sumIm += modalContribution.imag;
       });
