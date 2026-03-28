@@ -172,7 +172,7 @@ function modalContributionLocal(frequencyHz, modeFrequencyHz, qValue, coupling, 
   const denominator = Math.sqrt(deltaFrequency * deltaFrequency + bandwidth * bandwidth);
   const resonanceMagnitude = qValue * (bandwidth / denominator);
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
-  const scaledMagnitude = sourceAmplitudeLinear * coupling * resonanceMagnitude;
+  const scaledMagnitude = sourceAmplitudeLinear * coupling * resonanceMagnitude * 2;
 
   return {
     real: scaledMagnitude * Math.cos(resonancePhase),
