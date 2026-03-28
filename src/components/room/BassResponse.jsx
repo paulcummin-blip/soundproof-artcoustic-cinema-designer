@@ -215,7 +215,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       metrics: null,
       audit: null,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, absorptionPct]);
 
   // Find MLP seat for display
   const selectedSeat = useMemo(() => {
