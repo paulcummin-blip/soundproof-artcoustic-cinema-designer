@@ -848,6 +848,10 @@ export default function RP22CompliancePanel({
           const resolvedParam = (p.id === 12 || p.id === 13)
             ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode) }
             : p;
+          const targetBasisNote =
+            p.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
+            p.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
+            null;
 
           return (
             <div key={p.id} style={card}>
@@ -866,6 +870,11 @@ export default function RP22CompliancePanel({
                   {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
                   <span style={{ color: "#213428" }}>{achievedValue}</span>
                 </div>
+                {targetBasisNote && (
+                  <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
+                    {targetBasisNote}
+                  </div>
+                )}
               </div>
 
               <div style={body}>
