@@ -156,6 +156,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
 
     const seatResponses = {};
+    // __B44_STEP_DEBUG__ temporary — remove after diagnosis
+    let __b44StepDebugCapture = null;
+    const mlpSeatForDebug = seatingPositions.find(s => s.isPrimary) || seatingPositions[0];
+    const firstSubForDebug = subsForSimulation[0];
 
     seatingPositions.forEach((seat) => {
       const seatId = seat.id || `${seat.x}-${seat.y}`;
@@ -190,6 +194,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           }
         );
 
+        // __B44_STEP_DEBUG__ temporary — capture for MLP seat + first sub only
+        if (
+          __b44StepDebugCapture === null &&
+          mlpSeatForDebug && firstSubForDebug &&
+          seat === mlpSeatForDebug && sub === firstSubForDebug &&
+          rewResult.stepDebug?.length > 0
+        ) {
+          __b44StepDebugCapture = rewResult.stepDebug;
+        }
+
         if (!freqsHz) {
           freqsHz = rewResult.freqsHz;
           sumRe = rewResult.complexPressure.map(cp => cp.re);
@@ -221,6 +235,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       seatResponses,
       metrics: null,
       audit: null,
+      stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
     };
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, absorptionPct]);
 
@@ -544,6 +559,42 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           )}
         </div>
       </div>
+
+      {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
+      {useRewCoreTestMode && simulationResults.stepDebug?.length > 0 && (
+        <div style={{ border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', padding: 12, fontSize: 11, fontFamily: 'monospace' }}>
+          <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 8 }}>REW Step Debug (45–55 Hz) — MLP seat, sub[0]</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #fde68a', color: '#78350f' }}>
+                <th style={{ textAlign: 'left', padding: '2px 6px' }}>Freq</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>curveDb</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>directAmp</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>directPhase</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>sumRe</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>sumIm</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>preModalMag</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>Refl#</th>
+              </tr>
+            </thead>
+            <tbody>
+              {simulationResults.stepDebug.map((row) => (
+                <tr key={row.frequencyHz} style={{ borderBottom: '1px solid #fef3c7' }}>
+                  <td style={{ padding: '2px 6px', color: '#92400e', fontWeight: 600 }}>{row.frequencyHz.toFixed(2)}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.curveDb.toFixed(2)}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.direct.amplitude.toFixed(4)}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.direct.totalPhase.toFixed(4)}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.summedBeforeModes.sumRe.toFixed(4)}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.summedBeforeModes.sumIm.toFixed(4)}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 600 }}>{row.summedBeforeModes.preModalMagnitude.toFixed(4)}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 6px', color: '#6b7280' }}>{row.reflections.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {/* __B44_STEP_DEBUG__ end */}
 
       {/* Absorption Control */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">

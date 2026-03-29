@@ -255,7 +255,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     : [];
 
   // __B44_STEP_DEBUG__ temporary probe — remove after diagnosis
-  const __b44StepDebug = globalThis.__B44_REW_STEP_DEBUG === true;
+  const stepDebugRows = [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
@@ -301,8 +301,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const preModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
 
     // __B44_STEP_DEBUG__ temporary probe — remove after diagnosis
-    if (__b44StepDebug && frequencyHz >= 45 && frequencyHz <= 55) {
-      console.log('[REW_STEP_DEBUG]', JSON.stringify({
+    if (frequencyHz >= 45 && frequencyHz <= 55) {
+      stepDebugRows.push({
         frequencyHz,
         curveDb,
         direct: {
@@ -335,7 +335,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           sumIm,
           preModalMagnitude,
         },
-      }));
+      });
     }
     // __B44_STEP_DEBUG__ end
 
@@ -381,6 +381,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     freqsHz,
     splDbRaw,
     complexPressure,
+    stepDebug: stepDebugRows, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
   };
 }
 
