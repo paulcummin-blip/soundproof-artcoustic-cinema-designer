@@ -294,7 +294,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
       const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
 
-      const reflectionCoherenceWeight = 0.35; // __B44_COHERENCE_TEST__ temporary — remove after diagnosis
+      const reflectionCoherenceWeight = frequencyHz < 40 ? 0.75 : frequencyHz < 80 ? 0.50 : 0.25; // __B44_COHERENCE_ZONES__
       sumRe += reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
       sumIm += reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
     });
