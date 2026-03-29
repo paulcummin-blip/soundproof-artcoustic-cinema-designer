@@ -333,6 +333,10 @@ export default function RP22ReportParameterGrid({
         const resolvedParam = (param.id === 12 || param.id === 13)
           ? { ...param, thresholds: resolvedThresholds }
           : param;
+        const targetBasisNote =
+          param.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
+          param.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
+          null;
         return (
           <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
             <RP22ComplianceParameterTile
@@ -340,6 +344,7 @@ export default function RP22ReportParameterGrid({
               achievedValue={getHudValueForParam(param)}
               lvl={getHudLevelForParam(param)}
               seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
+              targetBasisNote={targetBasisNote}
             />
           </div>
         );

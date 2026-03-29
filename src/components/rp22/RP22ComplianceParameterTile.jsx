@@ -30,7 +30,7 @@ const fmtIneq = (dir) => {
 // Pill zone min-height: supports up to 3 seat rows (each ~28px pill + 6px gap) with breathing room
 const PILL_ZONE_MIN_HEIGHT = 110;
 
-export default function RP22ComplianceParameterTile({ param, achievedValue, lvl, seatPillGrid }) {
+export default function RP22ComplianceParameterTile({ param, achievedValue, lvl, seatPillGrid, targetBasisNote }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
 
   return (
@@ -51,6 +51,12 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
           {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
           <span style={{ color: "#213428" }}>{achievedValue}</span>
         </div>
+        {/* Target basis note (P12/P13 only) */}
+        {targetBasisNote && (
+          <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
+            {targetBasisNote}
+          </div>
+        )}
       </div>
 
       {/* ── Section 2: Pill zone (fixed min-height, grows for more rows) ── */}
