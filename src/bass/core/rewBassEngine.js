@@ -296,7 +296,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
       const f = frequencyHz;
       // Smooth coherence curve: ~0.75 at 20 Hz → ~0.25 at 200 Hz
-      const reflectionCoherenceWeight = 0.25 + 0.5 * Math.exp(-f / 80);
+      const reflectionCoherenceWeight = 0.25 + 0.6 * Math.exp(-(f - 20) / 70);
       sumRe += reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
       sumIm += reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
     });
