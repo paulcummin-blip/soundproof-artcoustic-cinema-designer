@@ -1,5 +1,6 @@
 // components/rp22/RP22CompliancePanel.jsx
 import React, { useMemo, useCallback } from "react";
+import { useAppState } from "@/components/AppStateProvider";
 import { computeScreenMetrics } from "@/components/utils/screenMetrics";
 import { renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
@@ -330,6 +331,18 @@ const RP22_PARAMS = [
   },
 ];
 
+/* ---------- P12/P13 mode-aware threshold constants ---------- */
+const P12_THRESHOLDS_MINIMUM     = { direction: ">=", L1: 99,  L2: 102, L3: 105, L4: 108 };
+const P12_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
+const P13_THRESHOLDS_MINIMUM     = { direction: ">=", L1: 96,  L2: 99,  L3: 102, L4: 105 };
+const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 99,  L2: 102, L3: 105, L4: 108 };
+
+function resolveParamThresholds(param, p12Mode, p13Mode) {
+  if (param.id === 12) return p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM;
+  if (param.id === 13) return p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM;
+  return param.thresholds;
+}
+
 /* ---------- Panel ---------- */
 
 export default function RP22CompliancePanel({
@@ -346,6 +359,9 @@ export default function RP22CompliancePanel({
   p21EarlyReflectionPreset,
   freeMoveLcr = false,
 }) {
+  const appState = useAppState ? useAppState() : null;
+  const p12Mode = appState?.p12Mode || "minimum";
+  const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   // Match pages/RP22Report.jsx fallback for P2
   const p2SystemConfig = React.useMemo(() => {
     const preset = dolbyLayout || "5.1";
@@ -640,6 +656,19 @@ export default function RP22CompliancePanel({
     if (isRoomScope) {
       const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
 
+      // P12/P13: re-grade from raw value using the user-selected mode thresholds
+      if ((pid === 12 || pid === 13) && res && res.status !== "no_data" && Number.isFinite(res.value)) {
+        const thresholds = pid === 12
+          ? (p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM)
+          : (p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM);
+        const v = res.value;
+        if (v >= thresholds.L4) return "L4";
+        if (v >= thresholds.L3) return "L3";
+        if (v >= thresholds.L2) return "L2";
+        if (v >= thresholds.L1) return "L1";
+        return "—";
+      }
+
       // If engine gave a usable level, use it
       if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) {
         return res.level; // may be "L1".."L4" or numeric
@@ -816,6 +845,9 @@ export default function RP22CompliancePanel({
           const lvl = getHudLevelForParam(p);
           const achievedValue = getHudValueForParam(p);
           const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
+          const resolvedParam = (p.id === 12 || p.id === 13)
+            ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode) }
+            : p;
 
           return (
             <div key={p.id} style={card}>
@@ -869,8 +901,8 @@ export default function RP22CompliancePanel({
                     }}
                   >
                     {["L4", "L3", "L2", "L1"].map((k) => {
-                      const trg = p.thresholds[k];
-                      const isEq = p.thresholds.direction === "=";
+                      const trg = resolvedParam.thresholds[k];
+                      const isEq = resolvedParam.thresholds.direction === "=";
                       return (
                         <div key={k} style={{ fontSize: 11 }}>
                           <div style={{ fontWeight: 700, color: "#3E4349" }}>{k}</div>
@@ -884,14 +916,14 @@ export default function RP22CompliancePanel({
                               ? "–"
                               : isEq
                               ? String(trg)
-                              : `${fmtIneq(p.thresholds.direction)} ${trg}${
-                                  p.unit === "°"
+                              : `${fmtIneq(resolvedParam.thresholds.direction)} ${trg}${
+                                  resolvedParam.unit === "°"
                                     ? "°"
-                                    : p.unit === "Hz"
+                                    : resolvedParam.unit === "Hz"
                                     ? " Hz"
-                                    : p.unit === "± dB" || p.unit === "dB"
+                                    : resolvedParam.unit === "± dB" || resolvedParam.unit === "dB"
                                     ? " dB"
-                                    : p.unit === "m"
+                                    : resolvedParam.unit === "m"
                                     ? " m"
                                     : ""
                                 }`}
