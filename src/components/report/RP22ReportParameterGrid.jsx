@@ -33,10 +33,10 @@ const RP22_PARAMS = [
 /* ---------- P12/P13 mode-aware threshold resolver ---------- */
 
 // Minimum thresholds (RP22 spec defaults)
-const P12_THRESHOLDS_MINIMUM = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
-const P12_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 105, L2: 108, L3: 111, L4: 114 };
-const P13_THRESHOLDS_MINIMUM = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 };
-const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
+const P12_THRESHOLDS_MINIMUM = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 };
+const P12_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
+const P13_THRESHOLDS_MINIMUM = { direction: ">=", L1: 96, L2: 99, L3: 102, L4: 105 };
+const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 };
 
 function resolveParamThresholds(param, p12Mode, p13Mode) {
   if (param.id === 12) {
