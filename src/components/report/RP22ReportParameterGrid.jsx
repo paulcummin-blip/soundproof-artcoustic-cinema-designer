@@ -3,6 +3,7 @@
 import React, { useMemo, useCallback } from "react";
 import RP22ComplianceParameterTile from "@/components/rp22/RP22ComplianceParameterTile";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import { useAppState } from "@/components/AppStateProvider";
 
 /* ---------- Canonical RP22 parameter definitions (mirrored from RP22CompliancePanel) ---------- */
 const RP22_PARAMS = [
@@ -28,6 +29,24 @@ const RP22_PARAMS = [
   { id: 20, title: "Seat-to-seat FR relative to measured RSP below transition frequency per seat (1/3-oct)", scope: "Seat", short: "Predicts similarity across seats below transition.", unit: "± dB", thresholds: { direction: "<=", L1: null, L2: 4, L3: 3, L4: 2 } },
   { id: 21, title: "Level of early reflections relative to direct sound (0–15 ms, 1–8 kHz)", scope: "Room", short: "Manage early reflections for optimum direct/reflected balance.", unit: "dB", thresholds: { direction: "<=", L1: null, L2: -8, L3: -10, L4: -12 } },
 ];
+
+/* ---------- P12/P13 mode-aware threshold resolver ---------- */
+
+// Minimum thresholds (RP22 spec defaults)
+const P12_THRESHOLDS_MINIMUM = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
+const P12_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 105, L2: 108, L3: 111, L4: 114 };
+const P13_THRESHOLDS_MINIMUM = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 };
+const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
+
+function resolveParamThresholds(param, p12Mode, p13Mode) {
+  if (param.id === 12) {
+    return p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM;
+  }
+  if (param.id === 13) {
+    return p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM;
+  }
+  return param.thresholds;
+}
 
 /* ---------- Data helpers (mirrored from RP22CompliancePanel) ---------- */
 
@@ -104,6 +123,9 @@ export default function RP22ReportParameterGrid({
   p15ConstructionLevel,
   p21EarlyReflectionPreset,
 }) {
+  const appState = useAppState();
+  const p12Mode = appState?.p12Mode || "minimum";
+  const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   /* ----- p2SystemConfig ----- */
   const p2SystemConfig = React.useMemo(() => {
     const preset = dolbyLayout || "5.1";
@@ -151,6 +173,18 @@ export default function RP22ReportParameterGrid({
 
     if (isRoomScope) {
       const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
+
+      // P12/P13: re-grade from raw value using the user-selected mode thresholds
+      if ((pid === 12 || pid === 13) && res && res.status !== "no_data" && Number.isFinite(res.value)) {
+        const thresholds = resolveParamThresholds(param, p12Mode, p13Mode);
+        const v = res.value;
+        if (v >= thresholds.L4) return "L4";
+        if (v >= thresholds.L3) return "L3";
+        if (v >= thresholds.L2) return "L2";
+        if (v >= thresholds.L1) return "L1";
+        return "—";
+      }
+
       if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) return res.level;
       if (pid === 2 && p2SystemConfig) return p2SystemConfig.p2Level;
       if (pid === 3) { const p3 = analysisResult?.gradedParameters?.primary?.[3]; return (p3 && p3.status === "ok") ? p3.level : "—"; }
@@ -165,7 +199,7 @@ export default function RP22ReportParameterGrid({
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
     return getMetricDisplayState(metric).level || "—";
-  }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId]);
+  }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode]);
 
   /* ----- getHudValueForParam (exact logic from RP22CompliancePanel) ----- */
   const getHudValueForParam = React.useCallback((param) => {
@@ -294,16 +328,22 @@ export default function RP22ReportParameterGrid({
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-      {RP22_PARAMS.map(param => (
-        <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
-          <RP22ComplianceParameterTile
-            param={param}
-            achievedValue={getHudValueForParam(param)}
-            lvl={getHudLevelForParam(param)}
-            seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
-          />
-        </div>
-      ))}
+      {RP22_PARAMS.map(param => {
+        const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode);
+        const resolvedParam = (param.id === 12 || param.id === 13)
+          ? { ...param, thresholds: resolvedThresholds }
+          : param;
+        return (
+          <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
+            <RP22ComplianceParameterTile
+              param={resolvedParam}
+              achievedValue={getHudValueForParam(param)}
+              lvl={getHudLevelForParam(param)}
+              seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
