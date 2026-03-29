@@ -315,23 +315,27 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           im: amplitude * Math.sin(totalPhase),
         },
         reflections: imageSources.map((imageSource) => {
-          const imageDx = imageSource.x - seat.x;
-          const imageDy = imageSource.y - seat.y;
-          const imageDz = imageSource.z - seat.z;
-          const imageDistanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(imageDx * imageDx + imageDy * imageDy + imageDz * imageDz));
-          const imageDistanceLossDb = -20 * Math.log10(imageDistanceM / 1);
-          const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
-          const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
-          const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
-          const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
-          return {
-            reflectionCoefficient: imageSource.reflectionCoefficient,
-            imageDistanceM,
-            imageAmplitude,
-            imageTotalPhase,
-            re: imageAmplitude * Math.cos(imageTotalPhase),
-            im: imageAmplitude * Math.sin(imageTotalPhase),
-          };
+        const imageDx = imageSource.x - seat.x;
+        const imageDy = imageSource.y - seat.y;
+        const imageDz = imageSource.z - seat.z;
+        const imageDistanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(imageDx * imageDx + imageDy * imageDy + imageDz * imageDz));
+        const imageDistanceLossDb = -20 * Math.log10(imageDistanceM / 1);
+        const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
+        const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
+        const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
+        const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
+        const debugCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
+        return {
+          reflectionCoefficient: imageSource.reflectionCoefficient,
+          imageDistanceM,
+          imageAmplitude,
+          imageTotalPhase,
+          re: imageAmplitude * Math.cos(imageTotalPhase),
+          im: imageAmplitude * Math.sin(imageTotalPhase),
+          reflectionCoherenceWeight: debugCoherenceWeight,
+          weightedRe: debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase),
+          weightedIm: debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase),
+        };
         }),
         summedBeforeModes: {
           sumRe,
