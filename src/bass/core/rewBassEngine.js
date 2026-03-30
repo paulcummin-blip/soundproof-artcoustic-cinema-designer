@@ -309,7 +309,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Derived from the direct-path amplitude, decaying with frequency.
     // Intentionally modest: adds believable residual energy without dominating.
     const lateFieldDecay = Math.exp(-(frequencyHz - 20) / 120);
-    const lateFieldAmplitude = amplitude * 0.18 * lateFieldDecay;
+    const lateFieldAmplitude = amplitude * 0.12 * lateFieldDecay;
     // Deterministic phase: offset from specular phases, stable per frequency.
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
     sumRe += lateFieldAmplitude * Math.cos(lateFieldPhase);
