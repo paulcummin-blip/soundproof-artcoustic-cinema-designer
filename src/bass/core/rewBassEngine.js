@@ -322,17 +322,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const preModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
 
     // __B44_STEP_DEBUG__ temporary probe — remove after diagnosis
-    if (frequencyHz >= 45 && frequencyHz <= 55) {
-      stepDebugRows.push({
-        frequencyHz,
-        curveDb,
-        direct: {
-          amplitude,
-          totalPhase,
-          re: amplitude * Math.cos(totalPhase),
-          im: amplitude * Math.sin(totalPhase),
-        },
-        reflections: imageSources.map((imageSource, reflectionIndex) => {
+    if (frequencyHz >= 43 && frequencyHz <= 55) {
+      // Aggregate weighted reflections from the live per-reflection contributions
+      let _refSumRe = 0;
+      let _refSumIm = 0;
+      imageSources.forEach((imageSource, reflectionIndex) => {
         const imageDx = imageSource.x - seat.x;
         const imageDy = imageSource.y - seat.y;
         const imageDz = imageSource.z - seat.z;
@@ -344,18 +338,55 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const debugPhaseJitter = 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
         const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + debugPhaseJitter;
         const debugCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
-        return {
-          reflectionCoefficient: imageSource.reflectionCoefficient,
-          imageDistanceM,
-          imageAmplitude,
-          imageTotalPhase,
-          re: imageAmplitude * Math.cos(imageTotalPhase),
-          im: imageAmplitude * Math.sin(imageTotalPhase),
-          reflectionCoherenceWeight: debugCoherenceWeight,
-          weightedRe: debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase),
-          weightedIm: debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase),
-        };
+        _refSumRe += debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
+        _refSumIm += debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
+      });
+
+      // Late-field values computed above (same formula)
+      const _lfRe = lateFieldAmplitude * Math.cos(lateFieldPhase);
+      const _lfIm = lateFieldAmplitude * Math.sin(lateFieldPhase);
+
+      stepDebugRows.push({
+        frequencyHz,
+        curveDb,
+        direct: {
+          amplitude,
+          totalPhase,
+          re: amplitude * Math.cos(totalPhase),
+          im: amplitude * Math.sin(totalPhase),
+        },
+        reflections: imageSources.map((imageSource, reflectionIndex) => {
+          const imageDx = imageSource.x - seat.x;
+          const imageDy = imageSource.y - seat.y;
+          const imageDz = imageSource.z - seat.z;
+          const imageDistanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(imageDx * imageDx + imageDy * imageDy + imageDz * imageDz));
+          const imageDistanceLossDb = -20 * Math.log10(imageDistanceM / 1);
+          const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
+          const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
+          const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
+          const debugPhaseJitter = 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
+          const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + debugPhaseJitter;
+          const debugCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
+          return {
+            reflectionCoefficient: imageSource.reflectionCoefficient,
+            imageDistanceM,
+            imageAmplitude,
+            imageTotalPhase,
+            re: imageAmplitude * Math.cos(imageTotalPhase),
+            im: imageAmplitude * Math.sin(imageTotalPhase),
+            reflectionCoherenceWeight: debugCoherenceWeight,
+            weightedRe: debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase),
+            weightedIm: debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase),
+          };
         }),
+        // Aggregated reflection vector (sum of all weighted per-reflection contributions)
+        summedWeightedReflectionsRe: _refSumRe,
+        summedWeightedReflectionsIm: _refSumIm,
+        summedWeightedReflectionsMag: Math.sqrt(_refSumRe * _refSumRe + _refSumIm * _refSumIm),
+        // Late-field contribution
+        lateFieldRe: _lfRe,
+        lateFieldIm: _lfIm,
+        lateFieldMag: lateFieldAmplitude,
         summedBeforeModes: {
           sumRe,   // pre-modal field real component (direct + reflections + late-field)
           sumIm,   // pre-modal field imaginary component

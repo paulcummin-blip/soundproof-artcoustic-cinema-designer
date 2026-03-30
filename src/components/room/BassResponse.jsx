@@ -562,36 +562,50 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
       {useRewCoreTestMode && simulationResults.stepDebug?.length > 0 && (
-        <div style={{ border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', padding: 12, fontSize: 11, fontFamily: 'monospace' }}>
-          <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 8 }}>REW Step Debug (45–55 Hz) — MLP seat, sub[0]</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', padding: 12, fontSize: 11, fontFamily: 'monospace', overflowX: 'auto' }}>
+          <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 8 }}>REW Step Debug (43–55 Hz) — MLP seat, sub[0]</div>
+          <table style={{ borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #fde68a', color: '#78350f' }}>
+              <tr style={{ borderBottom: '2px solid #fde68a', color: '#78350f' }}>
                 <th style={{ textAlign: 'left', padding: '2px 6px' }}>Freq</th>
-                <th style={{ textAlign: 'right', padding: '2px 6px' }}>curveDb</th>
                 <th style={{ textAlign: 'right', padding: '2px 6px' }}>directAmp</th>
-                <th style={{ textAlign: 'right', padding: '2px 6px' }}>directPhase</th>
-                <th style={{ textAlign: 'right', padding: '2px 6px' }}>sumRe</th>
-                <th style={{ textAlign: 'right', padding: '2px 6px' }}>sumIm</th>
-                <th style={{ textAlign: 'right', padding: '2px 6px' }}>preModalMag</th>
-                <th style={{ textAlign: 'right', padding: '2px 6px' }}>Refl#</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px', borderLeft: '1px solid #fde68a' }}>reflRe</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>reflIm</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>reflMag</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px', borderLeft: '1px solid #fde68a' }}>lfRe</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px' }}>lfIm</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>lfMag</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px', borderLeft: '1px solid #fde68a', fontWeight: 700 }}>preModalMag</th>
+                <th style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>postModalMag</th>
               </tr>
             </thead>
             <tbody>
-              {simulationResults.stepDebug.map((row) => (
-                <tr key={row.frequencyHz} style={{ borderBottom: '1px solid #fef3c7' }}>
-                  <td style={{ padding: '2px 6px', color: '#92400e', fontWeight: 600 }}>{row.frequencyHz.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.curveDb.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.direct.amplitude.toFixed(4)}</td>
-                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.direct.totalPhase.toFixed(4)}</td>
-                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.summedBeforeModes.sumRe.toFixed(4)}</td>
-                  <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.summedBeforeModes.sumIm.toFixed(4)}</td>
-                  <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 600 }}>{row.summedBeforeModes.preModalMagnitude.toFixed(4)}</td>
-                  <td style={{ textAlign: 'right', padding: '2px 6px', color: '#6b7280' }}>{row.reflections.length}</td>
-                </tr>
-              ))}
+              {simulationResults.stepDebug.map((row) => {
+                const isNearNull = Math.abs(row.frequencyHz - 44.5) < 1.5;
+                const rowBg = isNearNull ? '#fef08a' : undefined;
+                const postMag = row.postModal ? row.postModal.magnitude : null;
+                return (
+                  <tr key={row.frequencyHz} style={{ borderBottom: '1px solid #fef3c7', background: rowBg }}>
+                    <td style={{ padding: '2px 6px', color: '#92400e', fontWeight: isNearNull ? 700 : 600 }}>{row.frequencyHz.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.direct.amplitude.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px', borderLeft: '1px solid #fde68a' }}>{row.summedWeightedReflectionsRe.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.summedWeightedReflectionsIm.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, color: '#b45309' }}>{row.summedWeightedReflectionsMag.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px', borderLeft: '1px solid #fde68a' }}>{row.lateFieldRe.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px' }}>{row.lateFieldIm.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, color: '#7c3aed' }}>{row.lateFieldMag.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px', borderLeft: '1px solid #fde68a', fontWeight: 700 }}>{row.summedBeforeModes.preModalMagnitude.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, color: postMag !== null ? '#15803d' : '#9ca3af' }}>
+                      {postMag !== null ? postMag.toFixed(4) : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+          <div style={{ marginTop: 8, fontSize: 10, color: '#92400e' }}>
+            Highlighted rows = ±1.5 Hz around 44.5 Hz null region. reflMag = summed weighted reflections vector magnitude. lfMag = late-field amplitude.
+          </div>
         </div>
       )}
       {/* __B44_STEP_DEBUG__ end */}
