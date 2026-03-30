@@ -281,7 +281,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     sumIm += amplitude * Math.sin(totalPhase);
 
     // First-order reflections
-    imageSources.forEach((imageSource) => {
+    imageSources.forEach((imageSource, reflectionIndex) => {
       const imageDx = imageSource.x - seat.x;
       const imageDy = imageSource.y - seat.y;
       const imageDz = imageSource.z - seat.z;
@@ -292,7 +292,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
 
       const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
-      const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
+
+      // Deterministic frequency-dependent phase jitter — reflections only.
+      // Grows from ~0 at 20 Hz to ~0.4 rad at 200 Hz, stable per reflection identity.
+      const phaseJitter = 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
+      const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + phaseJitter;
 
       const f = frequencyHz;
       // Smooth coherence curve: ~0.75 at 20 Hz → ~0.25 at 200 Hz
@@ -314,7 +318,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           re: amplitude * Math.cos(totalPhase),
           im: amplitude * Math.sin(totalPhase),
         },
-        reflections: imageSources.map((imageSource) => {
+        reflections: imageSources.map((imageSource, reflectionIndex) => {
         const imageDx = imageSource.x - seat.x;
         const imageDy = imageSource.y - seat.y;
         const imageDz = imageSource.z - seat.z;
@@ -323,7 +327,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
         const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
         const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
-        const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
+        const debugPhaseJitter = 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
+        const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + debugPhaseJitter;
         const debugCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
         return {
           reflectionCoefficient: imageSource.reflectionCoefficient,
