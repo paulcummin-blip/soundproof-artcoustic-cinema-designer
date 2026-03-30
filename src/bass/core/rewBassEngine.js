@@ -163,7 +163,10 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
   return shapeX * shapeY * shapeZ;
 }
 
-function modalContributionLocal(frequencyHz, modeFrequencyHz, qValue, coupling, sourceAmplitudeLinear) {
+// Returns a complex transfer function contribution (re, im) for one mode.
+// coupling and resonance determine the magnitude and phase of the modal influence.
+// No sourceAmplitudeLinear — this is now a unit-normalised transfer term, not a source injection.
+function modalTransferLocal(frequencyHz, modeFrequencyHz, qValue, coupling) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
   const bandwidth = modalAngularFrequency / qValue;
@@ -172,11 +175,12 @@ function modalContributionLocal(frequencyHz, modeFrequencyHz, qValue, coupling, 
   const denominator = Math.sqrt(deltaFrequency * deltaFrequency + bandwidth * bandwidth);
   const resonanceMagnitude = qValue * (bandwidth / denominator);
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
-  const scaledMagnitude = sourceAmplitudeLinear * coupling * resonanceMagnitude * 2;
+  // coupling scales how strongly this mode influences the transfer function
+  const transferMagnitude = coupling * resonanceMagnitude;
 
   return {
-    real: scaledMagnitude * Math.cos(resonancePhase),
-    imag: scaledMagnitude * Math.sin(resonancePhase),
+    real: transferMagnitude * Math.cos(resonancePhase),
+    imag: transferMagnitude * Math.sin(resonancePhase),
   };
 }
 
@@ -353,16 +357,24 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         };
         }),
         summedBeforeModes: {
-          sumRe,
-          sumIm,
+          sumRe,   // pre-modal field real component (direct + reflections + late-field)
+          sumIm,   // pre-modal field imaginary component
           preModalMagnitude,
         },
+        // postModal is filled in after the modal transfer is applied below
+        postModal: null,
       });
     }
     // __B44_STEP_DEBUG__ end
 
-    // Optional modal contributions
+    // Modal transfer function — acts on the existing pre-modal complex field.
+    // Starts from a neutral transfer (1 + j0) and accumulates modal influence.
+    // The combined transfer is then applied multiplicatively to (sumRe, sumIm).
     if (enableModes) {
+      // Neutral complex transfer function: 1 + j0
+      let transferRe = 1;
+      let transferIm = 0;
+
       modes.forEach((mode) => {
         const bandwidthHz = mode.freq / mode.qValue;
         const df = Math.abs(frequencyHz - mode.freq);
@@ -382,10 +394,31 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           return;
         }
 
-        const modalContribution = modalContributionLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling, preModalMagnitude);
-        sumRe += weight * modalContribution.real;
-        sumIm += weight * modalContribution.imag;
+        const modalTransfer = modalTransferLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling);
+        // Accumulate each mode's transfer contribution into the running transfer function
+        transferRe += weight * modalTransfer.real;
+        transferIm += weight * modalTransfer.imag;
       });
+
+      // Apply the accumulated modal transfer multiplicatively to the pre-modal complex field
+      const preRe = sumRe;
+      const preIm = sumIm;
+      sumRe = preRe * transferRe - preIm * transferIm;
+      sumIm = preRe * transferIm + preIm * transferRe;
+
+      // __B44_STEP_DEBUG__ fill in post-modal result for debug rows in this frequency range
+      if (stepDebugRows.length > 0) {
+        const lastRow = stepDebugRows[stepDebugRows.length - 1];
+        if (lastRow && lastRow.postModal === null && Math.abs(lastRow.frequencyHz - frequencyHz) < 0.5) {
+          lastRow.postModal = {
+            transferRe,
+            transferIm,
+            sumRe,
+            sumIm,
+            magnitude: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
+          };
+        }
+      }
     }
 
     return {
