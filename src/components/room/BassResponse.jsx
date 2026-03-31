@@ -92,7 +92,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // State declarations
   // A/B modal model selector — "legacy_transfer" | "additive_pressure"
-  const [modalModel, setModalModel] = useState('additive_pressure');
+  const [modalModel, setModalModel] = useState('legacy_transfer');
 
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
   const [tryPolarity, setTryPolarity] = useState(false);
@@ -723,7 +723,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   onClick={() => setModalModel('legacy_transfer')}
                   style={{
                     padding: '2px 10px',
-                    background: modalModel === 'legacy_transfer' ? '#92400e' : '#F8F8F7',
+                    background: modalModel === 'legacy_transfer' ? '#213428' : '#F8F8F7',
                     color: modalModel === 'legacy_transfer' ? '#fff' : '#3E4349',
                     border: 'none',
                     cursor: 'pointer',
@@ -731,13 +731,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     fontWeight: modalModel === 'legacy_transfer' ? 700 : 400,
                   }}
                 >
-                  A: Legacy transfer
+                  A: Working REW parity
                 </button>
                 <button
                   onClick={() => setModalModel('additive_pressure')}
                   style={{
                     padding: '2px 10px',
-                    background: modalModel === 'additive_pressure' ? '#213428' : '#F8F8F7',
+                    background: modalModel === 'additive_pressure' ? '#92400e' : '#F8F8F7',
                     color: modalModel === 'additive_pressure' ? '#fff' : '#3E4349',
                     border: 'none',
                     cursor: 'pointer',
@@ -745,7 +745,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     fontWeight: modalModel === 'additive_pressure' ? 700 : 400,
                   }}
                 >
-                  B: Additive pressure
+                  B: Experimental additive
                 </button>
               </div>
             )}
@@ -845,8 +845,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 4 }}>REW Step Debug (43–55 Hz) — MLP seat, sub[0]</div>
           <div style={{ marginBottom: 8, fontSize: 11, color: '#78350f' }}>
             <strong>Modal model active:</strong>{' '}
-            <span style={{ background: modalModel === 'additive_pressure' ? '#213428' : '#92400e', color: '#fff', borderRadius: 4, padding: '1px 7px', fontFamily: 'monospace' }}>
-              {modalModel === 'additive_pressure' ? 'B: additive_pressure' : 'A: legacy_transfer'}
+            <span style={{ background: modalModel === 'additive_pressure' ? '#92400e' : '#213428', color: '#fff', borderRadius: 4, padding: '1px 7px', fontFamily: 'monospace' }}>
+              {modalModel === 'additive_pressure' ? 'B: Experimental additive' : 'A: Working REW parity'}
             </span>
           </div>
           <table style={{ borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
