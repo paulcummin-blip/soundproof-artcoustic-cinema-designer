@@ -41,16 +41,29 @@ export default function RvSeatRowLabels({
             
             {/* Row distance label (ROOM_DIMS overlay only) */}
             {_overlays?.ROOM_DIMS && exportMode !== 'dimensions' && rowDistanceLabelSeatIds.has(seat.id) && (
-              <text
-                x={seatX + 22}
-                y={seatY}
-                textAnchor="start"
-                fontSize={22}
-                fill="#1B1A1A"
-                pointerEvents="none"
-              >
-                ⬆️ {yM.toFixed(2)}m
-              </text>
+              <>
+                <text
+                  x={seatX + 22}
+                  y={seatY}
+                  textAnchor="start"
+                  fontSize={16}
+                  fill="#6B8A8F"
+                  pointerEvents="none"
+                >
+                  ⬆
+                </text>
+                <text
+                  x={seatX + 38}
+                  y={seatY}
+                  textAnchor="start"
+                  fontSize={12}
+                  fontFamily="system-ui, sans-serif"
+                  fill="#1B1A1A"
+                  pointerEvents="none"
+                >
+                  {yM.toFixed(2)}m
+                </text>
+              </>
             )}
           </React.Fragment>
         );
