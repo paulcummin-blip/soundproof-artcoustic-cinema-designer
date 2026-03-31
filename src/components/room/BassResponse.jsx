@@ -33,6 +33,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const dimsTxt = `${fmtFixed(roomDims?.widthM, 1)}×${fmtFixed(roomDims?.lengthM, 1)}×${fmtFixed(roomDims?.heightM, 1)} m`;
 
+  // --- Seat selection state ---
+  const resolveFallbackSeatId = (seats) => {
+    const primary = seats?.find(s => s.isPrimary);
+    if (primary) return primary.id || `${primary.x}-${primary.y}`;
+    const first = seats?.[0];
+    if (first) return first.id || `${first.x}-${first.y}`;
+    return null;
+  };
+
+  const [selectedSeatId, setSelectedSeatId] = useState(() => resolveFallbackSeatId(seatingPositions));
+
+  // Keep selectedSeatId valid when seats change
+  useEffect(() => {
+    const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
+    const allIds = seats.map(s => s.id || `${s.x}-${s.y}`);
+    if (!selectedSeatId || !allIds.includes(selectedSeatId)) {
+      setSelectedSeatId(resolveFallbackSeatId(seats));
+    }
+  }, [seatingPositions]);
+
   // State declarations
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
   const [tryPolarity, setTryPolarity] = useState(false);
@@ -239,22 +259,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     };
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, absorptionPct]);
 
-  // Find MLP seat for display
+  // Find seat to display — driven by selectedSeatId state
   const selectedSeat = useMemo(() => {
-    const mlpSeat = seatingPositions?.find(s => s.isPrimary);
-    const mlpId = mlpSeat ? (mlpSeat.id || `${mlpSeat.x}-${mlpSeat.y}`) : null;
-    
-    if (mlpId && simulationResults.seatResponses[mlpId]) {
-      return { id: mlpId, isPrimary: true, ...simulationResults.seatResponses[mlpId] };
+    const responses = simulationResults.seatResponses;
+
+    // Try the user-selected seat first
+    if (selectedSeatId && responses[selectedSeatId]) {
+      const seatMeta = seatingPositions?.find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatId);
+      return { id: selectedSeatId, isPrimary: !!seatMeta?.isPrimary, ...responses[selectedSeatId] };
     }
-    
-    const firstId = Object.keys(simulationResults.seatResponses)[0];
+
+    // Fallback: primary seat
+    const primarySeat = seatingPositions?.find(s => s.isPrimary);
+    const primaryId = primarySeat ? (primarySeat.id || `${primarySeat.x}-${primarySeat.y}`) : null;
+    if (primaryId && responses[primaryId]) {
+      return { id: primaryId, isPrimary: true, ...responses[primaryId] };
+    }
+
+    // Fallback: first available
+    const firstId = Object.keys(responses)[0];
     if (firstId) {
-      return { id: firstId, isPrimary: false, ...simulationResults.seatResponses[firstId] };
+      return { id: firstId, isPrimary: false, ...responses[firstId] };
     }
-    
+
     return null;
-  }, [seatingPositions, simulationResults.seatResponses]);
+  }, [selectedSeatId, seatingPositions, simulationResults.seatResponses]);
 
   // Display data for graph
   const displayData = useMemo(() => {
@@ -532,6 +561,64 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
           </div>
         </div>
+
+        {/* Seat selector pills — stacked rows matching room layout */}
+        {Array.isArray(seatingPositions) && seatingPositions.length > 1 && (() => {
+          // Group seats by row
+          const rowMap = new Map();
+          seatingPositions.forEach(seat => {
+            const r = Number(seat?.row || seat?.rowNumber) || 1;
+            if (!rowMap.has(r)) rowMap.set(r, []);
+            rowMap.get(r).push(seat);
+          });
+          const rowNums = Array.from(rowMap.keys()).sort((a, b) => a - b);
+
+          return (
+            <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+              {rowNums.map(r => {
+                const rowSeats = (rowMap.get(r) || []).slice().sort((a, b) => {
+                  return (Number(a?.indexInRow) || 0) - (Number(b?.indexInRow) || 0);
+                });
+                return (
+                  <div key={r} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {rowSeats.map(seat => {
+                      const sid = seat.id || `${seat.x}-${seat.y}`;
+                      const isSelected = sid === selectedSeatId;
+                      const isPrimary = !!seat.isPrimary;
+                      return (
+                        <button
+                          key={sid}
+                          onClick={() => setSelectedSeatId(sid)}
+                          style={{
+                            border: isSelected ? "2px solid #213428" : "1px solid #C1B6AD",
+                            borderRadius: 9999,
+                            padding: "2px 10px",
+                            fontSize: 12,
+                            fontWeight: isSelected ? 700 : 500,
+                            background: isSelected ? "#213428" : "#F6F3EE",
+                            color: isSelected ? "#fff" : "#1B1A1A",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            boxShadow: isPrimary && !isSelected ? "0 0 0 2px rgba(33,52,40,0.15)" : "none",
+                            outline: "none",
+                          }}
+                          title={`Row ${r}${isPrimary ? " — MLP" : ""}`}
+                        >
+                          {isPrimary && (
+                            <span style={{ fontSize: 10, opacity: 0.75 }}>★</span>
+                          )}
+                          R{r}S{Number(seat?.indexInRow) || rowSeats.indexOf(seat) + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         <div className="mt-4">
           {displayData.length > 0 ? (
