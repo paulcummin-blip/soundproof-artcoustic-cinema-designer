@@ -574,6 +574,75 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </Alert>
       )}
 
+      {/* __B44_SEAT_MAP_DEBUG__ temporary — remove after verification */}
+      {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
+        // Compute per-seat debug rows using same logic as pill renderer
+        const debugRows = orderedSeats.map((seat, globalIdx) => {
+          const sid = seat.id || `${seat.x}-${seat.y}`;
+          const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
+          const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
+          const posInRow = rowSeatsOrdered.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
+          const label = `R${rowNum}S${posInRow}`;
+          const color = getSeatColor(sid);
+          const isSelected = selectedSeatIds.includes(sid);
+          const hasResponse = !!simulationResults.seatResponses[sid];
+          return { label, sid, x: seat.x, y: seat.y, indexInRow: seat.indexInRow, isPrimary: !!seat.isPrimary, isSelected, color, hasResponse };
+        });
+        const firstSeriesId = multiSeries[0]?.id ?? '—';
+        const allSeriesIds = multiSeries.map(s => s.id).join(', ') || '—';
+        return (
+          <div style={{ border: '1px solid #f97316', borderRadius: 6, background: '#fff7ed', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, color: '#9a3412', marginBottom: 6 }}>Bass seat mapping debug</div>
+            <div style={{ marginBottom: 4, color: '#7c2d12' }}>
+              <strong>orderedSeats sequence:</strong> {orderedSeats.map(s => s.id || `${s.x}-${s.y}`).join(' → ')}
+            </div>
+            <div style={{ marginBottom: 4, color: '#7c2d12' }}>
+              <strong>selectedSeatIds:</strong> [{selectedSeatIds.join(', ')}]
+            </div>
+            <div style={{ marginBottom: 4, color: '#7c2d12' }}>
+              <strong>multiSeries first id:</strong> {firstSeriesId}
+            </div>
+            <div style={{ marginBottom: 6, color: '#7c2d12' }}>
+              <strong>multiSeries all ids:</strong> [{allSeriesIds}]
+            </div>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #fed7aa', color: '#9a3412' }}>
+                  <th style={{ textAlign: 'left', padding: '1px 4px' }}>label</th>
+                  <th style={{ textAlign: 'left', padding: '1px 4px' }}>id</th>
+                  <th style={{ textAlign: 'right', padding: '1px 4px' }}>x</th>
+                  <th style={{ textAlign: 'right', padding: '1px 4px' }}>y</th>
+                  <th style={{ textAlign: 'right', padding: '1px 4px' }}>idxInRow</th>
+                  <th style={{ textAlign: 'center', padding: '1px 4px' }}>MLP</th>
+                  <th style={{ textAlign: 'center', padding: '1px 4px' }}>sel</th>
+                  <th style={{ textAlign: 'left', padding: '1px 4px' }}>colour</th>
+                  <th style={{ textAlign: 'center', padding: '1px 4px' }}>hasResp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {debugRows.map(r => (
+                  <tr key={r.sid} style={{ borderBottom: '1px solid #ffedd5', background: r.isSelected ? '#fef3c7' : undefined }}>
+                    <td style={{ padding: '1px 4px', fontWeight: 700, color: '#9a3412' }}>{r.label}</td>
+                    <td style={{ padding: '1px 4px', color: '#78350f', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.sid}</td>
+                    <td style={{ textAlign: 'right', padding: '1px 4px' }}>{Number.isFinite(r.x) ? r.x.toFixed(3) : '—'}</td>
+                    <td style={{ textAlign: 'right', padding: '1px 4px' }}>{Number.isFinite(r.y) ? r.y.toFixed(3) : '—'}</td>
+                    <td style={{ textAlign: 'right', padding: '1px 4px' }}>{r.indexInRow ?? '—'}</td>
+                    <td style={{ textAlign: 'center', padding: '1px 4px' }}>{r.isPrimary ? '✓' : ''}</td>
+                    <td style={{ textAlign: 'center', padding: '1px 4px', fontWeight: r.isSelected ? 700 : 400 }}>{r.isSelected ? '●' : '○'}</td>
+                    <td style={{ padding: '1px 4px' }}>
+                      <span style={{ display: 'inline-block', width: 10, height: 10, background: r.color, borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }} />
+                      {r.color}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '1px 4px' }}>{r.hasResponse ? '✓' : '✗'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+      {/* __B44_SEAT_MAP_DEBUG__ end */}
+
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
