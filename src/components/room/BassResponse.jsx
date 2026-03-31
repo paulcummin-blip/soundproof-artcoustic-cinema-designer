@@ -42,7 +42,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       const ra = Number(a?.row || a?.rowNumber) || 1;
       const rb = Number(b?.row || b?.rowNumber) || 1;
       if (ra !== rb) return ra - rb;
-      return (Number(a?.indexInRow) || 0) - (Number(b?.indexInRow) || 0);
+      // Use indexInRow only if both seats have a valid (non-zero) value
+      const ia = Number(a?.indexInRow);
+      const ib = Number(b?.indexInRow);
+      const bothHaveIndex = Number.isFinite(ia) && ia > 0 && Number.isFinite(ib) && ib > 0;
+      if (bothHaveIndex) return ia - ib;
+      // Fall back to physical x position (left → right)
+      return (Number(a?.x) || 0) - (Number(b?.x) || 0);
     });
   }, [seatingPositions]);
 
@@ -601,8 +607,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       const isOn = selectedSeatIds.includes(sid);
                       const isPrimary = !!seat.isPrimary;
                       const color = getSeatColor(sid);
-                      const seatIdx = orderedSeats.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid);
-                      const label = `R${Number(seat?.row || seat?.rowNumber) || 1}S${Number(seat?.indexInRow) || (seatIdx + 1)}`;
+                      const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
+                      const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
+                      const posInRow = rowSeatsOrdered.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
+                      const label = `R${rowNum}S${posInRow}`;
                       return (
                         <button
                           key={sid}

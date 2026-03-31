@@ -380,7 +380,7 @@ export default function RewParityValidatorStrict({ b44Series, rewSeries }) {
             {validation.passBandPercent.toFixed(1)}%
           </div>
           <div className="text-xs text-gray-500">
-            {validation.passBandCount} / {deltas.length} pts
+            {validation.passBandCount} / {validation.gridPointCount} pts
           </div>
         </div>
       </div>
@@ -507,8 +507,8 @@ export default function RewParityValidatorStrict({ b44Series, rewSeries }) {
       
       {/* Validation grid info */}
       <div className="text-xs font-mono text-gray-600 bg-white p-2 rounded border border-gray-200 mb-3">
-        <div><strong>Validation grid:</strong> {validation.gridPointCount} points (log-spaced, {gridFMin}–{gridFMax} Hz)</div>
-        <div><strong>Sample count:</strong> {deltas.length} valid comparisons</div>
+        <div><strong>Validation grid:</strong> {validation.gridPointCount} points (log-spaced, {validation.gridFMin ?? 20}–{validation.gridFMax ?? 200} Hz)</div>
+        <div><strong>Sample count:</strong> {validation.gridPointCount} valid comparisons</div>
       </div>
       
       {/* Acceptance criteria */}

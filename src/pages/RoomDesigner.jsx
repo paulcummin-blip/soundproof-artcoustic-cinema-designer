@@ -830,7 +830,7 @@ function RoomDesignerWithState() {
       if (globalThis.__B44_LOGS) debug('[Speakers] Hydrating speakers from SPL handoff data (speakerNodes).');
       const hydratedSpeakers = _speakerNodes.map((node) => ({
         id: node.id || node.role, // Use ID or role for unique ID
-        role: canon(node.role), // Canonicalize roles (e.g., L -> FL, Ls -> SL)
+        role: safeCanon(node.role), // Canonicalize roles (e.g., L -> FL, Ls -> SL)
         brand: node.brand,
         model: node.model,
         position: { x: node.x, y: node.y, z: node.z },
@@ -1462,6 +1462,9 @@ function RoomDesignerWithState() {
     return base;
   }, [_overlays, frontWideZones, _enableFrontWides]);
 
+  // Subwoofer sync extracted to useSubwooferSync hook (must be before any conditional return)
+  useSubwooferSync({ appState, stableDimensions, frontSubsCfg: _frontSubsCfg, rearSubsCfg: _rearSubsCfg });
+
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
     return <div className="p-6 text-sm">Loading Room Designer…</div>;
@@ -1492,9 +1495,6 @@ function RoomDesignerWithState() {
     useRearGlobal: useRearGlobalFromState,
     setUseRearGlobal: setUseRearGlobalFromState
   } = appState;
-
-  // Subwoofer sync extracted to useSubwooferSync hook
-  useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rearSubsCfg });
 
   const updateGlobalSplWithProjectSync = (patch) => {
     appState?.updateGlobalSpl?.(patch);
