@@ -9,7 +9,6 @@ import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
 import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
-import { computeRoomModesResponse } from "@/components/utils/roomModesEngine";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
