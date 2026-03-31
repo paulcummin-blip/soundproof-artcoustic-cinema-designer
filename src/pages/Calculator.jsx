@@ -1,4 +1,3 @@
-
 // pages/Calculator.js — RP22-first calculator with compare+PDF+project wiring
 import React, { useMemo, useState, useCallback } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
@@ -314,7 +313,7 @@ export default function CalculatorPage() {
   }, [mode, target_dB, distance]);
 
   // Wire selected Artcoustic to project summary
-  function useInProject(kind /* "LCR"|"SUR" */) {
+  const applyToProject = (kind /* "LCR"|"SUR" */) => {
     if (!activeId || !art) return alert("Open or create a Project first.");
     const patch =
       kind === "LCR"
@@ -323,7 +322,7 @@ export default function CalculatorPage() {
     if (typeof setSummaryFor === "function") setSummaryFor(activeId, patch);
     else if (typeof mergeSummary === "function") mergeSummary(patch);
     alert(`${kind} set to ${art.brand} ${art.model} for project ${activeId}.`);
-  }
+  };
 
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: "100vh", color: BRAND.text }}>
@@ -556,8 +555,8 @@ export default function CalculatorPage() {
 
         {/* Use in Project */}
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <Button onClick={() => useInProject("LCR")} title="Set primary as LCR in active project">Use in Project (LCR)</Button>
-          <Button onClick={() => useInProject("SUR")} title="Set primary as Surrounds in active project">Use in Project (Surrounds)</Button>
+          <Button onClick={() => applyToProject("LCR")} title="Set primary as LCR in active project">Use in Project (LCR)</Button>
+          <Button onClick={() => applyToProject("SUR")} title="Set primary as Surrounds in active project">Use in Project (Surrounds)</Button>
         </div>
       </div>
 

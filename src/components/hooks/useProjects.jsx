@@ -2,16 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 // Prefer the unified API layer if present, but don't crash if it's missing.
-let ProjectAPI = null;
-let fetchApi = null;
-try {
-  // Optional – if your repo has this (it does in our app), we'll use it.
-  // If the import fails in this build, we keep graceful fallbacks below.
-  // eslint-disable-next-line import/no-unresolved
-  const api = require("@/components/net/api");
-  ProjectAPI = api?.ProjectAPI ?? null;
-  fetchApi = api?.fetchApi ?? null;
-} catch { /* noop – stay resilient */ }
+import * as _optionalNetApi from "@/components/net/api";
+const ProjectAPI = _optionalNetApi?.ProjectAPI ?? null;
+const fetchApi = _optionalNetApi?.fetchApi ?? null;
 
 // --- Helpers ---------------------------------------------------------------
 

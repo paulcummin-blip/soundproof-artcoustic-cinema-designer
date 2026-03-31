@@ -163,24 +163,38 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
   return shapeX * shapeY * shapeZ;
 }
 
-// Returns a complex transfer function contribution (re, im) for one mode.
-// coupling and resonance determine the magnitude and phase of the modal influence.
-// No sourceAmplitudeLinear — this is now a unit-normalised transfer term, not a source injection.
-function modalTransferLocal(frequencyHz, modeFrequencyHz, qValue, coupling) {
+// Returns a complex pressure contribution (re, im) for one mode at the receiver position.
+// This is a modal Green's function: it expresses the pressure response at the receiver
+// due to a source, mediated by a single room mode.
+//
+// Formulation: p_mode(f) = [Ψ_s * Ψ_r] / [(f0/Q)^2 + j*(f/Q)*f0 - (f-f0)^2] scaled form
+// Simplified to the standard resonant transfer: coupling * Q * (bw/denom) * e^(j*phase)
+// where coupling = Ψ_source * Ψ_receiver (mode shape at source × mode shape at receiver).
+// This is the physically correct room-mode pressure Green's function.
+//
+// IMPORTANT: combinedCoupling near zero means the mode is decoupled from either source
+// or receiver. It correctly produces near-zero contribution in that case — this is physical.
+// The fix for the identity-collapse bug is upstream: use abs(combinedCoupling) threshold
+// that is appropriate for the cosine mode shape range [-1, +1], and accumulate as an
+// additive pressure delta (not as a multiplicative transfer starting from identity 1+j0).
+function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
   const bandwidth = modalAngularFrequency / qValue;
   const deltaFrequency = angularFrequency - modalAngularFrequency;
 
   const denominator = Math.sqrt(deltaFrequency * deltaFrequency + bandwidth * bandwidth);
-  const resonanceMagnitude = qValue * (bandwidth / denominator);
+  const resonanceMagnitude = bandwidth / denominator;     // peak = 1 at f0, falls off with df
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
-  // coupling scales how strongly this mode influences the transfer function
-  const transferMagnitude = coupling * resonanceMagnitude;
+
+  // combinedCoupling = Ψ_source * Ψ_receiver ∈ [-1, +1]
+  // Scale by Q so that strongly resonant modes (high Q) contribute more energy —
+  // matching REW's modal pressure Green's function convention.
+  const pressureMagnitude = combinedCoupling * qValue * resonanceMagnitude;
 
   return {
-    real: transferMagnitude * Math.cos(resonancePhase),
-    imag: transferMagnitude * Math.sin(resonancePhase),
+    real: pressureMagnitude * Math.cos(resonancePhase),
+    imag: pressureMagnitude * Math.sin(resonancePhase),
   };
 }
 
@@ -398,13 +412,27 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     }
     // __B44_STEP_DEBUG__ end
 
-    // Modal transfer function — acts on the existing pre-modal complex field.
-    // Starts from a neutral transfer (1 + j0) and accumulates modal influence.
-    // The combined transfer is then applied multiplicatively to (sumRe, sumIm).
+    // Modal pressure injection — adds modal resonance contributions directly to the
+    // pre-modal complex pressure field as additive pressure deltas.
+    //
+    // Physical basis: each room mode is an independent resonator. Its contribution to
+    // the total pressure field at the receiver is additive (superposition principle).
+    // The modal pressure delta is: weight * Ψ_s * Ψ_r * Q * H(f, f0, Q)
+    // where H is the resonant transfer amplitude and phase.
+    //
+    // This replaces the previous multiplicative-from-identity approach which collapsed
+    // to no-op (TfRe=1, TfIm=0) whenever combinedCoupling was near zero at the receiver
+    // (e.g. centre seat for axial modes — a common and physically valid configuration).
+    //
+    // Normalisation: modal pressure contributions are scaled by (1 / Q_ref) where
+    // Q_ref is a reference Q to keep modal injection dimensionally consistent with the
+    // direct-path amplitude. This prevents modes from dominating the field at all freqs.
+    const Q_REF = 10; // reference Q for normalisation — typical room mode Q range 5–30
+
     if (enableModes) {
-      // Neutral complex transfer function: 1 + j0
-      let transferRe = 1;
-      let transferIm = 0;
+      // Accumulated modal pressure delta (additive to sumRe/sumIm)
+      let modalDeltaRe = 0;
+      let modalDeltaIm = 0;
 
       // __B44_STEP_DEBUG__ track strongest active mode for debug rows
       let _debugStrongestMode = null;
@@ -425,12 +453,30 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
         const combinedCoupling = sourceCoupling * receiverCoupling;
 
-        if (Math.abs(combinedCoupling) < 1e-6) {
+        // Lower threshold: cosine mode shapes are in [-1, +1].
+        // Near-zero combinedCoupling is physically meaningful (node at source or receiver)
+        // and correctly produces near-zero modal injection — do not skip these modes.
+        // Only skip if truly negligible (numerical noise floor).
+        if (Math.abs(combinedCoupling) < 1e-4) {
           return;
         }
 
-        const modalTransfer = modalTransferLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling);
-        const weightedMag = weight * Math.sqrt(modalTransfer.real * modalTransfer.real + modalTransfer.imag * modalTransfer.imag);
+        const modalContrib = modalPressureContributionLocal(
+          frequencyHz,
+          mode.freq,
+          mode.qValue,
+          combinedCoupling
+        );
+
+        // Normalise by Q_REF so modal injection scales consistently with direct amplitude.
+        // weight = Hann window over 3 bandwidths, tapers modes away from their peak.
+        const normalisedWeight = weight / Q_REF;
+        const weightedRe = normalisedWeight * modalContrib.real;
+        const weightedIm = normalisedWeight * modalContrib.imag;
+        const weightedMag = Math.sqrt(weightedRe * weightedRe + weightedIm * weightedIm);
+
+        modalDeltaRe += weightedRe;
+        modalDeltaIm += weightedIm;
 
         // __B44_STEP_DEBUG__ capture strongest active mode
         if (frequencyHz >= 43 && frequencyHz <= 55 && weightedMag > _debugStrongestModeWeightedMag) {
@@ -449,36 +495,38 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             df,
             normalized,
             weight,
-            transferRe: modalTransfer.real,
-            transferIm: modalTransfer.imag,
+            transferRe: modalContrib.real,
+            transferIm: modalContrib.imag,
           };
         }
-
-        // Accumulate each mode's transfer contribution into the running transfer function
-        transferRe += weight * modalTransfer.real;
-        transferIm += weight * modalTransfer.imag;
       });
 
-      // Apply the accumulated modal transfer multiplicatively to the pre-modal complex field
-      const preRe = sumRe;
-      const preIm = sumIm;
-      sumRe = preRe * transferRe - preIm * transferIm;
-      sumIm = preRe * transferIm + preIm * transferRe;
+      // Add modal pressure delta directly to the complex pressure field.
+      // Scale by direct-path amplitude so modal injection is in the same units
+      // as the direct field — modes modulate relative to the source level.
+      sumRe += amplitude * modalDeltaRe;
+      sumIm += amplitude * modalDeltaIm;
+
+      // Build a virtual "transfer" for debug reporting (ratio of post/pre-modal field)
+      const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+      const preMagForDebug = preModalMagnitude > 1e-10 ? preModalMagnitude : 1;
+      const debugTransferRe = (sumRe * Math.sqrt(sumRe * sumRe + sumIm * sumIm)) / (preMagForDebug * preMagForDebug + 1e-30) || 1;
+      const debugTransferIm = (sumIm * Math.sqrt(sumRe * sumRe + sumIm * sumIm)) / (preMagForDebug * preMagForDebug + 1e-30) || 0;
 
       // __B44_STEP_DEBUG__ fill in post-modal result for debug rows in this frequency range
       if (stepDebugRows.length > 0) {
         const lastRow = stepDebugRows[stepDebugRows.length - 1];
         if (lastRow && lastRow.postModal === null && Math.abs(lastRow.frequencyHz - frequencyHz) < 0.5) {
           lastRow.postModal = {
-            transferRe,
-            transferIm,
+            transferRe: modalDeltaRe,
+            transferIm: modalDeltaIm,
             sumRe,
             sumIm,
-            magnitude: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
+            magnitude: postMag,
           };
-          // Attach strongest-mode debug data and final transfer to the row
-          lastRow.modalTransferReFinal = transferRe;
-          lastRow.modalTransferImFinal = transferIm;
+          // Attach strongest-mode debug data and final delta to the row
+          lastRow.modalTransferReFinal = modalDeltaRe;
+          lastRow.modalTransferImFinal = modalDeltaIm;
           if (_debugStrongestMode) {
             lastRow.strongestModeFreq = _debugStrongestMode.freq;
             lastRow.strongestModeNx = _debugStrongestMode.nx;

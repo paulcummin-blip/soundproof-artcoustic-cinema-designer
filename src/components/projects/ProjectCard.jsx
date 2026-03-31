@@ -16,18 +16,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import StatusBadge from "@/components/ui/StatusBadge";
-- import { RenderSafe } from "@/components/dev/SegmentBoundary";
-+// local safe text helper (stringify common shapes and primitives)
-+function text(v, fb = "—") {
-+  if (v == null) return fb;
-+  if (typeof v === "string" || typeof v === "number") return String(v);
-+  if (typeof v === "object") {
-+    if (typeof v.name === "string") return v.name;
-+    if (typeof v.model === "string") return v.model;
-+    try { return JSON.stringify(v); } catch { return fb; }
-+  }
-+  return fb;
-+}
+
+// local safe text helper (stringify common shapes and primitives)
+function text(v, fb = "—") {
+  if (v == null) return fb;
+  if (typeof v === "string" || typeof v === "number") return String(v);
+  if (typeof v === "object") {
+    if (typeof v.name === "string") return v.name;
+    if (typeof v.model === "string") return v.model;
+    try { return JSON.stringify(v); } catch { return fb; }
+  }
+  return fb;
+}
 
 // Convert to memoized component to reduce re-renders
 function ProjectCard({ project, onDelete }) {
@@ -66,18 +66,12 @@ function ProjectCard({ project, onDelete }) {
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
--                <CardTitle className="text-[#1B1A1A] truncate font-header">
--                  <RenderSafe value={project?.name ?? 'Untitled Project'} label="project.name" />
--                </CardTitle>
--                <p className="text-sm text-[#3E4349] font-body">
--                  <RenderSafe value={project?.client_name ?? 'No client specified'} label="project.client_name" />
--                </p>
-+                <CardTitle className="text-[#1B1A1A] truncate font-header">
-+                  {text(project?.name, 'Untitled Project')}
-+                </CardTitle>
-+                <p className="text-sm text-[#3E4349] font-body">
-+                  {text(project?.client_name, 'No client specified')}
-+                </p>
+                <CardTitle className="text-[#1B1A1A] truncate font-header">
+                  {text(project?.name, 'Untitled Project')}
+                </CardTitle>
+                <p className="text-sm text-[#3E4349] font-body">
+                  {text(project?.client_name, 'No client specified')}
+                </p>
                 {/* Status badge under title */}
                 <div className="mt-2">
                   <StatusBadge value={getStatusLabel()} />
@@ -111,22 +105,15 @@ function ProjectCard({ project, onDelete }) {
       <CardContent className="flex-grow space-y-2 font-body">
         <div className="flex items-center gap-2 text-sm text-[#3E4349]">
           <Ruler className="w-4 h-4 text-[#3E4349]" />
--          <span>
--            Room: <RenderSafe value={project?.room_length ?? 'N/A'} label="project.room_length" />m ×{" "}
--            <RenderSafe value={project?.room_width ?? 'N/A'} label="project.room_width" />m
--          </span>
-+          <span>
-+            Room: {text(project?.room_length, 'N/A')}m × {text(project?.room_width, 'N/A')}m
-+          </span>
+          <span>
+            Room: {text(project?.room_length, 'N/A')}m × {text(project?.room_width, 'N/A')}m
+          </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-[#3E4349]">
           <Volume2 className="w-4 h-4 text-[#3E4349]" />
--          <span>
--            Config: <RenderSafe value={project?.dolby_config ?? 'N/A'} label="project.dolby_config" />
--          </span>
-+          <span>
-+            Config: {text(project?.dolby_config, 'N/A')}
-+          </span>
+          <span>
+            Config: {text(project?.dolby_config, 'N/A')}
+          </span>
         </div>
       </CardContent>
       <CardFooter className="bg-[#F8F8F7] p-4 mt-auto border-t border-[#DCDBD6]">

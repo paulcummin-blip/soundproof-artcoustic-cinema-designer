@@ -3,12 +3,9 @@ import { useProjectSummary } from "@/components/state/project-session";
 
 // Safely read a selected Artcoustic model from project session; fallback to a sensible default
 export function useSelectedArtcousticModel() {
-  let summary = null;
-  try {
-    summary = typeof useProjectSummary === "function" ? useProjectSummary() : null;
-  } catch {
-    summary = null;
-  }
+  // Hook must always be called unconditionally — guard the result instead
+  const rawSummary = useProjectSummary();
+  const summary = rawSummary && typeof rawSummary === "object" ? rawSummary : null;
 
   const model = useMemo(() => {
     if (!summary || typeof summary !== "object") return null;

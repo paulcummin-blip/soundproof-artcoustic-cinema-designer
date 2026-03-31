@@ -1525,8 +1525,7 @@ function SpeakerPlacementImpl(props) {
 
             const pillBasisDb = Math.min(...surroundTileSplDb);
             
-            // Use P13-specific mode (independent from P12)
-            const { splConfig } = useAppState() || {};
+            // Use P13-specific mode (independent from P12) — splConfig already destructured at top of component
             const isMinimumMode = splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode;
             const thresholds = isMinimumMode ? P13_THRESHOLDS_MIN : P13_THRESHOLDS_REC;
             
