@@ -160,8 +160,9 @@ export default function RvRoomBaseLayers(props) {
                         x={px}
                         y={py + 40}
                         textAnchor="middle"
-                        fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                        fontFamily="Century Gothic, sans-serif"
                         fontSize={12}
+                        fontWeight={600}
                         fill="#1B1A1A"
                       >
                         {`${sy.toFixed(2)} m`}
