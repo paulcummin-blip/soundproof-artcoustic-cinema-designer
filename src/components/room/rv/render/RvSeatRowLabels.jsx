@@ -53,7 +53,7 @@ export default function RvSeatRowLabels({
                   ⬆
                 </text>
                 <text
-                  x={seatX + 38}
+                  x={seatX + 34}
                   y={seatY}
                   textAnchor="start"
                   fontSize={12}
