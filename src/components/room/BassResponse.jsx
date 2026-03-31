@@ -1,6 +1,6 @@
 // BassResponse.jsx - Simplified bass simulation UI
 
-import React, { useMemo, useEffect, useState, useRef, useCallback } from "react";
+import React, { useMemo, useEffect, useState, useRef } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,7 +104,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const lastAutoAlignTriggerSigRef = React.useRef(null);
 
   const __b44SafeSig = (v) => {
-    try { return JSON.stringify(v); } catch { return String(v); }
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
   };
 
   const __b44SettingsSig = (settingsById, ids) => {
