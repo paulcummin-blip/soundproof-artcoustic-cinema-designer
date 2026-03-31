@@ -565,11 +565,18 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         }
       });
 
-      // Add modal pressure delta directly to the complex pressure field.
-      // Scale by direct-path amplitude so modal injection is in the same units
-      // as the direct field — modes modulate relative to the source level.
-      sumRe -= amplitude * modalDeltaRe;
-      sumIm -= amplitude * modalDeltaIm;
+      // Add modal pressure delta to the complex pressure field, phase-referenced
+      // to the existing pre-modal field.
+      // Step 1: compute the phase of the current pre-modal field.
+      const fieldPhase = Math.atan2(sumIm, sumRe);
+      // Step 2: rotate the accumulated modal delta into the field's reference frame.
+      const cosF = Math.cos(fieldPhase);
+      const sinF = Math.sin(fieldPhase);
+      const rotatedModalDeltaRe = modalDeltaRe * cosF - modalDeltaIm * sinF;
+      const rotatedModalDeltaIm = modalDeltaRe * sinF + modalDeltaIm * cosF;
+      // Step 3: apply rotated modal delta (subtractive — modes remove energy at nulls).
+      sumRe -= amplitude * rotatedModalDeltaRe;
+      sumIm -= amplitude * rotatedModalDeltaIm;
 
       // Build a virtual "transfer" for debug reporting (ratio of post/pre-modal field)
       const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
