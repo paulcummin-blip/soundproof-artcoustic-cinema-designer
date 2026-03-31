@@ -606,6 +606,65 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ marginTop: 8, fontSize: 10, color: '#92400e' }}>
             Highlighted rows = ±1.5 Hz around 44.5 Hz null region. reflMag = summed weighted reflections vector magnitude. lfMag = late-field amplitude.
           </div>
+          {/* Modal transfer sub-table — rows near 44.5 Hz only */}
+          {simulationResults.stepDebug.some(r => r.strongestModeFreq != null && Math.abs(r.frequencyHz - 44.5) < 4) && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 700, color: '#1e40af', marginBottom: 4, fontSize: 11 }}>Strongest Active Mode + Final Modal Transfer (43–50 Hz)</div>
+              <table style={{ borderCollapse: 'collapse', whiteSpace: 'nowrap', fontSize: 10 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #bfdbfe', color: '#1e40af' }}>
+                    <th style={{ textAlign: 'left', padding: '2px 5px' }}>Freq</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>modeFreq</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>type</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>nx,ny,nz</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>Q</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>srcC</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>rcvC</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>combC</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>bwHz</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>df</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>norm</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>wt</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>mTfRe</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>mTfIm</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px', borderLeft: '1px solid #bfdbfe', fontWeight: 700 }}>TfReFinal</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700 }}>TfImFinal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {simulationResults.stepDebug
+                    .filter(r => r.frequencyHz >= 43 && r.frequencyHz <= 50)
+                    .map((row) => {
+                      const isNearNull = Math.abs(row.frequencyHz - 44.5) < 1.5;
+                      const hasMode = row.strongestModeFreq != null;
+                      return (
+                        <tr key={row.frequencyHz} style={{ borderBottom: '1px solid #dbeafe', background: isNearNull ? '#eff6ff' : undefined }}>
+                          <td style={{ padding: '2px 5px', color: '#1e40af', fontWeight: isNearNull ? 700 : 500 }}>{row.frequencyHz.toFixed(2)}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeFreq.toFixed(2) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeType : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? `${row.strongestModeNx},${row.strongestModeNy},${row.strongestModeNz}` : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeQ.toFixed(2) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeSourceCoupling.toFixed(4) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeReceiverCoupling.toFixed(4) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700 }}>{hasMode ? row.strongestModeCombinedCoupling.toFixed(4) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeBandwidthHz.toFixed(3) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeDf.toFixed(3) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeNormalized.toFixed(4) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeWeight.toFixed(4) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeTransferRe.toFixed(4) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeTransferIm.toFixed(4) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px', borderLeft: '1px solid #bfdbfe', fontWeight: 700, color: '#1d4ed8' }}>{row.modalTransferReFinal != null ? row.modalTransferReFinal.toFixed(4) : '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700, color: '#1d4ed8' }}>{row.modalTransferImFinal != null ? row.modalTransferImFinal.toFixed(4) : '—'}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+              <div style={{ marginTop: 4, fontSize: 10, color: '#1e40af' }}>
+                srcC/rcvC/combC = source/receiver/combined coupling. norm = normalized df. wt = Hann weight. mTfRe/Im = single strongest mode transfer. TfReFinal/ImFinal = full accumulated modal transfer applied to field.
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* __B44_STEP_DEBUG__ end */}

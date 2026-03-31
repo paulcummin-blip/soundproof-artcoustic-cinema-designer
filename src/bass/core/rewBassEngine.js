@@ -406,6 +406,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       let transferRe = 1;
       let transferIm = 0;
 
+      // __B44_STEP_DEBUG__ track strongest active mode for debug rows
+      let _debugStrongestMode = null;
+      let _debugStrongestModeWeightedMag = -1;
+
       modes.forEach((mode) => {
         const bandwidthHz = mode.freq / mode.qValue;
         const df = Math.abs(frequencyHz - mode.freq);
@@ -426,6 +430,30 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         }
 
         const modalTransfer = modalTransferLocal(frequencyHz, mode.freq, mode.qValue, combinedCoupling);
+        const weightedMag = weight * Math.sqrt(modalTransfer.real * modalTransfer.real + modalTransfer.imag * modalTransfer.imag);
+
+        // __B44_STEP_DEBUG__ capture strongest active mode
+        if (frequencyHz >= 43 && frequencyHz <= 55 && weightedMag > _debugStrongestModeWeightedMag) {
+          _debugStrongestModeWeightedMag = weightedMag;
+          _debugStrongestMode = {
+            freq: mode.freq,
+            nx: mode.nx,
+            ny: mode.ny,
+            nz: mode.nz,
+            type: mode.type,
+            qValue: mode.qValue,
+            sourceCoupling,
+            receiverCoupling,
+            combinedCoupling,
+            bandwidthHz,
+            df,
+            normalized,
+            weight,
+            transferRe: modalTransfer.real,
+            transferIm: modalTransfer.imag,
+          };
+        }
+
         // Accumulate each mode's transfer contribution into the running transfer function
         transferRe += weight * modalTransfer.real;
         transferIm += weight * modalTransfer.imag;
@@ -448,6 +476,26 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             sumIm,
             magnitude: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
           };
+          // Attach strongest-mode debug data and final transfer to the row
+          lastRow.modalTransferReFinal = transferRe;
+          lastRow.modalTransferImFinal = transferIm;
+          if (_debugStrongestMode) {
+            lastRow.strongestModeFreq = _debugStrongestMode.freq;
+            lastRow.strongestModeNx = _debugStrongestMode.nx;
+            lastRow.strongestModeNy = _debugStrongestMode.ny;
+            lastRow.strongestModeNz = _debugStrongestMode.nz;
+            lastRow.strongestModeType = _debugStrongestMode.type;
+            lastRow.strongestModeQ = _debugStrongestMode.qValue;
+            lastRow.strongestModeSourceCoupling = _debugStrongestMode.sourceCoupling;
+            lastRow.strongestModeReceiverCoupling = _debugStrongestMode.receiverCoupling;
+            lastRow.strongestModeCombinedCoupling = _debugStrongestMode.combinedCoupling;
+            lastRow.strongestModeBandwidthHz = _debugStrongestMode.bandwidthHz;
+            lastRow.strongestModeDf = _debugStrongestMode.df;
+            lastRow.strongestModeNormalized = _debugStrongestMode.normalized;
+            lastRow.strongestModeWeight = _debugStrongestMode.weight;
+            lastRow.strongestModeTransferRe = _debugStrongestMode.transferRe;
+            lastRow.strongestModeTransferIm = _debugStrongestMode.transferIm;
+          }
         }
       }
     }
