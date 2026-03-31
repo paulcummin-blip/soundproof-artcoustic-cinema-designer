@@ -33,25 +33,57 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const dimsTxt = `${fmtFixed(roomDims?.widthM, 1)}×${fmtFixed(roomDims?.lengthM, 1)}×${fmtFixed(roomDims?.heightM, 1)} m`;
 
-  // --- Seat selection state ---
-  const resolveFallbackSeatId = (seats) => {
-    const primary = seats?.find(s => s.isPrimary);
-    if (primary) return primary.id || `${primary.x}-${primary.y}`;
-    const first = seats?.[0];
-    if (first) return first.id || `${first.x}-${first.y}`;
-    return null;
+  // --- Seat colour palette (stable, ordered, brand-aligned) ---
+  const SEAT_PALETTE = ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"];
+
+  // Build a stable ordered seat list so palette indices are deterministic
+  const orderedSeats = useMemo(() => {
+    if (!Array.isArray(seatingPositions)) return [];
+    return [...seatingPositions].sort((a, b) => {
+      const ra = Number(a?.row || a?.rowNumber) || 1;
+      const rb = Number(b?.row || b?.rowNumber) || 1;
+      if (ra !== rb) return ra - rb;
+      return (Number(a?.indexInRow) || 0) - (Number(b?.indexInRow) || 0);
+    });
+  }, [seatingPositions]);
+
+  const getSeatColor = (seatId) => {
+    const idx = orderedSeats.findIndex(s => (s.id || `${s.x}-${s.y}`) === seatId);
+    return SEAT_PALETTE[Math.max(0, idx) % SEAT_PALETTE.length];
   };
 
-  const [selectedSeatId, setSelectedSeatId] = useState(() => resolveFallbackSeatId(seatingPositions));
+  // --- Multi-seat selection state ---
+  const resolveFallbackIds = (seats) => {
+    const primary = seats?.find(s => s.isPrimary);
+    if (primary) return [primary.id || `${primary.x}-${primary.y}`];
+    const first = seats?.[0];
+    if (first) return [first.id || `${first.x}-${first.y}`];
+    return [];
+  };
 
-  // Keep selectedSeatId valid when seats change
+  const [selectedSeatIds, setSelectedSeatIds] = useState(() => resolveFallbackIds(seatingPositions));
+
+  // Keep selectedSeatIds valid when seats change
   useEffect(() => {
     const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
-    const allIds = seats.map(s => s.id || `${s.x}-${s.y}`);
-    if (!selectedSeatId || !allIds.includes(selectedSeatId)) {
-      setSelectedSeatId(resolveFallbackSeatId(seats));
+    const allIds = new Set(seats.map(s => s.id || `${s.x}-${s.y}`));
+    const still = selectedSeatIds.filter(id => allIds.has(id));
+    if (still.length === 0) {
+      setSelectedSeatIds(resolveFallbackIds(seats));
+    } else if (still.length !== selectedSeatIds.length) {
+      setSelectedSeatIds(still);
     }
   }, [seatingPositions]);
+
+  const toggleSeat = (sid) => {
+    setSelectedSeatIds(prev => {
+      if (prev.includes(sid)) {
+        // Don't allow deselecting the last active seat
+        return prev.length === 1 ? prev : prev.filter(id => id !== sid);
+      }
+      return [...prev, sid];
+    });
+  };
 
   // State declarations
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
@@ -259,64 +291,51 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     };
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, absorptionPct]);
 
-  // Find seat to display — driven by selectedSeatId state
-  const selectedSeat = useMemo(() => {
+  // Build one clean series per selected seat
+  const multiSeries = useMemo(() => {
     const responses = simulationResults.seatResponses;
+    const activeIds = selectedSeatIds.filter(id => responses[id]);
 
-    // Try the user-selected seat first
-    if (selectedSeatId && responses[selectedSeatId]) {
-      const seatMeta = seatingPositions?.find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatId);
-      return { id: selectedSeatId, isPrimary: !!seatMeta?.isPrimary, ...responses[selectedSeatId] };
+    const series = activeIds.map(sid => {
+      const response = responses[sid];
+      if (!response?.freqsHz || !response?.splDb) return null;
+
+      const raw = response.freqsHz
+        .map((frequency, i) => ({
+          frequency,
+          spl: Number.isFinite(response.splDb[i]) ? response.splDb[i] : null,
+        }))
+        .filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
+
+      const sorted = [...raw].sort((a, b) => a.frequency - b.frequency);
+      const deduped = [];
+      for (let i = 0; i < sorted.length; i++) {
+        const curr = sorted[i];
+        const next = sorted[i + 1];
+        if (next && Math.abs(curr.frequency - next.frequency) < 1e-9) continue;
+        deduped.push(curr);
+      }
+
+      return { id: sid, color: getSeatColor(sid), data: deduped };
+    }).filter(Boolean);
+
+    if (!isDraggingSub && series.length > 0 && series[0].data.length > 0) {
+      lastStablePlotRef.current = series[0].data;
     }
 
-    // Fallback: primary seat
-    const primarySeat = seatingPositions?.find(s => s.isPrimary);
-    const primaryId = primarySeat ? (primarySeat.id || `${primarySeat.x}-${primarySeat.y}`) : null;
-    if (primaryId && responses[primaryId]) {
-      return { id: primaryId, isPrimary: true, ...responses[primaryId] };
-    }
+    return series;
+  }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub]);
 
-    // Fallback: first available
-    const firstId = Object.keys(responses)[0];
-    if (firstId) {
-      return { id: firstId, isPrimary: false, ...responses[firstId] };
+  // Keep a single-seat "selectedSeat" reference for the graph title + per-seat detail cards
+  const primarySelectedSeat = useMemo(() => {
+    const responses = simulationResults.seatResponses;
+    const sid = selectedSeatIds[0];
+    if (sid && responses[sid]) {
+      const seatMeta = seatingPositions?.find(s => (s.id || `${s.x}-${s.y}`) === sid);
+      return { id: sid, isPrimary: !!seatMeta?.isPrimary };
     }
-
     return null;
-  }, [selectedSeatId, seatingPositions, simulationResults.seatResponses]);
-
-  // Display data for graph
-  const displayData = useMemo(() => {
-    if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) return [];
-    
-    return selectedSeat.freqsHz.map((frequency, i) => ({
-      frequency,
-      spl: Number.isFinite(selectedSeat.splDb[i]) ? selectedSeat.splDb[i] : null
-    })).filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
-  }, [selectedSeat]);
-
-  // Clean plotted series
-  const plottedSeries = useMemo(() => {
-    if (!displayData || displayData.length === 0) return [];
-    
-    const valid = displayData.filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
-    if (valid.length === 0) return [];
-    
-    const sorted = [...valid].sort((a, b) => a.frequency - b.frequency);
-    const deduplicated = [];
-    for (let i = 0; i < sorted.length; i++) {
-      const curr = sorted[i];
-      const next = sorted[i + 1];
-      if (next && Math.abs(curr.frequency - next.frequency) < 1e-9) continue;
-      deduplicated.push(curr);
-    }
-    
-    if (!isDraggingSub && deduplicated.length > 0) {
-      lastStablePlotRef.current = deduplicated;
-    }
-    
-    return deduplicated;
-  }, [displayData, isDraggingSub]);
+  }, [selectedSeatIds, seatingPositions, simulationResults.seatResponses]);
 
   // Schroeder frequency
   const schroederFrequency = React.useMemo(() => {
@@ -554,7 +573,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
-            Bass Response at {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
+            Bass Response
           </div>
           <div className="flex items-center gap-2">
             <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
@@ -562,11 +581,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         </div>
 
-        {/* Seat selector pills — stacked rows matching room layout */}
-        {Array.isArray(seatingPositions) && seatingPositions.length > 1 && (() => {
-          // Group seats by row
+        {/* Seat selector pills — stacked rows, multi-select toggles */}
+        {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
           const rowMap = new Map();
-          seatingPositions.forEach(seat => {
+          orderedSeats.forEach(seat => {
             const r = Number(seat?.row || seat?.rowNumber) || 1;
             if (!rowMap.has(r)) rowMap.set(r, []);
             rowMap.get(r).push(seat);
@@ -574,42 +592,42 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           const rowNums = Array.from(rowMap.keys()).sort((a, b) => a - b);
 
           return (
-            <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+            <div style={{ display: "grid", gap: 5, marginBottom: 12 }}>
               {rowNums.map(r => {
-                const rowSeats = (rowMap.get(r) || []).slice().sort((a, b) => {
-                  return (Number(a?.indexInRow) || 0) - (Number(b?.indexInRow) || 0);
-                });
+                const rowSeats = rowMap.get(r) || [];
                 return (
-                  <div key={r} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <div key={r} style={{ display: "flex", gap: 5 }}>
                     {rowSeats.map(seat => {
                       const sid = seat.id || `${seat.x}-${seat.y}`;
-                      const isSelected = sid === selectedSeatId;
+                      const isOn = selectedSeatIds.includes(sid);
                       const isPrimary = !!seat.isPrimary;
+                      const color = getSeatColor(sid);
+                      const seatIdx = orderedSeats.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid);
+                      const label = `R${Number(seat?.row || seat?.rowNumber) || 1}S${Number(seat?.indexInRow) || (seatIdx + 1)}`;
                       return (
                         <button
                           key={sid}
-                          onClick={() => setSelectedSeatId(sid)}
+                          onClick={() => toggleSeat(sid)}
+                          title={`${label}${isPrimary ? " — MLP" : ""}`}
                           style={{
-                            border: isSelected ? "2px solid #213428" : "1px solid #C1B6AD",
+                            width: 52,
+                            height: 26,
+                            border: isOn ? `2px solid ${color}` : isPrimary ? "1px solid #A09386" : "1px solid #DCDBD6",
                             borderRadius: 9999,
-                            padding: "2px 10px",
-                            fontSize: 12,
-                            fontWeight: isSelected ? 700 : 500,
-                            background: isSelected ? "#213428" : "#F6F3EE",
-                            color: isSelected ? "#fff" : "#1B1A1A",
+                            fontSize: 11,
+                            fontWeight: isOn ? 700 : 500,
+                            background: isOn ? color : "#F6F3EE",
+                            color: isOn ? "#fff" : isPrimary ? "#3E4349" : "#625143",
                             cursor: "pointer",
                             display: "inline-flex",
                             alignItems: "center",
-                            gap: 4,
-                            boxShadow: isPrimary && !isSelected ? "0 0 0 2px rgba(33,52,40,0.15)" : "none",
+                            justifyContent: "center",
                             outline: "none",
+                            flexShrink: 0,
+                            transition: "background 0.12s, border-color 0.12s",
                           }}
-                          title={`Row ${r}${isPrimary ? " — MLP" : ""}`}
                         >
-                          {isPrimary && (
-                            <span style={{ fontSize: 10, opacity: 0.75 }}>★</span>
-                          )}
-                          R{r}S{Number(seat?.indexInRow) || rowSeats.indexOf(seat) + 1}
+                          {label}
                         </button>
                       );
                     })}
@@ -621,9 +639,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         })()}
 
         <div className="mt-4">
-          {displayData.length > 0 ? (
+          {multiSeries.length > 0 ? (
             <BassGraph
-              responseData={plottedSeries}
+              multiSeries={multiSeries}
+              responseData={multiSeries[0]?.data ?? []}
               schroederFrequency={schroederFrequency}
               rp22Levels={rp22Levels}
               toggles={{}}

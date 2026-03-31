@@ -42,6 +42,7 @@ const RewPlotRangeDebug = ({ chartData, yDomain }) => {
 
 export default function BassGraph({ 
   responseData, 
+  multiSeries,
   schroederFrequency = 0, 
   rp22Levels = [], 
   toggles = {}, 
@@ -60,6 +61,27 @@ export default function BassGraph({
   disableHighlight = false
 }) {
     const lastValidYDomainRef = React.useRef(null);
+
+    // Multi-series: merge all series data into one keyed chartData array
+    const isMulti = rewStyleMode && Array.isArray(multiSeries) && multiSeries.length > 0;
+
+    const multiChartData = React.useMemo(() => {
+      if (!isMulti) return null;
+      // Collect all unique frequencies across all series
+      const freqSet = new Set();
+      multiSeries.forEach(s => s.data.forEach(p => freqSet.add(p.frequency)));
+      const freqs = Array.from(freqSet).sort((a, b) => a - b);
+      // Build one row per frequency, with a key per series id
+      return freqs.map(frequency => {
+        const row = { frequency };
+        multiSeries.forEach(s => {
+          const point = s.data.find(p => Math.abs(p.frequency - frequency) < 1e-9);
+          row[`spl_${s.id}`] = point ? point.spl : null;
+        });
+        return row;
+      });
+    }, [isMulti, multiSeries]);
+
     let data = responseData;
     
     // Build chart data: REW mode = one true series (ZERO processing), non-REW = good/bad split
@@ -230,9 +252,15 @@ export default function BassGraph({
 
       // REW mode: compute Y domain from actual plotted data (only finite values within X range)
       if (rewStyleMode) {
-        const splValues = chartData
+        const sourceData = isMulti ? multiChartData : chartData;
+        const splValues = (sourceData || [])
           .filter(d => d.frequency >= xMin && d.frequency <= xMax)
-          .map(d => d.spl)
+          .flatMap(d => {
+            if (isMulti) {
+              return Object.entries(d).filter(([k]) => k.startsWith('spl_')).map(([, v]) => v);
+            }
+            return [d.spl];
+          })
           .filter(v => Number.isFinite(v));
 
         if (splValues.length > 0) {
@@ -392,7 +420,7 @@ export default function BassGraph({
                 </>
             )}
             <ResponsiveContainer>
-                <LineChart data={chartData} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
+                <LineChart data={isMulti ? multiChartData : chartData} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#DCDBD6" />
                     <XAxis
                         dataKey="frequency"
@@ -461,8 +489,21 @@ export default function BassGraph({
                       />
                     ))}
 
-                    {/* REW mode: smooth curve with natural monotone interpolation (breaks on null) */}
-                    {rewStyleMode && (
+                    {/* REW mode: multi-series or single trace */}
+                    {rewStyleMode && isMulti && multiSeries.map((s) => (
+                      <Line
+                        key={s.id}
+                        type="monotone"
+                        dataKey={`spl_${s.id}`}
+                        stroke={s.color}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={false}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    ))}
+                    {rewStyleMode && !isMulti && (
                       <Line 
                           type="monotone" 
                           dataKey="spl"
