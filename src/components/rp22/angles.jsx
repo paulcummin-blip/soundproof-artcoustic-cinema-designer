@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * RP22 angular metrics and equalisation helpers (pure, side-effect free).
  * JS implementation with JSDoc typedefs for clarity and editor help.

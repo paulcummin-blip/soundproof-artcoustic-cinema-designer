@@ -198,6 +198,43 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LEGACY modal-transfer helper (multiplicative-from-identity, pre-additive-injection)
+// Kept here for A/B validation only. Do not tune or ship as production path.
+// ─────────────────────────────────────────────────────────────────────────────
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM) {
+  let tfRe = 1;
+  let tfIm = 0;
+
+  modes.forEach((mode) => {
+    const bandwidthHz = mode.freq / mode.qValue;
+    const df = Math.abs(frequencyHz - mode.freq);
+    const normalized = df / (3 * bandwidthHz);
+    if (normalized >= 1) return;
+
+    const weight = 0.5 * (1 + Math.cos(Math.PI * normalized));
+
+    const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
+    const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
+    const combinedCoupling = sourceCoupling * receiverCoupling;
+
+    if (Math.abs(combinedCoupling) < 1e-4) return;
+
+    const modalContrib = modalPressureContributionLocal(
+      frequencyHz,
+      mode.freq,
+      mode.qValue,
+      combinedCoupling
+    );
+
+    // Legacy: accumulate as a multiplicative transfer function delta from identity (1+j0)
+    tfRe += weight * modalContrib.real;
+    tfIm += weight * modalContrib.imag;
+  });
+
+  return { tfRe, tfIm };
+}
+
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);
@@ -225,6 +262,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const enableReflections = options?.enableReflections === true;
   const enableModes = options?.enableModes === true;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
+
+  // A/B modal model selector — "legacy_transfer" | "additive_pressure" (default)
+  const modalModel = options?.modalModel === 'legacy_transfer' ? 'legacy_transfer' : 'additive_pressure';
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
     throw new Error('roomDims must include finite widthM, lengthM, and heightM values.');
@@ -430,6 +470,30 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const Q_REF = 10; // reference Q for normalisation — typical room mode Q range 5–30
 
     if (enableModes) {
+      // ── CONDITIONAL MODAL APPLICATION ──────────────────────────────────────
+      // Branch on modalModel option: "legacy_transfer" or "additive_pressure"
+      if (modalModel === 'legacy_transfer') {
+        // LEGACY PATH: multiplicative transfer applied to current sumRe/sumIm field
+        const { tfRe, tfIm } = legacyModalTransferLocal(
+          frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM
+        );
+        const prevRe = sumRe;
+        const prevIm = sumIm;
+        sumRe = prevRe * tfRe - prevIm * tfIm;
+        sumIm = prevRe * tfIm + prevIm * tfRe;
+
+        // __B44_STEP_DEBUG__ fill in post-modal for legacy path
+        if (stepDebugRows.length > 0) {
+          const lastRow = stepDebugRows[stepDebugRows.length - 1];
+          if (lastRow && lastRow.postModal === null && Math.abs(lastRow.frequencyHz - frequencyHz) < 0.5) {
+            const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+            lastRow.postModal = { transferRe: tfRe, transferIm: tfIm, sumRe, sumIm, magnitude: postMag };
+            lastRow.modalTransferReFinal = tfRe;
+            lastRow.modalTransferImFinal = tfIm;
+          }
+        }
+      } else {
+      // ADDITIVE PRESSURE PATH (default) ─────────────────────────────────────
       // Accumulated modal pressure delta (additive to sumRe/sumIm)
       let modalDeltaRe = 0;
       let modalDeltaIm = 0;
@@ -546,6 +610,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           }
         }
       }
+      } // end additive_pressure else-branch
     }
 
     return {
