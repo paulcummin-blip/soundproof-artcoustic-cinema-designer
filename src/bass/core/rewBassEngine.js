@@ -568,8 +568,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // Add modal pressure delta directly to the complex pressure field.
       // Scale by direct-path amplitude so modal injection is in the same units
       // as the direct field — modes modulate relative to the source level.
-      sumRe += amplitude * modalDeltaRe;
-      sumIm += amplitude * modalDeltaIm;
+      sumRe -= amplitude * modalDeltaRe;
+      sumIm -= amplitude * modalDeltaIm;
 
       // Build a virtual "transfer" for debug reporting (ratio of post/pre-modal field)
       const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
