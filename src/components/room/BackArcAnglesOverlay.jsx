@@ -10,8 +10,6 @@ const DASH   = "6 6";
 export default function BackArcAnglesOverlay({
   dimensions, seatingPositions, speakers, scale = 1, padding = 0, visible = true
 }) {
-  if (!visible) return null;
-
   const W = Number(dimensions?.width) || 4.5;
   const L = Number(dimensions?.length) || 6.0;
   const mlp = useMemo(
@@ -65,6 +63,8 @@ export default function BackArcAnglesOverlay({
     };
     return backPairs.map(([a, b]) => [azCW(a.position), azCW(b.position)]);
   }, [backPairs, mlp]);
+
+  if (!visible) return null;
 
   return (
     <g data-overlay="angles" style={{ pointerEvents: "none" }}>

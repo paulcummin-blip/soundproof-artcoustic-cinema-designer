@@ -8,6 +8,26 @@ import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 
+// --- SINGLE-PRIMARY ENFORCER ---
+// After normalising, re-run computeMLPAndPrimary and collapse to exactly one
+// isPrimary seat (the RSP — closest to MLP). Prevents stale saved data from
+// carrying multiple isPrimary: true flags into live state.
+const enforceOnePrimary = (seats, dims, mlpBasis = "front") => {
+  if (!Array.isArray(seats) || seats.length === 0) return seats;
+  const W = Number(dims?.widthM ?? dims?.width) || 4.5;
+  const L = Number(dims?.lengthM ?? dims?.length) || 6.0;
+  try {
+    const { seatsWithFlags } = computeMLPAndPrimary(seats, W, L, mlpBasis, null);
+    if (!Array.isArray(seatsWithFlags) || seatsWithFlags.length === 0) return seats;
+    // Collapse: keep only the first primary as the single RSP
+    const primaries = seatsWithFlags.filter(s => s.isPrimary);
+    const rspId = primaries.length > 0 ? primaries[0].id : seatsWithFlags[0].id;
+    return seatsWithFlags.map(s => ({ ...s, isPrimary: s.id === rspId }));
+  } catch {
+    return seats.map((s, i) => ({ ...s, isPrimary: i === 0 }));
+  }
+};
+
 // --- SEATING POSITIONS NORMALISER ---
 const normaliseSeatingPositions = (seats, roomDims) => {
   if (!Array.isArray(seats)) return [];
@@ -415,11 +435,14 @@ function useDesignerState() {
       ? __autosavePayload.sevenBedLayoutType
       : "rears"
   ));
-  const [seatingPositions, setSeatingPositions] = useState(() => (
-    (__autosavePayload && Array.isArray(__autosavePayload.seatingPositions))
-      ? normaliseSeatingPositions(__autosavePayload.seatingPositions, __autosavePayload.roomDims || __autosavePayload.roomDimensions || null)
-      : []
-  ));
+  const [seatingPositions, setSeatingPositions] = useState(() => {
+    if (__autosavePayload && Array.isArray(__autosavePayload.seatingPositions)) {
+      const dims = __autosavePayload.roomDims || __autosavePayload.roomDimensions || null;
+      const normalised = normaliseSeatingPositions(__autosavePayload.seatingPositions, dims);
+      return enforceOnePrimary(normalised, dims, __autosavePayload.mlpBasis || "front");
+    }
+    return [];
+  });
   const [baselineSeatingPositions, setBaselineSeatingPositions] = useState([]);
   const [seatingRows, setSeatingRows] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.seatingRows === "number") ? __autosavePayload.seatingRows : 1
@@ -1265,7 +1288,11 @@ function useDesignerState() {
     try {
       if (p.roomDims) setRoomDims(p.roomDims);
       if (p.dimensions) setDimensions(p.dimensions);
-      if (p.seatingPositions) setSeatingPositions(normaliseSeatingPositions(p.seatingPositions, p.roomDims || p.roomDimensions || roomDims || null));
+      if (p.seatingPositions) {
+        const dims = p.roomDims || p.roomDimensions || roomDims || null;
+        const normalised = normaliseSeatingPositions(p.seatingPositions, dims);
+        setSeatingPositions(enforceOnePrimary(normalised, dims, p.mlpBasis || "front"));
+      }
       if (p.screen) setScreen(p.screen);
 
       // Restore speaker/config state from autosave for all modes (saved project and free-run).
@@ -1434,109 +1461,6 @@ function useDesignerState() {
     roomElements
     ]);
 
-    // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
-    useEffect(() => {
-    const payload = {
-      roomDims,
-      dimensions,
-      seatingPositions,
-      speakerSystem,
-      // Ensure sub configs are always serialised explicitly
-      frontSubsCfg: {
-        ...frontSubsCfg,
-        model: frontSubsCfg?.model || "SUB2-12",
-        count: Number(frontSubsCfg?.count) || 0,
-        positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
-        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : [],
-        orientation: frontSubsCfg?.orientation || "vertical"
-      },
-      rearSubsCfg: {
-        ...rearSubsCfg,
-        model: rearSubsCfg?.model || "SUB2-12",
-        count: Number(rearSubsCfg?.count) || 0,
-        positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
-        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : [],
-        orientation: rearSubsCfg?.orientation || "vertical"
-      },
-      dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
-      dolbyConfig,
-      screen,
-      screenHeight,
-      seatingRows,
-      seatsPerRow,
-      seatsPerRowByRow,
-      seatSpacing,
-      rowSpacingM,
-      mlpBasis,
-      autoSeatByRP23,
-      seatingBlockOffset,
-      rowEarHeights,
-      aimFrontWidesAtMLP,
-      aimSideSurroundsAtMLP,
-      aimRearSurroundsAtMLP,
-      lcrAimMode,
-      globalSurroundModel,
-      sevenBedLayoutType,
-      overheadGlobalModel,
-      overheadFrontOverride,
-      overheadMidOverride,
-      overheadRearOverride,
-      useFrontGlobal,
-      useMidGlobal,
-      useRearGlobal,
-      seatMetricsById,
-      p15ConstructionLevel,
-      p21EarlyReflectionPreset,
-      mlpOverride,
-      extraSurroundCount,
-      // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
-      roomElements: normaliseRoomElements(roomElements),
-      };
-
-      try {
-      saveAutosave(payload);
-      } catch (e) {
-      console.warn("Autosave failed:", e);
-      }
-      }, [
-    roomDims,
-    dimensions,
-    seatingPositions,
-    speakerSystem,
-    frontSubsCfg,
-    rearSubsCfg,
-    dolbyLayout,
-    dolbyConfig,
-    screen,
-    screenHeight,
-    seatingRows,
-    seatsPerRow,
-    seatsPerRowByRow,
-    seatSpacing,
-    rowSpacingM,
-    mlpBasis,
-    autoSeatByRP23,
-    seatingBlockOffset,
-    rowEarHeights,
-    aimFrontWidesAtMLP,
-    aimSideSurroundsAtMLP,
-    aimRearSurroundsAtMLP,
-    globalSurroundModel,
-    overheadGlobalModel,
-    overheadFrontOverride,
-    overheadMidOverride,
-    overheadRearOverride,
-    useFrontGlobal,
-    useMidGlobal,
-    useRearGlobal,
-    seatMetricsById,
-    p15ConstructionLevel,
-    p21EarlyReflectionPreset,
-    mlpOverride,
-    extraSurroundCount,
-    roomElements
-    ]);
-
     // --- Autosave: Manual restore/clear functions ---
   const restoreAutosave = useCallback(() => {
     const data = loadAutosave();
@@ -1547,7 +1471,11 @@ function useDesignerState() {
     try {
       if (p.roomDims) setRoomDims(p.roomDims);
       if (p.dimensions) setDimensions(p.dimensions);
-      if (p.seatingPositions) setSeatingPositions(normaliseSeatingPositions(p.seatingPositions, p.roomDims || p.roomDimensions || roomDims || null));
+      if (p.seatingPositions) {
+        const dims = p.roomDims || p.roomDimensions || roomDims || null;
+        const normalised = normaliseSeatingPositions(p.seatingPositions, dims);
+        setSeatingPositions(enforceOnePrimary(normalised, dims, p.mlpBasis || "front"));
+      }
       if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
       // Restore sub configs explicitly (even if count = 0)
       if (Object.prototype.hasOwnProperty.call(p, "frontSubsCfg")) {

@@ -42,7 +42,6 @@ export default function AngleProbeOverlay({
   padding = 0,
   visible = true,
 }) {
-  if (!visible) return null;
   const W = Number(dimensions?.width) || 4.5;
   const L = Number(dimensions?.length) || 6.0;
   const px = (m) => padding + m * scale;
@@ -62,6 +61,7 @@ export default function AngleProbeOverlay({
 
   const A = byRole.get(String(pairRoles[0]).toUpperCase());
   const B = byRole.get(String(pairRoles[1]).toUpperCase());
+  if (!visible) return null;
   if (!A || !B || !mlp) return null;
 
   const ang = interiorAngleDeg(mlp, A, B);

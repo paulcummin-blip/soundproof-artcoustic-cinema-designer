@@ -884,6 +884,30 @@ function RP22ReportInner() {
         return summary;
     }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility]);
 
+    const exportSystemConfiguration = React.useMemo(() => {
+        const dolbyPreset = app?.dolbyLayout || "5.1";
+        const base = String(dolbyPreset).split(" ")[0];
+        const parts = base.split(".");
+        const bed = parts[0] || "5";
+        const heights = parts[2] || "";
+        const totalSubs = Number(app?.frontSubsCfg?.count ?? 0) + Number(app?.rearSubsCfg?.count ?? 0);
+        return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+    }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
+
+    const exportDateLabel = React.useMemo(() => {
+        return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    }, []);
+
+    const frontPageProjectDetails = React.useMemo(() => {
+        if (!projectDetails) return null;
+        return {
+            ...projectDetails,
+            extraItems: [
+                { label: 'Date', value: exportDateLabel },
+            ],
+        };
+    }, [projectDetails, exportDateLabel, exportSystemConfiguration]);
+
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -909,30 +933,6 @@ function RP22ReportInner() {
         p15ConstructionLevel: app?.p15ConstructionLevel,
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
     };
-
-    const exportSystemConfiguration = React.useMemo(() => {
-        const dolbyPreset = app?.dolbyLayout || "5.1";
-        const base = String(dolbyPreset).split(" ")[0];
-        const parts = base.split(".");
-        const bed = parts[0] || "5";
-        const heights = parts[2] || "";
-        const totalSubs = Number(app?.frontSubsCfg?.count ?? 0) + Number(app?.rearSubsCfg?.count ?? 0);
-        return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-    }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
-
-    const exportDateLabel = React.useMemo(() => {
-        return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-    }, []);
-
-    const frontPageProjectDetails = React.useMemo(() => {
-        if (!projectDetails) return null;
-        return {
-            ...projectDetails,
-            extraItems: [
-                { label: 'Date', value: exportDateLabel },
-            ],
-        };
-    }, [projectDetails, exportDateLabel, exportSystemConfiguration]);
 
     const coverBoxStyle = {
         border: '1.5px solid #D9D5CE',

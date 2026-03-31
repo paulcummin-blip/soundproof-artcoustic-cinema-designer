@@ -17,9 +17,6 @@ const getScreenWidth = (screenSize, aspectRatio) => {
 export const useEnforceRoomLayoutLogic = () => {
   const appState = useAppState();
 
-  // Guard against missing appState
-  if (!appState) return { safeSeats: [], adjustedSpeakers: [] };
-
   const {
     dimensions = { width: 4, length: 6, height: 2.8 },
     seatingPositions = [],
@@ -27,9 +24,10 @@ export const useEnforceRoomLayoutLogic = () => {
     aspectRatio = '16:9',
     screenSize = 120,
     screenWall = 'front'
-  } = appState;
+  } = appState || {};
 
   return useMemo(() => {
+    if (!appState) return { safeSeats: [], adjustedSpeakers: [] };
     // Safety guard for invalid inputs
     if (!dimensions || !seatingPositions || !placedSpeakers) {
       return { safeSeats: [], adjustedSpeakers: [] };

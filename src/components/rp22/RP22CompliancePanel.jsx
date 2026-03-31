@@ -359,7 +359,7 @@ export default function RP22CompliancePanel({
   p21EarlyReflectionPreset,
   freeMoveLcr = false,
 }) {
-  const appState = useAppState ? useAppState() : null;
+  const appState = useAppState();
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   // Match pages/RP22Report.jsx fallback for P2

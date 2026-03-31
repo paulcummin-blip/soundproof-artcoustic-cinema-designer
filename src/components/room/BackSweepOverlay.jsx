@@ -92,8 +92,6 @@ export default function BackSweepOverlay({
   padding = 0,
   visible = true,
 }) {
-  if (!visible) return null;
-
   const W = Number(dimensions?.width)  || 4.5;
   const L = Number(dimensions?.length) || 6.0;
 
@@ -103,6 +101,7 @@ export default function BackSweepOverlay({
   const ordered = useMemo(() => orderBackSweepCW(speakers, mlp),
     [speakers, mlp]);
 
+  if (!visible) return null;
   if (ordered.length < 2) return null;
 
   // map metres → SVG px
