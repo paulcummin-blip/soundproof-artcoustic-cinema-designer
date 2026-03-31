@@ -4,9 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
 
 export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange, p21EarlyReflectionPreset, onP21EarlyReflectionPresetChange, displayedLevel = null }) {
-    if (!parameter) return null;
-
     const [p15Local, setP15Local] = React.useState("purpose-built");
+
+    if (!parameter) return null;
     const p21Local = p21EarlyReflectionPreset || "l3";
 
     const hasRoomResult = roomResult && typeof roomResult === 'object';

@@ -643,6 +643,65 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       })()}
       {/* __B44_SEAT_MAP_DEBUG__ end */}
 
+      {/* __B44_GEOMETRY_DEBUG__ temporary — runtime geometry parity check */}
+      {(() => {
+        const firstSelectedId = selectedSeatIds[0] || null;
+        const firstSeat = firstSelectedId
+          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === firstSelectedId)
+          : null;
+        const firstSeriesSeatId = multiSeries[0]?.id ?? null;
+
+        return (
+          <div style={{ border: '1px solid #6366f1', borderRadius: 6, background: '#eef2ff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, color: '#4338ca', marginBottom: 6 }}>Bass runtime geometry debug</div>
+
+            <div style={{ marginBottom: 4 }}>
+              <strong>selectedSeatIds:</strong> [{selectedSeatIds.join(', ')}]
+            </div>
+            <div style={{ marginBottom: 4 }}>
+              <strong>first graph series seat:</strong> {firstSeriesSeatId ?? '—'}
+            </div>
+
+            <div style={{ marginBottom: 4, borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
+              <strong>seat id:</strong> {firstSeat ? (firstSeat.id || `${firstSeat.x}-${firstSeat.y}`) : '—'}<br/>
+              <strong>seat x:</strong> {firstSeat ? firstSeat.x : '—'}<br/>
+              <strong>seat y:</strong> {firstSeat ? firstSeat.y : '—'}<br/>
+              <strong>seat z:</strong> {firstSeat ? (Number.isFinite(Number(firstSeat.z)) ? Number(firstSeat.z) : 1.2) : '—'}
+            </div>
+
+            <div style={{ marginBottom: 4, borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
+              <strong>room width:</strong> {roomDims?.widthM ?? '—'}<br/>
+              <strong>room length:</strong> {roomDims?.lengthM ?? '—'}<br/>
+              <strong>room height:</strong> {roomDims?.heightM ?? '—'}
+            </div>
+
+            <div style={{ marginBottom: 4, borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
+              <strong>subs ({subsForSimulation.length}):</strong>
+              {subsForSimulation.length === 0 && <span> none</span>}
+              {subsForSimulation.map((sub, i) => (
+                <div key={sub.id || i} style={{ marginLeft: 8 }}>
+                  [{i}] id: {sub.id ?? '—'}, model: {sub.modelKey ?? '—'}, x: {sub.x}, y: {sub.y}, z: {sub.z ?? '—'}, gain: {sub.tuning?.gainDb ?? 0} dB, delay: {sub.tuning?.delayMs ?? 0} ms, polarity: {sub.tuning?.polarity ?? 0}°
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginBottom: 4, borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
+              <strong>surface absorption:</strong><br/>
+              <span style={{ marginLeft: 8 }}>front: {surfaceAbsorption.front}, back: {surfaceAbsorption.back}, left: {surfaceAbsorption.left}, right: {surfaceAbsorption.right}, ceiling: {surfaceAbsorption.ceiling}, floor: {surfaceAbsorption.floor}</span>
+            </div>
+
+            <div style={{ borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
+              <strong>reflections:</strong> {useRewCoreTestMode ? 'true' : String(splConfig?.modesEnabled !== false)}<br/>
+              <strong>modes:</strong> {useRewCoreTestMode ? 'true' : String(splConfig?.modesEnabled !== false)}<br/>
+              <strong>smoothing:</strong> {useRewCoreTestMode ? 'none' : 'n/a (live engine)'}<br/>
+              <strong>freq min:</strong> 20 Hz<br/>
+              <strong>freq max:</strong> 200 Hz
+            </div>
+          </div>
+        );
+      })()}
+      {/* __B44_GEOMETRY_DEBUG__ end */}
+
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>

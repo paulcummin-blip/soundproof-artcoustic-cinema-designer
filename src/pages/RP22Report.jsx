@@ -458,17 +458,6 @@ function RP22ReportInner() {
 
     useSubwooferSync({ appState: app, stableDimensions, frontSubsCfg, rearSubsCfg });
 
-    if (!app) {
-        return (
-            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
-                <div className="text-center text-[#3E4349]">
-                    <p>App state is not initialised.</p>
-                    <p>Please open the Room Designer first, then return to this report.</p>
-                </div>
-            </div>
-        );
-    }
-
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
     const mlpBasis = app?.mlpBasis || "front";
@@ -907,6 +896,17 @@ function RP22ReportInner() {
             ],
         };
     }, [projectDetails, exportDateLabel, exportSystemConfiguration]);
+
+    if (!app) {
+        return (
+            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
+                <div className="text-center text-[#3E4349]">
+                    <p>App state is not initialised.</p>
+                    <p>Please open the Room Designer first, then return to this report.</p>
+                </div>
+            </div>
+        );
+    }
 
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from "react";
 import {
   LineChart,
@@ -203,22 +202,6 @@ export default function OffAxisAnalysis({
     }
   }, [selectedSpeaker, speakerInRoom, seatingPositions, roomOrientation, screenWall, roomDimensions]);
 
-  if (!availableSpeakers || availableSpeakers.length === 0) {
-    return (
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <SlidersHorizontal className="w-5 h-5" />
-            Speaker Directivity Analysis
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-zinc-400">No speaker data available to analyze.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   // --- RP22 Parameter Calculations ---
 
   // RP22 #5: Max Horizontal Angle (Surrounds)
@@ -291,6 +274,22 @@ export default function OffAxisAnalysis({
 
   const surroundAngle = useMemo(() => calculateSurroundAngleSeparation(), [placedSpeakers, seatingPositions]);
   const wideDeviation = useMemo(() => calculateWideSpeakerDeviation(), [placedSpeakers, seatingPositions]);
+
+  if (!availableSpeakers || availableSpeakers.length === 0) {
+    return (
+      <Card className="bg-zinc-900/50 border-zinc-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <SlidersHorizontal className="w-5 h-5" />
+            Speaker Directivity Analysis
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-zinc-400">No speaker data available to analyze.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const getLevelColor = (level) => {
     if (level === 'N/A') return 'bg-zinc-700 text-zinc-400'; // Specific style for N/A

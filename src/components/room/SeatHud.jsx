@@ -20,11 +20,11 @@ export default function SeatHud({
   splPowerW,
   splRadiationMode,
 }) {
-  // Guard: render nothing if no hovered seat or tooltip data
-  if (!effectiveHoveredSeat || !tooltipData) return null;
-
   // Track which parameter is being hovered for tooltip
   const [hoveredParam, setHoveredParam] = useState(null);
+
+  // Guard: render nothing if no hovered seat or tooltip data
+  if (!effectiveHoveredSeat || !tooltipData) return null;
 
   // Safe value formatter
   const fmt = (v) => {
