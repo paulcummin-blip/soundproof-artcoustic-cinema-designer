@@ -213,12 +213,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
 
     const seatResponses = {};
-    // Step debug: follow the first selected seat + first sub (matches the visible graph)
+    // Step debug: follow the first selected seat + first sub (matches the visible graph).
+    // Use ID-based matching (not reference equality) so it is robust to seat list re-creation.
     let __b44StepDebugCapture = null;
     const debugSeatId = selectedSeatIds[0] || null;
-    const debugSeatForCapture = debugSeatId
-      ? seatingPositions.find(s => (s.id || `${s.x}-${s.y}`) === debugSeatId)
-      : null;
     const debugSubForCapture = subsForSimulation[0] || null;
 
     seatingPositions.forEach((seat) => {
@@ -254,11 +252,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           }
         );
 
-        // Capture step debug for the first selected seat + first sub only
+        // Capture step debug for the first selected seat (by ID) + first sub only.
+        // ID-based match ensures we always capture the currently selected pill's seat.
         if (
           __b44StepDebugCapture === null &&
-          debugSeatForCapture && debugSubForCapture &&
-          seat === debugSeatForCapture && sub === debugSubForCapture &&
+          debugSeatId && seatId === debugSeatId &&
+          sub === debugSubForCapture &&
           rewResult.stepDebug?.length > 0
         ) {
           __b44StepDebugCapture = rewResult.stepDebug;
