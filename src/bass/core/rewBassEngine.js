@@ -206,16 +206,14 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   let tfRe = 1;
   let tfIm = 0;
 
-  // __B44_PREMODAL_SCALE__ legacy-only pre-modal-relative scaling test.
-  // Scale modal contribution relative to local pre-modal field magnitude, bounded.
+  // __B44_FIELD_DRIVEN_EXCITATION__ legacy-only field-driven modal excitation experiment.
+  // Instead of scaling the modal output afterward, the local pre-modal field magnitude
+  // is used to compute how strongly the incoming field excites each mode at this frequency.
+  // The normalised excitation amplitude drives the modal contribution before accumulation.
   // Reference is aligned to the real engine magnitude range (~25,000–35,000 Pa in the
-  // low-bass region), so the factor varies meaningfully around 1.0 instead of saturating.
-  const LEGACY_PREMODAL_SCALE_REF = 30000.0; // reference field amplitude in actual engine Pa units
-  const LEGACY_PREMODAL_SCALE_MAX = 4.0;     // conservative ceiling — prevents explosion
-  const preModalScaleFactor = Math.min(
-    preModalMag / LEGACY_PREMODAL_SCALE_REF,
-    LEGACY_PREMODAL_SCALE_MAX
-  );
+  // low-bass region), so excitation near 1.0 for typical fields, bounded conservatively.
+  const LEGACY_FIELD_EXCITATION_REF = 30000.0; // reference field amplitude in actual engine Pa units
+  const LEGACY_FIELD_EXCITATION_MAX = 3.0;     // conservative ceiling — prevents runaway
 
   // __B44_DEGENERACY_ASSIST__ legacy-only degenerate pair support.
   // Two modes with the same frequency (e.g. the ~34.3 Hz [1,0,0]/[0,1,0] pair in a square room)
@@ -264,6 +262,13 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       ? sign * partnerSupport
       : combinedCoupling;
 
+    // __B44_FIELD_DRIVEN_EXCITATION__: compute how strongly the local pre-modal field
+    // at this frequency excites this mode, via the source coupling as the coupling gate.
+    // The field drives the mode — the mode then contributes back into tfRe/tfIm.
+    // fieldExcitation = normalised local field magnitude, bounded, projected through sourceCoupling.
+    const normalisedField = Math.min(preModalMag / LEGACY_FIELD_EXCITATION_REF, LEGACY_FIELD_EXCITATION_MAX);
+    const fieldExcitation = normalisedField * Math.abs(sourceCoupling);
+
     const modalContrib = modalPressureContributionLocal(
       frequencyHz,
       mode.freq,
@@ -272,10 +277,11 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     );
 
     // Legacy: accumulate as a multiplicative transfer function delta from identity (1+j0)
-    // __B44_MODAL_DRIVE__ + __B44_PREMODAL_SCALE__: scale by local pre-modal magnitude.
+    // __B44_FIELD_DRIVEN_EXCITATION__: modal contribution is now scaled by how much
+    // the incoming field at this frequency excited this mode, not a flat drive constant.
     const LEGACY_MODAL_DRIVE = 2.0;
-    tfRe += LEGACY_MODAL_DRIVE * preModalScaleFactor * weight * modalContrib.real;
-    tfIm += LEGACY_MODAL_DRIVE * preModalScaleFactor * weight * modalContrib.imag;
+    tfRe += LEGACY_MODAL_DRIVE * fieldExcitation * weight * modalContrib.real;
+    tfIm += LEGACY_MODAL_DRIVE * fieldExcitation * weight * modalContrib.imag;
   });
 
   return { tfRe, tfIm };
