@@ -261,8 +261,10 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     );
 
     // Legacy: accumulate as a multiplicative transfer function delta from identity (1+j0)
-    tfRe += weight * modalContrib.real;
-    tfIm += weight * modalContrib.imag;
+    // __B44_MODAL_DRIVE__ legacy-only drive scale test — remove or tune after diagnosis.
+    const LEGACY_MODAL_DRIVE = 2.0;
+    tfRe += LEGACY_MODAL_DRIVE * weight * modalContrib.real;
+    tfIm += LEGACY_MODAL_DRIVE * weight * modalContrib.imag;
   });
 
   return { tfRe, tfIm };
