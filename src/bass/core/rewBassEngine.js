@@ -218,13 +218,21 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
-    if (Math.abs(combinedCoupling) < 1e-4) return;
+    // __B44_NODE_SOFTEN__ legacy-only coupling floor experiment.
+    // Hard-zero combinedCoupling causes important low modes (e.g. 34.3 Hz axial) to be
+    // silently skipped when the seat lies exactly on a pressure node for one cosine axis.
+    // Apply a small sign-preserving floor so near-node modes are not fully suppressed.
+    // Floor = 0.05 (5% of full coupling range), intentionally small to avoid over-boosting.
+    const LEGACY_COUPLING_FLOOR = 0.05;
+    const softenedCombinedCoupling = combinedCoupling >= 0
+      ? Math.max(combinedCoupling, LEGACY_COUPLING_FLOOR)
+      : Math.min(combinedCoupling, -LEGACY_COUPLING_FLOOR);
 
     const modalContrib = modalPressureContributionLocal(
       frequencyHz,
       mode.freq,
       mode.qValue,
-      combinedCoupling
+      softenedCombinedCoupling
     );
 
     // Legacy: accumulate as a multiplicative transfer function delta from identity (1+j0)
