@@ -206,7 +206,20 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   let tfRe = 1;
   let tfIm = 0;
 
-  modes.forEach((mode) => {
+  // __B44_DEGENERACY_ASSIST__ legacy-only degenerate pair support.
+  // Two modes with the same frequency (e.g. the ~34.3 Hz [1,0,0]/[0,1,0] pair in a square room)
+  // can collapse to a single survivor when one partner has near-zero coupling at the receiver.
+  // Pre-compute each mode's raw combined coupling so each mode can reference its partner's strength.
+  const DEGENERACY_FREQ_TOL_HZ = 0.5; // modes within 0.5 Hz are considered degenerate partners
+  const DEGENERACY_PARTNER_BLEND = 0.15; // 15% of strongest partner coupling bleeds into weak partner
+
+  const modeCouplings = modes.map((m) => ({
+    combinedCoupling: modeShapeValueLocal(m, source.x, source.y, source.z, { widthM, lengthM, heightM })
+                    * modeShapeValueLocal(m, seat.x, seat.y, seat.z, { widthM, lengthM, heightM }),
+    freq: m.freq,
+  }));
+
+  modes.forEach((mode, modeIdx) => {
     const bandwidthHz = mode.freq / mode.qValue;
     const df = Math.abs(frequencyHz - mode.freq);
     const normalized = df / (3 * bandwidthHz);
@@ -218,21 +231,33 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
-    // __B44_NODE_SOFTEN__ legacy-only coupling floor experiment.
-    // Hard-zero combinedCoupling causes important low modes (e.g. 34.3 Hz axial) to be
-    // silently skipped when the seat lies exactly on a pressure node for one cosine axis.
-    // Apply a small sign-preserving floor so near-node modes are not fully suppressed.
-    // Floor = 0.05 (5% of full coupling range), intentionally small to avoid over-boosting.
-    const LEGACY_COUPLING_FLOOR = 0.05;
-    const softenedCombinedCoupling = combinedCoupling >= 0
-      ? Math.max(combinedCoupling, LEGACY_COUPLING_FLOOR)
-      : Math.min(combinedCoupling, -LEGACY_COUPLING_FLOOR);
+    // __B44_DEGENERACY_ASSIST__: for this mode, find the strongest degenerate partner's
+    // |combinedCoupling| and allow a small fraction of it to support this mode if this
+    // mode's own coupling is weaker. This prevents the degenerate pair from collapsing to
+    // a single surviving mode when the seat is near a node for one of the pair.
+    let maxPartnerCoupling = 0;
+    for (let j = 0; j < modeCouplings.length; j++) {
+      if (j === modeIdx) continue;
+      if (Math.abs(modeCouplings[j].freq - mode.freq) <= DEGENERACY_FREQ_TOL_HZ) {
+        const partnerAbs = Math.abs(modeCouplings[j].combinedCoupling);
+        if (partnerAbs > maxPartnerCoupling) maxPartnerCoupling = partnerAbs;
+      }
+    }
+    const partnerSupport = maxPartnerCoupling * DEGENERACY_PARTNER_BLEND;
+
+    // Apply sign-preserving degeneracy support: raise |coupling| to at least partnerSupport,
+    // but only if a degenerate partner exists (partnerSupport > 0).
+    const absCC = Math.abs(combinedCoupling);
+    const sign = combinedCoupling >= 0 ? 1 : -1;
+    const effectiveCoupling = (partnerSupport > 0 && absCC < partnerSupport)
+      ? sign * partnerSupport
+      : combinedCoupling;
 
     const modalContrib = modalPressureContributionLocal(
       frequencyHz,
       mode.freq,
       mode.qValue,
-      softenedCombinedCoupling
+      effectiveCoupling
     );
 
     // Legacy: accumulate as a multiplicative transfer function delta from identity (1+j0)
