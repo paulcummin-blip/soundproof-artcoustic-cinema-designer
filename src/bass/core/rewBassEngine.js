@@ -266,8 +266,12 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     // at this frequency excites this mode, via the source coupling as the coupling gate.
     // The field drives the mode — the mode then contributes back into tfRe/tfIm.
     // fieldExcitation = normalised local field magnitude, bounded, projected through sourceCoupling.
+    // __B44_RECEIVER_EARLY_WEIGHT__: blend a modest receiver selectivity term into excitation
+    // so modes the listener position cannot support are gently damped before accumulation.
+    // receiverWeight is in [0.5, 1.0] — it softens but never hard-zeros weak receiver modes.
     const normalisedField = Math.min(preModalMag / LEGACY_FIELD_EXCITATION_REF, LEGACY_FIELD_EXCITATION_MAX);
-    const fieldExcitation = normalisedField * Math.abs(sourceCoupling);
+    const receiverWeight = 0.5 + 0.5 * Math.abs(receiverCoupling);
+    const fieldExcitation = normalisedField * Math.abs(sourceCoupling) * receiverWeight;
 
     const modalContrib = modalPressureContributionLocal(
       frequencyHz,
