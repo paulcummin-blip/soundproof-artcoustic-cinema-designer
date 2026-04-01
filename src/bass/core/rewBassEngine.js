@@ -24,7 +24,6 @@ function buildFrequencyAxis(freqMinHz, freqMaxHz) {
   return freqsHz;
 }
 
-// Reused from the existing bass engine pattern, kept local and independent here.
 function interpolateCurveDb(curvePoints, hz) {
   if (!Array.isArray(curvePoints) || curvePoints.length === 0) {
     return 90;
@@ -58,7 +57,6 @@ function interpolateCurveDb(curvePoints, hz) {
   return points[0].db;
 }
 
-// Reused from the existing bass engine pattern, kept local and independent here.
 function normalizeSubTuning(tuning) {
   const defaults = { gainDb: 0, delayMs: 0, polarity: 0 };
 
@@ -164,19 +162,8 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
 }
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
-// This is a modal Green's function: it expresses the pressure response at the receiver
-// due to a source, mediated by a single room mode.
-//
-// Formulation: p_mode(f) = [Ψ_s * Ψ_r] / [(f0/Q)^2 + j*(f/Q)*f0 - (f-f0)^2] scaled form
-// Simplified to the standard resonant transfer: coupling * Q * (bw/denom) * e^(j*phase)
-// where coupling = Ψ_source * Ψ_receiver (mode shape at source × mode shape at receiver).
-// This is the physically correct room-mode pressure Green's function.
-//
-// IMPORTANT: combinedCoupling near zero means the mode is decoupled from either source
-// or receiver. It correctly produces near-zero contribution in that case — this is physical.
-// The fix for the identity-collapse bug is upstream: use abs(combinedCoupling) threshold
-// that is appropriate for the cosine mode shape range [-1, +1], and accumulate as an
-// additive pressure delta (not as a multiplicative transfer starting from identity 1+j0).
+// Modal Green's function: coupling = Ψ_source * Ψ_receiver, resonant transfer H(f, f0, Q).
+// pressureMagnitude = combinedCoupling * Q * resonanceMagnitude
 function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
@@ -184,12 +171,9 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const deltaFrequency = angularFrequency - modalAngularFrequency;
 
   const denominator = Math.sqrt(deltaFrequency * deltaFrequency + bandwidth * bandwidth);
-  const resonanceMagnitude = bandwidth / denominator;     // peak = 1 at f0, falls off with df
+  const resonanceMagnitude = bandwidth / denominator;
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
 
-  // combinedCoupling = Ψ_source * Ψ_receiver ∈ [-1, +1]
-  // Scale by Q so that strongly resonant modes (high Q) contribute more energy —
-  // matching REW's modal pressure Green's function convention.
   const pressureMagnitude = combinedCoupling * qValue * resonanceMagnitude;
 
   return {
@@ -199,96 +183,63 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LEGACY modal-transfer helper (multiplicative-from-identity, pre-additive-injection)
-// Kept here for A/B validation only. Do not tune or ship as production path.
+// CLEAN LEGACY MODAL TRANSFER
+// Pure original legacy transfer baseline. No heuristic layers.
+// Removed layers (frozen, not present here):
+//   - node softening (normalized df window)
+//   - degeneracy assist (partner coupling bleed)
+//   - modal drive boost (LEGACY_MODAL_DRIVE constant)
+//   - pre-modal-relative scaling (field-driven excitation)
+//   - early receiver weighting (receiverWeight term)
+// Accumulation: multiplicative transfer from identity (1+j0), direct combinedCoupling only.
 // ─────────────────────────────────────────────────────────────────────────────
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, preModalMag) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM) {
   let tfRe = 1;
   let tfIm = 0;
 
-  // __B44_FIELD_DRIVEN_EXCITATION__ legacy-only field-driven modal excitation experiment.
-  // Instead of scaling the modal output afterward, the local pre-modal field magnitude
-  // is used to compute how strongly the incoming field excites each mode at this frequency.
-  // The normalised excitation amplitude drives the modal contribution before accumulation.
-  // Reference is aligned to the real engine magnitude range (~25,000–35,000 Pa in the
-  // low-bass region), so excitation near 1.0 for typical fields, bounded conservatively.
-  const LEGACY_FIELD_EXCITATION_REF = 30000.0; // reference field amplitude in actual engine Pa units
-  const LEGACY_FIELD_EXCITATION_MAX = 3.0;     // conservative ceiling — prevents runaway
+  // Step debug tracking for the strongest contributing mode
+  let _debugStrongestMode = null;
+  let _debugStrongestMag = -1;
 
-  // __B44_DEGENERACY_ASSIST__ legacy-only degenerate pair support.
-  // Two modes with the same frequency (e.g. the ~34.3 Hz [1,0,0]/[0,1,0] pair in a square room)
-  // can collapse to a single survivor when one partner has near-zero coupling at the receiver.
-  // Pre-compute each mode's raw combined coupling so each mode can reference its partner's strength.
-  const DEGENERACY_FREQ_TOL_HZ = 0.5; // modes within 0.5 Hz are considered degenerate partners
-  const DEGENERACY_PARTNER_BLEND = 0.15; // 15% of strongest partner coupling bleeds into weak partner
-
-  const modeCouplings = modes.map((m) => ({
-    combinedCoupling: modeShapeValueLocal(m, source.x, source.y, source.z, { widthM, lengthM, heightM })
-                    * modeShapeValueLocal(m, seat.x, seat.y, seat.z, { widthM, lengthM, heightM }),
-    freq: m.freq,
-  }));
-
-  modes.forEach((mode, modeIdx) => {
-    const bandwidthHz = mode.freq / mode.qValue;
-    const df = Math.abs(frequencyHz - mode.freq);
-    const normalized = df / (3 * bandwidthHz);
-    if (normalized >= 1) return;
-
-    const weight = 0.5 * (1 + Math.cos(Math.PI * normalized));
-
+  modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
     const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
     const combinedCoupling = sourceCoupling * receiverCoupling;
-
-    // __B44_DEGENERACY_ASSIST__: for this mode, find the strongest degenerate partner's
-    // |combinedCoupling| and allow a small fraction of it to support this mode if this
-    // mode's own coupling is weaker. This prevents the degenerate pair from collapsing to
-    // a single surviving mode when the seat is near a node for one of the pair.
-    let maxPartnerCoupling = 0;
-    for (let j = 0; j < modeCouplings.length; j++) {
-      if (j === modeIdx) continue;
-      if (Math.abs(modeCouplings[j].freq - mode.freq) <= DEGENERACY_FREQ_TOL_HZ) {
-        const partnerAbs = Math.abs(modeCouplings[j].combinedCoupling);
-        if (partnerAbs > maxPartnerCoupling) maxPartnerCoupling = partnerAbs;
-      }
-    }
-    const partnerSupport = maxPartnerCoupling * DEGENERACY_PARTNER_BLEND;
-
-    // Apply sign-preserving degeneracy support: raise |coupling| to at least partnerSupport,
-    // but only if a degenerate partner exists (partnerSupport > 0).
-    const absCC = Math.abs(combinedCoupling);
-    const sign = combinedCoupling >= 0 ? 1 : -1;
-    const effectiveCoupling = (partnerSupport > 0 && absCC < partnerSupport)
-      ? sign * partnerSupport
-      : combinedCoupling;
-
-    // __B44_FIELD_DRIVEN_EXCITATION__: compute how strongly the local pre-modal field
-    // at this frequency excites this mode, via the source coupling as the coupling gate.
-    // The field drives the mode — the mode then contributes back into tfRe/tfIm.
-    // fieldExcitation = normalised local field magnitude, bounded, projected through sourceCoupling.
-    // __B44_RECEIVER_EARLY_WEIGHT__: blend a modest receiver selectivity term into excitation
-    // so modes the listener position cannot support are gently damped before accumulation.
-    // receiverWeight is in [0.5, 1.0] — it softens but never hard-zeros weak receiver modes.
-    const normalisedField = Math.min(preModalMag / LEGACY_FIELD_EXCITATION_REF, LEGACY_FIELD_EXCITATION_MAX);
-    const receiverWeight = 0.5 + 0.5 * Math.abs(receiverCoupling);
-    const fieldExcitation = normalisedField * Math.abs(sourceCoupling) * receiverWeight;
 
     const modalContrib = modalPressureContributionLocal(
       frequencyHz,
       mode.freq,
       mode.qValue,
-      effectiveCoupling
+      combinedCoupling
     );
 
-    // Legacy: accumulate as a multiplicative transfer function delta from identity (1+j0)
-    // __B44_FIELD_DRIVEN_EXCITATION__: modal contribution is now scaled by how much
-    // the incoming field at this frequency excited this mode, not a flat drive constant.
-    const LEGACY_MODAL_DRIVE = 2.0;
-    tfRe += LEGACY_MODAL_DRIVE * fieldExcitation * weight * modalContrib.real;
-    tfIm += LEGACY_MODAL_DRIVE * fieldExcitation * weight * modalContrib.imag;
+    // Pure original accumulation: additive delta to transfer from identity (1+j0)
+    tfRe += modalContrib.real;
+    tfIm += modalContrib.imag;
+
+    // Step debug: track strongest mode contribution in the 43–55 Hz range
+    if (frequencyHz >= 43 && frequencyHz <= 55) {
+      const mag = Math.sqrt(modalContrib.real * modalContrib.real + modalContrib.imag * modalContrib.imag);
+      if (mag > _debugStrongestMag) {
+        _debugStrongestMag = mag;
+        _debugStrongestMode = {
+          freq: mode.freq,
+          nx: mode.nx,
+          ny: mode.ny,
+          nz: mode.nz,
+          type: mode.type,
+          qValue: mode.qValue,
+          sourceCoupling,
+          receiverCoupling,
+          combinedCoupling,
+          transferRe: modalContrib.real,
+          transferIm: modalContrib.imag,
+        };
+      }
+    }
   });
 
-  return { tfRe, tfIm };
+  return { tfRe, tfIm, _debugStrongestMode };
 }
 
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
@@ -318,9 +269,6 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const enableReflections = options?.enableReflections === true;
   const enableModes = options?.enableModes === true;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
-
-  // A/B modal model selector — "legacy_transfer" | "additive_pressure" (default)
-  const modalModel = options?.modalModel === 'legacy_transfer' ? 'legacy_transfer' : 'additive_pressure';
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
     throw new Error('roomDims must include finite widthM, lengthM, and heightM values.');
@@ -368,7 +316,6 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       }))
     : [];
 
-  // __B44_STEP_DEBUG__ temporary probe — remove after diagnosis
   const stepDebugRows = [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
@@ -408,32 +355,26 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
 
       // Deterministic frequency-dependent phase jitter — reflections only.
-      // Grows from ~0 at 20 Hz to ~0.4 rad at 200 Hz, stable per reflection identity.
       const phaseJitter = 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
       const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + phaseJitter;
 
-      const f = frequencyHz;
       // Smooth coherence curve: ~0.75 at 20 Hz → ~0.25 at 200 Hz
-      const reflectionCoherenceWeight = 0.25 + 0.6 * Math.exp(-(f - 20) / 70);
+      const reflectionCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
       sumRe += reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
       sumIm += reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
     });
 
-    // Diffuse late-field approximation — higher-order / late reflection residual.
-    // Derived from the direct-path amplitude, decaying with frequency.
-    // Intentionally modest: adds believable residual energy without dominating.
+    // Diffuse late-field approximation
     const lateFieldDecay = Math.exp(-(frequencyHz - 20) / 120);
     const lateFieldAmplitude = amplitude * 0.12 * lateFieldDecay;
-    // Deterministic phase: offset from specular phases, stable per frequency.
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
     sumRe += lateFieldAmplitude * Math.cos(lateFieldPhase);
     sumIm += lateFieldAmplitude * Math.sin(lateFieldPhase);
 
     const preModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
 
-    // __B44_STEP_DEBUG__ temporary probe — remove after diagnosis
+    // Collect step debug data for 43–55 Hz range
     if (frequencyHz >= 43 && frequencyHz <= 55) {
-      // Aggregate weighted reflections from the live per-reflection contributions
       let _refSumRe = 0;
       let _refSumIm = 0;
       imageSources.forEach((imageSource, reflectionIndex) => {
@@ -452,10 +393,6 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         _refSumIm += debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       });
 
-      // Late-field values computed above (same formula)
-      const _lfRe = lateFieldAmplitude * Math.cos(lateFieldPhase);
-      const _lfIm = lateFieldAmplitude * Math.sin(lateFieldPhase);
-
       stepDebugRows.push({
         frequencyHz,
         curveDb,
@@ -465,196 +402,38 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           re: amplitude * Math.cos(totalPhase),
           im: amplitude * Math.sin(totalPhase),
         },
-        reflections: imageSources.map((imageSource, reflectionIndex) => {
-          const imageDx = imageSource.x - seat.x;
-          const imageDy = imageSource.y - seat.y;
-          const imageDz = imageSource.z - seat.z;
-          const imageDistanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(imageDx * imageDx + imageDy * imageDy + imageDz * imageDz));
-          const imageDistanceLossDb = -20 * Math.log10(imageDistanceM / 1);
-          const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
-          const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
-          const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
-          const debugPhaseJitter = 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
-          const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + debugPhaseJitter;
-          const debugCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
-          return {
-            reflectionCoefficient: imageSource.reflectionCoefficient,
-            imageDistanceM,
-            imageAmplitude,
-            imageTotalPhase,
-            re: imageAmplitude * Math.cos(imageTotalPhase),
-            im: imageAmplitude * Math.sin(imageTotalPhase),
-            reflectionCoherenceWeight: debugCoherenceWeight,
-            weightedRe: debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase),
-            weightedIm: debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase),
-          };
-        }),
-        // Aggregated reflection vector (sum of all weighted per-reflection contributions)
         summedWeightedReflectionsRe: _refSumRe,
         summedWeightedReflectionsIm: _refSumIm,
         summedWeightedReflectionsMag: Math.sqrt(_refSumRe * _refSumRe + _refSumIm * _refSumIm),
-        // Late-field contribution
-        lateFieldRe: _lfRe,
-        lateFieldIm: _lfIm,
+        lateFieldRe: lateFieldAmplitude * Math.cos(lateFieldPhase),
+        lateFieldIm: lateFieldAmplitude * Math.sin(lateFieldPhase),
         lateFieldMag: lateFieldAmplitude,
-        summedBeforeModes: {
-          sumRe,   // pre-modal field real component (direct + reflections + late-field)
-          sumIm,   // pre-modal field imaginary component
-          preModalMagnitude,
-        },
-        // postModal is filled in after the modal transfer is applied below
+        summedBeforeModes: { sumRe, sumIm, preModalMagnitude },
         postModal: null,
+        strongestModeFreq: null,
+        modalTransferReFinal: null,
+        modalTransferImFinal: null,
       });
     }
-    // __B44_STEP_DEBUG__ end
 
-    // Modal pressure injection — adds modal resonance contributions directly to the
-    // pre-modal complex pressure field as additive pressure deltas.
-    //
-    // Physical basis: each room mode is an independent resonator. Its contribution to
-    // the total pressure field at the receiver is additive (superposition principle).
-    // The modal pressure delta is: weight * Ψ_s * Ψ_r * Q * H(f, f0, Q)
-    // where H is the resonant transfer amplitude and phase.
-    //
-    // This replaces the previous multiplicative-from-identity approach which collapsed
-    // to no-op (TfRe=1, TfIm=0) whenever combinedCoupling was near zero at the receiver
-    // (e.g. centre seat for axial modes — a common and physically valid configuration).
-    //
-    // Normalisation: modal pressure contributions are scaled by (1 / Q_ref) where
-    // Q_ref is a reference Q to keep modal injection dimensionally consistent with the
-    // direct-path amplitude. This prevents modes from dominating the field at all freqs.
-    const Q_REF = 10; // reference Q for normalisation — typical room mode Q range 5–30
-
+    // Clean legacy modal transfer path
     if (enableModes) {
-      // ── CONDITIONAL MODAL APPLICATION ──────────────────────────────────────
-      // Branch on modalModel option: "legacy_transfer" or "additive_pressure"
-      if (modalModel === 'legacy_transfer') {
-        // LEGACY PATH: multiplicative transfer applied to current sumRe/sumIm field
-        // Pass current pre-modal field magnitude for relative scaling inside legacyModalTransferLocal.
-        const { tfRe, tfIm } = legacyModalTransferLocal(
-          frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, preModalMagnitude
-        );
-        const prevRe = sumRe;
-        const prevIm = sumIm;
-        sumRe = prevRe * tfRe - prevIm * tfIm;
-        sumIm = prevRe * tfIm + prevIm * tfRe;
+      const { tfRe, tfIm, _debugStrongestMode } = legacyModalTransferLocal(
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM
+      );
+      const prevRe = sumRe;
+      const prevIm = sumIm;
+      sumRe = prevRe * tfRe - prevIm * tfIm;
+      sumIm = prevRe * tfIm + prevIm * tfRe;
 
-        // __B44_STEP_DEBUG__ fill in post-modal for legacy path
-        if (stepDebugRows.length > 0) {
-          const lastRow = stepDebugRows[stepDebugRows.length - 1];
-          if (lastRow && lastRow.postModal === null && Math.abs(lastRow.frequencyHz - frequencyHz) < 0.5) {
-            const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
-            lastRow.postModal = { transferRe: tfRe, transferIm: tfIm, sumRe, sumIm, magnitude: postMag };
-            lastRow.modalTransferReFinal = tfRe;
-            lastRow.modalTransferImFinal = tfIm;
-          }
-        }
-      } else {
-      // ADDITIVE PRESSURE PATH (default) ─────────────────────────────────────
-      // Accumulated modal pressure delta (additive to sumRe/sumIm)
-      let modalDeltaRe = 0;
-      let modalDeltaIm = 0;
-
-      // __B44_STEP_DEBUG__ track strongest active mode for debug rows
-      let _debugStrongestMode = null;
-      let _debugStrongestModeWeightedMag = -1;
-
-      modes.forEach((mode) => {
-        const bandwidthHz = mode.freq / mode.qValue;
-        const df = Math.abs(frequencyHz - mode.freq);
-        const normalized = df / (3 * bandwidthHz);
-
-        if (normalized >= 1) {
-          return;
-        }
-
-        const weight = 0.5 * (1 + Math.cos(Math.PI * normalized));
-
-        const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
-        const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
-        const combinedCoupling = sourceCoupling * receiverCoupling;
-
-        // Lower threshold: cosine mode shapes are in [-1, +1].
-        // Near-zero combinedCoupling is physically meaningful (node at source or receiver)
-        // and correctly produces near-zero modal injection — do not skip these modes.
-        // Only skip if truly negligible (numerical noise floor).
-        if (Math.abs(combinedCoupling) < 1e-4) {
-          return;
-        }
-
-        const modalContrib = modalPressureContributionLocal(
-          frequencyHz,
-          mode.freq,
-          mode.qValue,
-          combinedCoupling
-        );
-
-        // Normalise by Q_REF so modal injection scales consistently with direct amplitude.
-        // weight = Hann window over 3 bandwidths, tapers modes away from their peak.
-        const normalisedWeight = weight / Q_REF;
-        const weightedRe = normalisedWeight * modalContrib.real;
-        const weightedIm = normalisedWeight * modalContrib.imag;
-        const weightedMag = Math.sqrt(weightedRe * weightedRe + weightedIm * weightedIm);
-
-        modalDeltaRe += weightedRe;
-        modalDeltaIm += weightedIm;
-
-        // __B44_STEP_DEBUG__ capture strongest active mode
-        if (frequencyHz >= 43 && frequencyHz <= 55 && weightedMag > _debugStrongestModeWeightedMag) {
-          _debugStrongestModeWeightedMag = weightedMag;
-          _debugStrongestMode = {
-            freq: mode.freq,
-            nx: mode.nx,
-            ny: mode.ny,
-            nz: mode.nz,
-            type: mode.type,
-            qValue: mode.qValue,
-            sourceCoupling,
-            receiverCoupling,
-            combinedCoupling,
-            bandwidthHz,
-            df,
-            normalized,
-            weight,
-            transferRe: modalContrib.real,
-            transferIm: modalContrib.imag,
-          };
-        }
-      });
-
-      // Add modal pressure delta to the complex pressure field, phase-referenced
-      // to the existing pre-modal field.
-      // Step 1: compute the phase of the current pre-modal field.
-      const fieldPhase = Math.atan2(sumIm, sumRe);
-      // Step 2: rotate the accumulated modal delta into the field's reference frame.
-      const cosF = Math.cos(fieldPhase);
-      const sinF = Math.sin(fieldPhase);
-      const rotatedModalDeltaRe = modalDeltaRe * cosF - modalDeltaIm * sinF;
-      const rotatedModalDeltaIm = modalDeltaRe * sinF + modalDeltaIm * cosF;
-      // Step 3: apply rotated modal delta (subtractive — modes remove energy at nulls).
-      sumRe -= amplitude * rotatedModalDeltaRe;
-      sumIm -= amplitude * rotatedModalDeltaIm;
-
-      // Build a virtual "transfer" for debug reporting (ratio of post/pre-modal field)
-      const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
-      const preMagForDebug = preModalMagnitude > 1e-10 ? preModalMagnitude : 1;
-      const debugTransferRe = (sumRe * Math.sqrt(sumRe * sumRe + sumIm * sumIm)) / (preMagForDebug * preMagForDebug + 1e-30) || 1;
-      const debugTransferIm = (sumIm * Math.sqrt(sumRe * sumRe + sumIm * sumIm)) / (preMagForDebug * preMagForDebug + 1e-30) || 0;
-
-      // __B44_STEP_DEBUG__ fill in post-modal result for debug rows in this frequency range
+      // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
         const lastRow = stepDebugRows[stepDebugRows.length - 1];
         if (lastRow && lastRow.postModal === null && Math.abs(lastRow.frequencyHz - frequencyHz) < 0.5) {
-          lastRow.postModal = {
-            transferRe: modalDeltaRe,
-            transferIm: modalDeltaIm,
-            sumRe,
-            sumIm,
-            magnitude: postMag,
-          };
-          // Attach strongest-mode debug data and final delta to the row
-          lastRow.modalTransferReFinal = modalDeltaRe;
-          lastRow.modalTransferImFinal = modalDeltaIm;
+          const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+          lastRow.postModal = { transferRe: tfRe, transferIm: tfIm, sumRe, sumIm, magnitude: postMag };
+          lastRow.modalTransferReFinal = tfRe;
+          lastRow.modalTransferImFinal = tfIm;
           if (_debugStrongestMode) {
             lastRow.strongestModeFreq = _debugStrongestMode.freq;
             lastRow.strongestModeNx = _debugStrongestMode.nx;
@@ -665,22 +444,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             lastRow.strongestModeSourceCoupling = _debugStrongestMode.sourceCoupling;
             lastRow.strongestModeReceiverCoupling = _debugStrongestMode.receiverCoupling;
             lastRow.strongestModeCombinedCoupling = _debugStrongestMode.combinedCoupling;
-            lastRow.strongestModeBandwidthHz = _debugStrongestMode.bandwidthHz;
-            lastRow.strongestModeDf = _debugStrongestMode.df;
-            lastRow.strongestModeNormalized = _debugStrongestMode.normalized;
-            lastRow.strongestModeWeight = _debugStrongestMode.weight;
             lastRow.strongestModeTransferRe = _debugStrongestMode.transferRe;
             lastRow.strongestModeTransferIm = _debugStrongestMode.transferIm;
           }
         }
       }
-      } // end additive_pressure else-branch
     }
 
-    return {
-      re: sumRe,
-      im: sumIm,
-    };
+    return { re: sumRe, im: sumIm };
   });
 
   const splDbRaw = complexPressure.map(({ re, im }) => {
@@ -692,7 +463,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     freqsHz,
     splDbRaw,
     complexPressure,
-    stepDebug: stepDebugRows, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
+    stepDebug: stepDebugRows,
   };
 }
 

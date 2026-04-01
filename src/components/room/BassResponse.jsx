@@ -91,9 +91,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   };
 
   // State declarations
-  // A/B modal model selector — "legacy_transfer" | "additive_pressure"
-  const [modalModel, setModalModel] = useState('legacy_transfer');
-
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
   const [tryPolarity, setTryPolarity] = useState(false);
   const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
@@ -216,10 +213,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
 
     const seatResponses = {};
-    // __B44_STEP_DEBUG__ temporary — remove after diagnosis
+    // Step debug: follow the first selected seat + first sub (matches the visible graph)
     let __b44StepDebugCapture = null;
-    const mlpSeatForDebug = seatingPositions.find(s => s.isPrimary) || seatingPositions[0];
-    const firstSubForDebug = subsForSimulation[0];
+    const debugSeatId = selectedSeatIds[0] || null;
+    const debugSeatForCapture = debugSeatId
+      ? seatingPositions.find(s => (s.id || `${s.x}-${s.y}`) === debugSeatId)
+      : null;
+    const debugSubForCapture = subsForSimulation[0] || null;
 
     seatingPositions.forEach((seat) => {
       const seatId = seat.id || `${seat.x}-${seat.y}`;
@@ -251,15 +251,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             freqMinHz: 20,
             freqMaxHz: 200,
             smoothing: 'none',
-            modalModel,
           }
         );
 
-        // __B44_STEP_DEBUG__ temporary — capture for MLP seat + first sub only
+        // Capture step debug for the first selected seat + first sub only
         if (
           __b44StepDebugCapture === null &&
-          mlpSeatForDebug && firstSubForDebug &&
-          seat === mlpSeatForDebug && sub === firstSubForDebug &&
+          debugSeatForCapture && debugSubForCapture &&
+          seat === debugSeatForCapture && sub === debugSubForCapture &&
           rewResult.stepDebug?.length > 0
         ) {
           __b44StepDebugCapture = rewResult.stepDebug;
@@ -298,7 +297,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       audit: null,
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, absorptionPct, modalModel]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, absorptionPct, selectedSeatIds]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -712,43 +711,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
-              <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
-            </div>
-            {useRewCoreTestMode && (
-              <div className="flex items-center gap-1 border border-[#DCDBD6] rounded-full overflow-hidden" style={{ fontSize: 11 }}>
-                <button
-                  onClick={() => setModalModel('legacy_transfer')}
-                  style={{
-                    padding: '2px 10px',
-                    background: modalModel === 'legacy_transfer' ? '#213428' : '#F8F8F7',
-                    color: modalModel === 'legacy_transfer' ? '#fff' : '#3E4349',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'monospace',
-                    fontWeight: modalModel === 'legacy_transfer' ? 700 : 400,
-                  }}
-                >
-                  A: Working REW parity
-                </button>
-                <button
-                  onClick={() => setModalModel('additive_pressure')}
-                  style={{
-                    padding: '2px 10px',
-                    background: modalModel === 'additive_pressure' ? '#92400e' : '#F8F8F7',
-                    color: modalModel === 'additive_pressure' ? '#fff' : '#3E4349',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'monospace',
-                    fontWeight: modalModel === 'additive_pressure' ? 700 : 400,
-                  }}
-                >
-                  B: Experimental additive
-                </button>
-              </div>
-            )}
+          <div className="flex items-center gap-2">
+            <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
+            <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
           </div>
         </div>
 
@@ -842,11 +807,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
       {useRewCoreTestMode && simulationResults.stepDebug?.length > 0 && (
         <div style={{ border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', padding: 12, fontSize: 11, fontFamily: 'monospace', overflowX: 'auto' }}>
-          <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 4 }}>REW Step Debug (43–55 Hz) — MLP seat, sub[0]</div>
+          <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 4 }}>REW Step Debug (43–55 Hz) — selected seat [{selectedSeatIds[0] ?? '—'}], sub[0]</div>
           <div style={{ marginBottom: 8, fontSize: 11, color: '#78350f' }}>
-            <strong>Modal model active:</strong>{' '}
-            <span style={{ background: modalModel === 'additive_pressure' ? '#92400e' : '#213428', color: '#fff', borderRadius: 4, padding: '1px 7px', fontFamily: 'monospace' }}>
-              {modalModel === 'additive_pressure' ? 'B: Experimental additive' : 'A: Working REW parity'}
+            <strong>Engine:</strong>{' '}
+            <span style={{ background: '#213428', color: '#fff', borderRadius: 4, padding: '1px 7px', fontFamily: 'monospace' }}>
+              Clean legacy transfer baseline
             </span>
           </div>
           <table style={{ borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
