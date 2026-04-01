@@ -871,10 +871,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <th style={{ textAlign: 'right', padding: '2px 5px' }}>srcC</th>
                     <th style={{ textAlign: 'right', padding: '2px 5px' }}>rcvC</th>
                     <th style={{ textAlign: 'right', padding: '2px 5px' }}>combC</th>
-                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>bwHz</th>
-                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>df</th>
-                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>norm</th>
-                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>wt</th>
                     <th style={{ textAlign: 'right', padding: '2px 5px' }}>mTfRe</th>
                     <th style={{ textAlign: 'right', padding: '2px 5px' }}>mTfIm</th>
                     <th style={{ textAlign: 'right', padding: '2px 5px', borderLeft: '1px solid #bfdbfe', fontWeight: 700 }}>TfReFinal</th>
@@ -897,10 +893,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                           <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeSourceCoupling.toFixed(4) : '—'}</td>
                           <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeReceiverCoupling.toFixed(4) : '—'}</td>
                           <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700 }}>{hasMode ? row.strongestModeCombinedCoupling.toFixed(4) : '—'}</td>
-                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeBandwidthHz.toFixed(3) : '—'}</td>
-                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeDf.toFixed(3) : '—'}</td>
-                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeNormalized.toFixed(4) : '—'}</td>
-                          <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeWeight.toFixed(4) : '—'}</td>
                           <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeTransferRe.toFixed(4) : '—'}</td>
                           <td style={{ textAlign: 'right', padding: '2px 5px' }}>{hasMode ? row.strongestModeTransferIm.toFixed(4) : '—'}</td>
                           <td style={{ textAlign: 'right', padding: '2px 5px', borderLeft: '1px solid #bfdbfe', fontWeight: 700, color: '#1d4ed8' }}>{row.modalTransferReFinal != null ? row.modalTransferReFinal.toFixed(4) : '—'}</td>
@@ -911,7 +903,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </tbody>
               </table>
               <div style={{ marginTop: 4, fontSize: 10, color: '#1e40af' }}>
-                srcC/rcvC/combC = source/receiver/combined coupling. norm = normalized df. wt = Hann weight. mTfRe/Im = single strongest mode transfer. TfReFinal/ImFinal = full accumulated modal transfer applied to field.
+                srcC/rcvC/combC = source/receiver/combined coupling. mTfRe/Im = single strongest mode transfer. TfReFinal/ImFinal = full accumulated modal transfer applied to field.
               </div>
             </div>
           )}
