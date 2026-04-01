@@ -171,7 +171,7 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const deltaFrequency = angularFrequency - modalAngularFrequency;
 
   const denominator = Math.sqrt(deltaFrequency * deltaFrequency + bandwidth * bandwidth);
-  const resonanceMagnitude = bandwidth / denominator;
+  const resonanceMagnitude = (bandwidth * bandwidth) / (denominator * denominator);
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
 
   const pressureMagnitude = combinedCoupling * resonanceMagnitude;
