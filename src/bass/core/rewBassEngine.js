@@ -202,9 +202,20 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
 // LEGACY modal-transfer helper (multiplicative-from-identity, pre-additive-injection)
 // Kept here for A/B validation only. Do not tune or ship as production path.
 // ─────────────────────────────────────────────────────────────────────────────
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, preModalMag) {
   let tfRe = 1;
   let tfIm = 0;
+
+  // __B44_PREMODAL_SCALE__ legacy-only pre-modal-relative scaling test.
+  // Scale modal contribution relative to local pre-modal field magnitude, bounded.
+  // A normalised reference amplitude of 1.0 is used so small fields don't blow up,
+  // and the factor is capped at LEGACY_PREMODAL_SCALE_MAX to prevent explosion.
+  const LEGACY_PREMODAL_SCALE_REF = 1.0;   // reference field amplitude (Pa units normalised)
+  const LEGACY_PREMODAL_SCALE_MAX = 8.0;   // hard ceiling — prevents unbounded growth
+  const preModalScaleFactor = Math.min(
+    Math.max(preModalMag, LEGACY_PREMODAL_SCALE_REF) / LEGACY_PREMODAL_SCALE_REF,
+    LEGACY_PREMODAL_SCALE_MAX
+  );
 
   // __B44_DEGENERACY_ASSIST__ legacy-only degenerate pair support.
   // Two modes with the same frequency (e.g. the ~34.3 Hz [1,0,0]/[0,1,0] pair in a square room)
@@ -261,10 +272,10 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     );
 
     // Legacy: accumulate as a multiplicative transfer function delta from identity (1+j0)
-    // __B44_MODAL_DRIVE__ legacy-only drive scale test — remove or tune after diagnosis.
+    // __B44_MODAL_DRIVE__ + __B44_PREMODAL_SCALE__: scale by local pre-modal magnitude.
     const LEGACY_MODAL_DRIVE = 2.0;
-    tfRe += LEGACY_MODAL_DRIVE * weight * modalContrib.real;
-    tfIm += LEGACY_MODAL_DRIVE * weight * modalContrib.imag;
+    tfRe += LEGACY_MODAL_DRIVE * preModalScaleFactor * weight * modalContrib.real;
+    tfIm += LEGACY_MODAL_DRIVE * preModalScaleFactor * weight * modalContrib.imag;
   });
 
   return { tfRe, tfIm };
@@ -509,8 +520,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // Branch on modalModel option: "legacy_transfer" or "additive_pressure"
       if (modalModel === 'legacy_transfer') {
         // LEGACY PATH: multiplicative transfer applied to current sumRe/sumIm field
+        // Pass current pre-modal field magnitude for relative scaling inside legacyModalTransferLocal.
         const { tfRe, tfIm } = legacyModalTransferLocal(
-          frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM
+          frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, preModalMagnitude
         );
         const prevRe = sumRe;
         const prevIm = sumIm;
