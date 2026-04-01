@@ -208,12 +208,12 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
 
   // __B44_PREMODAL_SCALE__ legacy-only pre-modal-relative scaling test.
   // Scale modal contribution relative to local pre-modal field magnitude, bounded.
-  // A normalised reference amplitude of 1.0 is used so small fields don't blow up,
-  // and the factor is capped at LEGACY_PREMODAL_SCALE_MAX to prevent explosion.
-  const LEGACY_PREMODAL_SCALE_REF = 1.0;   // reference field amplitude (Pa units normalised)
-  const LEGACY_PREMODAL_SCALE_MAX = 8.0;   // hard ceiling — prevents unbounded growth
+  // Reference is aligned to the real engine magnitude range (~25,000–35,000 Pa in the
+  // low-bass region), so the factor varies meaningfully around 1.0 instead of saturating.
+  const LEGACY_PREMODAL_SCALE_REF = 30000.0; // reference field amplitude in actual engine Pa units
+  const LEGACY_PREMODAL_SCALE_MAX = 4.0;     // conservative ceiling — prevents explosion
   const preModalScaleFactor = Math.min(
-    Math.max(preModalMag, LEGACY_PREMODAL_SCALE_REF) / LEGACY_PREMODAL_SCALE_REF,
+    preModalMag / LEGACY_PREMODAL_SCALE_REF,
     LEGACY_PREMODAL_SCALE_MAX
   );
 
