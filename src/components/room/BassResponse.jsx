@@ -907,6 +907,56 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </div>
             </div>
           )}
+
+          {/* Fixed low-mode debug table — shows (1,0,0)(0,1,0)(1,1,0)(2,0,0) per frequency row */}
+          {simulationResults.stepDebug.some(r => Array.isArray(r.lowModes) && r.lowModes.length > 0) && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 700, color: '#065f46', marginBottom: 4, fontSize: 11 }}>Fixed Low-Mode Contributions (43–55 Hz) — all four modes always shown</div>
+              <table style={{ borderCollapse: 'collapse', whiteSpace: 'nowrap', fontSize: 10 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #6ee7b7', color: '#065f46' }}>
+                    <th style={{ textAlign: 'left', padding: '2px 5px' }}>evalHz</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>modeHz</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>nx,ny,nz</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>type</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>Q</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>srcC</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>rcvC</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700 }}>combC</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>tfRe</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px' }}>tfIm</th>
+                    <th style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700 }}>mag</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {simulationResults.stepDebug
+                    .filter(r => Array.isArray(r.lowModes) && r.lowModes.length > 0)
+                    .flatMap(r =>
+                      r.lowModes.map(m => ({ evalHz: r.frequencyHz, ...m }))
+                    )
+                    .map((row, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #d1fae5', background: row.nx === 2 ? '#ecfdf5' : undefined }}>
+                        <td style={{ padding: '2px 5px', color: '#065f46', fontWeight: 600 }}>{row.evalHz.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.freq.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.nx},{row.ny},{row.nz}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.type}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.qValue.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.sourceCoupling.toFixed(4)}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.receiverCoupling.toFixed(4)}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700, color: Math.abs(row.combinedCoupling) < 0.05 ? '#dc2626' : '#065f46' }}>{row.combinedCoupling.toFixed(4)}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.transferRe.toFixed(5)}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.transferIm.toFixed(5)}</td>
+                        <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700, color: '#047857' }}>{row.magnitude.toFixed(5)}</td>
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </table>
+              <div style={{ marginTop: 4, fontSize: 10, color: '#065f46' }}>
+                combC highlighted red = near-null coupling (&lt;0.05). (2,0,0) rows shaded green for easy comparison with lower modes.
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* __B44_STEP_DEBUG__ end */}

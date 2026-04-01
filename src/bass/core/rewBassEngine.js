@@ -193,6 +193,14 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
 //   - early receiver weighting (receiverWeight term)
 // Accumulation: multiplicative transfer from identity (1+j0), direct combinedCoupling only.
 // ─────────────────────────────────────────────────────────────────────────────
+// Fixed low-mode keys to watch regardless of instantaneous magnitude ranking.
+const LOW_MODE_KEYS = [
+  { nx: 1, ny: 0, nz: 0 },
+  { nx: 0, ny: 1, nz: 0 },
+  { nx: 1, ny: 1, nz: 0 },
+  { nx: 2, ny: 0, nz: 0 },
+];
+
 function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM) {
   let tfRe = 1;
   let tfIm = 0;
@@ -200,6 +208,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   // Step debug tracking for the strongest contributing mode
   let _debugStrongestMode = null;
   let _debugStrongestMag = -1;
+
+  // Fixed low-mode debug capture: always report these modes regardless of ranking.
+  const _debugLowModes = [];
 
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
@@ -217,9 +228,12 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     tfRe += modalContrib.real;
     tfIm += modalContrib.imag;
 
-    // Step debug: track strongest mode contribution in the 43–55 Hz range
-    if (frequencyHz >= 43 && frequencyHz <= 55) {
+    const isInDebugRange = frequencyHz >= 43 && frequencyHz <= 55;
+
+    if (isInDebugRange) {
       const mag = Math.sqrt(modalContrib.real * modalContrib.real + modalContrib.imag * modalContrib.imag);
+
+      // Existing: strongest-mode tracking
       if (mag > _debugStrongestMag) {
         _debugStrongestMag = mag;
         _debugStrongestMode = {
@@ -236,10 +250,29 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           transferIm: modalContrib.imag,
         };
       }
+
+      // New: fixed low-mode capture — always report (1,0,0) (0,1,0) (1,1,0) (2,0,0)
+      const isLowMode = LOW_MODE_KEYS.some(k => k.nx === mode.nx && k.ny === mode.ny && k.nz === mode.nz);
+      if (isLowMode) {
+        _debugLowModes.push({
+          freq: mode.freq,
+          nx: mode.nx,
+          ny: mode.ny,
+          nz: mode.nz,
+          type: mode.type,
+          qValue: mode.qValue,
+          sourceCoupling,
+          receiverCoupling,
+          combinedCoupling,
+          transferRe: modalContrib.real,
+          transferIm: modalContrib.imag,
+          magnitude: mag,
+        });
+      }
     }
   });
 
-  return { tfRe, tfIm, _debugStrongestMode };
+  return { tfRe, tfIm, _debugStrongestMode, _debugLowModes };
 }
 
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
@@ -418,7 +451,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
     // Clean legacy modal transfer path
     if (enableModes) {
-      const { tfRe, tfIm, _debugStrongestMode } = legacyModalTransferLocal(
+      const { tfRe, tfIm, _debugStrongestMode, _debugLowModes } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM
       );
       const prevRe = sumRe;
@@ -434,6 +467,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           lastRow.postModal = { transferRe: tfRe, transferIm: tfIm, sumRe, sumIm, magnitude: postMag };
           lastRow.modalTransferReFinal = tfRe;
           lastRow.modalTransferImFinal = tfIm;
+          lastRow.lowModes = _debugLowModes || [];
           if (_debugStrongestMode) {
             lastRow.strongestModeFreq = _debugStrongestMode.freq;
             lastRow.strongestModeNx = _debugStrongestMode.nx;
