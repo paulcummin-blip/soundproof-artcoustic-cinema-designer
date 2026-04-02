@@ -154,14 +154,18 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
   const lengthM = Math.max(1e-6, Number(roomDims?.lengthM) || 0);
   const heightM = Math.max(1e-6, Number(roomDims?.heightM) || 0);
 
-  // Smooth zero softening: hyperbolic blend that prevents exact zero output
-  // while remaining continuous and signed. At v=0 the output is EPSILON (not 0).
-  // Away from zero the added offset shrinks relative to |v|, preserving contrast.
-  // EPSILON is kept small so the softening is modest and localised near exact nodes.
+  // Near-zero-only softening: pass the raw cosine through unchanged except very
+  // near exact nodes where it is lifted by a small additive nudge that decays
+  // quickly as |v| grows. At v=0 the output is +EPSILON (never exact zero).
+  // Away from zero the correction term vanishes and the raw cosine is returned.
   const EPSILON = 0.04;
   const soften = (v) => {
+    // Additive nudge: EPSILON * exp(-v^2 / DECAY^2), zero-centred gaussian
+    // so it is ~EPSILON at the node and < 0.001*EPSILON one half-cycle away.
+    const DECAY = 0.15; // controls how quickly the nudge fades with |v|
+    const nudge = EPSILON * Math.exp(-(v * v) / (DECAY * DECAY));
     const sign = v < 0 ? -1 : 1;
-    return sign * Math.sqrt(v * v + EPSILON * EPSILON);
+    return v === 0 ? nudge : v + sign * nudge;
   };
 
   const shapeX = mode.nx > 0 ? soften(Math.cos(mode.nx * Math.PI * x / widthM)) : 1;
