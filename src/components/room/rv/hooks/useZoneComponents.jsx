@@ -28,7 +28,7 @@ export function useZoneComponents({
     // LCR Zone Component - Updated to use lcrZoneBlocks
     const LCRZoneComponent = ({ side }) => {
       // Only show LCR zone if floating mode is enabled and lcrZoneBlocks are available
-      if (!lcrZoneBlocks || screen?.mountMode !== 'floating') return null;
+      if (!lcrZoneBlocks) return null;
 
       const zone = lcrZoneBlocks[side];
       if (!zone) return null;
