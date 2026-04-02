@@ -967,7 +967,7 @@ const byId = useEntitiesById({
 
   // Compute LCR zone blocks with ZONE_DEPTH_M
   const lcrZoneBlocks = useMemo(() => {
-    if (!mlp || screen?.mountMode !== 'floating') return null;
+    if (!mlp) return null;
 
     const angle1 = 22.5 * (Math.PI / 180);
     const angle2 = 30.0 * (Math.PI / 180);
