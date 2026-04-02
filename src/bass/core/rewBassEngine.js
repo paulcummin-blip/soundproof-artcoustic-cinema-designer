@@ -154,16 +154,12 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
   const lengthM = Math.max(1e-6, Number(roomDims?.lengthM) || 0);
   const heightM = Math.max(1e-6, Number(roomDims?.heightM) || 0);
 
-  // Node floor: soften perfect cosine zeroes by blending each axis value with a
-  // small signed floor (NODE_FLOOR). Sign is preserved via Math.sign with a
-  // fallback of +1 at exactly zero. Continuity is preserved because the floor
-  // is applied uniformly to the raw cosine before any multiplication.
-  const NODE_FLOOR = 0.15;
-
-  const soften = (v) => {
-    const s = v < 0 ? -1 : 1;
-    return Math.abs(v) < NODE_FLOOR ? s * NODE_FLOOR : v;
-  };
+  // Smooth zero softening: replace the hard per-axis floor with a hyperbolic
+  // blend. Near exact zero the output approaches ±EPSILON smoothly rather than
+  // jumping to a fixed floor. Away from zero the cosine value is returned almost
+  // unchanged, so mode contrast is preserved everywhere except at exact nodes.
+  const EPSILON = 0.05;
+  const soften = (v) => Math.sign(v || 1) * Math.sqrt(v * v + EPSILON * EPSILON) - Math.sign(v || 1) * EPSILON + v;
 
   const shapeX = mode.nx > 0 ? soften(Math.cos(mode.nx * Math.PI * x / widthM)) : 1;
   const shapeY = mode.ny > 0 ? soften(Math.cos(mode.ny * Math.PI * y / lengthM)) : 1;
