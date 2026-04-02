@@ -217,17 +217,14 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
 
-    // Receiver coupling: positional blur applied only here, outside modeShapeValueLocal.
-    // Averaging five offsets (±0.12 m in X and Y) prevents exact-zero cancellation at
-    // a node without mixing source logic into the receiver evaluation.
-    const BLUR = 0.12;
-    const receiverCoupling = (
-      modeShapeValueLocal(mode, seat.x,        seat.y,        seat.z, { widthM, lengthM, heightM }) +
-      modeShapeValueLocal(mode, seat.x + BLUR,  seat.y,        seat.z, { widthM, lengthM, heightM }) +
-      modeShapeValueLocal(mode, seat.x - BLUR,  seat.y,        seat.z, { widthM, lengthM, heightM }) +
-      modeShapeValueLocal(mode, seat.x,        seat.y + BLUR,  seat.z, { widthM, lengthM, heightM }) +
-      modeShapeValueLocal(mode, seat.x,        seat.y - BLUR,  seat.z, { widthM, lengthM, heightM })
-    ) / 5;
+    // Receiver coupling: tiny deterministic offset breaks exact node cancellation
+    // that occurs when the listener is mathematically aligned with a cosine zero.
+    // No averaging or smoothing — single-point evaluation at the offset position.
+    const NODE_BREAK_OFFSET = 0.01; // metres (10 mm)
+    const rx = seat.x + NODE_BREAK_OFFSET;
+    const ry = seat.y + NODE_BREAK_OFFSET;
+    const rz = seat.z;
+    const receiverCoupling = modeShapeValueLocal(mode, rx, ry, rz, { widthM, lengthM, heightM });
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
