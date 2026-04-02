@@ -217,14 +217,17 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
 
-    // Receiver coupling: tiny deterministic offset breaks exact node cancellation
-    // that occurs when the listener is mathematically aligned with a cosine zero.
-    // No averaging or smoothing — single-point evaluation at the offset position.
-    const NODE_BREAK_OFFSET = 0.01; // metres (10 mm)
-    const rx = seat.x + NODE_BREAK_OFFSET;
-    const ry = seat.y + NODE_BREAK_OFFSET;
-    const rz = seat.z;
-    const receiverCoupling = modeShapeValueLocal(mode, rx, ry, rz, { widthM, lengthM, heightM });
+    // Receiver coupling: two-ear spatial receiver model.
+    // The listener is modelled as two ear positions symmetric about the head centre (seat).
+    // Inter-aural distance for low-frequency bass is ~0.175 m (half-span = 0.0875 m).
+    // Ears are offset laterally (X axis) in the plan view, which is the axis that
+    // most cleanly maps to the left/right head orientation of a seated listener.
+    // receiverCoupling is the arithmetic mean of the signed mode-shape values at
+    // both ear positions — sign is preserved, no magnitudes are averaged.
+    const EAR_HALF_SPAN_M = 0.0875; // half of ~175 mm inter-aural distance
+    const leftEarCoupling  = modeShapeValueLocal(mode, seat.x - EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
+    const rightEarCoupling = modeShapeValueLocal(mode, seat.x + EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
+    const receiverCoupling = 0.5 * (leftEarCoupling + rightEarCoupling);
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
