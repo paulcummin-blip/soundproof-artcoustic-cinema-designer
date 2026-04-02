@@ -154,38 +154,13 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
   const lengthM = Math.max(1e-6, Number(roomDims?.lengthM) || 0);
   const heightM = Math.max(1e-6, Number(roomDims?.heightM) || 0);
 
-  // Source coupling: exact point sampling (unchanged).
-  const sourceShapeX = mode.nx > 0 ? Math.cos(mode.nx * Math.PI * x / widthM) : 1;
-  const sourceShapeY = mode.ny > 0 ? Math.cos(mode.ny * Math.PI * y / lengthM) : 1;
-  const sourceShapeZ = mode.nz > 0 ? Math.cos(mode.nz * Math.PI * z / heightM) : 1;
-  const sourceCoupling = sourceShapeX * sourceShapeY * sourceShapeZ;
+  // Returns the signed mode-shape value for a single position.
+  // Caller is responsible for computing source and receiver couplings separately.
+  const shapeX = mode.nx > 0 ? Math.cos(mode.nx * Math.PI * x / widthM) : 1;
+  const shapeY = mode.ny > 0 ? Math.cos(mode.ny * Math.PI * y / lengthM) : 1;
+  const shapeZ = mode.nz > 0 ? Math.cos(mode.nz * Math.PI * z / heightM) : 1;
 
-  // Receiver coupling: positional blur.
-  // A real listener occupies physical space and their ears + torso average the
-  // pressure field over a small region. We approximate this by evaluating the
-  // mode shape at the nominal position plus four symmetric offsets (±BLUR in X
-  // and ±BLUR in Y) and averaging all five samples. This prevents exact zero
-  // cancellation at a perfect node without inflating coupling elsewhere,
-  // because the average of five cosine samples centred on a node is non-zero
-  // as long as the blur radius spans any curvature in the mode shape.
-  const BLUR = 0.12; // metres — roughly head/shoulder span
-
-  const evalReceiver = (rx, ry, rz) => {
-    const rx_ = mode.nx > 0 ? Math.cos(mode.nx * Math.PI * rx / widthM) : 1;
-    const ry_ = mode.ny > 0 ? Math.cos(mode.ny * Math.PI * ry / lengthM) : 1;
-    const rz_ = mode.nz > 0 ? Math.cos(mode.nz * Math.PI * rz / heightM) : 1;
-    return rx_ * ry_ * rz_;
-  };
-
-  const receiverCoupling = (
-    evalReceiver(x,        y,        z) +
-    evalReceiver(x + BLUR, y,        z) +
-    evalReceiver(x - BLUR, y,        z) +
-    evalReceiver(x,        y + BLUR, z) +
-    evalReceiver(x,        y - BLUR, z)
-  ) / 5;
-
-  return sourceCoupling * receiverCoupling;
+  return shapeX * shapeY * shapeZ;
 }
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
@@ -241,7 +216,19 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
 
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
-    const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
+
+    // Receiver coupling: positional blur applied only here, outside modeShapeValueLocal.
+    // Averaging five offsets (±0.12 m in X and Y) prevents exact-zero cancellation at
+    // a node without mixing source logic into the receiver evaluation.
+    const BLUR = 0.12;
+    const receiverCoupling = (
+      modeShapeValueLocal(mode, seat.x,        seat.y,        seat.z, { widthM, lengthM, heightM }) +
+      modeShapeValueLocal(mode, seat.x + BLUR,  seat.y,        seat.z, { widthM, lengthM, heightM }) +
+      modeShapeValueLocal(mode, seat.x - BLUR,  seat.y,        seat.z, { widthM, lengthM, heightM }) +
+      modeShapeValueLocal(mode, seat.x,        seat.y + BLUR,  seat.z, { widthM, lengthM, heightM }) +
+      modeShapeValueLocal(mode, seat.x,        seat.y - BLUR,  seat.z, { widthM, lengthM, heightM })
+    ) / 5;
+
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
     const modalContrib = modalPressureContributionLocal(
