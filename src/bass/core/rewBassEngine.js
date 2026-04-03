@@ -227,7 +227,10 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     const EAR_HALF_SPAN_M = 0.0875; // half of ~175 mm inter-aural distance
     const leftEarCoupling  = modeShapeValueLocal(mode, seat.x - EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
     const rightEarCoupling = modeShapeValueLocal(mode, seat.x + EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    const receiverCoupling = 0.5 * (leftEarCoupling + rightEarCoupling);
+    // Symmetric ear sampling can cancel odd x-order modes when signed values are averaged:
+    // cos(nx*π*(x-δ)/W) and cos(nx*π*(x+δ)/W) have opposite signs at an x-node, summing to ~zero.
+    // Using absolute values preserves receiver coupling strength without artificial left/right sign cancellation.
+    const receiverCoupling = 0.5 * (Math.abs(leftEarCoupling) + Math.abs(rightEarCoupling));
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
