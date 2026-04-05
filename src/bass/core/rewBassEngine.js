@@ -225,12 +225,14 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     // receiverCoupling is the arithmetic mean of the signed mode-shape values at
     // both ear positions — sign is preserved, no magnitudes are averaged.
     const EAR_HALF_SPAN_M = 0.0875; // half of ~175 mm inter-aural distance
-    const leftEarCoupling  = modeShapeValueLocal(mode, seat.x - EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    const rightEarCoupling = modeShapeValueLocal(mode, seat.x + EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    // Symmetric ear sampling can cancel odd x-order modes when signed values are averaged:
-    // cos(nx*π*(x-δ)/W) and cos(nx*π*(x+δ)/W) have opposite signs at an x-node, summing to ~zero.
-    // Using absolute values preserves receiver coupling strength without artificial left/right sign cancellation.
-    const receiverCoupling = 0.5 * (Math.abs(leftEarCoupling) + Math.abs(rightEarCoupling));
+    const leftEarCoupling   = modeShapeValueLocal(mode, seat.x - EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
+    const centreCoupling    = modeShapeValueLocal(mode, seat.x,                   seat.y, seat.z, { widthM, lengthM, heightM });
+    const rightEarCoupling  = modeShapeValueLocal(mode, seat.x + EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
+    // 2-point ear-only sampling remains too narrow near the room-centre x-node: both ear points sit
+    // close to the cos-null for odd x-order modes, leaving (1,0,0) artificially suppressed.
+    // 3-point lateral sampling (left ear, centre, right ear) widens modal pickup without altering
+    // the source coupling, resonance equations, or any other part of the modal framework.
+    const receiverCoupling = (Math.abs(leftEarCoupling) + Math.abs(centreCoupling) + Math.abs(rightEarCoupling)) / 3;
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
