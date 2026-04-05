@@ -217,22 +217,16 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
 
-    // Receiver coupling: two-ear spatial receiver model.
-    // The listener is modelled as two ear positions symmetric about the head centre (seat).
-    // Inter-aural distance for low-frequency bass is ~0.175 m (half-span = 0.0875 m).
-    // Ears are offset laterally (X axis) in the plan view, which is the axis that
-    // most cleanly maps to the left/right head orientation of a seated listener.
-    // receiverCoupling is the arithmetic mean of the signed mode-shape values at
-    // both ear positions — sign is preserved, no magnitudes are averaged.
-    const EAR_HALF_SPAN_M = 0.0875; // half of ~175 mm inter-aural distance
-    const leftEarCoupling   = modeShapeValueLocal(mode, seat.x - EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    const centreCoupling    = modeShapeValueLocal(mode, seat.x,                   seat.y, seat.z, { widthM, lengthM, heightM });
-    const rightEarCoupling  = modeShapeValueLocal(mode, seat.x + EAR_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    // 2-point ear-only sampling remains too narrow near the room-centre x-node: both ear points sit
-    // close to the cos-null for odd x-order modes, leaving (1,0,0) artificially suppressed.
-    // 3-point lateral sampling (left ear, centre, right ear) widens modal pickup without altering
-    // the source coupling, resonance equations, or any other part of the modal framework.
-    const receiverCoupling = (Math.abs(leftEarCoupling) + Math.abs(centreCoupling) + Math.abs(rightEarCoupling)) / 3;
+    // Receiver coupling: controlled REW-parity test — 2-point lateral receiver model.
+    // Span widened from the anatomical ear half-span (0.0875 m) to 0.15 m.
+    // Rationale: at a centre seat, both ear points at ±0.0875 m sit very close to the
+    // (1,0,0) x-node (cos-null at x = W/2), leaving odd x-order modes artificially suppressed.
+    // Widening to ±0.15 m materially lifts (1,0,0) coupling without heavily distorting (2,0,0).
+    // 2-point absolute average is retained; no centre sample; no other framework changes.
+    const RECEIVER_HALF_SPAN_M = 0.15;
+    const leftEarCoupling  = modeShapeValueLocal(mode, seat.x - RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
+    const rightEarCoupling = modeShapeValueLocal(mode, seat.x + RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
+    const receiverCoupling = 0.5 * (Math.abs(leftEarCoupling) + Math.abs(rightEarCoupling));
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
