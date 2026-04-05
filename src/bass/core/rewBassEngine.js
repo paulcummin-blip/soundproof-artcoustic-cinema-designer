@@ -214,6 +214,11 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   // Fixed low-mode debug capture: always report these modes regardless of ranking.
   const _debugLowModes = [];
 
+  // HIGH-PRECISION RAW DEBUG — only fires near 44.90 Hz, only for the four key modes.
+  // Does not affect any simulation behaviour. Debug-only instrumentation.
+  const _isHighPrecisionSlice = Math.abs(frequencyHz - 44.90) < 0.50;
+  const _highPrecisionRaw = [];
+
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
 
@@ -281,11 +286,41 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           transferIm: modalContrib.imag,
           magnitude: mag,
         });
+
+        // HIGH-PRECISION RAW DEBUG — surgical addition, debug-only, no simulation change.
+        // Captures exact floating-point values passed to and returned from
+        // modalPressureContributionLocal at the 44.90 Hz slice for the four key modes.
+        if (_isHighPrecisionSlice) {
+          const unscaledRe = Math.abs(combinedCoupling) > 1e-30
+            ? modalContrib.real / combinedCoupling
+            : null;
+          const unscaledIm = Math.abs(combinedCoupling) > 1e-30
+            ? modalContrib.imag / combinedCoupling
+            : null;
+
+          _highPrecisionRaw.push({
+            label: `(${mode.nx},${mode.ny},${mode.nz})`,
+            evalHz:            frequencyHz,
+            modeFreq:          mode.freq,
+            qValue:            mode.qValue,
+            sourceCoupling:    sourceCoupling,
+            receiverCoupling:  receiverCoupling,
+            combinedCoupling:  combinedCoupling,
+            modalContribRe:    modalContrib.real,
+            modalContribIm:    modalContrib.imag,
+            mag:               mag,
+            // Unscaled transfer shape (before combinedCoupling multiplication).
+            // If modeFreq and qValue are truly identical for two modes, these
+            // must also be identical within floating-point tolerance.
+            unscaledRe,
+            unscaledIm,
+          });
+        }
       }
     }
   });
 
-  return { tfRe, tfIm, _debugStrongestMode, _debugLowModes };
+  return { tfRe, tfIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw };
 }
 
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
@@ -464,7 +499,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
     // Clean legacy modal transfer path
     if (enableModes) {
-      const { tfRe, tfIm, _debugStrongestMode, _debugLowModes } = legacyModalTransferLocal(
+      const { tfRe, tfIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM
       );
       const prevRe = sumRe;
@@ -481,6 +516,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           lastRow.modalTransferReFinal = tfRe;
           lastRow.modalTransferImFinal = tfIm;
           lastRow.lowModes = _debugLowModes || [];
+          lastRow.highPrecisionRaw = _highPrecisionRaw || [];
           if (_debugStrongestMode) {
             lastRow.strongestModeFreq = _debugStrongestMode.freq;
             lastRow.strongestModeNx = _debugStrongestMode.nx;
