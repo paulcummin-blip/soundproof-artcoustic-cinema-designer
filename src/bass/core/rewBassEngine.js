@@ -298,22 +298,52 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
             ? modalContrib.imag / combinedCoupling
             : null;
 
+          // ── PARALLEL RECEIVER MODEL COMPARISON (debug-only, no simulation change) ──
+          // Computes three receiver coupling variants in parallel for the four key modes
+          // at ~44.90 Hz. None of these touch tfRe/tfIm or any simulation output.
+
+          // Model A — current live model (half-span=0.15, absolute average)
+          const _rcvA_left  = modeShapeValueLocal(mode, seat.x - 0.15, seat.y, seat.z, { widthM, lengthM, heightM });
+          const _rcvA_right = modeShapeValueLocal(mode, seat.x + 0.15, seat.y, seat.z, { widthM, lengthM, heightM });
+          const _rcvA = 0.5 * (Math.abs(_rcvA_left) + Math.abs(_rcvA_right));
+          const _combA = sourceCoupling * _rcvA;
+          const _contribA = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combA);
+          const _magA = Math.sqrt(_contribA.real * _contribA.real + _contribA.imag * _contribA.imag);
+
+          // Model B — anatomical ear model (half-span=0.0875, absolute average)
+          const _rcvB_left  = modeShapeValueLocal(mode, seat.x - 0.0875, seat.y, seat.z, { widthM, lengthM, heightM });
+          const _rcvB_right = modeShapeValueLocal(mode, seat.x + 0.0875, seat.y, seat.z, { widthM, lengthM, heightM });
+          const _rcvB = 0.5 * (Math.abs(_rcvB_left) + Math.abs(_rcvB_right));
+          const _combB = sourceCoupling * _rcvB;
+          const _contribB = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combB);
+          const _magB = Math.sqrt(_contribB.real * _contribB.real + _contribB.imag * _contribB.imag);
+
+          // Model C — point receiver at exact seat position
+          const _rcvC = Math.abs(modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM }));
+          const _combC = sourceCoupling * _rcvC;
+          const _contribC = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combC);
+          const _magC = Math.sqrt(_contribC.real * _contribC.real + _contribC.imag * _contribC.imag);
+
           _highPrecisionRaw.push({
             label: `(${mode.nx},${mode.ny},${mode.nz})`,
             evalHz:            frequencyHz,
             modeFreq:          mode.freq,
             qValue:            mode.qValue,
             sourceCoupling:    sourceCoupling,
+            // Live simulation values (Model A — identical to what tfRe/tfIm used)
             receiverCoupling:  receiverCoupling,
             combinedCoupling:  combinedCoupling,
             modalContribRe:    modalContrib.real,
             modalContribIm:    modalContrib.imag,
             mag:               mag,
-            // Unscaled transfer shape (before combinedCoupling multiplication).
-            // If modeFreq and qValue are truly identical for two modes, these
-            // must also be identical within floating-point tolerance.
             unscaledRe,
             unscaledIm,
+            // Parallel receiver model comparison (debug only)
+            receiverModels: {
+              A: { label: 'live_0.15',      rcv: _rcvA, comb: _combA, re: _contribA.real, im: _contribA.imag, mag: _magA },
+              B: { label: 'anatomical_0.0875', rcv: _rcvB, comb: _combB, re: _contribB.real, im: _contribB.imag, mag: _magB },
+              C: { label: 'point_seat',     rcv: _rcvC, comb: _combC, re: _contribC.real, im: _contribC.imag, mag: _magC },
+            },
           });
         }
       }
