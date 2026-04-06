@@ -194,7 +194,8 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
 //   - modal drive boost (LEGACY_MODAL_DRIVE constant)
 //   - pre-modal-relative scaling (field-driven excitation)
 //   - early receiver weighting (receiverWeight term)
-// Accumulation: multiplicative transfer from identity (1+j0), direct combinedCoupling only.
+// Accumulation: direct pressure sum (modalSumRe/Im starts at 0, no identity seed).
+// Modal contributions are true pressure additions — NOT a transfer function.
 // ─────────────────────────────────────────────────────────────────────────────
 // Fixed low-mode keys to watch regardless of instantaneous magnitude ranking.
 const LOW_MODE_KEYS = [
@@ -205,8 +206,10 @@ const LOW_MODE_KEYS = [
 ];
 
 function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude) {
-  let tfRe = 1;
-  let tfIm = 0;
+  // Direct pressure sum — starts at zero, no identity seed.
+  // Modal contributions are true acoustic pressure additions, not a transfer function.
+  let modalSumRe = 0;
+  let modalSumIm = 0;
 
   // Step debug tracking for the strongest contributing mode
   let _debugStrongestMode = null;
@@ -244,9 +247,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       modalSourceAmplitude
     );
 
-    // Pure original accumulation: additive delta to transfer from identity (1+j0)
-    tfRe += modalContrib.real;
-    tfIm += modalContrib.imag;
+    // True pressure accumulation: direct sum of all modal pressure contributions.
+    modalSumRe += modalContrib.real;
+    modalSumIm += modalContrib.imag;
 
     const isInDebugRange = frequencyHz >= 43 && frequencyHz <= 55;
 
@@ -302,7 +305,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
 
           // ── PARALLEL RECEIVER MODEL COMPARISON (debug-only, no simulation change) ──
           // Computes three receiver coupling variants in parallel for the four key modes
-          // at ~44.90 Hz. None of these touch tfRe/tfIm or any simulation output.
+          // at ~44.90 Hz. None of these touch modalSumRe/Im or any simulation output.
 
           // Model A — current live model (half-span=0.15, absolute average)
           const _rcvA_left  = modeShapeValueLocal(mode, seat.x - 0.15, seat.y, seat.z, { widthM, lengthM, heightM });
@@ -352,7 +355,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     }
   });
 
-  return { tfRe, tfIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw };
+  return { modalSumRe, modalSumIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw };
 }
 
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
@@ -534,27 +537,26 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       });
     }
 
-    // Additive modal pressure contribution path
-    // legacyModalTransferLocal seeds tfRe=1, tfIm=0 then accumulates modal pressure deltas.
-    // We strip the identity seed (tfRe − 1) so only the net modal pressure delta is added
-    // to the pre-modal field in complex pressure space (superposition).
+    // Additive modal pressure contribution path.
+    // legacyModalTransferLocal returns the net modal pressure sum (starts at zero).
+    // Modal contributions are added directly to the pre-modal field — true superposition.
     if (enableModes) {
-      const { tfRe, tfIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw } = legacyModalTransferLocal(
+      const { modalSumRe, modalSumIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
-      sumRe = prevRe + (tfRe - 1);
-      sumIm = prevIm + tfIm;
+      sumRe = prevRe + modalSumRe;
+      sumIm = prevIm + modalSumIm;
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
         const lastRow = stepDebugRows[stepDebugRows.length - 1];
         if (lastRow && lastRow.postModal === null && Math.abs(lastRow.frequencyHz - frequencyHz) < 0.5) {
           const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
-          lastRow.postModal = { transferRe: tfRe, transferIm: tfIm, sumRe, sumIm, magnitude: postMag };
-          lastRow.modalTransferReFinal = tfRe;
-          lastRow.modalTransferImFinal = tfIm;
+          lastRow.postModal = { modalSumRe, modalSumIm, sumRe, sumIm, magnitude: postMag };
+          lastRow.modalTransferReFinal = modalSumRe;
+          lastRow.modalTransferImFinal = modalSumIm;
           lastRow.lowModes = _debugLowModes || [];
           lastRow.highPrecisionRaw = _highPrecisionRaw || [];
           if (_debugStrongestMode) {
@@ -572,18 +574,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           }
 
           // ── MODEL APPLICATION COMPARISON (debug-only, no simulation change) ──────
-          // Current live method:  postModal = preModal + modal_pressure_delta (additive superposition)
-          //                       sumRe = prevRe + (tfRe - 1),  sumIm = prevIm + tfIm
-          //                       tfRe − 1 strips the identity seed; only the net modal pressure delta is added.
-          // Multiplicative reference (legacy, for comparison only):
-          //                       altSumRe = prevRe * tfRe - prevIm * tfIm
-          //                       altSumIm = prevRe * tfIm + prevIm * tfRe
-          // Neither branch changes sumRe/sumIm or any simulation output.
-          const _tfMag = Math.sqrt(tfRe * tfRe + tfIm * tfIm);
+          // Current live method: true pressure superposition.
+          //   sumRe = prevRe + modalSumRe,  sumIm = prevIm + modalSumIm
+          //   modalSumRe/Im is the net sum of all modal pressure contributions (starts at 0).
+          // No identity subtraction, no transfer function — modal layer is pure pressure addition.
+          const _tfMag = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
 
-          // Additive path
-          const _altRe = prevRe + (tfRe - 1);
-          const _altIm = prevIm + tfIm;
+          // Additive path (identical to live; kept for structural symmetry in debug output)
+          const _altRe = prevRe + modalSumRe;
+          const _altIm = prevIm + modalSumIm;
           const _altMag = Math.sqrt(_altRe * _altRe + _altIm * _altIm);
 
           // Low-mode summary (complex sum + sum-of-magnitudes from the four tracked modes)
@@ -607,15 +606,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             prevRe,
             prevIm,
             preModalMagnitude: Math.sqrt(prevRe * prevRe + prevIm * prevIm),
-            tfRe,
-            tfIm,
-            tfMag: _tfMag,
-            // Model A — live additive result (matches sumRe/sumIm exactly)
+            modalSumRe,
+            modalSumIm,
+            modalSumMag: _tfMag,
+            // Live result (true pressure superposition)
             livePostRe:  sumRe,
             livePostIm:  sumIm,
             livePostMag: postMag,
             liveRatio:   postMag / Math.max(1e-30, Math.sqrt(prevRe * prevRe + prevIm * prevIm)),
-            // Model M — debug-only multiplicative comparison (legacy form, now superseded)
+            // Debug mirror (identical to live in this model)
             additivePostRe:  _altRe,
             additivePostIm:  _altIm,
             additivePostMag: _altMag,
