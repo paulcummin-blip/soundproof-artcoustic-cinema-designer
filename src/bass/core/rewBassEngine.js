@@ -236,7 +236,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     const RECEIVER_HALF_SPAN_M = 0.15;
     const leftEarCoupling  = modeShapeValueLocal(mode, seat.x - RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
     const rightEarCoupling = modeShapeValueLocal(mode, seat.x + RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    const receiverCoupling = 0.5 * (Math.abs(leftEarCoupling) + Math.abs(rightEarCoupling));
+    const receiverCoupling = 0.5 * (leftEarCoupling + rightEarCoupling);
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
