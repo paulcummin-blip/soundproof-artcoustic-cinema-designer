@@ -446,6 +446,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const totalMagnitudeDb = curveDb + distanceLossDb + source.tuning.gainDb;
     const amplitude = Math.pow(10, totalMagnitudeDb / 20);
 
+    // Modal source strength at 1 m: uses source output + gain only, no seat-distance attenuation.
+    // Room modes are excited by energy injected into the room from the source.
+    // Seat-distance effects are already handled separately by sourceCoupling / receiverCoupling.
+    const modalSourceAmplitude1m = Math.pow(10, (curveDb + source.tuning.gainDb) / 20);
+
     const timeOfFlightPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
     const delayPhase = -2 * Math.PI * frequencyHz * (source.tuning.delayMs / 1000);
     const polarityPhase = source.tuning.polarity === 180 ? Math.PI : 0;
@@ -535,7 +540,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // to the pre-modal field in complex pressure space (superposition).
     if (enableModes) {
       const { tfRe, tfIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, amplitude
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
