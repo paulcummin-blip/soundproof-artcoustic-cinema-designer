@@ -965,6 +965,66 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             );
           })()}
 
+          {/* Three Raw Mode Rows — nearest available row to each target frequency */}
+          {(() => {
+            const rows = simulationResults.stepDebug;
+            const targets = [34.3, 48.5, 68.6];
+            const SEARCH_WINDOW_HZ = 8;
+
+            return (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontWeight: 700, color: '#0f766e', marginBottom: 6, fontSize: 11 }}>
+                  Three Raw Mode Rows
+                </div>
+                {targets.map(target => {
+                  const nearest = rows.reduce((best, row) => {
+                    const d = Math.abs(row.frequencyHz - target);
+                    return best === null || d < Math.abs(best.frequencyHz - target) ? row : best;
+                  }, null);
+
+                  if (!nearest || Math.abs(nearest.frequencyHz - target) > SEARCH_WINDOW_HZ) {
+                    return (
+                      <div key={target} style={{ marginBottom: 10, padding: '6px 10px', background: '#f1f5f9', borderRadius: 6, fontSize: 10, color: '#64748b', fontFamily: 'monospace' }}>
+                        No debug row found near {target} Hz
+                      </div>
+                    );
+                  }
+
+                  const payload = {
+                    frequencyHz:           nearest.frequencyHz,
+                    summedBeforeModes:     nearest.summedBeforeModes     ?? null,
+                    postModal:             nearest.postModal             ?? null,
+                    lowModes:              nearest.lowModes              ?? [],
+                    applicationComparison: nearest.applicationComparison ?? null,
+                  };
+
+                  return (
+                    <div key={target} style={{ marginBottom: 12 }}>
+                      <div style={{ fontWeight: 700, color: '#0f766e', marginBottom: 3, fontSize: 10 }}>
+                        Target {target} Hz → nearest eval: {nearest.frequencyHz.toFixed(4)} Hz
+                      </div>
+                      <pre style={{
+                        background: '#042f2e',
+                        color: '#99f6e4',
+                        borderRadius: 6,
+                        padding: '10px 12px',
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                        overflowX: 'auto',
+                        whiteSpace: 'pre',
+                        lineHeight: 1.5,
+                        userSelect: 'all',
+                        cursor: 'text',
+                      }}>
+                        {JSON.stringify(payload, null, 2)}
+                      </pre>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           {/* Fixed low-mode debug table — shows (1,0,0)(0,1,0)(1,1,0)(2,0,0) per frequency row */}
           {simulationResults.stepDebug.some(r => Array.isArray(r.lowModes) && r.lowModes.length > 0) && (
             <div style={{ marginTop: 12 }}>
