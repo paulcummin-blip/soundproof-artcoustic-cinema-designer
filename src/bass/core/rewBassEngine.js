@@ -527,15 +527,18 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       });
     }
 
-    // Clean legacy modal transfer path
+    // Additive modal pressure contribution path
+    // legacyModalTransferLocal seeds tfRe=1, tfIm=0 then accumulates modal pressure deltas.
+    // We strip the identity seed (tfRe − 1) so only the net modal pressure delta is added
+    // to the pre-modal field in complex pressure space (superposition).
     if (enableModes) {
       const { tfRe, tfIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
-      sumRe = prevRe * tfRe - prevIm * tfIm;
-      sumIm = prevRe * tfIm + prevIm * tfRe;
+      sumRe = prevRe + (tfRe - 1);
+      sumIm = prevIm + tfIm;
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
@@ -562,11 +565,12 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           }
 
           // ── MODEL APPLICATION COMPARISON (debug-only, no simulation change) ──────
-          // Current live method:  postModal = preModal × (tfRe + i·tfIm)
-          //                       where tfRe = 1 + summed_modal_re, tfIm = 0 + summed_modal_im
-          // Additive comparison:  postModal_alt = preModal + (summed_modal_delta)
-          //                       i.e. altSumRe = prevRe + (tfRe - 1), altSumIm = prevIm + tfIm
-          // tfRe − 1 strips the identity seed so only the net modal delta is added.
+          // Current live method:  postModal = preModal + modal_pressure_delta (additive superposition)
+          //                       sumRe = prevRe + (tfRe - 1),  sumIm = prevIm + tfIm
+          //                       tfRe − 1 strips the identity seed; only the net modal pressure delta is added.
+          // Multiplicative reference (legacy, for comparison only):
+          //                       altSumRe = prevRe * tfRe - prevIm * tfIm
+          //                       altSumIm = prevRe * tfIm + prevIm * tfRe
           // Neither branch changes sumRe/sumIm or any simulation output.
           const _tfMag = Math.sqrt(tfRe * tfRe + tfIm * tfIm);
 
@@ -599,12 +603,12 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             tfRe,
             tfIm,
             tfMag: _tfMag,
-            // Model M — live multiplicative result (matches sumRe/sumIm exactly)
+            // Model A — live additive result (matches sumRe/sumIm exactly)
             livePostRe:  sumRe,
             livePostIm:  sumIm,
             livePostMag: postMag,
             liveRatio:   postMag / Math.max(1e-30, Math.sqrt(prevRe * prevRe + prevIm * prevIm)),
-            // Model A — debug-only additive comparison
+            // Model M — debug-only multiplicative comparison (legacy form, now superseded)
             additivePostRe:  _altRe,
             additivePostIm:  _altIm,
             additivePostMag: _altMag,
