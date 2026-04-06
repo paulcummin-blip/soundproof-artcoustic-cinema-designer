@@ -560,6 +560,62 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             lastRow.strongestModeTransferRe = _debugStrongestMode.transferRe;
             lastRow.strongestModeTransferIm = _debugStrongestMode.transferIm;
           }
+
+          // ── MODEL APPLICATION COMPARISON (debug-only, no simulation change) ──────
+          // Current live method:  postModal = preModal × (tfRe + i·tfIm)
+          //                       where tfRe = 1 + summed_modal_re, tfIm = 0 + summed_modal_im
+          // Additive comparison:  postModal_alt = preModal + (summed_modal_delta)
+          //                       i.e. altSumRe = prevRe + (tfRe - 1), altSumIm = prevIm + tfIm
+          // tfRe − 1 strips the identity seed so only the net modal delta is added.
+          // Neither branch changes sumRe/sumIm or any simulation output.
+          const _tfMag = Math.sqrt(tfRe * tfRe + tfIm * tfIm);
+
+          // Additive path
+          const _altRe = prevRe + (tfRe - 1);
+          const _altIm = prevIm + tfIm;
+          const _altMag = Math.sqrt(_altRe * _altRe + _altIm * _altIm);
+
+          // Low-mode summary (complex sum + sum-of-magnitudes from the four tracked modes)
+          const _lowModes = _debugLowModes || [];
+          let _lowModeSumRe = 0, _lowModeSumIm = 0, _lowModeSumMag = 0;
+          _lowModes.forEach(m => {
+            _lowModeSumRe += (m.transferRe || 0);
+            _lowModeSumIm += (m.transferIm || 0);
+            _lowModeSumMag += (m.magnitude || 0);
+          });
+
+          // Strongest single-mode magnitude
+          const _strongestMag = _debugStrongestMode
+            ? Math.sqrt(
+                (_debugStrongestMode.transferRe || 0) * (_debugStrongestMode.transferRe || 0) +
+                (_debugStrongestMode.transferIm || 0) * (_debugStrongestMode.transferIm || 0)
+              )
+            : null;
+
+          lastRow.applicationComparison = {
+            prevRe,
+            prevIm,
+            preModalMagnitude: Math.sqrt(prevRe * prevRe + prevIm * prevIm),
+            tfRe,
+            tfIm,
+            tfMag: _tfMag,
+            // Model M — live multiplicative result (matches sumRe/sumIm exactly)
+            livePostRe:  sumRe,
+            livePostIm:  sumIm,
+            livePostMag: postMag,
+            liveRatio:   postMag / Math.max(1e-30, Math.sqrt(prevRe * prevRe + prevIm * prevIm)),
+            // Model A — debug-only additive comparison
+            additivePostRe:  _altRe,
+            additivePostIm:  _altIm,
+            additivePostMag: _altMag,
+            additiveRatio:   _altMag / Math.max(1e-30, Math.sqrt(prevRe * prevRe + prevIm * prevIm)),
+            // Modal summary
+            strongestModeMag:   _strongestMag,
+            lowModeSumRe:       _lowModeSumRe,
+            lowModeSumIm:       _lowModeSumIm,
+            lowModeSumOfMags:   _lowModeSumMag,
+          };
+          // ── END MODEL APPLICATION COMPARISON ─────────────────────────────────────
         }
       }
     }
