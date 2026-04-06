@@ -251,7 +251,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     modalSumRe += modalContrib.real;
     modalSumIm += modalContrib.imag;
 
-    const isInDebugRange = frequencyHz >= 43 && frequencyHz <= 55;
+    const isInDebugRange = frequencyHz >= 30 && frequencyHz <= 72;
 
     if (isInDebugRange) {
       const mag = Math.sqrt(modalContrib.real * modalContrib.real + modalContrib.imag * modalContrib.imag);
@@ -494,8 +494,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
     const preModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
 
-    // Collect step debug data for 43–55 Hz range
-    if (frequencyHz >= 43 && frequencyHz <= 55) {
+    // Collect step debug data for 30–72 Hz range
+    if (frequencyHz >= 30 && frequencyHz <= 72) {
       let _refSumRe = 0;
       let _refSumIm = 0;
       imageSources.forEach((imageSource, reflectionIndex) => {
