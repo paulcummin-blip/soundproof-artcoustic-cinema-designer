@@ -907,6 +907,64 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
           )}
 
+          {/* Application Comparison Raw Row — nearest row to 44.90 Hz */}
+          {(() => {
+            const rows = simulationResults.stepDebug;
+            const target = 44.90;
+            const nearest = rows.reduce((best, row) => {
+              const d = Math.abs(row.frequencyHz - target);
+              return best === null || d < Math.abs(best.frequencyHz - target) ? row : best;
+            }, null);
+
+            if (!nearest || Math.abs(nearest.frequencyHz - target) > 5) {
+              return (
+                <div style={{ marginTop: 12, padding: '6px 10px', background: '#f1f5f9', borderRadius: 6, fontSize: 10, color: '#64748b', fontFamily: 'monospace' }}>
+                  No debug row found near 44.90 Hz
+                </div>
+              );
+            }
+
+            const pick = (obj) => {
+              if (!obj) return null;
+              const { frequencyHz: _f, ...rest } = obj;
+              return { frequencyHz: nearest.frequencyHz, ...rest };
+            };
+
+            const payload = {
+              frequencyHz:        nearest.frequencyHz,
+              summedBeforeModes:  nearest.summedBeforeModes  ?? null,
+              postModal:          nearest.postModal           ?? null,
+              lowModes:           nearest.lowModes            ?? [],
+              applicationComparison: nearest.applicationComparison ?? null,
+            };
+
+            return (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontWeight: 700, color: '#7c3aed', marginBottom: 4, fontSize: 11 }}>
+                  Application Comparison Raw Row — nearest to 44.90 Hz (eval: {nearest.frequencyHz.toFixed(4)} Hz)
+                </div>
+                <pre style={{
+                  background: '#1e1b4b',
+                  color: '#e0e7ff',
+                  borderRadius: 6,
+                  padding: '10px 12px',
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  overflowX: 'auto',
+                  whiteSpace: 'pre',
+                  lineHeight: 1.5,
+                  userSelect: 'all',
+                  cursor: 'text',
+                }}>
+                  {JSON.stringify(payload, null, 2)}
+                </pre>
+                <div style={{ marginTop: 4, fontSize: 10, color: '#7c3aed' }}>
+                  Select all text in the block above to copy the full JSON row.
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Fixed low-mode debug table — shows (1,0,0)(0,1,0)(1,1,0)(2,0,0) per frequency row */}
           {simulationResults.stepDebug.some(r => Array.isArray(r.lowModes) && r.lowModes.length > 0) && (
             <div style={{ marginTop: 12 }}>
