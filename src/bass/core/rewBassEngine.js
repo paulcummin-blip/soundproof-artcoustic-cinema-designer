@@ -227,16 +227,28 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
 
-    // Receiver coupling: controlled REW-parity test — 2-point lateral receiver model.
-    // Span widened from the anatomical ear half-span (0.0875 m) to 0.15 m.
-    // Rationale: at a centre seat, both ear points at ±0.0875 m sit very close to the
-    // (1,0,0) x-node (cos-null at x = W/2), leaving odd x-order modes artificially suppressed.
-    // Widening to ±0.15 m materially lifts (1,0,0) coupling without heavily distorting (2,0,0).
-    // 2-point absolute average is retained; no centre sample; no other framework changes.
+    // Receiver coupling: hybrid 2-point lateral receiver model (half-span = 0.15 m).
+    // Blends signed average (preserves phase cancellation direction) with 35% of the
+    // abs-average residual (prevents odd x-order modes from collapsing to zero at centre seat).
+    // Middle ground between pure signed (too destructive) and pure absolute (no sign info).
     const RECEIVER_HALF_SPAN_M = 0.15;
     const leftEarCoupling  = modeShapeValueLocal(mode, seat.x - RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
     const rightEarCoupling = modeShapeValueLocal(mode, seat.x + RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    const receiverCoupling = 0.5 * (leftEarCoupling + rightEarCoupling);
+
+    // Hybrid receiver model: blend signed average with 35% of abs-average residual.
+    // Preserves sign direction but prevents odd x-order collapse at centre seat.
+    const signedAvgReceiver = 0.5 * (leftEarCoupling + rightEarCoupling);
+    const absAvgReceiver = 0.5 * (Math.abs(leftEarCoupling) + Math.abs(rightEarCoupling));
+
+    const receiverSign =
+      Math.abs(signedAvgReceiver) > 1e-12
+        ? Math.sign(signedAvgReceiver)
+        : Math.sign(leftEarCoupling + rightEarCoupling) || 1;
+
+    const blendedMagnitude =
+      Math.abs(signedAvgReceiver) + 0.35 * (absAvgReceiver - Math.abs(signedAvgReceiver));
+
+    const receiverCoupling = receiverSign * blendedMagnitude;
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
@@ -287,6 +299,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           qValue: mode.qValue,
           sourceCoupling,
           receiverCoupling,
+          signedAvgReceiver,
+          absAvgReceiver,
           combinedCoupling,
           transferRe: modalContrib.real,
           transferIm: modalContrib.imag,
