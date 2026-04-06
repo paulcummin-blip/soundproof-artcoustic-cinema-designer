@@ -165,8 +165,9 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
 // Modal Green's function: coupling = Ψ_source * Ψ_receiver, resonant transfer H(f, f0, Q).
-// pressureMagnitude = combinedCoupling * Q * resonanceMagnitude
-function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling) {
+// pressureMagnitude = modalSourceAmplitude * combinedCoupling * resonanceMagnitude
+// modalSourceAmplitude brings the modal layer into the same pressure domain as the direct path.
+function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
   const bandwidth = modalAngularFrequency / qValue;
@@ -176,7 +177,7 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const resonanceMagnitude = (bandwidth * bandwidth) / (denominator * denominator);
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
 
-  const pressureMagnitude = combinedCoupling * resonanceMagnitude;
+  const pressureMagnitude = modalSourceAmplitude * combinedCoupling * resonanceMagnitude;
 
   return {
     real: pressureMagnitude * Math.cos(resonancePhase),
@@ -203,7 +204,7 @@ const LOW_MODE_KEYS = [
   { nx: 2, ny: 0, nz: 0 },
 ];
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude) {
   let tfRe = 1;
   let tfIm = 0;
 
@@ -239,7 +240,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       frequencyHz,
       mode.freq,
       mode.qValue,
-      combinedCoupling
+      combinedCoupling,
+      modalSourceAmplitude
     );
 
     // Pure original accumulation: additive delta to transfer from identity (1+j0)
@@ -307,7 +309,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           const _rcvA_right = modeShapeValueLocal(mode, seat.x + 0.15, seat.y, seat.z, { widthM, lengthM, heightM });
           const _rcvA = 0.5 * (Math.abs(_rcvA_left) + Math.abs(_rcvA_right));
           const _combA = sourceCoupling * _rcvA;
-          const _contribA = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combA);
+          const _contribA = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combA, modalSourceAmplitude);
           const _magA = Math.sqrt(_contribA.real * _contribA.real + _contribA.imag * _contribA.imag);
 
           // Model B — anatomical ear model (half-span=0.0875, absolute average)
@@ -315,13 +317,13 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           const _rcvB_right = modeShapeValueLocal(mode, seat.x + 0.0875, seat.y, seat.z, { widthM, lengthM, heightM });
           const _rcvB = 0.5 * (Math.abs(_rcvB_left) + Math.abs(_rcvB_right));
           const _combB = sourceCoupling * _rcvB;
-          const _contribB = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combB);
+          const _contribB = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combB, modalSourceAmplitude);
           const _magB = Math.sqrt(_contribB.real * _contribB.real + _contribB.imag * _contribB.imag);
 
           // Model C — point receiver at exact seat position
           const _rcvC = Math.abs(modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM }));
           const _combC = sourceCoupling * _rcvC;
-          const _contribC = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combC);
+          const _contribC = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combC, modalSourceAmplitude);
           const _magC = Math.sqrt(_contribC.real * _contribC.real + _contribC.imag * _contribC.imag);
 
           _highPrecisionRaw.push({
@@ -533,7 +535,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // to the pre-modal field in complex pressure space (superposition).
     if (enableModes) {
       const { tfRe, tfIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, amplitude
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
