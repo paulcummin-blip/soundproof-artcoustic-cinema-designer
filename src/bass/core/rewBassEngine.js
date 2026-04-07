@@ -508,7 +508,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
     // Diffuse late-field approximation
     const lateFieldDecay = Math.exp(-(frequencyHz - 20) / 120);
-    const lateFieldAmplitude = amplitude * 0.12 * lateFieldDecay;
+    const lateFieldAmplitude = 0; // ISOLATION TEST: late-field energy zeroed. Original: amplitude * 0.12 * lateFieldDecay
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
     sumRe += lateFieldAmplitude * Math.cos(lateFieldPhase);
     sumIm += lateFieldAmplitude * Math.sin(lateFieldPhase);
