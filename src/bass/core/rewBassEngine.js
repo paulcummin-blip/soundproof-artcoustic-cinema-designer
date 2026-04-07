@@ -177,7 +177,7 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const resonanceMagnitude = (bandwidth * bandwidth) / (denominator * denominator);
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
 
-  const softenedCoupling = Math.sign(combinedCoupling) * Math.pow(Math.abs(combinedCoupling), 0.7);
+  const softenedCoupling = Math.sign(combinedCoupling) * Math.sqrt(Math.abs(combinedCoupling));
   const pressureMagnitude = modalSourceAmplitude * softenedCoupling * resonanceMagnitude;
 
   return {
