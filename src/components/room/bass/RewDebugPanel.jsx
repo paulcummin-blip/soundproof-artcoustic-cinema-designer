@@ -38,6 +38,82 @@ function DebugSection({ title, defaultOpen = false, accentColor = '#92400e', chi
   );
 }
 
+// ── Compact Target Summary ────────────────────────────────────────────────────
+function CompactTargetSummary({ stepDebug }) {
+  const targets = [34.3, 48.5, 68.6];
+  const SEARCH_WINDOW_HZ = 8;
+
+  const blocks = targets.map(target => {
+    const nearest = stepDebug.reduce((best, row) => {
+      const d = Math.abs(row.frequencyHz - target);
+      return best === null || d < Math.abs(best.frequencyHz - target) ? row : best;
+    }, null);
+
+    if (!nearest || Math.abs(nearest.frequencyHz - target) > SEARCH_WINDOW_HZ) {
+      return { target, missing: true };
+    }
+
+    const ac = nearest.applicationComparison ?? {};
+    const sb = nearest.summedBeforeModes ?? {};
+    const pm = nearest.postModal ?? {};
+
+    const summary = {
+      target_hz:         target,
+      frequencyHz:       nearest.frequencyHz,
+      preModalMagnitude: sb.preModalMagnitude  ?? null,
+      modalSumRe:        ac.modalSumRe         ?? null,
+      modalSumIm:        ac.modalSumIm         ?? null,
+      modalSumMag:       ac.modalSumMag        ?? null,
+      livePostMag:       ac.livePostMag        ?? pm.magnitude ?? null,
+      strongestModeMag:  ac.strongestModeMag   ?? null,
+      lowModeSumRe:      ac.lowModeSumRe       ?? null,
+      lowModeSumIm:      ac.lowModeSumIm       ?? null,
+      lowModeSumOfMags:  ac.lowModeSumOfMags   ?? null,
+      lowModes: (nearest.lowModes ?? []).map(m => ({
+        freq:            m.freq,
+        nx:              m.nx,
+        ny:              m.ny,
+        nz:              m.nz,
+        combinedCoupling: m.combinedCoupling,
+        transferRe:      m.transferRe,
+        transferIm:      m.transferIm,
+        magnitude:       m.magnitude,
+      })),
+    };
+
+    return { target, missing: false, summary };
+  });
+
+  const fullText = blocks.map(b =>
+    b.missing
+      ? `// Target ${b.target} Hz — no debug row found within ±8 Hz`
+      : JSON.stringify(b.summary, null, 2)
+  ).join('\n\n');
+
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: '#b45309', fontWeight: 700, marginBottom: 6 }}>
+        Three target regions — select all to copy exact values for DISCUSS prompts
+      </div>
+      <pre style={{
+        background: '#1c1917',
+        color: '#fef3c7',
+        borderRadius: 6,
+        padding: '10px 12px',
+        fontSize: 10,
+        fontFamily: 'monospace',
+        overflowX: 'auto',
+        whiteSpace: 'pre',
+        lineHeight: 1.5,
+        userSelect: 'all',
+        cursor: 'text',
+      }}>
+        {fullText}
+      </pre>
+    </div>
+  );
+}
+
 // ── Three Raw Mode Rows (primary working area) ────────────────────────────────
 function ThreeRawModeRows({ stepDebug }) {
   const rows = stepDebug;
@@ -332,7 +408,12 @@ export default function RewDebugPanel({ stepDebug, selectedSeatIds }) {
         </span>
       </div>
 
-      {/* ① Three Raw Mode Rows — PRIMARY, open by default */}
+      {/* ① Compact Target Summary — PRIMARY, open by default */}
+      <DebugSection title="Compact Target Summary" defaultOpen={true} accentColor="#b45309">
+        <CompactTargetSummary stepDebug={stepDebug} />
+      </DebugSection>
+
+      {/* ② Three Raw Mode Rows — open by default */}
       <DebugSection title="Three Raw Mode Rows" defaultOpen={true} accentColor="#0f766e">
         <ThreeRawModeRows stepDebug={stepDebug} />
       </DebugSection>
