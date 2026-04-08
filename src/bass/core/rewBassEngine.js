@@ -252,7 +252,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     const blendedMagnitude =
       Math.abs(signedAvgReceiver) + 0.35 * (absAvgReceiver - Math.abs(signedAvgReceiver));
 
-    const receiverCoupling = receiverSign * blendedMagnitude;
+    const receiverCoupling = signedAvgReceiver; // ISOLATION TEST: pure signed average, bypassing blendedMagnitude anti-collapse. Original: receiverSign * blendedMagnitude
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
