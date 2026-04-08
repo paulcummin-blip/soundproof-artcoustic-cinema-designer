@@ -121,7 +121,7 @@ function computeRoomModesLocal({ widthM, lengthM, heightM, fMax, c }) {
   return modes.sort((a, b) => a.freq - b.freq);
 }
 
-function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, modeType }) {
+function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, modeType, nx, ny, nz }) {
   const widthM = Number(roomDims?.widthM) || 1;
   const lengthM = Number(roomDims?.lengthM) || 1;
   const heightM = Number(roomDims?.heightM) || 1;
@@ -135,12 +135,9 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, modeType }) {
   const surfaceRight = lengthM * heightM;
 
   const absorptionArea =
-    surfaceFloor * (surfaceAbsorption?.floor ?? 0.3) +
-    surfaceCeiling * (surfaceAbsorption?.ceiling ?? 0.3) +
-    surfaceFront * (surfaceAbsorption?.front ?? 0.3) +
-    surfaceBack * (surfaceAbsorption?.back ?? 0.3) +
-    surfaceLeft * (surfaceAbsorption?.left ?? 0.3) +
-    surfaceRight * (surfaceAbsorption?.right ?? 0.3);
+    (nx > 0 ? surfaceLeft * (surfaceAbsorption?.left ?? 0.3) + surfaceRight * (surfaceAbsorption?.right ?? 0.3) : 0) +
+    (ny > 0 ? surfaceFront * (surfaceAbsorption?.front ?? 0.3) + surfaceBack * (surfaceAbsorption?.back ?? 0.3) : 0) +
+    (nz > 0 ? surfaceFloor * (surfaceAbsorption?.floor ?? 0.3) + surfaceCeiling * (surfaceAbsorption?.ceiling ?? 0.3) : 0);
 
   const rt60 = 0.161 * volume / Math.max(absorptionArea, 1e-6);
   const tau = rt60 / 13.815;
@@ -455,6 +452,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                   surfaceAbsorption,
                   f0: mode.freq,
                   modeType: mode.type,
+                  nx: mode.nx,
+                  ny: mode.ny,
+                  nz: mode.nz,
                 }),
       }))
     : [];
