@@ -121,7 +121,7 @@ function computeRoomModesLocal({ widthM, lengthM, heightM, fMax, c }) {
   return modes.sort((a, b) => a.freq - b.freq);
 }
 
-function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
+function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, modeType }) {
   const widthM = Number(roomDims?.widthM) || 1;
   const lengthM = Number(roomDims?.lengthM) || 1;
   const heightM = Number(roomDims?.heightM) || 1;
@@ -146,7 +146,12 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
   const tau = rt60 / 13.815;
   const qSabine = 2 * Math.PI * f0 * tau;
 
-  return Math.max(1, Math.min(80, qSabine));
+  const familyWeight =
+    modeType === 'axial' ? 1.0 :
+    modeType === 'tangential' ? 0.8 :
+    0.65;
+
+  return Math.max(1, Math.min(80, qSabine * familyWeight));
 }
 
 function modeShapeValueLocal(mode, x, y, z, roomDims) {
@@ -446,10 +451,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       }).map((mode) => ({
         ...mode,
         qValue: estimateModeQLocal({
-          roomDims: { widthM, lengthM, heightM },
-          surfaceAbsorption,
-          f0: mode.freq,
-        }),
+                  roomDims: { widthM, lengthM, heightM },
+                  surfaceAbsorption,
+                  f0: mode.freq,
+                  modeType: mode.type,
+                }),
       }))
     : [];
 
