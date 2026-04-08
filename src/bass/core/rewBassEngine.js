@@ -177,7 +177,7 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const resonanceMagnitude = (bandwidth * bandwidth) / (denominator * denominator);
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
 
-  const softenedCoupling = Math.sign(combinedCoupling) * Math.sqrt(Math.abs(combinedCoupling));
+  const softenedCoupling = combinedCoupling; // ISOLATION TEST: raw combinedCoupling — removes non-linear coupling inflation. Original: Math.sign(combinedCoupling) * Math.sqrt(Math.abs(combinedCoupling))
 
   const modeOrder = Math.abs(modeIndices.nx) + Math.abs(modeIndices.ny) + Math.abs(modeIndices.nz);
   const orderWeight = modeOrder >= 2 ? 0.72 : 1.0;
