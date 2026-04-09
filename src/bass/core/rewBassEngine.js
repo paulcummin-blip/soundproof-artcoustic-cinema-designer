@@ -507,14 +507,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + phaseJitter;
 
       // Smooth coherence curve: ~0.75 at 20 Hz → ~0.25 at 200 Hz
-      const reflectionCoherenceWeight = 0; // ISOLATION TEST: coherence zeroed. Original: 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70)
+      const reflectionCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
       sumRe += reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
       sumIm += reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
     });
 
     // Diffuse late-field approximation
     const lateFieldDecay = Math.exp(-(frequencyHz - 20) / 120);
-    const lateFieldAmplitude = 0; // ISOLATION TEST: late-field energy zeroed. Original: amplitude * 0.12 * lateFieldDecay
+    const lateFieldAmplitude = amplitude * 0.12 * lateFieldDecay;
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
     sumRe += lateFieldAmplitude * Math.cos(lateFieldPhase);
     sumIm += lateFieldAmplitude * Math.sin(lateFieldPhase);
