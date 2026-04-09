@@ -179,7 +179,7 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const resonanceMagnitude = (bandwidth * bandwidth) / (denominator * denominator);
   const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
 
-  const softenedCoupling = combinedCoupling; // ISOLATION TEST: raw coupling, bypassing sqrt-softening. Original: Math.sign(combinedCoupling) * Math.sqrt(Math.abs(combinedCoupling))
+  const softenedCoupling = Math.sign(combinedCoupling) * Math.sqrt(Math.abs(combinedCoupling));
 
   const modeOrder = Math.abs(modeIndices.nx) + Math.abs(modeIndices.ny) + Math.abs(modeIndices.nz);
   const orderWeight = modeOrder >= 2 ? 0.72 : 1.0;
@@ -254,7 +254,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     const blendedMagnitude =
       Math.abs(signedAvgReceiver) + 0.35 * (absAvgReceiver - Math.abs(signedAvgReceiver));
 
-    const receiverCoupling = signedAvgReceiver; // ISOLATION TEST: pure signed average, bypassing blendedMagnitude anti-collapse. Original: receiverSign * blendedMagnitude
+    const receiverCoupling = receiverSign * blendedMagnitude;
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
