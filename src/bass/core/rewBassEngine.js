@@ -573,8 +573,17 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
-      sumRe = prevRe + modalSumRe;
-      sumIm = prevIm + modalSumIm;
+
+      const preMag = Math.sqrt(prevRe * prevRe + prevIm * prevIm);
+      const modalMag = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
+
+      // ISOLATION TEST:
+      // Instead of adding the full modal pressure field on top,
+      // apply only a normalized modal ratio relative to the existing room field magnitude.
+      const modalScale = preMag > 1e-9 ? Math.min(1, modalMag / preMag) : 0;
+
+      sumRe = prevRe + modalSumRe * modalScale;
+      sumIm = prevIm + modalSumIm * modalScale;
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
