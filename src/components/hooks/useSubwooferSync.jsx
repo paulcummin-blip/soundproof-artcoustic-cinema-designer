@@ -27,8 +27,6 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
         !String(rearSubsCfg.model || "").trim() && Number(rearSubsCfg.count) === 0);
 
     if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
-      if (hasPlacedSubs) return;
-      if (!cfgExplicitNone) return;
       setSubwoofers((prev) => (Array.isArray(prev) && prev.length ? [] : prev));
       return;
     }
