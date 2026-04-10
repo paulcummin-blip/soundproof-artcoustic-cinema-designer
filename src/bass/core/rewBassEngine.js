@@ -121,7 +121,11 @@ function computeRoomModesLocal({ widthM, lengthM, heightM, fMax, c }) {
   return modes.sort((a, b) => a.freq - b.freq);
 }
 
-function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, modeType, nx, ny, nz }) {
+// ─── ORIGINAL DAMPING BASELINE ───────────────────────────────────────────────
+// Global Sabine-derived Q. No family weighting. No mode-axis-selective absorption.
+// All six surfaces contribute to absorptionArea for every mode equally.
+// ─────────────────────────────────────────────────────────────────────────────
+function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
   const widthM = Number(roomDims?.widthM) || 1;
   const lengthM = Number(roomDims?.lengthM) || 1;
   const heightM = Number(roomDims?.heightM) || 1;
@@ -135,20 +139,18 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, modeType, nx, ny,
   const surfaceRight = lengthM * heightM;
 
   const absorptionArea =
-    (nx > 0 ? surfaceLeft * (surfaceAbsorption?.left ?? 0.3) + surfaceRight * (surfaceAbsorption?.right ?? 0.3) : 0) +
-    (ny > 0 ? surfaceFront * (surfaceAbsorption?.front ?? 0.3) + surfaceBack * (surfaceAbsorption?.back ?? 0.3) : 0) +
-    (nz > 0 ? surfaceFloor * (surfaceAbsorption?.floor ?? 0.3) + surfaceCeiling * (surfaceAbsorption?.ceiling ?? 0.3) : 0);
+    surfaceFloor * (surfaceAbsorption?.floor ?? 0.3) +
+    surfaceCeiling * (surfaceAbsorption?.ceiling ?? 0.3) +
+    surfaceFront * (surfaceAbsorption?.front ?? 0.3) +
+    surfaceBack * (surfaceAbsorption?.back ?? 0.3) +
+    surfaceLeft * (surfaceAbsorption?.left ?? 0.3) +
+    surfaceRight * (surfaceAbsorption?.right ?? 0.3);
 
   const rt60 = 0.161 * volume / Math.max(absorptionArea, 1e-6);
   const tau = rt60 / 13.815;
   const qSabine = 2 * Math.PI * f0 * tau;
 
-  const familyWeight =
-    modeType === 'axial' ? 1.0 :
-    modeType === 'tangential' ? 0.8 :
-    0.65;
-
-  return Math.max(1, Math.min(80, qSabine * familyWeight));
+  return Math.max(1, Math.min(80, qSabine));
 }
 
 function modeShapeValueLocal(mode, x, y, z, roomDims) {
@@ -451,10 +453,6 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                   roomDims: { widthM, lengthM, heightM },
                   surfaceAbsorption,
                   f0: mode.freq,
-                  modeType: mode.type,
-                  nx: mode.nx,
-                  ny: mode.ny,
-                  nz: mode.nz,
                 }),
       }))
     : [];
