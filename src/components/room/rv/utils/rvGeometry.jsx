@@ -9,8 +9,8 @@
 export const SURROUND_WALL_GAP_M = 0.01;
 
 // Clearance constants for screen-plane depth calculation
-export const WALL_BUFFER_M   = 0.02;  // gap between front wall and back of speaker
-export const SCREEN_BUFFER_M = 0.30;  // gap between speaker front face and screen face
+export const WALL_BUFFER_M   = 0.01;  // gap between front wall and back of speaker
+export const SCREEN_BUFFER_M = 0.01;  // gap between speaker front face and screen face
 
 // ─── Wall-position helpers ────────────────────────────────────────────────────
 
