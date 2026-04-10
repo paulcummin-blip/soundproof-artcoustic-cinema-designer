@@ -8,7 +8,9 @@
 
 export const SURROUND_WALL_GAP_M = 0.01;
 
-const WALL_BUFFER_M = 0.01; // min gap between screen face and speaker face
+// Clearance constants for screen-plane depth calculation
+export const WALL_BUFFER_M   = 0.02;  // gap between front wall and back of speaker
+export const SCREEN_BUFFER_M = 0.30;  // gap between speaker front face and screen face
 
 // ─── Wall-position helpers ────────────────────────────────────────────────────
 
@@ -189,20 +191,22 @@ export function computeMinimumScreenDepthM({
     // Determine yaw angle for this speaker
     let yawDeg = 0;
     if (role === 'FL' || role === 'L') {
+      // FL: use live LCR angle when aiming at MLP
       yawDeg = aimAtMLP ? (lcrAngles?.L ?? 0) : 0;
     } else if (role === 'FR' || role === 'R') {
+      // FR: use live LCR angle when aiming at MLP
       yawDeg = aimAtMLP ? (lcrAngles?.R ?? 0) : 0;
-    } else {
-      // FC / centre / subs — always 0
+    } else if (role === 'FC' || role === 'C') {
+      // FC: always 0° until real centre angle data exists
       yawDeg = 0;
+    } else {
+      // Subwoofers: use obj.yaw if present (future-proof); default 0°
+      yawDeg = Number(obj?.yaw ?? obj?.rotation_deg ?? 0) || 0;
     }
 
     const halfExtent = yHalfExtentM(depthM, widthM, yawDeg);
-    // The speaker front face is at: speakerCentreY - halfExtent
-    // We need the screen front plane to be at least: speakerCentreY + halfExtent + WALL_BUFFER_M
-    // But the centreY for a front-wall speaker IS halfExtent (touching back of screen)
-    // So minimum screen depth = depthM + WALL_BUFFER_M (full depth + gap)
-    const neededDepth = halfExtent * 2 + WALL_BUFFER_M;
+    // Required depth = wall buffer + full projected object depth + screen-face buffer
+    const neededDepth = WALL_BUFFER_M + halfExtent * 2 + SCREEN_BUFFER_M;
     if (neededDepth > maxDepth) maxDepth = neededDepth;
   }
 
