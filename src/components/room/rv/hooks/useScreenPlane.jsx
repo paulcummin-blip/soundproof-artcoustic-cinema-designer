@@ -24,10 +24,21 @@ export function useScreenPlane({
 
   // LIVE EMIT: recompute minimum screen depth whenever anything relevant changes
   useEffect(() => {
+    const roomWidthM = Number(appState?.roomDims?.widthM) || 4.5;
+    const screenCentreX = roomWidthM / 2;
+    const screenVisibleWidthM = Math.max(0.1, Number(screen?.visibleWidthInches || 100) * 0.0254);
+    const screenLeftX  = screenCentreX - screenVisibleWidthM / 2 - 0.05;
+    const screenRightX = screenCentreX + screenVisibleWidthM / 2 + 0.05;
+
     const frontObjectsToCalculate = [...(placedSpeakers || []), ...(frontSubs || [])]
       .filter(s => {
         const r = getCanonicalRole(s.role);
-        return r === 'FL' || r === 'FC' || r === 'FR' || isSubRole(r);
+        if (r === 'FL' || r === 'FC' || r === 'FR') return true;
+        if (isSubRole(r)) {
+          const x = Number(s?.position?.x);
+          return Number.isFinite(x) && x >= screenLeftX && x <= screenRightX;
+        }
+        return false;
       })
       .map(s => ({
         model: s.model,
