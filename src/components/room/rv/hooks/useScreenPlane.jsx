@@ -112,22 +112,29 @@ export function useScreenPlane({
     return Math.max(0.10, Math.min(0.60, raw));
   }, [screenPlaneY]);
 
+  // Resolve final screen plane: locked value wins over live calculation.
+  // This must be computed BEFORE all publish effects so that upstream consumers
+  // (appState.screenFrontPlaneM, onScreenPlaneChange, onScreenPlaneYChange) always
+  // receive the locked value when the screen is locked, regardless of what the
+  // live geometry recalculates (e.g. due to lcrAngleInfo / speaker aiming changes).
+  const resolvedScreenPlaneY = (isLocked && Number.isFinite(lockedY)) ? lockedY : screenPlaneY;
+
   // Publish screen front plane to AppState with guards (rounded to mm + change detection)
   const lastScreenFrontPlaneRef = useRef(null);
 
   useEffect(() => {
     if (!appState?.setScreenFrontPlaneM) return;
-    if (!Number.isFinite(screenPlaneY)) return;
+    if (!Number.isFinite(resolvedScreenPlaneY)) return;
 
     // Round to mm to avoid jitter/loops
-    const v = Math.round(screenPlaneY * 1000) / 1000;
+    const v = Math.round(resolvedScreenPlaneY * 1000) / 1000;
 
     // Only update if value actually changed
     if (lastScreenFrontPlaneRef.current === v) return;
     lastScreenFrontPlaneRef.current = v;
 
     appState.setScreenFrontPlaneM(v);
-  }, [screenPlaneY, appState?.setScreenFrontPlaneM]);
+  }, [resolvedScreenPlaneY, appState?.setScreenFrontPlaneM]);
 
   // Push live plane up to RoomDesigner when it changes (debounced + change guard)
   const screenSendTimerRef = useRef(null);
@@ -135,10 +142,10 @@ export function useScreenPlane({
 
   useEffect(() => {
     if (typeof onScreenPlaneChange !== 'function') return;
-    if (!Number.isFinite(screenPlaneY)) return;
+    if (!Number.isFinite(resolvedScreenPlaneY)) return;
 
     // Round to 0.1mm to prevent float jitter
-    const rounded = Math.round(screenPlaneY * 10000) / 10000;
+    const rounded = Math.round(resolvedScreenPlaneY * 10000) / 10000;
 
     // If unchanged, skip update
     if (lastSentRef.current === rounded) return;
@@ -153,27 +160,26 @@ export function useScreenPlane({
     }, 1000);
 
     return () => clearTimeout(screenSendTimerRef.current);
-  }, [screenPlaneY, onScreenPlaneChange]);
+  }, [resolvedScreenPlaneY, onScreenPlaneChange]);
 
   // NEW: Publish live screen plane Y to screen object for Live Metrics (immediate, no debounce)
   const lastSentScreenPlaneYRef = useRef(null);
 
   useEffect(() => {
     if (typeof onScreenPlaneYChange !== 'function') return;
-    if (!Number.isFinite(screenPlaneY)) return;
+    if (!Number.isFinite(resolvedScreenPlaneY)) return;
 
     // Round to mm to prevent jitter
-    const rounded = Math.round(screenPlaneY * 1000) / 1000;
+    const rounded = Math.round(resolvedScreenPlaneY * 1000) / 1000;
 
     // Only call if value actually changed
     if (lastSentScreenPlaneYRef.current === rounded) return;
     lastSentScreenPlaneYRef.current = rounded;
 
     onScreenPlaneYChange(rounded);
-  }, [screenPlaneY, onScreenPlaneYChange]);
+  }, [resolvedScreenPlaneY, onScreenPlaneYChange]);
 
-  // Return locked value if active, otherwise live value
-  const resolvedScreenPlaneY = (isLocked && Number.isFinite(lockedY)) ? lockedY : screenPlaneY;
+  // resolvedScreenPlaneY is computed early (before publish effects) — reuse it here.
   const resolvedZoneDepthM = (isLocked && Number.isFinite(lockedY))
     ? Math.max(0.10, Math.min(0.60, lockedY))
     : ZONE_DEPTH_M;
