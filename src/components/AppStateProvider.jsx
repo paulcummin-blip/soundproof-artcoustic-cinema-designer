@@ -532,6 +532,8 @@ function useDesignerState() {
 
   const [screenCentreDepthM, setScreenCentreDepthM] = useState(null);
   const [screenFrontPlaneM, _setScreenFrontPlaneM] = useState(null);
+  const [screenPlaneLocked, setScreenPlaneLocked] = useState(false);
+  const [lockedScreenFrontPlaneM, setLockedScreenFrontPlaneM] = useState(null);
   const [mlpY_m, setMlpY_m] = useState(null);
   const [rowCentersM, _setRowCentersM] = useState([]);
 
@@ -1761,6 +1763,8 @@ function useDesignerState() {
     DBG_FW, frozenTabs, isFrozen, freezeTab, unfreezeTab, showToast,
     screenCentreDepthM, setScreenCentreDepthM,
     screenFrontPlaneM, setScreenFrontPlaneM,
+    screenPlaneLocked, setScreenPlaneLocked,
+    lockedScreenFrontPlaneM, setLockedScreenFrontPlaneM,
     mlpY_m, setMlpY_m,
     rowCentersM, setRowCentersM,
     overheadGlobalModel, setOverheadGlobalModel,
@@ -1845,6 +1849,8 @@ function useDesignerState() {
     DBG_FW, frozenTabs, isFrozen, freezeTab, unfreezeTab, showToast,
     screenCentreDepthM,
     screenFrontPlaneM, setScreenFrontPlaneM,
+    screenPlaneLocked, setScreenPlaneLocked,
+    lockedScreenFrontPlaneM, setLockedScreenFrontPlaneM,
     mlp,
     mlpY_m, setMlpY_m,
     rowCentersM, setRowCentersM,

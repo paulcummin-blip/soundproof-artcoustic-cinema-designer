@@ -17,6 +17,10 @@ export function useScreenPlane({
   onScreenPlaneChange,
   onScreenPlaneYChange
 }) {
+  // LOCK: if screen plane is locked, return the locked value immediately
+  const isLocked = appState?.screenPlaneLocked === true;
+  const lockedY = appState?.lockedScreenFrontPlaneM;
+
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = React.useState(
     0.02 + 0.30 // WALL_BUFFER_M + SCREEN_BUFFER_M default
   );
@@ -168,9 +172,15 @@ export function useScreenPlane({
     onScreenPlaneYChange(rounded);
   }, [screenPlaneY, onScreenPlaneYChange]);
 
+  // Return locked value if active, otherwise live value
+  const resolvedScreenPlaneY = (isLocked && Number.isFinite(lockedY)) ? lockedY : screenPlaneY;
+  const resolvedZoneDepthM = (isLocked && Number.isFinite(lockedY))
+    ? Math.max(0.10, Math.min(0.60, lockedY))
+    : ZONE_DEPTH_M;
+
   return {
-    screenPlaneY,
+    screenPlaneY: resolvedScreenPlaneY,
     minScreenDepth: effectiveMinScreenDepthM,
-    ZONE_DEPTH_M,
+    ZONE_DEPTH_M: resolvedZoneDepthM,
   };
 }

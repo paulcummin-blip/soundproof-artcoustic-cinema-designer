@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { useAppState } from "@/components/AppStateProvider";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -13,6 +15,9 @@ const SUB_MODELS = ["SUB2-12", "SUB3-12", "SUB4-12"];
  * - Max 4 positions
  */
 export default function SubwooferSelector({ title, cfg, onChange, disabled = false }) {
+  const appState = useAppState();
+  const isFront = String(title || "").toLowerCase().includes("front");
+  const screenPlaneLocked = appState?.screenPlaneLocked ?? false;
   const safeCount = Math.max(0, Math.min(4, Number(cfg?.count ?? 0)));
   const safeModel = cfg?.model || "SUB2-12";
 
@@ -96,6 +101,36 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
           </SelectContent>
         </Select>
       </div>
+
+      {isFront && (
+        <div className="pt-2 border-t border-[#DCDBD6] space-y-1">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-xs font-medium text-[#1B1A1A]">Lock screen position</Label>
+              <p className="text-[11px] text-muted-foreground leading-tight">Keeps the screen at its current depth even if subwoofer position changes.</p>
+            </div>
+            <Switch
+              checked={screenPlaneLocked}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  const live = appState?.screenFrontPlaneM;
+                  if (Number.isFinite(live)) {
+                    appState.setLockedScreenFrontPlaneM(live);
+                  }
+                  appState.setScreenPlaneLocked(true);
+                } else {
+                  appState.setScreenPlaneLocked(false);
+                }
+              }}
+            />
+          </div>
+          {screenPlaneLocked && Number.isFinite(appState?.lockedScreenFrontPlaneM) && (
+            <p className="text-[11px] text-[#213428] font-medium">
+              Locked at {(appState.lockedScreenFrontPlaneM * 100).toFixed(1)} cm
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
