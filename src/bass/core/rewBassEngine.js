@@ -235,23 +235,37 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
 
-    // Receiver coupling: hybrid 2-point lateral receiver model (half-span = 0.15 m).
-    // Blends signed average (preserves phase cancellation direction) with 35% of the
-    // abs-average residual (prevents odd x-order modes from collapsing to zero at centre seat).
-    // Middle ground between pure signed (too destructive) and pure absolute (no sign info).
     const RECEIVER_HALF_SPAN_M = 0.15;
+    const RECEIVER_HALF_DEPTH_M = 0.15;
+
+    // Existing lateral points
     const leftEarCoupling  = modeShapeValueLocal(mode, seat.x - RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
     const rightEarCoupling = modeShapeValueLocal(mode, seat.x + RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
 
-    // Hybrid receiver model: blend signed average with 35% of abs-average residual.
-    // Preserves sign direction but prevents odd x-order collapse at centre seat.
-    const signedAvgReceiver = 0.5 * (leftEarCoupling + rightEarCoupling);
-    const absAvgReceiver = 0.5 * (Math.abs(leftEarCoupling) + Math.abs(rightEarCoupling));
+    // New front/back points
+    const frontCoupling = modeShapeValueLocal(mode, seat.x, seat.y - RECEIVER_HALF_DEPTH_M, seat.z, { widthM, lengthM, heightM });
+    const backCoupling  = modeShapeValueLocal(mode, seat.x, seat.y + RECEIVER_HALF_DEPTH_M, seat.z, { widthM, lengthM, heightM });
+
+    // Four-point signed average
+    const signedAvgReceiver = 0.25 * (
+      leftEarCoupling +
+      rightEarCoupling +
+      frontCoupling +
+      backCoupling
+    );
+
+    // Four-point absolute average
+    const absAvgReceiver = 0.25 * (
+      Math.abs(leftEarCoupling) +
+      Math.abs(rightEarCoupling) +
+      Math.abs(frontCoupling) +
+      Math.abs(backCoupling)
+    );
 
     const receiverSign =
       Math.abs(signedAvgReceiver) > 1e-12
         ? Math.sign(signedAvgReceiver)
-        : Math.sign(leftEarCoupling + rightEarCoupling) || 1;
+        : Math.sign(leftEarCoupling + rightEarCoupling + frontCoupling + backCoupling) || 1;
 
     const blendedMagnitude =
       Math.abs(signedAvgReceiver) + 0.35 * (absAvgReceiver - Math.abs(signedAvgReceiver));
