@@ -1,6 +1,7 @@
 import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
@@ -95,9 +96,35 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               </div>
             )}
 
+            <div className="pt-2 mt-1 border-t border-[#DCDBD6] space-y-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[12px] font-medium text-[#1B1A1A]">Lock screen position</p>
+                  <p className="text-[11px] text-[#625143] leading-tight">Keeps the screen at its current depth even if subwoofer position changes.</p>
+                </div>
+                <Switch
+                  checked={!!appState?.screenPlaneLocked}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      const live = appState?.screenFrontPlaneM;
+                      if (Number.isFinite(live)) appState.setLockedScreenFrontPlaneM(live);
+                      appState.setScreenPlaneLocked(true);
+                    } else {
+                      appState.setScreenPlaneLocked(false);
+                    }
+                  }}
+                />
+              </div>
+              {appState?.screenPlaneLocked && Number.isFinite(appState?.lockedScreenFrontPlaneM) && (
+                <p className="text-[11px] text-[#213428] font-medium">
+                  Locked at {(appState.lockedScreenFrontPlaneM * 100).toFixed(1)} cm
+                </p>
+              )}
+            </div>
+
             {subWarnings?.front?.length > 0 && (
               <div className="mt-2 text-xs px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">
-                {subWarnings.front[0]}
+              {subWarnings.front[0]}
               </div>
             )}
           </div>
