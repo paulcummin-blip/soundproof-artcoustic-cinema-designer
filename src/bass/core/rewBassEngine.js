@@ -158,16 +158,16 @@ function estimateModeQByType(mode) {
 
   // Axial
   if (order === 1) {
-    return 6.0;
+    return 10.0;
   }
 
   // Tangential
   if (order === 2) {
-    return 4.5;
+    return 7.0;
   }
 
   // Oblique and higher
-  return 3.5;
+  return 5.0;
 }
 
 function modeShapeValueLocal(mode, x, y, z, roomDims) {
