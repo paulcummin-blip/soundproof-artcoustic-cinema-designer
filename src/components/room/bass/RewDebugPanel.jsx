@@ -264,14 +264,18 @@ function FixedLowModeTable({ stepDebug }) {
                 <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.freq.toFixed(2)}</td>
                 <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.nx},{row.ny},{row.nz}</td>
                 <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.type}</td>
-                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.qValue.toFixed(2)}</td>
-                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.sourceCoupling.toFixed(4)}</td>
-                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.receiverCoupling.toFixed(4)}</td>
-                <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700, color: Math.abs(row.combinedCoupling) < 0.05 ? '#dc2626' : '#065f46' }}>{row.combinedCoupling.toFixed(4)}</td>
+                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{Number.isFinite(row.qValue) ? row.qValue.toFixed(2) : '—'}</td>
+                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{Number.isFinite(row.sourceCoupling) ? row.sourceCoupling.toFixed(4) : '—'}</td>
+                <td style={{ textAlign: 'right', padding: '2px 5px' }}>
+                  {Number.isFinite(row.receiverCoupling)
+                    ? row.receiverCoupling.toFixed(4)
+                    : '—'}
+                </td>
+                <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700, color: Math.abs(row.combinedCoupling) < 0.05 ? '#dc2626' : '#065f46' }}>{Number.isFinite(row.combinedCoupling) ? row.combinedCoupling.toFixed(4) : '—'}</td>
                 <td style={{ textAlign: 'right', padding: '2px 5px', color: row.orderWeight < 1 ? '#b45309' : '#065f46', fontWeight: 600 }}>{row.orderWeight != null ? row.orderWeight.toFixed(2) : '—'}</td>
-                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.transferRe.toFixed(5)}</td>
-                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{row.transferIm.toFixed(5)}</td>
-                <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700, color: '#047857' }}>{row.magnitude.toFixed(5)}</td>
+                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{Number.isFinite(row.transferRe) ? row.transferRe.toFixed(5) : '—'}</td>
+                <td style={{ textAlign: 'right', padding: '2px 5px' }}>{Number.isFinite(row.transferIm) ? row.transferIm.toFixed(5) : '—'}</td>
+                <td style={{ textAlign: 'right', padding: '2px 5px', fontWeight: 700, color: '#047857' }}>{Number.isFinite(row.magnitude) ? row.magnitude.toFixed(5) : '—'}</td>
               </tr>
             ))
           }
