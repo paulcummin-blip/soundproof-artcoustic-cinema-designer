@@ -235,58 +235,13 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
 
-    const RECEIVER_HALF_SPAN_M = 0.15;
-    const RECEIVER_HALF_DEPTH_M = 0.15;
-    const RECEIVER_WIDE_HALF_SPAN_M = 0.30;
-
-    // Existing lateral points
-    const leftEarCoupling  = modeShapeValueLocal(mode, seat.x - RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    const rightEarCoupling = modeShapeValueLocal(mode, seat.x + RECEIVER_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-
-    // Wider lateral pair
-    const leftWideCoupling  = modeShapeValueLocal(mode, seat.x - RECEIVER_WIDE_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-    const rightWideCoupling = modeShapeValueLocal(mode, seat.x + RECEIVER_WIDE_HALF_SPAN_M, seat.y, seat.z, { widthM, lengthM, heightM });
-
-    // Existing front/back points
-    const frontCoupling = modeShapeValueLocal(mode, seat.x, seat.y - RECEIVER_HALF_DEPTH_M, seat.z, { widthM, lengthM, heightM });
-    const backCoupling  = modeShapeValueLocal(mode, seat.x, seat.y + RECEIVER_HALF_DEPTH_M, seat.z, { widthM, lengthM, heightM });
-
-    // Six-point signed average
-    const signedAvgReceiver = (1 / 6) * (
-      leftEarCoupling +
-      rightEarCoupling +
-      leftWideCoupling +
-      rightWideCoupling +
-      frontCoupling +
-      backCoupling
+    const receiverCoupling = modeShapeValueLocal(
+      mode,
+      seat.x,
+      seat.y,
+      seat.z,
+      { widthM, lengthM, heightM }
     );
-
-    // Six-point absolute average
-    const absAvgReceiver = (1 / 6) * (
-      Math.abs(leftEarCoupling) +
-      Math.abs(rightEarCoupling) +
-      Math.abs(leftWideCoupling) +
-      Math.abs(rightWideCoupling) +
-      Math.abs(frontCoupling) +
-      Math.abs(backCoupling)
-    );
-
-    const receiverSign =
-      Math.abs(signedAvgReceiver) > 1e-12
-        ? Math.sign(signedAvgReceiver)
-        : Math.sign(
-            leftEarCoupling +
-            rightEarCoupling +
-            leftWideCoupling +
-            rightWideCoupling +
-            frontCoupling +
-            backCoupling
-          ) || 1;
-
-    const blendedMagnitude =
-      Math.abs(signedAvgReceiver) + 0.35 * (absAvgReceiver - Math.abs(signedAvgReceiver));
-
-    const receiverCoupling = receiverSign * blendedMagnitude;
 
     const combinedCoupling = sourceCoupling * receiverCoupling;
 
@@ -338,8 +293,6 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           qValue: mode.qValue,
           sourceCoupling,
           receiverCoupling,
-          signedAvgReceiver,
-          absAvgReceiver,
           combinedCoupling,
           orderWeight: (Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz)) >= 2 ? 0.72 : 1.0,
           transferRe: modalContrib.real,
