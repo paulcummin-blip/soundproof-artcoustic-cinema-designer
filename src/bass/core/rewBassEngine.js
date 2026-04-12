@@ -558,19 +558,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const prevRe = sumRe;
       const prevIm = sumIm;
 
-      const preModalMag = Math.sqrt(prevRe * prevRe + prevIm * prevIm);
-      const modalMag = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
-
-      // ISOLATION TEST:
-      // Constrain additive modal contribution relative to the existing field.
-      // If modalMag exceeds preModalMag, scale the applied modal field down
-      // so its applied magnitude does not exceed the pre-modal magnitude.
-      const modalApplyScale = modalMag > preModalMag && modalMag > 1e-9
-        ? preModalMag / modalMag
-        : 1;
-
-      sumRe = prevRe + modalSumRe * modalApplyScale;
-      sumIm = prevIm + modalSumIm * modalApplyScale;
+      sumRe = prevRe + modalSumRe;
+      sumIm = prevIm + modalSumIm;
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
