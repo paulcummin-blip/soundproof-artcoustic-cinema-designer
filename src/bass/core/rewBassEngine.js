@@ -177,20 +177,21 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const bandwidth = modalAngularFrequency / qValue;
   const deltaFrequency = angularFrequency - modalAngularFrequency;
 
-  const denominator = Math.sqrt(deltaFrequency * deltaFrequency + bandwidth * bandwidth);
-  const resonanceMagnitude = (bandwidth * bandwidth) / (denominator * denominator);
-  const resonancePhase = -Math.atan2(deltaFrequency, bandwidth);
-
-  const effectiveCoupling = combinedCoupling;
+  const denominatorSq = (bandwidth * bandwidth) + (deltaFrequency * deltaFrequency);
 
   const modeOrder = Math.abs(modeIndices.nx) + Math.abs(modeIndices.ny) + Math.abs(modeIndices.nz);
   const orderWeight = modeOrder >= 2 ? 0.72 : 1.0;
 
-  const pressureMagnitude = modalSourceAmplitude * effectiveCoupling * resonanceMagnitude * orderWeight;
+  const effectiveCoupling = combinedCoupling;
+  const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
+
+  // Direct complex amplitude-domain modal transfer
+  const transferReal = (bandwidth * deltaFrequency) / denominatorSq;
+  const transferImag = (bandwidth * bandwidth) / denominatorSq;
 
   return {
-    real: pressureMagnitude * Math.cos(resonancePhase),
-    imag: pressureMagnitude * Math.sin(resonancePhase),
+    real: modalGain * transferReal,
+    imag: modalGain * transferImag,
   };
 }
 
