@@ -191,10 +191,13 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
 function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
-  const bandwidth = modalAngularFrequency / qValue;
-  const deltaFrequency = angularFrequency - modalAngularFrequency;
 
-  const denominatorSq = (bandwidth * bandwidth) + (deltaFrequency * deltaFrequency);
+  const ratioSq = (angularFrequency / modalAngularFrequency) * (angularFrequency / modalAngularFrequency);
+  const qTerm = angularFrequency / (qValue * modalAngularFrequency);
+
+  const realDen = 1 - ratioSq;
+  const imagDen = qTerm;
+  const denominatorSq = (realDen * realDen) + (imagDen * imagDen);
 
   const modeOrder = Math.abs(modeIndices.nx) + Math.abs(modeIndices.ny) + Math.abs(modeIndices.nz);
   const orderWeight = modeOrder >= 2 ? 0.72 : 1.0;
@@ -202,9 +205,9 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const effectiveCoupling = combinedCoupling;
   const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
 
-  // Direct complex amplitude-domain modal transfer
-  const transferReal = (bandwidth * deltaFrequency) / denominatorSq;
-  const transferImag = (bandwidth * bandwidth) / denominatorSq;
+  // Standard second-order complex damped-resonator transfer
+  const transferReal = realDen / denominatorSq;
+  const transferImag = -imagDen / denominatorSq;
 
   return {
     real: modalGain * transferReal,
