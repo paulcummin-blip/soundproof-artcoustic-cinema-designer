@@ -191,10 +191,11 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
 function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
-  const bandwidth = modalAngularFrequency / qValue;
-  const deltaFrequency = angularFrequency - modalAngularFrequency;
 
-  const denominatorSq = (bandwidth * bandwidth) + (deltaFrequency * deltaFrequency);
+  const ratio = angularFrequency / modalAngularFrequency;
+  const realDen = 1 - (ratio * ratio);
+  const imagDen = angularFrequency / (qValue * modalAngularFrequency);
+  const denominatorSq = (realDen * realDen) + (imagDen * imagDen);
 
   const modeOrder = Math.abs(modeIndices.nx) + Math.abs(modeIndices.ny) + Math.abs(modeIndices.nz);
   const orderWeight = modeOrder >= 2 ? 0.72 : 1.0;
@@ -202,9 +203,11 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const effectiveCoupling = combinedCoupling;
   const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
 
-  // Direct complex amplitude-domain modal transfer
-  const transferReal = (bandwidth * deltaFrequency) / denominatorSq;
-  const transferImag = (bandwidth * bandwidth) / denominatorSq;
+  // Unit-normalised second-order pressure-domain transfer:
+  // H(jω) = (j * ω/ω0Q) / (1 - (ω/ω0)^2 + j * ω/ω0Q)
+  // This gives |H| = 1 at resonance before modalGain is applied.
+  const transferReal = (imagDen * imagDen) / denominatorSq;
+  const transferImag = (-imagDen * realDen) / denominatorSq;
 
   return {
     real: modalGain * transferReal,
