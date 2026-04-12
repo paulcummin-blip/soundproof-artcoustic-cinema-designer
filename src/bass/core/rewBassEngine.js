@@ -153,6 +153,23 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
   return Math.max(1, Math.min(80, qSabine));
 }
 
+function estimateModeQByType(mode) {
+  const order = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
+
+  // Axial
+  if (order === 1) {
+    return 6.0;
+  }
+
+  // Tangential
+  if (order === 2) {
+    return 4.5;
+  }
+
+  // Oblique and higher
+  return 3.5;
+}
+
 function modeShapeValueLocal(mode, x, y, z, roomDims) {
   const widthM = Math.max(1e-6, Number(roomDims?.widthM) || 0);
   const lengthM = Math.max(1e-6, Number(roomDims?.lengthM) || 0);
@@ -436,11 +453,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         c: SPEED_OF_SOUND_MPS,
       }).map((mode) => ({
         ...mode,
-        qValue: estimateModeQLocal({
-                  roomDims: { widthM, lengthM, heightM },
-                  surfaceAbsorption,
-                  f0: mode.freq,
-                }),
+        qValue: estimateModeQByType(mode),
       }))
     : [];
 
