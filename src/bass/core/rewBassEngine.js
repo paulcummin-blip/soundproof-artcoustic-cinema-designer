@@ -293,6 +293,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           qValue: mode.qValue,
           sourceCoupling,
           receiverCoupling,
+          // Restore debug compatibility (UI expects these fields)
+          signedAvgReceiver: receiverCoupling,
+          absAvgReceiver: Math.abs(receiverCoupling),
           combinedCoupling,
           orderWeight: (Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz)) >= 2 ? 0.72 : 1.0,
           transferRe: modalContrib.real,
