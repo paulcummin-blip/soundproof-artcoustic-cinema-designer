@@ -283,34 +283,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
             backCoupling
           ) || 1;
 
-    const signedSamples = [
-      leftEarCoupling,
-      rightEarCoupling,
-      leftWideCoupling,
-      rightWideCoupling,
-      frontCoupling,
-      backCoupling,
-    ];
-
-    const signedMean = signedAvgReceiver;
-    const signedVariance =
-      signedSamples.reduce((acc, v) => acc + Math.pow(v - signedMean, 2), 0) / signedSamples.length;
-    const signedStdDev = Math.sqrt(signedVariance);
-
-    const signedAvgAbs = Math.max(1e-9, Math.abs(signedAvgReceiver));
-    const normalisedAgreement = signedStdDev / signedAvgAbs;
-
-    // ISOLATION TEST:
-    // If the sample set is too spatially coherent, attenuate progressively.
-    // Above threshold: no attenuation.
-    // Below threshold: progressively more attenuation as agreement becomes tighter.
-    const AGREEMENT_THRESHOLD = 0.1;
-    const attenuationFactor =
-      normalisedAgreement >= AGREEMENT_THRESHOLD
-        ? 1
-        : (normalisedAgreement / AGREEMENT_THRESHOLD);
-
-    const blendedMagnitude = Math.abs(signedAvgReceiver) * attenuationFactor;
+    const blendedMagnitude =
+      Math.abs(signedAvgReceiver) + 0.35 * (absAvgReceiver - Math.abs(signedAvgReceiver));
 
     const receiverCoupling = receiverSign * blendedMagnitude;
 
