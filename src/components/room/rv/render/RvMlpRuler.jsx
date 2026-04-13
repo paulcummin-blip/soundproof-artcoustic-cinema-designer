@@ -31,6 +31,7 @@ export default function RvMlpRuler(props) {
   
   // Ruler styling (match speaker rulers)
   const rulerColor = '#625143';
+  const brandGreen = '#213428';
   const rulerStroke = 1.5;
   const dotRadius = 3;
   const fontSize = 11;
@@ -122,14 +123,14 @@ export default function RvMlpRuler(props) {
       {/* Screen plane dot */}
       <circle cx={rulerX_screen} cy={screenY_px} r={dotRadius} fill={rulerColor} opacity={0.8} />
       {/* RSP dot (centre) */}
-      <circle cx={rulerX_screen} cy={mlpY_px} r={dotRadius} fill={rulerColor} opacity={0.8} />
+      <circle cx={rulerX_screen} cy={mlpY_px} r={dotRadius} fill={brandGreen} opacity={0.8} />
       {/* Screen → RSP label */}
       <text
         x={rulerX_screen - labelOffset}
         y={(screenY_px + mlpY_px) / 2}
         textAnchor="middle"
         fontSize={fontSize}
-        fill={rulerColor}
+        fill={brandGreen}
         fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
         transform={`rotate(-90 ${rulerX_screen - labelOffset} ${(screenY_px + mlpY_px) / 2})`}
       >
