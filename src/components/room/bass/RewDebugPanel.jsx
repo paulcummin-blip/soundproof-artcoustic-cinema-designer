@@ -40,7 +40,7 @@ function DebugSection({ title, defaultOpen = false, accentColor = '#92400e', chi
 
 // ── Compact Target Summary ────────────────────────────────────────────────────
 function CompactTargetSummary({ stepDebug }) {
-  const targets = [34.3, 48.5, 68.6];
+  const targets = [34.3, 40.4, 68.6];
   const SEARCH_WINDOW_HZ = 8;
 
   const blocks = targets.map(target => {
@@ -117,7 +117,7 @@ function CompactTargetSummary({ stepDebug }) {
 // ── Three Raw Mode Rows (primary working area) ────────────────────────────────
 function ThreeRawModeRows({ stepDebug }) {
   const rows = stepDebug;
-  const targets = [34.3, 48.5, 68.6];
+  const targets = [34.3, 40.4, 68.6];
   const SEARCH_WINDOW_HZ = 8;
 
   return (
