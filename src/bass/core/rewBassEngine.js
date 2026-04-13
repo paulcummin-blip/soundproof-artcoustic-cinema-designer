@@ -495,8 +495,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
-        const lastRow = stepDebugRows[stepDebugRows.length - 1];
-        if (lastRow && lastRow.postModal === null && Math.abs(lastRow.frequencyHz - frequencyHz) < 0.5) {
+        const nearestRow = stepDebugRows.reduce((bestRow, row) => {
+          if (!bestRow) return row;
+          return Math.abs(row.frequencyHz - frequencyHz) < Math.abs(bestRow.frequencyHz - frequencyHz)
+            ? row
+            : bestRow;
+        }, null);
+
+        if (nearestRow && nearestRow.postModal === null) {
           const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
           const modalSumMag = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
           const strongestModeMagnitude = _debugStrongestMode
@@ -506,9 +512,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
               )
             : null;
 
-          if (TARGET_DEBUG_FREQUENCIES.some((targetHz) => Math.abs(lastRow.frequencyHz - targetHz) < 0.75)) {
-            lastRow.targetVectorDebug = {
-              frequencyHz,
+          if (TARGET_DEBUG_FREQUENCIES.some((targetHz) => Math.abs(nearestRow.frequencyHz - targetHz) < 0.75)) {
+            nearestRow.targetVectorDebug = {
+              frequencyHz: nearestRow.frequencyHz,
               summedBeforeModes: {
                 sumRe: prevRe,
                 sumIm: prevIm,
