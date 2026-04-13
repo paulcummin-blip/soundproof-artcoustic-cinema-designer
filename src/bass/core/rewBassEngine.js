@@ -235,6 +235,8 @@ const LOW_MODE_KEYS = [
   { nx: 2, ny: 0, nz: 0 },
 ];
 
+const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6];
+
 function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
@@ -654,6 +656,30 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             lowModeSumIm:       _lowModeSumIm,
             lowModeSumOfMags:   _lowModeSumMag,
           };
+
+          if (TARGET_DEBUG_FREQUENCIES.some((targetHz) => Math.abs(lastRow.frequencyHz - targetHz) < 0.75)) {
+            lastRow.targetVectorDebug = {
+              frequencyHz,
+              prevRe,
+              prevIm,
+              preModalMagnitude: Math.sqrt(prevRe * prevRe + prevIm * prevIm),
+              modalSumRe,
+              modalSumIm,
+              modalSumMag: _tfMag,
+              finalSumRe: sumRe,
+              finalSumIm: sumIm,
+              finalMagnitude: postMag,
+              strongestMode: _debugStrongestMode ? {
+                freq: _debugStrongestMode.freq,
+                nx: _debugStrongestMode.nx,
+                ny: _debugStrongestMode.ny,
+                nz: _debugStrongestMode.nz,
+                transferRe: _debugStrongestMode.transferRe,
+                transferIm: _debugStrongestMode.transferIm,
+                magnitude: _strongestMag,
+              } : null,
+            };
+          }
           // ── END MODEL APPLICATION COMPARISON ─────────────────────────────────────
         }
       }
