@@ -247,13 +247,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   let _debugStrongestMode = null;
   let _debugStrongestMag = -1;
 
-  // Fixed low-mode debug capture: always report these modes regardless of ranking.
-  const _debugLowModes = [];
-
-  // HIGH-PRECISION RAW DEBUG — only fires near 44.90 Hz, only for the four key modes.
-  // Does not affect any simulation behaviour. Debug-only instrumentation.
-  const _isHighPrecisionSlice = Math.abs(frequencyHz - 44.90) < 0.50;
-  const _highPrecisionRaw = [];
+  // Debug-only strongest mode capture for target-bin summaries.
 
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
@@ -304,92 +298,11 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
         };
       }
 
-      // New: fixed low-mode capture — always report (1,0,0) (0,1,0) (1,1,0) (2,0,0)
-      const isLowMode = LOW_MODE_KEYS.some(k => k.nx === mode.nx && k.ny === mode.ny && k.nz === mode.nz);
-      if (isLowMode) {
-        _debugLowModes.push({
-          freq: mode.freq,
-          nx: mode.nx,
-          ny: mode.ny,
-          nz: mode.nz,
-          type: mode.type,
-          qValue: mode.qValue,
-          sourceCoupling,
-          receiverCoupling,
-          // Restore debug compatibility (UI expects these fields)
-          signedAvgReceiver: receiverCoupling,
-          absAvgReceiver: Math.abs(receiverCoupling),
-          combinedCoupling,
-          orderWeight: (Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz)) >= 2 ? 0.72 : 1.0,
-          transferRe: modalContrib.real,
-          transferIm: modalContrib.imag,
-          magnitude: mag,
-        });
 
-        // HIGH-PRECISION RAW DEBUG — surgical addition, debug-only, no simulation change.
-        // Captures exact floating-point values passed to and returned from
-        // modalPressureContributionLocal at the 44.90 Hz slice for the four key modes.
-        if (_isHighPrecisionSlice) {
-          const unscaledRe = Math.abs(combinedCoupling) > 1e-30
-            ? modalContrib.real / combinedCoupling
-            : null;
-          const unscaledIm = Math.abs(combinedCoupling) > 1e-30
-            ? modalContrib.imag / combinedCoupling
-            : null;
-
-          // ── PARALLEL RECEIVER MODEL COMPARISON (debug-only, no simulation change) ──
-          // Computes three receiver coupling variants in parallel for the four key modes
-          // at ~44.90 Hz. None of these touch modalSumRe/Im or any simulation output.
-
-          // Model A — current live model (half-span=0.15, absolute average)
-          const _rcvA_left  = modeShapeValueLocal(mode, seat.x - 0.15, seat.y, seat.z, { widthM, lengthM, heightM });
-          const _rcvA_right = modeShapeValueLocal(mode, seat.x + 0.15, seat.y, seat.z, { widthM, lengthM, heightM });
-          const _rcvA = 0.5 * (Math.abs(_rcvA_left) + Math.abs(_rcvA_right));
-          const _combA = sourceCoupling * _rcvA;
-          const _contribA = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combA, modalSourceAmplitude, { nx: mode.nx, ny: mode.ny, nz: mode.nz });
-          const _magA = Math.sqrt(_contribA.real * _contribA.real + _contribA.imag * _contribA.imag);
-
-          // Model B — anatomical ear model (half-span=0.0875, absolute average)
-          const _rcvB_left  = modeShapeValueLocal(mode, seat.x - 0.0875, seat.y, seat.z, { widthM, lengthM, heightM });
-          const _rcvB_right = modeShapeValueLocal(mode, seat.x + 0.0875, seat.y, seat.z, { widthM, lengthM, heightM });
-          const _rcvB = 0.5 * (Math.abs(_rcvB_left) + Math.abs(_rcvB_right));
-          const _combB = sourceCoupling * _rcvB;
-          const _contribB = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combB, modalSourceAmplitude, { nx: mode.nx, ny: mode.ny, nz: mode.nz });
-          const _magB = Math.sqrt(_contribB.real * _contribB.real + _contribB.imag * _contribB.imag);
-
-          // Model C — point receiver at exact seat position
-          const _rcvC = Math.abs(modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM }));
-          const _combC = sourceCoupling * _rcvC;
-          const _contribC = modalPressureContributionLocal(frequencyHz, mode.freq, mode.qValue, _combC, modalSourceAmplitude, { nx: mode.nx, ny: mode.ny, nz: mode.nz });
-          const _magC = Math.sqrt(_contribC.real * _contribC.real + _contribC.imag * _contribC.imag);
-
-          _highPrecisionRaw.push({
-            label: `(${mode.nx},${mode.ny},${mode.nz})`,
-            evalHz:            frequencyHz,
-            modeFreq:          mode.freq,
-            qValue:            mode.qValue,
-            sourceCoupling:    sourceCoupling,
-            // Live simulation values (Model A — identical to what tfRe/tfIm used)
-            receiverCoupling:  receiverCoupling,
-            combinedCoupling:  combinedCoupling,
-            modalContribRe:    modalContrib.real,
-            modalContribIm:    modalContrib.imag,
-            mag:               mag,
-            unscaledRe,
-            unscaledIm,
-            // Parallel receiver model comparison (debug only)
-            receiverModels: {
-              A: { label: 'live_0.15',      rcv: _rcvA, comb: _combA, re: _contribA.real, im: _contribA.imag, mag: _magA },
-              B: { label: 'anatomical_0.0875', rcv: _rcvB, comb: _combB, re: _contribB.real, im: _contribB.imag, mag: _magB },
-              C: { label: 'point_seat',     rcv: _rcvC, comb: _combC, re: _contribC.real, im: _contribC.imag, mag: _magC },
-            },
-          });
-        }
-      }
     }
   });
 
-  return { modalSumRe, modalSumIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw };
+  return { modalSumRe, modalSumIm, _debugStrongestMode };
 }
 
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
@@ -571,7 +484,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // legacyModalTransferLocal returns the net modal pressure sum (starts at zero).
     // Modal contributions are added directly to the pre-modal field — true superposition.
     if (enableModes) {
-      const { modalSumRe, modalSumIm, _debugStrongestMode, _debugLowModes, _highPrecisionRaw } = legacyModalTransferLocal(
+      const { modalSumRe, modalSumIm, _debugStrongestMode } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m
       );
       const prevRe = sumRe;
@@ -585,77 +498,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const lastRow = stepDebugRows[stepDebugRows.length - 1];
         if (lastRow && lastRow.postModal === null && Math.abs(lastRow.frequencyHz - frequencyHz) < 0.5) {
           const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
-          lastRow.postModal = { modalSumRe, modalSumIm, sumRe, sumIm, magnitude: postMag };
-          lastRow.modalTransferReFinal = modalSumRe;
-          lastRow.modalTransferImFinal = modalSumIm;
-          lastRow.lowModes = _debugLowModes || [];
-          lastRow.highPrecisionRaw = _highPrecisionRaw || [];
-          if (_debugStrongestMode) {
-            lastRow.strongestModeFreq = _debugStrongestMode.freq;
-            lastRow.strongestModeNx = _debugStrongestMode.nx;
-            lastRow.strongestModeNy = _debugStrongestMode.ny;
-            lastRow.strongestModeNz = _debugStrongestMode.nz;
-            lastRow.strongestModeType = _debugStrongestMode.type;
-            lastRow.strongestModeQ = _debugStrongestMode.qValue;
-            lastRow.strongestModeSourceCoupling = _debugStrongestMode.sourceCoupling;
-            lastRow.strongestModeReceiverCoupling = _debugStrongestMode.receiverCoupling;
-            lastRow.strongestModeCombinedCoupling = _debugStrongestMode.combinedCoupling;
-            lastRow.strongestModeTransferRe = _debugStrongestMode.transferRe;
-            lastRow.strongestModeTransferIm = _debugStrongestMode.transferIm;
-          }
-
-          // ── MODEL APPLICATION COMPARISON (debug-only, no simulation change) ──────
-          // Current live method: true pressure superposition.
-          //   sumRe = prevRe + modalSumRe,  sumIm = prevIm + modalSumIm
-          //   modalSumRe/Im is the net sum of all modal pressure contributions (starts at 0).
-          // No identity subtraction, no transfer function — modal layer is pure pressure addition.
-          const _tfMag = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
-
-          // Additive path (identical to live; kept for structural symmetry in debug output)
-          const _altRe = prevRe + modalSumRe;
-          const _altIm = prevIm + modalSumIm;
-          const _altMag = Math.sqrt(_altRe * _altRe + _altIm * _altIm);
-
-          // Low-mode summary (complex sum + sum-of-magnitudes from the four tracked modes)
-          const _lowModes = _debugLowModes || [];
-          let _lowModeSumRe = 0, _lowModeSumIm = 0, _lowModeSumMag = 0;
-          _lowModes.forEach(m => {
-            _lowModeSumRe += (m.transferRe || 0);
-            _lowModeSumIm += (m.transferIm || 0);
-            _lowModeSumMag += (m.magnitude || 0);
-          });
-
-          // Strongest single-mode magnitude
-          const _strongestMag = _debugStrongestMode
+          const modalSumMag = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
+          const strongestModeMagnitude = _debugStrongestMode
             ? Math.sqrt(
                 (_debugStrongestMode.transferRe || 0) * (_debugStrongestMode.transferRe || 0) +
                 (_debugStrongestMode.transferIm || 0) * (_debugStrongestMode.transferIm || 0)
               )
             : null;
-
-          lastRow.applicationComparison = {
-            prevRe,
-            prevIm,
-            preModalMagnitude: Math.sqrt(prevRe * prevRe + prevIm * prevIm),
-            modalSumRe,
-            modalSumIm,
-            modalSumMag: _tfMag,
-            // Live result (true pressure superposition)
-            livePostRe:  sumRe,
-            livePostIm:  sumIm,
-            livePostMag: postMag,
-            liveRatio:   postMag / Math.max(1e-30, Math.sqrt(prevRe * prevRe + prevIm * prevIm)),
-            // Debug mirror (identical to live in this model)
-            additivePostRe:  _altRe,
-            additivePostIm:  _altIm,
-            additivePostMag: _altMag,
-            additiveRatio:   _altMag / Math.max(1e-30, Math.sqrt(prevRe * prevRe + prevIm * prevIm)),
-            // Modal summary
-            strongestModeMag:   _strongestMag,
-            lowModeSumRe:       _lowModeSumRe,
-            lowModeSumIm:       _lowModeSumIm,
-            lowModeSumOfMags:   _lowModeSumMag,
-          };
 
           if (TARGET_DEBUG_FREQUENCIES.some((targetHz) => Math.abs(lastRow.frequencyHz - targetHz) < 0.75)) {
             lastRow.targetVectorDebug = {
@@ -665,7 +514,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
               preModalMagnitude: Math.sqrt(prevRe * prevRe + prevIm * prevIm),
               modalSumRe,
               modalSumIm,
-              modalSumMag: _tfMag,
+              modalSumMag,
               finalSumRe: sumRe,
               finalSumIm: sumIm,
               finalMagnitude: postMag,
@@ -676,11 +525,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 nz: _debugStrongestMode.nz,
                 transferRe: _debugStrongestMode.transferRe,
                 transferIm: _debugStrongestMode.transferIm,
-                magnitude: _strongestMag,
+                magnitude: strongestModeMagnitude,
               } : null,
             };
           }
-          // ── END MODEL APPLICATION COMPARISON ─────────────────────────────────────
         }
       }
     }
@@ -697,7 +545,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     freqsHz,
     splDbRaw,
     complexPressure,
-    stepDebug: stepDebugRows,
+    stepDebug: stepDebugRows
+      .map((row) => row.targetVectorDebug)
+      .filter(Boolean),
   };
 }
 
