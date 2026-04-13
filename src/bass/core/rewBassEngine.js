@@ -381,6 +381,12 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
     let sumRe = 0;
     let sumIm = 0;
+    let directRe = 0;
+    let directIm = 0;
+    let reflectionRe = 0;
+    let reflectionIm = 0;
+    let lateFieldRe = 0;
+    let lateFieldIm = 0;
 
     // Direct path
     const dx = source.x - seat.x;
@@ -402,8 +408,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const polarityPhase = source.tuning.polarity === 180 ? Math.PI : 0;
     const totalPhase = timeOfFlightPhase + delayPhase + polarityPhase;
 
-    sumRe += amplitude * Math.cos(totalPhase);
-    sumIm += amplitude * Math.sin(totalPhase);
+    directRe = amplitude * Math.cos(totalPhase);
+    directIm = amplitude * Math.sin(totalPhase);
+    sumRe += directRe;
+    sumIm += directIm;
 
     // First-order reflections
     imageSources.forEach((imageSource, reflectionIndex) => {
@@ -424,16 +432,22 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
       // Smooth coherence curve: ~0.75 at 20 Hz → ~0.25 at 200 Hz
       const reflectionCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
-      sumRe += reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
-      sumIm += reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
+      const imageRe = reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
+      const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
+      reflectionRe += imageRe;
+      reflectionIm += imageIm;
+      sumRe += imageRe;
+      sumIm += imageIm;
     });
 
     // Diffuse late-field approximation
     const lateFieldDecay = Math.exp(-(frequencyHz - 20) / 120);
     const lateFieldAmplitude = amplitude * 0.12 * lateFieldDecay;
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
-    sumRe += lateFieldAmplitude * Math.cos(lateFieldPhase);
-    sumIm += lateFieldAmplitude * Math.sin(lateFieldPhase);
+    lateFieldRe = lateFieldAmplitude * Math.cos(lateFieldPhase);
+    lateFieldIm = lateFieldAmplitude * Math.sin(lateFieldPhase);
+    sumRe += lateFieldRe;
+    sumIm += lateFieldIm;
 
     const preModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
 
@@ -543,6 +557,25 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                       _debugStrongestMode.transferIm * _debugStrongestMode.transferIm
                     )
                   : null,
+                preModalComponents: Math.abs(nearestRow.frequencyHz - 40.4) < 0.75
+                  ? {
+                      direct: {
+                        re: directRe,
+                        im: directIm,
+                        magnitude: Math.sqrt(directRe * directRe + directIm * directIm),
+                      },
+                      reflections: {
+                        re: reflectionRe,
+                        im: reflectionIm,
+                        magnitude: Math.sqrt(reflectionRe * reflectionRe + reflectionIm * reflectionIm),
+                      },
+                      lateField: {
+                        re: lateFieldRe,
+                        im: lateFieldIm,
+                        magnitude: Math.sqrt(lateFieldRe * lateFieldRe + lateFieldIm * lateFieldIm),
+                      }
+                    }
+                  : undefined,
               },
               strongestMode: _debugStrongestMode
                 ? {
