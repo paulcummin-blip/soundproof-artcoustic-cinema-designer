@@ -509,24 +509,49 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           if (TARGET_DEBUG_FREQUENCIES.some((targetHz) => Math.abs(lastRow.frequencyHz - targetHz) < 0.75)) {
             lastRow.targetVectorDebug = {
               frequencyHz,
-              prevRe,
-              prevIm,
-              preModalMagnitude: Math.sqrt(prevRe * prevRe + prevIm * prevIm),
-              modalSumRe,
-              modalSumIm,
-              modalSumMag,
-              finalSumRe: sumRe,
-              finalSumIm: sumIm,
-              finalMagnitude: postMag,
-              strongestMode: _debugStrongestMode ? {
-                freq: _debugStrongestMode.freq,
-                nx: _debugStrongestMode.nx,
-                ny: _debugStrongestMode.ny,
-                nz: _debugStrongestMode.nz,
-                transferRe: _debugStrongestMode.transferRe,
-                transferIm: _debugStrongestMode.transferIm,
-                magnitude: strongestModeMagnitude,
-              } : null,
+              summedBeforeModes: {
+                sumRe: prevRe,
+                sumIm: prevIm,
+                preModalMagnitude: Math.sqrt(prevRe * prevRe + prevIm * prevIm),
+              },
+              postModal: {
+                modalSumRe,
+                modalSumIm,
+                sumRe,
+                sumIm,
+                magnitude: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
+              },
+              applicationComparison: {
+                prevRe,
+                prevIm,
+                preModalMagnitude: Math.sqrt(prevRe * prevRe + prevIm * prevIm),
+                modalSumRe,
+                modalSumIm,
+                modalSumMag: Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm),
+                livePostRe: sumRe,
+                livePostIm: sumIm,
+                livePostMag: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
+                strongestModeMag: _debugStrongestMode
+                  ? Math.sqrt(
+                      _debugStrongestMode.transferRe * _debugStrongestMode.transferRe +
+                      _debugStrongestMode.transferIm * _debugStrongestMode.transferIm
+                    )
+                  : null,
+              },
+              strongestMode: _debugStrongestMode
+                ? {
+                    freq: _debugStrongestMode.freq,
+                    nx: _debugStrongestMode.nx,
+                    ny: _debugStrongestMode.ny,
+                    nz: _debugStrongestMode.nz,
+                    transferRe: _debugStrongestMode.transferRe,
+                    transferIm: _debugStrongestMode.transferIm,
+                    magnitude: Math.sqrt(
+                      _debugStrongestMode.transferRe * _debugStrongestMode.transferRe +
+                      _debugStrongestMode.transferIm * _debugStrongestMode.transferIm
+                    ),
+                  }
+                : null,
             };
           }
         }
