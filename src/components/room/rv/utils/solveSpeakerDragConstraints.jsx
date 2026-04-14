@@ -201,7 +201,7 @@ export function solveSpeakerDragConstraints({
 
     const yMin_side   = Number(sideSurroundVisualSpanM?.minY) || 0;
     const yMax_visual = Number(sideSurroundVisualSpanM?.maxY) || 0;
-    const yMax_clamp  = Math.max(yMin_side, Math.min(yMax_visual, L - CORNER_CLEAR_M));
+    const yMax_clamp  = Math.max(yMin_side, Math.min(yMax_visual, L - WALL_BUFFER_M));
 
     const { y: proposedRoomY_m } = canvasToRoom(newCanvasPos);
     const yPtr = Number(proposedRoomY_m);
