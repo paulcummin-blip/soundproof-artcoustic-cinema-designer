@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppState } from '@/components/AppStateProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
@@ -7,6 +7,7 @@ import SeatComplianceSummary from '@/components/report/SeatComplianceSummary';
 import { useRP22AnalysisEngine } from '@/components/hooks/useRP22AnalysisEngine';
 import { computeAllSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
+import RP22ReportParameterGrid from '@/components/report/RP22ReportParameterGrid';
 
 export default function ComplianceReportPrint() {
   const app = useAppState();
@@ -38,7 +39,25 @@ export default function ComplianceReportPrint() {
     seatMetricsById: app?.seatMetricsById || {},
   });
 
-  const roomParams = analysis?.roomAnalysis || [];
+  const reportGridElement = RP22ReportParameterGrid({
+    analysisResult: analysis,
+    seatHudSnapshots: {},
+    seatingPositions: seats,
+    mlpSeatId: rspSeatId,
+    dolbyLayout,
+    frontSubsCount: 0,
+    rearSubsCount: 0,
+    p15ConstructionLevel: app?.p15ConstructionLevel,
+    p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
+  });
+
+  const roomParams = React.useMemo(() => {
+    const roomElements = React.Children.toArray(reportGridElement?.props?.children || []);
+    return roomElements
+      .map((child) => child?.props?.children?.props?.param)
+      .filter((param) => String(param?.scope || '').toLowerCase() === 'room');
+  }, [reportGridElement]);
+
   const seatParams = analysis?.perSeatAnalysis || {};
 
   // Count levels
@@ -220,11 +239,14 @@ export default function ComplianceReportPrint() {
               RP22 Parameters (Room)
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {roomParams.map(param => (
-                <div key={param.number} className="print-avoid-break">
-                  <ParameterCard parameter={param} />
-                </div>
-              ))}
+              {roomParams.map(param => {
+                const roomResult = analysis?.gradedParameters?.primary?.[param.id] || null;
+                return (
+                  <div key={param.id} className="print-avoid-break">
+                    <ParameterCard parameter={param} roomResult={roomResult} />
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

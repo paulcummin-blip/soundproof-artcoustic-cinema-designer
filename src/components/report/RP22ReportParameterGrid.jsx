@@ -208,13 +208,22 @@ export default function RP22ReportParameterGrid({
 
     if (isRoomScope) {
       const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
+      if (pid === 3) {
+        const p3 = analysisResult?.gradedParameters?.primary?.[3] || null;
+        if (p3?.status === "ok") {
+          if (typeof p3.formatted === "string" && p3.formatted.trim()) return p3.formatted;
+          if (typeof p3.value === "number" && Number.isFinite(p3.value)) {
+            const paramDef = RP22_PARAMS.find(p => p.id === 3);
+            const unit = paramDef?.unit || "";
+            return unit ? `${Math.round(p3.value)} ${unit}` : String(Math.round(p3.value));
+          }
+          return "Achieved";
+        }
+        if (p3?.status === "no_data") return "Not Calculated";
+        return "—";
+      }
       if (res && res.status !== "no_data" && res.status !== "fail") {
         const v = res.value;
-        if (pid === 3 && v !== null && v !== undefined && typeof v === "number" && Number.isFinite(v)) {
-          const paramDef = RP22_PARAMS.find(p => p.id === pid);
-          const unit = paramDef?.unit || "";
-          return unit ? `${Math.round(v)} ${unit}` : String(Math.round(v));
-        }
         if (res.formatted) return res.formatted;
         if (v !== null && v !== undefined) {
           if (typeof v === "number" && Number.isFinite(v)) {
@@ -226,7 +235,6 @@ export default function RP22ReportParameterGrid({
         }
       }
       if (pid === 2 && p2SystemConfig) return `${p2SystemConfig.discreteSpeakerCount} speakers`;
-      if (pid === 3) { const p3 = analysisResult?.gradedParameters?.primary?.[3]; if (p3 && p3.status === "ok" && p3.formatted) return p3.formatted; return "—"; }
       if (pid === 8) return "No";
       if (pid === 11) return "0";
       if (pid === 15) { const LABEL = { standard: "NCB 26 (standard)", "purpose-built": "NCB 22 (purpose-built)", reference: "NCB 18 (reference)", studio: "NCB 15 (studio)" }; return LABEL[p15ConstructionLevel || "standard"] || "—"; }
