@@ -584,7 +584,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const flPass = checkSpk(fl, zoneLeft);
       const frPass = checkSpk(fr, zoneRight);
 
-      if (flPass === null && frPass === null) {
+      if (!fl && !fr) {
         gradedParameters.primary[3] = {
           title: "Number of screen wall speakers allowed outside of recommended zonal locations",
           level: null,
@@ -596,14 +596,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         return;
       }
 
-      const failCount = (flPass === false ? 1 : 0) + (frPass === false ? 1 : 0);
+      const failCount =
+        (flPass === false || flPass === null ? 1 : 0) +
+        (frPass === false || frPass === null ? 1 : 0);
       gradedParameters.primary[3] = {
         title: "Number of screen wall speakers allowed outside of recommended zonal locations",
-        level: failCount > 0 ? "L1" : "L4",
+        level: failCount > 0 ? "FAIL" : "L4",
         value: failCount,
         unit: "speakers",
         formatted: failCount > 0 ? "Outside permitted zone tolerance" : "0 speakers",
-        status: failCount > 0 ? "fail" : "ok"
+        status: "ok"
       };
     })();
 
