@@ -526,7 +526,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     // RP22 Parameter 3 — Screen wall speakers in LCR zones (binary: L4 or FAIL)
     (() => {
-      if (screen?.mountMode !== 'floating') {
+      // Only skip if screen is completely missing
+      if (!screen) {
         gradedParameters.primary[3] = {
           title: "Number of screen wall speakers allowed outside of recommended zonal locations",
           level: null,
