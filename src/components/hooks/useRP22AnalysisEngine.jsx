@@ -527,7 +527,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // RP22 Parameter 3 — Screen wall speakers in LCR zones (binary: L4 or FAIL)
     (() => {
       if (screen?.mountMode !== 'floating') {
-        gradedParameters.primary[3] = { level: null, value: null, formatted: null, status: "no_data" };
+        gradedParameters.primary[3] = {
+          title: "Number of screen wall speakers allowed outside of recommended zonal locations",
+          level: null,
+          value: null,
+          unit: "speakers",
+          formatted: null,
+          status: "no_data"
+        };
         return;
       }
 
@@ -536,7 +543,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         : (mlp && isNum(mlp.x) && isNum(mlp.y) ? mlp : null);
 
       if (!mlpForP3) {
-        gradedParameters.primary[3] = { level: null, value: null, formatted: null, status: "no_data" };
+        gradedParameters.primary[3] = {
+          title: "Number of screen wall speakers allowed outside of recommended zonal locations",
+          level: null,
+          value: null,
+          unit: "speakers",
+          formatted: null,
+          status: "no_data"
+        };
         return;
       }
 
@@ -570,16 +584,25 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const frPass = checkSpk(fr, zoneRight);
 
       if (flPass === null && frPass === null) {
-        gradedParameters.primary[3] = { level: null, value: null, formatted: null, status: "no_data" };
+        gradedParameters.primary[3] = {
+          title: "Number of screen wall speakers allowed outside of recommended zonal locations",
+          level: null,
+          value: null,
+          unit: "speakers",
+          formatted: null,
+          status: "no_data"
+        };
         return;
       }
 
       const failCount = (flPass === false ? 1 : 0) + (frPass === false ? 1 : 0);
       gradedParameters.primary[3] = {
-        level: failCount > 0 ? "FAIL" : "L4",
-        formatted: failCount > 0 ? "Outside permitted zone tolerance" : "",
+        title: "Number of screen wall speakers allowed outside of recommended zonal locations",
+        level: failCount > 0 ? "L1" : "L4",
         value: failCount,
-        status: "ok",
+        unit: "speakers",
+        formatted: failCount > 0 ? "Outside permitted zone tolerance" : "0 speakers",
+        status: failCount > 0 ? "fail" : "ok"
       };
     })();
 
