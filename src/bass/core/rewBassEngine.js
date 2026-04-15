@@ -206,11 +206,11 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // Unit-normalised second-order pressure-domain transfer:
   // H(jω) = (j * ω/ω0Q) / (1 - (ω/ω0)^2 + j * ω/ω0Q)
   // This gives |H| = 1 at resonance before modalGain is applied.
-  // Positive-real-share isolation test:
-  // keep the current useful quadrant behaviour at 40 Hz,
-  // but increase the positive real contribution below resonance
-  // while leaving the helpful imaginary cancellation path unchanged.
-  const transferReal = -1.00 * (imagDen * (imagDen + 0.10)) / denominatorSq;
+  // Mid-step real-share test:
+  // keep the successful branch structure,
+  // but increase the positive real contribution only moderately
+  // between the previous -1.00 test and the overshot -1.60 test.
+  const transferReal = -1.25 * (imagDen * (imagDen + 0.10)) / denominatorSq;
   const transferImag = -((imagDen + 0.10) * realDen) / denominatorSq;
 
   return {
