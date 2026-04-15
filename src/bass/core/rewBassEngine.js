@@ -203,11 +203,11 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const effectiveCoupling = combinedCoupling;
   const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
 
-  // Isolation test: less restrictive numerator on the same second-order denominator.
-  // This keeps the current pole/damping structure but removes one power of imagDen
-  // from the numerator so off-resonance modal contribution does not collapse as fast.
-  const transferReal = imagDen / denominatorSq;
-  const transferImag = realDen / denominatorSq;
+  // Unit-normalised second-order pressure-domain transfer:
+  // H(jω) = (j * ω/ω0Q) / (1 - (ω/ω0)^2 + j * ω/ω0Q)
+  // This gives |H| = 1 at resonance before modalGain is applied.
+  const transferReal = (imagDen * imagDen) / denominatorSq;
+  const transferImag = (imagDen * realDen) / denominatorSq;
 
   return {
     real: modalGain * transferReal,
