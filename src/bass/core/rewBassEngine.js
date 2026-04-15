@@ -206,12 +206,11 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // Unit-normalised second-order pressure-domain transfer:
   // H(jω) = (j * ω/ω0Q) / (1 - (ω/ω0)^2 + j * ω/ω0Q)
   // This gives |H| = 1 at resonance before modalGain is applied.
-  // Real/imag weighting isolation test:
-  // keep the same off-resonance floor idea and phase direction,
-  // but reduce the real component weighting relative to the imaginary component
-  // so the modal vector can rotate further toward cancellation at 40 Hz
-  // without simply increasing total magnitude.
-  const transferReal = 0.35 * (imagDen * (imagDen + 0.10)) / denominatorSq;
+  // Below-resonance real-sign isolation test:
+  // keep the helpful imaginary-direction behaviour from the current branch,
+  // but flip the real component sign so the modal vector can oppose
+  // the pre-modal real axis below resonance instead of adding to it.
+  const transferReal = -0.35 * (imagDen * (imagDen + 0.10)) / denominatorSq;
   const transferImag = -((imagDen + 0.10) * realDen) / denominatorSq;
 
   return {
