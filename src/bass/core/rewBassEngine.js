@@ -203,11 +203,12 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const effectiveCoupling = combinedCoupling;
   const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
 
-  // Unit-normalised second-order pressure-domain transfer:
-  // H(jω) = (j * ω/ω0Q) / (1 - (ω/ω0)^2 + j * ω/ω0Q)
-  // This gives |H| = 1 at resonance before modalGain is applied.
-  const transferReal = (imagDen * imagDen) / denominatorSq;
-  const transferImag = (imagDen * realDen) / denominatorSq;
+  // Isolation test: use the denominator-only complex resonator shape
+  // instead of the current band-pass-normalised numerator.
+  // This keeps the same pole/damping structure but removes the extra
+  // band-pass suppression away from resonance.
+  const transferReal = realDen / denominatorSq;
+  const transferImag = -imagDen / denominatorSq;
 
   return {
     real: modalGain * transferReal,
