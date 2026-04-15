@@ -206,8 +206,11 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // Unit-normalised second-order pressure-domain transfer:
   // H(jω) = (j * ω/ω0Q) / (1 - (ω/ω0)^2 + j * ω/ω0Q)
   // This gives |H| = 1 at resonance before modalGain is applied.
-  const transferReal = (imagDen * imagDen) / denominatorSq;
-  const transferImag = (imagDen * realDen) / denominatorSq;
+  // Mixed numerator test: retain the current stable band-pass behaviour
+  // but add a small finite floor so the off-resonance modal contribution
+  // does not collapse too aggressively around the 40 Hz region.
+  const transferReal = (imagDen * (imagDen + 0.10)) / denominatorSq;
+  const transferImag = ((imagDen + 0.10) * realDen) / denominatorSq;
 
   return {
     real: modalGain * transferReal,
