@@ -207,7 +207,7 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // H(jω) = (j * ω/ω0Q) / (1 - (ω/ω0)^2 + j * ω/ω0Q)
   // This gives |H| = 1 at resonance before modalGain is applied.
   const transferReal = (imagDen * imagDen) / denominatorSq;
-  const transferImag = (-imagDen * realDen) / denominatorSq;
+  const transferImag = (imagDen * realDen) / denominatorSq;
 
   return {
     real: modalGain * transferReal,
