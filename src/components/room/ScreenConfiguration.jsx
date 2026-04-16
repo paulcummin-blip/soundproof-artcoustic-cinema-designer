@@ -263,7 +263,7 @@ export default function ScreenConfiguration(props) {
             <div className="space-y-2">
               <Label className="text-[#3E4349] font-medium text-sm">Viewing Width (inches)</Label>
               <Select
-                value={String(screenData.visibleWidthInches ?? 100)}
+                value={Number.isInteger(Number(screenData.visibleWidthInches ?? 100)) ? String(Number(screenData.visibleWidthInches ?? 100)) : Number(screenData.visibleWidthInches ?? 100).toFixed(2)}
                 onValueChange={(val) => {
                   const tvPresetLabels = {
                     "55.55": 'TV 65"',
