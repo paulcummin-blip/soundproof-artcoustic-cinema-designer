@@ -30,12 +30,7 @@ export default function RvSpeakerLayer({
   if (!toPx || !scale) return null;
 
   const resolveRole = getCanonicalRole || defaultGetCanonicalRole;
-  const tvPresetKey = (() => {
-    const raw = Number(screen?.visibleWidthInches);
-    if (!Number.isFinite(raw)) return null;
-    const fixed = raw.toFixed(2);
-    return ['55.55', '67.36', '72.52', '87.80'].includes(fixed) ? fixed : null;
-  })();
+  const tvPresetKey = screen?.tvPresetKey || null;
   const fcSpeaker = (speakers || []).find((speaker) => resolveRole(speaker?.role) === 'FC');
   const fcMeta = fcSpeaker?.model ? getSpeakerModelMeta(fcSpeaker.model, tvPresetKey || undefined) : null;
   const hideDiscreteFronts = fcMeta?.frontStageType === 'integrated_lcr';
@@ -53,16 +48,7 @@ export default function RvSpeakerLayer({
           ? getSpeakerDims(speaker.model)
           : speakerMeta;
 
-        const tvVisibleWidthM = Number(screen?.visibleWidthInches) > 0
-          ? Number(screen.visibleWidthInches) * 0.0254
-          : null;
-        const soundbarTvWidthModels = ['C4-1', 'Multi (Mono)', 'HSPL (Mono)', 'Multi (LCR)', 'HSPL (LCR)'];
-        const isFcSoundbar = role === 'FC';
-        const speakerWidthM = isFcSoundbar && speaker.model === 'C-1'
-          ? 0.4
-          : isFcSoundbar && soundbarTvWidthModels.includes(speaker.model) && Number.isFinite(tvVisibleWidthM)
-            ? tvVisibleWidthM
-            : metaWidthM;
+        const speakerWidthM = metaWidthM;
 
         // Compute yaw first — wall-mounted position derivation depends on it
         const speakerForAim = { ...speaker, x: speaker.position.x, y: speaker.position.y };

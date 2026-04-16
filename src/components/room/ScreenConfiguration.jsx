@@ -271,17 +271,25 @@ export default function ScreenConfiguration(props) {
                     "72.52": 'TV 83"',
                     "87.80": 'TV 100"',
                   };
+                  const tvPresetKeyMap = {
+                    "55.55": "tv65",
+                    "67.36": "tv77",
+                    "72.52": "tv83",
+                    "87.80": "tv100",
+                  };
                   if (tvPresetLabels[val]) {
                     handleUpdate({
                       visibleWidthInches: Number(val),
                       aspectRatio: "16:9",
                       borderThicknessM: 0.005,
+                      tvPresetKey: tvPresetKeyMap[val],
                     });
                     return;
                   }
                   handleUpdate({
                     visibleWidthInches: Number(val),
                     borderThicknessM: 0.08,
+                    tvPresetKey: null,
                   });
                 }}
                 disabled={disabled || manualSize.enabled}
