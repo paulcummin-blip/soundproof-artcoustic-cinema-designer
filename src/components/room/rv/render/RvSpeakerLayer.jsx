@@ -4,6 +4,7 @@ import { getCanonicalRole as defaultGetCanonicalRole } from "@/components/utils/
 import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
 import { sideWallX, rearWallY } from "@/components/room/rv/utils/rvGeometry";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { useAppState } from "@/components/AppStateProvider";
 
 /**
  * RvSpeakerLayer — renders all bed-layer draggable speaker icons onto the SVG canvas.
@@ -29,8 +30,12 @@ export default function RvSpeakerLayer({
 }) {
   if (!toPx || !scale) return null;
 
+  // Read screen from appState directly — RvPlanCanvas does not pass screen prop to RvSpeakerLayer,
+  // so the prop is always undefined. Reading from appState ensures tvPresetKey is always current.
+  const appState = useAppState();
+  const resolvedScreen = appState?.screen || screen || {};
   const resolveRole = getCanonicalRole || defaultGetCanonicalRole;
-  const tvPresetKey = screen?.tvPresetKey || null;
+  const tvPresetKey = resolvedScreen?.tvPresetKey || null;
   const fcSpeaker = (speakers || []).find((speaker) => resolveRole(speaker?.role) === 'FC');
   const fcMeta = fcSpeaker?.model ? getSpeakerModelMeta(fcSpeaker.model, tvPresetKey || undefined) : null;
   const hideDiscreteFronts = fcMeta?.frontStageType === 'integrated_lcr';
@@ -127,7 +132,7 @@ export default function RvSpeakerLayer({
         const debugW = speakerWidthM * scale;
         const debugLines = isFcDebug ? [
           `model: ${speaker.model}`,
-          `tvPresetKey: ${tvPresetKey ?? 'null'}`,
+          `tvKey(appState): ${tvPresetKey ?? 'null'}`,
           `widthM prop: ${speakerWidthM?.toFixed(4)}`,
           `safeWidthM: ${speakerWidthM?.toFixed(4)}`,
           `w(px): ${debugW?.toFixed(1)}`,
