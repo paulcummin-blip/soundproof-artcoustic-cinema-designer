@@ -265,8 +265,13 @@ export default function ScreenConfiguration(props) {
               <Select
                 value={String(screenData.visibleWidthInches ?? 100)}
                 onValueChange={(val) => {
-                  const tvPresetValues = new Set(["55.55", "67.36", "72.52", "87.80"]);
-                  if (tvPresetValues.has(val)) {
+                  const tvPresetLabels = {
+                    "55.55": 'TV 65"',
+                    "67.36": 'TV 77"',
+                    "72.52": 'TV 83"',
+                    "87.80": 'TV 100"',
+                  };
+                  if (tvPresetLabels[val]) {
                     handleUpdate({
                       visibleWidthInches: Number(val),
                       aspectRatio: "16:9",
@@ -274,13 +279,23 @@ export default function ScreenConfiguration(props) {
                     });
                     return;
                   }
-                  handleUpdate({ visibleWidthInches: Number(val) });
+                  handleUpdate({
+                    visibleWidthInches: Number(val),
+                    borderThicknessM: 0.08,
+                  });
                 }}
                 disabled={disabled || manualSize.enabled}
                 modal={false}
               >
                 <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A] h-10 hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-                  <SelectValue />
+                  <SelectValue>
+                    {{
+                      "55.55": 'TV 65"',
+                      "67.36": 'TV 77"',
+                      "72.52": 'TV 83"',
+                      "87.80": 'TV 100"',
+                    }[String(screenData.visibleWidthInches ?? 100)] ?? `${String(screenData.visibleWidthInches ?? 100)}"`}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent 
                   position="popper" 
