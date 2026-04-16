@@ -126,19 +126,6 @@ export default function RvSpeakerLayer({
           ? (e) => bedLayerSpeakerMouseDownHandler(e, speaker.id)
           : undefined;
 
-        // --- DEBUG LABEL: FC soundbar only (remove when done) ---
-        const FC_SOUNDBAR_MODELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)', 'Multi (LCR)', 'HSPL (LCR)'];
-        const isFcDebug = role === 'FC' && FC_SOUNDBAR_MODELS.includes(speaker.model);
-        const debugW = speakerWidthM * scale;
-        const debugLines = isFcDebug ? [
-          `model: ${speaker.model}`,
-          `tvKey(appState): ${tvPresetKey ?? 'null'}`,
-          `widthM prop: ${speakerWidthM?.toFixed(4)}`,
-          `safeWidthM: ${speakerWidthM?.toFixed(4)}`,
-          `w(px): ${debugW?.toFixed(1)}`,
-        ] : [];
-        // --- END DEBUG LABEL ---
-
         return (
           <g key={speaker.id || speaker.role}>
             <SpeakerIcon
@@ -154,19 +141,6 @@ export default function RvSpeakerLayer({
               onIconMove={handleIconMove}
               onIconLeave={handleIconLeave}
             />
-            {isFcDebug && debugLines.map((line, i) => (
-              <text
-                key={i}
-                x={canvasX}
-                y={canvasY - (speakerDepthM * scale) / 2 - 4 - (debugLines.length - 1 - i) * 12}
-                textAnchor="middle"
-                fontSize="10"
-                fill="#00cc44"
-                style={{ pointerEvents: 'none', userSelect: 'none', fontFamily: 'monospace' }}
-              >
-                {line}
-              </text>
-            ))}
           </g>
         );
       })}
