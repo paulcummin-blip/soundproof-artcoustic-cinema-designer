@@ -110,11 +110,11 @@ function getSPL1mCapability(speakerMeta, ampPowerW, effectiveSensitivity = null)
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // CRITICAL: Cap at CF6 peak @ 1m from speakerData.js (matches SPL Calculator)
-  // No crest factor deduction here - the peak value IS the continuous limit.
+  // Hard cap: use the continuous anechoic 1m SPL as the ceiling.
+  // max_spl_cont_db_1m on effectiveMeta is already resolved to anechoic via
+  // the priority chain in calculateSplAtPoint / computeSingleSeatSplAtDistance.
   // ─────────────────────────────────────────────────────────────────────────
-  const hardCap = safeNum(speakerMeta?.max_spl_peak_db_cf6_1m) || 
-                  safeNum(speakerMeta?.max_spl_cont_db_1m) || 
+  const hardCap = safeNum(speakerMeta?.max_spl_cont_db_1m) || 
                   safeNum(speakerMeta?.max_spl);
   
   // Determine final 1m capability
@@ -179,7 +179,7 @@ function calculateSplAtPoint({
     resolvedMeta = findSpeakerData(speakerModel);
   }
   
-  // Build effective speaker data (merge passed values with resolved data)
+  // Build effective speaker data — prefer canonical anechoic registry fields first
   const effectiveMeta = {
     sensitivity_db_1w_1m: safeNum(resolvedMeta?.sensitivity_db_1w_1m) || 
                           safeNum(resolvedMeta?.sensitivity) || 
@@ -188,10 +188,30 @@ function calculateSplAtPoint({
     power_handling_w: safeNum(resolvedMeta?.power_handling_w) || 
                       safeNum(resolvedMeta?.max_power) || 
                       Infinity,
-    max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m) || 
+    // Continuous cap: canonical anechoic → legacy cont → legacy max_spl
+    max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m_anechoic) ||
+                        safeNum(resolvedMeta?.max_spl_cont_db_1m) || 
                         safeNum(resolvedMeta?.max_spl) || 
                         null,
+    // Peak cap: canonical anechoic → legacy CF6 peak → legacy peak_spl
+    max_spl_peak_db_cf6_1m: safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) ||
+                            safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m) ||
+                            safeNum(resolvedMeta?.peak_spl) ||
+                            null,
+    // Flag: tells getSPL1mCapability whether peak is already on anechoic basis
+    peak_is_anechoic: !!(resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic != null),
   };
+
+  // Dev-only warning if canonical anechoic fields are absent
+  if (process.env.NODE_ENV !== 'production' && speakerModel) {
+    if (!resolvedMeta?.max_spl_cont_db_1m_anechoic && !resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) {
+      const warnKey = `__splWarn_${speakerModel}`;
+      if (!globalThis[warnKey]) {
+        globalThis[warnKey] = true;
+        console.warn(`[SPL] No canonical anechoic SPL fields for model: ${speakerModel}`);
+      }
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // Step 2: Resolve effective sensitivity (applies radiationMode adjustment)
@@ -458,13 +478,32 @@ export function computeSingleSeatSplAtDistance({
     };
   }
 
-  // Build effective metadata
+  // Build effective metadata — prefer canonical anechoic registry fields first
   const effectiveMeta = {
     sensitivity_db_1w_1m: safeNum(resolvedMeta?.sensitivity_db_1w_1m || resolvedMeta?.sensitivity) || 87,
     power_handling_w: safeNum(resolvedMeta?.power_handling_w || resolvedMeta?.max_power) || Infinity,
-    max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m || resolvedMeta?.max_spl) || null,
-    max_spl_peak_db_cf6_1m: safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m) || null,
+    // Continuous cap: canonical anechoic → legacy cont → legacy max_spl
+    max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m_anechoic) ||
+                        safeNum(resolvedMeta?.max_spl_cont_db_1m) ||
+                        safeNum(resolvedMeta?.max_spl) || null,
+    // Peak cap: canonical anechoic → legacy CF6 → legacy peak_spl
+    max_spl_peak_db_cf6_1m: safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) ||
+                            safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m) ||
+                            safeNum(resolvedMeta?.peak_spl) || null,
+    // Flag: true when peak is already on anechoic basis — prevents double -6 dB
+    peak_is_anechoic: !!(resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic != null),
   };
+
+  // Dev-only warning if canonical anechoic fields are absent
+  if (process.env.NODE_ENV !== 'production' && speakerModelId) {
+    if (!resolvedMeta?.max_spl_cont_db_1m_anechoic && !resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) {
+      const warnKey = `__splWarn_${speakerModelId}`;
+      if (!globalThis[warnKey]) {
+        globalThis[warnKey] = true;
+        console.warn(`[SPL] No canonical anechoic SPL fields for model: ${speakerModelId}`);
+      }
+    }
+  }
   
   // Console log for sanity check
   if (speakerModelId && distance_m && powerW) {
@@ -478,10 +517,10 @@ export function computeSingleSeatSplAtDistance({
   const { spl1m_capability: spl1m_cont } = getSPL1mCapability(effectiveMeta, powerW, effectiveSensitivity);
 
   // 4. Peak SPL @ 1m (CF6) - direct from spec, not amp-limited
-  // ALWAYS use anechoic calculation (no radiation mode adjustment)
+  // Only apply -6 dB anechoic correction if the field is NOT already canonical anechoic.
   let spl1m_peak = effectiveMeta.max_spl_peak_db_cf6_1m;
-  if (spl1m_peak !== null) {
-    spl1m_peak -= 6; // Always apply anechoic reduction
+  if (spl1m_peak !== null && !effectiveMeta.peak_is_anechoic) {
+    spl1m_peak -= 6; // Only for legacy non-anechoic fields
   }
 
   // 5. Distance loss (simple 1D for calculator context)
