@@ -412,12 +412,29 @@ function useDesignerState() {
     "87.80": "tv100",
   };
 
+  // Exact fixed TV widths in mm (source of truth, must match soundbar tvWidthMap)
+  const TV_PRESET_WIDTH_MM = {
+    tv65:  1411,
+    tv77:  1711,
+    tv83:  1872,
+    tv100: 2230,
+  };
+
   const backfillTvPresetKey = (s) => {
-    if (!s || s.tvPresetKey) return s; // already set, nothing to do
-    const widthStr = Number(s.visibleWidthInches).toFixed(2);
-    const derived = TV_PRESET_KEY_MAP[widthStr];
-    if (derived) return { ...s, tvPresetKey: derived };
-    return s;
+    if (!s) return s;
+    let result = s;
+    // Backfill tvPresetKey from visibleWidthInches if missing
+    if (!result.tvPresetKey) {
+      const widthStr = Number(result.visibleWidthInches).toFixed(2);
+      const derived = TV_PRESET_KEY_MAP[widthStr];
+      if (derived) result = { ...result, tvPresetKey: derived };
+    }
+    // Backfill tvWidthMm from tvPresetKey if missing or zero
+    if (result.tvPresetKey && !result.tvWidthMm) {
+      const mm = TV_PRESET_WIDTH_MM[result.tvPresetKey];
+      if (mm) result = { ...result, tvWidthMm: mm };
+    }
+    return result;
   };
 
   const [screen, setScreen] = useState(() => {
@@ -428,6 +445,8 @@ function useDesignerState() {
       visibleWidthInches: 100, aspectRatio: "16:9", mountMode: "baffle",
       floatDepthM: 0, showScreenPlane: false, showCavity: false, speakerClearanceM: 0.02,
       borderThicknessM: 0.08,
+      tvPresetKey: null,
+      tvWidthMm: null,
     };
   });
   const [screenHeight, setScreenHeight] = useState(() => (

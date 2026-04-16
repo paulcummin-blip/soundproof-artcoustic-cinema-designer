@@ -265,24 +265,26 @@ export default function ScreenConfiguration(props) {
               <Select
                 value={Number.isInteger(Number(screenData.visibleWidthInches ?? 100)) ? String(Number(screenData.visibleWidthInches ?? 100)) : Number(screenData.visibleWidthInches ?? 100).toFixed(2)}
                 onValueChange={(val) => {
-                  const tvPresetLabels = {
-                    "55.55": 'TV 65"',
-                    "67.36": 'TV 77"',
-                    "72.52": 'TV 83"',
-                    "87.80": 'TV 100"',
+                  const TV_PRESET_MAP = {
+                    "tv65":  { label: 'TV 65"',  widthMm: 1411 },
+                    "tv77":  { label: 'TV 77"',  widthMm: 1711 },
+                    "tv83":  { label: 'TV 83"',  widthMm: 1872 },
+                    "tv100": { label: 'TV 100"', widthMm: 2230 },
                   };
-                  const tvPresetKeyMap = {
+                  const VAL_TO_KEY = {
                     "55.55": "tv65",
                     "67.36": "tv77",
                     "72.52": "tv83",
                     "87.80": "tv100",
                   };
-                  if (tvPresetLabels[val]) {
+                  const presetKey = VAL_TO_KEY[val];
+                  if (presetKey && TV_PRESET_MAP[presetKey]) {
                     handleUpdate({
                       visibleWidthInches: Number(val),
                       aspectRatio: "16:9",
                       borderThicknessM: 0.005,
-                      tvPresetKey: tvPresetKeyMap[val],
+                      tvPresetKey: presetKey,
+                      tvWidthMm: TV_PRESET_MAP[presetKey].widthMm,
                     });
                     return;
                   }
@@ -290,6 +292,7 @@ export default function ScreenConfiguration(props) {
                     visibleWidthInches: Number(val),
                     borderThicknessM: 0.08,
                     tvPresetKey: null,
+                    tvWidthMm: null,
                   });
                 }}
                 disabled={disabled || manualSize.enabled}
