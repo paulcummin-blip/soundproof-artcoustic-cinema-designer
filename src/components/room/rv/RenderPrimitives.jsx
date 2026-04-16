@@ -138,8 +138,8 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   const isRound = modelMeta?.round === true || (modelMeta?.diameterM && modelMeta?.round !== false);
   
   // Safe fallbacks: use registry dimensions or defaults (ensure always visible)
-  const safeWidthM = modelMeta?.widthM || (Number(widthM) > 0 ? Number(widthM) : 0.27);
-  const safeDepthM = modelMeta?.depthM || (Number(depthM) > 0 ? Number(depthM) : 0.27);
+  const safeWidthM = (Number(widthM) > 0 ? Number(widthM) : modelMeta?.widthM) || 0.27;
+  const safeDepthM = (Number(depthM) > 0 ? Number(depthM) : modelMeta?.depthM) || 0.27;
   
   // Get color (currently always black)
   const color = getChannelColor(role);
