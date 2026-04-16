@@ -28,12 +28,12 @@ export default function RvSpeakerLayer({
   handleIconLeave,
   screen,
 }) {
-  if (!toPx || !scale) return null;
-
   // Read screen from appState directly — RvPlanCanvas does not pass screen prop to RvSpeakerLayer,
   // so the prop is always undefined. Reading from appState ensures tvPresetKey is always current.
   const appState = useAppState();
   const resolvedScreen = appState?.screen || screen || {};
+
+  if (!toPx || !scale) return null;
   const resolveRole = getCanonicalRole || defaultGetCanonicalRole;
   const tvPresetKey = resolvedScreen?.tvPresetKey || null;
   const fcSpeaker = (speakers || []).find((speaker) => resolveRole(speaker?.role) === 'FC');
