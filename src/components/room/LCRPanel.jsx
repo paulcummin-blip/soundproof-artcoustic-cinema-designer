@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAppState } from '@/components/AppStateProvider';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -54,25 +54,12 @@ function buildRoleMap(list) {
   return m;
 }
 
-const TV_SOUND_BAR_WIDTH_MAP = {
-  '55.55': 1222,
-  '67.36': 1711,
-  '72.52': 1872,
-  '87.80': 2230,
-};
-
 const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
 const INTEGRATED_LCR_SOUNDBAR_LABELS = ['Multi (LCR)', 'HSPL (LCR)'];
 
-function getTvPresetKey(screen) {
-  const raw = Number(screen?.visibleWidthInches ?? 100);
-  const fixed = raw.toFixed(2);
-  return TV_SOUND_BAR_WIDTH_MAP[fixed] ? fixed : null;
-}
-
 function resolveSoundbarMeta(modelLabel, screen) {
-  const tvPresetKey = getTvPresetKey(screen);
-  return getSpeakerModelMeta(modelLabel, tvPresetKey || undefined);
+  const tvPresetKey = screen?.tvPresetKey || null;
+  return getSpeakerModelMeta(modelLabel, tvPresetKey);
 }
 
 function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabel, dimensions, screen, setSpeakers }) {
@@ -225,7 +212,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     return standardLcrOptions[0]?.label || '';
   }, [getByRole, LCR_CANONICAL_ROLES, standardLcrOptions]);
 
-  const lastP12SentRef = React.useRef(null);
+  const lastP12SentRef = useRef(null);
 
   // Compute P12 values at component scope so the effect can depend on them
   const p12Computed = useMemo(() => {
