@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getModelsByCategoryOrdered, getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { getModelsByCategoryOrdered, getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
@@ -54,7 +54,28 @@ function buildRoleMap(list) {
   return m;
 }
 
-function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
+const TV_SOUND_BAR_WIDTH_MAP = {
+  '55.55': 1222,
+  '67.36': 1711,
+  '72.52': 1872,
+  '87.80': 2230,
+};
+
+const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
+const INTEGRATED_LCR_SOUNDBAR_LABELS = ['Multi (LCR)', 'HSPL (LCR)'];
+
+function getTvPresetKey(screen) {
+  const raw = Number(screen?.visibleWidthInches ?? 100);
+  const fixed = raw.toFixed(2);
+  return TV_SOUND_BAR_WIDTH_MAP[fixed] ? fixed : null;
+}
+
+function resolveSoundbarMeta(modelLabel, screen) {
+  const tvPresetKey = getTvPresetKey(screen);
+  return getSpeakerModelMeta(modelLabel, tvPresetKey || undefined);
+}
+
+function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabel, dimensions, screen, setSpeakers }) {
   setSpeakers(prev => {
     const list = Array.isArray(prev) ? prev : [];
     const by = buildRoleMap(list);
@@ -64,23 +85,81 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
 
     const roomW = Number(dimensions?.width ?? dimensions?.widthM) || 4.5;
     const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
+    const screenHeightFromFloorM = Number(screen?.heightFromFloorM) || 0.5;
+    const visibleWidthInches = Number(screen?.visibleWidthInches) || 100;
+    const aspectRatio = String(screen?.aspectRatio || '16:9');
+    const [arW, arH] = aspectRatio.split(':').map(Number);
+    const ratio = (arW && arH) ? arW / arH : 16 / 9;
+    const viewableWidthM = visibleWidthInches * 0.0254;
+    const viewableHeightM = viewableWidthM / ratio;
+    const screenBottomM = screenHeightFromFloorM;
 
     const defaultY = 0.20;
     const defaultZ = roomH * 0.5;
     const spread = Math.min(1.2, roomW * 0.22);
+    const midX = roomW / 2;
 
     const FL = by.get('FL') || { role: 'FL', id: 'FL-1', draggable: true };
     const FC = by.get('FC') || { role: 'FC', id: 'FC-1', draggable: true };
     const FR = by.get('FR') || { role: 'FR', id: 'FR-1', draggable: true };
 
-    const midX = roomW / 2;
+    const soundbarLabel = soundbarModelLabel || null;
+    const soundbarMeta = soundbarLabel ? resolveSoundbarMeta(soundbarLabel, screen) : null;
+    const soundbarOffsetM = Number(soundbarMeta?.placementOffsetFromScreenBottomMm || 0) / 1000;
+    const soundbarHeightM = Number(soundbarMeta?.heightM) || 0;
+    const soundbarCenterZ = soundbarMeta ? Math.max(soundbarHeightM / 2, screenBottomM - soundbarOffsetM - (soundbarHeightM / 2)) : defaultZ;
 
-    const seeded = [
+    if (frontStageMode === 'integrated_lcr' && soundbarLabel) {
+      return [
+        ...filtered,
+        {
+          ...FC,
+          role: 'FC',
+          id: FC.id || 'FC-1',
+          model: soundbarLabel,
+          position: { x: midX, y: defaultY, z: soundbarCenterZ },
+          rotation: FC.rotation || { x: 0, y: 0, z: 0 },
+        },
+      ];
+    }
+
+    if (frontStageMode === 'center_only' && soundbarLabel) {
+      return [
+        ...filtered,
+        {
+          ...FL,
+          role: 'FL',
+          id: FL.id || 'FL-1',
+          model: baseModelLabel,
+          position: FL.position || { x: midX - spread, y: defaultY, z: defaultZ },
+          rotation: FL.rotation || { x: 0, y: 0, z: 0 },
+        },
+        {
+          ...FC,
+          role: 'FC',
+          id: FC.id || 'FC-1',
+          model: soundbarLabel,
+          position: { x: midX, y: defaultY, z: soundbarCenterZ },
+          rotation: FC.rotation || { x: 0, y: 0, z: 0 },
+        },
+        {
+          ...FR,
+          role: 'FR',
+          id: FR.id || 'FR-1',
+          model: baseModelLabel,
+          position: FR.position || { x: midX + spread, y: defaultY, z: defaultZ },
+          rotation: FR.rotation || { x: 0, y: 0, z: 0 },
+        },
+      ];
+    }
+
+    return [
+      ...filtered,
       {
         ...FL,
         role: 'FL',
         id: FL.id || 'FL-1',
-        model: modelLabel,
+        model: baseModelLabel,
         position: FL.position || { x: midX - spread, y: defaultY, z: defaultZ },
         rotation: FL.rotation || { x: 0, y: 0, z: 0 },
       },
@@ -88,7 +167,7 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
         ...FC,
         role: 'FC',
         id: FC.id || 'FC-1',
-        model: modelLabel,
+        model: baseModelLabel,
         position: FC.position || { x: midX, y: defaultY, z: defaultZ },
         rotation: FC.rotation || { x: 0, y: 0, z: 0 },
       },
@@ -96,19 +175,17 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
         ...FR,
         role: 'FR',
         id: FR.id || 'FR-1',
-        model: modelLabel,
+        model: baseModelLabel,
         position: FR.position || { x: midX + spread, y: defaultY, z: defaultZ },
         rotation: FR.rotation || { x: 0, y: 0, z: 0 },
       },
     ];
-
-    return [...filtered, ...seeded];
   });
 }
 
 export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Update }) {
   const appState = useAppState();
-  const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions } = appState || {};
+  const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions, screen } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(['FL', 'FC', 'FR']), []);
@@ -119,13 +196,34 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
   const getByRole = useCallback(r => byRole.get(getCanonicalRole(r)), [byRole]);
 
+  const soundbarOptions = useMemo(() => lcrModelOptions.filter((opt) => {
+    const meta = getSpeakerModelMeta(opt.label);
+    return meta?.frontStageType === 'center_only' || meta?.frontStageType === 'integrated_lcr';
+  }), [lcrModelOptions]);
+
+  const standardLcrOptions = useMemo(() => lcrModelOptions.filter((opt) => {
+    const meta = getSpeakerModelMeta(opt.label);
+    return !meta?.frontStageType;
+  }), [lcrModelOptions]);
+
   const initialModel = useMemo(() => {
+    const fcModel = getByRole('FC')?.model;
+    const fcMeta = fcModel ? getSpeakerModelMeta(fcModel) : null;
+
+    if (fcMeta?.frontStageType === 'center_only' || fcMeta?.frontStageType === 'integrated_lcr') {
+      for (const role of ['FL', 'FR']) {
+        const m = getByRole(role)?.model;
+        if (m && standardLcrOptions.some(opt => opt.label === m)) return m;
+      }
+      return standardLcrOptions[0]?.label || '';
+    }
+
     for (const r of LCR_CANONICAL_ROLES) {
       const m = getByRole(r)?.model;
-      if (m && lcrModelOptions.some(opt => opt.label === m)) return m;
+      if (m && standardLcrOptions.some(opt => opt.label === m)) return m;
     }
-    return '';
-  }, [getByRole, LCR_CANONICAL_ROLES, lcrModelOptions]);
+    return standardLcrOptions[0]?.label || '';
+  }, [getByRole, LCR_CANONICAL_ROLES, standardLcrOptions]);
 
   const lastP12SentRef = React.useRef(null);
 
@@ -161,12 +259,24 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     appState?.setP12Level?.(p12Computed.level);
   }, [p12Computed, appState?.setP12Mode, appState?.setP12Level]);
 
+  const fcModel = getByRole('FC')?.model;
+  const fcMeta = fcModel ? getSpeakerModelMeta(fcModel) : null;
+  const derivedFrontStageMode = fcMeta?.frontStageType === 'integrated_lcr' ? 'integrated_lcr' : fcMeta?.frontStageType === 'center_only' ? 'center_only' : 'standard';
+  const derivedSoundbarModel = (fcMeta?.frontStageType === 'center_only' || fcMeta?.frontStageType === 'integrated_lcr') ? fcModel : '';
+
   const [lcrModel, setLcrModel] = useState(initialModel);
+  const [frontStageMode, setFrontStageMode] = useState(derivedFrontStageMode);
+  const [soundbarModel, setSoundbarModel] = useState(derivedSoundbarModel);
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
   }, [initialModel, lcrModel]);
+
+  useEffect(() => {
+    if (derivedFrontStageMode !== frontStageMode) setFrontStageMode(derivedFrontStageMode);
+    if (derivedSoundbarModel !== soundbarModel) setSoundbarModel(derivedSoundbarModel);
+  }, [derivedFrontStageMode, derivedSoundbarModel, frontStageMode, soundbarModel]);
 
   useEffect(() => {
     setLcrPowerInputValue(String(splConfig?.lcrW || 100));
@@ -197,12 +307,45 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     }
   }, [splConfig?.lcrW, updateGlobalSpl]);
 
-  const onChooseModel = useCallback((modelLabel) => {
-    if (!lcrModelOptions.some(opt => opt.label === modelLabel)) return;
-    setLcrModel(modelLabel);
-    ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers);
-  }, [dimensions, setSpeakers, lcrModelOptions]);
+  const applyFrontStage = useCallback((nextBaseModel, nextMode, nextSoundbarModel) => {
+    buildFrontStageSeed({
+      baseModelLabel: nextBaseModel,
+      frontStageMode: nextMode,
+      soundbarModelLabel: nextSoundbarModel,
+      dimensions,
+      screen,
+      setSpeakers,
+    });
+  }, [dimensions, screen, setSpeakers]);
 
+  const onChooseModel = useCallback((modelLabel) => {
+    if (!standardLcrOptions.some(opt => opt.label === modelLabel)) return;
+    setLcrModel(modelLabel);
+    applyFrontStage(modelLabel, frontStageMode, soundbarModel);
+  }, [standardLcrOptions, applyFrontStage, frontStageMode, soundbarModel]);
+
+  const onChooseFrontStageMode = useCallback((mode) => {
+    const nextMode = mode || 'standard';
+    const nextSoundbarModel = nextMode === 'standard'
+      ? ''
+      : nextMode === 'center_only'
+        ? (CENTER_ONLY_SOUNDBAR_LABELS.includes(soundbarModel) ? soundbarModel : CENTER_ONLY_SOUNDBAR_LABELS[0])
+        : (INTEGRATED_LCR_SOUNDBAR_LABELS.includes(soundbarModel) ? soundbarModel : INTEGRATED_LCR_SOUNDBAR_LABELS[0]);
+
+    setFrontStageMode(nextMode);
+    setSoundbarModel(nextSoundbarModel);
+    applyFrontStage(lcrModel, nextMode, nextSoundbarModel);
+  }, [applyFrontStage, lcrModel, soundbarModel]);
+
+  const onChooseSoundbarModel = useCallback((modelLabel) => {
+    if (!soundbarOptions.some(opt => opt.label === modelLabel)) return;
+    setSoundbarModel(modelLabel);
+    const meta = getSpeakerModelMeta(modelLabel);
+    const nextMode = meta?.frontStageType === 'integrated_lcr' ? 'integrated_lcr' : 'center_only';
+    if (nextMode !== frontStageMode) setFrontStageMode(nextMode);
+    applyFrontStage(lcrModel, nextMode, modelLabel);
+  }, [soundbarOptions, applyFrontStage, lcrModel, frontStageMode]);
+  
   return (
     <div className="space-y-2 p-2">
       <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
@@ -213,11 +356,50 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
           </span>
         </SelectTrigger>
         <SelectContent className="bg-white border-[#DCDBD6]">
-          {lcrModelOptions.map(model => (
+          {standardLcrOptions.map(model => (
             <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
           ))}
         </SelectContent>
       </Select>
+
+      <div className="space-y-2 mt-4">
+        <Label htmlFor="front-stage-mode" className="text-[#3E4349] font-medium">Front Stage</Label>
+        <Select value={frontStageMode} onValueChange={onChooseFrontStageMode} disabled={disabled}>
+          <SelectTrigger id="front-stage-mode" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+            <span className="text-base font-semibold" style={{ color: '#213428' }}>
+              {frontStageMode === 'integrated_lcr' ? 'Integrated LCR soundbar' : frontStageMode === 'center_only' ? 'Center-only soundbar override' : 'Separate LCR speakers'}
+            </span>
+          </SelectTrigger>
+          <SelectContent className="bg-white border-[#DCDBD6]">
+            <SelectItem value="standard" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Separate LCR speakers</SelectItem>
+            <SelectItem value="center_only" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Center-only soundbar override</SelectItem>
+            <SelectItem value="integrated_lcr" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Integrated LCR soundbar</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {frontStageMode !== 'standard' && (
+        <div className="space-y-2 mt-4">
+          <Label htmlFor="front-stage-soundbar" className="text-[#3E4349] font-medium">Soundbar Model</Label>
+          <Select value={soundbarModel || undefined} onValueChange={onChooseSoundbarModel} disabled={disabled}>
+            <SelectTrigger id="front-stage-soundbar" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+              <span className="text-base font-semibold" style={{ color: '#213428' }}>
+                {soundbarModel ? (getSpeakerModelMeta(soundbarModel)?.label || soundbarModel) : 'Select soundbar model'}
+              </span>
+            </SelectTrigger>
+            <SelectContent className="bg-white border-[#DCDBD6]">
+              {soundbarOptions
+                .filter((model) => frontStageMode === 'center_only'
+                  ? CENTER_ONLY_SOUNDBAR_LABELS.includes(model.label)
+                  : INTEGRATED_LCR_SOUNDBAR_LABELS.includes(model.label)
+                )
+                .map(model => (
+                  <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <p className="text-xs text-[#625143] mt-1">
         Angle to MLP: <span className="font-semibold text-[#1B1A1A]">{Math.round(lcrAngleDeg)}°</span>

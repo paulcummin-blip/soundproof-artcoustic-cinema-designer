@@ -1,4 +1,5 @@
 import React from "react";
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 /** Text-only printer: never returns objects/arrays to React */
 function t(v, fb = "—") {
@@ -15,10 +16,17 @@ function t(v, fb = "—") {
 export default function SystemSummarySafe({ activeProjectId, summary }) {
   // Hard defaults to guarantee string-only rendering
   const s = summary || {};
+  const fcModel = s?.selected_speakers_by_role?.FC?.model || s?.selectedSpeakersByRole?.FC?.model || s?.fcModel || null;
+  const fcMeta = fcModel ? getSpeakerModelMeta(fcModel) : null;
+  const usesIntegratedLcr = fcMeta?.frontStageType === 'integrated_lcr';
+  const lcrSummaryValue = usesIntegratedLcr
+    ? `${t(fcMeta?.label || fcModel, "Not set yet")} (integrated LCR)`
+    : t(s?.lcrModel, "Not set yet");
+
   const rows = [
     ["Layout",                     t(s?.dolbyLayout)],
     ["Target SPL (dB) LCR",        s?.targetSPL_LCR_dB != null ? `${t(s?.targetSPL_LCR_dB)} dB LCR` : "—"],
-    ["LCR",                        t(s?.lcrModel, "Not set yet")],
+    ["LCR",                        lcrSummaryValue],
     ["Surround",                   t(s?.surroundModel, "Not set yet")],
     ["Height",                     t(s?.heightModel, "Not set yet")],
     ["Subwoofer(s)",               s?.subModel ? `${t(s?.subModel)}${s?.subCount ? ` × ${t(s?.subCount)}` : ""}` : "Not set yet"],
@@ -34,12 +42,14 @@ export default function SystemSummarySafe({ activeProjectId, summary }) {
         {!activeProjectId ? (
           <p className="text-[#3E4349]">Open a project in Room Designer to populate the summary.</p>
         ) : (
-          rows.map(([label, value]) => (
-            <div key={label} className="flex justify-between gap-4">
-              <span className="text-[#3E4349]">{label}</span>
-              <span className="text-[#1B1A1A] font-medium">{value}</span>
-            </div>
-          ))
+          rows
+            .filter(([label]) => !(usesIntegratedLcr && (label === 'FL' || label === 'FR')))
+            .map(([label, value]) => (
+              <div key={label} className="flex justify-between gap-4">
+                <span className="text-[#3E4349]">{label}</span>
+                <span className="text-[#1B1A1A] font-medium">{value}</span>
+              </div>
+            ))
         )}
       </div>
     </div>

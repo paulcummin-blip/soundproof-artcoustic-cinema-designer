@@ -3,6 +3,7 @@ import { SpeakerIcon, isRenderableSpeaker, getSpeakerDims } from "@/components/r
 import { getCanonicalRole as defaultGetCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
 import { sideWallX, rearWallY } from "@/components/room/rv/utils/rvGeometry";
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 /**
  * RvSpeakerLayer — renders all bed-layer draggable speaker icons onto the SVG canvas.
@@ -28,16 +29,21 @@ export default function RvSpeakerLayer({
   if (!toPx || !scale) return null;
 
   const resolveRole = getCanonicalRole || defaultGetCanonicalRole;
+  const fcSpeaker = (speakers || []).find((speaker) => resolveRole(speaker?.role) === 'FC');
+  const fcMeta = fcSpeaker?.model ? getSpeakerModelMeta(fcSpeaker.model) : null;
+  const hideDiscreteFronts = fcMeta?.frontStageType === 'integrated_lcr';
 
   return (
     <g data-layer="bed-speakers">
       {(speakers || []).map((speaker) => {
         if (!isRenderableSpeaker(speaker)) return null;
 
+        const role = resolveRole(speaker.role);
+        if (hideDiscreteFronts && (role === 'FL' || role === 'FR')) return null;
+
         const { widthM: speakerWidthM, depthM: speakerDepthM } = getSpeakerDims(speaker.model);
 
         // Compute yaw first — wall-mounted position derivation depends on it
-        const role = resolveRole(speaker.role);
         const speakerForAim = { ...speaker, x: speaker.position.x, y: speaker.position.y };
         const yawDeg = getPlanAimDeg(
           speakerForAim,

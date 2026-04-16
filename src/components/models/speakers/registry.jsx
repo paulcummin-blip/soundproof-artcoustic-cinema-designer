@@ -18,6 +18,13 @@ export const MODELS = [
   { key: "evolve-4-2", label: "EVOLVE 4-2", category: "LCR", widthMm: 270, heightMm: 370, depthMm: 82, sensitivity_dB_1w1m: 96, sensitivity_dB_2p83: 99, nominalOhms: 4, max_power: 120, price_gbp_exVat: 1780, retailPriceGBP: 1780.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 30, minus5deg: 40 }, dispersion: { horizontal: { minus1p5dB: 36, minus3dB: 52, minus5dB: 70 } } },
   { key: "evolve-6-3", label: "EVOLVE 6-3", category: "LCR", widthMm: 270, heightMm: 370, depthMm: 82, sensitivity_dB_1w1m: 100, sensitivity_dB_2p83: 103, nominalOhms: 4, max_power: 180, price_gbp_exVat: 2250, retailPriceGBP: 2250.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 30, minus5deg: 40 }, dispersion: { horizontal: { minus1p5dB: 36, minus3dB: 52, minus5dB: 70 } } },
   { key: "evolve-8-4", label: "EVOLVE 8-4", category: "LCR", widthMm: 270, heightMm: 370, depthMm: 82, sensitivity_dB_1w1m: 102, sensitivity_dB_2p83: 106, nominalOhms: 3, max_power: 240, price_gbp_exVat: 2720, retailPriceGBP: 2720.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 30, minus5deg: 40 }, dispersion: { horizontal: { minus1p5dB: 36, minus3dB: 52, minus5dB: 70 } } },
+  // TODO: Replace C-1 dimensions with verified source dimensions if/when available.
+  { key: "c-1", label: "C-1", category: "LCR", frontStageType: "center_only", widthType: "fixed", fixedWidthMm: 500, widthMm: 500, heightMm: 120, depthMm: 81, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 96, sensitivity_dB_2p83: 96, nominalOhms: 4, max_power: 60, max_spl: 108, peak_spl: 114, frequency_response_low: 90, usable_lf_hz_minus6db: 87, recommended_hpf_hz: 100, recommended_hpf_slope: "24dB/oct", hfOffAxis16k: { minus3deg: 35, minus5deg: 45 }, dispersion: { horizontal: { minus1p5dB: 50, minus3dB: 70, minus5dB: 85 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 100 } } },
+  { key: "c4-1", label: "C4-1", category: "LCR", frontStageType: "center_only", widthType: "tv_linked", tvWidthMap: { "55.55": 1222, "67.36": 1711, "72.52": 1872, "87.80": 2230 }, heightMm: 120, depthMm: 81, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 98, sensitivity_dB_2p83: 98, nominalOhms: 8, max_power: 120, max_spl: 109, peak_spl: 115, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 45, minus5deg: 60 }, dispersion: { horizontal: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 } } },
+  { key: "multi-lcr", label: "Multi (LCR)", category: "LCR", frontStageType: "integrated_lcr", widthType: "tv_linked", tvWidthMap: { "55.55": 1222, "67.36": 1711, "72.52": 1872, "87.80": 2230 }, heightMm: 100, depthMm: 80, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 96, sensitivity_dB_2p83: 96, nominalOhms: 12, max_power: 60, max_spl: 108, peak_spl: 114, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 45, minus5deg: 60 }, dispersion: { horizontal: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 } } },
+  { key: "multi-mono", label: "Multi (Mono)", category: "LCR", frontStageType: "center_only", widthType: "tv_linked", tvWidthMap: { "55.55": 1222, "67.36": 1711, "72.52": 1872, "87.80": 2230 }, heightMm: 100, depthMm: 80, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 101, sensitivity_dB_2p83: 101, nominalOhms: 12, max_power: 180, max_spl: 113, peak_spl: 119, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 45, minus5deg: 60 }, dispersion: { horizontal: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 } } },
+  { key: "hspl-lcr", label: "HSPL (LCR)", category: "LCR", frontStageType: "integrated_lcr", widthType: "tv_linked", tvWidthMap: { "55.55": 1222, "67.36": 1711, "72.52": 1872, "87.80": 2230 }, heightMm: 100, depthMm: 80, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 98, sensitivity_dB_2p83: 98, nominalOhms: 8, max_power: 120, max_spl: 110, peak_spl: 116, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 35, minus5deg: 45 }, dispersion: { horizontal: { minus1p5dB: 50, minus3dB: 70, minus5dB: 85 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 100 } } },
+  { key: "hspl-mono", label: "HSPL (Mono)", category: "LCR", frontStageType: "center_only", widthType: "tv_linked", tvWidthMap: { "55.55": 1222, "67.36": 1711, "72.52": 1872, "87.80": 2230 }, heightMm: 100, depthMm: 80, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 103, sensitivity_dB_2p83: 103, nominalOhms: 8, max_power: 360, max_spl: 115, peak_spl: 121, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 35, minus5deg: 45 }, dispersion: { horizontal: { minus1p5dB: 50, minus3dB: 70, minus5dB: 85 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 100 } } },
 
   // SURROUNDS — EXACT ORDER
   { key: "evolve-1-1_s", label: "EVOLVE 1-1", category: "SURROUNDS", widthMm: 150, heightMm: 150, depthMm: 72, sensitivity_dB_1w1m: 93, sensitivity_dB_2p83: 96, nominalOhms: 8, max_power: 30, price_gbp_exVat: 550 },
@@ -284,7 +291,18 @@ export function getSpeakerModelMeta(modelName, orientation) {
   }
 
   // SUB4-12 orientation handling: swap width and height for horizontal
-  let widthM = mmToM(hit.widthMm);
+  let resolvedWidthMm = hit.widthMm;
+
+  if (hit.widthType === "fixed" && Number.isFinite(hit.fixedWidthMm)) {
+    resolvedWidthMm = hit.fixedWidthMm;
+  }
+
+  if (hit.widthType === "tv_linked" && hit.tvWidthMap && orientation != null) {
+    const tvKey = Number.isInteger(Number(orientation)) ? String(Number(orientation)) : Number(orientation).toFixed(2);
+    resolvedWidthMm = hit.tvWidthMap[tvKey] || hit.widthMm || hit.fixedWidthMm;
+  }
+
+  let widthM = mmToM(resolvedWidthMm);
   let heightM = mmToM(hit.heightMm);
   const depthM = mmToM(hit.depthMm);
   
@@ -301,10 +319,21 @@ export function getSpeakerModelMeta(modelName, orientation) {
     key: hit.key,
     label: hit.label,
     category: hit.category,
+    frontStageType: hit.frontStageType ?? null,
+    widthType: hit.widthType ?? null,
+    fixedWidthMm: hit.fixedWidthMm ?? null,
+    tvWidthMap: hit.tvWidthMap ?? null,
+    placementOffsetFromScreenBottomMm: hit.placementOffsetFromScreenBottomMm ?? null,
     sensitivity_dB_1w1m: hit.sensitivity_dB_1w1m ?? null,
     sensitivity_dB_2p83: hit.sensitivity_dB_2p83 ?? null,
     nominalOhms: hit.nominalOhms ?? null,
     max_power: hit.max_power ?? null,
+    max_spl: hit.max_spl ?? null,
+    peak_spl: hit.peak_spl ?? null,
+    frequency_response_low: hit.frequency_response_low ?? null,
+    usable_lf_hz_minus6db: hit.usable_lf_hz_minus6db ?? null,
+    recommended_hpf_hz: hit.recommended_hpf_hz ?? null,
+    recommended_hpf_slope: hit.recommended_hpf_slope ?? null,
     hfOffAxis16k: finalHfOffAxis16k,
     builtInTiltDeg: hit.builtInTiltDeg ?? null,
     dispersion: finalDispersion,
