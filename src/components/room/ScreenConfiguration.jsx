@@ -264,7 +264,18 @@ export default function ScreenConfiguration(props) {
               <Label className="text-[#3E4349] font-medium text-sm">Viewing Width (inches)</Label>
               <Select
                 value={String(screenData.visibleWidthInches ?? 100)}
-                onValueChange={(val) => handleUpdate({ visibleWidthInches: Number(val) })}
+                onValueChange={(val) => {
+                  const tvPresetValues = new Set(["55.55", "67.36", "72.52", "87.80"]);
+                  if (tvPresetValues.has(val)) {
+                    handleUpdate({
+                      visibleWidthInches: Number(val),
+                      aspectRatio: "16:9",
+                      borderThicknessM: 0.005,
+                    });
+                    return;
+                  }
+                  handleUpdate({ visibleWidthInches: Number(val) });
+                }}
                 disabled={disabled || manualSize.enabled}
                 modal={false}
               >
@@ -276,6 +287,18 @@ export default function ScreenConfiguration(props) {
                   sideOffset={6}
                   className="z-[70] bg-white border-[#DCDBD6]"
                 >
+                  <SelectItem value="55.55" className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
+                    TV 65\"
+                  </SelectItem>
+                  <SelectItem value="67.36" className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
+                    TV 77\"
+                  </SelectItem>
+                  <SelectItem value="72.52" className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
+                    TV 83\"
+                  </SelectItem>
+                  <SelectItem value="87.80" className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
+                    TV 100\"
+                  </SelectItem>
                   {[80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250].map((width) => (
                     <SelectItem 
                       key={width} 
