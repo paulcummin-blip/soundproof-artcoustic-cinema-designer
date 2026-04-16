@@ -20,7 +20,9 @@ export default function RvBaffleAndScreen({
 
   const inch2m = 0.0254;
 
-  const borderM = Math.max(0, (Number(screen?.borderThicknessCm ?? screen?.frameThicknessCm ?? 8) || 0) / 100);
+  const isTvPreset = !!(screen?.tvPresetKey);
+  const DEFAULT_BORDER_M = isTvPreset ? 0.005 : 0.08;
+  const borderM = Math.max(0, Number(screen?.borderThicknessM ?? DEFAULT_BORDER_M) || DEFAULT_BORDER_M);
   const visibleWm = Math.max(0.1, Number(screen?.visibleWidthInches || 100) * inch2m);
   const frameWm = visibleWm + (2 * borderM);
 
