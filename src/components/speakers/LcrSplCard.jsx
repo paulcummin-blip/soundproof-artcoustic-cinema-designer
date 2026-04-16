@@ -6,7 +6,7 @@ import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getSeatSplMetrics, getMlpSeat } from '@/components/utils/spl/centralSplEngine';
 import { formatDb } from '@/components/utils/formatDb';
 
-export default function LcrSplCard({ role, label, allSeatSplMetrics }) {
+export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedLcrMode = false }) {
   const appState = useAppState();
   
   // Get MLP seat and its SPL data
@@ -40,7 +40,9 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics }) {
 
   // Get SPL value from centralized data
   const canonicalRole = { 'L': 'FL', 'C': 'FC', 'R': 'FR' }[role] || role;
-  const splValue = mlpSplData?.screen?.[canonicalRole]?.value;
+  const isFlankingRole = integratedLcrMode && (canonicalRole === 'FL' || canonicalRole === 'FR');
+  const splLookupRole = isFlankingRole ? 'FC' : canonicalRole;
+  const splValue = mlpSplData?.screen?.[splLookupRole]?.value;
   const finalSplDb = Number.isFinite(splValue) ? splValue : null;
 
   // Get speaker metadata for display
@@ -91,7 +93,7 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics }) {
         <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
           {formatDb(finalSplDb)}
         </div>
-        {!speaker?.position && (
+        {!speaker?.position && !isFlankingRole && (
           <div className="text-xs text-[#625143] mt-1">Not placed</div>
         )}
       </CardContent>

@@ -401,6 +401,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
               role={role}
               label={role === 'FL' ? 'Left' : role === 'FC' ? 'Center' : 'Right'}
               allSeatSplMetrics={allSeatSplMetrics}
+              integratedLcrMode={derivedFrontStageMode === 'integrated_lcr'}
             />
           ))}
         </div>
