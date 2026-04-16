@@ -294,7 +294,7 @@ export default function ScreenConfiguration(props) {
                       "67.36": 'TV 77"',
                       "72.52": 'TV 83"',
                       "87.80": 'TV 100"',
-                    }[String(screenData.visibleWidthInches ?? 100)] ?? `${String(screenData.visibleWidthInches ?? 100)}"`}
+                    }[String(screenData.visibleWidthInches ?? 100).match(/^\d+\.\d{2}$/) ? String(screenData.visibleWidthInches ?? 100) : Number(screenData.visibleWidthInches ?? 100).toFixed(2)] ?? `${String(screenData.visibleWidthInches ?? 100)}"`}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent 
@@ -303,16 +303,16 @@ export default function ScreenConfiguration(props) {
                   className="z-[70] bg-white border-[#DCDBD6]"
                 >
                   <SelectItem value="55.55" className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
-                    TV 65\"
+                    TV 65"
                   </SelectItem>
                   <SelectItem value="67.36" className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
-                    TV 77\"
+                    TV 77"
                   </SelectItem>
                   <SelectItem value="72.52" className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
-                    TV 83\"
+                    TV 83"
                   </SelectItem>
                   <SelectItem value="87.80" className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
-                    TV 100\"
+                    TV 100"
                   </SelectItem>
                   {[80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250].map((width) => (
                     <SelectItem 
