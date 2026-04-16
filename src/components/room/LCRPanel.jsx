@@ -339,7 +339,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
       <Select value={lcrModel || undefined} onValueChange={onChooseModel} disabled={disabled}>
         <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
           <span className="text-2xl font-semibold" style={{ color: '#213428' }}>
-            {lcrModel ? (getSpeakerModelMeta(lcrModel)?.label || lcrModel) : 'Select LCR model'}
+            {frontStageMode === 'integrated_lcr' ? '-' : (lcrModel ? (getSpeakerModelMeta(lcrModel)?.label || lcrModel) : 'Select LCR model')}
           </span>
         </SelectTrigger>
         <SelectContent className="bg-white border-[#DCDBD6]">
