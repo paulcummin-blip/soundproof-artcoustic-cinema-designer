@@ -404,15 +404,7 @@ function useDesignerState() {
 
   const [dimensions, setDimensions] = useState({}); 
 
-  // TV preset width → key map for backfill
-  const TV_PRESET_KEY_MAP = {
-    "55.55": "tv65",
-    "67.36": "tv77",
-    "72.52": "tv83",
-    "87.80": "tv100",
-  };
-
-  // Exact fixed TV widths in mm (source of truth, must match soundbar tvWidthMap)
+  // SINGLE SOURCE OF TRUTH for TV preset widths — must match registry.js tvWidthMap and ScreenConfiguration
   const TV_PRESET_WIDTH_MM = {
     tv65:  1411,
     tv77:  1711,
@@ -420,20 +412,27 @@ function useDesignerState() {
     tv100: 2230,
   };
 
+  // Reverse map: mm value → preset key (for backfilling tvPresetKey from tvWidthMm)
+  const TV_WIDTH_MM_TO_KEY = Object.fromEntries(
+    Object.entries(TV_PRESET_WIDTH_MM).map(([k, v]) => [v, k])
+  );
+
   const backfillTvPresetKey = (s) => {
     if (!s) return s;
     let result = s;
-    // Backfill tvPresetKey from visibleWidthInches if missing
-    if (!result.tvPresetKey) {
-      const widthStr = Number(result.visibleWidthInches).toFixed(2);
-      const derived = TV_PRESET_KEY_MAP[widthStr];
-      if (derived) result = { ...result, tvPresetKey: derived };
-    }
-    // Backfill tvWidthMm from tvPresetKey if missing or zero
+
+    // Case 1: tvPresetKey exists but tvWidthMm is missing/zero → derive from key
     if (result.tvPresetKey && !result.tvWidthMm) {
       const mm = TV_PRESET_WIDTH_MM[result.tvPresetKey];
       if (mm) result = { ...result, tvWidthMm: mm };
     }
+
+    // Case 2: tvWidthMm exists but tvPresetKey is missing → derive from width
+    if (!result.tvPresetKey && Number(result.tvWidthMm) > 0) {
+      const key = TV_WIDTH_MM_TO_KEY[Number(result.tvWidthMm)];
+      if (key) result = { ...result, tvPresetKey: key };
+    }
+
     return result;
   };
 
