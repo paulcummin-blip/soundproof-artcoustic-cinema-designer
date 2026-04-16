@@ -25,12 +25,19 @@ export default function RvSpeakerLayer({
   handleIconEnter,
   handleIconMove,
   handleIconLeave,
+  screen,
 }) {
   if (!toPx || !scale) return null;
 
   const resolveRole = getCanonicalRole || defaultGetCanonicalRole;
+  const tvPresetKey = (() => {
+    const raw = Number(screen?.visibleWidthInches);
+    if (!Number.isFinite(raw)) return null;
+    const fixed = raw.toFixed(2);
+    return ['55.55', '67.36', '72.52', '87.80'].includes(fixed) ? fixed : null;
+  })();
   const fcSpeaker = (speakers || []).find((speaker) => resolveRole(speaker?.role) === 'FC');
-  const fcMeta = fcSpeaker?.model ? getSpeakerModelMeta(fcSpeaker.model) : null;
+  const fcMeta = fcSpeaker?.model ? getSpeakerModelMeta(fcSpeaker.model, tvPresetKey || undefined) : null;
   const hideDiscreteFronts = fcMeta?.frontStageType === 'integrated_lcr';
 
   return (
@@ -41,7 +48,10 @@ export default function RvSpeakerLayer({
         const role = resolveRole(speaker.role);
         if (hideDiscreteFronts && (role === 'FL' || role === 'FR')) return null;
 
-        const { widthM: speakerWidthM, depthM: speakerDepthM } = getSpeakerDims(speaker.model);
+        const speakerMeta = getSpeakerModelMeta(speaker.model, tvPresetKey || undefined);
+        const { widthM: speakerWidthM, depthM: speakerDepthM } = speakerMeta?.notFound
+          ? getSpeakerDims(speaker.model)
+          : speakerMeta;
 
         // Compute yaw first — wall-mounted position derivation depends on it
         const speakerForAim = { ...speaker, x: speaker.position.x, y: speaker.position.y };
