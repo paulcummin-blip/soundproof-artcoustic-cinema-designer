@@ -49,9 +49,20 @@ export default function RvSpeakerLayer({
         if (hideDiscreteFronts && (role === 'FL' || role === 'FR')) return null;
 
         const speakerMeta = getSpeakerModelMeta(speaker.model, tvPresetKey || undefined);
-        const { widthM: speakerWidthM, depthM: speakerDepthM } = speakerMeta?.notFound
+        const { widthM: metaWidthM, depthM: speakerDepthM } = speakerMeta?.notFound
           ? getSpeakerDims(speaker.model)
           : speakerMeta;
+
+        const tvVisibleWidthM = Number(screen?.visibleWidthInches) > 0
+          ? Number(screen.visibleWidthInches) * 0.0254
+          : null;
+        const soundbarTvWidthModels = ['C4-1', 'Multi (Mono)', 'HSPL (Mono)', 'Multi (LCR)', 'HSPL (LCR)'];
+        const isFcSoundbar = role === 'FC';
+        const speakerWidthM = isFcSoundbar && speaker.model === 'C-1'
+          ? 0.4
+          : isFcSoundbar && soundbarTvWidthModels.includes(speaker.model) && Number.isFinite(tvVisibleWidthM)
+            ? tvVisibleWidthM
+            : metaWidthM;
 
         // Compute yaw first — wall-mounted position derivation depends on it
         const speakerForAim = { ...speaker, x: speaker.position.x, y: speaker.position.y };
