@@ -203,8 +203,8 @@ function calculateSplAtPoint({
   };
 
   // Dev-only warning if canonical anechoic fields are absent
-  if (process.env.NODE_ENV !== 'production' && speakerModel) {
-    if (!resolvedMeta?.max_spl_cont_db_1m_anechoic && !resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) {
+  if (typeof __DEV__ !== 'undefined' ? __DEV__ : true) {
+    if (speakerModel && !resolvedMeta?.max_spl_cont_db_1m_anechoic && !resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) {
       const warnKey = `__splWarn_${speakerModel}`;
       if (!globalThis[warnKey]) {
         globalThis[warnKey] = true;
@@ -495,13 +495,11 @@ export function computeSingleSeatSplAtDistance({
   };
 
   // Dev-only warning if canonical anechoic fields are absent
-  if (process.env.NODE_ENV !== 'production' && speakerModelId) {
-    if (!resolvedMeta?.max_spl_cont_db_1m_anechoic && !resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) {
-      const warnKey = `__splWarn_${speakerModelId}`;
-      if (!globalThis[warnKey]) {
-        globalThis[warnKey] = true;
-        console.warn(`[SPL] No canonical anechoic SPL fields for model: ${speakerModelId}`);
-      }
+  if (speakerModelId && !resolvedMeta?.max_spl_cont_db_1m_anechoic && !resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) {
+    const warnKey = `__splWarn_${speakerModelId}`;
+    if (!globalThis[warnKey]) {
+      globalThis[warnKey] = true;
+      console.warn(`[SPL] No canonical anechoic SPL fields for model: ${speakerModelId}`);
     }
   }
   
