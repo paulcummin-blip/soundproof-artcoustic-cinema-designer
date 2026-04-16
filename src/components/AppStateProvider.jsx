@@ -404,12 +404,32 @@ function useDesignerState() {
 
   const [dimensions, setDimensions] = useState({}); 
 
-  const [screen, setScreen] = useState(() => (
-    (__autosavePayload && __autosavePayload.screen) ? __autosavePayload.screen : {
+  // TV preset width → key map for backfill
+  const TV_PRESET_KEY_MAP = {
+    "55.55": "tv65",
+    "67.36": "tv77",
+    "72.52": "tv83",
+    "87.80": "tv100",
+  };
+
+  const backfillTvPresetKey = (s) => {
+    if (!s || s.tvPresetKey) return s; // already set, nothing to do
+    const widthStr = Number(s.visibleWidthInches).toFixed(2);
+    const derived = TV_PRESET_KEY_MAP[widthStr];
+    if (derived) return { ...s, tvPresetKey: derived };
+    return s;
+  };
+
+  const [screen, setScreen] = useState(() => {
+    if (__autosavePayload && __autosavePayload.screen) {
+      return backfillTvPresetKey(__autosavePayload.screen);
+    }
+    return {
       visibleWidthInches: 100, aspectRatio: "16:9", mountMode: "baffle",
       floatDepthM: 0, showScreenPlane: false, showCavity: false, speakerClearanceM: 0.02,
-    }
-  ));
+      borderThicknessM: 0.08,
+    };
+  });
   const [screenHeight, setScreenHeight] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.screenHeight === "number") ? __autosavePayload.screenHeight : 0.5
   ));
