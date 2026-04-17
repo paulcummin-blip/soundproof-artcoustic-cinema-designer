@@ -209,6 +209,7 @@ export function useSpeakerDragUpdate({
               position: upd.position,
               ...(upd.meta        !== undefined ? { meta: upd.meta }               : {}),
               ...(upd.positionSource !== undefined ? { positionSource: upd.positionSource } : {}),
+              ...(upd.isOnRearWall !== undefined ? { isOnRearWall: upd.isOnRearWall } : {}),
             };
           })
         );

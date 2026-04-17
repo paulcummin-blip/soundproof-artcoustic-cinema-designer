@@ -253,11 +253,13 @@ export function solveSpeakerDragConstraints({
         id: thisSpeaker.id,
         position: { ...(thisSpeaker.position || {}), x: baseSide === 'SL' ? xL_side : xR_side, y: yStar },
         positionSource: 'user',
+        isOnRearWall: false,
       });
       finalPositions.push({
         id: partnerSpeaker.id,
         position: { ...(partnerSpeaker.position || {}), x: partnerBaseSide === 'SL' ? xL_side : xR_side, y: yStar },
         positionSource: 'user',
+        isOnRearWall: false,
       });
       return { finalPositions, additionalUpdates };
     }
@@ -281,11 +283,13 @@ export function solveSpeakerDragConstraints({
       id: thisSpeaker.id,
       position: { ...(thisSpeaker.position || {}), x: xL_star, y: y_back_this },
       positionSource: 'user',
+      isOnRearWall: true,
     });
     finalPositions.push({
       id: partnerSpeaker.id,
       position: { ...(partnerSpeaker.position || {}), x: xR_star, y: y_back_partner },
       positionSource: 'user',
+      isOnRearWall: true,
     });
     return { finalPositions, additionalUpdates };
   }
