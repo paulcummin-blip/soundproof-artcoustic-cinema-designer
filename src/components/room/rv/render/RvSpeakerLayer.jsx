@@ -80,8 +80,7 @@ export default function RvSpeakerLayer({
 
         const rearWallTargetY = rearWallY(
           lengthM,
-          { widthM: speakerWidthM, depthM: speakerDepthM },
-          yawDeg || 0
+          { widthM: speakerWidthM, depthM: speakerDepthM }
         );
         const sideSurroundIsOnRearWall =
           isSideSurroundRole &&
