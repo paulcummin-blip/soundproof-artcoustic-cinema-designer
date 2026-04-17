@@ -80,8 +80,19 @@ export function resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole 
     return 0;
   }
 
-  // Side surrounds: wall-flat
+  // Side surrounds: wall-flat by default, but rear-wall-mounted if on the back wall
   if (isSide) {
+    // Detect rear-wall mounting via explicit flag stamped by the drag solver (nextMode === 'back')
+    const isOnRearWall = speaker.isOnRearWall === true;
+
+    if (isOnRearWall) {
+      // Long edge against rear wall, face into room → yaw 0
+      // Reuse aimRear toggle so the same MLP-aim UI controls both SBL/SBR and rear-mounted SL/SR
+      if (aimRear && hasValidMlp) return _yawFromTo(pos, mlpPos) ?? 0;
+      return 0;
+    }
+
+    // On side wall: original behaviour preserved exactly
     if (canon === 'SL' || /^SL\d+$/.test(canon)) return  90;
     if (canon === 'SR' || /^SR\d+$/.test(canon)) return -90;
     return 0;
