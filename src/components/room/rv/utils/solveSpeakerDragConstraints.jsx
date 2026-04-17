@@ -263,16 +263,13 @@ export function solveSpeakerDragConstraints({
     }
 
     // back-wall mode
-    const lanes    = rearSurroundVisualLanes;
-    const leftLaneMin = lanes.left.minX;
-    const leftLaneMax = lanes.left.maxX;
-
     const { x: proposedRoomX_m_slsr } = canvasToRoom(newCanvasPos);
     const rawXL = (baseSide === 'SL')
       ? proposedRoomX_m_slsr
       : (W - proposedRoomX_m_slsr);
 
-    const xL_star = clamp(rawXL, leftLaneMin, leftLaneMax);
+    const dimsThisHalfW = (getModelDimsM(thisSpeaker.model)?.widthM || 0.20) / 2;
+    const xL_star = clamp(rawXL, dimsThisHalfW + WALL_BUFFER_M, W / 2);
     const xR_star = W - xL_star;
 
     const dimsL = getSpeakerDims(thisSpeaker.model);
