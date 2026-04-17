@@ -84,6 +84,17 @@ export function useEnsureOverheadPairs({
     // No overhead roles required for this layout
     if (requiredOverheadRoles.length === 0) return;
 
+    // Guard: do not seed T* speakers unless an overhead model is actually selected.
+    // An overhead is "effectively off" when overheadGlobalModel is absent AND no
+    // zone-specific override is independently active.
+    const isModelOff = (m) => !m || ['off', 'none', ''].includes(String(m).toLowerCase().trim());
+    const hasGlobal = !isModelOff(overheadGlobalModel);
+    const hasFrontOverride = !useFrontGlobal && !isModelOff(overheadFrontOverride);
+    const hasMidOverride   = !useMidGlobal   && !isModelOff(overheadMidOverride);
+    const hasRearOverride  = !useRearGlobal  && !isModelOff(overheadRearOverride);
+    const overheadsEffectivelyEnabled = hasGlobal || hasFrontOverride || hasMidOverride || hasRearOverride;
+    if (!overheadsEffectivelyEnabled) return;
+
     // 2. Index existing speakers by role
     const existingByRole = {};
     placedSpeakers.forEach(spk => {
