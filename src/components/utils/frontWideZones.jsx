@@ -1,5 +1,7 @@
 // Safe inputs, no bare mlp usage
 
+import { sideWallX } from '@/components/room/rv/utils/rvGeometry';
+
 const CANONICAL_ROLE_MAP = {
   'SL': 'SL', 'LS': 'SL',
   'SR': 'SR', 'RS': 'SR',
@@ -72,7 +74,13 @@ export function computeFrontWideZonesStrict({
   const mlpY = Number(mlpPoint.y);
 
   const computeSide = (F, S, xWall, sideName) => {
-    const midX = (F.position.x + S.position.x) / 2;
+    // Use canonical (wall-flat, yaw=90°) side-wall X for SL/SR so that aiming
+    // changes never shift the Front Wide zone geometry.
+    const sSide = sideName === 'L' ? 'L' : 'R';
+    const sDims = getModelDimsM ? getModelDimsM(S.model) : null;
+    const sCanonX = sideWallX(W, sDims, sSide, 90);
+
+    const midX = (F.position.x + sCanonX) / 2;
     const midY = (F.position.y + S.position.y) / 2;
 
     const theta = Math.atan2(midY - mlpY, midX - mlpX);
