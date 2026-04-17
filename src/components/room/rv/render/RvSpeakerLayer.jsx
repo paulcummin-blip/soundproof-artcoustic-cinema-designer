@@ -74,19 +74,37 @@ export default function RvSpeakerLayer({
         // by the yaw-projected half-depth so the cabinet stays flush to the front wall
         // regardless of rotation angle.
         const LCR_ROLES = ['FL', 'FC', 'FR'];
+        const isSideSurroundRole =
+          role === 'SL' || role === 'SR' ||
+          /^SL\d+$/.test(role) || /^SR\d+$/.test(role);
+
+        const rearWallTargetY = rearWallY(
+          lengthM,
+          { widthM: speakerWidthM, depthM: speakerDepthM },
+          yawDeg || 0
+        );
+        const sideSurroundIsOnRearWall =
+          isSideSurroundRole &&
+          Math.abs(speaker.position.y - rearWallTargetY) <= 0.02;
+
         const isLeftWallMounted =
-          role === 'LW' ||
-          role === 'SL' ||
-          /^SL\d+$/.test(role);
+          !sideSurroundIsOnRearWall && (
+            role === 'LW' ||
+            role === 'SL' ||
+            /^SL\d+$/.test(role)
+          );
 
         const isRightWallMounted =
-          role === 'RW' ||
-          role === 'SR' ||
-          /^SR\d+$/.test(role);
+          !sideSurroundIsOnRearWall && (
+            role === 'RW' ||
+            role === 'SR' ||
+            /^SR\d+$/.test(role)
+          );
 
         const isRearWallMounted =
           role === 'SBL' ||
-          role === 'SBR';
+          role === 'SBR' ||
+          sideSurroundIsOnRearWall;
 
         const FRONT_WALL_GAP_M = 0.01; // matches frontWallY in drag solver
 
