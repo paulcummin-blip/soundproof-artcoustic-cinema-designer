@@ -214,7 +214,7 @@ export function solveSpeakerDragConstraints({
       const yMx = Number(yMax_clamp);
       const hys = Number.isFinite(BACKWALL_HYSTERESIS_M) ? Number(BACKWALL_HYSTERESIS_M) : 0.10;
       if (slsrModeCurrent === 'back') return py < (yMx - hys) ? 'side' : 'back';
-      return py > (yMx + hys) ? 'back' : 'side';
+      return py >= yMx ? 'back' : 'side';
     })();
     additionalUpdates.slsrMode = nextMode;
 
