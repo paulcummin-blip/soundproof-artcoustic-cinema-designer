@@ -28,6 +28,9 @@ export function useAutoHugSurroundsToWalls({
   aimFrontWidesAtMLP,
   lcrAngleInfo,
 }) {
+  // ── Effect 1: Side surrounds (SL/SR/SL2/SR2...) and rear surrounds (SBL/SBR) ──
+  // Depends on aimSideSurroundsAtMLP. Front Wides are intentionally excluded here
+  // so that toggling side surround aiming never repositions LW/RW.
   useEffect(() => {
     if (isAnyDraggingRef.current) return;
     if (!onSetSpeakers || !placedSpeakers?.length) return;
@@ -36,8 +39,6 @@ export function useAutoHugSurroundsToWalls({
     const L = lengthM || 0;
     if (!(W > 0 && L > 0)) return;
 
-    // Compute the canonical Y midpoint for side surrounds
-    // Use sideSurroundVisualSpanM when available (same logic as resetSideSurroundsToDefault)
     const yMin_center = Number(sideSurroundVisualSpanM?.minY);
     const yMax_center = Number(sideSurroundVisualSpanM?.maxY);
     const sideSurroundDefaultY = (Number.isFinite(yMin_center) && Number.isFinite(yMax_center) && yMax_center > yMin_center)
@@ -51,53 +52,36 @@ export function useAutoHugSurroundsToWalls({
       const next = prev.map(spk => {
         const canon = getCanonicalRole(spk.role);
 
-        // Detect ALL wall-mounted surrounds:
-        // - Side surrounds: SL/SR/SL2/SR2/SL3/SR3...
-        // - Front Wides: LW/RW
-        // - Rear surrounds: SBL/SBR
         const extraSurroundPattern = /^(SL|SR)\d*$/;
         const isSideSurround = extraSurroundPattern.test(canon);
-        const isFrontWide = (canon === 'LW' || canon === 'RW');
         const isRearSurround = (canon === 'SBL' || canon === 'SBR');
 
-        // Process ALL wall-mounted surrounds
-        if (!isSideSurround && !isFrontWide && !isRearSurround) return spk;
+        // Front Wides (LW/RW) are handled in their own separate effect below
+        if (!isSideSurround && !isRearSurround) return spk;
         if (!spk.position || !spk.model) return spk;
-
-        // [B44 POSITION LOCK] Skip user-positioned speakers (they've been manually placed)
         if (spk.positionSource === 'user') return spk;
 
-        // Get speaker icon dimensions
         const dims = getModelDimsM(spk.model);
-
-        // Compute the live yaw exactly as the renderer does — this accounts for
-        // "aim at MLP" mode and produces the correct rotated half-extent.
         const liveYaw = getPlanAimDeg(
           { x: spk.position?.x, y: spk.position?.y, role: spk.role },
           mlp || null,
-          W,
-          L,
-          false,              // aimLeftRightAtMLP — only for LCR, not used here
-          aimFrontWidesAtMLP || false,
+          W, L,
+          false,
+          false,                          // aimFrontWidesAtMLP — not relevant here
           aimSideSurroundsAtMLP || false,
           aimRearSurroundsAtMLP || false,
           lcrAngleInfo || null,
         );
 
-        let targetX = spk.position.x; // Default: keep current X
-        let targetY = spk.position.y; // Default: keep current Y
+        let targetX = spk.position.x;
+        let targetY = spk.position.y;
 
-        // Side wall speakers: snap X to wall using live yaw, and Y to span midpoint
-        if (isSideSurround || isFrontWide) {
-          const isLeft = canon.startsWith('SL') || canon === 'LW';
+        if (isSideSurround) {
+          const isLeft = canon.startsWith('SL');
           targetX = sideWallX(W, dims, isLeft ? 'L' : 'R', liveYaw);
-          // For SL/SR only: also snap Y to the canonical midpoint (not seed position)
-          if (isSideSurround) {
-            targetY = sideSurroundDefaultY;
-          }
+          targetY = sideSurroundDefaultY;
         }
 
-        // Rear wall speakers: icon edge 1cm from wall, using live yaw
         if (isRearSurround) {
           targetY = rearWallY(L, dims, liveYaw);
         }
@@ -105,13 +89,9 @@ export function useAutoHugSurroundsToWalls({
         const currentX = Number(spk.position.x) || 0;
         const currentY = Number(spk.position.y) || 0;
 
-        // Only update if position has actually changed (prevents jitter)
         if (Math.abs(currentX - targetX) > 0.001 || Math.abs(currentY - targetY) > 0.001) {
           changed = true;
-          return {
-            ...spk,
-            position: { ...spk.position, x: targetX, y: targetY }
-          };
+          return { ...spk, position: { ...spk.position, x: targetX, y: targetY } };
         }
 
         return spk;
@@ -120,5 +100,61 @@ export function useAutoHugSurroundsToWalls({
       return changed ? next : prev;
     });
   }, [widthM, lengthM, placedSpeakers, onSetSpeakers, getModelDimsM, getCanonicalRole,
-      mlp, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, aimFrontWidesAtMLP, lcrAngleInfo]);
+      mlp, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, lcrAngleInfo,
+      sideSurroundVisualSpanM]);
+
+  // ── Effect 2: Front Wides (LW/RW) only ──
+  // Depends on aimFrontWidesAtMLP. Completely decoupled from aimSideSurroundsAtMLP
+  // so toggling side surround aiming never repositions LW/RW or invalidates
+  // the front wide zone overlay.
+  useEffect(() => {
+    if (isAnyDraggingRef.current) return;
+    if (!onSetSpeakers || !placedSpeakers?.length) return;
+
+    const W = widthM || 0;
+    const L = lengthM || 0;
+    if (!(W > 0 && L > 0)) return;
+
+    onSetSpeakers(prev => {
+      if (!Array.isArray(prev) || !prev.length) return prev;
+
+      let changed = false;
+      const next = prev.map(spk => {
+        const canon = getCanonicalRole(spk.role);
+
+        const isFrontWide = (canon === 'LW' || canon === 'RW');
+        if (!isFrontWide) return spk;
+        if (!spk.position || !spk.model) return spk;
+        if (spk.positionSource === 'user') return spk;
+
+        const dims = getModelDimsM(spk.model);
+        const liveYaw = getPlanAimDeg(
+          { x: spk.position?.x, y: spk.position?.y, role: spk.role },
+          mlp || null,
+          W, L,
+          false,
+          aimFrontWidesAtMLP || false,
+          false,                          // aimSideSurroundsAtMLP — not relevant here
+          false,                          // aimRearSurroundsAtMLP — not relevant here
+          lcrAngleInfo || null,
+        );
+
+        const isLeft = (canon === 'LW');
+        const targetX = sideWallX(W, dims, isLeft ? 'L' : 'R', liveYaw);
+        const targetY = spk.position.y; // Front Wides keep their Y (user-draggable along wall)
+
+        const currentX = Number(spk.position.x) || 0;
+
+        if (Math.abs(currentX - targetX) > 0.001) {
+          changed = true;
+          return { ...spk, position: { ...spk.position, x: targetX } };
+        }
+
+        return spk;
+      });
+
+      return changed ? next : prev;
+    });
+  }, [widthM, lengthM, placedSpeakers, onSetSpeakers, getModelDimsM, getCanonicalRole,
+      mlp, aimFrontWidesAtMLP, lcrAngleInfo]);
 }
