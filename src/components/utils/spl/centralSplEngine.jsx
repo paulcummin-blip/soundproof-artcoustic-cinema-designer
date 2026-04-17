@@ -241,11 +241,26 @@ function calculateSplAtPoint({
   const distanceLoss = (20 * Math.log10(d)) - lineBenefit;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Step 5: Apply all losses to the CAPPED 1m capability
+  // Step 5: Apply all losses to the CAPPED 1m capability (RP22 continuous)
   // ─────────────────────────────────────────────────────────────────────────
   const spl = spl1m_capability - distanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0);
-  
-  return Number.isFinite(spl) ? spl : null;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 6: Theoretical SPL (uncapped — sensitivity + power only, no hard cap)
+  // ─────────────────────────────────────────────────────────────────────────
+  const P_amp_theoretical = safeNum(powerW) || 0;
+  const P_spk_theoretical = safeNum(effectiveMeta?.power_handling_w) || Infinity;
+  const P_available_theoretical = Math.min(P_amp_theoretical, P_spk_theoretical);
+  let spl_theoretical = null;
+  if (P_available_theoretical > 0) {
+    const spl1m_theoretical = effectiveSensitivity + 10 * Math.log10(P_available_theoretical);
+    const theoreticalLineBenefit = quasiLineBenefitDb(d, speakerForBenefit);
+    const theoreticalDistanceLoss = (20 * Math.log10(d)) - theoreticalLineBenefit;
+    spl_theoretical = spl1m_theoretical - theoreticalDistanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0);
+    if (!Number.isFinite(spl_theoretical)) spl_theoretical = null;
+  }
+
+  return Number.isFinite(spl) ? { spl, spl_theoretical } : null;
 }
 
 /**
@@ -374,7 +389,7 @@ export function computeAllSeatSplMetrics({
           : spk.position;
 
         // Calculate SPL using UNIFIED logic with 1m capability cap
-        const splValue = calculateSplAtPoint({
+        const splResult = calculateSplAtPoint({
           speakerPos: speakerPosForSpl,
           seatPos,
           // Pass model name for speakerData.js lookup
@@ -396,10 +411,14 @@ export function computeAllSeatSplMetrics({
           effectiveSplInputs: effectiveSplInputs,
         });
 
+        const splValue = splResult?.spl ?? null;
+        const splTheoretical = splResult?.spl_theoretical ?? null;
+
         if (Number.isFinite(splValue)) {
           spl[categoryKey][role] = {
             value: splValue,
             formatted: `${splValue.toFixed(1)} dB`,
+            theoretical: Number.isFinite(splTheoretical) ? splTheoretical : null,
           };
         }
       }
