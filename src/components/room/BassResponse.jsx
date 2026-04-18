@@ -11,6 +11,7 @@ import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import RewDebugPanel from "@/components/room/bass/RewDebugPanel";
+import RewParityBenchmark from "@/components/room/bass/RewParityBenchmark";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -809,6 +810,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <RewDebugPanel stepDebug={simulationResults.stepDebug} selectedSeatIds={selectedSeatIds} />
       )}
       {/* __B44_STEP_DEBUG__ end */}
+
+      {/* REW Parity Benchmark — measurement layer, no physics changes */}
+      {useRewCoreTestMode && (
+        <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginTop: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#213428', marginBottom: 8 }}>REW Parity Benchmark</div>
+          <RewParityBenchmark
+            b44Series={multiSeries[0]?.data ?? []}
+            stepDebug={simulationResults.stepDebug}
+          />
+        </div>
+      )}
 
       {/* Absorption Control */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
