@@ -11,31 +11,31 @@ import React, { useMemo } from 'react';
 // Replace these values whenever a new REW capture is taken for this room.
 // Do NOT compute or interpolate these — they must be entered from real REW data.
 export const REW_TARGETS_CURRENT_ROOM = {
-  _room: 'Current test room — replace with project ID when known',
-  _capturedAt: 'Replace with ISO date of REW capture',
+  _room: 'Current test room — multi-screenshot REW capture 2026-04-18',
+  _capturedAt: '2026-04-18',
 
-  // 34 Hz region — local feature (peak or dip) near 34 Hz
+  // 34 Hz region — slight peak near 33.5–34 Hz (REW cursor: 33.5 Hz @ 93.6 dB, baseline ~90 dB)
   hz34: {
-    featureFrequencyHz: 34.0,    // Hz — centre of local feature in REW
-    featureMagnitudeDb: null,    // dB — relative to 40-80 Hz median (null = not yet measured)
+    featureFrequencyHz: 33.5,   // Hz — REW cursor confirmed 33.5 Hz
+    featureMagnitudeDb: 3.6,    // dB relative to 40-80 Hz median — slight peak above baseline
   },
 
-  // 40 Hz region — deep null
+  // 40 Hz region — broad interference dip (REW cursor: 40.6 Hz @ 72.9 dB, trend ~90 dB)
   hz40: {
-    nullCentreHz:   40.0,   // Hz — centre of the deepest null in REW
-    nullDepthDb:    null,   // dB — depth at null centre relative to surrounding trend (negative, e.g. -18)
-    nullWidthHz:    null,   // Hz — width of null at -10 dB relative to surrounding trend
+    nullCentreHz:   40.6,   // Hz — REW cursor confirmed 40.6 Hz
+    nullDepthDb:    -17.0,  // dB — depth relative to surrounding trend (~90 dB baseline)
+    nullWidthHz:    10.0,   // Hz — broad interference dip, visually ~10 Hz wide at -10 dB
   },
 
-  // 68 Hz region — local peak
+  // 68 Hz region — moderate peak (REW cursor: 67.9 Hz @ 92.4 dB, trend ~88-89 dB)
   hz68: {
-    peakFrequencyHz:   68.0,  // Hz — centre of peak near 68 Hz
-    peakProminenceDb:  null,  // dB — peak height above surrounding trend
+    peakFrequencyHz:   67.9,  // Hz — REW cursor confirmed 67.9 Hz
+    peakProminenceDb:  4.0,   // dB — peak above surrounding trend
   },
 
-  // Vector behaviour at null — phase shift across null
+  // Vector behaviour at null — not visible in REW screenshots provided
   vectorAtNull: {
-    phaseShiftDeg: null,  // degrees — phase shift from (nullCentreHz - 2) to (nullCentreHz + 2) in REW
+    phaseShiftDeg: null,  // degrees — not yet captured from REW phase view
   },
 
   // Agreed tolerances (do not edit these without a design discussion)
