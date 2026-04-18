@@ -202,23 +202,23 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
       spl: Number.isFinite(p.spl) ? p.spl - median : null,
     }));
 
-    // ── 34 Hz region ──────────────────────────────────────────────────────────
-    const hz34Feature = findMinInWindow(norm, T.hz34.featureFrequencyHz, 6);
-    const hz34PeakAlt = findMaxInWindow(norm, T.hz34.featureFrequencyHz, 6);
+    // ── 34 Hz region — anchored to REW-defined 34.3 Hz (±2 Hz) ──────────────
+    const hz34Feature = findMinInWindow(norm, T.hz34.featureFrequencyHz, 2);
+    const hz34PeakAlt = findMaxInWindow(norm, T.hz34.featureFrequencyHz, 2);
     // Use whichever is the stronger feature (further from 0)
     const hz34Best = (hz34Feature && hz34PeakAlt)
       ? (Math.abs(hz34Feature.spl) >= Math.abs(hz34PeakAlt.spl) ? hz34Feature : hz34PeakAlt)
       : (hz34Feature || hz34PeakAlt);
 
-    // ── 40 Hz null ────────────────────────────────────────────────────────────
-    const hz40Null = findMinInWindow(norm, T.hz40.nullCentreHz, 8);
+    // ── 40 Hz null — anchored to REW problem region (±4 Hz) ──────────────────
+    const hz40Null = findMinInWindow(norm, T.hz40.nullCentreHz, 4);
     const hz40NullDepth = hz40Null?.spl ?? null; // dB relative to median
     const hz40Width = hz40Null
       ? computeNullWidth(norm, hz40Null.frequency, hz40NullDepth, 10)
       : null;
 
-    // ── 68 Hz region ─────────────────────────────────────────────────────────
-    const hz68Peak = findMaxInWindow(norm, T.hz68.peakFrequencyHz, 8);
+    // ── 68 Hz region — anchored to REW-defined 68 Hz (±3 Hz) ────────────────
+    const hz68Peak = findMaxInWindow(norm, T.hz68.peakFrequencyHz, 3);
 
     // Prominence = peak spl minus average of neighbours (±10 Hz excluding ±3 Hz)
     let hz68Prominence = null;
