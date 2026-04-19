@@ -247,9 +247,14 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
       b44PhaseShift = delta;
     }
 
-    // ── Phase-alignment diagnostic at REW null target frequency ──────────────
+    // ── Transfer-style phase-alignment diagnostic at REW null target frequency ─
     // Uses REW_TARGETS_CURRENT_ROOM.hz40.nullCentreHz (NOT the B44-detected null centre).
-    // pre-modal vector = summedBeforeModes; modal vector = postModal.modalSumRe/Im
+    // Topology: modal behaviour is now a complex transfer applied to the pre-modal field.
+    //   pre-modal field angle  = atan2(sumIm, sumRe) before modal
+    //   transfer angle         = atan2(modalTransferIm, modalTransferRe)  [from applicationComparison]
+    //   post-modal field angle = atan2(livePostIm, livePostRe)
+    //   rotation applied       = postAngle - preAngle (how much the transfer rotated the field)
+    //   cancellation condition = post-modal field should be ~180° from pre-modal field
     const rewNullTargetHz = T.hz40.nullCentreHz;
     let phaseAlignment = null;
     if (Array.isArray(stepDebug) && stepDebug.length > 0) {
@@ -260,28 +265,52 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
 
       if (nearestRow && Math.abs(nearestRow.frequencyHz - rewNullTargetHz) <= 5) {
         const sb = nearestRow.summedBeforeModes;
-        const pm = nearestRow.postModal;
         const ac = nearestRow.applicationComparison;
 
         const preRe = sb?.sumRe ?? ac?.prevRe ?? null;
         const preIm = sb?.sumIm ?? ac?.prevIm ?? null;
-        const modRe = pm?.modalSumRe ?? ac?.modalSumRe ?? null;
-        const modIm = pm?.modalSumIm ?? ac?.modalSumIm ?? null;
+        const postRe = ac?.livePostRe ?? null;
+        const postIm = ac?.livePostIm ?? null;
+        // Transfer coefficients exposed in applicationComparison by engine debug
+        const txRe = ac?.modalTransferRe ?? null;
+        const txIm = ac?.modalTransferIm ?? null;
 
-        if (Number.isFinite(preRe) && Number.isFinite(preIm) &&
-            Number.isFinite(modRe) && Number.isFinite(modIm)) {
+        if (Number.isFinite(preRe) && Number.isFinite(preIm)) {
           const preAngleDeg = (Math.atan2(preIm, preRe) * 180) / Math.PI;
-          const modAngleDeg = (Math.atan2(modIm, modRe) * 180) / Math.PI;
-          let angleDiff = Math.abs(preAngleDeg - modAngleDeg);
-          // Reduce to 0–180 range
-          if (angleDiff > 180) angleDiff = 360 - angleDiff;
-          const cancellationPass = angleDiff >= 160 && angleDiff <= 200 ? true
-            : angleDiff >= 0 && angleDiff <= 180 ? (Math.abs(angleDiff - 180) <= 20) : false;
+          const postAngleDeg = (Number.isFinite(postRe) && Number.isFinite(postIm))
+            ? (Math.atan2(postIm, postRe) * 180) / Math.PI
+            : null;
+          const txAngleDeg = (Number.isFinite(txRe) && Number.isFinite(txIm))
+            ? (Math.atan2(txIm, txRe) * 180) / Math.PI
+            : null;
+
+          // How much did the transfer rotate the field?
+          let rotationAppliedDeg = null;
+          if (Number.isFinite(postAngleDeg)) {
+            let rot = postAngleDeg - preAngleDeg;
+            if (rot > 180) rot -= 360;
+            if (rot <= -180) rot += 360;
+            rotationAppliedDeg = rot;
+          }
+
+          // Cancellation: post-modal field should be ~180° opposite to pre-modal field
+          let postVsPreDiff = null;
+          if (Number.isFinite(postAngleDeg)) {
+            let diff = Math.abs(postAngleDeg - preAngleDeg);
+            if (diff > 180) diff = 360 - diff;
+            postVsPreDiff = diff;
+          }
+          const cancellationPass = Number.isFinite(postVsPreDiff)
+            ? Math.abs(postVsPreDiff - 180) <= 20
+            : null;
+
           phaseAlignment = {
             rowHz: nearestRow.frequencyHz,
             preAngleDeg,
-            modAngleDeg,
-            angleDiff,
+            postAngleDeg,
+            txAngleDeg,
+            rotationAppliedDeg,
+            postVsPreDiff,
             pass: cancellationPass,
           };
         }
@@ -451,10 +480,13 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
         </div>
       )}
 
-      {/* Phase alignment at REW null target */}
+      {/* Transfer-style phase alignment at REW null target */}
       <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f8f0ff', border: '1px solid #d8b4fe' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#6d28d9', marginBottom: 6 }}>
-          Phase alignment at REW null target
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#6d28d9', marginBottom: 2 }}>
+          Transfer-style phase alignment at REW null target
+        </div>
+        <div style={{ fontSize: 9, color: '#7c3aed', marginBottom: 6 }}>
+          Topology: modal acts as complex transfer on pre-modal field. Cancellation = post-field ≈ 180° opposite pre-field.
         </div>
         {results.phaseAlignment ? (() => {
           const pa = results.phaseAlignment;
@@ -467,23 +499,41 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
                   <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>nearest row: {pa.rowHz.toFixed(2)} Hz</td>
                 </tr>
                 <tr>
-                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Pre-modal angle</td>
+                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Pre-modal field angle</td>
                   <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>{pa.preAngleDeg.toFixed(1)}°</td>
-                  <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>atan2(sumIm, sumRe) before modal</td>
+                  <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>atan2(sumIm, sumRe) before transfer</td>
                 </tr>
                 <tr>
-                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Modal vector angle</td>
-                  <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>{pa.modAngleDeg.toFixed(1)}°</td>
-                  <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>atan2(modalSumIm, modalSumRe)</td>
+                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Transfer angle (modalTransfer)</td>
+                  <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>
+                    {Number.isFinite(pa.txAngleDeg) ? pa.txAngleDeg.toFixed(1) + '°' : '—'}
+                  </td>
+                  <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>atan2(modalTransferIm, modalTransferRe)</td>
                 </tr>
                 <tr>
-                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Angle difference</td>
-                  <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>{pa.angleDiff.toFixed(1)}°</td>
+                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Post-modal field angle</td>
+                  <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>
+                    {Number.isFinite(pa.postAngleDeg) ? pa.postAngleDeg.toFixed(1) + '°' : '—'}
+                  </td>
+                  <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>atan2(livePostIm, livePostRe)</td>
+                </tr>
+                <tr>
+                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Rotation applied by transfer</td>
+                  <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
+                    {Number.isFinite(pa.rotationAppliedDeg) ? (pa.rotationAppliedDeg >= 0 ? '+' : '') + pa.rotationAppliedDeg.toFixed(1) + '°' : '—'}
+                  </td>
+                  <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>postAngle − preAngle (wrapped)</td>
+                </tr>
+                <tr>
+                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Post vs Pre field difference</td>
+                  <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
+                    {Number.isFinite(pa.postVsPreDiff) ? pa.postVsPreDiff.toFixed(1) + '°' : '—'}
+                  </td>
                   <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>wrapped 0–180°</td>
                 </tr>
                 <tr>
-                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Cancellation target</td>
-                  <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>180° ± 20°</td>
+                  <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Cancellation condition</td>
+                  <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>post vs pre ≈ 180° ± 20°</td>
                   <td style={{ fontSize: 10, padding: '2px 6px' }}><Pill pass={pa.pass} /></td>
                 </tr>
               </tbody>
