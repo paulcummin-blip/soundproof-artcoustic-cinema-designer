@@ -29,6 +29,8 @@ export function useAllSeatSplMetrics({
     const screenLoss = Number(splConfig.screenLossDb) || 0;
     const eqHeadroom = Number(splConfig.globalEqHeadroomDb) || 0;
     const roomHeightM = Number(appState?.roomDims?.heightM) || 2.4;
+    const roomWidthM  = appState?.roomDims?.widthM  ?? null;
+    const roomLengthM = appState?.roomDims?.lengthM ?? null;
 
     const resolvedGetMeta = getSpeakerModelMetaProp || getSpeakerModelMeta;
 
@@ -36,6 +38,8 @@ export function useAllSeatSplMetrics({
       seats: _seatingPositions || [],
       placedSpeakers: analysisSpeakers || [],
       heightM: roomHeightM,
+      widthM: roomWidthM,
+      lengthM: roomLengthM,
       getCanonicalRole: getCanonicalRoleLocal,
       getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
       getModelDimsM: (model) => {
@@ -60,6 +64,8 @@ export function useAllSeatSplMetrics({
     appState?.getEffectiveSplInputs,
     appState?.splConfig,
     appState?.roomDims?.heightM,
+    appState?.roomDims?.widthM,
+    appState?.roomDims?.lengthM,
     mlpAnchorEffective,
     getSpeakerModelMetaProp,
   ]);
