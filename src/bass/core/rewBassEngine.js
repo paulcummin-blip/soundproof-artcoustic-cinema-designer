@@ -516,9 +516,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
-
-      sumRe = prevRe + modalSumRe;
-      sumIm = prevIm + modalSumIm;
+      // Transfer-style modal test:
+      // treat modal sum as a complex modifier on the existing field
+      // rather than an independent additive pressure source.
+      const modalTransferRe = 1 + modalSumRe;
+      const modalTransferIm = modalSumIm;
+      sumRe = (prevRe * modalTransferRe) - (prevIm * modalTransferIm);
+      sumIm = (prevRe * modalTransferIm) + (prevIm * modalTransferRe);
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
@@ -564,6 +568,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 livePostRe: sumRe,
                 livePostIm: sumIm,
                 livePostMag: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
+                modalTransferRe,
+                modalTransferIm,
                 strongestModeMag: _debugStrongestMode
                   ? Math.sqrt(
                       _debugStrongestMode.transferRe * _debugStrongestMode.transferRe +
