@@ -219,8 +219,11 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // Real part follows realDen so it can change sign naturally across resonance.
   // Imaginary part follows imagDen but stays smooth and finite.
   // No arbitrary additive floor terms.
-  const transferReal = -(realDen * imagDen) / denominatorSq;
-  const transferImag = -(imagDen * imagDen) / denominatorSq;
+  // Vector-direction construction test.
+  // Goal: rotate the modal vector more decisively toward opposition
+  // in the null region without changing modalGain or adding new constants.
+  const transferReal = -(imagDen * realDen) / denominatorSq;
+  const transferImag = -(realDen * realDen) / denominatorSq;
 
   return {
     real: modalGain * transferReal,
