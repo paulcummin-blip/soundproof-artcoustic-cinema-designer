@@ -54,6 +54,23 @@ function findSpeakerData(modelName) {
   }) || null;
 }
 
+/**
+ * Small bounded room-support approximation based on room volume.
+ * SOURCE BASIS: published half-space values + direct-sound propagation.
+ * Room support is a modest steady-state in-room gain correction only.
+ * Intentionally bounded — this is a design approximation, not exact acoustics.
+ * 
+ * @param {number|null} volumeM3 - Room volume in cubic metres
+ * @returns {number} Room support gain in dB (0.5–2.0 dB)
+ */
+function roomSupportDbFromVolume(volumeM3) {
+  if (!Number.isFinite(volumeM3)) return 1.0;  // sensible default when unknown
+  if (volumeM3 < 60)  return 2.0;              // small room — strong boundary support
+  if (volumeM3 < 120) return 1.5;              // medium room
+  if (volumeM3 < 200) return 1.0;              // large room
+  return 0.5;                                   // very large — minimal support
+}
+
 // Helper to safely parse numbers
 function safeNum(v) {
   if (v === null || v === undefined) return null;
@@ -62,23 +79,20 @@ function safeNum(v) {
 }
 
 /**
- * Resolve effective sensitivity, applying radiation mode adjustment.
+ * Resolve effective sensitivity.
+ * SOURCE BASIS: published half-space sensitivity — no anechoic correction applied.
+ * This engine predicts realistic in-room SPL for design purposes (not exact simulation).
  * 
  * @param {Object} speakerMeta - Speaker metadata
- * @param {Object} effectiveSplInputs - SPL inputs including radiationMode
+ * @param {Object} effectiveSplInputs - SPL inputs (retained for API compatibility)
  * @returns {number} Effective sensitivity in dB @ 1W/1m
  */
 function resolveEffectiveSensitivity(speakerMeta, effectiveSplInputs) {
-  // Start from speaker's sensitivity (same resolution as before)
-  let baseSens = safeNum(speakerMeta?.sensitivity_db_1w_1m) || 
-                 safeNum(speakerMeta?.sensitivity) || 
-                 87; // default fallback
-  
-  // ALWAYS use anechoic calculation (no radiation mode adjustment to SPL maths)
-  // Radiation mode now only affects P12 level grading thresholds
-  baseSens -= 6; // Always apply anechoic reduction
-  
-  return baseSens;
+  // Use published half-space sensitivity directly — no -6 dB anechoic reduction.
+  // The quoted sensitivity_db_1w_1m values are half-space (2π) measurements.
+  return safeNum(speakerMeta?.sensitivity_db_1w_1m) ||
+         safeNum(speakerMeta?.sensitivity) ||
+         87; // default fallback
 }
 
 /**
@@ -166,6 +180,8 @@ function calculateSplAtPoint({
   eqHeadroom_dB = 0,
   // Effective SPL inputs (includes radiationMode)
   effectiveSplInputs = null,
+  // Room volume for bounded in-room support approximation
+  roomVolumeM3 = null,
 }) {
   // Validate positions
   if (!speakerPos || !Number.isFinite(speakerPos.x) || !Number.isFinite(speakerPos.y)) return null;
@@ -179,7 +195,9 @@ function calculateSplAtPoint({
     resolvedMeta = findSpeakerData(speakerModel);
   }
   
-  // Build effective speaker data — prefer canonical anechoic registry fields first
+  // Build effective speaker data — source basis is published half-space values.
+  // Propagation remains current direct-sound seat-loss method.
+  // This is intended for realistic in-room design prediction, not exact acoustic simulation.
   const effectiveMeta = {
     sensitivity_db_1w_1m: safeNum(resolvedMeta?.sensitivity_db_1w_1m) || 
                           safeNum(resolvedMeta?.sensitivity) || 
@@ -188,26 +206,24 @@ function calculateSplAtPoint({
     power_handling_w: safeNum(resolvedMeta?.power_handling_w) || 
                       safeNum(resolvedMeta?.max_power) || 
                       Infinity,
-    // Continuous cap: canonical anechoic → legacy cont → legacy max_spl
-    max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m_anechoic) ||
+    // Continuous cap: half-space first → legacy cont → legacy max_spl
+    max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m_halfspace) ||
                         safeNum(resolvedMeta?.max_spl_cont_db_1m) || 
                         safeNum(resolvedMeta?.max_spl) || 
                         null,
-    // Peak cap: canonical anechoic → legacy CF6 peak → legacy peak_spl
-    max_spl_peak_db_cf6_1m: safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) ||
+    // Peak cap: half-space first → legacy CF6 peak → legacy peak_spl
+    max_spl_peak_db_cf6_1m: safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m_halfspace) ||
                             safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m) ||
                             safeNum(resolvedMeta?.peak_spl) ||
                             null,
-    // Flag: tells getSPL1mCapability whether peak is already on anechoic basis
-    peak_is_anechoic: !!(resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic != null),
   };
 
-  // Dev-only warning if canonical anechoic fields are absent
-  if (speakerModel && !resolvedMeta?.max_spl_cont_db_1m_anechoic && !resolvedMeta?.max_spl_peak_db_cf6_1m_anechoic) {
+  // Dev-only warning if half-space fields are absent
+  if (speakerModel && !resolvedMeta?.max_spl_cont_db_1m_halfspace && !resolvedMeta?.max_spl_cont_db_1m) {
     const warnKey = `__splWarn_${speakerModel}`;
     if (!globalThis[warnKey]) {
       globalThis[warnKey] = true;
-      console.warn(`[SPL] No canonical anechoic SPL fields for model: ${speakerModel}`);
+      console.warn(`[SPL] No half-space or continuous SPL fields for model: ${speakerModel}`);
     }
   }
 
@@ -239,9 +255,12 @@ function calculateSplAtPoint({
   const distanceLoss = (20 * Math.log10(d)) - lineBenefit;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Step 5: Apply all losses to the CAPPED 1m capability (RP22 continuous)
+  // Step 5: Apply all losses + small bounded room support approximation.
+  // Source basis: published half-space values. Propagation: direct-sound seat-loss.
+  // Room support is a small bounded steady-state approximation from room volume.
   // ─────────────────────────────────────────────────────────────────────────
-  const spl = spl1m_capability - distanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0);
+  const roomSupportDb = roomSupportDbFromVolume(roomVolumeM3);
+  const spl = spl1m_capability - distanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0) + roomSupportDb;
 
   // ─────────────────────────────────────────────────────────────────────────
   // Step 6: Theoretical SPL (uncapped — sensitivity + power only, no hard cap)
@@ -254,7 +273,7 @@ function calculateSplAtPoint({
     const spl1m_theoretical = effectiveSensitivity + 10 * Math.log10(P_available_theoretical);
     const theoreticalLineBenefit = quasiLineBenefitDb(d, speakerForBenefit);
     const theoreticalDistanceLoss = (20 * Math.log10(d)) - theoreticalLineBenefit;
-    spl_theoretical = spl1m_theoretical - theoreticalDistanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0);
+    spl_theoretical = spl1m_theoretical - theoreticalDistanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0) + roomSupportDb;
     if (!Number.isFinite(spl_theoretical)) spl_theoretical = null;
   }
 
@@ -287,8 +306,10 @@ export function computeAllSeatSplMetrics({
   getModelDimsM,
   screenLoss_dB = 0,
   eqHeadroom_dB = 0,
-  mlpPoint = null, // NEW: canonical MLP point (green dot)
-  heightM = 2.4, // NEW: room height for overhead z-fix
+  mlpPoint = null, // canonical MLP point (green dot)
+  heightM = 2.4,  // room height for overhead z-fix
+  widthM = null,  // room width for volume-based room support
+  lengthM = null, // room length for volume-based room support
 }) {
   const metricsMap = new Map();
   
@@ -297,6 +318,12 @@ export function computeAllSeatSplMetrics({
   }
 
   const roomHeightM = Number.isFinite(Number(heightM)) ? Number(heightM) : 2.4;
+  const roomWidthM  = Number.isFinite(Number(widthM))  ? Number(widthM)  : null;
+  const roomLengthM = Number.isFinite(Number(lengthM)) ? Number(lengthM) : null;
+  // Room volume used for small bounded in-room support approximation
+  const roomVolumeM3 = (Number.isFinite(roomWidthM) && Number.isFinite(roomLengthM) && Number.isFinite(roomHeightM))
+    ? roomWidthM * roomLengthM * roomHeightM
+    : null;
 
   // NEW: Add synthetic "mlp" seat if mlpPoint is provided
   let seatsToProcess = [...seats];
@@ -407,6 +434,8 @@ export function computeAllSeatSplMetrics({
           eqHeadroom_dB: eqHeadroom_dB || 0,
           // Pass effectiveSplInputs for radiationMode
           effectiveSplInputs: effectiveSplInputs,
+          // Room volume for bounded in-room support approximation
+          roomVolumeM3,
         });
 
         const splValue = splResult?.spl ?? null;
