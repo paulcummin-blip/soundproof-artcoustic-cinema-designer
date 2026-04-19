@@ -210,8 +210,8 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // Imag(H) = -imagDen / denominatorSq
   //
   // No heuristic offsets, no hand-tuned real scaling.
-  const transferReal = realDen / denominatorSq;
-  const transferImag = -imagDen / denominatorSq;
+  const transferReal = -1.25 * (imagDen * (imagDen + 0.10)) / denominatorSq;
+  const transferImag = -((imagDen + 0.10) * realDen) / denominatorSq;
 
   return {
     real: modalGain * transferReal,
