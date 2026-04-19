@@ -97,11 +97,6 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedL
         <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
           {formatDb(finalSplDb)}
         </div>
-        {finalTheoreticalDb !== null && (
-          <div className="text-xs mt-1" style={{ color: '#9a8878' }}>
-            Theoretical: {finalTheoreticalDb.toFixed(1)} dB
-          </div>
-        )}
         {isOutputLimited && (
           <div className="text-xs mt-0.5" style={{ color: '#b08060' }}>
             Output limited by speaker
@@ -109,11 +104,6 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedL
         )}
         {!speaker?.position && !isFlankingRole && (
           <div className="text-xs text-[#625143] mt-1">Not placed</div>
-        )}
-        {finalTheoreticalDb !== null && (
-          <div className="text-xs mt-2 leading-tight" style={{ color: '#aaa098' }}>
-            Continuous SPL is limited by speaker capability. Theoretical shows sensitivity + amp power only.
-          </div>
         )}
       </CardContent>
     </Card>
