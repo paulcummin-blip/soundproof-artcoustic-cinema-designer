@@ -188,7 +188,7 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
 // Modal Green's function: coupling = Ψ_source * Ψ_receiver, resonant transfer H(f, f0, Q).
 // pressureMagnitude = modalSourceAmplitude * combinedCoupling * resonanceMagnitude
 // modalSourceAmplitude brings the modal layer into the same pressure domain as the direct path.
-function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices) {
+function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices, preModalMagnitude) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
 
@@ -201,7 +201,9 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const orderWeight = modeOrder >= 2 ? 0.72 : 1.0;
 
   const effectiveCoupling = combinedCoupling;
-  const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
+  // Field-referenced test gain: ties modal energy to the local pre-modal field magnitude.
+  // Testing whether this improves coherent cancellation at the REW null target.
+  const modalGain = preModalMagnitude * effectiveCoupling * orderWeight;
 
   // Standard second-order resonant transfer, derived directly from:
   // H(jω) = 1 / (1 - (ω/ω0)^2 + j * ω/(ω0 Q))
@@ -250,7 +252,7 @@ const LOW_MODE_KEYS = [
 
 const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6];
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, preModalMagnitude) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -281,7 +283,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       mode.qValue,
       combinedCoupling,
       modalSourceAmplitude,
-      { nx: mode.nx, ny: mode.ny, nz: mode.nz }
+      { nx: mode.nx, ny: mode.ny, nz: mode.nz },
+      preModalMagnitude
     );
 
     // True pressure accumulation: direct sum of all modal pressure contributions.
@@ -512,7 +515,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Modal contributions are added directly to the pre-modal field — true superposition.
     if (enableModes) {
       const { modalSumRe, modalSumIm, _debugStrongestMode } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, preModalMagnitude
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
