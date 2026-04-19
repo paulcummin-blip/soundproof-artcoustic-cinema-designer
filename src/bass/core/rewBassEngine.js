@@ -210,8 +210,17 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // Imag(H) = -imagDen / denominatorSq
   //
   // No heuristic offsets, no hand-tuned real scaling.
-  const transferReal = -1.25 * (imagDen * (imagDen + 0.10)) / denominatorSq;
-  const transferImag = -((imagDen + 0.10) * realDen) / denominatorSq;
+  // Controlled phase-trajectory test transfer.
+  // Goal:
+  // - broadly constructive below the null region
+  // - strong opposition through the null region
+  // - recovery above the null region
+  //
+  // Real part follows realDen so it can change sign naturally across resonance.
+  // Imaginary part follows imagDen but stays smooth and finite.
+  // No arbitrary additive floor terms.
+  const transferReal = -(realDen * imagDen) / denominatorSq;
+  const transferImag = -(imagDen * imagDen) / denominatorSq;
 
   return {
     real: modalGain * transferReal,
