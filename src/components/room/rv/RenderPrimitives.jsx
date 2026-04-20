@@ -1,6 +1,7 @@
 import React from "react";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
+import { useAppState } from "@/components/AppStateProvider";
 
 // ---- Roles / misc helpers ----
 export const isSubRole = (role) => {
@@ -121,12 +122,17 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   speakerMouseDownHandler,
   onIconEnter,
   onIconMove,
-  onIconLeave
+  onIconLeave,
+  tvPresetKey,
 }) {
   const { model, role, id } = speaker || {};
   
-  // Get speaker metadata from registry
-  const modelMeta = getSpeakerModelMeta(model);
+  // Resolve tvPresetKey: prefer the prop (passed by caller), fall back to appState
+  const appState = useAppState();
+  const resolvedTvPresetKey = tvPresetKey || appState?.screen?.tvPresetKey || null;
+  
+  // Get speaker metadata from registry — pass tvPresetKey so TV-linked models resolve correct width
+  const modelMeta = getSpeakerModelMeta(model, resolvedTvPresetKey);
   
   // Log warning if model not found in registry (with better visibility for overhead debugging)
   if (false && modelMeta?.notFound && typeof console !== 'undefined') {
@@ -201,8 +207,8 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
 SpeakerIcon.displayName = "SpeakerIcon";
 
 // Speaker dims helper — returns physical dimensions for a model key
-export function getSpeakerDims(modelName) {
-  const meta = getSpeakerModelMeta(modelName);
+export function getSpeakerDims(modelName, tvPresetKey = null) {
+  const meta = getSpeakerModelMeta(modelName, tvPresetKey || null);
   return {
     widthM:    Number(meta?.widthM)    || 0.27,
     heightM:   Number(meta?.heightM)   || 0.27,
