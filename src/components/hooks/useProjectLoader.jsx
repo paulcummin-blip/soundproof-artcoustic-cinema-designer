@@ -255,6 +255,10 @@ appState, // Pass appState directly for setters
           showCavity: !!p?.show_cavity,
           speakerClearanceM: Number(p?.speaker_clearance_m) || 0.02,
           heightFromFloorM: typeof p?.screen_height_from_floor === "number" ? p.screen_height_from_floor : 0.5,
+
+          // CRITICAL: restore TV preset state
+          tvPresetKey: p?.tv_preset_key ?? null,
+          tvWidthMm: Number(p?.tv_width_mm) || null,
         };
         const loadedFrontSubsCfg = _parseMaybe(p?.front_subs_cfg ?? p?.frontSubsCfg, null);
         const loadedRearSubsCfg  = _parseMaybe(p?.rear_subs_cfg  ?? p?.rearSubsCfg,  null);
