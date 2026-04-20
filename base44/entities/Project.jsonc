@@ -1,0 +1,308 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Client name"
+    },
+    "project_status": {
+      "type": "string",
+      "description": "Lifecycle status: Live, Prospective, Lost, Completed",
+      "default": "Prospective"
+    },
+    "roomDims": {
+      "type": "string",
+      "description": "JSON string of room dimensions {widthM, lengthM, heightM}"
+    },
+    "room_length": {
+      "type": "number",
+      "description": "Room length in meters (legacy)"
+    },
+    "room_width": {
+      "type": "number",
+      "description": "Room width in meters (legacy)"
+    },
+    "room_height": {
+      "type": "number",
+      "description": "Room height in meters (legacy)"
+    },
+    "room_orientation": {
+      "type": "string",
+      "enum": [
+        "length_front",
+        "width_front"
+      ],
+      "default": "length_front"
+    },
+    "screen_wall": {
+      "type": "string",
+      "enum": [
+        "front",
+        "back",
+        "left",
+        "right"
+      ],
+      "default": "front"
+    },
+    "screen_size": {
+      "type": "number",
+      "description": "Screen width in inches",
+      "default": 120
+    },
+    "screen_height_from_floor": {
+      "type": "number",
+      "default": 0.5
+    },
+    "aspect_ratio": {
+      "type": "string",
+      "enum": [
+        "16:9",
+        "2.35:1"
+      ],
+      "default": "16:9"
+    },
+    "manual_dimensions": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, use manual screen width/height (meters)"
+    },
+    "manual_width_m": {
+      "type": "number",
+      "description": "Manual viewable width in meters"
+    },
+    "manual_height_m": {
+      "type": "number",
+      "description": "Manual viewable height in meters"
+    },
+    "viewing_level": {
+      "type": "string",
+      "enum": [
+        "level1",
+        "level2",
+        "level3",
+        "level4"
+      ],
+      "default": "level2"
+    },
+    "seating_positions": {
+      "type": "array",
+      "description": "Seating positions array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "row_spacing_m": {
+      "type": "number",
+      "default": 1.8,
+      "description": "Centre-to-centre spacing between seat rows in meters"
+    },
+    "seats_per_row_by_row": {
+      "type": "array",
+      "description": "Per-row seat counts array [3, 5, 2]",
+      "items": {
+        "type": "number"
+      }
+    },
+    "dolby_config": {
+      "type": "string",
+      "enum": [
+        "5.1",
+        "7.1",
+        "5.1.2",
+        "5.1.4",
+        "7.1.2",
+        "7.1.4",
+        "9.1.2",
+        "9.1.4",
+        "9.1.6",
+        "9.2.4",
+        "9.4.2",
+        "9.4.4",
+        "9.4.6"
+      ]
+    },
+    "selected_speakers": {
+      "type": "array",
+      "description": "Selected speakers array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "selected_speakers_by_role": {
+      "type": "object",
+      "description": "Speaker models by role for SPL handoff"
+    },
+    "spl_speaker_nodes": {
+      "type": "array",
+      "description": "Speaker placement nodes from SPL Calculator",
+      "items": {
+        "type": "object"
+      }
+    },
+    "room_elements": {
+      "type": "array",
+      "description": "Room elements array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "subwoofers": {
+      "type": "array",
+      "description": "Subwoofer config array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "target_spl": {
+      "type": "number",
+      "default": 85
+    },
+    "amplifier_power": {
+      "type": "number"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Project notes"
+    },
+    "show_zones": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether RP22 pads overlay is enabled"
+    },
+    "show_angles": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether angles overlay is enabled"
+    },
+    "screen_mount_mode": {
+      "type": "string",
+      "enum": [
+        "baffle",
+        "floating"
+      ],
+      "default": "baffle"
+    },
+    "float_depth_m": {
+      "type": "number",
+      "enum": [
+        0,
+        0.2,
+        0.3
+      ],
+      "default": 0
+    },
+    "show_screen_plane": {
+      "type": "boolean",
+      "default": false
+    },
+    "show_cavity": {
+      "type": "boolean",
+      "default": false
+    },
+    "speaker_clearance_m": {
+      "type": "number",
+      "default": 0.02,
+      "description": "Fixed screen\u2192speaker clearance (m)"
+    },
+    "seven_bed_layout_type": {
+      "type": "string",
+      "default": "rears",
+      "description": "7.x bed layout choice: rears or wides"
+    },
+    "overlays": {
+      "type": "object",
+      "description": "Overlay visibility flags"
+    },
+    "overhead_global_model": {
+      "type": "string",
+      "default": "architect-2-1",
+      "description": "Global overhead speaker model"
+    },
+    "overhead_front_override": {
+      "type": "string",
+      "description": "Front overhead position model override"
+    },
+    "overhead_mid_override": {
+      "type": "string",
+      "description": "Mid overhead position model override"
+    },
+    "overhead_rear_override": {
+      "type": "string",
+      "description": "Rear overhead position model override"
+    },
+    "use_front_global": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use global model for front overhead"
+    },
+    "use_mid_global": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use global model for mid overhead"
+    },
+    "use_rear_global": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use global model for rear overhead"
+    },
+    "screen_front_plane_m": {
+      "type": "number",
+      "description": "Screen front plane Y-coordinate in meters"
+    },
+    "lcr_aim_mode": {
+      "type": "string",
+      "description": "LCR speaker aim mode: flat or angled"
+    },
+    "enable_front_wides": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable front wide speakers for 7.x layouts"
+    },
+    "front_subs_cfg": {
+      "type": "object",
+      "description": "Front subwoofer configuration"
+    },
+    "rear_subs_cfg": {
+      "type": "object",
+      "description": "Rear subwoofer configuration"
+    },
+    "spl_config": {
+      "type": "object",
+      "description": "SPL configuration"
+    },
+    "tv_preset_key": {
+      "type": "string",
+      "description": "TV preset identifier (e.g. tv83)",
+      "nullable": true
+    },
+    "tv_width_mm": {
+      "type": "number",
+      "description": "Exact TV width in millimeters",
+      "nullable": true
+    },
+    "seating_block_offset": {
+      "type": "number",
+      "description": "Viewing distance offset in meters",
+      "default": 0
+    },
+    "mlp_basis": {
+      "type": "string",
+      "enum": [
+        "front",
+        "middle",
+        "back",
+        "all"
+      ],
+      "default": "middle",
+      "description": "Reference for MLP calculation"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
