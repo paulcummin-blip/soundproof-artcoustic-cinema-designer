@@ -353,6 +353,12 @@ appState, // Pass appState directly for setters
 
   const isHydratingRef = useRef(false); // Initialize with false
   const lastBootTargetRef = useRef("");
+  const autosaveProjectIdRef = useRef(null); // tracks which project the autosave timers belong to
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     // Update the ref whenever loadState changes
@@ -499,20 +505,26 @@ appState, // Pass appState directly for setters
       }, AUTOSAVE_INTERVAL_MS);
     }
 
-    // Cleanup: clear the interval and debounce for THIS project bucket when the effect
-    // re-runs (project switch, scratch transition) or the component unmounts.
-    // This prevents stale intervals from a previous effectiveProjectId continuing to
-    // call trySaveNow() — and therefore Project.update() and setAutosaveStatus() —
-    // against the wrong project or after the component is gone.
+    // Cleanup: only tear down timers when the project ID changes or the component unmounts.
+    // Normal payload-change re-runs must NOT cancel a pending debounce/interval —
+    // that was the root cause of the "stuck on pending changes" bug.
+    const capturedProjectId = effectiveProjectId;
+    autosaveProjectIdRef.current = capturedProjectId;
     return () => {
-      if (r.intervalId) {
-        clearInterval(r.intervalId);
-        r.intervalId = null;
+      const projectChanged = autosaveProjectIdRef.current !== capturedProjectId;
+      const unmounting = !isMountedRef.current;
+      if (projectChanged || unmounting) {
+        const rCleanup = globalThis[`__rdAutosaveRefs_${capturedProjectId}`];
+        if (rCleanup?.intervalId) {
+          clearInterval(rCleanup.intervalId);
+          rCleanup.intervalId = null;
+        }
+        if (rCleanup?.debounceId) {
+          clearTimeout(rCleanup.debounceId);
+          rCleanup.debounceId = null;
+        }
       }
-      if (r.debounceId) {
-        clearTimeout(r.debounceId);
-        r.debounceId = null;
-      }
+      // else: same project, normal payload-change re-run — leave timers alive
     };
   }, [
   projectIdState,
