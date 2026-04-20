@@ -129,7 +129,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   
   // Resolve tvPresetKey: prefer the prop (passed by caller), fall back to appState
   const appState = useAppState();
-  const resolvedTvPresetKey = tvPresetKey || appState?.screen?.tvPresetKey || null;
+  const resolvedTvPresetKey = appState?.screen?.tvPresetKey ?? tvPresetKey ?? null;
   
   // Get speaker metadata from registry — pass tvPresetKey so TV-linked models resolve correct width
   const modelMeta = getSpeakerModelMeta(model, resolvedTvPresetKey);
