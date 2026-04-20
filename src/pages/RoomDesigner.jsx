@@ -886,7 +886,7 @@ function RoomDesignerWithState() {
     if (typeof appState?.setSeatingBlockOffset === 'function') {
       appState.setSeatingBlockOffset(next);
     }
-  }, [appState]);
+  }, [seatingBlockOffsetSetterGuarded, appState?.setSeatingBlockOffset]);
 
   const setMlpBasisGuarded = useGuardedSetter(appState?.setMlpBasis, 'seating');
   const setRoomElementsGuarded = useGuardedSetter((next) => {
