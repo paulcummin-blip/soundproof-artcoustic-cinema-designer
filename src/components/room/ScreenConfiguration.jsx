@@ -263,7 +263,11 @@ export default function ScreenConfiguration(props) {
             <div className="space-y-2">
               <Label className="text-[#3E4349] font-medium text-sm">Viewing Width (inches)</Label>
               <Select
-                value={Number.isInteger(Number(screenData.visibleWidthInches ?? 100)) ? String(Number(screenData.visibleWidthInches ?? 100)) : Number(screenData.visibleWidthInches ?? 100).toFixed(2)}
+                value={(() => {
+                  const TV_KEY_TO_VAL = { tv65: "55.55", tv77: "67.36", tv83: "72.52", tv100: "87.80" };
+                  if (screenData.tvPresetKey && TV_KEY_TO_VAL[screenData.tvPresetKey]) return TV_KEY_TO_VAL[screenData.tvPresetKey];
+                  return Number.isInteger(Number(screenData.visibleWidthInches ?? 100)) ? String(Number(screenData.visibleWidthInches ?? 100)) : Number(screenData.visibleWidthInches ?? 100).toFixed(2);
+                })()}
                 onValueChange={(val) => {
                   const TV_PRESET_MAP = {
                     "tv65":  { label: 'TV 65"',  widthMm: 1411 },
@@ -300,12 +304,12 @@ export default function ScreenConfiguration(props) {
               >
                 <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A] h-10 hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
                   <SelectValue>
-                    {{
-                      "55.55": 'TV 65"',
-                      "67.36": 'TV 77"',
-                      "72.52": 'TV 83"',
-                      "87.80": 'TV 100"',
-                    }[String(screenData.visibleWidthInches ?? 100).match(/^\d+\.\d{2}$/) ? String(screenData.visibleWidthInches ?? 100) : Number(screenData.visibleWidthInches ?? 100).toFixed(2)] ?? `${String(screenData.visibleWidthInches ?? 100)}"`}
+                    {(() => {
+                      const TV_KEY_TO_LABEL = { tv65: 'TV 65"', tv77: 'TV 77"', tv83: 'TV 83"', tv100: 'TV 100"' };
+                      if (screenData.tvPresetKey && TV_KEY_TO_LABEL[screenData.tvPresetKey]) return TV_KEY_TO_LABEL[screenData.tvPresetKey];
+                      const valStr = Number(screenData.visibleWidthInches ?? 100).toFixed(2);
+                      return { "55.55": 'TV 65"', "67.36": 'TV 77"', "72.52": 'TV 83"', "87.80": 'TV 100"' }[valStr] ?? `${String(screenData.visibleWidthInches ?? 100)}"`;
+                    })()}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent 
