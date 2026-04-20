@@ -31,6 +31,7 @@ export default function RoomDesignerHeader({
   autosaveStatus,
   reloadProject,
   projectIdState,
+  activeProjectId,
   isProjectMode,
   onFreeUse,
   onNewProject,
@@ -40,9 +41,11 @@ export default function RoomDesignerHeader({
   const navigate = useNavigate();
   const [overwriteCandidate, setOverwriteCandidate] = useState(null); // { id, name }
 
+  const effectiveProjectId = activeProjectId || projectIdState || null;
+
   const handleRP22ReportClick = () => {
-    if (projectIdState) {
-      navigate(`/RP22Report?projectId=${projectIdState}`);
+    if (effectiveProjectId) {
+      navigate(`/RP22Report?projectId=${effectiveProjectId}`);
     }
   };
 
@@ -102,7 +105,7 @@ export default function RoomDesignerHeader({
             variant="secondary"
             className="font-semibold border-[#213428] text-[#213428]"
             onClick={handleRP22ReportClick}
-            disabled={!projectIdState || loadState.phase !== "loaded"}
+            disabled={!effectiveProjectId || loadState.phase !== "loaded"}
           >
             <FileText className="w-4 h-4 mr-2" />
             RP22 Report
