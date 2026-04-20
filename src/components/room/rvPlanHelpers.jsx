@@ -50,8 +50,8 @@ export const getCanonicalRoleGlobal = (role) => {
 };
 
 /** Get speaker dimensions with safe fallbacks */
-export function getSpeakerDims(roleOrModel) {
-  const meta = getSpeakerModelMeta(roleOrModel);
+export function getSpeakerDims(roleOrModel, tvPresetKey = null) {
+  const meta = getSpeakerModelMeta(roleOrModel, tvPresetKey || null);
   return {
     widthM:  meta?.widthM  ?? 0.200,
     heightM: meta?.heightM ?? 0.200,
