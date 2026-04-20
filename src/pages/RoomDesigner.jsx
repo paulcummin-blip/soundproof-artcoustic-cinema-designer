@@ -349,6 +349,12 @@ function RoomDesignerWithState() {
   const screenVisibleWidthInchesEffective = useMemo(() => {
     const s = stableScreen || _screen || appState?.screen || {};
 
+    // 0) TV preset is authoritative when present
+    const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
+    if (s?.tvPresetKey && TV_KEY_TO_INCHES[s.tvPresetKey]) {
+      return TV_KEY_TO_INCHES[s.tvPresetKey];
+    }
+
     // 1) Preferred: already in inches
     const vwi = Number(s?.visibleWidthInches);
     if (Number.isFinite(vwi) && vwi > 0) return vwi;
