@@ -101,7 +101,10 @@ export default function ScreenConfiguration(props) {
         };
       }
     } else {
-      const widthInches = Number(screenData.visibleWidthInches) || 100;
+      const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
+      const widthInches = (screenData.tvPresetKey && TV_KEY_TO_INCHES[screenData.tvPresetKey])
+        ? TV_KEY_TO_INCHES[screenData.tvPresetKey]
+        : (Number(screenData.visibleWidthInches) || 100);
       const aspectRatio = screenData.aspectRatio || "16:9";
       const [arW, arH] = aspectRatio.split(':').map(Number);
       const ratio = (arW && arH) ? arW / arH : 16 / 9;
@@ -111,7 +114,7 @@ export default function ScreenConfiguration(props) {
       
       return { widthM, heightM };
     }
-  }, [manualSize, screenData.visibleWidthInches, screenData.aspectRatio]);
+  }, [manualSize, screenData.visibleWidthInches, screenData.aspectRatio, screenData.tvPresetKey]);
 
   // Compute required front wall to screen distance based on actual speaker depths
   const requiredFrontWallToScreenM = useMemo(() => {
