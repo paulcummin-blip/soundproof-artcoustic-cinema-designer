@@ -1549,6 +1549,7 @@ function RoomDesignerWithState() {
         autosaveStatus={autosaveStatus}
         reloadProject={reloadProject}
         projectIdState={projectIdState}
+        activeProjectId={activeProjectId}
         isProjectMode={isProjectMode}
         onFreeUse={handleFreeUse}
         onNewProject={handleNewProject}
