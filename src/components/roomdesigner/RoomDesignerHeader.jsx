@@ -105,7 +105,7 @@ export default function RoomDesignerHeader({
             variant="secondary"
             className="font-semibold border-[#213428] text-[#213428]"
             onClick={handleRP22ReportClick}
-            disabled={!effectiveProjectId || loadState.phase !== "loaded"}
+            disabled={!effectiveProjectId}
           >
             <FileText className="w-4 h-4 mr-2" />
             RP22 Report
