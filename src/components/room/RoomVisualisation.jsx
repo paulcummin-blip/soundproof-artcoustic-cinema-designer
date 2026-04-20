@@ -207,8 +207,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const PLAN_TOP_PAD_PX = 60; // headroom for top dimension line + labels
   const BOTTOM_GUTTER_PX = 220; // ensures bottom speaker dimension lanes never clip
 
+  const tvPresetKey = screen?.tvPresetKey || null;
+
   const getModelDimsM = useCallback((modelName, orientation = "vertical") => {
-    const meta = getSpeakerModelMeta?.(modelName, orientation);
+    const meta = getSpeakerModelMeta?.(modelName, tvPresetKey || orientation);
     
     return {
       widthM:    Number(meta?.widthM)    || 0.27,
@@ -221,7 +223,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       impedance:             meta?.impedance || 8,
       sensitivity_dB_1w1m:   meta?.sensitivity_dB_1w1m || meta?.sensitivity || 87,
     };
-  }, []);
+  }, [tvPresetKey]);
 
   const getCanonicalRole = useCallback((role) => {
     const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
@@ -1529,8 +1531,8 @@ useEffect(() => {
 
       // Determine fixed X positions for both, even if only one exists for robustness
       // Use getSpeakerDims directly to get dimensions.
-      const dimsL = slSpeaker ? getSpeakerDims(slSpeaker.model) : { heightM: 0.2, depthM: 0.082 };
-      const dimsR = srSpeaker ? getSpeakerDims(srSpeaker.model) : { heightM: 0.2, depthM: 0.082 };
+      const dimsL = slSpeaker ? getSpeakerDims(slSpeaker.model, tvPresetKey) : { heightM: 0.2, depthM: 0.082 };
+      const dimsR = srSpeaker ? getSpeakerDims(srSpeaker.model, tvPresetKey) : { heightM: 0.2, depthM: 0.082 };
 
       const xL = fixedSideX(roomWidth, dimsL, 'L');
       const xR = fixedSideX(roomWidth, dimsR, 'R');
