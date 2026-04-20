@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { buildRowCenters, distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 
 /**
@@ -22,6 +22,10 @@ export function useSeatingRebuild({
   stableDimensions,
   _rowEarHeights,
 }) {
+  // Tracks the last structural signature that triggered a seat rebuild.
+  // Used to distinguish an offset-only rowCenters update from a real structural change.
+  const lastStructuralSigRef = useRef(null);
+
   // Helper: get ear height for a 1-based row index, falling back to step pattern
   const getRowZ = (rowIndex) => {
     const h = _rowEarHeights?.[rowIndex];
@@ -38,6 +42,17 @@ export function useSeatingRebuild({
 
     const userHasChangedSeatingSinceLoad =
       seatingConfigEpoch !== (seatingLoadedEpochRef?.current ?? 0);
+
+  // Structural signature: changes to this force a real seat rebuild.
+  // seatingBlockOffset is intentionally excluded — offset only moves the MLP/rowCenters
+  // but must NOT regenerate seat positions for a loaded project.
+  const structuralSig = JSON.stringify([
+    Array.isArray(_seatsPerRowByRow) ? _seatsPerRowByRow : [],
+    _seatingRows,
+    _seatsPerRow,
+    _seatSpacing,
+    _rowSpacingM,
+  ]);
 
     const isScratch = loadState?.phase === "scratch" && !hasProjectId;
 
@@ -155,6 +170,24 @@ export function useSeatingRebuild({
       return;
     }
 
+    // OFFSET GUARD: for a loaded project where the user HAS changed seating,
+    // only allow a full rebuild when the structural config actually changed
+    // (rows / seats-per-row / spacing). A pure offset change only moves rowCentersM
+    // via the MLP effect in RoomDesigner — it must NOT trigger a seat position rebuild.
+    if (
+      isLoadedProject &&
+      currentSeats.length > 0 &&
+      userHasChangedSeatingSinceLoad &&
+      !didUserRequestResetRef.current &&
+      !(appState?.roomResetEpoch > 0) &&
+      lastStructuralSigRef.current !== null &&
+      lastStructuralSigRef.current === structuralSig
+    ) {
+      // Structural config is unchanged — this re-run was caused by rowCentersM updating
+      // due to an offset change. Preserve current seats.
+      return;
+    }
+
     const setSeats = appState?.setSeatingPositions;
     if (typeof setSeats !== 'function') return;
 
@@ -240,7 +273,8 @@ export function useSeatingRebuild({
       }
     });
 
-    // 5) Commit to app state
+    // 5) Commit to app state — stamp structural sig so offset-only reruns are blocked
+    lastStructuralSigRef.current = structuralSig;
     setSeats(seats);
 
     if (globalThis.__B44_LOGS) console.log(
