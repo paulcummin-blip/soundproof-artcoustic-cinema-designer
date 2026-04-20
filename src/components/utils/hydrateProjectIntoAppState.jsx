@@ -98,10 +98,14 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   // 2) SCREEN
   const screenSizeInches = Number(p?.screen_size) || 120;
   const aspectRatio = p?.aspect_ratio || "16:9";
+  const hasTvPreset = !!p?.tv_preset_key;
   if (typeof setScreen === "function") {
     setScreen((prev) => ({
       ...prev,
-      visibleWidthInches: screenSizeInches,
+      // When a TV preset is saved, do not overwrite visibleWidthInches with the stale
+      // numeric screen_size value — the TV preset width map is the authority.
+      // For projector/manual projects (no tv_preset_key), always restore screen_size.
+      ...(!hasTvPreset ? { visibleWidthInches: screenSizeInches } : {}),
       aspectRatio,
       manualMode: !!p?.manual_dimensions,
       manualWidthM: Number(p?.manual_width_m) || 0,
