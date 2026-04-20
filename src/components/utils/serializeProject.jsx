@@ -169,6 +169,8 @@ export function serializeProject(input = {}) {
     show_cavity: showCavity,
     speaker_clearance_m: speakerClearanceM,
     screen_front_plane_m: Number(screenFrontPlaneM) || 0,
+    tv_preset_key: screen?.tvPresetKey ?? null,
+    tv_width_mm: Number(screen?.tvWidthMm) || null,
 
     // Seating & layout
     seating_positions: asArray(seatingPositions),

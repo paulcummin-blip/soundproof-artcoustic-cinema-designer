@@ -112,6 +112,8 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       showCavity: !!p?.show_cavity,
       speakerClearanceM: Number(p?.speaker_clearance_m) || 0.02,
       heightFromFloorM: typeof p?.screen_height_from_floor === "number" ? p.screen_height_from_floor : 0.5,
+      tvPresetKey: p?.tv_preset_key ?? null,
+      tvWidthMm: Number(p?.tv_width_mm) || null,
     }));
   }
 
