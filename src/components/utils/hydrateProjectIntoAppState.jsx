@@ -118,6 +118,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       heightFromFloorM: typeof p?.screen_height_from_floor === "number" ? p.screen_height_from_floor : 0.5,
       tvPresetKey: p?.tv_preset_key ?? null,
       tvWidthMm: Number(p?.tv_width_mm) || null,
+      borderThicknessM: Number(p?.border_thickness_m) || 0.08,
     }));
   }
 

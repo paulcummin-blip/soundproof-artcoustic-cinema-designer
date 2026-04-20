@@ -171,6 +171,7 @@ export function serializeProject(input = {}) {
     screen_front_plane_m: Number(screenFrontPlaneM) || 0,
     tv_preset_key: screen?.tvPresetKey ?? null,
     tv_width_mm: Number(screen?.tvWidthMm) || null,
+    border_thickness_m: Number(screen?.borderThicknessM) || 0.08,
 
     // Seating & layout
     seating_positions: asArray(seatingPositions),

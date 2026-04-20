@@ -300,6 +300,11 @@
       ],
       "default": "middle",
       "description": "Reference for MLP calculation"
+    },
+    "border_thickness_m": {
+      "type": "number",
+      "description": "Screen border thickness in meters",
+      "default": 0.08
     }
   },
   "required": [
