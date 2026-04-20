@@ -50,7 +50,7 @@ export default function RvSpeakerLayer({
 
         const speakerMeta = getSpeakerModelMeta(speaker.model, tvPresetKey || undefined);
         const { widthM: metaWidthM, depthM: speakerDepthM } = speakerMeta?.notFound
-          ? getSpeakerDims(speaker.model)
+          ? getSpeakerDims(speaker.model, tvPresetKey || null)
           : speakerMeta;
 
         const speakerWidthM = metaWidthM;
@@ -157,6 +157,7 @@ export default function RvSpeakerLayer({
               onIconEnter={handleIconEnter}
               onIconMove={handleIconMove}
               onIconLeave={handleIconLeave}
+              tvPresetKey={tvPresetKey}
             />
           </g>
         );
