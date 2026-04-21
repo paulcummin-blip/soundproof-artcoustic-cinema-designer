@@ -1273,30 +1273,43 @@ function RP22ReportInner() {
                                             const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;
                                             const fmtCm = (m) => `${Math.round(m * 100)}`;
 
-                                            // Per-row geometry — prefer sightlineRowData (already computed with projector context),
-                                            // fall back to building from rowCentralSeats when sightline data is not available.
-                                            const screenFrontM = app?.screenFrontPlaneM ?? null;
-                                            const rowGeo = sightlineRowData.length > 0
-                                                ? sightlineRowData
-                                                : rowCentralSeats.map(seat => {
-                                                    const eyeY = seat.y;
-                                                    const eyeZ = Number.isFinite(seat.z) ? seat.z : 1.2;
-                                                    const screenY = Number.isFinite(screenFrontM) ? screenFrontM : 0;
-                                                    const dist = Math.abs(eyeY - screenY);
-                                                    const scrW = viewWm || 0;
-                                                    const scrH = viewHm || 0;
-                                                    const scrBottom = Number(app?.screen?.heightFromFloorM ?? app?.screenHeight ?? 0.5);
-                                                    const scrTop = scrBottom + scrH;
-                                                    const hAngle = dist > 0 ? 2 * Math.atan((scrW / 2) / dist) * (180 / Math.PI) : 0;
-                                                    const vTop = dist > 0 ? Math.atan2(scrTop - eyeZ, dist) * (180 / Math.PI) : 0;
-                                                    const vBot = dist > 0 ? Math.atan2(scrBottom - eyeZ, dist) * (180 / Math.PI) : 0;
-                                                    return {
-                                                        rowNumber: seat.rowNumber || 1,
-                                                        viewingDistanceM: dist,
-                                                        horizontalViewingAngleDeg: hAngle,
-                                                        totalVerticalAngleDeg: vTop - vBot,
-                                                    };
-                                                    });
+                                            // Per-row geometry — use the same viewer source as the live Room Designer panel:
+                                            // app?.mlp (green-dot / MLP position) for Row 1, then fall back to rowCentralSeats
+                                            // for additional rows. This matches ViewingAnglePanel's effectiveViewerY logic.
+                                            const screenFrontM = app?.screenFrontPlaneM ?? 0;
+                                            const screenY = Number.isFinite(screenFrontM) ? screenFrontM : 0;
+                                            const scrW = viewWm || 0;
+                                            const scrH = viewHm || 0;
+                                            const scrBottom = Number(app?.screen?.heightFromFloorM ?? app?.screenHeight ?? 0.5);
+                                            const scrTop = scrBottom + scrH;
+                                            const buildRowGeoEntry = (eyeY, eyeZ, rowNumber) => {
+                                                const dist = Math.abs(eyeY - screenY);
+                                                const hAngle = dist > 0 ? 2 * Math.atan((scrW / 2) / dist) * (180 / Math.PI) : 0;
+                                                const vTop = dist > 0 ? Math.atan2(scrTop - eyeZ, dist) * (180 / Math.PI) : 0;
+                                                const vBot = dist > 0 ? Math.atan2(scrBottom - eyeZ, dist) * (180 / Math.PI) : 0;
+                                                return { rowNumber, viewingDistanceM: dist, horizontalViewingAngleDeg: hAngle, totalVerticalAngleDeg: vTop - vBot };
+                                            };
+                                            const mlpPoint = app?.mlp;
+                                            const rowGeo = (() => {
+                                                // Row 1: always use MLP / green-dot position (same as live panel)
+                                                const row1Entry = (() => {
+                                                    if (mlpPoint && Number.isFinite(mlpPoint.y)) {
+                                                        const eyeZ = Number.isFinite(mlpPoint.z) ? mlpPoint.z : 1.2;
+                                                        return buildRowGeoEntry(mlpPoint.y, eyeZ, 1);
+                                                    }
+                                                    // No MLP available — fall back to primary seat of row 1
+                                                    const row1Seat = rowCentralSeats.find(s => (s.rowNumber || 1) === 1);
+                                                    if (row1Seat && Number.isFinite(row1Seat.y)) {
+                                                        return buildRowGeoEntry(row1Seat.y, Number.isFinite(row1Seat.z) ? row1Seat.z : 1.2, 1);
+                                                    }
+                                                    return null;
+                                                })();
+                                                // Rows 2+: use rowCentralSeats for the representative seat
+                                                const additionalRows = rowCentralSeats
+                                                    .filter(s => (s.rowNumber || 1) > 1)
+                                                    .map(seat => buildRowGeoEntry(seat.y, Number.isFinite(seat.z) ? seat.z : 1.2, seat.rowNumber || 1));
+                                                return [row1Entry, ...additionalRows].filter(Boolean);
+                                            })();
 
                                             return (
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: '8mm', rowGap: '4mm' }}>
