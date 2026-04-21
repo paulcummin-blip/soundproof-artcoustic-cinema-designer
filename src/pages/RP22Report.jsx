@@ -488,7 +488,15 @@ function RP22ReportInner() {
     };
 
     const formatScreenChoiceLabel = (scr) => {
-        const inches = Number(scr?.visibleWidthInches || scr?.diagonalInches || scr?.sizeInches);
+        const TV_PRESET_WIDTH_MM = { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 };
+        const tvKey = scr?.tvPresetKey;
+        const tvMm = Number(scr?.tvWidthMm);
+        const resolvedIn = (() => {
+            if (tvKey && TV_PRESET_WIDTH_MM[tvKey]) return TV_PRESET_WIDTH_MM[tvKey] / 25.4;
+            if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
+            return Number(scr?.visibleWidthInches || scr?.diagonalInches || scr?.sizeInches) || 0;
+        })();
+        const inches = resolvedIn;
         const ratio = cleanAspectLabel(scr?.aspectRatio);
         const inchesTxt = Number.isFinite(inches) && inches > 0 ? `${Math.round(inches)}"` : "";
         const ratioTxt = ratio ? ratio : "";
@@ -513,12 +521,21 @@ function RP22ReportInner() {
     // Used by ReportHeader to snapshot metrics at print time.
     const resolveScreenMetricsSnapshot = React.useCallback(() => {
         try {
-            const visibleWidthInches = Number(app?.screen?.visibleWidthInches);
+            const TV_PRESET_WIDTH_MM = { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 };
+            const tvKey = app?.screen?.tvPresetKey;
+            const tvMm = Number(app?.screen?.tvWidthMm);
+            const resolvedWidthIn = (() => {
+                if (tvKey && TV_PRESET_WIDTH_MM[tvKey]) return TV_PRESET_WIDTH_MM[tvKey] / 25.4;
+                if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
+                return Number(app?.screen?.visibleWidthInches) || 0;
+            })();
             const aspectRatio = app?.screen?.aspectRatio || "16:9";
-            if (!Number.isFinite(visibleWidthInches) || visibleWidthInches <= 0) {
+            const rawBorder = Number(app?.screen?.borderThicknessM);
+            const borderThicknessM = Number.isFinite(rawBorder) && rawBorder >= 0 ? rawBorder : 0.08;
+            if (resolvedWidthIn <= 0) {
                 return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, wallDistM: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
             }
-            const { viewWm, viewHm, overallWm, overallHm } = computeScreenMetrics(visibleWidthInches, aspectRatio);
+            const { viewWm, viewHm, overallWm, overallHm } = computeScreenMetrics(resolvedWidthIn, aspectRatio, borderThicknessM);
             const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
             return {
                 ok: true, viewWm, viewHm, overallWm, overallHm,
@@ -1233,12 +1250,25 @@ function RP22ReportInner() {
                                     <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
                                         <div style={coverBoxTitleStyle}>Screen &amp; Viewing Geometry</div>
                                         {(() => {
-                                            // Screen dims — always from live screen object, never from a stale snapshot
-                                            const liveWidthIn = Number(app?.screen?.visibleWidthInches);
+                                            // Screen dims — resolve width from TV preset first, then fall back to visibleWidthInches
+                                            const TV_PRESET_WIDTH_MM = { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 };
+                                            const tvPresetKey = app?.screen?.tvPresetKey;
+                                            const tvWidthMm = Number(app?.screen?.tvWidthMm);
+                                            const resolvedWidthIn = (() => {
+                                               if (tvPresetKey && TV_PRESET_WIDTH_MM[tvPresetKey]) {
+                                                   return TV_PRESET_WIDTH_MM[tvPresetKey] / 25.4;
+                                               }
+                                               if (Number.isFinite(tvWidthMm) && tvWidthMm > 0) {
+                                                   return tvWidthMm / 25.4;
+                                               }
+                                               return Number(app?.screen?.visibleWidthInches) || 0;
+                                            })();
                                             const liveAspect = app?.screen?.aspectRatio || "16:9";
-                                            const { viewWm, viewHm, overallWm, overallHm } = (Number.isFinite(liveWidthIn) && liveWidthIn > 0)
-                                                ? computeScreenMetrics(liveWidthIn, liveAspect)
-                                                : { viewWm: null, viewHm: null, overallWm: null, overallHm: null };
+                                            const liveBorderM = Number(app?.screen?.borderThicknessM);
+                                            const borderThicknessM = Number.isFinite(liveBorderM) && liveBorderM >= 0 ? liveBorderM : 0.08;
+                                            const { viewWm, viewHm, overallWm, overallHm } = (resolvedWidthIn > 0)
+                                               ? computeScreenMetrics(resolvedWidthIn, liveAspect, borderThicknessM)
+                                               : { viewWm: null, viewHm: null, overallWm: null, overallHm: null };
                                             const choiceLabel = formatScreenChoiceLabel(app?.screen) || "Not specified";
                                             const hasViewable = Number.isFinite(viewWm) && viewWm > 0 && Number.isFinite(viewHm) && viewHm > 0;
                                             const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;

@@ -16,11 +16,13 @@ export function aspectHeight(widthM, aspect) {
   return aspect === "16:9" ? widthM * 9 / 16 : widthM / 2.35;
 }
 
-export function computeScreenMetrics(widthIn, aspect) {
+export function computeScreenMetrics(widthIn, aspect, borderThicknessM) {
   const viewWm = (Number(widthIn) || 0) * M_PER_IN;
   const viewHm = aspectHeight(viewWm, aspect);
-  const overallWm = viewWm + 0.16; // +8cm each side
-  const overallHm = viewHm + 0.16;
+  // borderThicknessM is per-side; default 0.08 m (8 cm) for projector screens
+  const border = Number.isFinite(Number(borderThicknessM)) ? Number(borderThicknessM) : 0.08;
+  const overallWm = viewWm + border * 2;
+  const overallHm = viewHm + border * 2;
 
   // RP23 57.5° FOV distance calculation
   const distance57 = (viewWm / 2) / Math.tan(toRad(RP23.defaultFovDeg / 2));
