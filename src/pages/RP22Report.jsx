@@ -1103,12 +1103,28 @@ function RP22ReportInner() {
                                     if (!rowMap[rowNum]) rowMap[rowNum] = [];
                                     rowMap[rowNum].push(s);
                                 });
+                                const mlpPoint = app?.mlp;
                                 const rp23Rows = Object.keys(rowMap).map(Number).sort((a, b) => a - b).map(rowNum => {
-                                    const rowSeats = rowMap[rowNum];
-                                    const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
-                                    const snap = reportSeatHudById?.[primary?.id];
-                                    return { rowNum, rp23: snap?.rp23 || null };
-                                }).filter(r => r.rp23);
+                                                    const rowSeats = rowMap[rowNum];
+                                                    let snap = null;
+                                                    if (rowNum === 1 && mlpPoint && Number.isFinite(mlpPoint.y)) {
+                                                        // Row 1: use the seat closest to the MLP / green-dot (same source as live panel)
+                                                        let minDist = Infinity;
+                                                        let closestSeat = null;
+                                                        rowSeats.forEach(s => {
+                                                            if (!Number.isFinite(s?.y)) return;
+                                                            const d = Math.abs(s.y - mlpPoint.y);
+                                                            if (d < minDist) { minDist = d; closestSeat = s; }
+                                                        });
+                                                        snap = closestSeat ? reportSeatHudById?.[closestSeat.id] : null;
+                                                    }
+                                                    if (!snap) {
+                                                        // Rows 2+, or Row 1 fallback: use isPrimary or middle seat
+                                                        const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
+                                                        snap = reportSeatHudById?.[primary?.id];
+                                                    }
+                                                    return { rowNum, rp23: snap?.rp23 || null };
+                                                }).filter(r => r.rp23);
                                 return (
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                                         {/* ── Report assumptions block — 2 cols ── */}
