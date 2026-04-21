@@ -342,8 +342,10 @@ function RoomDesignerWithState() {
     heightFromFloorM: Number(_screen?.heightFromFloorM) || 0.5,
     manualMode: _screen?.manualMode || false,
     manualWidthM: Number(_screen?.manualWidthM) || 0,
-    manualHeightM: Number(_screen?.manualHeightM) || 0
-  }), [_screen?.visibleWidthInches, _screen?.aspectRatio, _screen?.floatDepthM, _screen?.heightFromFloorM, _screen?.manualMode, _screen?.manualWidthM, _screen?.manualHeightM, _screen?.mountMode]);
+    manualHeightM: Number(_screen?.manualHeightM) || 0,
+    tvPresetKey: _screen?.tvPresetKey || null,
+    tvWidthMm: Number(_screen?.tvWidthMm) || null,
+  }), [_screen?.visibleWidthInches, _screen?.aspectRatio, _screen?.floatDepthM, _screen?.heightFromFloorM, _screen?.manualMode, _screen?.manualWidthM, _screen?.manualHeightM, _screen?.mountMode, _screen?.tvPresetKey, _screen?.tvWidthMm]);
 
   // --- Screen width used for MLP + row centres (must be available even if Screen Size panel was never opened) ---
   const screenVisibleWidthInchesEffective = useMemo(() => {
