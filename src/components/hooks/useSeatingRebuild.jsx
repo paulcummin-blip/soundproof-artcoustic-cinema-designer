@@ -31,9 +31,7 @@ export function useSeatingRebuild({
   };
   useEffect(() => {
     // CRITICAL: Wait for autosave hydration AND project hydration to be fully ready
-    if (!appState?.isHydrated) return;
-    // Also block during active project load (prevents regenerating seats before hydrateFromProject completes)
-    if (loadState?.phase === "loading" || loadState?.phase === "idle") return;
+    if (!appState?.isHydrated || !appState?.isProjectHydrationReady) return;
 
     const currentSeats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
     const hasProjectId = resolvedProjectId || projectIdState;
