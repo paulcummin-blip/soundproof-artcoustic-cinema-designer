@@ -488,15 +488,14 @@ function RP22ReportInner() {
     };
 
     const formatScreenChoiceLabel = (scr) => {
-        const TV_PRESET_WIDTH_MM = { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 };
+        const TV_PRESET_LABELS = { tv65: 'TV 65"', tv77: 'TV 77"', tv83: 'TV 83"', tv100: 'TV 100"' };
         const tvKey = scr?.tvPresetKey;
+        if (tvKey && TV_PRESET_LABELS[tvKey]) return TV_PRESET_LABELS[tvKey];
+        // For non-TV screens: derive inches from tvWidthMm fallback or visibleWidthInches
         const tvMm = Number(scr?.tvWidthMm);
-        const resolvedIn = (() => {
-            if (tvKey && TV_PRESET_WIDTH_MM[tvKey]) return TV_PRESET_WIDTH_MM[tvKey] / 25.4;
-            if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
-            return Number(scr?.visibleWidthInches || scr?.diagonalInches || scr?.sizeInches) || 0;
-        })();
-        const inches = resolvedIn;
+        const inches = Number.isFinite(tvMm) && tvMm > 0
+            ? tvMm / 25.4
+            : Number(scr?.visibleWidthInches || scr?.diagonalInches || scr?.sizeInches) || 0;
         const ratio = cleanAspectLabel(scr?.aspectRatio);
         const inchesTxt = Number.isFinite(inches) && inches > 0 ? `${Math.round(inches)}"` : "";
         const ratioTxt = ratio ? ratio : "";
@@ -1291,15 +1290,11 @@ function RP22ReportInner() {
                                                     const hAngle = dist > 0 ? 2 * Math.atan((scrW / 2) / dist) * (180 / Math.PI) : 0;
                                                     const vTop = dist > 0 ? Math.atan2(scrTop - eyeZ, dist) * (180 / Math.PI) : 0;
                                                     const vBot = dist > 0 ? Math.atan2(scrBottom - eyeZ, dist) * (180 / Math.PI) : 0;
-                                                    const fbSeatHud = reportSeatHudById?.[seat.id];
-                                                    const fbRp23 = fbSeatHud?.rp23;
                                                     return {
                                                         rowNumber: seat.rowNumber || 1,
                                                         viewingDistanceM: dist,
                                                         horizontalViewingAngleDeg: hAngle,
                                                         totalVerticalAngleDeg: vTop - vBot,
-                                                        rp23Level: fbRp23?.level ?? null,
-                                                        rp23Formatted: fbRp23?.formatted ?? null,
                                                     };
                                                     });
 
@@ -1324,35 +1319,43 @@ function RP22ReportInner() {
                                                             <div>
                                                                 <div style={{ display: 'grid', rowGap: '3mm' }}>
                                                                     {rowGeo.map(row => {
-                                                                        const rp23AngleStr = row.rp23Formatted
-                                                                            || (Number.isFinite(row.horizontalViewingAngleDeg) ? `${row.horizontalViewingAngleDeg.toFixed(1)}°` : '—');
-                                                                        return (
-                                                                            <div key={row.rowNumber} style={{ paddingBottom: '2mm', borderBottom: '1px solid #F0EFEA', display: 'grid', gridTemplateColumns: '1fr auto', columnGap: '6mm', alignItems: 'start' }}>
-                                                                                {/* Left: existing geometry values */}
-                                                                                <div>
-                                                                                    <div style={{ ...coverLabelStyle, marginBottom: '1.5mm' }}>Row {row.rowNumber}</div>
-                                                                                    <div style={coverLabelValueRowStyle}>
-                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Horizontal angle</div>
-                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.horizontalViewingAngleDeg) ? `${row.horizontalViewingAngleDeg.toFixed(1)}°` : '—'}</div>
-                                                                                    </div>
-                                                                                    <div style={coverLabelValueRowStyle}>
-                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Vertical angle</div>
-                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.totalVerticalAngleDeg) ? `${row.totalVerticalAngleDeg.toFixed(1)}°` : '—'}</div>
-                                                                                    </div>
-                                                                                    <div style={coverLabelValueRowStyle}>
-                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Distance from wall</div>
-                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.viewingDistanceM) ? `${Math.round(row.viewingDistanceM * 100)} cm` : '—'}</div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                {/* Right: RP23 block */}
-                                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '28mm' }}>
-                                                                                    <div style={{ fontSize: '8pt', fontWeight: 600, color: '#625143', marginBottom: '2mm', textAlign: 'center', whiteSpace: 'nowrap' }}>RP23 viewing angle</div>
-                                                                                    <div style={{ fontSize: '10pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '2mm', textAlign: 'center' }}>{rp23AngleStr}</div>
-                                                                                    <PrintRp23Pill level={row.rp23Level} />
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
+                                                                                        const hDeg = row.horizontalViewingAngleDeg;
+                                                                                        const rp23AngleStr = Number.isFinite(hDeg) ? `${hDeg.toFixed(1)}°` : '—';
+                                                                                        const rp23Level = (() => {
+                                                                                            if (!Number.isFinite(hDeg)) return null;
+                                                                                            if (hDeg >= 50 && hDeg <= 65) return 'L4';
+                                                                                            if (hDeg >= 45 && hDeg <= 70) return 'L3';
+                                                                                            if (hDeg >= 40 && hDeg <= 80) return 'L2';
+                                                                                            if (hDeg >= 33 && hDeg <= 90) return 'L1';
+                                                                                            return null;
+                                                                                        })();
+                                                                                        return (
+                                                                                            <div key={row.rowNumber} style={{ paddingBottom: '2mm', borderBottom: '1px solid #F0EFEA', display: 'grid', gridTemplateColumns: '1fr auto', columnGap: '6mm', alignItems: 'start' }}>
+                                                                                                {/* Left: existing geometry values */}
+                                                                                                <div>
+                                                                                                    <div style={{ ...coverLabelStyle, marginBottom: '1.5mm' }}>Row {row.rowNumber}</div>
+                                                                                                    <div style={coverLabelValueRowStyle}>
+                                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Horizontal angle</div>
+                                                                                                        <div style={coverValueStyle}>{rp23AngleStr}</div>
+                                                                                                    </div>
+                                                                                                    <div style={coverLabelValueRowStyle}>
+                                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Vertical angle</div>
+                                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.totalVerticalAngleDeg) ? `${row.totalVerticalAngleDeg.toFixed(1)}°` : '—'}</div>
+                                                                                                    </div>
+                                                                                                    <div style={coverLabelValueRowStyle}>
+                                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Distance from wall</div>
+                                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.viewingDistanceM) ? `${Math.round(row.viewingDistanceM * 100)} cm` : '—'}</div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                {/* Right: RP23 block */}
+                                                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '28mm' }}>
+                                                                                                    <div style={{ fontSize: '8pt', fontWeight: 600, color: '#625143', marginBottom: '2mm', textAlign: 'center', whiteSpace: 'nowrap' }}>RP23 viewing angle</div>
+                                                                                                    <div style={{ fontSize: '10pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '2mm', textAlign: 'center' }}>{rp23AngleStr}</div>
+                                                                                                    <PrintRp23Pill level={rp23Level} />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
                                                                 </div>
                                                                 {/* RP23 reference ranges */}
                                                                 <div style={{ marginTop: '4mm', paddingTop: '3mm', borderTop: '1px solid #E8E6E1', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontSize: '9pt', color: '#6F6B64' }}>
