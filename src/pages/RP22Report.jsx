@@ -347,6 +347,17 @@ function RP22ReportInner() {
                 setFrontSubsCfg: app.setFrontSubsCfg,
                 setRearSubsCfg: app.setRearSubsCfg,
                 setSpeakerSystem: app.setSpeakerSystem,
+                setSeatingRows: app.setSeatingRows,
+                setSeatsPerRow: app.setSeatsPerRow,
+                setSeatSpacing: app.setSeatSpacing,
+                setMlpBasis: app.setMlpBasis,
+                setSeatingBlockOffset: app.setSeatingBlockOffset,
+                setRowEarHeights: app.setRowEarHeights,
+                setSelectedSpeakersByRole: app.setSelectedSpeakersByRole,
+                setSpeakerNodes: app.setSpeakerNodes,
+                setGlobalSurroundModel: app.setGlobalSurroundModel,
+                setExtraSurroundCount: app.setExtraSurroundCount,
+                setFreeMoveLcr: app.setFreeMoveLcr,
             });
             setReportReadyProjectId(p.id);
             setReportHydrating(false);
