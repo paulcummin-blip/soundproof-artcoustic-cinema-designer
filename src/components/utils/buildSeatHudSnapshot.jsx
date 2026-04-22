@@ -251,11 +251,9 @@ export function buildSeatHudSnapshot({
     );
 
     const worst = data.rp22.p9.details.worst;
-    if (worst) {
-      data.rp22.p9Detail = `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°)`;
-    } else {
-      data.rp22.p9Detail = lines.join(', ');
-    }
+    data.rp22.p9.debugText = worst
+      ? `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°)`
+      : lines.join(', ');
   }
 
   // P9: Set N/A if no overheads
