@@ -1228,6 +1228,7 @@ function RP22ReportInner() {
                 <div className="print-root">
                     <div className="print-container rp22-report">
                         <section id="pdf-cover">
+                            {/* ── Page 1: Logo + title + RP22/RP23 explanations ── */}
                             <div className="print-page-break-after print-summary">
                                 <div style={{ maxWidth: '185mm', margin: '0 auto 0 auto', textAlign: 'center' }}>
                                     <img
@@ -1235,13 +1236,28 @@ function RP22ReportInner() {
                                         alt="SoundProof"
                                         style={{ width: "100%", height: "auto", marginBottom: "8mm" }}
                                     />
-
-                                    <div style={{ fontSize: '26pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.2, marginBottom: '3mm' }}>
+                                    <div style={{ fontSize: '26pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.2, marginBottom: '8mm' }}>
                                         RP22 Compliance Report
                                     </div>
-
                                 </div>
+                                {/* RP22 explanation */}
+                                <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '6mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '9pt', color: '#3E4349', lineHeight: 1.6, textAlign: 'left' }}>
+                                    <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '9pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
+                                    <div><strong>Level 1</strong> – The minimum level of performance necessary to convey basic artistic intent.</div>
+                                    <div><strong>Level 2</strong> – A higher level of performance that more accurately conveys artistic intent.</div>
+                                    <div><strong>Level 3</strong> – Meets or exceeds reference commercial cinema exhibition standards.</div>
+                                    <div><strong>Level 4</strong> – The maximum level of achievable performance across every parameter.</div>
+                                    <div style={{ marginTop: '2mm' }}>Performance levels apply to both individual seating positions as well as the room, with parameters therein attributed to one or the other.</div>
+                                </div>
+                                {/* RP23 explanation */}
+                                <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '6mm', paddingTop: '6mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '9pt', color: '#3E4349', lineHeight: 1.6, textAlign: 'left' }}>
+                                    <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '9pt' }}>RP23 - Image Performance</div>
+                                    <div>CEDIA's forthcoming RP23 document will address best practice for image. Currently, we only have the size of the images based on the horizontal viewing angle, and the brightness which is known.</div>
+                                </div>
+                            </div>
 
+                            {/* ── Page 2: Project details, geometry, system summary, counts ── */}
+                            <div className="print-page-break-after print-summary">
                                 <div className="rp22-cover-stack" style={{ maxWidth: '185mm', margin: '0 auto 0', display: 'flex', flexDirection: 'column', gap: '2mm' }}>
                                     <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '0', textAlign: 'left' }}>
                                         <ProjectDetailsCard
@@ -1404,22 +1420,33 @@ function RP22ReportInner() {
                                     </div>
 
                                     {/* System Summary */}
-                                    <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
-                                        <div style={coverBoxTitleStyle}>System summary</div>
-                                        <div style={coverBoxSubtitleStyle}>Selected loudspeaker models</div>
-                                        <div style={{ display: 'grid', rowGap: '4mm' }}>
-                                            {[['LCR', systemSummary.lcr], ['Surrounds', systemSummary.surrounds], ['Overheads', systemSummary.overheads], ['Subwoofers', systemSummary.subs]].map(([label, models], i, arr) => (
-                                                <div key={label} style={{ display: 'grid', gridTemplateColumns: '32mm 1fr', columnGap: '6mm', alignItems: 'start', paddingBottom: i < arr.length - 1 ? '4mm' : 0, borderBottom: i < arr.length - 1 ? '1px solid #EEEAE3' : 'none' }}>
-                                                    <div style={{ fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A', lineHeight: 1.3 }}>{label}</div>
-                                                    <div style={{ fontSize: '11.5pt', color: '#3E4349', lineHeight: 1.3 }}>{models.join(', ')}</div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                     <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
+                                         <div style={coverBoxTitleStyle}>System summary</div>
+                                         <div style={coverBoxSubtitleStyle}>Selected loudspeaker models</div>
+                                         <div style={{ display: 'grid', rowGap: '4mm' }}>
+                                             {[['LCR', systemSummary.lcr], ['Surrounds', systemSummary.surrounds], ['Overheads', systemSummary.overheads], ['Subwoofers', systemSummary.subs]].map(([label, models], i, arr) => (
+                                                 <div key={label} style={{ display: 'grid', gridTemplateColumns: '32mm 1fr', columnGap: '6mm', alignItems: 'start', paddingBottom: i < arr.length - 1 ? '4mm' : 0, borderBottom: i < arr.length - 1 ? '1px solid #EEEAE3' : 'none' }}>
+                                                     <div style={{ fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A', lineHeight: 1.3 }}>{label}</div>
+                                                     <div style={{ fontSize: '11.5pt', color: '#3E4349', lineHeight: 1.3 }}>{models.join(', ')}</div>
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+
                                     </div>
 
-                                </div>
-                            </div>
-                        </section>
+                                    {/* ReportCountsDashboard at bottom of project/summary page */}
+                                    <div style={{ maxWidth: '185mm', margin: '4mm auto 0', paddingTop: '4mm' }}>
+                                     <ReportCountsDashboard
+                                         roomLevelCounts={roomLevelCounts}
+                                         seatCountsByRow={seatCountsByRow}
+                                         analysisResult={analysisResult}
+                                         totalRoomParameters={roomScopedParamCount}
+                                         totalSeatParameters={seatScopedParamCount}
+                                     />
+                                    </div>
+                                    </div>
+                                    </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
                             <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
@@ -1440,17 +1467,8 @@ function RP22ReportInner() {
                         )}
 
                         <section id="pdf-room-parameters">
-                            <div>
-                                <div className="print-avoid-break" style={{ marginBottom: 24 }}>
-                                    <ReportCountsDashboard
-                                        roomLevelCounts={roomLevelCounts}
-                                        seatCountsByRow={seatCountsByRow}
-                                        analysisResult={analysisResult}
-                                        totalRoomParameters={roomScopedParamCount}
-                                        totalSeatParameters={seatScopedParamCount}
-                                    />
-                                </div>
-                                <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
+                             <div>
+                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
                                 <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
                                 <RP22ReportParameterGrid {...parameterGridProps} />
                             </div>
@@ -1485,28 +1503,7 @@ function RP22ReportInner() {
                             </section>
                         )}
 
-                        {/* ── RP22 Performance Levels note — always the final printed element ── */}
-                        <div style={{
-                            marginTop: '12mm',
-                            paddingTop: '6mm',
-                            borderTop: '1px solid #D9D5CE',
-                            breakInside: 'avoid',
-                            pageBreakInside: 'avoid',
-                            WebkitColumnBreakInside: 'avoid',
-                            fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif',
-                            fontSize: '9pt',
-                            color: '#3E4349',
-                            lineHeight: 1.6,
-                            textAlign: 'left',
-                            width: '100%',
-                        }}>
-                            <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '9pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
-                            <div><strong>Level 1</strong> – The minimum level of performance necessary to convey basic artistic intent.</div>
-                            <div><strong>Level 2</strong> – A higher level of performance that more accurately conveys artistic intent.</div>
-                            <div><strong>Level 3</strong> – Meets or exceeds reference commercial cinema exhibition standards.</div>
-                            <div><strong>Level 4</strong> – The maximum level of achievable performance across every parameter.</div>
-                            <div style={{ marginTop: '2mm' }}>Performance levels apply to both individual seating positions as well as the room, with parameters therein attributed to one or the other.</div>
-                        </div>
+
                     </div>
                 </div>
             </div>
