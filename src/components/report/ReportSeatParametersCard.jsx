@@ -125,6 +125,11 @@ export default function ReportSeatParametersCard({
                                                             Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                         </div>
                                                     )}
+                                                    {key === 'p9' && rp22Hud?.p9Detail && (
+                                                        <div className="text-[10px] text-gray-500 pl-2 mt-0.5 whitespace-pre-wrap break-words">
+                                                            {rp22Hud.p9Detail}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
