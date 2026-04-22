@@ -11,7 +11,7 @@ export default function ReportCountsDashboard({
     totalSeatParameters,
 }) {
     return (
-        <div className="grid grid-cols-[auto_1fr] gap-10 items-start mt-8">
+        <div className="grid grid-cols-[360px_minmax(0,1fr)] gap-6 items-start mt-6 w-full">
             {/* Left: Room count box */}
             <div className="justify-self-start">
                 <div className="flex items-center gap-2 mb-3">
@@ -21,7 +21,7 @@ export default function ReportCountsDashboard({
                     </div>
                     <span className="text-sm text-gray-500">({totalRoomParameters})</span>
                 </div>
-                <div className="border-2 border-[#213428] rounded-lg px-5 py-4 bg-white w-[340px] min-h-[100px] flex flex-col justify-center">
+                <div className="border-2 border-[#213428] rounded-lg px-5 py-4 bg-white w-full min-h-[100px] flex flex-col justify-center">
                     <div className="flex justify-center items-center mt-1 px-1">
                         {(() => {
                             const l4 = Number(roomLevelCounts?.L4 ?? 0);
@@ -62,7 +62,7 @@ export default function ReportCountsDashboard({
                     <span className="text-sm text-gray-500">({totalSeatParameters})</span>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="grid grid-cols-2 gap-4 w-full">
                     {seatCountsByRow.map(({ rowNum, seats }) => (
                         <div key={rowNum} className="flex flex-col gap-4">
                             {seats.map(({ seatId, counts, activeCount, failCount }) => { // activeCount and failCount are siblings of counts
@@ -70,7 +70,7 @@ export default function ReportCountsDashboard({
                                 return (
                                     <div
                                         key={seatId}
-                                        className={`rounded-lg px-5 py-4 bg-white w-[340px] min-h-[100px] flex flex-col justify-center ${
+                                        className={`rounded-lg px-5 py-4 bg-white w-full min-h-[100px] flex flex-col justify-center ${
                                             isPrimary ? 'border-[3px] border-[#213428]' : 'border-2 border-[#213428]'
                                         }`}
                                     >

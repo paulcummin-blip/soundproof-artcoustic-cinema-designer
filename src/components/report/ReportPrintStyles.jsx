@@ -86,12 +86,12 @@ export default function ReportPrintStyles() {
                 }
 
                 #pdf-cover .rp22-cover-card {
-                  padding-top: 6mm !important;
-                  padding-bottom: 6mm !important;
+                  padding-top: 9mm !important;
+                  padding-bottom: 9mm !important;
                 }
 
                 #pdf-cover .rp22-cover-stack {
-                  gap: 2mm !important;
+                  gap: 4mm !important;
                 }
 
                 html, body, #root, #__next {
@@ -377,7 +377,7 @@ export default function ReportPrintStyles() {
               #pdf-cover,
               #pdf-room-parameters,
               #pdf-seat-parameters {
-                zoom: 0.75 !important;
+                zoom: 0.9 !important;
               }
 
               #pdf-room-plan,
