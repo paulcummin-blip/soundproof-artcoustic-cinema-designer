@@ -187,6 +187,18 @@ function RoomDesignerWithState() {
   const _seatingBlockOffset = appState?.seatingBlockOffset;
   const _seatSpacing = appState?.seatSpacing;
   const _mlpBasis = appState?.mlpBasis;
+  // SEPARATION: seatingArrangementBasis controls how rows are distributed around the
+  // fixed RSP anchor. It is independent of the true RSP position (driven by seatingBlockOffset).
+  // Initialise from persisted mlpBasis so loaded projects restore correctly.
+  const [seatingArrangementBasis, _setSeatingArrangementBasis] = useState(
+    () => appState?.mlpBasis || 'front'
+  );
+  const setSeatingArrangementBasis = React.useCallback((next) => {
+    _setSeatingArrangementBasis(next);
+    // Keep persisted mlpBasis in sync so autosave/hydration round-trips correctly.
+    // This does NOT drive the true RSP calculation — that path uses mlpY_m exclusively.
+    appState?.setMlpBasis?.(next);
+  }, [appState?.setMlpBasis]);
   const _roomElements = appState?.roomElements;
   const _frozenTabs = appState?.frozenTabs;
   const _isFrozen = appState?.isFrozen;
@@ -400,7 +412,9 @@ function RoomDesignerWithState() {
     const viewingOffsetM = Number(_seatingBlockOffset) || 0;
     const rows = Number(_seatingRows) || 1;
     const rowSpacing = Number(_rowSpacingM) || 1.8; // default 1.8m
-    const mlpReference = _mlpBasis; // 'front' | 'back' | 'all'
+    // SEPARATION: use seatingArrangementBasis (not _mlpBasis / true RSP basis)
+    // to distribute rows around the fixed RSP anchor (fixedMlpY).
+    const mlpReference = seatingArrangementBasis; // 'front' | 'back' | 'all'
 
     // Must have screen width
     if (!Number.isFinite(screenVisibleWidthM)) {
@@ -510,7 +524,7 @@ function RoomDesignerWithState() {
   screenVisibleWidthInchesEffective,
   _seatingBlockOffset,
   _seatingRows,
-  _mlpBasis,
+  seatingArrangementBasis, // row distribution — does NOT redefine RSP
   _rowSpacingM,
   appState?.setMlpY_m,
   appState?.setRowCentersM,
@@ -521,57 +535,32 @@ function RoomDesignerWithState() {
   );
 
   // Use computed MLP as the effective anchor (for backwards compatibility)
+  // SEPARATION: mlpAnchorEffective is the true RSP position.
+  // It is driven exclusively by appState.mlpY_m (which is set from seatingBlockOffset + screen).
+  // It must NOT shift when seatingArrangementBasis changes — only Viewing Offset moves the RSP.
   const mlpAnchorEffective = useMemo(() => {
     const roomWidthM = Number(stableDimensions?.width) || 0;
     const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
-    const seats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
 
-    // In scratch/Free Use mode with no project, visually lock the dot to the centre/primary seat.
-    // This prevents the dot drifting ahead of the seating row during Viewing Offset changes,
-    // because mlpY_m updates before the seating rebuild has finished moving the seats.
-    if (!isProjectMode && seats.length > 0 && Number.isFinite(roomWidthM)) {
-      // 'all' (average) mode: RSP is the average of all row-centre Y values, which can fall
-      // between rows (even row counts). Compute directly from unique seat Y values rather than
-      // snapping to the nearest primary seat, which would be off-centre.
-      if (_mlpBasis === 'all') {
-        const uniqueYs = [...new Set(
-          seats.map(s => Number(s.y ?? s.position?.y)).filter(y => Number.isFinite(y))
-        )];
-        if (uniqueYs.length > 0) {
-          const avgY = uniqueYs.reduce((sum, y) => sum + y, 0) / uniqueYs.length;
-          return { x: cx, y: avgY, z: 1.2 };
-        }
-      }
-
-      const primarySeat = seats.find(s => s.isPrimary);
-      const candidate = primarySeat || (() => {
-        let best = null; let bestDx = Infinity;
-        for (const s of seats) {
-          const sx = Number(s?.x ?? s?.position?.x);
-          const sy = Number(s?.y ?? s?.position?.y);
-          if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
-          const dx = Math.abs(sx - cx);
-          if (dx < bestDx) { bestDx = dx; best = s; }
-        }
-        return best;
-      })();
-      if (candidate) {
-        const cy = Number(candidate.y ?? candidate.position?.y);
-        const cz = Number(candidate.z ?? candidate.position?.z);
-        if (Number.isFinite(cy)) return { x: cx, y: cy, z: Number.isFinite(cz) ? cz : 1.2 };
-      }
-    }
-
-    // Canonical anchor for both Free Use and saved projects: always use appState?.mlpY_m.
-    // Seat-derived Y must not override during offset changes — mlpY_m is the single source of truth.
+    // Single source of truth: always use mlpY_m (set by the MLP useEffect from seatingBlockOffset).
     const mlpY = appState?.mlpY_m;
     if (Number.isFinite(mlpY)) {
       return { x: cx, y: mlpY, z: 1.2 };
     }
 
-    // If no seats yet, keep null so RV can do its own last-resort fallback
+    // Fallback: if mlpY_m not yet computed, derive from primary seat as a one-time bootstrap.
+    const seats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
+    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
+      const primarySeat = seats.find(s => s.isPrimary);
+      if (primarySeat) {
+        const cy = Number(primarySeat.y ?? primarySeat.position?.y);
+        const cz = Number(primarySeat.z ?? primarySeat.position?.z);
+        if (Number.isFinite(cy)) return { x: cx, y: cy, z: Number.isFinite(cz) ? cz : 1.2 };
+      }
+    }
+
     return null;
-  }, [appState?.mlpY_m, appState?.seatingPositions, stableDimensions?.width, isProjectMode]);
+  }, [appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions]);
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
   console.log('[ROOM placedSpeakers]', placedSpeakers.map(s => String(s?.role)));
@@ -713,12 +702,12 @@ function RoomDesignerWithState() {
       seats,
       stableDimensions.width,
       stableDimensions.length,
-      _mlpBasis
+      seatingArrangementBasis // identifies primary seat within the arrangement
     );
     // Lock MLP X to centerline for analysis purposes
     const roomWidth = stableDimensions.width;
     return primary ? { ...primary, x: roomWidth / 2 } : null;
-  }, [seats, stableDimensions.width, stableDimensions.length, _mlpBasis]);
+  }, [seats, stableDimensions.width, stableDimensions.length, seatingArrangementBasis]);
 
   // ✅ Compute frontWideZones BEFORE analysisResult to avoid TDZ
   const enableFrontWides = _enableFrontWides;
@@ -739,7 +728,7 @@ function RoomDesignerWithState() {
     seatingPositions: seats,
     primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
-    mlpBasis: _mlpBasis,
+    mlpBasis: seatingArrangementBasis,
     sevenBedLayoutType: appState?.sevenBedLayoutType,
     extraSurroundCount: appState?.extraSurroundCount,
     p15ConstructionLevel: appState?.p15ConstructionLevel,
@@ -897,6 +886,17 @@ function RoomDesignerWithState() {
   }, [seatingBlockOffsetSetterGuarded, appState?.setSeatingBlockOffset]);
 
   const setMlpBasisGuarded = useGuardedSetter(appState?.setMlpBasis, 'seating');
+
+  // Sync seatingArrangementBasis from persisted mlpBasis when a project loads.
+  // This ensures a saved mlpBasis value (e.g., 'back') is correctly restored.
+  const _syncedMlpBasisRef = React.useRef(null);
+  React.useEffect(() => {
+    const loaded = appState?.mlpBasis;
+    if (typeof loaded === 'string' && loaded !== _syncedMlpBasisRef.current) {
+      _syncedMlpBasisRef.current = loaded;
+      _setSeatingArrangementBasis(loaded);
+    }
+  }, [appState?.mlpBasis]);
   const setRoomElementsGuarded = useGuardedSetter((next) => {
     const widthM = Number(appState?.roomDims?.widthM ?? appState?.dimensions?.widthM);
     const lengthM = Number(appState?.roomDims?.lengthM ?? appState?.dimensions?.lengthM);
@@ -1336,7 +1336,7 @@ function RoomDesignerWithState() {
       Array.isArray(_seatingPositions) ? _seatingPositions : [],
       _roomDims?.widthM || 0,
       _roomDims?.lengthM || 0,
-      _mlpBasis
+      seatingArrangementBasis // which seat is primary is determined by arrangement, not true RSP
     );
 
     // Only update if isPrimary flags actually changed
@@ -1358,7 +1358,7 @@ function RoomDesignerWithState() {
     if (flagsChanged) {
       (appState?.setSeatingPositions || (() => {}))(seatsWithFlags);
     }
-  }, [_seatingPositions, _roomDims?.widthM, _roomDims?.lengthM, _mlpBasis, appState?.setSeatingPositions]);
+  }, [_seatingPositions, _roomDims?.widthM, _roomDims?.lengthM, seatingArrangementBasis, appState?.setSeatingPositions]);
 
   const handleResetPositions = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
@@ -1389,7 +1389,7 @@ function RoomDesignerWithState() {
       const bedSpeakers = spks.filter((s) => bedRoles.has(String(s.role).toUpperCase())).map((s) => ({ id: String(s.id || s.role), role: String(s.role).toUpperCase(), position: { x: Number(s.position?.x) || 0, y: Number(s.position?.y) || 0 } }));
       if (bedSpeakers.length < 2) return;
       const pads = getBedPads({ dimensions: stableDimensions, seatingPositions: _seatingPositions });
-      const mlpForOptimization = mlpAnchorEffective || computeMLPAndPrimary(_seatingPositions, stableDimensions.width, stableDimensions.length, _mlpBasis).mlp;
+      const mlpForOptimization = mlpAnchorEffective || computeMLPAndPrimary(_seatingPositions, stableDimensions.width, stableDimensions.length, seatingArrangementBasis).mlp;
       const eq = equalizeBedAngles({ dimensions: { width: stableDimensions.width, length: stableDimensions.length }, mlp: mlpForOptimization, speakers: bedSpeakers, pads, targets: [50, 60, 80], weights: { evenness: 1.0, pad: 5.0, target: 0.6 }, steps: 250 });
       const byId = new Map(eq.map((s) => [s.id, s]));
       const surRoles = new Set(["FWL", "FWR", "LW", "RW", "SL", "SR", "LS", "RS", "LRS", "RRS", "SBL", "SBR", "LR", "RR"]);
@@ -1402,7 +1402,7 @@ function RoomDesignerWithState() {
       if (globalThis.__B44_LOGS) console.log('[RD] optimiseAll -> roles', merged.map((s) => safeCanon(s.role)));
       setSpeakers((prev) => mergePreserveOverheads(prev, merged, dolbyPreset));
     } catch (e) { if (globalThis.__B44_LOGS) console.error("[OptimiseAll] failed:", e); }
-  }, [placedSpeakers, stableDimensions, _seatingPositions, _mlpBasis, _isFrozen, setSpeakers, mlpAnchorEffective]);
+  }, [placedSpeakers, stableDimensions, _seatingPositions, seatingArrangementBasis, _isFrozen, setSpeakers, mlpAnchorEffective]);
 
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
@@ -1647,7 +1647,7 @@ function RoomDesignerWithState() {
                   onLcrAngleComputed={setLcrAngleDeg}
                   rowTarget={null}
                   viewingDistanceOffsetM={_seatingBlockOffset}
-                  mlpBasis={_mlpBasis}
+                  mlpBasis={seatingArrangementBasis}
                   rp22AnglesEnabled={_overlays?.RP22_ANGLES}
                   allSeatSplMetrics={allSeatSplMetrics}
                   speakerPositionsView={speakerPositionsView}
@@ -1775,8 +1775,8 @@ function RoomDesignerWithState() {
                   }}
                   seatingBlockOffset={_seatingBlockOffset}
                   onSeatingBlockOffsetChange={setSeatingBlockOffsetGuarded}
-                  mlpBasis={mlpBasis}
-                  onMlpBasisChange={setMlpBasisGuarded}
+                  mlpBasis={seatingArrangementBasis}
+                  onMlpBasisChange={setSeatingArrangementBasis}
                   onSetSeatingPositions={appState?.setSeatingPositions}
                   disabled={isFrozen('seating')}
                   screen={_screen}
