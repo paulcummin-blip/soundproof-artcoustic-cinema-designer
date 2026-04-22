@@ -1059,11 +1059,19 @@ const byId = useEntitiesById({
   const commitDraftSubPositions = useCallback(() => {
     if (draftFrontSubsRef.current && onSetFrontSubs) {
       const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
-      onSetFrontSubs(prev => ({ ...prev, positions }));
+      onSetFrontSubs(prev => ({
+        ...prev,
+        positions,
+        count: Array.isArray(positions) ? positions.length : 0,
+      }));
     }
     if (draftRearSubsRef.current && onSetRearSubs) {
       const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
-      onSetRearSubs(prev => ({ ...prev, positions }));
+      onSetRearSubs(prev => ({
+        ...prev,
+        positions,
+        count: Array.isArray(positions) ? positions.length : 0,
+      }));
     }
   }, [onSetFrontSubs, onSetRearSubs]);
 
