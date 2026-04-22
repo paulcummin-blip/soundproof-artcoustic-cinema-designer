@@ -157,6 +157,8 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
         elevDeg,
         avgY,
         avgZ,
+        dy,
+        dz,
       };
     };
 
@@ -184,8 +186,23 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
       const b = rowData[i].elevDeg;
       const gap = Math.abs(b - a);
 
+      const prevRow = rowData[i - 1];
+      const nextRow = rowData[i];
+
       allGaps.push({
-        pair: `${rowData[i - 1].roleLabel} ↔ ${rowData[i].roleLabel}`,
+        pair:
+          `${sideName.toUpperCase()} | ` +
+          `${prevRow.rowName} ` +
+          `[${prevRow.roleLabel}] ` +
+          `y=${prevRow.avgY.toFixed(2)} z=${prevRow.avgZ.toFixed(2)} ` +
+          `dy=${prevRow.dy.toFixed(2)} dz=${prevRow.dz.toFixed(2)} ` +
+          `elev=${prevRow.elevDeg.toFixed(1)}° ` +
+          `↔ ` +
+          `${nextRow.rowName} ` +
+          `[${nextRow.roleLabel}] ` +
+          `y=${nextRow.avgY.toFixed(2)} z=${nextRow.avgZ.toFixed(2)} ` +
+          `dy=${nextRow.dy.toFixed(2)} dz=${nextRow.dz.toFixed(2)} ` +
+          `elev=${nextRow.elevDeg.toFixed(1)}°`,
         deg: gap,
       });
     }
