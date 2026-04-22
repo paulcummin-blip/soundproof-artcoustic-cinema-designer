@@ -11,7 +11,7 @@ export default function ReportCountsDashboard({
     totalSeatParameters,
 }) {
     return (
-        <div className="grid grid-cols-[360px_minmax(0,1fr)] gap-6 items-start mt-6 w-full">
+        <div className="report-counts-dashboard grid grid-cols-[320px_minmax(0,1fr)] gap-4 items-start mt-4 w-full break-inside-avoid-page page-break-inside-avoid">
             {/* Left: Room count box */}
             <div className="justify-self-start">
                 <div className="flex items-center gap-2 mb-3">
@@ -21,7 +21,7 @@ export default function ReportCountsDashboard({
                     </div>
                     <span className="text-sm text-gray-500">({totalRoomParameters})</span>
                 </div>
-                <div className="border-2 border-[#213428] rounded-lg px-5 py-4 bg-white w-full min-h-[100px] flex flex-col justify-center">
+                <div className="border-2 border-[#213428] rounded-lg px-4 py-4 bg-white w-full min-h-[96px] flex flex-col justify-center break-inside-avoid-page page-break-inside-avoid">
                     <div className="flex justify-center items-center mt-1 px-1">
                         {(() => {
                             const l4 = Number(roomLevelCounts?.L4 ?? 0);
@@ -62,15 +62,15 @@ export default function ReportCountsDashboard({
                     <span className="text-sm text-gray-500">({totalSeatParameters})</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 w-full">
+                <div className="grid grid-cols-2 gap-3 w-full content-start">
                     {seatCountsByRow.map(({ rowNum, seats }) => (
-                        <div key={rowNum} className="flex flex-col gap-4">
+                        <div key={rowNum} className="flex flex-col gap-3">
                             {seats.map(({ seatId, counts, activeCount, failCount }) => { // activeCount and failCount are siblings of counts
                                 const isPrimary = analysisResult?.perSeatRp22?.[seatId]?.isPrimary === true;
                                 return (
                                     <div
                                         key={seatId}
-                                        className={`rounded-lg px-5 py-4 bg-white w-full min-h-[100px] flex flex-col justify-center ${
+                                        className={`rounded-lg px-4 py-4 bg-white w-full min-h-[96px] flex flex-col justify-center break-inside-avoid-page page-break-inside-avoid ${
                                             isPrimary ? 'border-[3px] border-[#213428]' : 'border-2 border-[#213428]'
                                         }`}
                                     >

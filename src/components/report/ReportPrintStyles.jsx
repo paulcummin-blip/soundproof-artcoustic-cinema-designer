@@ -312,6 +312,25 @@ export default function ReportPrintStyles() {
                 }
             }
 
+            .break-inside-avoid-page,
+            .page-break-inside-avoid {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+            }
+
+            @media print {
+                .break-inside-avoid-page,
+                .page-break-inside-avoid {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+
+                .report-counts-dashboard {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+            }
+
             .rp22-report .rp22-param-card {
                 border: 1.5px solid #D9D5CE;
                 border-radius: 10px;
