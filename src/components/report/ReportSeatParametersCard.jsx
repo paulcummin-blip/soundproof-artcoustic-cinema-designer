@@ -47,6 +47,15 @@ export default function ReportSeatParametersCard({
                         const rp23 = tooltipData?.rp23 || {};
                         const rp22Hud = tooltipData?.rp22 || {};
 
+                        if (rp22Hud?.p9) {
+                          console.log("P9 HUD DEBUG", {
+                            seatId,
+                            p9: rp22Hud.p9,
+                            p9Detail: rp22Hud.p9Detail,
+                            tooltipData,
+                          });
+                        }
+
                         const getRp22Metric = (key) => {
                             const n = parseInt(String(key).replace("p", ""), 10);
                             if (!Number.isFinite(n)) return null;
