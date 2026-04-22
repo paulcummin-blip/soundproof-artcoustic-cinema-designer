@@ -351,6 +351,24 @@ export default function SeatHud({
                 </div>
               )}
 
+              {/* P9 debug text */}
+              {key === 'p9' && metric?.debugText && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: '#999',
+                    paddingLeft: 16,
+                    paddingBottom: 3,
+                    lineHeight: 1.5,
+                    fontFamily: 'monospace',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {metric.debugText}
+                </div>
+              )}
+
               {/* P17 per-speaker breakdown - no separate "Worst group" line */}
               {key === 'p17' && metric?.perSpeaker && metric.perSpeaker.length > 0 && (
                 <div>
