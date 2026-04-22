@@ -964,34 +964,34 @@ function RP22ReportInner() {
     const coverBoxStyle = {
         border: '1.5px solid #D9D5CE',
         borderRadius: '10px',
-        padding: '8mm 10mm',
+        padding: '9mm 11mm',
         background: '#FBFAF8',
         width: '100%',
         boxShadow: 'none',
     };
 
     const coverBoxTitleStyle = {
-        fontSize: '15pt',
+        fontSize: '16pt',
         fontWeight: 700,
         color: '#1B1A1A',
-        marginBottom: '4mm',
+        marginBottom: '5mm',
         textAlign: 'center',
         lineHeight: 1.15,
     };
 
     const coverBoxSubtitleStyle = {
-        fontSize: '10pt',
+        fontSize: '10.5pt',
         color: '#3E4349',
-        marginBottom: '4mm',
+        marginBottom: '5mm',
         textAlign: 'center',
         lineHeight: 1.35,
     };
 
     const coverSectionTitleStyle = {
         fontWeight: 600,
-        fontSize: '11pt',
+        fontSize: '11.5pt',
         color: '#1B1A1A',
-        marginBottom: '3mm',
+        marginBottom: '3.5mm',
         lineHeight: 1.2,
     };
 
@@ -1003,14 +1003,14 @@ function RP22ReportInner() {
     };
 
     const coverLabelStyle = {
-        fontSize: '10pt',
+        fontSize: '10.5pt',
         fontWeight: 600,
         color: '#1B1A1A',
         lineHeight: 1.35,
     };
 
     const coverValueStyle = {
-        fontSize: '10pt',
+        fontSize: '10.5pt',
         color: '#3E4349',
         lineHeight: 1.35,
     };
@@ -1234,15 +1234,15 @@ function RP22ReportInner() {
                                     <img
                                         src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
                                         alt="SoundProof"
-                                        style={{ width: "100%", height: "auto", marginBottom: "8mm" }}
+                                        style={{ width: "100%", height: "auto", marginBottom: "14mm" }}
                                     />
-                                    <div style={{ fontSize: '26pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.2, marginBottom: '8mm' }}>
+                                    <div style={{ fontSize: '30pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.15, marginBottom: '12mm' }}>
                                         RP22 Compliance Report
                                     </div>
                                 </div>
                                 {/* RP22 explanation */}
-                                <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '6mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '9pt', color: '#3E4349', lineHeight: 1.6, textAlign: 'left' }}>
-                                    <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '9pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
+                                <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '8mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '10.5pt', color: '#3E4349', lineHeight: 1.75, textAlign: 'left' }}>
+                                    <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', fontSize: '11pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
                                     <div><strong>Level 1</strong> – The minimum level of performance necessary to convey basic artistic intent.</div>
                                     <div><strong>Level 2</strong> – A higher level of performance that more accurately conveys artistic intent.</div>
                                     <div><strong>Level 3</strong> – Meets or exceeds reference commercial cinema exhibition standards.</div>
@@ -1250,15 +1250,15 @@ function RP22ReportInner() {
                                     <div style={{ marginTop: '2mm' }}>Performance levels apply to both individual seating positions as well as the room, with parameters therein attributed to one or the other.</div>
                                 </div>
                                 {/* RP23 explanation */}
-                                <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '6mm', paddingTop: '6mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '9pt', color: '#3E4349', lineHeight: 1.6, textAlign: 'left' }}>
-                                    <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '9pt' }}>RP23 - Image Performance</div>
+                                <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '8mm', paddingTop: '8mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '10.5pt', color: '#3E4349', lineHeight: 1.75, textAlign: 'left' }}>
+                                    <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', fontSize: '11pt' }}>RP23 - Image Performance</div>
                                     <div>CEDIA's forthcoming RP23 document will address best practice for image. Currently, we only have the size of the images based on the horizontal viewing angle, and the brightness which is known.</div>
                                 </div>
                             </div>
 
                             {/* ── Page 2: Project details, geometry, system summary, counts ── */}
                             <div className="print-page-break-after print-summary">
-                                <div className="rp22-cover-stack" style={{ maxWidth: '185mm', margin: '0 auto 0', display: 'flex', flexDirection: 'column', gap: '2mm' }}>
+                                <div className="rp22-cover-stack" style={{ maxWidth: '195mm', margin: '0 auto 0', display: 'flex', flexDirection: 'column', gap: '3mm' }}>
                                     <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '0', textAlign: 'left' }}>
                                         <ProjectDetailsCard
                                             project={frontPageProjectDetails}
@@ -1436,7 +1436,7 @@ function RP22ReportInner() {
                                     </div>
 
                                     {/* ReportCountsDashboard at bottom of project/summary page */}
-                                    <div style={{ maxWidth: '185mm', margin: '4mm auto 0', paddingTop: '4mm' }}>
+                                    <div style={{ maxWidth: '195mm', width: '100%', margin: '5mm auto 0', paddingTop: '5mm' }}>
                                      <ReportCountsDashboard
                                          roomLevelCounts={roomLevelCounts}
                                          seatCountsByRow={seatCountsByRow}
