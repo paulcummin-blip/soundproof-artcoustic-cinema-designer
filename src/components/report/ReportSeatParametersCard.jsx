@@ -139,6 +139,11 @@ export default function ReportSeatParametersCard({
                                                             {metric.debugText}
                                                         </div>
                                                     )}
+                                                    {metric && key === 'p9' && (
+                                                        <pre className="text-[10px] text-gray-400 pl-2 mt-0.5 whitespace-pre-wrap break-words overflow-x-auto">
+                                                            {JSON.stringify(metric, null, 2)}
+                                                        </pre>
+                                                    )}
                                                 </div>
                                             );
                                         })}
