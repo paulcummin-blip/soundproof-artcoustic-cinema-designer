@@ -195,10 +195,10 @@ function RoomDesignerWithState() {
   );
   const setSeatingArrangementBasis = React.useCallback((next) => {
     _setSeatingArrangementBasis(next);
-    // Keep persisted mlpBasis in sync so autosave/hydration round-trips correctly.
-    // This does NOT drive the true RSP calculation — that path uses mlpY_m exclusively.
-    appState?.setMlpBasis?.(next);
-  }, [appState?.setMlpBasis]);
+    // NOTE: intentionally not calling appState.setMlpBasis here.
+    // seatingArrangementBasis is local to RoomDesigner for row-distribution only.
+    // The true RSP is always derived from mlpY_m (screen geometry + offset).
+  }, []);
   const _roomElements = appState?.roomElements;
   const _frozenTabs = appState?.frozenTabs;
   const _isFrozen = appState?.isFrozen;
@@ -696,18 +696,25 @@ function RoomDesignerWithState() {
   stableScreen.widthMeters :
   (Number(stableScreen?.visibleWidthInches) || 0) * 0.0254;
 
-  // Derive primarySeatingPosition for backwards compatibility with existing code
+  // Derive primarySeatingPosition: seat closest to the fixed RSP anchor (mlpAnchorEffective).
+  // This is now independent of seatingArrangementBasis.
   const primarySeatingPosition = useMemo(() => {
-    const { primary } = computeMLPAndPrimary(
-      seats,
-      stableDimensions.width,
-      stableDimensions.length,
-      seatingArrangementBasis // identifies primary seat within the arrangement
-    );
-    // Lock MLP X to centerline for analysis purposes
+    if (!Array.isArray(seats) || seats.length === 0) return null;
+    const anchor = mlpAnchorEffective;
+    if (!anchor || !Number.isFinite(anchor.y)) return seats[0] || null;
+    // Find seat with minimum Euclidean distance to the fixed RSP anchor
+    let closest = null;
+    let minDist = Infinity;
+    for (const seat of seats) {
+      const dx = (Number(seat.x) || 0) - anchor.x;
+      const dy = (Number(seat.y) || 0) - anchor.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < minDist) { minDist = dist; closest = seat; }
+    }
+    // Lock X to centerline for analysis purposes
     const roomWidth = stableDimensions.width;
-    return primary ? { ...primary, x: roomWidth / 2 } : null;
-  }, [seats, stableDimensions.width, stableDimensions.length, seatingArrangementBasis]);
+    return closest ? { ...closest, x: roomWidth / 2 } : null;
+  }, [seats, mlpAnchorEffective, stableDimensions.width]);
 
   // ✅ Compute frontWideZones BEFORE analysisResult to avoid TDZ
   const enableFrontWides = _enableFrontWides;
@@ -728,7 +735,7 @@ function RoomDesignerWithState() {
     seatingPositions: seats,
     primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
-    mlpBasis: seatingArrangementBasis,
+    mlpBasis: "front", // fixed stable value — does not vary with seating arrangement
     sevenBedLayoutType: appState?.sevenBedLayoutType,
     extraSurroundCount: appState?.extraSurroundCount,
     p15ConstructionLevel: appState?.p15ConstructionLevel,
@@ -1330,35 +1337,35 @@ function RoomDesignerWithState() {
   setSeatSpacingGuarded]
   );
 
-  // Normalise seat flags whenever seating or room size changes
+  // Normalise isPrimary flags: mark the seat closest to mlpAnchorEffective as primary.
+  // This is now independent of seatingArrangementBasis.
   useEffect(() => {
-    const { seatsWithFlags } = computeMLPAndPrimary(
-      Array.isArray(_seatingPositions) ? _seatingPositions : [],
-      _roomDims?.widthM || 0,
-      _roomDims?.lengthM || 0,
-      seatingArrangementBasis // which seat is primary is determined by arrangement, not true RSP
-    );
+    const prev = Array.isArray(_seatingPositions) ? _seatingPositions : [];
+    if (prev.length === 0) return;
 
-    // Only update if isPrimary flags actually changed
-    const prev = _seatingPositions || [];
-    const sameLength = prev.length === seatsWithFlags.length;
-    
-    if (!sameLength) {
-      (appState?.setSeatingPositions || (() => {}))(seatsWithFlags);
-      return;
+    const anchor = mlpAnchorEffective;
+
+    // Find id of the seat closest to the fixed RSP anchor
+    let closestId = null;
+    if (anchor && Number.isFinite(anchor.y)) {
+      let minDist = Infinity;
+      for (const seat of prev) {
+        const dx = (Number(seat.x) || 0) - anchor.x;
+        const dy = (Number(seat.y) || 0) - anchor.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < minDist) { minDist = dist; closestId = seat.id; }
+      }
+    } else {
+      closestId = prev[0]?.id;
     }
 
-    // Check if any seat's isPrimary changed (must match by seatId)
-    const prevById = new Map(prev.map(s => [s.id, s]));
-    const flagsChanged = seatsWithFlags.some(s => {
-      const p = prevById.get(s.id);
-      return p && (!!p.isPrimary !== !!s.isPrimary);
-    });
+    // Only update if any isPrimary flag differs from what we want
+    const flagsChanged = prev.some(s => !!s.isPrimary !== (s.id === closestId));
+    if (!flagsChanged) return;
 
-    if (flagsChanged) {
-      (appState?.setSeatingPositions || (() => {}))(seatsWithFlags);
-    }
-  }, [_seatingPositions, _roomDims?.widthM, _roomDims?.lengthM, seatingArrangementBasis, appState?.setSeatingPositions]);
+    const seatsWithFlags = prev.map(s => ({ ...s, isPrimary: s.id === closestId }));
+    (appState?.setSeatingPositions || (() => {}))(seatsWithFlags);
+  }, [_seatingPositions, mlpAnchorEffective, appState?.setSeatingPositions]);
 
   const handleResetPositions = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
@@ -1389,7 +1396,12 @@ function RoomDesignerWithState() {
       const bedSpeakers = spks.filter((s) => bedRoles.has(String(s.role).toUpperCase())).map((s) => ({ id: String(s.id || s.role), role: String(s.role).toUpperCase(), position: { x: Number(s.position?.x) || 0, y: Number(s.position?.y) || 0 } }));
       if (bedSpeakers.length < 2) return;
       const pads = getBedPads({ dimensions: stableDimensions, seatingPositions: _seatingPositions });
-      const mlpForOptimization = mlpAnchorEffective || computeMLPAndPrimary(_seatingPositions, stableDimensions.width, stableDimensions.length, seatingArrangementBasis).mlp;
+      // Use the fixed RSP anchor exclusively. If unavailable, fall back to room centre.
+      const mlpForOptimization = mlpAnchorEffective || {
+        x: stableDimensions.width / 2,
+        y: stableDimensions.length * 0.6,
+        z: 1.2,
+      };
       const eq = equalizeBedAngles({ dimensions: { width: stableDimensions.width, length: stableDimensions.length }, mlp: mlpForOptimization, speakers: bedSpeakers, pads, targets: [50, 60, 80], weights: { evenness: 1.0, pad: 5.0, target: 0.6 }, steps: 250 });
       const byId = new Map(eq.map((s) => [s.id, s]));
       const surRoles = new Set(["FWL", "FWR", "LW", "RW", "SL", "SR", "LS", "RS", "LRS", "RRS", "SBL", "SBR", "LR", "RR"]);
