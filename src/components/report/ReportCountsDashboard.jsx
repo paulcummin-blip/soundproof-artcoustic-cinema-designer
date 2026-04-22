@@ -11,9 +11,9 @@ export default function ReportCountsDashboard({
     totalSeatParameters,
 }) {
     return (
-        <div className="report-counts-dashboard grid grid-cols-[320px_minmax(0,1fr)] gap-4 items-start mt-4 w-full break-inside-avoid-page page-break-inside-avoid">
+        <div className="report-counts-dashboard flex flex-col gap-4 mt-4 w-full break-inside-avoid-page page-break-inside-avoid">
             {/* Left: Room count box */}
-            <div className="justify-self-start">
+            <div>
                 <div className="flex items-center gap-2 mb-3">
                     <Home className="w-4 h-4 text-[#213428]" />
                     <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
@@ -21,7 +21,7 @@ export default function ReportCountsDashboard({
                     </div>
                     <span className="text-sm text-gray-500">({totalRoomParameters})</span>
                 </div>
-                <div className="border-2 border-[#213428] rounded-lg px-4 py-4 bg-white w-full min-h-[96px] flex flex-col justify-center break-inside-avoid-page page-break-inside-avoid">
+                <div className="border-2 border-[#213428] rounded-lg px-4 py-4 bg-white w-full max-w-[360px] min-h-[96px] flex flex-col justify-center break-inside-avoid-page page-break-inside-avoid">
                     <div className="flex justify-center items-center mt-1 px-1">
                         {(() => {
                             const l4 = Number(roomLevelCounts?.L4 ?? 0);
@@ -53,7 +53,7 @@ export default function ReportCountsDashboard({
             </div>
 
             {/* Right: Seat parameters section */}
-            <div className="justify-self-end">
+            <div className="w-full">
                 <div className="flex items-center gap-2 mb-3">
                     <User className="w-4 h-4 text-[#213428]" />
                     <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
