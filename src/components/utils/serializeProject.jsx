@@ -216,9 +216,26 @@ export function serializeProject(input = {}) {
     subwoofers: asArray(subwoofers),
 
     // Sub configs must be objects to match Project schema.
-    // Do not stringify. Do not inject defaults. If unset/null, omit entirely.
-    ...(frontSubsCfg && typeof frontSubsCfg === "object" ? { front_subs_cfg: frontSubsCfg } : {}),
-    ...(rearSubsCfg && typeof rearSubsCfg === "object" ? { rear_subs_cfg: rearSubsCfg } : {}),
+    // Normalise shape so all paths (SubwooferSelector, AppStateProvider, DB restore)
+    // produce the same JSON signature — prevents autosave being permanently dirty.
+    ...(frontSubsCfg && typeof frontSubsCfg === "object" ? {
+      front_subs_cfg: {
+        model: frontSubsCfg.model || "SUB2-12",
+        count: Number(frontSubsCfg.count) || 0,
+        positions: Array.isArray(frontSubsCfg.positions) ? frontSubsCfg.positions : [],
+        tuning: Array.isArray(frontSubsCfg.tuning) ? frontSubsCfg.tuning : [],
+        orientation: frontSubsCfg.orientation || "vertical",
+      }
+    } : {}),
+    ...(rearSubsCfg && typeof rearSubsCfg === "object" ? {
+      rear_subs_cfg: {
+        model: rearSubsCfg.model || "SUB2-12",
+        count: Number(rearSubsCfg.count) || 0,
+        positions: Array.isArray(rearSubsCfg.positions) ? rearSubsCfg.positions : [],
+        tuning: Array.isArray(rearSubsCfg.tuning) ? rearSubsCfg.tuning : [],
+        orientation: rearSubsCfg.orientation || "vertical",
+      }
+    } : {}),
 
     // Overlays / UI state
     overlays: asObject(overlays),
