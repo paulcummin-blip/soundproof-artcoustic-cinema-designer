@@ -901,7 +901,7 @@ export default function RP22CompliancePanel({
         </div>
         <div style={body}>
           <div style={row}>
-            <span style={keyTx}>Recommended distance (50°–65°)</span>
+            <span style={keyTx}>Recommended distance from screen (50°–65°)</span>
             <span style={chip}>
               {rp23.dMin.toFixed(2)} m – {rp23.dMax.toFixed(2)} m
             </span>
