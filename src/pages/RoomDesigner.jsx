@@ -1254,7 +1254,8 @@ function RoomDesignerWithState() {
   useSeatingRebuild({
     appState, resolvedProjectId, projectIdState, loadState, seatingConfigEpoch,
     seatingLoadedEpochRef, didUserRequestResetRef, _seatsPerRowByRow, _seatingRows,
-    _seatsPerRow, _seatSpacing, _rowSpacingM, _mlpBasis, stableDimensions,
+    _seatsPerRow, _seatSpacing, _rowSpacingM, _mlpBasis, seatingArrangementBasis,
+    stableDimensions,
     _rowEarHeights: appState?.rowEarHeights,
   });
 
