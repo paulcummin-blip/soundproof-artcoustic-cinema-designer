@@ -1939,7 +1939,7 @@ function RoomDesignerWithState() {
                                 : {})
                         }
                         roomHudSnapshot={appState?.roomHudSnapshot || analysisResult?.roomHudSnapshot || null}
-                        mlpSeatId={primarySeatingPosition?.id || "mlp"}
+                        mlpSeatId={"mlp"}
                         dolbyLayout={appState?.dolbyLayout}
                         frontSubsCount={appState?.frontSubsCfg?.count}
                         rearSubsCount={appState?.rearSubsCfg?.count}
