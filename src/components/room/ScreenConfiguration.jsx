@@ -61,25 +61,42 @@ export default function ScreenConfiguration(props) {
 
     seatingPositions.forEach((seat) => {
       const rowNumber = Number(seat?.rowNumber);
+      const x = Number(seat?.x);
       const y = Number(seat?.y);
       const z = Number.isFinite(Number(seat?.z)) ? Number(seat?.z) : 1.2;
 
       if (!Number.isFinite(rowNumber) || !Number.isFinite(y)) return;
 
       if (!rowsMap.has(rowNumber)) {
-        rowsMap.set(rowNumber, { rowNumber, ys: [], zs: [] });
+        rowsMap.set(rowNumber, { rowNumber, seats: [] });
       }
 
-      rowsMap.get(rowNumber).ys.push(y);
-      rowsMap.get(rowNumber).zs.push(z);
+      rowsMap.get(rowNumber).seats.push({
+        ...seat,
+        x: Number.isFinite(x) ? x : null,
+        y,
+        z,
+      });
     });
 
     return Array.from(rowsMap.values())
-      .map((row) => ({
-        rowNumber: row.rowNumber,
-        rowCentreY: row.ys.reduce((sum, value) => sum + value, 0) / row.ys.length,
-        rowEarHeight: row.zs.reduce((sum, value) => sum + value, 0) / row.zs.length,
-      }))
+      .map((row) => {
+        const sortedSeats = [...row.seats].sort((a, b) => {
+          const ax = Number.isFinite(a.x) ? a.x : Number.POSITIVE_INFINITY;
+          const bx = Number.isFinite(b.x) ? b.x : Number.POSITIVE_INFINITY;
+          return ax - bx;
+        });
+        const centreSeat = sortedSeats[Math.floor(sortedSeats.length / 2)] || null;
+        const rowCentreY = sortedSeats.reduce((sum, seat) => sum + seat.y, 0) / sortedSeats.length;
+        const rowEarHeight = sortedSeats.reduce((sum, seat) => sum + seat.z, 0) / sortedSeats.length;
+
+        return {
+          rowNumber: row.rowNumber,
+          centreSeat,
+          rowCentreY,
+          rowEarHeight,
+        };
+      })
       .sort((a, b) => a.rowNumber - b.rowNumber);
   }, [seatingPositions]);
 
@@ -157,11 +174,15 @@ export default function ScreenConfiguration(props) {
   // Live metrics computation - per row, uses VIEWABLE width only
   const liveMetrics = useMemo(() => {
     const rows = seatingRowsLive.map((row) => {
-      const viewingDistance = Math.max(0, row.rowCentreY - screenFrontPlaneM);
+      const sourceSeatY = Number(row.centreSeat?.y);
+      const sourceSeatZ = Number.isFinite(Number(row.centreSeat?.z)) ? Number(row.centreSeat.z) : 1.2;
+      const viewingDistance = Math.max(0, sourceSeatY - screenFrontPlaneM);
 
-      if (viewingDistance <= 0.10) {
+      if (!Number.isFinite(sourceSeatY) || viewingDistance <= 0.10) {
         return {
           ...row,
+          sourceSeatY,
+          sourceSeatZ,
           viewingDistance,
           rawHorizontalAngle: 0,
           rawVerticalAngle: 0,
@@ -177,6 +198,8 @@ export default function ScreenConfiguration(props) {
 
       return {
         ...row,
+        sourceSeatY,
+        sourceSeatZ,
         viewingDistance,
         rawHorizontalAngle,
         rawVerticalAngle,
