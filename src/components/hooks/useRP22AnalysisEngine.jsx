@@ -12,6 +12,7 @@ import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
+import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -1257,24 +1258,20 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         const rp23AngleDeg = rp23AngleRad < 6.5 ? (rp23AngleRad * 180 / Math.PI) : rp23AngleRad;
         const rp23DisplayDeg = Math.round(rp23AngleDeg);
         
-        // RP23 Level thresholds (CEDIA standard)
-        let rp23Level = 'L1';
-        if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
-        else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
-        else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
-        else if (rp23AngleDeg >= 35 && rp23AngleDeg <= 80) rp23Level = 'L1';
-        
+        const displayDeg = rp23DisplayAngleDeg(rp23AngleDeg);
+        const level = rp23LevelForAngleDeg(rp23AngleDeg);
+
         perSeatRp23[seatId] = {
           angleDeg: rp23AngleDeg,
-          displayDeg: rp23DisplayDeg,
-          level: rp23Level,
-          formatted: `${rp23DisplayDeg}°`
+          displayDeg,
+          formatted: displayDeg != null ? `${displayDeg}°` : '—',
+          level,
         };
       } else {
         perSeatRp23[seatId] = {
           angleDeg: null,
           displayDeg: null,
-          level: '—',
+          level: null,
           formatted: '—'
         };
       }

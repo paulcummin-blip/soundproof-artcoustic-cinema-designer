@@ -49,20 +49,28 @@ function calculateViewingAngle(seatPosition, screenSize, aspectRatio, screenPosi
  */
 export function rp23LevelForAngleDeg(angleDeg) {
   if (!Number.isFinite(angleDeg)) return null;
-  
-  // RP23 recommended horizontal FOV windows (choose highest level containing the angle):
-  // L4: 50–65° (Excellent)
-  // L3: 45–70° (Good)
-  // L2: 40–80° (Acceptable)
-  // L1: 33–90° (Minimum)
-  // Fail: outside 33–90°
-  
-  if (angleDeg >= 50 && angleDeg <= 65) return 'L4';
-  if (angleDeg >= 45 && angleDeg <= 70) return 'L3';
-  if (angleDeg >= 40 && angleDeg <= 80) return 'L2';
-  if (angleDeg >= 33 && angleDeg <= 90) return 'L1';
-  
-  return null; // out of range
+  // --- Sales-friendly normalisation ---
+  let displayDeg;
+  if (angleDeg < 50) {
+    displayDeg = Math.ceil(angleDeg); // always round UP below 50
+  } else if (angleDeg > 65) {
+    displayDeg = Math.floor(angleDeg); // always round DOWN above 65
+  } else {
+    displayDeg = Math.round(angleDeg); // normal rounding inside window
+  }
+  // --- RP23 grading (STRICT 50–65 window) ---
+  if (displayDeg >= 50 && displayDeg <= 65) return 'L4';
+  if (displayDeg >= 45 && displayDeg <= 70) return 'L3';
+  if (displayDeg >= 40 && displayDeg <= 80) return 'L2';
+  if (displayDeg >= 33 && displayDeg <= 90) return 'L1';
+  return null;
+}
+
+export function rp23DisplayAngleDeg(angleDeg) {
+  if (!Number.isFinite(angleDeg)) return null;
+  if (angleDeg < 50) return Math.ceil(angleDeg);
+  if (angleDeg > 65) return Math.floor(angleDeg);
+  return Math.round(angleDeg);
 }
 
 /**

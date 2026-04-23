@@ -11,6 +11,7 @@ import {
   rp22LevelForP5_NoWrap 
 } from "@/components/utils/seatMetrics";
 import { getSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
+import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
 
 // Helper: check if point has valid coordinates
 const hasPoint = (p) => {
@@ -111,19 +112,19 @@ export function computeSeatHudMetrics({
     if (screenWidthM > 0) {
       rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
       
-      if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
-      else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
-      else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
-      else if (rp23AngleDeg >= 35 && rp23AngleDeg <= 80) rp23Level = 'L1';
-      else rp23Level = 'N/A';
+      rp23Level = rp23LevelForAngleDeg(rp23AngleDeg);
     }
   }
 
+  const displayDeg = rp23DisplayAngleDeg(rp23AngleDeg);
+  const level = rp23LevelForAngleDeg(rp23AngleDeg);
+
   const metrics = {
     rp23: {
-      angleDeg: rp23AngleDeg,
-      level: rp23Level,
-      formatted: Number.isFinite(rp23AngleDeg) ? `${rp23AngleDeg.toFixed(1)}°` : '—',
+      value: rp23AngleDeg,
+      displayDeg,
+      formatted: displayDeg != null ? `${displayDeg}°` : '—',
+      level,
     },
     rp22: {}
   };
