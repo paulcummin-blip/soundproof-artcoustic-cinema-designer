@@ -10,6 +10,7 @@ import { normaliseScreenConfig } from "@/components/models/screen/normalise";
 import { WIDTH_PRESETS } from "@/components/data/screenSizes"; // Keep this import, even if not directly used in the final select list
 import { useAppState } from "@/components/AppStateProvider";
 import RoomVisualisation from "./RoomVisualisation";
+import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
@@ -52,23 +53,35 @@ export default function ScreenConfiguration(props) {
 
   const borderThicknessM = Number(screenData.borderThicknessM) || 0.08;
 
-  // Compute MLP position
-  const mlpPoint = useMemo(() => {
-    if (!seatingPositions?.length || !dimensions) return null;
-    
-    const primarySeats = seatingPositions.filter(s => s.isPrimary);
-    const seats = primarySeats.length > 0 ? primarySeats : seatingPositions;
-    
-    const sum = seats.reduce((acc, seat) => ({
-      x: acc.x + (Number(seat.x) || 0),
-      y: acc.y + (Number(seat.y) || 0)
-    }), { x: 0, y: 0 });
-    
-    return {
-      x: sum.x / seats.length,
-      y: sum.y / seats.length
-    };
-  }, [seatingPositions, dimensions]);
+  // Compute per-row live metrics source data
+  const seatingRowsLive = useMemo(() => {
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return [];
+
+    const rowsMap = new Map();
+
+    seatingPositions.forEach((seat) => {
+      const rowNumber = Number(seat?.rowNumber);
+      const y = Number(seat?.y);
+      const z = Number.isFinite(Number(seat?.z)) ? Number(seat?.z) : 1.2;
+
+      if (!Number.isFinite(rowNumber) || !Number.isFinite(y)) return;
+
+      if (!rowsMap.has(rowNumber)) {
+        rowsMap.set(rowNumber, { rowNumber, ys: [], zs: [] });
+      }
+
+      rowsMap.get(rowNumber).ys.push(y);
+      rowsMap.get(rowNumber).zs.push(z);
+    });
+
+    return Array.from(rowsMap.values())
+      .map((row) => ({
+        rowNumber: row.rowNumber,
+        rowCentreY: row.ys.reduce((sum, value) => sum + value, 0) / row.ys.length,
+        rowEarHeight: row.zs.reduce((sum, value) => sum + value, 0) / row.zs.length,
+      }))
+      .sort((a, b) => a.rowNumber - b.rowNumber);
+  }, [seatingPositions]);
 
   // Compute viewable dimensions
   const viewableDimensions = useMemo(() => {
@@ -141,41 +154,44 @@ export default function ScreenConfiguration(props) {
     return gapWallToSpeakerM + maxDepthM + gapSpeakerToScreenM;
   }, [placedSpeakers]);
 
-  // Live metrics computation - uses VIEWABLE width only (same as Viewing Angle Analysis)
+  // Live metrics computation - per row, uses VIEWABLE width only
   const liveMetrics = useMemo(() => {
-    if (!mlpPoint || !dimensions) {
-      return {
-        horizontalAngle: 0,
-        verticalAngle: 0,
-        distanceToMLP: 0,
-        valid: false
-      };
-    }
+    const rows = seatingRowsLive.map((row) => {
+      const viewingDistance = Math.max(0, row.rowCentreY - screenFrontPlaneM);
 
-    // Use live screen front plane from appState (same as Viewing Angle Analysis)
-    const distanceToMLP = Math.max(0, mlpPoint.y - screenFrontPlaneM);
-    
-    if (distanceToMLP <= 0.10) {
-      return {
-        horizontalAngle: 0,
-        verticalAngle: 0,
-        distanceToMLP,
-        valid: false
-      };
-    }
+      if (viewingDistance <= 0.10) {
+        return {
+          ...row,
+          viewingDistance,
+          rawHorizontalAngle: 0,
+          rawVerticalAngle: 0,
+          displayHorizontal: null,
+          displayVertical: null,
+          level: null,
+          valid: false,
+        };
+      }
 
-    // CRITICAL: Use viewableDimensions (excludes borders) for angle calculation
-    // This matches the Viewing Angle Analysis calculation exactly
-    const horizontalAngle = 2 * Math.atan((viewableDimensions.widthM / 2) / distanceToMLP) * (180 / Math.PI);
-    const verticalAngle = 2 * Math.atan((viewableDimensions.heightM / 2) / distanceToMLP) * (180 / Math.PI);
+      const rawHorizontalAngle = 2 * Math.atan((viewableDimensions.widthM / 2) / viewingDistance) * (180 / Math.PI);
+      const rawVerticalAngle = 2 * Math.atan((viewableDimensions.heightM / 2) / viewingDistance) * (180 / Math.PI);
+
+      return {
+        ...row,
+        viewingDistance,
+        rawHorizontalAngle,
+        rawVerticalAngle,
+        displayHorizontal: rp23DisplayAngleDeg(rawHorizontalAngle),
+        displayVertical: Math.round(rawVerticalAngle),
+        level: rp23LevelForAngleDeg(rawHorizontalAngle),
+        valid: true,
+      };
+    });
 
     return {
-      horizontalAngle: Math.round(horizontalAngle * 10) / 10,
-      verticalAngle: Math.round(verticalAngle * 10) / 10,
-      distanceToMLP,
-      valid: true
+      rows,
+      valid: rows.some((row) => row.valid),
     };
-  }, [mlpPoint, screenFrontPlaneM, viewableDimensions]);
+  }, [seatingRowsLive, screenFrontPlaneM, viewableDimensions]);
 
   // Overall dimensions including border
   const overallDimensions = useMemo(() => {
@@ -188,15 +204,16 @@ export default function ScreenConfiguration(props) {
   // Fire custom event when metrics change
   useEffect(() => {
     if (typeof window !== 'undefined' && liveMetrics.valid) {
+      const firstValidRow = liveMetrics.rows.find((row) => row.valid) || null;
       const event = new CustomEvent('b44:screen:metrics', {
         detail: {
-          hdeg: liveMetrics.horizontalAngle,
-          vdeg: liveMetrics.verticalAngle,
+          hdeg: firstValidRow?.displayHorizontal ?? 0,
+          vdeg: firstValidRow?.displayVertical ?? 0,
           viewableW_m: viewableDimensions.widthM,
           viewableH_m: viewableDimensions.heightM,
           overallW_m: overallDimensions.widthM,
           overallH_m: overallDimensions.heightM,
-          distanceToMLP_m: liveMetrics.distanceToMLP
+          distanceToMLP_m: firstValidRow?.viewingDistance ?? 0
         }
       });
       window.dispatchEvent(event);
@@ -581,37 +598,59 @@ export default function ScreenConfiguration(props) {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <Label className="text-[#625143] text-xs">Horizontal viewing angle</Label>
-                  <div className="text-[#1B1A1A] font-medium">{liveMetrics.horizontalAngle}°</div>
-                </div>
-                <div>
-                  <Label className="text-[#625143] text-xs">Vertical viewing angle</Label>
-                  <div className="text-[#1B1A1A] font-medium">{liveMetrics.verticalAngle}°</div>
-                </div>
-                <div>
-                  <Label className="text-[#625143] text-xs">Viewable area</Label>
-                  <div className="text-[#1B1A1A] font-medium">
-                    {toCm(viewableDimensions.widthM)} × {toCm(viewableDimensions.heightM)} cm
-                    <span className="text-[#625143] ml-1">
-                      ({toInches(viewableDimensions.widthM)}" × {toInches(viewableDimensions.heightM)}")
-                    </span>
+              <div className="space-y-3 text-sm">
+                {liveMetrics.rows.map((row) => (
+                  <div key={row.rowNumber} className="rounded-md border border-[#E5E5E5] p-3">
+                    <div className="text-[#1B1A1A] font-medium">Row {row.rowNumber}</div>
+                    {row.valid ? (
+                      <div className="mt-2 grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-[#625143] text-xs">Horizontal</Label>
+                          <div className="text-[#1B1A1A] font-medium">{row.displayHorizontal}°</div>
+                        </div>
+                        <div>
+                          <Label className="text-[#625143] text-xs">Vertical</Label>
+                          <div className="text-[#1B1A1A] font-medium">{row.displayVertical}°</div>
+                        </div>
+                        <div>
+                          <Label className="text-[#625143] text-xs">Distance</Label>
+                          <div className="text-[#1B1A1A] font-medium">{row.viewingDistance.toFixed(2)}m</div>
+                        </div>
+                        <div>
+                          <Label className="text-[#625143] text-xs">RP23</Label>
+                          <div className="text-[#1B1A1A] font-medium">{row.level ? `Level ${row.level.replace('L', '')}` : '—'}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-amber-600 text-xs">Move this row away from screen to compute angles</div>
+                    )}
                   </div>
-                </div>
-                <div>
-                  <Label className="text-[#625143] text-xs">Overall with border</Label>
-                  <div className="text-[#1B1A1A] font-medium">
-                    {toCm(overallDimensions.widthM)} × {toCm(overallDimensions.heightM)} cm
-                    <span className="text-[#625143] ml-1">
-                      ({toInches(overallDimensions.widthM)}" × {toInches(overallDimensions.heightM)}")
-                    </span>
+                ))}
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <Label className="text-[#625143] text-xs">Viewable area</Label>
+                    <div className="text-[#1B1A1A] font-medium">
+                      {toCm(viewableDimensions.widthM)} × {toCm(viewableDimensions.heightM)} cm
+                      <span className="text-[#625143] ml-1">
+                        ({toInches(viewableDimensions.widthM)}" × {toInches(viewableDimensions.heightM)}")
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
-                  <div className="text-[#1B1A1A] font-medium">
-                    {Math.round((screen?.screenPlaneY_m ?? 0) * 100)} cm
+                  <div>
+                    <Label className="text-[#625143] text-xs">Overall with border</Label>
+                    <div className="text-[#1B1A1A] font-medium">
+                      {toCm(overallDimensions.widthM)} × {toCm(overallDimensions.heightM)} cm
+                      <span className="text-[#625143] ml-1">
+                        ({toInches(overallDimensions.widthM)}" × {toInches(overallDimensions.heightM)}")
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
+                    <div className="text-[#1B1A1A] font-medium">
+                      {Math.round((screen?.screenPlaneY_m ?? 0) * 100)} cm
+                    </div>
                   </div>
                 </div>
               </div>
