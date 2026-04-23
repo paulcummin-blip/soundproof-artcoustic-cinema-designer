@@ -19,6 +19,7 @@ export function useSeatingRebuild({
   _seatSpacing,
   _rowSpacingM,
   _mlpBasis,
+  seatingArrangementBasis,
   stableDimensions,
   _rowEarHeights,
 }) {
@@ -100,7 +101,7 @@ export function useSeatingRebuild({
       const MAX_Y = len - 0.40;
       const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
-      const rawCenters = buildRowCenters(stableBaseY, list.length, Number(_rowSpacingM) || 1.8, _mlpBasis) || [];
+      const rawCenters = buildRowCenters(stableBaseY, list.length, Number(_rowSpacingM) || 1.8, seatingArrangementBasis || _mlpBasis) || [];
       const centers = rawCenters.map((y) => clampY(Number(y)));
 
       const roomWidth = Number(stableDimensions?.width) || 4.5;
@@ -181,7 +182,7 @@ export function useSeatingRebuild({
 
       const mlpY = appState?.mlpY_m;
       const rowSpacing = Number(_rowSpacingM) || 1.8;
-      const mlpReference = _mlpBasis;
+      const mlpReference = seatingArrangementBasis || _mlpBasis;
 
       if (Number.isFinite(mlpY) && typeof buildRowCenters === 'function' && typeof appState?.setRowCentersM === 'function') {
         let generated = [];
