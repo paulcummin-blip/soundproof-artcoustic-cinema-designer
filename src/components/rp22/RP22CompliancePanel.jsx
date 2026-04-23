@@ -4,6 +4,7 @@ import { useAppState } from "@/components/AppStateProvider";
 import { computeScreenMetrics } from "@/components/utils/screenMetrics";
 import { renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 /* ---------- Helpers ---------- */
 
@@ -138,6 +139,75 @@ const sub   = { fontSize: 12, color: "#625143", marginTop: 4 };
 const body  = { padding: "8px 12px 12px 12px" };
 const row   = { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 };
 const keyTx = { fontSize: 12, color: "#3E4349" };
+
+const buildP16DebugText = (metric) => {
+  const perSpeaker = metric?.debug?.perSpeaker;
+  if (!perSpeaker || Object.keys(perSpeaker).length === 0) return "";
+  return Object.entries(perSpeaker).map(([role, sp]) => {
+    const isWorst = role === String(metric.debug?.worst?.role);
+    const seatAz = Number.isFinite(sp?.seatAzDeg) ? sp.seatAzDeg.toFixed(1) : '—';
+    const aim = Number.isFinite(sp?.aimDegRaw) ? sp.aimDegRaw.toFixed(1) : '—';
+    const offAxis = Number.isFinite(sp?.offAxisRaw) ? sp.offAxisRaw.toFixed(1) : '—';
+    const angle = Number.isFinite(sp?.angleDeg) ? sp.angleDeg : '—';
+    const seat = Number.isFinite(sp?.continuousLossAtSeat) ? sp.continuousLossAtSeat.toFixed(2) : '—';
+    const rsp = Number.isFinite(sp?.continuousLossAtRsp) ? sp.continuousLossAtRsp.toFixed(2) : '—';
+    const delta = Number.isFinite(sp?.normalizedDelta) ? sp.normalizedDelta.toFixed(1) : '—';
+    return `${isWorst ? '[worst] ' : ''}${role} seatAz=${seatAz} aim=${aim} offAxis=${offAxis} angle=${angle} | seat ${seat} dB | rsp ${rsp} dB | delta ${delta} dB`;
+  }).join('\n');
+};
+
+const buildP17DebugText = (metric) => {
+  if (!metric?.perSpeaker || metric.perSpeaker.length === 0) return "";
+  const lines = [];
+  const speakerLine = metric.perSpeaker
+    .slice()
+    .sort((a, b) => a.role.localeCompare(b.role))
+    .map((s) => {
+      const displayAngle = Number.isFinite(s?.rawAngleDeg) ? s.rawAngleDeg : s?.angleDeg;
+      const angle = Number.isFinite(displayAngle) ? String(Math.floor(Math.abs(displayAngle) + 1e-9)) : '—';
+      const rawLoss = Number.isFinite(s?.lossDb) ? Number(s.lossDb) : null;
+      let lossText = '—';
+      if (s?.isBeyondNonLcrLimit) lossText = 'N/A';
+      else if (rawLoss == null) lossText = '—';
+      else if (rawLoss <= 0.0) lossText = '0.0 dB';
+      else if (rawLoss <= 1.5) lossText = '1.5 dB';
+      else if (rawLoss <= 3.0) lossText = '3.0 dB';
+      else lossText = '>3.0 dB';
+      const text = `${s.role} ${angle}° / ${lossText}`;
+      return metric?.worstRole === s.role ? `[worst] ${text}` : text;
+    })
+    .join(', ');
+  lines.push(speakerLine);
+
+  if (metric?.worstRole && Number.isFinite(metric?.worstAngleDeg) && Number.isFinite(metric?.worstLossDb)) {
+    const raw = Number(metric.worstLossDb);
+    const worstLossText = raw <= 0.0 ? '0.0 dB' : raw <= 1.5 ? '1.5 dB' : raw <= 3.0 ? '3.0 dB' : '>3.0 dB';
+    lines.push(`(worst: ${metric.worstRole} ${String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / ${worstLossText})`);
+  }
+
+  if (metric.p17HasNaAngles) {
+    lines.push('N/A = >41° off-axis; RP22 Level 2 limit');
+  }
+
+  const BED_DEBUG_ROLES = ['SBL', 'SBR', 'SL', 'SR', 'LW', 'RW'];
+  const debugSpeakers = metric.perSpeaker.filter(s => BED_DEBUG_ROLES.includes(s.role) && s.debug);
+  if (debugSpeakers.length) {
+    const formatDbgVal = (v) => Number.isFinite(v) ? v.toFixed(1) : '—';
+    debugSpeakers.forEach((s) => {
+      lines.push(`${s.role} dbg: seatAz=${formatDbgVal(s.debug.seatAzDeg)} ref=${formatDbgVal(s.debug.referenceDeg ?? s.debug.aimDegRaw)} offAxis=${formatDbgVal(s.debug.offAxisDegComputed)}`);
+    });
+  }
+
+  return lines.join('\n');
+};
+
+const getMetricDebugText = (paramId, metric) => {
+  if (!metric) return "";
+  if (paramId === 9) return metric?.debugText || "";
+  if (paramId === 16) return buildP16DebugText(metric);
+  if (paramId === 17) return buildP17DebugText(metric);
+  return "";
+};
 
 /* ---------- Canonical RP22 Parameters (FULL, with scope) ---------- */
 const RP22_PARAMS = [
@@ -856,12 +926,64 @@ export default function RP22CompliancePanel({
             p.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
             p.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
             null;
+          const debugMetric = String(reportSource).startsWith("seat:")
+            ? (() => {
+                const seatId = String(reportSource).split(":")[1];
+                const snap =
+                  seatSnapshotsById?.[seatId] ||
+                  seatSnapshotsById?.["mlp"] ||
+                  (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
+                  (seatId === "mlp" ? analysisResult?.perSeatRp22?.["mlp"] : null) ||
+                  null;
+                return snap?.rp22?.[`p${p.id}`] || null;
+              })()
+            : null;
+          const debugText = getMetricDebugText(p.id, debugMetric);
 
           return (
             <div key={p.id} style={card}>
               <div style={head}>
-                <div style={title}>
-                  {p.id}. {p.title}
+                <div style={{ ...title, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>{p.id}. {p.title}</span>
+                  {debugText ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={`Debug info for parameter ${p.id}`}
+                            style={{
+                              border: "1px solid #C1B6AD",
+                              background: "#F6F3EE",
+                              color: "#625143",
+                              borderRadius: 9999,
+                              width: 18,
+                              height: 18,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              lineHeight: 1,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "help",
+                              flex: "0 0 auto",
+                            }}
+                          >
+                            i
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="start"
+                          className="max-w-[420px] whitespace-pre-wrap break-words rounded-md border border-[#C1B6AD] bg-white px-3 py-2 text-[#1B1A1A] shadow-lg"
+                        >
+                          <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace", fontSize: 11, lineHeight: 1.5 }}>
+                            {debugText}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : null}
                 </div>
                 <div style={{ ...sub, display: "flex", gap: 8, alignItems: "center" }}>
                   <span>{p.short}</span>
