@@ -14,6 +14,7 @@ import {
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { computeSurroundRingGaps, rp22LevelForP5 } from '@/components/utils/p5SurroundGaps';
 import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
+import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 
 // Helper for safe number extraction
 const finite = (v, fallback) => {
@@ -167,18 +168,13 @@ export function buildSeatHudSnapshot({
   // RP23 horizontal viewing angle
   let rp23AngleDeg = null;
   let rp23Level = null;
-  let rp23DisplayDeg = null; // Floored integer for display
+  let rp23DisplayDeg = null;
   if (screen?.visibleWidthInches && distanceToScreen > 0.1) {
     const screenWidthM = (screen.visibleWidthInches * 0.0254) || 0;
     if (screenWidthM > 0) {
       rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
-      rp23DisplayDeg = Math.floor(rp23AngleDeg);
-      
-      if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
-      else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
-      else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
-      else if (rp23AngleDeg >= 35 && rp23AngleDeg <= 80) rp23Level = 'L1';
-      else rp23Level = 'FAIL';
+      rp23DisplayDeg = rp23DisplayAngleDeg(rp23AngleDeg);
+      rp23Level = rp23LevelForAngleDeg(rp23AngleDeg) || 'FAIL';
     }
   }
 
