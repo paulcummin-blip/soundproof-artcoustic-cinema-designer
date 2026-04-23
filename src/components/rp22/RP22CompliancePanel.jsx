@@ -703,6 +703,8 @@ export default function RP22CompliancePanel({
         seatSnapshotsById?.[seatId] ||
         seatSnapshotsById?.["mlp"] ||
         (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
+        // Fallback: if seatId is "mlp", read directly from analysisResult.perSeatRp22["mlp"]
+        (seatId === "mlp" ? analysisResult?.perSeatRp22?.["mlp"] : null) ||
         null;
 
       const key = `p${pid}`;
@@ -780,6 +782,8 @@ export default function RP22CompliancePanel({
         seatSnapshotsById?.[seatId] ||
         seatSnapshotsById?.["mlp"] ||
         (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
+        // Fallback: if seatId is "mlp", read directly from analysisResult.perSeatRp22["mlp"]
+        (seatId === "mlp" ? analysisResult?.perSeatRp22?.["mlp"] : null) ||
         null;
 
       const key = `p${pid}`;
