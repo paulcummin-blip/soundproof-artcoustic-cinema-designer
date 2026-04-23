@@ -251,9 +251,22 @@ export function buildSeatHudSnapshot({
     );
 
     const worst = data.rp22.p9.details.worst;
+    const rowElevations = Array.isArray(data.rp22.p9.details.rowElevations)
+      ? data.rp22.p9.details.rowElevations
+      : [];
+    const frontRow = rowElevations.find(r => r?.rowName === 'front');
+    const midRow = rowElevations.find(r => r?.rowName === 'mid');
+    const rearRow = rowElevations.find(r => r?.rowName === 'rear');
+    const fmtSigned = (v) => Number.isFinite(Number(v)) ? `${Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(2)}` : '—';
+    const geometryText = [
+      `seatY=${seatY.toFixed(2)}`,
+      `F=${Number.isFinite(frontRow?.avgY) ? frontRow.avgY.toFixed(2) : '—'} M=${Number.isFinite(midRow?.avgY) ? midRow.avgY.toFixed(2) : '—'} R=${Number.isFinite(rearRow?.avgY) ? rearRow.avgY.toFixed(2) : '—'}`,
+      `dF=${fmtSigned(frontRow?.dy)} dM=${fmtSigned(midRow?.dy)} dR=${fmtSigned(rearRow?.dy)}`
+    ].join(' | ');
+
     data.rp22.p9.debugText = worst
-      ? `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°)`
-      : lines.join(', ');
+      ? `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°) | ${geometryText}`
+      : `${lines.join(', ')} | ${geometryText}`;
   }
 
   // P9: Set N/A if no overheads
