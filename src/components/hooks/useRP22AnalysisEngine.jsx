@@ -1065,7 +1065,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const upperSpeakers = getUpperSpeakersForSeat(seat, safeSpeakers, getCanonicalRole);
       if (upperSpeakers.length >= 2) {
         const result = computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCenterX);
-        const { maxVerticalGapDeg, gaps, worstGap } = result;
+        const { maxVerticalGapDeg, gaps, worstGap, rowElevations } = result;
         
         if (isNum(maxVerticalGapDeg)) {
           let level9 = 1;
@@ -1080,6 +1080,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             details: {
               gaps,
               worst: worstGap,
+              rowElevations,
             },
           };
         }

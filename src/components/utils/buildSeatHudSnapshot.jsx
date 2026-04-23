@@ -257,11 +257,13 @@ export function buildSeatHudSnapshot({
     const frontRow = rowElevations.find(r => r?.rowName === 'front');
     const midRow = rowElevations.find(r => r?.rowName === 'mid');
     const rearRow = rowElevations.find(r => r?.rowName === 'rear');
-    const fmtSigned = (v) => Number.isFinite(Number(v)) ? `${Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(2)}` : '—';
+    const rspY = Number.isFinite(mlp?.y) ? mlp.y.toFixed(2) : '—';
     const geometryText = [
-      `seatY=${seatY.toFixed(2)}`,
-      `F=${Number.isFinite(frontRow?.avgY) ? frontRow.avgY.toFixed(2) : '—'} M=${Number.isFinite(midRow?.avgY) ? midRow.avgY.toFixed(2) : '—'} R=${Number.isFinite(rearRow?.avgY) ? rearRow.avgY.toFixed(2) : '—'}`,
-      `dF=${fmtSigned(frontRow?.dy)} dM=${fmtSigned(midRow?.dy)} dR=${fmtSigned(rearRow?.dy)}`
+      `seatY=${Number.isFinite(seatY) ? seatY.toFixed(2) : '—'}`,
+      `rspY=${rspY}`,
+      `F=${Number.isFinite(frontRow?.avgY) ? frontRow.avgY.toFixed(2) : '—'}`,
+      `M=${Number.isFinite(midRow?.avgY) ? midRow.avgY.toFixed(2) : '—'}`,
+      `R=${Number.isFinite(rearRow?.avgY) ? rearRow.avgY.toFixed(2) : '—'}`
     ].join(' | ');
 
     data.rp22.p9.debugText = worst
