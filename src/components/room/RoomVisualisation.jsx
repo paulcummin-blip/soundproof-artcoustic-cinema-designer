@@ -83,7 +83,6 @@ import { computeAllSeatSplMetrics, getSeatSplMetrics, getMlpSeat } from "@/compo
 // NEW: Import shared seat HUD metrics calculator
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
-import { getLevelColors } from '@/components/utils/rp22Colors';
 import { useTooltipData } from '@/components/room/hooks/useTooltipData';
 
 import {
@@ -1845,7 +1844,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds}
         rowDistanceLabelSeatIds={rowDistanceLabelSeatIds}
         _overlays={_overlays}
-        hudPinnedSeatId={hudPinnedSeatId}
+        hudPinnedSeatId={null}
         handleSeatMouseEnter={handleSeatMouseEnter}
         handleSeatMouseLeave={handleSeatMouseLeave}
         handleSeatClick={handleSeatClick}

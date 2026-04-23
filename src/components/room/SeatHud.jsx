@@ -195,7 +195,7 @@ export default function SeatHud({
         }}
       >
         <div>
-          {formatSeatLabel(tooltipData.seatId)} {tooltipData.isPrimary ? '(RSP)' : ''}
+          {formatSeatLabel(tooltipData.seatId)}
           {isHudPinned && (
             <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 500, color: '#999' }}>(Pinned)</span>
           )}

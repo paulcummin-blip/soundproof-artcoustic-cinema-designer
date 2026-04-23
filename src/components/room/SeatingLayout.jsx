@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Users, Award, Eye, Ruler, RotateCcw } from 'lucide-react';
+import { Users, Eye, Ruler, RotateCcw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { clampViewingOffset } from "@/components/utils/screenMetrics";
@@ -112,12 +112,10 @@ export default function SeatingLayout({
 
 
   const totalSeats = seatingPositions.length;
-  const primarySeats = seatingPositions.filter((s) => s.isPrimary).length;
-  const secondarySeats = totalSeats - primarySeats;
 
-  const primarySeat = useMemo(() => seatingPositions.find((s) => s.isPrimary) || seatingPositions[0], [seatingPositions]);
+  const rspSeat = useMemo(() => seatingPositions.find((s) => s.isPrimary) || seatingPositions[0], [seatingPositions]);
 
-  // Compute MLP override from primary seats (fallback: all seats)
+  // Compute MLP override from RSP seat (fallback: all seats)
   const mlpOverride = useMemo(() => {
     const list = seatingPositions?.filter((s) => s.isPrimary);
     const seats = (list && list.length ? list : seatingPositions) || [];
@@ -229,30 +227,21 @@ export default function SeatingLayout({
         Current Layout Analysis
       </h3>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="text-center">
           <div className="text-2xl font-bold" style={{ color: '#1B1A1A' }}>{totalSeats}</div>
           <div className="text-xs" style={{ color: '#625143' }}>Total Seats</div>
         </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold" style={{ color: '#213428' }}>{primarySeats}</div>
-          <div className="text-xs" style={{ color: '#625143' }}>Primary</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold" style={{ color: '#625143' }}>{secondarySeats}</div>
-          <div className="text-xs" style={{ color: '#625143' }}>Secondary</div>
-        </div>
       </div>
 
-      {primarySeat &&
+      {rspSeat &&
         <div className="p-3 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7' }}>
           <div className="flex items-center gap-2 mb-2">
-            <Award className="w-4 h-4" style={{ color: '#213428' }} />
             <span className="text-sm font-medium" style={{ color: '#1B1A1A' }}>Reference Seating Position (RSP)</span>
           </div>
           <div className="text-xs space-y-1" style={{ color: '#625143' }}>
-            <p>Position: ({primarySeat.x.toFixed(2)}m, {primarySeat.y.toFixed(2)}m)</p>
-            <p>Ear Height: {primarySeat.z.toFixed(2)}m</p>
+            <p>Position: ({rspSeat.x.toFixed(2)}m, {rspSeat.y.toFixed(2)}m)</p>
+            <p>Ear Height: {rspSeat.z.toFixed(2)}m</p>
           </div>
         </div>
         }
