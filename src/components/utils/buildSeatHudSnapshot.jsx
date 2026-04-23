@@ -246,66 +246,14 @@ export function buildSeatHudSnapshot({
   });
 
   if (data.rp22.p9?.details?.gaps?.length) {
-    const seatId = seat.id || `seat-${seatX}-${seatY}`;
-    const uppers = (placedSpeakers || []).filter((s) => {
-      const role = getCanonicalRole(s?.role);
-      return role.startsWith('T') && hasPos(s);
-    });
+    const lines = data.rp22.p9.details.gaps.map(
+      g => `${g.pair} ${g.deg.toFixed(0)}°`
+    );
 
-    const rows = [
-      { key: 'front', match: (r) => r === 'TFL' || r === 'TFR' || r === 'TFC' },
-      { key: 'middle', match: (r) => r === 'TML' || r === 'TMR' || r === 'TL' || r === 'TR' },
-      { key: 'rear', match: (r) => r === 'TRL' || r === 'TRR' || r === 'TBL' || r === 'TBR' || r === 'TBC' },
-    ];
-
-    const rowStats = rows.map(({ key, match }) => {
-      const speakers = uppers.filter((s) => match(getCanonicalRole(s?.role)));
-      if (!speakers.length) {
-        return { key, avg: null, dy: null, dz: null, elev: null };
-      }
-      const avg = speakers.reduce((acc, s) => ({
-        x: acc.x + finite(s?.position?.x, 0),
-        y: acc.y + finite(s?.position?.y, 0),
-        z: acc.z + finite(s?.position?.z, roomHeight),
-      }), { x: 0, y: 0, z: 0 });
-      avg.x /= speakers.length;
-      avg.y /= speakers.length;
-      avg.z /= speakers.length;
-      const dy = avg.y - seatY;
-      const dz = avg.z - seatZ;
-      const elev = Math.atan2(Math.abs(dy), Math.max(0.0001, dz)) * (180 / Math.PI);
-      return { key, avg, dy, dz, elev };
-    });
-
-    const byKey = Object.fromEntries(rowStats.map((r) => [r.key, r]));
-    const gaps = data.rp22.p9.details.gaps || [];
-    const findGap = (a, b) => gaps.find((g) => {
-      const pair = String(g?.pair || '').toLowerCase();
-      return pair.includes(a) && pair.includes(b);
-    });
-    const frontMidGap = findGap('front', 'mid') || findGap('tfl', 'tml') || findGap('tfr', 'tmr') || null;
-    const midRearGap = findGap('mid', 'rear') || findGap('tml', 'trl') || findGap('tmr', 'trr') || null;
     const worst = data.rp22.p9.details.worst;
-    const level = data.rp22.p9.level;
-    const fmtNum = (v, d = 3) => Number.isFinite(v) ? Number(v).toFixed(d) : '—';
-    const fmtElev = (v) => Number.isFinite(v) ? `${Number(v).toFixed(1)}°` : '—';
-    const fmtGap = (g) => g && Number.isFinite(g?.deg) ? `${Number(g.deg).toFixed(1)}°` : '—';
-    const fmtAvg = (avg) => avg ? `x=${fmtNum(avg.x)} y=${fmtNum(avg.y)} z=${fmtNum(avg.z)}` : 'x=— y=— z=—';
-
-    data.rp22.p9.debugText = [
-      `seat id: ${seatId}`,
-      `seat: x=${fmtNum(seatX)} y=${fmtNum(seatY)} z=${fmtNum(seatZ)}`,
-      `front row avg: ${fmtAvg(byKey.front?.avg)}`,
-      `middle row avg: ${fmtAvg(byKey.middle?.avg)}`,
-      `rear row avg: ${fmtAvg(byKey.rear?.avg)}`,
-      `front row: dy=${fmtNum(byKey.front?.dy)} dz=${fmtNum(byKey.front?.dz)} elev=${fmtElev(byKey.front?.elev)}`,
-      `middle row: dy=${fmtNum(byKey.middle?.dy)} dz=${fmtNum(byKey.middle?.dz)} elev=${fmtElev(byKey.middle?.elev)}`,
-      `rear row: dy=${fmtNum(byKey.rear?.dy)} dz=${fmtNum(byKey.rear?.dz)} elev=${fmtElev(byKey.rear?.elev)}`,
-      `front→mid gap: ${fmtGap(frontMidGap)}`,
-      `mid→rear gap: ${fmtGap(midRearGap)}`,
-      `worst P9 gap: ${fmtGap(worst)}`,
-      `final P9 level: ${level ?? '—'}`,
-    ].join('\n');
+    data.rp22.p9.debugText = worst
+      ? `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°)`
+      : lines.join(', ');
   }
 
   // P9: Set N/A if no overheads
