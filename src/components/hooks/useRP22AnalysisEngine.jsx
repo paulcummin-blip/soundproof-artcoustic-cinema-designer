@@ -768,6 +768,29 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const seatMetrics = new Map();
     const roomCenterX = (dimensions?.widthM || 0) / 2;
 
+    // Synthetic RSP point for headline RP22 lookup (id="mlp").
+    // This is analysis-only — it never enters seatingPositions or the UI seat grid.
+    const syntheticMlpSeat = (() => {
+      const pt = (mlpPointOverride && isNum(mlpPointOverride.x) && isNum(mlpPointOverride.y))
+        ? mlpPointOverride
+        : (mlp && isNum(mlp.x) && isNum(mlp.y) ? mlp : null);
+      if (!pt) return null;
+      return {
+        id: "mlp",
+        x: pt.x,
+        y: pt.y,
+        z: isNum(pt.z) ? pt.z : 1.2,
+        isPrimary: true,
+        __isSyntheticMLP: true,
+      };
+    })();
+
+    // seatsToEvaluate = real seats + optional synthetic RSP point
+    // seatsWithRoles is intentionally left unchanged for all other consumers
+    const seatsToEvaluate = syntheticMlpSeat
+      ? [...seatsWithRoles, syntheticMlpSeat]
+      : seatsWithRoles;
+
     // IF visiblePlanSpeakers IS PROVIDED (EVEN EMPTY), IT IS THE SOURCE OF TRUTH.
     // DO NOT FALL BACK TO safeSpeakers, OR GHOST SPEAKERS RETURN.
     const speakersForP17 = Array.isArray(visiblePlanSpeakers)
@@ -853,7 +876,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // Compute P17 for all seats (non-LCR HF variance) - PASS allowedP17Roles for layout-based filtering
 
     const p17Results = computeP17ForAllSeats({
-      seats: seatsWithRoles,
+      seats: seatsToEvaluate,
       speakers: speakersWithResolvedOverheads.filter(hasRealModel), // CRITICAL: NO MODEL = NO P17
       mlpPos: mlp,
       getSpeakerModelMeta,
@@ -881,7 +904,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // Compute screenPlaneOffsetM once for all seats (same as seating generation)
     const screenPlaneOffsetM = screen?.mountMode === "floating" ? (Number(screen?.floatDepthM) || 0) : 0;
 
-    for (const seat of seatsWithRoles) {
+    for (const seat of seatsToEvaluate) {
       const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
       const metrics = { p1: null, p4: null, p5: null, p6: null, p9: null, p10: null, p16: null, p17: null, p20: null };
 
@@ -1183,8 +1206,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     }
 
     // Build perSeatRp22 - reusable structure for all consumers
+    // seatsToEvaluate includes real seats + synthetic "mlp" RSP point for headline lookup
     const perSeatRp22 = {};
-    for (const seat of seatsWithRoles) {
+    for (const seat of seatsToEvaluate) {
       const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
       const metrics = seatMetrics.get(seatId) || {};
       
