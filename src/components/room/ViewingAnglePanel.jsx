@@ -32,11 +32,10 @@ export default function ViewingAnglePanel({
       : Number(screen?.floatDepthM ?? 0);
 
   const rp23Data = useMemo(() => {
-    // Derive effective viewer Y: prefer the visible RSP/primary-seat override,
-    // fall back to mlpY_m from app state.
-    const effectiveViewerY = Number.isFinite(mlpOverride?.y)
-      ? mlpOverride.y
-      : (Number.isFinite(mlpY_m) ? mlpY_m : null);
+    // Use only the true RSP Y value (mlpY_m from app state).
+    // Seat layout changes must NOT affect this panel — only the true RSP
+    // position (driven by screen geometry + Viewing Offset) should.
+    const effectiveViewerY = Number.isFinite(mlpY_m) ? mlpY_m : null;
 
     if (effectiveViewerY === null || !Number.isFinite(screenFrontPlaneM)) {
       return null;
@@ -52,12 +51,12 @@ export default function ViewingAnglePanel({
     })();
     const aspectRatio = screen?.aspectRatio || "16:9";
 
-    // Use the exact same inputs as dot placement
+    // Compute angle using only the true RSP position (mlpY_m)
     const computedAngle = calculateViewingAngle(
-      { y: effectiveViewerY }, // viewer position (follows visible RSP/seat)
-      visibleWidthInches, // visible width in inches
-      aspectRatio, // aspect ratio
-      { y: screenFrontPlaneM } // screen front plane Y
+      { y: effectiveViewerY }, // true RSP viewer position
+      visibleWidthInches,
+      aspectRatio,
+      { y: screenFrontPlaneM }
     );
 
     if (computedAngle == null) return null;
@@ -82,7 +81,7 @@ export default function ViewingAnglePanel({
       label: rp23Level.label,
       color: rp23Level.color
     };
-  }, [mlpY_m, mlpOverride, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio]);
+  }, [mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio]);
 
   if (!rp23Data) {
     return (
