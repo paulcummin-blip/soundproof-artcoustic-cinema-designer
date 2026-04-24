@@ -85,11 +85,6 @@ function getQuantityLabel(quantity) {
   return `${total} ${total === 1 ? 'sub' : 'subs'}`;
 }
 
-function getCoverageLabel(seatVariation, nullPenalty) {
-  if (seatVariation < 3 && nullPenalty === 0) return 'Good';
-  if (seatVariation <= 6 && nullPenalty <= 2) return 'Moderate';
-  return 'Poor';
-}
 
 function getGrade(seatVariation, nullPenalty) {
   if (seatVariation > 10 || nullPenalty >= 4) {
@@ -205,7 +200,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
         rearSubsCfg
       });
 
-      const rankedResults = primaryResult?.bestLayout ? [primaryResult.bestLayout] : [];
+      const rankedResults = Array.isArray(primaryResult?.rankedResults) ? primaryResult.rankedResults : [];
       const currentMatchesAny = rankedResults.some((result) => isSameLayout(result, frontSubsCfg, rearSubsCfg));
 
       return {
@@ -544,7 +539,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
               <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Best Sub Layout Shortcut</h5>
               <p className="text-[11px] text-[#625143] leading-relaxed mt-1 mb-3">
-                This compares common subwoofer layouts for this room and seating to find the most even bass response. This is a fast guide, not the RP22 report.
+                This shortcut compares common subwoofer locations against the seating layout to find the least destructive modal result. It is a design guide, not the RP22 report.
               </p>
 
               {recommendationState.status === 'missing' && (
@@ -623,8 +618,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                               <div className="text-[12px] text-[#1B1A1A] mt-1">{nullPenalty}</div>
                             </div>
                             <div>
-                              <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">20–80 Hz coverage</div>
-                              <div className="text-[12px] text-[#1B1A1A] mt-1">{getCoverageLabel(seatVariance, nullPenalty)}</div>
+                              <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Modal risk</div>
+                              <div className="text-[12px] text-[#1B1A1A] mt-1">{result.modalRiskLabel || 'Moderate'}</div>
                             </div>
                           </div>
                         </div>

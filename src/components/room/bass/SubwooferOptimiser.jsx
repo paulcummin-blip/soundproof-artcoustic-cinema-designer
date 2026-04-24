@@ -179,6 +179,13 @@ function computeSeatVariance(seatResponses) {
   return average(perFrequencyDiffs);
 }
 
+function getModalRiskLabel({ seatVariance, nullPenalty, smoothness }) {
+  if (seatVariance > 10 || nullPenalty >= 4 || smoothness > 7) return 'Not recommended';
+  if (seatVariance > 6 || nullPenalty >= 2 || smoothness > 5) return 'High';
+  if (seatVariance > 3 || nullPenalty >= 1 || smoothness > 3) return 'Moderate';
+  return 'Low';
+}
+
 function buildSummary(candidate) {
   const wallText = candidate.wallConfig === 'front+rear'
     ? 'Front + Rear'
@@ -207,6 +214,7 @@ export function optimiseSubwooferLayout({
   if (seatList.length === 0) {
     const emptyResult = {
       bestLayout: null,
+      rankedResults: [],
       score: null,
       summary: 'No seats available for optimisation',
     };
@@ -299,6 +307,8 @@ export function optimiseSubwooferLayout({
       (smoothness * 1.0) -
       (outputScore * 0.1);
 
+    const modalRiskLabel = getModalRiskLabel({ seatVariance, nullPenalty, smoothness });
+
     return {
       candidate: {
         ...candidate,
@@ -311,6 +321,7 @@ export function optimiseSubwooferLayout({
       smoothness,
       outputScore,
       score,
+      modalRiskLabel,
     };
   });
 
@@ -325,24 +336,27 @@ export function optimiseSubwooferLayout({
     });
   });
 
-  const best = evaluated.reduce((currentBest, result) => {
-    if (!currentBest) return result;
-    return result.score < currentBest.score ? result : currentBest;
-  }, null);
+  const rankedResults = evaluated
+    .slice()
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 5)
+    .map((result) => ({
+      ...result.candidate,
+      seatVariance: result.seatVariance,
+      nullPenalty: result.nullPenalty,
+      smoothness: result.smoothness,
+      outputScore: result.outputScore,
+      score: result.score,
+      modalRiskLabel: result.modalRiskLabel,
+    }));
+
+  const best = rankedResults[0] || null;
 
   const finalResult = {
-    bestLayout: best
-      ? {
-          ...best.candidate,
-          subwoofers: best.subwoofers,
-          seatVariance: best.seatVariance,
-          nullPenalty: best.nullPenalty,
-          smoothness: best.smoothness,
-          outputScore: best.outputScore,
-        }
-      : null,
+    bestLayout: best,
+    rankedResults,
     score: best ? best.score : null,
-    summary: best ? buildSummary(best.candidate) : 'No valid layout found',
+    summary: best ? buildSummary(best) : 'No valid layout found',
   };
 
   console.log('[SubwooferOptimiser] Best result', finalResult);
