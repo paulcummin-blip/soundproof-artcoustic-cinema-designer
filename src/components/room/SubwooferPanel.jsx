@@ -80,9 +80,9 @@ function getWallLayoutLabel(wallConfig) {
 function getQuantityLabel(quantity) {
   if (typeof quantity === 'object' && quantity) {
     const total = (Number(quantity.front) || 0) + (Number(quantity.rear) || 0);
-    return `${total} subs`;
+    return `${total} unique subs`;
   }
-  return `${Number(quantity) || 0} subs`;
+  return `${Number(quantity) || 0} unique subs`;
 }
 
 function getCoverageLabel(seatVariation, nullPenalty) {
@@ -205,54 +205,13 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
         rearSubsCfg
       });
 
-      const roomWidth = Number(roomDimensions?.widthM ?? roomDimensions?.width) || 4.5;
-      const roomLength = Number(roomDimensions?.lengthM ?? roomDimensions?.length) || 6.0;
-      const seatCount = Array.isArray(seats) ? seats.length : 0;
-      const wallConfigs = ['front', 'rear', 'front+rear'];
-      const placementModes = ['quarter', 'corners', 'midpoint', 'sixth', 'asymmetric'];
-      const quantityOptions = [1, 2, 4];
-
-      const candidates = [];
-      wallConfigs.forEach((wallConfig) => {
-        placementModes.forEach((placementMode, placementIndex) => {
-          quantityOptions.forEach((quantity, quantityIndex) => {
-            const isFrontRear = wallConfig === 'front+rear';
-            const seatVariationBase = placementMode === 'quarter'
-              ? 2.2
-              : placementMode === 'corners'
-                ? 3.4
-                : placementMode === 'sixth'
-                  ? 4.8
-                  : placementMode === 'midpoint'
-                    ? 6.7
-                    : 7.9;
-            const wallBonus = wallConfig === 'front+rear' ? -0.8 : wallConfig === 'front' ? 0 : 0.4;
-            const quantityBonus = quantity === 4 ? -0.9 : quantity === 2 ? -0.3 : 0.8;
-            const sizeFactor = ((roomWidth + roomLength) / 12) * 0.4;
-            const seatFactor = Math.max(0, seatCount - 1) * 0.08;
-            const seatVariation = Math.max(1.4, seatVariationBase + wallBonus + quantityBonus + sizeFactor + seatFactor + (placementIndex * 0.05) + (quantityIndex * 0.03));
-            const nullPenalty = seatVariation < 3 ? 0 : seatVariation < 6 ? 1 : seatVariation < 8 ? 2 : 4;
-            const score = (seatVariation * 2) + (nullPenalty * 3) + (quantity === 1 ? 1.5 : 0);
-
-            candidates.push({
-              wallConfig,
-              placementMode,
-              quantity: isFrontRear ? { front: quantity, rear: quantity } : quantity,
-              seatVariation,
-              nullPenalty,
-              score,
-            });
-          });
-        });
-      });
-
-      const sortedResults = candidates.sort((a, b) => a.score - b.score).slice(0, 5);
-      const currentMatchesAny = sortedResults.some((result) => isSameLayout(result, frontSubsCfg, rearSubsCfg));
+      const rankedResults = primaryResult?.bestLayout ? [primaryResult.bestLayout] : [];
+      const currentMatchesAny = rankedResults.some((result) => isSameLayout(result, frontSubsCfg, rearSubsCfg));
 
       return {
         status: primaryResult?.bestLayout ? 'ready' : 'empty',
         result: primaryResult,
-        rankedResults: sortedResults,
+        rankedResults,
         currentMatchesAny,
       };
     } catch (error) {

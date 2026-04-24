@@ -76,25 +76,17 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const patterns = {
         quarter: safeQty === 1
           ? [widthM * 0.5]
-          : safeQty === 2
-            ? [widthM * 0.25, widthM * 0.75]
-            : [widthM * 0.25, widthM * 0.5, widthM * 0.75],
+          : [widthM * 0.25, widthM * 0.75],
         corners: safeQty === 1
           ? [left]
           : [left, right],
         midpoint: [widthM * 0.5],
         sixth: safeQty === 1
           ? [widthM * 0.5]
-          : safeQty === 2
-            ? [widthM / 6, widthM * 5 / 6]
-            : [widthM / 6, widthM * 0.5, widthM * 5 / 6],
+          : [widthM / 6, widthM * 5 / 6],
         asymmetric: safeQty === 1
           ? [widthM * 0.38]
-          : safeQty === 2
-            ? [widthM * 0.32, widthM * 0.78]
-            : safeQty === 3
-              ? [widthM * 0.22, widthM * 0.47, widthM * 0.73]
-              : [widthM * 0.22, widthM * 0.47, widthM * 0.73, widthM * 0.86],
+          : [widthM * 0.32, widthM * 0.78],
       };
 
       const selected = patterns[placementMode] || patterns.quarter;

@@ -12,11 +12,11 @@ const DEFAULT_SUB_HEIGHT_M = 0.5;
 const DEFAULT_SUB_DEPTH_M = 0.255;
 
 const USEFUL_QTY_BY_PLACEMENT_MODE = {
-  quarter: 3,
-  sixth: 3,
+  quarter: 2,
+  sixth: 2,
   corners: 2,
   midpoint: 1,
-  asymmetric: 4,
+  asymmetric: 2,
 };
 
 function clamp(value, min, max) {
@@ -82,30 +82,22 @@ function makePlacementXs({ qty, placementMode, roomWidth, model, orientation }) 
     return Array.from({ length: qty }, (_, i) => margin + span * (i / (qty - 1))).map((x) => clamp(x, minX, maxX));
   }
 
-  const safeQty = Math.max(1, Math.min(qty, USEFUL_QTY_BY_PLACEMENT_MODE[placementMode] || 4));
+  const safeQty = Math.max(1, Math.min(qty, USEFUL_QTY_BY_PLACEMENT_MODE[placementMode] || 2));
 
   const patterns = {
     quarter: safeQty === 1
       ? [roomWidth * 0.5]
-      : safeQty === 2
-        ? [roomWidth * 0.25, roomWidth * 0.75]
-        : [roomWidth * 0.25, roomWidth * 0.5, roomWidth * 0.75],
+      : [roomWidth * 0.25, roomWidth * 0.75],
     corners: safeQty === 1
       ? [left]
       : [left, right],
     midpoint: [roomWidth * 0.5],
     sixth: safeQty === 1
       ? [roomWidth * 0.5]
-      : safeQty === 2
-        ? [roomWidth / 6, roomWidth * 5 / 6]
-        : [roomWidth / 6, roomWidth * 0.5, roomWidth * 5 / 6],
+      : [roomWidth / 6, roomWidth * 5 / 6],
     asymmetric: safeQty === 1
       ? [roomWidth * 0.38]
-      : safeQty === 2
-        ? [roomWidth * 0.32, roomWidth * 0.78]
-        : safeQty === 3
-          ? [roomWidth * 0.22, roomWidth * 0.47, roomWidth * 0.73]
-          : [roomWidth * 0.22, roomWidth * 0.47, roomWidth * 0.73, roomWidth * 0.86],
+      : [roomWidth * 0.32, roomWidth * 0.78],
   };
 
   const selected = patterns[placementMode] || patterns.quarter;
@@ -226,23 +218,15 @@ export function optimiseSubwooferLayout({
   const candidates = [];
 
   placementModes.forEach((placementMode) => {
-    const frontQuantities = getQuantityOptions(frontSubsCfg?.count, placementMode);
-    const rearQuantities = getQuantityOptions(rearSubsCfg?.count, placementMode);
+    const frontQuantity = USEFUL_QTY_BY_PLACEMENT_MODE[placementMode] || 1;
+    const rearQuantity = USEFUL_QTY_BY_PLACEMENT_MODE[placementMode] || 1;
 
-    frontQuantities.forEach((quantity) => {
-      candidates.push({ placementMode, quantity, wallConfig: 'front' });
-    });
-    rearQuantities.forEach((quantity) => {
-      candidates.push({ placementMode, quantity, wallConfig: 'rear' });
-    });
-    frontQuantities.forEach((frontQuantity) => {
-      rearQuantities.forEach((rearQuantity) => {
-        candidates.push({
-          placementMode,
-          quantity: { front: frontQuantity, rear: rearQuantity },
-          wallConfig: 'front+rear',
-        });
-      });
+    candidates.push({ placementMode, quantity: frontQuantity, wallConfig: 'front' });
+    candidates.push({ placementMode, quantity: rearQuantity, wallConfig: 'rear' });
+    candidates.push({
+      placementMode,
+      quantity: { front: frontQuantity, rear: rearQuantity },
+      wallConfig: 'front+rear',
     });
   });
 
