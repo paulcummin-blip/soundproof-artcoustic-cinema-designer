@@ -11,13 +11,22 @@ const DEFAULT_SUB_MODEL = 'SUB2-12';
 const DEFAULT_SUB_HEIGHT_M = 0.5;
 const DEFAULT_SUB_DEPTH_M = 0.255;
 
+const USEFUL_QTY_BY_PLACEMENT_MODE = {
+  quarter: 3,
+  sixth: 3,
+  corners: 2,
+  midpoint: 1,
+  asymmetric: 4,
+};
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function getQuantityOptions(count) {
+function getQuantityOptions(count, placementMode) {
   const explicit = Number(count);
-  const allowed = [1, 2, 4];
+  const maxUseful = USEFUL_QTY_BY_PLACEMENT_MODE[placementMode] || 4;
+  const allowed = [1, 2, 3, 4].filter((qty) => qty <= maxUseful);
   if (allowed.includes(explicit)) return [explicit];
   return allowed;
 }
@@ -71,32 +80,34 @@ function makePlacementXs({ qty, placementMode, roomWidth, model, orientation }) 
     return Array.from({ length: qty }, (_, i) => margin + span * (i / (qty - 1))).map((x) => clamp(x, minX, maxX));
   }
 
+  const safeQty = Math.max(1, Math.min(qty, USEFUL_QTY_BY_PLACEMENT_MODE[placementMode] || 4));
+
   const patterns = {
-    quarter: qty === 1
+    quarter: safeQty === 1
       ? [roomWidth * 0.5]
-      : qty === 2
+      : safeQty === 2
         ? [roomWidth * 0.25, roomWidth * 0.75]
-        : [roomWidth * 0.25, roomWidth * 0.5, roomWidth * 0.75, roomWidth * 0.5],
-    corners: qty === 1
+        : [roomWidth * 0.25, roomWidth * 0.5, roomWidth * 0.75],
+    corners: safeQty === 1
       ? [left]
-      : qty === 2
-        ? [left, right]
-        : [left, right, left, right],
-    midpoint: Array.from({ length: qty }, () => roomWidth * 0.5),
-    sixth: qty === 1
+      : [left, right],
+    midpoint: [roomWidth * 0.5],
+    sixth: safeQty === 1
       ? [roomWidth * 0.5]
-      : qty === 2
+      : safeQty === 2
         ? [roomWidth / 6, roomWidth * 5 / 6]
-        : [roomWidth / 6, roomWidth * 0.5, roomWidth * 5 / 6, roomWidth * 0.5],
-    asymmetric: qty === 1
+        : [roomWidth / 6, roomWidth * 0.5, roomWidth * 5 / 6],
+    asymmetric: safeQty === 1
       ? [roomWidth * 0.38]
-      : qty === 2
+      : safeQty === 2
         ? [roomWidth * 0.32, roomWidth * 0.78]
-        : [roomWidth * 0.22, roomWidth * 0.47, roomWidth * 0.73, roomWidth * 0.86],
+        : safeQty === 3
+          ? [roomWidth * 0.22, roomWidth * 0.47, roomWidth * 0.73]
+          : [roomWidth * 0.22, roomWidth * 0.47, roomWidth * 0.73, roomWidth * 0.86],
   };
 
   const selected = patterns[placementMode] || patterns.quarter;
-  return Array.from({ length: qty }, (_, i) => clamp(selected[i] ?? selected[selected.length - 1] ?? (roomWidth * 0.5), minX, maxX));
+  return selected.map((x) => clamp(x, minX, maxX));
 }
 
 function buildVirtualSubsForGroup({ cfg, group, qty, placementMode, roomDimensions }) {
@@ -210,11 +221,12 @@ export function optimiseSubwooferLayout({
   }
 
   const placementModes = ['quarter', 'corners', 'midpoint', 'sixth', 'asymmetric'];
-  const frontQuantities = getQuantityOptions(frontSubsCfg?.count);
-  const rearQuantities = getQuantityOptions(rearSubsCfg?.count);
   const candidates = [];
 
   placementModes.forEach((placementMode) => {
+    const frontQuantities = getQuantityOptions(frontSubsCfg?.count, placementMode);
+    const rearQuantities = getQuantityOptions(rearSubsCfg?.count, placementMode);
+
     frontQuantities.forEach((quantity) => {
       candidates.push({ placementMode, quantity, wallConfig: 'front' });
     });
