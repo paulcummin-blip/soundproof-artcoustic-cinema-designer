@@ -792,7 +792,7 @@ function RP22ReportInner() {
     }, [canRenderSightlinePage, app?.screen, app?.screenFrontPlaneM, app?.screenHeight, resolveScreenMetricsSnapshot]);
 
     const rowCentralSeats = React.useMemo(() => {
-        // Used both for sightline page AND for cover box row geometry fallback
+        // Used by all report/export row-based RP23 sections
         const grouped = {};
         (app?.seatingPositions || []).forEach(seat => {
             const row = seat.rowNumber || 1;
@@ -805,9 +805,7 @@ function RP22ReportInner() {
             .sort((a, b) => a - b)
             .map(rowNum => {
                 const rowSeats = grouped[rowNum];
-                const primary = rowSeats.filter(s => s.isPrimary);
-                const candidates = primary.length ? primary : rowSeats;
-                return candidates
+                return rowSeats
                     .slice()
                     .sort((a, b) => {
                         const da = Math.abs(a.x - roomCentreX);
@@ -1106,28 +1104,13 @@ function RP22ReportInner() {
                                     if (!rowMap[rowNum]) rowMap[rowNum] = [];
                                     rowMap[rowNum].push(s);
                                 });
-                                const mlpPoint = app?.mlp;
-                                const rp23Rows = Object.keys(rowMap).map(Number).sort((a, b) => a - b).map(rowNum => {
-                                                    const rowSeats = rowMap[rowNum];
-                                                    let snap = null;
-                                                    if (rowNum === 1 && mlpPoint && Number.isFinite(mlpPoint.y)) {
-                                                        // Row 1: use the seat closest to the MLP / green-dot (same source as live panel)
-                                                        let minDist = Infinity;
-                                                        let closestSeat = null;
-                                                        rowSeats.forEach(s => {
-                                                            if (!Number.isFinite(s?.y)) return;
-                                                            const d = Math.abs(s.y - mlpPoint.y);
-                                                            if (d < minDist) { minDist = d; closestSeat = s; }
-                                                        });
-                                                        snap = closestSeat ? reportSeatHudById?.[closestSeat.id] : null;
-                                                    }
-                                                    if (!snap) {
-                                                        // Rows 2+, or Row 1 fallback: use isPrimary or middle seat
-                                                        const primary = rowSeats.find(s => s.isPrimary) || rowSeats[Math.floor(rowSeats.length / 2)];
-                                                        snap = reportSeatHudById?.[primary?.id];
-                                                    }
-                                                    return { rowNum, rp23: snap?.rp23 || null };
-                                                }).filter(r => r.rp23);
+                                const rp23Rows = rowCentralSeats
+                                    .map(seat => {
+                                        const rowNum = seat.rowNumber || 1;
+                                        const snap = reportSeatHudById?.[seat.id];
+                                        return { rowNum, rp23: snap?.rp23 || null };
+                                    })
+                                    .filter(r => r.rp23);
                                 return (
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                                         {/* ── Report assumptions block — 2 cols ── */}
@@ -1308,9 +1291,8 @@ function RP22ReportInner() {
                                             const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;
                                             const fmtCm = (m) => `${Math.round(m * 100)}`;
 
-                                            // Per-row geometry — use the same viewer source as the live Room Designer panel:
-                                            // app?.mlp (green-dot / MLP position) for Row 1, then fall back to rowCentralSeats
-                                            // for additional rows. This matches ViewingAnglePanel's effectiveViewerY logic.
+                                            // Per-row geometry — use the same representative row seat source as all
+                                            // other report/export RP23 sections: rowCentralSeats.
                                             const screenFrontM = app?.screenFrontPlaneM ?? 0;
                                             const screenY = Number.isFinite(screenFrontM) ? screenFrontM : 0;
                                             const scrW = viewWm || 0;
@@ -1324,27 +1306,13 @@ function RP22ReportInner() {
                                                 const vBot = dist > 0 ? Math.atan2(scrBottom - eyeZ, dist) * (180 / Math.PI) : 0;
                                                 return { rowNumber, viewingDistanceM: dist, horizontalViewingAngleDeg: hAngle, totalVerticalAngleDeg: vTop - vBot };
                                             };
-                                            const mlpPoint = app?.mlp;
-                                            const rowGeo = (() => {
-                                                // Row 1: always use MLP / green-dot position (same as live panel)
-                                                const row1Entry = (() => {
-                                                    if (mlpPoint && Number.isFinite(mlpPoint.y)) {
-                                                        const eyeZ = Number.isFinite(mlpPoint.z) ? mlpPoint.z : 1.2;
-                                                        return buildRowGeoEntry(mlpPoint.y, eyeZ, 1);
-                                                    }
-                                                    // No MLP available — fall back to primary seat of row 1
-                                                    const row1Seat = rowCentralSeats.find(s => (s.rowNumber || 1) === 1);
-                                                    if (row1Seat && Number.isFinite(row1Seat.y)) {
-                                                        return buildRowGeoEntry(row1Seat.y, Number.isFinite(row1Seat.z) ? row1Seat.z : 1.2, 1);
-                                                    }
-                                                    return null;
-                                                })();
-                                                // Rows 2+: use rowCentralSeats for the representative seat
-                                                const additionalRows = rowCentralSeats
-                                                    .filter(s => (s.rowNumber || 1) > 1)
-                                                    .map(seat => buildRowGeoEntry(seat.y, Number.isFinite(seat.z) ? seat.z : 1.2, seat.rowNumber || 1));
-                                                return [row1Entry, ...additionalRows].filter(Boolean);
-                                            })();
+                                            const rowGeo = rowCentralSeats
+                                                .map(seat => buildRowGeoEntry(
+                                                    seat.y,
+                                                    Number.isFinite(seat.z) ? seat.z : 1.2,
+                                                    seat.rowNumber || 1
+                                                ))
+                                                .filter(Boolean);
 
                                             return (
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: '8mm', rowGap: '4mm' }}>
