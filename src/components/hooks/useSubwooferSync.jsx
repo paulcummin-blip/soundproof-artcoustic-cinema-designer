@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 
+const WALL_BUFFER_M = 0.01;
+const SUB_WIDTH_FALLBACK_M = 0.50;
+
 /**
  * Syncs the subwoofer placement array from frontSubsCfg / rearSubsCfg config objects.
  * Extracted from RoomDesignerWithState.
@@ -40,6 +43,13 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
         return Number.isFinite(d) && d > 0 ? d : 0.30;
       } catch (_) { return 0.30; }
     };
+    const getSubWidthM = (model) => {
+      try {
+        const dims = getModelDimsM?.(model) || {};
+        const w = Number(dims?.widthM);
+        return Number.isFinite(w) && w > 0 ? w : SUB_WIDTH_FALLBACK_M;
+      } catch (_) { return SUB_WIDTH_FALLBACK_M; }
+    };
     const wallPinnedY = (wall, model) => {
       const d = getDepthM(model);
       const halfD = d / 2;
@@ -47,26 +57,70 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       if (wall === 'rear') return Math.max(halfD + EPS, lengthM - halfD - EPS);
       return 0.30;
     };
-    const makeDefaultXs = (qty) => {
+    const makePlacementXs = (qty, placementMode, model) => {
       if (qty <= 0) return [];
-      if (qty === 1) return [widthM * 0.5];
-      const margin = widthM * 0.15;
-      const span = Math.max(0.01, widthM - margin * 2);
-      return Array.from({ length: qty }, (_, i) => margin + span * (i / (qty - 1)));
+      if (placementMode === 'default') {
+        if (qty === 1) return [widthM * 0.5];
+        const margin = widthM * 0.15;
+        const span = Math.max(0.01, widthM - margin * 2);
+        return Array.from({ length: qty }, (_, i) => margin + span * (i / (qty - 1)));
+      }
+
+      const subWidth = getSubWidthM(model);
+      const minX = WALL_BUFFER_M + subWidth / 2;
+      const maxX = widthM - WALL_BUFFER_M - subWidth / 2;
+      const left = minX;
+      const right = maxX;
+
+      const patterns = {
+        quarter: qty === 1
+          ? [widthM * 0.5]
+          : qty === 2
+            ? [widthM * 0.25, widthM * 0.75]
+            : [widthM * 0.25, widthM * 0.5, widthM * 0.75, widthM * 0.5],
+        corners: qty === 1
+          ? [left]
+          : qty === 2
+            ? [left, right]
+            : [left, right, left, right],
+        midpoint: Array.from({ length: qty }, () => widthM * 0.5),
+        sixth: qty === 1
+          ? [widthM * 0.5]
+          : qty === 2
+            ? [widthM / 6, widthM * 5 / 6]
+            : [widthM / 6, widthM * 0.5, widthM * 5 / 6, widthM * 0.5],
+        asymmetric: qty === 1
+          ? [widthM * 0.38]
+          : qty === 2
+            ? [widthM * 0.32, widthM * 0.78]
+            : [widthM * 0.22, widthM * 0.47, widthM * 0.73, widthM * 0.86],
+      };
+
+      const selected = patterns[placementMode] || patterns.quarter;
+      return Array.from({ length: qty }, (_, i) => {
+        const baseX = selected[i] ?? selected[selected.length - 1] ?? (widthM * 0.5);
+        return clamp(baseX, minX, maxX);
+      });
     };
     const safePositionsArray = (arr) => (Array.isArray(arr) ? arr : []);
-    const buildGroup = (group, qty, model, cfgPositions, existingSubs) => {
+    const buildGroup = (group, qty, cfg, existingSubs) => {
+      const model = String(cfg?.model || '').trim();
       if (!model || qty <= 0) return [];
-      const defaultsX = makeDefaultXs(qty);
-      const cfgPos = safePositionsArray(cfgPositions);
+      const placementMode = String(cfg?.placementMode || 'default').trim() || 'default';
+      const defaultsX = makePlacementXs(qty, placementMode, model);
+      const cfgPos = safePositionsArray(cfg?.positions);
       const yPinned = wallPinnedY(group === 'front' ? 'front' : 'rear', model);
-      const minX = EPS; const maxX = Math.max(EPS, widthM - EPS);
+      const subWidth = getSubWidthM(model);
+      const minX = WALL_BUFFER_M + subWidth / 2;
+      const maxX = widthM - WALL_BUFFER_M - subWidth / 2;
       return Array.from({ length: qty }, (_, i) => {
         const prev = existingSubs?.[i] || null;
         const xFromCfg = Number(cfgPos?.[i]?.x);
         const xFromPrev = Number(prev?.position?.x);
         const xFromDefault = Number(defaultsX?.[i]);
-        const pickedX = Number.isFinite(xFromCfg) ? xFromCfg : (Number.isFinite(xFromPrev) ? xFromPrev : xFromDefault);
+        const pickedX = placementMode === 'default'
+          ? (Number.isFinite(xFromCfg) ? xFromCfg : (Number.isFinite(xFromPrev) ? xFromPrev : xFromDefault))
+          : xFromDefault;
         const finalX = clamp(pickedX, minX, maxX);
         return {
           ...(prev ? { ...prev } : {}),
@@ -82,8 +136,8 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const prevList = Array.isArray(prevAll) ? prevAll : [];
       const prevFront = prevList.filter(s => s?.group === 'front');
       const prevRear = prevList.filter(s => s?.group === 'rear');
-      const nextFront = buildGroup('front', frontQty, frontModel, frontSubsCfg?.positions, prevFront);
-      const nextRear = buildGroup('rear', rearQty, rearModel, rearSubsCfg?.positions, prevRear);
+      const nextFront = buildGroup('front', frontQty, frontSubsCfg, prevFront);
+      const nextRear = buildGroup('rear', rearQty, rearSubsCfg, prevRear);
       const next = [...nextFront, ...nextRear];
       const sameLen = prevList.length === next.length;
       const same = sameLen && prevList.every((p, i) => {
@@ -101,7 +155,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
     appState?.setSubwoofers,
     appState?.roomDims?.widthM, appState?.roomDims?.lengthM,
     stableDimensions?.width, stableDimensions?.length,
-    frontSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.positions,
-    rearSubsCfg?.model, rearSubsCfg?.count, rearSubsCfg?.positions,
+    frontSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.positions, frontSubsCfg?.placementMode, frontSubsCfg?.mountMode,
+    rearSubsCfg?.model, rearSubsCfg?.count, rearSubsCfg?.positions, rearSubsCfg?.placementMode, rearSubsCfg?.mountMode,
   ]);
 }
