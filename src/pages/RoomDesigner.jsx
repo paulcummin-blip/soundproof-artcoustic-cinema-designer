@@ -1514,7 +1514,8 @@ function RoomDesignerWithState() {
     useMidGlobal: useMidGlobalFromState,
     setUseMidGlobal: setUseMidGlobalFromState,
     useRearGlobal: useRearGlobalFromState,
-    setUseRearGlobal: setUseRearGlobalFromState
+    setUseRearGlobal: setUseRearGlobalFromState,
+    showRoomModesOverlay,
   } = appState;
 
   const updateGlobalSplWithProjectSync = (patch) => {
@@ -1669,6 +1670,7 @@ function RoomDesignerWithState() {
                   onZoomModeChange={setZoomMode}
                   isDraggingRef={isDraggingRef}
                   extraSurroundCount={appState?.extraSurroundCount ?? 0}
+                  showRoomModesOverlay={showRoomModesOverlay}
                   freeMoveLcr={freeMoveLcr} />
 
               </Suspense>

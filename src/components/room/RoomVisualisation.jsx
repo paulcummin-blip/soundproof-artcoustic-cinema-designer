@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
+import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, useLayoutEffect, forwardRef } from "react";
 
 import SeatHud from "@/components/room/SeatHud";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
@@ -178,6 +178,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     exportWidthPx,
     exportHeightPx,
     freeMoveLcr = false,
+    showRoomModesOverlay = false,
   } = props;
 
   const appState = useAppState();
@@ -1840,6 +1841,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         rearSubs={safeRearSubs}
         frontSubsCfg={frontSubsCfg}
         rearSubsCfg={rearSubsCfg}
+        showRoomModesOverlay={showRoomModesOverlay}
         handleMouseDown={handleMouseDown}
         rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds}
         rowDistanceLabelSeatIds={rowDistanceLabelSeatIds}

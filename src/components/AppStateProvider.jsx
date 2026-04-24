@@ -562,6 +562,7 @@ function useDesignerState() {
   const [enableFrontWides, setEnableFrontWides] = useState(false);
   const [useFrontWidesInsteadOfRear, setUseFrontWidesInsteadOfRear] = useState(false);
   const [useWidesInsteadOfRears, setUseWidesInsteadOfRears] = useState(false);
+  const [showRoomModesOverlay, setShowRoomModesOverlay] = useState(false);
   
   const DBG_FW = typeof window !== 'undefined' && window.DBG_FW;
 
@@ -1810,7 +1811,9 @@ function useDesignerState() {
     enableFrontWides, setEnableFrontWides,
     useFrontWidesInsteadOfRear, setUseFrontWidesInsteadOfRear,
     useWidesInsteadOfRears, setUseWidesInsteadOfRears,
+    showRoomModesOverlay, setShowRoomModesOverlay,
     DBG_FW, frozenTabs, isFrozen, freezeTab, unfreezeTab, showToast,
+    showRoomModesOverlay, setShowRoomModesOverlay,
     screenCentreDepthM, setScreenCentreDepthM,
     screenFrontPlaneM, setScreenFrontPlaneM,
     screenPlaneLocked, setScreenPlaneLocked,
@@ -1897,7 +1900,9 @@ function useDesignerState() {
     enableFrontWides, setEnableFrontWides,
     useFrontWidesInsteadOfRear, setUseFrontWidesInsteadOfRear,
     useWidesInsteadOfRears, setUseWidesInsteadOfRears,
+    showRoomModesOverlay, setShowRoomModesOverlay,
     DBG_FW, frozenTabs, isFrozen, freezeTab, unfreezeTab, showToast,
+    showRoomModesOverlay, setShowRoomModesOverlay,
     screenCentreDepthM,
     screenFrontPlaneM, setScreenFrontPlaneM,
     screenPlaneLocked, setScreenPlaneLocked,

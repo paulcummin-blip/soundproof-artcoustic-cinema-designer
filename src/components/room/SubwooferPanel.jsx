@@ -537,6 +537,21 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             </div>
 
             <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Show Room Modes</h5>
+                  <p className="text-[11px] text-[#625143] leading-relaxed mt-1">
+                    Shows predicted low-frequency cancellation zones on the room plan.
+                  </p>
+                </div>
+                <Switch
+                  checked={!!appState?.showRoomModesOverlay}
+                  onCheckedChange={(checked) => appState?.setShowRoomModesOverlay?.(checked)}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
               <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Best Sub Layout Shortcut</h5>
               <p className="text-[11px] text-[#625143] leading-relaxed mt-1 mb-3">
                 This shortcut compares common subwoofer locations against the seating layout to find the least destructive modal result. It is a design guide, not the RP22 report.

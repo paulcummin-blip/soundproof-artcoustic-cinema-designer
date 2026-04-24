@@ -7,6 +7,7 @@ import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
 import RvBaffleAndScreen from "@/components/room/rv/render/RvBaffleAndScreen";
 import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
 import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
+import RvModalZonesOverlay from "@/components/room/rv/render/RvModalZonesOverlay";
 import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer";
 import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import RvRp22AnglesOverlay from "@/components/room/rv/render/RvRp22AnglesOverlay";
@@ -95,6 +96,7 @@ export default function RvPlanCanvas({
   rearSubs,
   frontSubsCfg,
   rearSubsCfg,
+  showRoomModesOverlay,
   handleMouseDown,
 
   rowFrontWallLabelSeatIds,
@@ -300,6 +302,14 @@ export default function RvPlanCanvas({
               seatingPositions={seatingPositions}
             />
 
+            {showRoomModesOverlay && (
+              <RvModalZonesOverlay
+                widthM={widthM}
+                lengthM={lengthM}
+                toPx={toPx}
+                seatingPositions={seatingPositions}
+              />
+            )}
 
              <RvZonesAndOverlays
               exportMode={exportMode}
