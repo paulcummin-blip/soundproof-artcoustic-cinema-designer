@@ -28,6 +28,7 @@ const STROKE = {
   viewable:  { stroke: PALETTE.viewable,   strokeWidth: 2,   fill: 'rgba(33,52,40,0.07)' },
   projBody:  { stroke: PALETTE.projector,  strokeWidth: 1,   fill: 'rgba(98,81,67,0.12)' },
   sightline: { stroke: PALETTE.sightline,  strokeWidth: 0.6, fill: 'none', strokeDasharray: '5 3', opacity: 0.7 },
+  comfort:   { stroke: '#4B5563',          strokeWidth: 0.6, fill: 'none', strokeDasharray: '4 3', opacity: 0.28 },
   beam:      { stroke: PALETTE.beam,       strokeWidth: 0.8, fill: 'none', strokeDasharray: '6 2', opacity: 0.8 },
 };
 
@@ -98,6 +99,11 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
   // Colours for rows
   const rowColors = ['#213428','#625143','#3E4349','#B45309','#1B1A1A'];
   const rowColor = (i) => rowColors[i % rowColors.length];
+  const comfortAngleRad = 15 * Math.PI / 180;
+  const comfortUpperTargetZ = (eyeZ, eyeY) => eyeZ + Math.tan(comfortAngleRad) * (screenFrontPlaneY - eyeY);
+  const comfortLowerTargetZ = (eyeZ, eyeY) => eyeZ - Math.tan(comfortAngleRad) * (screenFrontPlaneY - eyeY);
+  const comfortZoneLowerZ = screenBottomHeightM + (screenTopHeightM - screenBottomHeightM) / 6;
+  const comfortZoneUpperZ = screenBottomHeightM + (screenTopHeightM - screenBottomHeightM) / 3;
 
   return (
     <svg
@@ -115,6 +121,33 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
 
       {/* Floor line */}
       <line x1={rx0} y1={ry0} x2={rx1} y2={ry0} {...STROKE.floor} />
+
+      {/* Vertical viewing comfort guides — drawn behind sightlines */}
+      {rowData.map((row, i) => {
+        const ex = toX(row.eyeY);
+        const ez = toY(row.eyeZ);
+        const stx = toX(screenFrontPlaneY);
+        const upperZ = comfortUpperTargetZ(row.eyeZ, row.eyeY);
+        const lowerZ = comfortLowerTargetZ(row.eyeZ, row.eyeY);
+        const upperY = toY(upperZ);
+        const lowerY = toY(lowerZ);
+        return (
+          <g key={`comfort-${row.rowNumber}`}>
+            <polygon
+              points={`${ex},${ez} ${stx},${upperY} ${stx},${lowerY}`}
+              fill="#4B5563"
+              opacity="0.05"
+            />
+            <line x1={ex} y1={ez} x2={stx} y2={upperY} {...STROKE.comfort} />
+            <line x1={ex} y1={ez} x2={stx} y2={lowerY} {...STROKE.comfort} />
+            {i === 0 && (
+              <text x={stx - 6} y={upperY - 6} fontSize={6} fill="#4B5563" opacity={0.75} textAnchor="end">
+                ±15° comfort guide
+              </text>
+            )}
+          </g>
+        );
+      })}
 
       {/* Sightlines & beam lines — drawn first so they sit behind elements */}
       {rowData.map((row, i) => {
@@ -169,6 +202,44 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
         height={toY(vImgBottom) - toY(vImgTop)}
         {...STROKE.viewable}
       />
+
+      {/* Eye-line comfort zone markers: 1/6–1/3 screen height from bottom */}
+      <g>
+        <line
+          x1={toX(screenFrontPlaneY) + 8}
+          y1={toY(comfortZoneLowerZ)}
+          x2={toX(screenFrontPlaneY) + 16}
+          y2={toY(comfortZoneLowerZ)}
+          stroke="#4B5563"
+          strokeWidth={0.7}
+          opacity={0.55}
+        />
+        <line
+          x1={toX(screenFrontPlaneY) + 8}
+          y1={toY(comfortZoneUpperZ)}
+          x2={toX(screenFrontPlaneY) + 16}
+          y2={toY(comfortZoneUpperZ)}
+          stroke="#4B5563"
+          strokeWidth={0.7}
+          opacity={0.55}
+        />
+        <line
+          x1={toX(screenFrontPlaneY) + 16}
+          y1={toY(comfortZoneUpperZ)}
+          x2={toX(screenFrontPlaneY) + 16}
+          y2={toY(comfortZoneLowerZ)}
+          stroke="#4B5563"
+          strokeWidth={0.7}
+          opacity={0.45}
+          strokeDasharray="2 2"
+        />
+        <text x={toX(screenFrontPlaneY) + 20} y={toY(comfortZoneUpperZ) - 4} fontSize={6} fill="#4B5563" opacity={0.8} textAnchor="start">
+          Eye-line comfort zone
+        </text>
+        <text x={toX(screenFrontPlaneY) + 20} y={toY(comfortZoneLowerZ) + 8} fontSize={6} fill="#4B5563" opacity={0.7} textAnchor="start">
+          1/6–1/3 screen height
+        </text>
+      </g>
 
       {/* Projector body */}
       {Number.isFinite(projectorLensY) && (
@@ -412,6 +483,7 @@ export default function SightlineGraphic({
       <div style={{ display: 'flex', gap: 14, marginBottom: 6, flexWrap: 'wrap' }}>
         {[
           { color: PALETTE.sightline, dash: true, label: 'Sightlines (seat to screen)' },
+          { color: '#4B5563',         dash: true, label: '±15° viewing comfort guide' },
           { color: PALETTE.beam,      dash: true, label: 'Projector beam' },
           { color: PALETTE.viewable,  dash: false, label: 'Viewable image area' },
         ].map(({ color, dash, label }) => (
@@ -445,8 +517,7 @@ export default function SightlineGraphic({
 
       {/* Footer note */}
       <div style={{ marginTop: 6, fontSize: 7, color: PALETTE.subLabel }}>
-        Calculations use viewable image area only. Vertical angles measured from eye level to top and bottom of viewable image.
-        Projector throw is lens to screen plane.
+        Calculations use viewable image area only. Vertical angles are measured from viewer eye level to the top and bottom of the viewable image. The ±15° guide is a visual comfort reference based on common CEDIA/SMPTE sightline guidance and is not part of RP22 audio scoring.
       </div>
     </div>
   );
