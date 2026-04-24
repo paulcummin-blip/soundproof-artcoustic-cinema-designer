@@ -146,6 +146,8 @@ export default function RvPlanCanvas({
     let subs;
     if (dragging && Array.isArray(draftFrontSubsRef.current)) {
       subs = draftFrontSubsRef.current;
+    } else if (Array.isArray(frontSubs) && frontSubs.length > 0) {
+      subs = frontSubs;
     } else if (lastValidDraftFrontSubs) {
       subs = lastValidDraftFrontSubs;
     } else {
@@ -164,6 +166,8 @@ export default function RvPlanCanvas({
     let subs;
     if (dragging && Array.isArray(draftRearSubsRef.current)) {
       subs = draftRearSubsRef.current;
+    } else if (Array.isArray(rearSubs) && rearSubs.length > 0) {
+      subs = rearSubs;
     } else if (lastValidDraftRearSubs) {
       subs = lastValidDraftRearSubs;
     } else {
