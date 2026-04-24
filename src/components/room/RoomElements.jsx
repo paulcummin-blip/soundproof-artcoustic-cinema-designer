@@ -250,7 +250,24 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
                       />
-                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>From left wall</div>
+                      <div className="flex items-center justify-between text-[10px] mt-1" style={{ color: '#625143' }}>
+                        <span>From left wall</span>
+                        <button
+                          type="button"
+                          className="text-[10px] underline hover:opacity-80"
+                          onClick={() => {
+                            const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+                            const bodyW = Number(element?.body_width_m ?? 0) || 0;
+
+                            if (!roomW) return;
+
+                            const centeredX = (roomW / 2);
+                            updateElement(element.id, 'x_lens_m', centeredX);
+                          }}
+                        >
+                          Centre
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <Label className="text-[#3E4349]">Lens Y (m)</Label>
