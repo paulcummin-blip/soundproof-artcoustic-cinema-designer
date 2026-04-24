@@ -71,36 +71,34 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const maxX = widthM - WALL_BUFFER_M - subWidth / 2;
       const left = minX;
       const right = maxX;
+      const safeQty = Math.max(1, Number(qty) || 0);
 
       const patterns = {
-        quarter: qty === 1
+        quarter: safeQty === 1
           ? [widthM * 0.5]
-          : qty === 2
+          : safeQty === 2
             ? [widthM * 0.25, widthM * 0.75]
-            : [widthM * 0.25, widthM * 0.5, widthM * 0.75, widthM * 0.5],
-        corners: qty === 1
+            : [widthM * 0.25, widthM * 0.5, widthM * 0.75],
+        corners: safeQty === 1
           ? [left]
-          : qty === 2
-            ? [left, right]
-            : [left, right, left, right],
-        midpoint: Array.from({ length: qty }, () => widthM * 0.5),
-        sixth: qty === 1
+          : [left, right],
+        midpoint: [widthM * 0.5],
+        sixth: safeQty === 1
           ? [widthM * 0.5]
-          : qty === 2
+          : safeQty === 2
             ? [widthM / 6, widthM * 5 / 6]
-            : [widthM / 6, widthM * 0.5, widthM * 5 / 6, widthM * 0.5],
-        asymmetric: qty === 1
+            : [widthM / 6, widthM * 0.5, widthM * 5 / 6],
+        asymmetric: safeQty === 1
           ? [widthM * 0.38]
-          : qty === 2
+          : safeQty === 2
             ? [widthM * 0.32, widthM * 0.78]
-            : [widthM * 0.22, widthM * 0.47, widthM * 0.73, widthM * 0.86],
+            : safeQty === 3
+              ? [widthM * 0.22, widthM * 0.47, widthM * 0.73]
+              : [widthM * 0.22, widthM * 0.47, widthM * 0.73, widthM * 0.86],
       };
 
       const selected = patterns[placementMode] || patterns.quarter;
-      return Array.from({ length: qty }, (_, i) => {
-        const baseX = selected[i] ?? selected[selected.length - 1] ?? (widthM * 0.5);
-        return clamp(baseX, minX, maxX);
-      });
+      return selected.map((x) => clamp(x, minX, maxX));
     };
     const safePositionsArray = (arr) => (Array.isArray(arr) ? arr : []);
     const buildGroup = (group, qty, cfg, existingSubs) => {
@@ -118,7 +116,8 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const resolvedSubHeight = Number.isFinite(subHeight) && subHeight > 0 ? subHeight : 0.50;
       const bottom = cfg?.mountMode === 'wall' ? 0.80 : 0.10;
       const z = bottom + resolvedSubHeight / 2;
-      return Array.from({ length: qty }, (_, i) => {
+      const buildCount = placementMode === 'default' ? qty : defaultsX.length;
+      return Array.from({ length: buildCount }, (_, i) => {
         const prev = existingSubs?.[i] || null;
         const xFromCfg = Number(cfgPos?.[i]?.x);
         const xFromPrev = Number(prev?.position?.x);

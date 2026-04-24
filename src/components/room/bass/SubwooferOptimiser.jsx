@@ -27,7 +27,9 @@ function getQuantityOptions(count, placementMode) {
   const explicit = Number(count);
   const maxUseful = USEFUL_QTY_BY_PLACEMENT_MODE[placementMode] || 4;
   const allowed = [1, 2, 3, 4].filter((qty) => qty <= maxUseful);
-  if (allowed.includes(explicit)) return [explicit];
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return [Math.min(explicit, maxUseful)];
+  }
   return allowed;
 }
 
@@ -246,6 +248,7 @@ export function optimiseSubwooferLayout({
 
   const evaluated = candidates.map((candidate) => {
     let subwoofers = [];
+    let actualQuantity = candidate.quantity;
 
     if (candidate.wallConfig === 'front') {
       subwoofers = buildVirtualSubsForGroup({
@@ -255,6 +258,7 @@ export function optimiseSubwooferLayout({
         placementMode: candidate.placementMode,
         roomDimensions,
       });
+      actualQuantity = subwoofers.length;
     }
 
     if (candidate.wallConfig === 'rear') {
@@ -265,25 +269,29 @@ export function optimiseSubwooferLayout({
         placementMode: candidate.placementMode,
         roomDimensions,
       });
+      actualQuantity = subwoofers.length;
     }
 
     if (candidate.wallConfig === 'front+rear') {
+      const frontGroup = buildVirtualSubsForGroup({
+        cfg: frontSubsCfg,
+        group: 'front',
+        qty: candidate.quantity.front,
+        placementMode: candidate.placementMode,
+        roomDimensions,
+      });
+      const rearGroup = buildVirtualSubsForGroup({
+        cfg: rearSubsCfg,
+        group: 'rear',
+        qty: candidate.quantity.rear,
+        placementMode: candidate.placementMode,
+        roomDimensions,
+      });
       subwoofers = [
-        ...buildVirtualSubsForGroup({
-          cfg: frontSubsCfg,
-          group: 'front',
-          qty: candidate.quantity.front,
-          placementMode: candidate.placementMode,
-          roomDimensions,
-        }),
-        ...buildVirtualSubsForGroup({
-          cfg: rearSubsCfg,
-          group: 'rear',
-          qty: candidate.quantity.rear,
-          placementMode: candidate.placementMode,
-          roomDimensions,
-        }),
+        ...frontGroup,
+        ...rearGroup,
       ];
+      actualQuantity = { front: frontGroup.length, rear: rearGroup.length };
     }
 
     const seatResponses = seatList.map((seat) => ({
@@ -308,7 +316,10 @@ export function optimiseSubwooferLayout({
       (outputScore * 0.1);
 
     return {
-      candidate,
+      candidate: {
+        ...candidate,
+        quantity: actualQuantity,
+      },
       subwoofers,
       seatResponses,
       seatVariance,
