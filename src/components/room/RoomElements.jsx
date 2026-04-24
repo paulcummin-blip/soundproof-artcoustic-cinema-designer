@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
+import { sanitizeProjectorElement } from '@/components/utils/projectorSanitise';
 
 export default function RoomElements({ elements = [], onChange, roomDims }) {
   // Create a stable next id that won't collide if you add quickly
@@ -77,7 +78,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
       height_m: bodyH,
     };
 
-    onChange([...(elements || []), newElement]);
+    onChange([...(elements || []), sanitizeProjectorElement(newElement, roomDims)]);
   };
 
   const updateElement = (id, field, value) => {
@@ -93,7 +94,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
         const maxLensZ = Math.max(0, roomH - 0.10 - bodyH / 2);
         finalValue = Math.min(Math.max(0, parsed), maxLensZ);
       }
-      return { ...el, [field]: finalValue };
+      return sanitizeProjectorElement({ ...el, [field]: finalValue }, roomDims);
     });
 
     onChange(next);
