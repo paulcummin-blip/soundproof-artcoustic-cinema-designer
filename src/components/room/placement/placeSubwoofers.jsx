@@ -2,6 +2,7 @@ import { subDimsMM, subHeightDefault } from "@/components/data/subwooferData";
 
 // helpers
 const mmToM = v => (v ?? 0) / 1000;
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
 export function placeSubwoofers({
   room,                   // { width_m, length_m, height_m }
@@ -68,10 +69,54 @@ export function placeSubwoofers({
   // compute “needed” screen depth if front
   const neededScreenDepth_m = isFront ? (wallBuffer_m + subD_m + screenBuffer_m) : 0;
 
-  // build desired slots order for qty 1..4
-  const order = ["LC", "RC", "LC2", "RC2"]; // LC2/RC2 are stacked instances
-  const xBySlot = { LC: xLC_m, RC: xRC_m, LC2: xLC_m, RC2: xRC_m };
-  const corridorOK = { LC: slotOK.LC, RC: slotOK.RC, LC2: slotOK.LC, RC2: slotOK.RC };
+  const placementMode = cfg?.placementMode || "default";
+  const minX = 0.01 + subW_m / 2;
+  const maxX = room.width_m - 0.01 - subW_m / 2;
+
+  let order = ["LC", "RC", "LC2", "RC2"];
+  let xBySlot = { LC: xLC_m, RC: xRC_m, LC2: xLC_m, RC2: xRC_m };
+  let corridorOK = { LC: slotOK.LC, RC: slotOK.RC, LC2: slotOK.LC, RC2: slotOK.RC };
+
+  if (placementMode !== "default") {
+    const xPatterns = {
+      quarter: [room.width_m * 0.25, room.width_m * 0.5, room.width_m * 0.75, room.width_m * 0.5],
+      corners: [0.01 + subW_m / 2, room.width_m - 0.01 - subW_m / 2, 0.01 + subW_m / 2, room.width_m - 0.01 - subW_m / 2],
+      midpoint: [room.width_m * 0.5, room.width_m * 0.5, room.width_m * 0.5, room.width_m * 0.5],
+      sixth: [room.width_m / 6, room.width_m * 0.5, room.width_m * 5 / 6, room.width_m * 0.5],
+      asymmetric: [room.width_m * 0.22, room.width_m * 0.47, room.width_m * 0.73, room.width_m * 0.86],
+    };
+
+    const pairPatterns = {
+      quarter: [room.width_m * 0.25, room.width_m * 0.75],
+      corners: [0.01 + subW_m / 2, room.width_m - 0.01 - subW_m / 2],
+      midpoint: [room.width_m * 0.5, room.width_m * 0.5],
+      sixth: [room.width_m / 6, room.width_m * 5 / 6],
+      asymmetric: [room.width_m * 0.32, room.width_m * 0.78],
+    };
+
+    const singlePatterns = {
+      quarter: room.width_m * 0.5,
+      corners: 0.01 + subW_m / 2,
+      midpoint: room.width_m * 0.5,
+      sixth: room.width_m * 0.5,
+      asymmetric: room.width_m * 0.38,
+    };
+
+    const selectedXs = qty === 1
+      ? [singlePatterns[placementMode]]
+      : qty === 2
+        ? pairPatterns[placementMode]
+        : xPatterns[placementMode];
+
+    order = ["P1", "P2", "P3", "P4"];
+    xBySlot = {
+      P1: clamp(selectedXs[0], minX, maxX),
+      P2: clamp(selectedXs[1] ?? selectedXs[0], minX, maxX),
+      P3: clamp(selectedXs[2] ?? selectedXs[0], minX, maxX),
+      P4: clamp(selectedXs[3] ?? selectedXs[0], minX, maxX),
+    };
+    corridorOK = { P1: true, P2: true, P3: true, P4: true };
+  }
 
   const placed = [];
   for (let i = 0; i < qty; i++) {
@@ -80,8 +125,7 @@ export function placeSubwoofers({
       warnings.push(`${group.toUpperCase()} ${slot.replace("2","")} slot: does not fit (need ${needClearance_m.toFixed(3)} m, have ${(slot.includes("LC")?innerGapLC_m:innerGapRC_m).toFixed(3)} m).`);
       continue;
     }
-    // stacking logic: second in a corridor stacks vertically
-    const stackIdx = slot.endsWith("2") ? 1 : 0;
+    const stackIdx = slot.endsWith("2") || (placementMode !== "default" && ((placementMode === "midpoint" && i > 0) || (placementMode === "corners" && i >= 2))) ? 1 : 0;
     const zStack_m = z_m + (stackIdx === 1 ? (subH_m + 0.05) : 0);
     if (zStack_m + subH_m/2 > room.height_m - 0.05) {
       warnings.push(`${group.toUpperCase()} ${slot.replace("2","")} stack: not enough height to stack.`);

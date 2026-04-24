@@ -4,6 +4,63 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 
+const placementOptions = [
+  {
+    mode: 'quarter',
+    title: '1/4 Points',
+    description: 'At the 1/4 points along the wall (X dimension).',
+    diagram: (
+      <div className="relative h-8 w-12 rounded border border-[#CFC8BE] bg-white">
+        <div className="absolute top-1/2 left-3 h-2 w-2 -translate-y-1/2 rounded-full bg-[#213428]" />
+        <div className="absolute top-1/2 right-3 h-2 w-2 -translate-y-1/2 rounded-full bg-[#213428]" />
+      </div>
+    )
+  },
+  {
+    mode: 'corners',
+    title: 'Corners',
+    description: 'At the room corners with 1cm buffer.',
+    diagram: (
+      <div className="relative h-8 w-12 rounded border border-[#CFC8BE] bg-white">
+        <div className="absolute left-[2px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#213428]" />
+        <div className="absolute right-[2px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#213428]" />
+      </div>
+    )
+  },
+  {
+    mode: 'midpoint',
+    title: 'Mid-Point (Centre)',
+    description: 'Centred on the wall.',
+    diagram: (
+      <div className="relative h-8 w-12 rounded border border-[#CFC8BE] bg-white">
+        <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#213428]" />
+      </div>
+    )
+  },
+  {
+    mode: 'sixth',
+    title: '1/6 – 5/6 Positions',
+    description: 'At the 1/6 and 5/6 points.',
+    diagram: (
+      <div className="relative h-8 w-12 rounded border border-[#CFC8BE] bg-white">
+        <div className="absolute top-1/2 left-[16.666%] h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#213428]" />
+        <div className="absolute top-1/2 left-[83.333%] h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#213428]" />
+      </div>
+    )
+  },
+  {
+    mode: 'asymmetric',
+    title: 'Asymmetric (Offset Pair)',
+    description: 'Asymmetric placement to reduce axial mode build-up.',
+    diagram: (
+      <div className="relative h-8 w-12 rounded border border-[#CFC8BE] bg-white">
+        <div className="absolute top-1/2 left-[32%] h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#213428]" />
+        <div className="absolute top-1/2 left-[78%] h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#213428]" />
+      </div>
+    )
+  },
+];
+
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
@@ -261,6 +318,63 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 {subWarnings.rear[0]}
               </div>
             )}
+          </div>
+
+          <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
+            <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-3">Subwoofer Placement</h4>
+            <div className="rounded-lg border border-[#E7E4DF] bg-white/70 overflow-hidden">
+              <div className="grid grid-cols-12 gap-0 border-b border-[#E7E4DF] bg-[#F7F4F0] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#625143]">
+                <div className="col-span-7">Placement Preset</div>
+                <div className="col-span-5 grid grid-cols-2 gap-4 text-center">
+                  <div>Front Wall</div>
+                  <div>Rear Wall</div>
+                </div>
+              </div>
+
+              {placementOptions.map((option, index) => (
+                <div
+                  key={option.mode}
+                  className={`grid grid-cols-12 items-center gap-4 px-4 py-3 ${index !== placementOptions.length - 1 ? 'border-b border-[#E7E4DF]' : ''}`}
+                >
+                  <div className="col-span-12 md:col-span-7 flex items-center gap-3">
+                    <div className="shrink-0">{option.diagram}</div>
+                    <div>
+                      <div className="text-[13px] font-medium text-[#1B1A1A]">{option.title}</div>
+                      <div className="text-[11px] text-[#625143] leading-snug">{option.description}</div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-12 md:col-span-5 grid grid-cols-2 gap-4">
+                    <div className="flex items-center justify-center">
+                      <Switch
+                        checked={(frontSubsCfg?.placementMode ?? 'default') === option.mode}
+                        onCheckedChange={(checked) => {
+                          if (appState?.setFrontSubsCfg) {
+                            appState.setFrontSubsCfg(prev => ({
+                              ...prev,
+                              placementMode: checked ? option.mode : 'default'
+                            }));
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <Switch
+                        checked={(rearSubsCfg?.placementMode ?? 'default') === option.mode}
+                        onCheckedChange={(checked) => {
+                          if (appState?.setRearSubsCfg) {
+                            appState.setRearSubsCfg(prev => ({
+                              ...prev,
+                              placementMode: checked ? option.mode : 'default'
+                            }));
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

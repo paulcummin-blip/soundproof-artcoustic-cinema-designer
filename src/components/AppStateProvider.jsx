@@ -524,7 +524,8 @@ function useDesignerState() {
       count: 0,
       positions: [],
       tuning: [],
-      orientation: "vertical"
+      orientation: "vertical",
+      placementMode: "default"
     }
   ));
   const [rearSubsCfg, setRearSubsCfg] = useState(() => (
@@ -533,7 +534,8 @@ function useDesignerState() {
       count: 0,
       positions: [],
       tuning: [],
-      orientation: "vertical"
+      orientation: "vertical",
+      placementMode: "default"
     }
   ));
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
@@ -1344,7 +1346,8 @@ function useDesignerState() {
           count: 0,
           positions: [],
           tuning: [],
-          orientation: "vertical"
+          orientation: "vertical",
+          placementMode: "default"
         });
       }
       if (Object.prototype.hasOwnProperty.call(p, "rearSubsCfg")) {
@@ -1353,7 +1356,8 @@ function useDesignerState() {
           count: 0,
           positions: [],
           tuning: [],
-          orientation: "vertical"
+          orientation: "vertical",
+          placementMode: "default"
         });
       }
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
@@ -1405,7 +1409,8 @@ function useDesignerState() {
         count: Number(frontSubsCfg?.count) || 0,
         positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
         tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : [],
-        orientation: frontSubsCfg?.orientation || "vertical"
+        orientation: frontSubsCfg?.orientation || "vertical",
+        placementMode: frontSubsCfg?.placementMode || "default"
       },
       rearSubsCfg: {
         ...rearSubsCfg,
@@ -1413,7 +1418,8 @@ function useDesignerState() {
         count: Number(rearSubsCfg?.count) || 0,
         positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
         tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : [],
-        orientation: rearSubsCfg?.orientation || "vertical"
+        orientation: rearSubsCfg?.orientation || "vertical",
+        placementMode: rearSubsCfg?.placementMode || "default"
       },
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
@@ -1524,7 +1530,8 @@ function useDesignerState() {
           count: 0,
           positions: [],
           tuning: [],
-          orientation: "vertical"
+          orientation: "vertical",
+          placementMode: "default"
         });
       }
 
@@ -1534,7 +1541,8 @@ function useDesignerState() {
           count: 0,
           positions: [],
           tuning: [],
-          orientation: "vertical"
+          orientation: "vertical",
+          placementMode: "default"
         });
       }
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
@@ -1578,7 +1586,8 @@ function useDesignerState() {
         count: Number(frontSubsCfg?.count) || 0,
         positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
         tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : [],
-        orientation: frontSubsCfg?.orientation || "vertical"
+        orientation: frontSubsCfg?.orientation || "vertical",
+        placementMode: frontSubsCfg?.placementMode || "default"
       },
       rearSubsCfg: {
         ...rearSubsCfg,
@@ -1586,7 +1595,8 @@ function useDesignerState() {
         count: Number(rearSubsCfg?.count) || 0,
         positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
         tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : [],
-        orientation: rearSubsCfg?.orientation || "vertical"
+        orientation: rearSubsCfg?.orientation || "vertical",
+        placementMode: rearSubsCfg?.placementMode || "default"
       },
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
@@ -1702,14 +1712,16 @@ function useDesignerState() {
       count: 0,
       positions: [],
       tuning: [],
-      orientation: "vertical"
+      orientation: "vertical",
+      placementMode: "default"
     });
     setRearSubsCfg({
       model: "SUB2-12",
       count: 0,
       positions: [],
       tuning: [],
-      orientation: "vertical"
+      orientation: "vertical",
+      placementMode: "default"
     });
 
     // Layout/Config
