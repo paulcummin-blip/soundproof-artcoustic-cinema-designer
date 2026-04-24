@@ -132,6 +132,45 @@ function getSeatPoint(seat) {
   };
 }
 
+// Each seat is expanded laterally to represent a real seating area, not a single head point.
+function expandSeatToListeningZone(seatPoint, roomDimensions, sourceSeatIndex) {
+  const roomWidth = Number(roomDimensions?.width) || Number(roomDimensions?.widthM) || 4.5;
+  const lateralOffset = 0.30;
+  const baseX = Number(seatPoint?.x);
+  const baseY = Number(seatPoint?.y);
+  const baseZ = Number(seatPoint?.z);
+
+  if (!Number.isFinite(baseX) || !Number.isFinite(baseY) || !Number.isFinite(baseZ)) {
+    return [];
+  }
+
+  const clampX = (x) => clamp(x, 0, roomWidth);
+
+  return [
+    {
+      x: clampX(baseX),
+      y: baseY,
+      z: baseZ,
+      sourceSeatIndex,
+      isSeatCenter: true,
+    },
+    {
+      x: clampX(baseX - lateralOffset),
+      y: baseY,
+      z: baseZ,
+      sourceSeatIndex,
+      isSeatCenter: false,
+    },
+    {
+      x: clampX(baseX + lateralOffset),
+      y: baseY,
+      z: baseZ,
+      sourceSeatIndex,
+      isSeatCenter: false,
+    },
+  ];
+}
+
 function average(values) {
   if (!Array.isArray(values) || values.length === 0) return 0;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -211,6 +250,7 @@ export function optimiseSubwooferLayout({
   rearSubsCfg,
 }) {
   const seatList = Array.isArray(seats) ? seats.map(getSeatPoint).filter((seat) => Number.isFinite(seat.x) && Number.isFinite(seat.y) && Number.isFinite(seat.z)) : [];
+  const listeningZoneSamples = seatList.flatMap((seat, index) => expandSeatToListeningZone(seat, roomDimensions, index));
   if (seatList.length === 0) {
     const emptyResult = {
       bestLayout: null,
@@ -286,12 +326,15 @@ export function optimiseSubwooferLayout({
       actualQuantity = { front: frontGroup.length, rear: rearGroup.length };
     }
 
-    const seatResponses = seatList.map((seat) => ({
-      seat,
-      ...engine.simulateResponseWithExtras(subwoofers, seat, roomDimensions),
+    const seatResponses = listeningZoneSamples.map((seatSample) => ({
+      seat: seatSample,
+      ...engine.simulateResponseWithExtras(subwoofers, seatSample, roomDimensions),
     }));
 
-    const rspResponse = seatResponses[0]?.responseData || [];
+    const rspSeatResponse = seatResponses.find((seatResponse) => (
+      seatResponse?.seat?.sourceSeatIndex === 0 && seatResponse?.seat?.isSeatCenter
+    ));
+    const rspResponse = rspSeatResponse?.responseData || seatResponses[0]?.responseData || [];
     const seatVariance = computeSeatVariance(seatResponses);
     const nullPenalty = seatResponses.reduce((sum, seatResponse) => sum + countNulls(seatResponse.responseData), 0);
     const smoothness = standardDeviation(
