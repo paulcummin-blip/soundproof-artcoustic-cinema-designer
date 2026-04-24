@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
+import optimiseSubwooferLayout from '@/components/room/bass/SubwooferOptimiser';
 
 const placementOptions = [
   {
@@ -62,6 +63,59 @@ const placementOptions = [
 ];
 
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
+  const roomDimensions = appState?.roomDims;
+  const seats = appState?.seatingPositions;
+
+  const recommendationState = useMemo(() => {
+    const hasRoom = Number.isFinite(Number(roomDimensions?.widthM ?? roomDimensions?.width))
+      && Number.isFinite(Number(roomDimensions?.lengthM ?? roomDimensions?.length));
+    const hasSeats = Array.isArray(seats) && seats.length > 0;
+
+    if (!hasRoom || !hasSeats) {
+      return {
+        status: 'missing',
+        message: 'Add room dimensions and seating positions to generate a recommendation.'
+      };
+    }
+
+    try {
+      const result = optimiseSubwooferLayout({
+        roomDimensions,
+        seats,
+        frontSubsCfg,
+        rearSubsCfg
+      });
+
+      return {
+        status: result?.bestLayout ? 'ready' : 'empty',
+        result
+      };
+    } catch (error) {
+      console.error('[SubwooferPanel] Recommendation failed', error);
+      return {
+        status: 'error',
+        message: 'Recommendation could not be calculated.'
+      };
+    }
+  }, [roomDimensions, seats, frontSubsCfg, rearSubsCfg]);
+
+  const recommendedWallLayout = recommendationState?.result?.bestLayout?.wallConfig === 'front+rear'
+    ? 'Front + Rear'
+    : recommendationState?.result?.bestLayout?.wallConfig === 'front'
+      ? 'Front only'
+      : recommendationState?.result?.bestLayout?.wallConfig === 'rear'
+        ? 'Rear only'
+        : '—';
+
+  const recommendedQuantity = typeof recommendationState?.result?.bestLayout?.quantity === 'object'
+    ? `Front ${recommendationState.result.bestLayout.quantity.front}, Rear ${recommendationState.result.bestLayout.quantity.rear}`
+    : recommendationState?.result?.bestLayout?.quantity ?? '—';
+
+  const recommendedPlacementMode = recommendationState?.result?.bestLayout?.placementMode ?? '—';
+  const recommendedScore = typeof recommendationState?.result?.score === 'number'
+    ? recommendationState.result.score.toFixed(2)
+    : '—';
+
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
@@ -374,6 +428,62 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
+              <h5 className="text-[14px] font-semibold text-[#1B1A1A] mb-3">Optimised recommendation</h5>
+
+              {recommendationState.status === 'missing' && (
+                <p className="text-[12px] text-[#625143] leading-relaxed">
+                  {recommendationState.message}
+                </p>
+              )}
+
+              {recommendationState.status === 'error' && (
+                <p className="text-[12px] text-[#625143] leading-relaxed">
+                  Recommendation could not be calculated.
+                </p>
+              )}
+
+              {recommendationState.status === 'empty' && (
+                <p className="text-[12px] text-[#625143] leading-relaxed">
+                  Recommendation could not be calculated.
+                </p>
+              )}
+
+              {recommendationState.status === 'ready' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Recommended wall layout</div>
+                      <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{recommendedWallLayout}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Recommended quantity</div>
+                      <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{recommendedQuantity}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Recommended placement mode</div>
+                      <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{recommendedPlacementMode}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Score</div>
+                      <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{recommendedScore}</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Summary</div>
+                    <div className="text-[12px] text-[#1B1A1A] leading-relaxed mt-1">
+                      {recommendationState?.result?.summary || '—'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0] px-3 py-2 text-[11px] text-[#8A7B6A]">
+                    Recommendation only — manual apply coming next.
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
