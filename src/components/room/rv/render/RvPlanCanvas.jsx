@@ -8,7 +8,6 @@ import RvBaffleAndScreen from "@/components/room/rv/render/RvBaffleAndScreen";
 import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
 import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
 import RvModalZonesOverlay from "@/components/room/rv/render/RvModalZonesOverlay";
-import RvSeatBassZoneOverlay from "@/components/room/rv/render/RvSeatBassZoneOverlay";
 import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer";
 import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import RvRp22AnglesOverlay from "@/components/room/rv/render/RvRp22AnglesOverlay";
@@ -304,22 +303,16 @@ export default function RvPlanCanvas({
             />
 
             {showRoomModesOverlay && (
-              <>
-                <RvModalZonesOverlay
-                  widthM={widthM}
-                  lengthM={lengthM}
-                  toPx={toPx}
-                  seatingPositions={seatingPositions}
-                  subwoofers={[
-                    ...(frontLive || []),
-                    ...(rearLive || [])
-                  ]}
-                />
-                <RvSeatBassZoneOverlay
-                  seatingPositions={seatingPositions}
-                  toPx={toPx}
-                />
-              </>
+              <RvModalZonesOverlay
+                widthM={widthM}
+                lengthM={lengthM}
+                toPx={toPx}
+                seatingPositions={seatingPositions}
+                subwoofers={[
+                  ...(frontLive || []),
+                  ...(rearLive || [])
+                ]}
+              />
             )}
 
              <RvZonesAndOverlays
