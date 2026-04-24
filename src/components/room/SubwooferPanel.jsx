@@ -56,9 +56,29 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            {frontSubsCfg?.model === "SUB4-12" && (
+              <div className="col-span-12 mt-2">
+                <label className="block text-[12px] text-[#625143] mb-1">Mount height</label>
+                <Select
+                  value={frontSubsCfg?.mountMode ?? "floor"}
+                  onValueChange={(mountMode) => {
+                    if (appState?.setFrontSubsCfg) {
+                      appState.setFrontSubsCfg(prev => ({ ...prev, mountMode }));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-10 w-full bg-white border-[#DCDBD6]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="floor">Floor mount — bottom 10 cm</SelectItem>
+                    <SelectItem value="wall">Wall mount — bottom 80 cm</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              </div>
+
+              {frontSubsCfg?.model === "SUB4-12" && (
               <div className="col-span-12 mt-3 flex items-center gap-3">
                 <label className="shrink-0 text-[12px] text-[#625143]">Orientation</label>
                 <div className="relative z-10 flex flex-wrap gap-2">
@@ -176,9 +196,29 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            {rearSubsCfg?.model === "SUB4-12" && (
+              <div className="col-span-12 mt-2">
+                <label className="block text-[12px] text-[#625143] mb-1">Mount height</label>
+                <Select
+                  value={rearSubsCfg?.mountMode ?? "floor"}
+                  onValueChange={(mountMode) => {
+                    if (appState?.setRearSubsCfg) {
+                      appState.setRearSubsCfg(prev => ({ ...prev, mountMode }));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-10 w-full bg-white border-[#DCDBD6]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    <SelectItem value="floor">Floor mount — bottom 10 cm</SelectItem>
+                    <SelectItem value="wall">Wall mount — bottom 80 cm</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              </div>
+
+              {rearSubsCfg?.model === "SUB4-12" && (
               <div className="col-span-12 mt-3 flex items-center gap-3">
                 <label className="shrink-0 text-[12px] text-[#625143]">Orientation</label>
                 <div className="relative z-10 flex flex-wrap gap-2">

@@ -55,10 +55,10 @@ export function placeSubwoofers({
     ? wallY_m + wallBuffer_m + subD_m / 2 // Center of sub depth
     : (room.length_m - wallBuffer_m - subD_m / 2);
 
-  // height Z (BOTTOM-referenced now)
-  const hDef = subHeightDefault[model] || { mode: "bottom", z_mm: 800 };
-  const bottomZ_m = Math.max(mmToM(hDef.z_mm), 0.05); // keep 5 cm safety from floor
-  let z_m = bottomZ_m + (subH_m / 2);                 // convert bottom -> centre
+  // height Z (centre-referenced position from selected mount mode)
+  const mountMode = cfg?.mountMode === "wall" ? "wall" : "floor";
+  const bottomZ_m = mountMode === "wall" ? 0.80 : 0.10;
+  let z_m = bottomZ_m + (subH_m / 2);
 
   // keep 5 cm headroom from ceiling for the top of cabinet
   if (z_m + subH_m / 2 > room.height_m - 0.05) {
