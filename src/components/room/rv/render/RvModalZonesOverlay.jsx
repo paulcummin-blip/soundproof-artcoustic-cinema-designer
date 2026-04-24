@@ -69,7 +69,48 @@ function getContourOpacity(excitation) {
   return 0.05 + clamp01(excitation) * 0.16;
 }
 
-export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers = [] }) {
+const SEAT_HALF_WIDTH_M = 0.30;
+const SEAT_FRONT_BACK_TOLERANCE_M = 0.15;
+
+function getSeatAxisPosition(seat, axisLength, axis) {
+  const value = Number(seat?.[axis] ?? seat?.position?.[axis]);
+  if (!(Number.isFinite(value) && axisLength > 0)) return null;
+  return clamp01(value / axisLength);
+}
+
+function getSeatBandIntersectionFactor(seatingPositions, bandPosition, bandWidth, axisLength, axis) {
+  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0 || !(axisLength > 0)) return 0;
+
+  const bandCenterM = clamp01(bandPosition) * axisLength;
+  const bandHalfWidthM = (bandWidth * axisLength) / 2;
+  const toleranceM = axis === "x" ? SEAT_HALF_WIDTH_M : SEAT_FRONT_BACK_TOLERANCE_M;
+
+  const intersections = seatingPositions
+    .map((seat) => {
+      const seatValue = Number(seat?.[axis] ?? seat?.position?.[axis]);
+      if (!Number.isFinite(seatValue)) return null;
+      const distance = Math.abs(seatValue - bandCenterM);
+      const threshold = bandHalfWidthM + toleranceM;
+      if (distance <= threshold) return 1;
+      const fadeThreshold = threshold + toleranceM;
+      if (distance <= fadeThreshold) {
+        return Math.max(0, 1 - ((distance - threshold) / Math.max(toleranceM, 0.001)));
+      }
+      return 0;
+    })
+    .filter((value) => value !== null);
+
+  if (intersections.length === 0) return 0;
+  return Math.max(...intersections);
+}
+
+function getCombinedBandEmphasis(excitation, seatIntersection) {
+  const safeExcitation = clamp01(excitation);
+  const safeSeatIntersection = clamp01(seatIntersection);
+  return clamp01((safeExcitation * 0.7) + (safeSeatIntersection * 0.45));
+}
+
+export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers = [], seatingPositions = [] }) {
   if (!(Number(widthM) > 0) || !(Number(lengthM) > 0) || typeof toPx !== "function") {
     return null;
   }
@@ -90,6 +131,10 @@ export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers 
 
   const widthCenterExcitation = getBandExcitation(xPositions, 0.5, 0.08);
   const lengthCenterExcitation = getBandExcitation(yPositions, 0.5, 0.08);
+  const widthCenterSeatIntersection = getSeatBandIntersectionFactor(seatingPositions, 0.5, 0.08, Number(widthM), "x");
+  const lengthCenterSeatIntersection = getSeatBandIntersectionFactor(seatingPositions, 0.5, 0.08, Number(lengthM), "y");
+  const widthCenterEmphasis = getCombinedBandEmphasis(widthCenterExcitation, widthCenterSeatIntersection);
+  const lengthCenterEmphasis = getCombinedBandEmphasis(lengthCenterExcitation, lengthCenterSeatIntersection);
 
   return (
     <g data-layer="modal-zones-overlay" pointerEvents="none">
@@ -97,6 +142,8 @@ export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers 
         const xCenter = left + roomWidthPx * clamp01(band.position);
         const bandWidth = roomWidthPx * band.width;
         const excitation = getBandExcitation(xPositions, band.position, band.width);
+        const seatIntersection = getSeatBandIntersectionFactor(seatingPositions, band.position, band.width, Number(widthM), "x");
+        const emphasis = getCombinedBandEmphasis(excitation, seatIntersection);
         return (
           <rect
             key={`width-band-${index}`}
@@ -105,7 +152,7 @@ export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers 
             width={bandWidth}
             height={roomHeightPx}
             fill={getFillForKind(band.kind)}
-            opacity={getBandOpacity(band.kind, excitation)}
+            opacity={getBandOpacity(band.kind, emphasis)}
           />
         );
       })}
@@ -114,6 +161,8 @@ export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers 
         const yCenter = top + roomHeightPx * clamp01(band.position);
         const bandHeight = roomHeightPx * band.width;
         const excitation = getBandExcitation(yPositions, band.position, band.width);
+        const seatIntersection = getSeatBandIntersectionFactor(seatingPositions, band.position, band.width, Number(lengthM), "y");
+        const emphasis = getCombinedBandEmphasis(excitation, seatIntersection);
         return (
           <rect
             key={`length-band-${index}`}
@@ -122,7 +171,7 @@ export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers 
             width={roomWidthPx}
             height={bandHeight}
             fill={getFillForKind(band.kind)}
-            opacity={getBandOpacity(band.kind, excitation)}
+            opacity={getBandOpacity(band.kind, emphasis)}
           />
         );
       })}
@@ -133,7 +182,7 @@ export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers 
         x2={left + roomWidthPx * 0.5}
         y2={top + roomHeightPx}
         stroke={CONTOUR_STROKE}
-        strokeOpacity={getContourOpacity(widthCenterExcitation)}
+        strokeOpacity={getContourOpacity(widthCenterEmphasis)}
         strokeWidth={1.5}
         strokeDasharray="8 8"
       />
@@ -144,7 +193,7 @@ export default function RvModalZonesOverlay({ widthM, lengthM, toPx, subwoofers 
         x2={left + roomWidthPx}
         y2={top + roomHeightPx * 0.5}
         stroke={CONTOUR_STROKE}
-        strokeOpacity={getContourOpacity(lengthCenterExcitation)}
+        strokeOpacity={getContourOpacity(lengthCenterEmphasis)}
         strokeWidth={1.5}
         strokeDasharray="8 8"
       />
