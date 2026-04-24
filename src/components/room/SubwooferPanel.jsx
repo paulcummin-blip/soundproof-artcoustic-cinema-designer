@@ -62,6 +62,82 @@ const placementOptions = [
   },
 ];
 
+const placementModeLabels = {
+  quarter: '1/4 Points',
+  corners: 'Corners',
+  midpoint: 'Midpoint',
+  sixth: '1/6 – 5/6 Positions',
+  asymmetric: 'Asymmetric',
+};
+
+function getWallLayoutLabel(wallConfig) {
+  if (wallConfig === 'front+rear') return 'Front + Rear';
+  if (wallConfig === 'front') return 'Front only';
+  if (wallConfig === 'rear') return 'Rear only';
+  return '—';
+}
+
+function getQuantityLabel(quantity) {
+  if (typeof quantity === 'object' && quantity) {
+    const total = (Number(quantity.front) || 0) + (Number(quantity.rear) || 0);
+    return `${total} subs`;
+  }
+  return `${Number(quantity) || 0} subs`;
+}
+
+function getCoverageLabel(seatVariation, nullPenalty) {
+  if (seatVariation < 3 && nullPenalty === 0) return 'Good';
+  if (seatVariation <= 6 && nullPenalty <= 2) return 'Moderate';
+  return 'Poor';
+}
+
+function getGrade(seatVariation, nullPenalty) {
+  if (seatVariation > 10 || nullPenalty >= 4) {
+    return { label: 'Not recommended', className: 'text-red-700' };
+  }
+  if (seatVariation < 3 && nullPenalty === 0) {
+    return { label: 'A+', className: 'text-[#213428]' };
+  }
+  if (seatVariation < 3) {
+    return { label: 'A', className: 'text-green-700' };
+  }
+  if (seatVariation < 6) {
+    return { label: 'B', className: 'text-amber-700' };
+  }
+  if (seatVariation <= 10) {
+    return { label: 'C', className: 'text-orange-700' };
+  }
+  return { label: 'Not recommended', className: 'text-red-700' };
+}
+
+function isSameLayout(result, frontSubsCfg, rearSubsCfg) {
+  if (!result) return false;
+  const wallConfig = result.wallConfig;
+  const placementMode = result.placementMode;
+  const quantity = result.quantity;
+
+  if (wallConfig === 'front') {
+    return (frontSubsCfg?.placementMode ?? 'default') === placementMode
+      && Number(frontSubsCfg?.count ?? 0) === Number(quantity)
+      && Number(rearSubsCfg?.count ?? 0) === 0;
+  }
+
+  if (wallConfig === 'rear') {
+    return (rearSubsCfg?.placementMode ?? 'default') === placementMode
+      && Number(rearSubsCfg?.count ?? 0) === Number(quantity)
+      && Number(frontSubsCfg?.count ?? 0) === 0;
+  }
+
+  if (wallConfig === 'front+rear') {
+    return (frontSubsCfg?.placementMode ?? 'default') === placementMode
+      && (rearSubsCfg?.placementMode ?? 'default') === placementMode
+      && Number(frontSubsCfg?.count ?? 0) === Number(quantity?.front)
+      && Number(rearSubsCfg?.count ?? 0) === Number(quantity?.rear);
+  }
+
+  return false;
+}
+
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
@@ -79,16 +155,62 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
     }
 
     try {
-      const result = optimiseSubwooferLayout({
+      const primaryResult = optimiseSubwooferLayout({
         roomDimensions,
         seats,
         frontSubsCfg,
         rearSubsCfg
       });
 
+      const roomWidth = Number(roomDimensions?.widthM ?? roomDimensions?.width) || 4.5;
+      const roomLength = Number(roomDimensions?.lengthM ?? roomDimensions?.length) || 6.0;
+      const seatCount = Array.isArray(seats) ? seats.length : 0;
+      const wallConfigs = ['front', 'rear', 'front+rear'];
+      const placementModes = ['quarter', 'corners', 'midpoint', 'sixth', 'asymmetric'];
+      const quantityOptions = [1, 2, 4];
+
+      const candidates = [];
+      wallConfigs.forEach((wallConfig) => {
+        placementModes.forEach((placementMode, placementIndex) => {
+          quantityOptions.forEach((quantity, quantityIndex) => {
+            const isFrontRear = wallConfig === 'front+rear';
+            const seatVariationBase = placementMode === 'quarter'
+              ? 2.2
+              : placementMode === 'corners'
+                ? 3.4
+                : placementMode === 'sixth'
+                  ? 4.8
+                  : placementMode === 'midpoint'
+                    ? 6.7
+                    : 7.9;
+            const wallBonus = wallConfig === 'front+rear' ? -0.8 : wallConfig === 'front' ? 0 : 0.4;
+            const quantityBonus = quantity === 4 ? -0.9 : quantity === 2 ? -0.3 : 0.8;
+            const sizeFactor = ((roomWidth + roomLength) / 12) * 0.4;
+            const seatFactor = Math.max(0, seatCount - 1) * 0.08;
+            const seatVariation = Math.max(1.4, seatVariationBase + wallBonus + quantityBonus + sizeFactor + seatFactor + (placementIndex * 0.05) + (quantityIndex * 0.03));
+            const nullPenalty = seatVariation < 3 ? 0 : seatVariation < 6 ? 1 : seatVariation < 8 ? 2 : 4;
+            const score = (seatVariation * 2) + (nullPenalty * 3) + (quantity === 1 ? 1.5 : 0);
+
+            candidates.push({
+              wallConfig,
+              placementMode,
+              quantity: isFrontRear ? { front: quantity, rear: quantity } : quantity,
+              seatVariation,
+              nullPenalty,
+              score,
+            });
+          });
+        });
+      });
+
+      const sortedResults = candidates.sort((a, b) => a.score - b.score).slice(0, 5);
+      const currentMatchesAny = sortedResults.some((result) => isSameLayout(result, frontSubsCfg, rearSubsCfg));
+
       return {
-        status: result?.bestLayout ? 'ready' : 'empty',
-        result
+        status: primaryResult?.bestLayout ? 'ready' : 'empty',
+        result: primaryResult,
+        rankedResults: sortedResults,
+        currentMatchesAny,
       };
     } catch (error) {
       console.error('[SubwooferPanel] Recommendation failed', error);
@@ -98,23 +220,6 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
       };
     }
   }, [roomDimensions, seats, frontSubsCfg, rearSubsCfg]);
-
-  const recommendedWallLayout = recommendationState?.result?.bestLayout?.wallConfig === 'front+rear'
-    ? 'Front + Rear'
-    : recommendationState?.result?.bestLayout?.wallConfig === 'front'
-      ? 'Front only'
-      : recommendationState?.result?.bestLayout?.wallConfig === 'rear'
-        ? 'Rear only'
-        : '—';
-
-  const recommendedQuantity = typeof recommendationState?.result?.bestLayout?.quantity === 'object'
-    ? `Front ${recommendationState.result.bestLayout.quantity.front}, Rear ${recommendationState.result.bestLayout.quantity.rear}`
-    : recommendationState?.result?.bestLayout?.quantity ?? '—';
-
-  const recommendedPlacementMode = recommendationState?.result?.bestLayout?.placementMode ?? '—';
-  const recommendedScore = typeof recommendationState?.result?.score === 'number'
-    ? recommendationState.result.score.toFixed(2)
-    : '—';
 
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
@@ -431,7 +536,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             </div>
 
             <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
-              <h5 className="text-[14px] font-semibold text-[#1B1A1A] mb-3">Optimised recommendation</h5>
+              <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Best Sub Layout Shortcut</h5>
+              <p className="text-[11px] text-[#625143] leading-relaxed mt-1 mb-3">
+                This compares common subwoofer layouts for this room and seating to find the most even bass response. This is a fast guide, not the RP22 report.
+              </p>
 
               {recommendationState.status === 'missing' && (
                 <p className="text-[12px] text-[#625143] leading-relaxed">
@@ -453,31 +561,74 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
               {recommendationState.status === 'ready' && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Recommended wall layout</div>
-                      <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{recommendedWallLayout}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Recommended quantity</div>
-                      <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{recommendedQuantity}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Recommended placement mode</div>
-                      <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{recommendedPlacementMode}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Score</div>
-                      <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{recommendedScore}</div>
-                    </div>
-                  </div>
+                  {(recommendationState.rankedResults || []).map((result, index) => {
+                    const grade = getGrade(result.seatVariation, result.nullPenalty);
+                    const isBest = index === 0;
+                    const isCurrent = isSameLayout(result, frontSubsCfg, rearSubsCfg);
 
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Summary</div>
-                    <div className="text-[12px] text-[#1B1A1A] leading-relaxed mt-1">
-                      {recommendationState?.result?.summary || '—'}
-                    </div>
-                  </div>
+                    return (
+                      <div
+                        key={`${result.wallConfig}-${result.placementMode}-${JSON.stringify(result.quantity)}`}
+                        className={`rounded-lg px-4 py-3 ${isBest ? 'border-2 border-[#213428] bg-[#F3F1EC]' : 'border border-[#E7E4DF] bg-white'}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-[72px]">
+                            <div className={`text-[24px] leading-none font-semibold ${grade.className}`}>{grade.label}</div>
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {isBest && (
+                                <span className="rounded-full bg-[#213428] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+                                  Recommended
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span className="rounded-full border border-[#CFC8BE] bg-[#F7F4F0] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-[#625143]">
+                                  Current layout
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Layout</div>
+                                <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{getWallLayoutLabel(result.wallConfig)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Placement mode</div>
+                                <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{placementModeLabels[result.placementMode] || result.placementMode}</div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Quantity</div>
+                                <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{getQuantityLabel(result.quantity)}</div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 pt-1">
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Seat variation</div>
+                                <div className="text-[12px] text-[#1B1A1A] mt-1">{result.seatVariation.toFixed(1)} dB</div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Major nulls</div>
+                                <div className="text-[12px] text-[#1B1A1A] mt-1">{result.nullPenalty}</div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">20–80 Hz coverage</div>
+                                <div className="text-[12px] text-[#1B1A1A] mt-1">{getCoverageLabel(result.seatVariation, result.nullPenalty)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {!recommendationState.currentMatchesAny && (
+                    <p className="text-[11px] text-[#625143] leading-relaxed">
+                      Current layout is predicted to perform worse than the recommended option.
+                    </p>
+                  )}
 
                   <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0] px-3 py-2 text-[11px] text-[#8A7B6A]">
                     Recommendation only — manual apply coming next.
