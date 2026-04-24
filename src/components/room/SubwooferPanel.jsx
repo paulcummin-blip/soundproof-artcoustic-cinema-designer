@@ -615,7 +615,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 pt-1">
                               <div>
                                 <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Seat variation</div>
-                                <div className="text-[12px] text-[#1B1A1A] mt-1">{result.seatVariation.toFixed(1)} dB</div>
+                                <div className="text-[12px] text-[#1B1A1A] mt-1">{Number(result.seatVariation ?? result.seatVariance ?? 0).toFixed(1)} dB</div>
                               </div>
                               <div>
                                 <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Major nulls</div>
