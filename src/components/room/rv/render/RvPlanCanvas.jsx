@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { hasPos } from "@/components/room/rv/RenderPrimitives";
+import RvBassConsistencyOverlay from "@/components/room/rv/render/RvBassConsistencyOverlay";
 import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import SvgDefs from "@/components/room/SvgDefs";
 import RvZoomGroup from "@/components/room/rv/render/RvZoomGroup";
@@ -138,6 +139,8 @@ export default function RvPlanCanvas({
   handleIconMove,
   handleIconLeave,
 }) {
+  const [showBassMap, setShowBassMap] = useState(false);
+
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
   // Three-tier priority: active draft > held last-valid draft > committed state
@@ -300,7 +303,16 @@ export default function RvPlanCanvas({
               seatingPositions={seatingPositions}
             />
 
-            <RvZonesAndOverlays
+            {showBassMap && (
+              <RvBassConsistencyOverlay
+                widthM={widthM}
+                lengthM={lengthM}
+                subwoofers={[...(frontSubs || []), ...(rearSubs || [])]}
+                toPx={toPx}
+              />
+            )}
+
+             <RvZonesAndOverlays
               exportMode={exportMode}
               overlaysForRendering={overlaysForRendering}
               augmentedZones={augmentedZones}
