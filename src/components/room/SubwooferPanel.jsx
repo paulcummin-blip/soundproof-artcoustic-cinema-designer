@@ -138,6 +138,49 @@ function isSameLayout(result, frontSubsCfg, rearSubsCfg) {
   return false;
 }
 
+function applyRecommendedLayout(result, appState) {
+  if (!result || !appState?.setFrontSubsCfg || !appState?.setRearSubsCfg) return;
+
+  if (result.wallConfig === 'front') {
+    appState.setFrontSubsCfg((prev) => ({
+      ...prev,
+      count: Number(result.quantity) || 0,
+      placementMode: result.placementMode,
+    }));
+    appState.setRearSubsCfg((prev) => ({
+      ...prev,
+      count: 0,
+    }));
+    return;
+  }
+
+  if (result.wallConfig === 'rear') {
+    appState.setRearSubsCfg((prev) => ({
+      ...prev,
+      count: Number(result.quantity) || 0,
+      placementMode: result.placementMode,
+    }));
+    appState.setFrontSubsCfg((prev) => ({
+      ...prev,
+      count: 0,
+    }));
+    return;
+  }
+
+  if (result.wallConfig === 'front+rear') {
+    appState.setFrontSubsCfg((prev) => ({
+      ...prev,
+      count: Number(result.quantity?.front) || 0,
+      placementMode: result.placementMode,
+    }));
+    appState.setRearSubsCfg((prev) => ({
+      ...prev,
+      count: Number(result.quantity?.rear) || 0,
+      placementMode: result.placementMode,
+    }));
+  }
+}
+
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
@@ -269,6 +312,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     <SelectItem value="0">0</SelectItem>
                     <SelectItem value="1">1</SelectItem>
                     <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -409,6 +454,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     <SelectItem value="0">0</SelectItem>
                     <SelectItem value="1">1</SelectItem>
                     <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -567,9 +614,11 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     const isCurrent = isSameLayout(result, frontSubsCfg, rearSubsCfg);
 
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={`${result.wallConfig}-${result.placementMode}-${JSON.stringify(result.quantity)}`}
-                        className={`rounded-lg px-4 py-3 ${isBest ? 'border-2 border-[#213428] bg-[#F3F1EC]' : 'border border-[#E7E4DF] bg-white'}`}
+                        onClick={() => applyRecommendedLayout(result, appState)}
+                        className={`w-full rounded-lg px-4 py-3 text-left transition-colors cursor-pointer hover:bg-[#ECE8E0] ${isBest ? 'border-2 border-[#213428] bg-[#F3F1EC]' : 'border border-[#E7E4DF] bg-white'}`}
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-[72px]">
@@ -620,7 +669,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
 
@@ -631,7 +680,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   )}
 
                   <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0] px-3 py-2 text-[11px] text-[#8A7B6A]">
-                    Recommendation only — manual apply coming next.
+                    Click a layout above to apply it to the room.
                   </div>
                 </div>
               )}
