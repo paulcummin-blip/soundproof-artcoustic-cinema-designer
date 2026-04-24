@@ -31,6 +31,7 @@ import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
 import { fovForDistance } from '../components/utils/screenMetrics';
 import { getLevelColors } from '../components/utils/rp22Colors';
+import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
 
 // Local print-only pill — exact same visual spec as RP22GradingPill
 function PrintRp23Pill({ level }) {
@@ -830,22 +831,24 @@ function RP22ReportInner() {
             const defaultEarHeight = rowNum === 1 ? 1.2 : rowNum === 2 ? 1.5 : rowNum === 3 ? 1.8 : 1.2 + (rowNum - 1) * 0.3;
             const eyeZ = Number.isFinite(seat.z) && seat.z !== 1.2 ? seat.z : defaultEarHeight;
             const viewingDistanceM = Math.abs(eyeY - screenFrontPlaneY);
-            const horizontalViewingAngleDeg = viewingDistanceM > 0
+            const rawHorizontalAngle = viewingDistanceM > 0
                 ? 2 * Math.atan((screenWidthM / 2) / viewingDistanceM) * (180 / Math.PI)
                 : 0;
+            const horizontalViewingAngleDeg = rp23DisplayAngleDeg(rawHorizontalAngle);
             const verticalAngleToTopDeg    = viewingDistanceM > 0 ? Math.atan2(screenTopHeightM    - eyeZ, viewingDistanceM) * (180 / Math.PI) : 0;
             const verticalAngleToBottomDeg = viewingDistanceM > 0 ? Math.atan2(screenBottomHeightM - eyeZ, viewingDistanceM) * (180 / Math.PI) : 0;
             const totalVerticalAngleDeg    = verticalAngleToTopDeg - verticalAngleToBottomDeg;
             const seatHud = reportSeatHudById?.[seat.id];
             const rp23 = seatHud?.rp23;
             const complianceNote = rp23?.level
-                ? `RP23 H: ${rp23.formatted || `${(horizontalViewingAngleDeg).toFixed(1)}°`} (${rp23.level})`
+                ? `RP23 H: ${rp23.formatted || `${horizontalViewingAngleDeg}°`} (${rp23.level})`
                 : '—';
             return {
                 rowNumber: seat.rowNumber || 1,
                 seatId:    seat.id,
                 eyeY, eyeZ,
                 viewingDistanceM,
+                rawHorizontalAngle,
                 horizontalViewingAngleDeg,
                 verticalAngleToTopDeg,
                 verticalAngleToBottomDeg,
@@ -1365,15 +1368,9 @@ function RP22ReportInner() {
                                                                 <div style={{ display: 'grid', rowGap: '3mm' }}>
                                                                     {rowGeo.map(row => {
                                                                                         const hDeg = row.horizontalViewingAngleDeg;
-                                                                                        const rp23AngleStr = Number.isFinite(hDeg) ? `${hDeg.toFixed(1)}°` : '—';
-                                                                                        const rp23Level = (() => {
-                                                                                            if (!Number.isFinite(hDeg)) return null;
-                                                                                            if (hDeg >= 50 && hDeg <= 65) return 'L4';
-                                                                                            if (hDeg >= 45 && hDeg <= 70) return 'L3';
-                                                                                            if (hDeg >= 40 && hDeg <= 80) return 'L2';
-                                                                                            if (hDeg >= 33 && hDeg <= 90) return 'L1';
-                                                                                            return null;
-                                                                                        })();
+                                                                                        const displayHorizontalDeg = rp23DisplayAngleDeg(hDeg);
+                                                                                        const rp23AngleStr = Number.isFinite(displayHorizontalDeg) ? `${displayHorizontalDeg}°` : '—';
+                                                                                        const rp23Level = rp23LevelForAngleDeg(hDeg);
                                                                                         return (
                                                                                             <div key={row.rowNumber} style={{ paddingBottom: '2mm', borderBottom: '1px solid #F0EFEA', display: 'grid', gridTemplateColumns: '1fr auto', columnGap: '6mm', alignItems: 'start' }}>
                                                                                                 {/* Left: existing geometry values */}
