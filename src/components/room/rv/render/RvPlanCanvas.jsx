@@ -139,7 +139,7 @@ export default function RvPlanCanvas({
   handleIconMove,
   handleIconLeave,
 }) {
-  const [showBassMap, setShowBassMap] = useState(false);
+  const [showBassMap, setShowBassMap] = useState(true);
 
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
@@ -307,7 +307,10 @@ export default function RvPlanCanvas({
               <RvBassConsistencyOverlay
                 widthM={widthM}
                 lengthM={lengthM}
-                subwoofers={[...(frontSubs || []), ...(rearSubs || [])]}
+                subwoofers={[
+                  ...(frontLive || []),
+                  ...(rearLive || [])
+                ]}
                 toPx={toPx}
               />
             )}
