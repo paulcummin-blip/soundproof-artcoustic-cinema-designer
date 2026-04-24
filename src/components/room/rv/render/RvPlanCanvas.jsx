@@ -548,33 +548,6 @@ export default function RvPlanCanvas({
           )}
         </svg>
 
-        <div
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            zIndex: 20,
-            display: 'flex',
-            alignItems: 'center'
-          }}
-        >
-          <button
-            onClick={() => setShowBassMap(v => !v)}
-            style={{
-              marginLeft: 8,
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 12,
-              background: showBassMap ? '#213428' : '#F3F1EC',
-              color: showBassMap ? '#FFFFFF' : '#625143',
-              border: '1px solid #CFC8BE',
-              cursor: 'pointer'
-            }}
-          >
-            Room Modes
-          </button>
-        </div>
-
         {/* SEAT HOVER HUD - updated with drag and hide/show */}
         <RvSeatHudLayer
           exportMode={exportMode}

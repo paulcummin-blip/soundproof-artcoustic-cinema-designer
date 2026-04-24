@@ -35,15 +35,22 @@ export default function RvBassConsistencyOverlay({
     return points.map(p => ({
       ...p,
       norm: (p.value - min) / range,
-      risk: Math.abs(((p.value - min) / range) - 0.5) * 2,
     }));
   }, [widthM, lengthM, subwoofers]);
 
   return (
-    <g pointerEvents="none">
+    <g pointerEvents="none" opacity={0.55}>
       {grid.map((p, i) => {
         const [cx, cy] = toPx(p.x, p.y);
-        const { risk } = p;
+        // brand-aligned tones
+        let fill;
+        if (p.norm < 0.35) {
+          fill = "#F1F0EE"; // cancellation (light)
+        } else if (p.norm < 0.7) {
+          fill = "#DCDBD6"; // neutral
+        } else {
+          fill = "#625143"; // strong / stable
+        }
         return (
           <rect
             key={i}
@@ -51,15 +58,7 @@ export default function RvBassConsistencyOverlay({
             y={cy - 6}
             width={12}
             height={12}
-            fill={
-              risk > 0.75
-                ? 'rgba(180, 38, 38, 0.35)'
-                : risk > 0.5
-                ? 'rgba(180, 38, 38, 0.22)'
-                : risk > 0.25
-                ? 'rgba(180, 38, 38, 0.12)'
-                : 'transparent'
-            }
+            fill={fill}
           />
         );
       })}
