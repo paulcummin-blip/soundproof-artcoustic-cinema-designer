@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const WALL_BUFFER_M = 0.01;
 const SUB_WIDTH_FALLBACK_M = 0.50;
 
@@ -34,7 +35,6 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       return;
     }
 
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const EPS = 0.01;
     const getDepthM = (model) => {
       try {
@@ -113,6 +113,11 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const subWidth = getSubWidthM(model);
       const minX = WALL_BUFFER_M + subWidth / 2;
       const maxX = widthM - WALL_BUFFER_M - subWidth / 2;
+      const dims = getModelDimsM?.(model) || {};
+      const subHeight = Number(dims?.heightM);
+      const resolvedSubHeight = Number.isFinite(subHeight) && subHeight > 0 ? subHeight : 0.50;
+      const bottom = cfg?.mountMode === 'wall' ? 0.80 : 0.10;
+      const z = bottom + resolvedSubHeight / 2;
       return Array.from({ length: qty }, (_, i) => {
         const prev = existingSubs?.[i] || null;
         const xFromCfg = Number(cfgPos?.[i]?.x);
@@ -127,7 +132,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
           id: `sub-${group}-${i + 1}`,
           role: group === 'front' ? `SUBF${i + 1}` : `SUBR${i + 1}`,
           group, model,
-          position: { x: finalX, y: yPinned, z: Number.isFinite(prev?.position?.z) ? prev.position.z : 0 }
+          position: { x: finalX, y: yPinned, z }
         };
       });
     };
