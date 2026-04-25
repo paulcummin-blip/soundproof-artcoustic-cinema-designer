@@ -108,7 +108,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const resolvedSubHeight = Number.isFinite(subHeight) && subHeight > 0 ? subHeight : 0.50;
       const bottom = cfg?.mountMode === 'wall' ? 0.80 : 0.10;
       const z = bottom + resolvedSubHeight / 2;
-      const buildCount = placementMode === 'default' ? qty : defaultsX.length;
+      const buildCount = qty;
       return Array.from({ length: buildCount }, (_, i) => {
         const prev = existingSubs?.[i] || null;
         const xFromCfg = Number(cfgPos?.[i]?.x);

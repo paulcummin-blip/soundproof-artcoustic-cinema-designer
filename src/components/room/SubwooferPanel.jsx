@@ -84,10 +84,12 @@ function applyRecommendedLayout(result, appState) {
       ...prev,
       count: Number(result.quantity) || 0,
       placementMode: result.placementMode,
+      positions: [],
     }));
     appState.setRearSubsCfg((prev) => ({
       ...prev,
       count: 0,
+      positions: [],
     }));
     return;
   }
@@ -97,10 +99,12 @@ function applyRecommendedLayout(result, appState) {
       ...prev,
       count: Number(result.quantity) || 0,
       placementMode: result.placementMode,
+      positions: [],
     }));
     appState.setFrontSubsCfg((prev) => ({
       ...prev,
       count: 0,
+      positions: [],
     }));
     return;
   }
@@ -110,11 +114,13 @@ function applyRecommendedLayout(result, appState) {
       ...prev,
       count: Number(result.quantity?.front) || 0,
       placementMode: result.placementMode,
+      positions: [],
     }));
     appState.setRearSubsCfg((prev) => ({
       ...prev,
       count: Number(result.quantity?.rear) || 0,
       placementMode: result.placementMode,
+      positions: [],
     }));
   }
 }
