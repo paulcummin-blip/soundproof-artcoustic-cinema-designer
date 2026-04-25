@@ -62,6 +62,7 @@ import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
 import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
 import AimLoudspeakerPanel from "@/components/roomdesigner/AimLoudspeakerPanel";
+import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
 
