@@ -318,7 +318,7 @@ export default function SeatHud({
                     ) : key === 'p17' ? (
                     `: ${(metric.formatted || '—')}${Number.isFinite(metric.worstAngleDeg) ? ` ${metric.worstAngleDeg}°` : ''}`
                     ) : (
-                    `: ${metricText || '—'}`
+                    `: ${key === 'p10' ? (metricText || '—') : (metric.formatted || '—')}`
                     )}
                     </span>
                     <RP22GradingPill level={pillLevel} />
