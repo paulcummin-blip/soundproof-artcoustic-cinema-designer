@@ -91,7 +91,11 @@ const getMetricDisplayState = (metric, paramId = null) => {
 
   const formatted = metric.formatted;
   const level = metric.level;
-  const treatUnavailableAsNA = Number(paramId) === 10 && (formatted === '—' || formatted === 'Not Calculated') && (level === '—' || level == null);
+  const formattedText = String(formatted || '').toLowerCase();
+  const treatUnavailableAsNA = Number(paramId) === 10 && (
+    ((formatted === '—' || formatted === 'Not Calculated') && (level === '—' || level == null)) ||
+    formattedText.includes('insufficient data')
+  );
 
   if (treatUnavailableAsNA) return { text: 'N/A', level: 'N/A' };
   if (formatted === '—') return { text: hasRealValue ? 'Not Calculated' : 'N/A', level };
@@ -318,7 +322,7 @@ export default function RP22ReportParameterGrid({
               const snap = getSnapshotForSeat(seat);
               const metric = snap?.rp22?.[pKey];
               const display = getMetricDisplayState(metric, pId);
-              const lvl = display.text === 'N/A' ? 'N/A' : (metric?.level || "—");
+              const lvl = display.level === 'N/A' || display.text === 'N/A' ? 'N/A' : (metric?.level || "—");
               const isPrimary = !!seat?.isPrimary;
               return (
                 <span
