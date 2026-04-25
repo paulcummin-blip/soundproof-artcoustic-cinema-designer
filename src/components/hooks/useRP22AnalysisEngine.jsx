@@ -850,6 +850,17 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       allowedP17Roles.add("RW");
     }
 
+    // Also include physically present front wides in the evaluated P17 speaker list,
+    // even in layouts where bedCount is below 9 (e.g. 7.1 with wides instead of rears)
+    for (const spk of speakersWithResolvedOverheads) {
+      if (!hasRealModel(spk)) continue;
+      if (!isNum(spk?.position?.x) || !isNum(spk?.position?.y)) continue;
+      const r = getCanonicalRole(spk.role);
+      if (r === "LW" || r === "RW") {
+        allowedP17Roles.add(r);
+      }
+    }
+
     // Dynamically include any numbered side-surround roles that actually exist
     // in the drawing with real models (SL2, SR2, SL3, SR3, etc.)
     for (const spk of speakersWithResolvedOverheads) {
