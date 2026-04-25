@@ -275,10 +275,13 @@ export default function SeatHud({
           };
 
           const formattedValue = String(metric?.formatted || '');
-          const metricText = key === 'p10' && formattedValue.toLowerCase().includes('insufficient data')
-            ? 'Not Calculated'
-            : fmt(metric);
-          const pillLevel = (key === 'p10' && fmt(metric) === 'N/A') || metricText === 'N/A' ? 'N/A' : normalizeLevel(metric.level);
+          const isP10Unavailable = key === 'p10' && (
+            fmt(metric) === 'N/A' ||
+            formattedValue === 'N/A (insufficient data)' ||
+            formattedValue.toLowerCase().includes('insufficient data')
+          );
+          const metricText = isP10Unavailable ? 'Not Calculated' : fmt(metric);
+          const pillLevel = isP10Unavailable || metricText === 'N/A' ? 'N/A' : normalizeLevel(metric.level);
 
           return (
             <div key={key}>
