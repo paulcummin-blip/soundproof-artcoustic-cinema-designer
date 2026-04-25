@@ -70,12 +70,19 @@ export function useSeatHoverLogic({
     if (!speaker) return;
     const role = getCanonicalRole(speaker.role);
     const displayName = getSpeakerModelDisplayName(speaker.model);
-    const text = `${role} — ${displayName}`;
+    const rspSeat = Array.isArray(seatingPositions)
+      ? seatingPositions.find((seat) => seat?.isPrimary) || seatingPositions[0] || null
+      : null;
+    const rspMetrics = rspSeat?.id ? allSeatSplMetrics?.[rspSeat.id] : null;
+    const speakerMetrics = role ? rspMetrics?.byRole?.[role] || rspMetrics?.roles?.[role] || null : null;
+    const splValue = speakerMetrics?.splAtSeatDb ?? speakerMetrics?.splDb ?? speakerMetrics?.spl ?? null;
+    const splLabel = Number.isFinite(Number(splValue)) ? `${Math.round(Number(splValue))} dB` : '—';
+    const text = `${role} — ${displayName}\nSPL @ RSP: ${splLabel}`;
     
     setSpeakerTooltip({ visible: true, text, x: 0, y: 0 });
     // Position immediately via move handler
     handleIconMove(e, speaker);
-  }, [getSpeakerModelDisplayName, getCanonicalRole]);
+  }, [getSpeakerModelDisplayName, getCanonicalRole, seatingPositions, allSeatSplMetrics, handleIconMove]);
 
   const handleIconMove = useCallback((e, speaker) => {
     const rect = rvWrapRef.current?.getBoundingClientRect();
