@@ -86,6 +86,17 @@ export function useSeatHoverLogic({
   const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
 
   // Speaker icon tooltip handlers
+  const handleIconMove = useCallback((e, speaker) => {
+    const rect = rvWrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    setSpeakerTooltip(prev => ({
+      ...prev,
+      x: e.clientX - rect.left + 12,
+      y: e.clientY - rect.top + 12
+    }));
+  }, [rvWrapRef]);
+
   const handleIconEnter = useCallback((e, speaker) => {
     if (!speaker) return;
     const role = getCanonicalRole(speaker.role);
@@ -103,17 +114,6 @@ export function useSeatHoverLogic({
     // Position immediately via move handler
     handleIconMove(e, speaker);
   }, [getSpeakerModelDisplayName, getCanonicalRole, seatingPositions, allSeatSplMetrics, handleIconMove]);
-
-  const handleIconMove = useCallback((e, speaker) => {
-    const rect = rvWrapRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    setSpeakerTooltip(prev => ({
-      ...prev,
-      x: e.clientX - rect.left + 12,
-      y: e.clientY - rect.top + 12
-    }));
-  }, [rvWrapRef]);
 
   const handleIconLeave = useCallback(() => {
     setSpeakerTooltip({ visible: false, text: '', x: 0, y: 0 });
