@@ -274,8 +274,8 @@ export default function SeatHud({
             return String(level);
           };
 
-          const metricText = fmt(metric);
-          const pillLevel = metricText === 'N/A' ? 'N/A' : normalizeLevel(metric.level);
+          const metricText = key === 'p10' && fmt(metric) === 'N/A' ? 'Not Calculated' : fmt(metric);
+          const pillLevel = (key === 'p10' && fmt(metric) === 'N/A') || metricText === 'N/A' ? 'N/A' : normalizeLevel(metric.level);
 
           return (
             <div key={key}>
