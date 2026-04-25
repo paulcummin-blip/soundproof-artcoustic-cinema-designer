@@ -17,7 +17,7 @@ export default function RvSpeakerTooltip({ speakerTooltip }) {
         fontFamily: 'system-ui, sans-serif',
         zIndex: 9999,
         boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
-        whiteSpace: 'nowrap',
+        whiteSpace: 'pre-line',
       }}
     >
       {speakerTooltip.text}

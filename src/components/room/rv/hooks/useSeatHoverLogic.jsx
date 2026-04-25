@@ -104,14 +104,16 @@ export function useSeatHoverLogic({
     const rspSeat = Array.isArray(seatingPositions)
       ? seatingPositions.find((seat) => seat?.isPrimary) || seatingPositions[0] || null
       : null;
-    const rspMetrics = rspSeat?.id ? allSeatSplMetrics?.[rspSeat.id] : null;
-    const speakerMetrics = role ? rspMetrics?.byRole?.[role] || rspMetrics?.roles?.[role] || null : null;
-    const splValue = speakerMetrics?.splAtSeatDb ?? speakerMetrics?.splDb ?? speakerMetrics?.spl ?? null;
+    const rspEntry = rspSeat?.id ? allSeatSplMetrics?.get?.(rspSeat.id) : null;
+    const rspSplData = rspEntry?.spl;
+    const speakerMetrics = role
+      ? rspSplData?.screen?.[role] || rspSplData?.surrounds?.[role] || rspSplData?.uppers?.[role] || null
+      : null;
+    const splValue = speakerMetrics?.value;
     const splLabel = Number.isFinite(Number(splValue)) ? `${Math.round(Number(splValue))} dB` : '—';
-    const text = `${role} — ${displayName}\nSPL @ RSP: ${splLabel}`;
-    
+    const text = `${role} — ${displayName}\nSPL @ RSP: ${splLabel}\nDistance from wall: —`;
+
     setSpeakerTooltip({ visible: true, text, x: 0, y: 0 });
-    // Position immediately via move handler
     handleIconMove(e, speaker);
   }, [getSpeakerModelDisplayName, getCanonicalRole, seatingPositions, allSeatSplMetrics, handleIconMove]);
 
