@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useTooltipData } from "@/components/room/hooks/useTooltipData";
 import getSpeakerWallDepthCm from "@/components/room/rv/utils/getSpeakerWallDepthCm";
+import { formatDb } from '@/components/utils/formatDb';
 
 export function useSeatHoverLogic({
   seatingPositions,
@@ -102,16 +103,12 @@ export function useSeatHoverLogic({
     if (!speaker) return;
     const role = getCanonicalRole(speaker.role);
     const displayName = getSpeakerModelDisplayName(speaker.model);
-    const rspSeat = Array.isArray(seatingPositions)
-      ? seatingPositions.find((seat) => seat?.isPrimary) || seatingPositions[0] || null
-      : null;
-    const rspEntry = rspSeat?.id ? allSeatSplMetrics?.get?.(rspSeat.id) : null;
-    const rspSplData = rspEntry?.spl;
+    const mlpSpl = allSeatSplMetrics?.get?.("mlp")?.spl;
     const speakerMetrics = role
-      ? rspSplData?.screen?.[role] || rspSplData?.surrounds?.[role] || rspSplData?.uppers?.[role] || null
+      ? mlpSpl?.screen?.[role] || mlpSpl?.surrounds?.[role] || mlpSpl?.uppers?.[role] || null
       : null;
     const splValue = speakerMetrics?.value;
-    const splLabel = Number.isFinite(Number(splValue)) ? `${Math.ceil(Number(splValue))} dB` : '—';
+    const splLabel = Number.isFinite(Number(splValue)) ? formatDb(Number(splValue)) : '—';
     const wallDepthCm = getSpeakerWallDepthCm({
       speaker,
       widthM,
