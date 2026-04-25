@@ -23,6 +23,7 @@ export default function RvSpeakerLayer({
   lcrAngleInfo,
   getCanonicalRole,
   bedLayerSpeakerMouseDownHandler,
+  onSpeakerAimToggle,
   handleIconEnter,
   handleIconMove,
   handleIconLeave,
@@ -154,6 +155,7 @@ export default function RvSpeakerLayer({
               depthM={speakerDepthM}
               scale={scale}
               speakerMouseDownHandler={onMouseDown}
+              onSpeakerAimToggle={onSpeakerAimToggle}
               onIconEnter={handleIconEnter}
               onIconMove={handleIconMove}
               onIconLeave={handleIconLeave}

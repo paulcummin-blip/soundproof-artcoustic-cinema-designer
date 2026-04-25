@@ -120,6 +120,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   depthM,
   scale,
   speakerMouseDownHandler,
+  onSpeakerAimToggle,
   onIconEnter,
   onIconMove,
   onIconLeave,
@@ -149,6 +150,17 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   
   // Get color (currently always black)
   const color = getChannelColor(role);
+
+  const handleMouseDown = (e) => {
+    if (e.altKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      onSpeakerAimToggle?.(speaker);
+      return;
+    }
+
+    speakerMouseDownHandler?.(e);
+  };
   
   // For round speakers (overheads), render as circle
   if (isRound) {
@@ -158,7 +170,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
     return (
       <g
         pointerEvents="all"
-        onMouseDown={speakerMouseDownHandler}
+        onMouseDown={handleMouseDown}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
         <circle
@@ -188,7 +200,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
     <g
       transform={transform}
       pointerEvents="all"
-      onMouseDown={speakerMouseDownHandler}
+      onMouseDown={handleMouseDown}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
       <path

@@ -136,6 +136,7 @@ export default function RvPlanCanvas({
   aimRearSurroundsAtMLP,
   lcrAngleInfo,
   bedLayerSpeakerMouseDownHandler,
+  onSpeakerAimToggle,
   handleIconEnter,
   handleIconMove,
   handleIconLeave,
@@ -509,6 +510,7 @@ export default function RvPlanCanvas({
               lcrAngleInfo={lcrAngleInfo}
               getCanonicalRole={getCanonicalRole}
               bedLayerSpeakerMouseDownHandler={bedLayerSpeakerMouseDownHandler}
+              onSpeakerAimToggle={onSpeakerAimToggle}
               handleIconEnter={handleIconEnter}
               handleIconMove={handleIconMove}
               handleIconLeave={handleIconLeave}

@@ -911,6 +911,30 @@ const byId = useEntitiesById({
     [handleMouseDown]
   );
 
+  const handleBedLayerSpeakerAimToggle = useCallback((speaker) => {
+    const role = String(getCanonicalRole(speaker?.role) || '').toUpperCase();
+
+    if (role === 'FL' || role === 'FR' || role === 'L' || role === 'R') {
+      const nextMode = appState?.lcrAimMode === 'angled' ? 'flat' : 'angled';
+      appState?.setLcrAimMode?.(nextMode);
+      return;
+    }
+
+    if (role === 'LW' || role === 'RW') {
+      appState?.setAimFrontWidesAtMLP?.(!(appState?.aimFrontWidesAtMLP ?? false));
+      return;
+    }
+
+    if (role === 'SL' || role === 'SR' || /^SL\d+$/.test(role) || /^SR\d+$/.test(role)) {
+      appState?.setAimSideSurroundsAtMLP?.(!(appState?.aimSideSurroundsAtMLP ?? false));
+      return;
+    }
+
+    if (role === 'SBL' || role === 'SBR') {
+      appState?.setAimRearSurroundsAtMLP?.(!(appState?.aimRearSurroundsAtMLP ?? false));
+    }
+  }, [appState, getCanonicalRole]);
+
   // Zoom handlers — delegated to hook
   const { handlePlanClick } = useCanvasZoomHandlers({
     zoom,
@@ -1859,6 +1883,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         aimRearSurroundsAtMLP={aimRearSurroundsAtMLP}
         lcrAngleInfo={lcrAngleInfo}
         bedLayerSpeakerMouseDownHandler={bedLayerSpeakerMouseDownHandler}
+        onSpeakerAimToggle={handleBedLayerSpeakerAimToggle}
         handleIconEnter={handleIconEnter}
         handleIconMove={handleIconMove}
         handleIconLeave={handleIconLeave}
