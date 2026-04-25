@@ -201,30 +201,66 @@ function countNulls(responseData) {
   return nullCount;
 }
 
-function calculateWorstNullDepth(responseData) {
-  if (!Array.isArray(responseData) || responseData.length === 0) return 0;
+function findDestructiveNulls(responseData) {
+  if (!Array.isArray(responseData) || responseData.length === 0) return [];
 
-  const spls = responseData
-    .map((point) => Number(point?.spl))
-    .filter(Number.isFinite);
+  const destructiveNulls = [];
 
-  if (spls.length < 5) return 0;
+  for (let index = 0; index < responseData.length; index += 1) {
+    const current = responseData[index];
+    const frequency = Number(current?.frequency);
+    const currentSpl = Number(current?.spl);
+    if (!Number.isFinite(frequency) || !Number.isFinite(currentSpl)) continue;
 
-  let worstDepth = 0;
+    const leftSpl = Number(responseData[Math.max(0, index - 1)]?.spl);
+    const rightSpl = Number(responseData[Math.min(responseData.length - 1, index + 1)]?.spl);
+    if (!Number.isFinite(leftSpl) || !Number.isFinite(rightSpl)) continue;
 
-  for (let index = 0; index < spls.length; index += 1) {
-    const windowStart = Math.max(0, index - 2);
-    const windowEnd = Math.min(spls.length - 1, index + 2);
-    const window = spls.slice(windowStart, windowEnd + 1);
-    const localAverage = window.reduce((sum, value) => sum + value, 0) / window.length;
-    const depth = localAverage - spls[index];
+    const localAverage = (leftSpl + currentSpl + rightSpl) / 3;
+    const depth = localAverage - currentSpl;
+    if (depth < 3) continue;
 
-    if (depth > worstDepth) {
-      worstDepth = depth;
-    }
+    const leftNeighbour = leftSpl - currentSpl;
+    const rightNeighbour = rightSpl - currentSpl;
+    if (leftNeighbour <= 0 || rightNeighbour <= 0) continue;
+
+    destructiveNulls.push({
+      frequency: Math.round(frequency),
+      depth: Math.round(depth),
+    });
   }
 
-  return Math.max(0, worstDepth);
+  return destructiveNulls;
+}
+
+function calculateWorstNullDepth(responseData) {
+  const destructiveNulls = findDestructiveNulls(responseData);
+  if (destructiveNulls.length === 0) return 0;
+  return Math.max(...destructiveNulls.map((nullPoint) => Number(nullPoint.depth) || 0), 0);
+}
+
+function calculateLowFrequencyNullPenalty(destructiveNulls) {
+  if (!Array.isArray(destructiveNulls) || destructiveNulls.length === 0) return 0;
+
+  return destructiveNulls.reduce((sum, nullPoint) => {
+    const frequency = Number(nullPoint?.frequency);
+    const depth = Number(nullPoint?.depth);
+    if (!Number.isFinite(frequency) || !Number.isFinite(depth)) return sum;
+
+    let weight = 1;
+    if (frequency >= 30 && frequency <= 60) {
+      weight = 3.5;
+    } else if (frequency < 30) {
+      weight = 2.5;
+    } else if (frequency <= 80) {
+      weight = 2;
+    } else if (frequency <= 120) {
+      weight = 1.25;
+    }
+
+    const heavyLowBassPenalty = frequency >= 30 && frequency <= 60 && depth > 6 ? 30 : 0;
+    return sum + (depth * weight) + heavyLowBassPenalty;
+  }, 0);
 }
 
 function computeSeatVariance(seatResponses) {
@@ -244,7 +280,11 @@ function computeSeatVariance(seatResponses) {
   return average(perFrequencyDiffs);
 }
 
-function getModalRiskLabel({ seatVariance, nullPenalty, smoothness, worstNullDepth }) {
+function getModalRiskLabel({ seatVariance, nullPenalty, smoothness, worstNullDepth, destructiveNulls }) {
+  const hasSevereLowBassNull = Array.isArray(destructiveNulls)
+    && destructiveNulls.some((nullPoint) => Number(nullPoint?.frequency) >= 30 && Number(nullPoint?.frequency) <= 60 && Number(nullPoint?.depth) > 6);
+
+  if (hasSevereLowBassNull) return 'Avoid';
   if (worstNullDepth >= 10) return 'Avoid';
   if (worstNullDepth >= 6) return 'Uneven';
   if (worstNullDepth >= 3) return 'Some variation';
@@ -366,10 +406,20 @@ export function optimiseSubwooferLayout({
     const rspResponse = rspSeatResponse?.responseData || seatResponses[0]?.responseData || [];
     const seatVariance = computeSeatVariance(seatResponses);
     const nullPenalty = seatResponses.reduce((sum, seatResponse) => sum + countNulls(seatResponse.responseData), 0);
-    const worstNullDepth = Math.max(
-      ...seatResponses.map((seatResponse) => calculateWorstNullDepth(seatResponse.responseData)),
-      0
-    );
+    const allDestructiveNulls = seatResponses.flatMap((seatResponse) => findDestructiveNulls(seatResponse.responseData));
+    const sortedDestructiveNulls = allDestructiveNulls
+      .slice()
+      .sort((a, b) => {
+        const aLowBass = Number(a?.frequency) >= 30 && Number(a?.frequency) <= 60;
+        const bLowBass = Number(b?.frequency) >= 30 && Number(b?.frequency) <= 60;
+        if (aLowBass !== bLowBass) return bLowBass ? 1 : -1;
+        if (Number(b?.depth) !== Number(a?.depth)) return Number(b?.depth) - Number(a?.depth);
+        return Number(a?.frequency) - Number(b?.frequency);
+      });
+    const worstNull = sortedDestructiveNulls[0] || null;
+    const worstNullDepth = Number(worstNull?.depth) || 0;
+    const worstNullFrequency = Number.isFinite(Number(worstNull?.frequency)) ? Number(worstNull.frequency) : null;
+    const lowFrequencyNullPenalty = calculateLowFrequencyNullPenalty(sortedDestructiveNulls);
     const smoothness = standardDeviation(
       rspResponse.map((point) => Number(point?.spl)).filter(Number.isFinite)
     );
@@ -380,11 +430,18 @@ export function optimiseSubwooferLayout({
     const score =
       (seatVariance * 2.0) +
       (nullPenalty * 3.0) +
-      (worstNullDepth * 1.5) +
+      (worstNullDepth * 4.0) +
+      (lowFrequencyNullPenalty * 1.0) +
       (smoothness * 1.0) -
       (outputScore * 0.1);
 
-    const modalRiskLabel = getModalRiskLabel({ seatVariance, nullPenalty, smoothness, worstNullDepth });
+    const modalRiskLabel = getModalRiskLabel({
+      seatVariance,
+      nullPenalty,
+      smoothness,
+      worstNullDepth,
+      destructiveNulls: sortedDestructiveNulls,
+    });
 
     return {
       candidate: {
@@ -395,7 +452,10 @@ export function optimiseSubwooferLayout({
       seatResponses,
       seatVariance,
       nullPenalty,
+      destructiveNulls: sortedDestructiveNulls,
       worstNullDepth,
+      worstNullFrequency,
+      lowFrequencyNullPenalty,
       smoothness,
       outputScore,
       score,
@@ -408,7 +468,10 @@ export function optimiseSubwooferLayout({
       candidate: result.candidate,
       seatVariance: result.seatVariance,
       nullPenalty: result.nullPenalty,
+      destructiveNulls: result.destructiveNulls,
       worstNullDepth: result.worstNullDepth,
+      worstNullFrequency: result.worstNullFrequency,
+      lowFrequencyNullPenalty: result.lowFrequencyNullPenalty,
       smoothness: result.smoothness,
       outputScore: result.outputScore,
       score: result.score,
@@ -423,7 +486,10 @@ export function optimiseSubwooferLayout({
       ...result.candidate,
       seatVariance: result.seatVariance,
       nullPenalty: result.nullPenalty,
+      destructiveNulls: result.destructiveNulls,
       worstNullDepth: result.worstNullDepth,
+      worstNullFrequency: result.worstNullFrequency,
+      lowFrequencyNullPenalty: result.lowFrequencyNullPenalty,
       smoothness: result.smoothness,
       outputScore: result.outputScore,
       score: result.score,

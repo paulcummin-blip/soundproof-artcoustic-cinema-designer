@@ -29,8 +29,8 @@ function getQuantityLabel(quantity) {
 }
 
 
-function getGrade(seatVariation, nullPenalty) {
-  if (seatVariation > 10 || nullPenalty >= 4) {
+function getGrade(seatVariation, nullPenalty, modalRiskLabel) {
+  if (modalRiskLabel === 'Avoid' || seatVariation > 10 || nullPenalty >= 4) {
     return { label: 'Not recommended', className: 'text-red-700' };
   }
   if (seatVariation < 3 && nullPenalty === 0) {
@@ -46,6 +46,17 @@ function getGrade(seatVariation, nullPenalty) {
     return { label: 'C', className: 'text-orange-700' };
   }
   return { label: 'Not recommended', className: 'text-red-700' };
+}
+
+function formatDestructiveNulls(destructiveNulls) {
+  if (!Array.isArray(destructiveNulls) || destructiveNulls.length === 0) {
+    return 'None ≥3 dB';
+  }
+
+  return destructiveNulls
+    .slice(0, 3)
+    .map((nullPoint) => `${nullPoint.frequency} Hz / ${nullPoint.depth} dB`)
+    .join(', ');
 }
 
 function isSameLayout(result, frontSubsCfg, rearSubsCfg) {
@@ -474,17 +485,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   {(recommendationState.rankedResults || []).map((result, index) => {
                     const seatVariance = Number(result.seatVariance ?? result.seatVariation ?? 0);
                     const nullPenalty = Number(result.nullPenalty ?? 0);
-                    const modalRiskLabel =
-                      result.nullPenalty >= 2
-                        ? 'Avoid'
-                        : result.nullPenalty === 1
-                        ? 'Uneven'
-                        : Number(result.seatVariance ?? 0) < 1.5
-                        ? 'Even'
-                        : Number(result.seatVariance ?? 0) < 3
-                        ? 'Some variation'
-                        : 'Uneven';
-                    const grade = getGrade(seatVariance, nullPenalty);
+                    const modalRiskLabel = result.modalRiskLabel || 'Low';
+                    const destructiveNullsText = formatDestructiveNulls(result.destructiveNulls);
+                    const grade = getGrade(seatVariance, nullPenalty, modalRiskLabel);
                     const isBest = index === 0;
                     const isCurrent = isSameLayout(result, frontSubsCfg, rearSubsCfg);
 
@@ -535,6 +538,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                             <div>
                               <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Major nulls</div>
                               <div className="text-[12px] text-[#1B1A1A] mt-1">{nullPenalty}</div>
+                              <div className="text-[11px] text-[#625143] mt-1">Destructive nulls: {destructiveNullsText}</div>
                             </div>
                             <div>
                               <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Modal risk</div>
