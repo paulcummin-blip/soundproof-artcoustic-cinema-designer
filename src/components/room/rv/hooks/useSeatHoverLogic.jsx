@@ -65,6 +65,26 @@ export function useSeatHoverLogic({
     return 'Unknown model';
   }, [registryNormaliseModelKey, getSpeakerModelMeta]);
 
+  // SPL metrics: Use prop from RoomDesigner if available (single source of truth)
+  // Only compute locally if prop not provided (fallback for standalone use)
+  const allSeatSplMetricsLocal = useMemo(() => {
+    // If prop is provided, don't compute locally
+    if (allSeatSplMetricsProp) return null;
+    
+    return computeAllSeatSplMetrics({
+      seats: seatingPositions,
+      placedSpeakers,
+      getCanonicalRole,
+      getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
+      getModelDimsM: () => ({}),
+      mlpPoint: mlp,
+      heightM,
+    });
+  }, [allSeatSplMetricsProp, seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, mlp, heightM, computeAllSeatSplMetrics]);
+
+  // Use prop if available, otherwise use local computation
+  const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
+
   // Speaker icon tooltip handlers
   const handleIconEnter = useCallback((e, speaker) => {
     if (!speaker) return;
@@ -110,26 +130,6 @@ export function useSeatHoverLogic({
     // If not pinned, fall back to hovered seat
     return pinnedSeat || hoveredSeat || null;
   }, [appState?.hudPinnedSeatId, hudPinnedSeatId, hoveredSeat, seatingPositions]);
-
-  // SPL metrics: Use prop from RoomDesigner if available (single source of truth)
-  // Only compute locally if prop not provided (fallback for standalone use)
-  const allSeatSplMetricsLocal = useMemo(() => {
-    // If prop is provided, don't compute locally
-    if (allSeatSplMetricsProp) return null;
-    
-    return computeAllSeatSplMetrics({
-      seats: seatingPositions,
-      placedSpeakers,
-      getCanonicalRole,
-      getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
-      getModelDimsM: () => ({}),
-      mlpPoint: mlp,
-      heightM,
-    });
-  }, [allSeatSplMetricsProp, seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, mlp, heightM, computeAllSeatSplMetrics]);
-
-  // Use prop if available, otherwise use local computation
-  const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
 
   // Build tooltip data: delegated to useTooltipData hook
   const tooltipData = useTooltipData({
