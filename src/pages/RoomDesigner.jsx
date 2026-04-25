@@ -61,7 +61,6 @@ import { useSubwooferSync } from "@/components/hooks/useSubwooferSync";
 import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
 import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
-import AimLoudspeakerPanel from "@/components/roomdesigner/AimLoudspeakerPanel";
 import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
@@ -1817,6 +1816,8 @@ function RoomDesignerWithState() {
                     </div>
               }
                   
+
+                  <AimLoudspeakerControls lcrAimMode={lcrAimMode} setLcrAimMode={setLcrAimMode} isFrozen={isFrozen} screenFrontPlaneM={appState?.screenFrontPlaneM} aimFrontWidesAtMLP={appState?.aimFrontWidesAtMLP} setAimFrontWidesAtMLP={(v) => appState?.setAimFrontWidesAtMLP(v)} aimSideSurroundsAtMLP={appState?.aimSideSurroundsAtMLP} setAimSideSurroundsAtMLP={(v) => appState?.setAimSideSurroundsAtMLP(v)} aimRearSurroundsAtMLP={appState?.aimRearSurroundsAtMLP} setAimRearSurroundsAtMLP={(v) => appState?.setAimRearSurroundsAtMLP(v)} inRoomDepthsCm={inRoomDepthsCm} allSeatSplMetrics={allSeatSplMetrics} primarySeatingPosition={primarySeatingPosition} />
 
                   <Suspense fallback={<div>Loading...</div>}>
                       <SpeakerPlacement disabled={isFrozen('speakers')}
