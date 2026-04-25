@@ -1805,10 +1805,11 @@ function RoomDesignerWithState() {
                   </Suspense>
               </CollapsiblePanel>
 
-              <CollapsiblePanel
-              title="Speakers"
-              icon={<Speaker className="w-5 h-5" />}
-              defaultOpen={false}>
+              <div className="mb-6">
+                <CollapsiblePanel
+                title="Speakers"
+                icon={<Speaker className="w-5 h-5" />}
+                defaultOpen={false}>
 
                   {isFrozen('speakers') &&
               <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
@@ -1881,7 +1882,8 @@ function RoomDesignerWithState() {
                 screenFrontPlaneM={appState?.screenFrontPlaneM}
                 view={speakerPositionsView} />
 
-              </CollapsiblePanel>
+                </CollapsiblePanel>
+              </div>
               
               <CollapsiblePanel
               title="Bass Simulation"
