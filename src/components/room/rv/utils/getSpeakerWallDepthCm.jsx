@@ -7,6 +7,7 @@ const isSideRightRole = (role) => role === "RW" || /^SR\d*$/.test(role);
 const isRearRole = (role) => role === "SBL" || role === "SBR";
 const isFrontWideRole = (role) => role === "LW" || role === "RW";
 const isSurroundRole = (role) => /^SL\d*$/.test(role) || /^SR\d*$/.test(role);
+const isLcrRole = (role) => role === "FL" || role === "FC" || role === "FR";
 
 function getWallForRole(role) {
   if (isSideLeftRole(role)) return "LEFT";
@@ -66,12 +67,19 @@ export default function getSpeakerWallDepthCm({
   if (!speaker?.position || !_isNum(speaker.position.x) || !_isNum(speaker.position.y)) return null;
 
   const role = getCanonicalRole ? getCanonicalRole(speaker?.role) : String(speaker?.role || "").toUpperCase();
-  const wall = getWallForRole(role);
-  if (!wall) return null;
 
   const meta = getSpeakerModelMeta?.(speaker?.model);
   const modelWidthM = _isNum(meta?.widthM) ? meta.widthM : 0.27;
   const modelDepthM = _isNum(meta?.depthM) ? meta.depthM : 0.082;
+
+  if (isLcrRole(role)) {
+    const totalDepthM = WALL_BUFFER_M + modelDepthM;
+    return _isNum(totalDepthM) ? Math.round(totalDepthM * 100) : null;
+  }
+
+  const wall = getWallForRole(role);
+  if (!wall) return null;
+
   const yawDeg = getSpeakerYawDeg({ speaker, role, mlp, appState });
   const hingeAngleDeg = getHingeAngleDegFromWall(wall, yawDeg);
   const intrusionM = getHingeIntrusionM(modelWidthM, modelDepthM, hingeAngleDeg);

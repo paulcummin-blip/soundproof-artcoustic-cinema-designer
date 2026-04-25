@@ -111,7 +111,7 @@ export function useSeatHoverLogic({
       ? rspSplData?.screen?.[role] || rspSplData?.surrounds?.[role] || rspSplData?.uppers?.[role] || null
       : null;
     const splValue = speakerMetrics?.value;
-    const splLabel = Number.isFinite(Number(splValue)) ? `${Math.round(Number(splValue))} dB` : '—';
+    const splLabel = Number.isFinite(Number(splValue)) ? `${Math.ceil(Number(splValue))} dB` : '—';
     const wallDepthCm = getSpeakerWallDepthCm({
       speaker,
       widthM,
