@@ -1316,7 +1316,7 @@ function SpeakerPlacementImpl(props) {
 
   return (
     <div className="space-y-4 font-sans" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
-      <div className="space-y-3">
+      <div className="space-y-3 mt-4">
         <Label htmlFor="system-config" className="text-[#1B1A1A] font-bold text-base block">System Configuration</Label>
         <Select 
           value={effectivePreset} 
