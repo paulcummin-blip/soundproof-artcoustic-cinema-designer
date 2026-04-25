@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useTooltipData } from "@/components/room/hooks/useTooltipData";
+import getSpeakerWallDepthCm from "@/components/room/rv/utils/getSpeakerWallDepthCm";
 
 export function useSeatHoverLogic({
   seatingPositions,
@@ -111,11 +112,20 @@ export function useSeatHoverLogic({
       : null;
     const splValue = speakerMetrics?.value;
     const splLabel = Number.isFinite(Number(splValue)) ? `${Math.round(Number(splValue))} dB` : '—';
-    const text = `${role} — ${displayName}\nSPL @ RSP: ${splLabel}\nDistance from wall: —`;
+    const wallDepthCm = getSpeakerWallDepthCm({
+      speaker,
+      widthM,
+      lengthM,
+      mlp,
+      appState,
+      getCanonicalRole,
+      getSpeakerModelMeta,
+    });
+    const text = `${role} — ${displayName}\nSPL @ RSP: ${splLabel}\nDistance from wall: ${Number.isFinite(wallDepthCm) ? `${wallDepthCm} cm` : '—'}`;
 
     setSpeakerTooltip({ visible: true, text, x: 0, y: 0 });
     handleIconMove(e, speaker);
-  }, [getSpeakerModelDisplayName, getCanonicalRole, seatingPositions, allSeatSplMetrics, handleIconMove]);
+  }, [getSpeakerModelDisplayName, getCanonicalRole, seatingPositions, allSeatSplMetrics, handleIconMove, widthM, lengthM, mlp, appState, getSpeakerModelMeta]);
 
   const handleIconLeave = useCallback(() => {
     setSpeakerTooltip({ visible: false, text: '', x: 0, y: 0 });
