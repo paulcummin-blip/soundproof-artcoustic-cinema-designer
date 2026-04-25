@@ -1816,21 +1816,7 @@ function RoomDesignerWithState() {
                     </div>
               }
                   
-                  {/* Aim Loudspeaker - Extracted component */}
-                  <AimLoudspeakerPanel
-                    lcrAimMode={lcrAimMode}
-                    setLcrAimMode={setLcrAimMode}
-                    isFrozen={isFrozen}
-                    screenFrontPlaneM={appState?.screenFrontPlaneM}
-                    aimFrontWidesAtMLP={appState?.aimFrontWidesAtMLP}
-                    setAimFrontWidesAtMLP={(v) => appState?.setAimFrontWidesAtMLP(v)}
-                    aimSideSurroundsAtMLP={appState?.aimSideSurroundsAtMLP}
-                    setAimSideSurroundsAtMLP={(v) => appState?.setAimSideSurroundsAtMLP(v)}
-                    aimRearSurroundsAtMLP={appState?.aimRearSurroundsAtMLP}
-                    setAimRearSurroundsAtMLP={(v) => appState?.setAimRearSurroundsAtMLP(v)}
-                    inRoomDepthsCm={inRoomDepthsCm}
-                  />
-                  
+
                   <Suspense fallback={<div>Loading...</div>}>
                       <SpeakerPlacement disabled={isFrozen('speakers')}
                 dimensions={stableDimensions}
