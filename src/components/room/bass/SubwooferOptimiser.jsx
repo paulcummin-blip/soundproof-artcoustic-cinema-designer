@@ -201,6 +201,32 @@ function countNulls(responseData) {
   return nullCount;
 }
 
+function calculateWorstNullDepth(responseData) {
+  if (!Array.isArray(responseData) || responseData.length === 0) return 0;
+
+  const spls = responseData
+    .map((point) => Number(point?.spl))
+    .filter(Number.isFinite);
+
+  if (spls.length < 5) return 0;
+
+  let worstDepth = 0;
+
+  for (let index = 0; index < spls.length; index += 1) {
+    const windowStart = Math.max(0, index - 2);
+    const windowEnd = Math.min(spls.length - 1, index + 2);
+    const window = spls.slice(windowStart, windowEnd + 1);
+    const localAverage = window.reduce((sum, value) => sum + value, 0) / window.length;
+    const depth = localAverage - spls[index];
+
+    if (depth > worstDepth) {
+      worstDepth = depth;
+    }
+  }
+
+  return Math.max(0, worstDepth);
+}
+
 function computeSeatVariance(seatResponses) {
   if (!Array.isArray(seatResponses) || seatResponses.length === 0) return 0;
   const responseLength = seatResponses[0]?.responseData?.length || 0;
@@ -218,7 +244,10 @@ function computeSeatVariance(seatResponses) {
   return average(perFrequencyDiffs);
 }
 
-function getModalRiskLabel({ seatVariance, nullPenalty, smoothness }) {
+function getModalRiskLabel({ seatVariance, nullPenalty, smoothness, worstNullDepth }) {
+  if (worstNullDepth >= 10) return 'Avoid';
+  if (worstNullDepth >= 6) return 'Uneven';
+  if (worstNullDepth >= 3) return 'Some variation';
   if (seatVariance > 10 || nullPenalty >= 4 || smoothness > 7) return 'Not recommended';
   if (seatVariance > 6 || nullPenalty >= 2 || smoothness > 5) return 'High';
   if (seatVariance > 3 || nullPenalty >= 1 || smoothness > 3) return 'Moderate';
@@ -337,6 +366,10 @@ export function optimiseSubwooferLayout({
     const rspResponse = rspSeatResponse?.responseData || seatResponses[0]?.responseData || [];
     const seatVariance = computeSeatVariance(seatResponses);
     const nullPenalty = seatResponses.reduce((sum, seatResponse) => sum + countNulls(seatResponse.responseData), 0);
+    const worstNullDepth = Math.max(
+      ...seatResponses.map((seatResponse) => calculateWorstNullDepth(seatResponse.responseData)),
+      0
+    );
     const smoothness = standardDeviation(
       rspResponse.map((point) => Number(point?.spl)).filter(Number.isFinite)
     );
@@ -347,10 +380,11 @@ export function optimiseSubwooferLayout({
     const score =
       (seatVariance * 2.0) +
       (nullPenalty * 3.0) +
+      (worstNullDepth * 1.5) +
       (smoothness * 1.0) -
       (outputScore * 0.1);
 
-    const modalRiskLabel = getModalRiskLabel({ seatVariance, nullPenalty, smoothness });
+    const modalRiskLabel = getModalRiskLabel({ seatVariance, nullPenalty, smoothness, worstNullDepth });
 
     return {
       candidate: {
@@ -361,6 +395,7 @@ export function optimiseSubwooferLayout({
       seatResponses,
       seatVariance,
       nullPenalty,
+      worstNullDepth,
       smoothness,
       outputScore,
       score,
@@ -373,6 +408,7 @@ export function optimiseSubwooferLayout({
       candidate: result.candidate,
       seatVariance: result.seatVariance,
       nullPenalty: result.nullPenalty,
+      worstNullDepth: result.worstNullDepth,
       smoothness: result.smoothness,
       outputScore: result.outputScore,
       score: result.score,
@@ -387,6 +423,7 @@ export function optimiseSubwooferLayout({
       ...result.candidate,
       seatVariance: result.seatVariance,
       nullPenalty: result.nullPenalty,
+      worstNullDepth: result.worstNullDepth,
       smoothness: result.smoothness,
       outputScore: result.outputScore,
       score: result.score,
