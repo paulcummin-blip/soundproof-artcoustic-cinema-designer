@@ -69,7 +69,7 @@ const formatMetricFallback = (n, unit) => {
   return `${n.toFixed(2)} ${u}`.trim();
 };
 
-const getMetricDisplayState = (metric) => {
+const getMetricDisplayState = (metric, paramId = null) => {
   if (!metric || typeof metric !== "object") return { text: "Not Calculated", level: "—" };
 
   const hasRealValue = Object.keys(metric).some((key) => (
@@ -91,7 +91,9 @@ const getMetricDisplayState = (metric) => {
 
   const formatted = metric.formatted;
   const level = metric.level;
+  const treatUnavailableAsNA = Number(paramId) === 10 && (formatted === '—' || formatted === 'Not Calculated') && (level === '—' || level == null);
 
+  if (treatUnavailableAsNA) return { text: 'N/A', level: 'N/A' };
   if (formatted === '—') return { text: hasRealValue ? 'Not Calculated' : 'N/A', level };
   if (formatted === 'Not Calculated' && !hasRealValue && (level === '—' || level == null)) return { text: 'N/A', level };
   if (formatted) return { text: formatted, level };
@@ -198,7 +200,7 @@ export default function RP22ReportParameterGrid({
     // Seat scope
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
-    return getMetricDisplayState(metric).level || "—";
+    return getMetricDisplayState(metric, pid).level || "—";
   }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode]);
 
   /* ----- getHudValueForParam (exact logic from RP22CompliancePanel) ----- */
@@ -247,7 +249,7 @@ export default function RP22ReportParameterGrid({
     const metric = snap?.rp22?.[`p${pid}`];
     if (!metric) return "Not Calculated";
     if (pid === 17) {
-      const display = getMetricDisplayState(metric);
+      const display = getMetricDisplayState(metric, pid);
       if (display.text === 'N/A' || display.text === 'Not Calculated') return display.text;
       const parts = [];
       if (metric.worstRole) parts.push(String(metric.worstRole));
@@ -259,7 +261,7 @@ export default function RP22ReportParameterGrid({
       }
       return parts.length > 0 ? parts.join(" ") : display.text;
     }
-    const display = getMetricDisplayState(metric);
+    const display = getMetricDisplayState(metric, pid);
     if (display.text && display.text !== '—') return display.text;
     const paramDef = RP22_PARAMS.find(p => p.id === pid);
     const n = getMetricNumericValue(metric);
@@ -315,7 +317,7 @@ export default function RP22ReportParameterGrid({
             {rowObj.seats.map(seat => {
               const snap = getSnapshotForSeat(seat);
               const metric = snap?.rp22?.[pKey];
-              const display = getMetricDisplayState(metric);
+              const display = getMetricDisplayState(metric, pId);
               const lvl = display.text === 'N/A' ? 'N/A' : (metric?.level || "—");
               const isPrimary = !!seat?.isPrimary;
               return (
