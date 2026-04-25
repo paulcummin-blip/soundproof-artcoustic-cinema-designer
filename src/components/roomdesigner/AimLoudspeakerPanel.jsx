@@ -9,8 +9,13 @@ export default function AimLoudspeakerPanel({
   aimSideSurroundsAtMLP, setAimSideSurroundsAtMLP,
   aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP,
   inRoomDepthsCm,
+  splAtRsp,
 }) {
   const _isNum = (v) => typeof v === "number" && Number.isFinite(v);
+  const _formatPair = (labelA, valueA, labelB, valueB) => {
+    if (!_isNum(valueA) || !_isNum(valueB)) return 'SPL @ RSP: —';
+    return `SPL @ RSP: ${labelA} ${valueA} dB / ${labelB} ${valueB} dB`;
+  };
 
   return (
     <div className="mt-4 mb-4 px-4">
@@ -31,6 +36,9 @@ export default function AimLoudspeakerPanel({
           <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
             Front wall → screen: {_isNum(screenFrontPlaneM) ? `${Math.round(screenFrontPlaneM * 100)} cm` : '—'}
           </div>
+          <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
+            {_formatPair('L', splAtRsp?.leftRight?.L, 'R', splAtRsp?.leftRight?.R)}
+          </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="aim-front-wides" className="text-sm">Front Wides</Label>
             <Switch
@@ -42,6 +50,9 @@ export default function AimLoudspeakerPanel({
           </div>
           <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
             In-room depth: {inRoomDepthsCm.frontWides !== null ? `${inRoomDepthsCm.frontWides} cm` : '—'}
+          </div>
+          <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
+            {_formatPair('LW', splAtRsp?.frontWides?.LW, 'RW', splAtRsp?.frontWides?.RW)}
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="aim-side-surrounds" className="text-sm">Side Surrounds</Label>
@@ -55,6 +66,9 @@ export default function AimLoudspeakerPanel({
           <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
             In-room depth: {inRoomDepthsCm.sideSurrounds !== null ? `${inRoomDepthsCm.sideSurrounds} cm` : '—'}
           </div>
+          <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
+            {_formatPair('SL', splAtRsp?.sideSurrounds?.SL, 'SR', splAtRsp?.sideSurrounds?.SR)}
+          </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="aim-rear-surrounds" className="text-sm">Rear Surrounds</Label>
             <Switch
@@ -66,6 +80,9 @@ export default function AimLoudspeakerPanel({
           </div>
           <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
             In-room depth: {inRoomDepthsCm.rearSurrounds !== null ? `${inRoomDepthsCm.rearSurrounds} cm` : '—'}
+          </div>
+          <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
+            {_formatPair('SBL', splAtRsp?.rearSurrounds?.SBL, 'SBR', splAtRsp?.rearSurrounds?.SBR)}
           </div>
         </div>
       </div>
