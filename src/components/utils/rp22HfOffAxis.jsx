@@ -631,9 +631,18 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       return 0;
     };
 
-    // Default reference: physical wall-normal, but SBL/SBR respect the aim toggle
+    // Default reference: physical wall-normal, but LW/RW use shared visualiser aim logic
+    // and SBL/SBR respect the rear-surround aim toggle.
     let referenceDeg;
-    if ((role === 'SBL' || role === 'SBR') && appState?.aimRearSurroundsAtMLP) {
+    if (role === 'LW' || role === 'RW') {
+      const resolvedYaw = resolveSpeakerYaw({
+        speaker,
+        mlpPos,
+        appState,
+        getCanonicalRole,
+      });
+      referenceDeg = isNum(resolvedYaw) ? resolvedYaw : getWallNormal(role);
+    } else if ((role === 'SBL' || role === 'SBR') && appState?.aimRearSurroundsAtMLP) {
       // Toggle ON: aim at MLP/RSP
       const mlpYaw = isNum(mlpPos?.x) && isNum(mlpPos?.y) ? angleFromTo(pos, mlpPos) : null;
       referenceDeg = isNum(mlpYaw) ? mlpYaw : 180;
