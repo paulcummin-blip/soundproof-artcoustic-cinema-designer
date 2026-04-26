@@ -315,9 +315,9 @@ export default function RP22ReportParameterGrid({
     if (!rows.length) return null;
     const pKey = `p${Number(pId)}`;
     return (
-      <div className="rp22-seat-pill-grid" style={{ display: "grid", gap: 6 }}>
+      <div style={{ display: "grid", gap: 6 }}>
         {rows.map(rowObj => (
-          <div key={`row-${rowObj.row}`} className="rp22-seat-pill-row" style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "min-content", justifyContent: "end", gap: 6 }}>
+          <div key={`row-${rowObj.row}`} style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "min-content", justifyContent: "end", gap: 6 }}>
             {rowObj.seats.map(seat => {
               const snap = getSnapshotForSeat(seat);
               const metric = snap?.rp22?.[pKey];
@@ -341,7 +341,7 @@ export default function RP22ReportParameterGrid({
   };
 
   return (
-    <div className="rp22-cards-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
       {RP22_PARAMS.map(param => {
         const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode);
         const resolvedParam = (param.id === 12 || param.id === 13)
