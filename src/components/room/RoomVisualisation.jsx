@@ -1087,6 +1087,8 @@ const byId = useEntitiesById({
         ...prev,
         positions,
         count: Array.isArray(positions) ? positions.length : 0,
+        placementMode: 'manual',
+        isManual: true,
       }));
     }
     if (draftRearSubsRef.current && onSetRearSubs) {
@@ -1095,6 +1097,8 @@ const byId = useEntitiesById({
         ...prev,
         positions,
         count: Array.isArray(positions) ? positions.length : 0,
+        placementMode: 'manual',
+        isManual: true,
       }));
     }
   }, [onSetFrontSubs, onSetRearSubs]);

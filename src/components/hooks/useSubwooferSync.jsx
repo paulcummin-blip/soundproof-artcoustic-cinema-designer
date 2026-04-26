@@ -97,6 +97,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const model = String(cfg?.model || '').trim();
       if (!model || qty <= 0) return [];
       const placementMode = String(cfg?.placementMode || 'default').trim() || 'default';
+      const isManual = cfg?.isManual === true || placementMode === 'manual';
       const defaultsX = makePlacementXs(qty, placementMode, model);
       const cfgPos = safePositionsArray(cfg?.positions);
       const yPinned = wallPinnedY(group === 'front' ? 'front' : 'rear', model);
@@ -114,7 +115,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
         const xFromCfg = Number(cfgPos?.[i]?.x);
         const xFromPrev = Number(prev?.position?.x);
         const xFromDefault = Number(defaultsX?.[i]);
-        const pickedX = placementMode === 'default'
+        const pickedX = isManual || placementMode === 'default'
           ? (Number.isFinite(xFromCfg) ? xFromCfg : (Number.isFinite(xFromPrev) ? xFromPrev : xFromDefault))
           : xFromDefault;
         const finalX = clamp(pickedX, minX, maxX);
@@ -151,7 +152,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
     appState?.setSubwoofers,
     appState?.roomDims?.widthM, appState?.roomDims?.lengthM,
     stableDimensions?.width, stableDimensions?.length,
-    frontSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.positions, frontSubsCfg?.placementMode, frontSubsCfg?.mountMode,
-    rearSubsCfg?.model, rearSubsCfg?.count, rearSubsCfg?.positions, rearSubsCfg?.placementMode, rearSubsCfg?.mountMode,
+    frontSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.positions, frontSubsCfg?.placementMode, frontSubsCfg?.isManual, frontSubsCfg?.mountMode,
+    rearSubsCfg?.model, rearSubsCfg?.count, rearSubsCfg?.positions, rearSubsCfg?.placementMode, rearSubsCfg?.isManual, rearSubsCfg?.mountMode,
   ]);
 }
