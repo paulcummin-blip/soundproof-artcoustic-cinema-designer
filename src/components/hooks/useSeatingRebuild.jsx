@@ -1,6 +1,30 @@
 import { useEffect } from "react";
 import { buildRowCenters, distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 
+const EQ_EPS = 0.001;
+const arraysEqualWithin1mm = (a = [], b = []) => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => Math.abs(Number(value) - Number(b[index])) <= EQ_EPS);
+};
+
+const seatsEqualWithin1mm = (prev = [], next = []) => {
+  if (!Array.isArray(prev) || !Array.isArray(next)) return false;
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    const a = prev[i];
+    const b = next[i];
+    if ((a?.id ?? null) !== (b?.id ?? null)) return false;
+    if (Math.abs(Number(a?.x) - Number(b?.x)) > EQ_EPS) return false;
+    if (Math.abs(Number(a?.y) - Number(b?.y)) > EQ_EPS) return false;
+    if (Math.abs(Number(a?.z) - Number(b?.z)) > EQ_EPS) return false;
+    if (Number(a?.rowNumber) !== Number(b?.rowNumber)) return false;
+    if (Boolean(a?.isPrimary) !== Boolean(b?.isPrimary)) return false;
+    if (Boolean(a?.isSecondary) !== Boolean(b?.isSecondary)) return false;
+  }
+  return true;
+};
+
 /**
  * Builds or rebuilds seating positions whenever seating config changes.
  * Extracted verbatim from RoomDesigner.jsx (lines 2279–2415).
@@ -125,7 +149,7 @@ export function useSeatingRebuild({
         }
       });
 
-      setSeats(seats);
+      setSeats((prev) => (seatsEqualWithin1mm(prev, seats) ? prev : seats));
       return;
     }
 
@@ -200,7 +224,9 @@ export function useSeatingRebuild({
 
         if (Array.isArray(generated) && generated.length === rowsNeeded) {
           const clamped = generated.map((y) => clampY(Number(y)));
-          appState.setRowCentersM(clamped);
+          if (!arraysEqualWithin1mm(appState?.rowCentersM || [], clamped)) {
+            appState.setRowCentersM(clamped);
+          }
           centers = clamped;
         } else {
           return;
@@ -243,7 +269,7 @@ export function useSeatingRebuild({
     });
 
     // 5) Commit to app state
-    setSeats(seats);
+    setSeats((prev) => (seatsEqualWithin1mm(prev, seats) ? prev : seats));
 
     if (globalThis.__B44_LOGS) console.log(
       '[RD] seating rebuilt: rows=',
