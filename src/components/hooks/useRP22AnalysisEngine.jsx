@@ -180,7 +180,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
           mlpPoint: mlpUsed,
           dimensions: { width: roomWidthM, length: roomLengthM },
           placedSpeakers: speakersToUse,
-          getModelDims: getSpeakerModelMeta,
+          getModelDimsM: getSpeakerModelMeta,
           rp22BoundDeg: 10
         });
         
