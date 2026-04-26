@@ -191,22 +191,24 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
             isNum(fwZones.left.medianY) && 
             isNum(fwZones.right.medianY)) {
           
-          const yOnMedianLine = (zone, speakerX) => {
-            if (!zone || !Number.isFinite(zone.theta) || !Number.isFinite(zone.mlpX) || !Number.isFinite(zone.mlpY) || !Number.isFinite(speakerX)) {
-              return null;
-            }
-            return zone.mlpY + (speakerX - zone.mlpX) * Math.tan(zone.theta);
+          const idealLWPoint = {
+            x: Number.isFinite(fwZones.left.xWall) ? fwZones.left.xWall : 0.01,
+            y: fwZones.left.medianY
           };
 
-          const idealLWY = yOnMedianLine(fwZones.left, LW.position.x);
-          const idealRWY = yOnMedianLine(fwZones.right, RW.position.x);
+          const idealRWPoint = {
+            x: Number.isFinite(fwZones.right.xWall) ? fwZones.right.xWall : roomWidthM - 0.01,
+            y: fwZones.right.medianY
+          };
 
-          if (!Number.isFinite(idealLWY) || !Number.isFinite(idealRWY)) {
-            throw new Error('Invalid median line sample');
+          if (
+            !Number.isFinite(idealLWPoint.x) ||
+            !Number.isFinite(idealLWPoint.y) ||
+            !Number.isFinite(idealRWPoint.x) ||
+            !Number.isFinite(idealRWPoint.y)
+          ) {
+            throw new Error('Invalid front wide median marker point');
           }
-
-          const idealLWPoint = { x: LW.position.x, y: idealLWY };
-          const idealRWPoint = { x: RW.position.x, y: idealRWY };
           
           const azActualLW = azimuthDeg(mlpUsed, LW.position);
           const azIdealLW = azimuthDeg(mlpUsed, idealLWPoint);
