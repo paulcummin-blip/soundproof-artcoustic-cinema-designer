@@ -104,7 +104,12 @@ export function computeFrontWideZonesStrict({
       status: 'ok',
       yMin,
       yMax,
-      medianY
+      medianY,
+      theta,
+      thetaDeg,
+      mlpX,
+      mlpY,
+      xWall
     };
   };
 

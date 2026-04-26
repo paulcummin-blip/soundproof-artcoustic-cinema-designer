@@ -191,16 +191,22 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
             isNum(fwZones.left.medianY) && 
             isNum(fwZones.right.medianY)) {
           
-          // CRITICAL: Use actual speaker X (not hardcoded wall inset)
-          // This eliminates the final 2.2° because ideal X now matches where reset places the speaker
-          const idealLWPoint = { 
-            x: LW.position.x,  // Use actual speaker X
-            y: fwZones.left.medianY 
+          const yOnMedianLine = (zone, speakerX) => {
+            if (!zone || !Number.isFinite(zone.theta) || !Number.isFinite(zone.mlpX) || !Number.isFinite(zone.mlpY) || !Number.isFinite(speakerX)) {
+              return null;
+            }
+            return zone.mlpY + (speakerX - zone.mlpX) * Math.tan(zone.theta);
           };
-          const idealRWPoint = { 
-            x: RW.position.x,  // Use actual speaker X
-            y: fwZones.right.medianY 
-          };
+
+          const idealLWY = yOnMedianLine(fwZones.left, LW.position.x);
+          const idealRWY = yOnMedianLine(fwZones.right, RW.position.x);
+
+          if (!Number.isFinite(idealLWY) || !Number.isFinite(idealRWY)) {
+            throw new Error('Invalid median line sample');
+          }
+
+          const idealLWPoint = { x: LW.position.x, y: idealLWY };
+          const idealRWPoint = { x: RW.position.x, y: idealRWY };
           
           const azActualLW = azimuthDeg(mlpUsed, LW.position);
           const azIdealLW = azimuthDeg(mlpUsed, idealLWPoint);
