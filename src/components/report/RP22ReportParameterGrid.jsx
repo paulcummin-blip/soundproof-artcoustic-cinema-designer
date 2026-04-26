@@ -4,6 +4,7 @@ import React, { useMemo, useCallback } from "react";
 import RP22ComplianceParameterTile from "@/components/rp22/RP22ComplianceParameterTile";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { useAppState } from "@/components/AppStateProvider";
+import { getLevelColors } from "@/components/utils/rp22Colors";
 
 /* ---------- Canonical RP22 parameter definitions (mirrored from RP22CompliancePanel) ---------- */
 const RP22_PARAMS = [
@@ -291,6 +292,12 @@ export default function RP22ReportParameterGrid({
     });
   }, [seats]);
 
+  const denseSeatGrid = React.useMemo(() => {
+    const totalSeats = seats.length;
+    const hasDenseRow = rows.some((rowObj) => rowObj.seats.length > 5);
+    return hasDenseRow || totalSeats > 12;
+  }, [rows, seats.length]);
+
   const getSnapshotForSeat = React.useCallback((seat) => {
     if (!seat) return null;
     const sid = String(seat.id || "").trim();
@@ -314,23 +321,60 @@ export default function RP22ReportParameterGrid({
   const renderSeatPillGrid = (pId) => {
     if (!rows.length) return null;
     const pKey = `p${Number(pId)}`;
+    const getCompactPillState = (lvl) => {
+      const str = String(lvl || '').toUpperCase();
+      if (str === 'L1') return { n: 1, label: 'L1' };
+      if (str === 'L2') return { n: 2, label: 'L2' };
+      if (str === 'L3') return { n: 3, label: 'L3' };
+      if (str === 'L4') return { n: 4, label: 'L4' };
+      if (str === 'FAIL') return { n: 0, label: 'FAIL' };
+      if (str === 'N/A') return { n: -2, label: 'N/A' };
+      return { n: -1, label: '—' };
+    };
     return (
-      <div style={{ display: "grid", gap: 6 }}>
+      <div style={{ display: "grid", gap: denseSeatGrid ? 3 : 6 }}>
         {rows.map(rowObj => (
-          <div key={`row-${rowObj.row}`} style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "min-content", justifyContent: "end", gap: 6 }}>
+          <div key={`row-${rowObj.row}`} style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "min-content", justifyContent: "end", gap: denseSeatGrid ? 3 : 6 }}>
             {rowObj.seats.map(seat => {
               const snap = getSnapshotForSeat(seat);
               const metric = snap?.rp22?.[pKey];
               const display = getMetricDisplayState(metric, pId);
               const lvl = display.level === 'N/A' || display.text === 'N/A' ? 'N/A' : (metric?.level || "—");
               const isPrimary = !!seat?.isPrimary;
+              const compact = getCompactPillState(lvl);
+              const compactColors = (compact.n === -1 || compact.n === -2)
+                ? { bg: '#F3F4F6', border: '#E5E7EB', text: '#9CA3AF' }
+                : getLevelColors(compact.n);
               return (
                 <span
                   key={`seat-${seat?.id || `${rowObj.row}-${seat?.indexInRow || ""}`}`}
                   title={`${seat?.id || ""}  Row ${seat?.row || seat?.rowNumber || 1} Seat ${seat?.indexInRow || ""}${isPrimary ? " (RSP)" : ""}`}
-                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: isPrimary ? "0 0 0 2px rgba(33,52,40,0.10)" : "none", borderRadius: 6 }}
+                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: isPrimary ? "0 0 0 2px rgba(33,52,40,0.10)" : "none", borderRadius: denseSeatGrid ? 4 : 6 }}
                 >
-                  <RP22GradingPill level={lvl} />
+                  {denseSeatGrid ? (
+                    <span
+                      style={{
+                        minWidth: 24,
+                        height: 18,
+                        padding: "2px 5px",
+                        fontSize: 9,
+                        lineHeight: "1",
+                        borderRadius: 4,
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: `1px solid ${compactColors.border}`,
+                        background: compactColors.bg,
+                        color: compactColors.text,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {compact.label}
+                    </span>
+                  ) : (
+                    <RP22GradingPill level={lvl} />
+                  )}
                 </span>
               );
             })}
