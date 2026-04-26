@@ -286,6 +286,42 @@ export default function ReportPrintStyles() {
                     grid-auto-rows: auto !important;
                 }
 
+                .rp22-report .rp22-cards-grid {
+                  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                  gap: 4mm !important;
+                }
+
+                .rp22-report .rp22-param-card-inner {
+                  padding: 3.5mm 4mm !important;
+                }
+
+                .rp22-report .rp22-param-title {
+                  font-size: 8.5pt !important;
+                  line-height: 1.15 !important;
+                }
+
+                .rp22-report .rp22-param-subtitle,
+                .rp22-report .rp22-param-card,
+                .rp22-report .rp22-param-card * {
+                  font-size: 7pt !important;
+                  line-height: 1.15 !important;
+                }
+
+                .rp22-report .rp22-seat-pill-grid {
+                  gap: 2mm !important;
+                  transform: scale(0.78);
+                  transform-origin: top right;
+                }
+
+                .rp22-report .rp22-seat-pill-row {
+                  gap: 2mm !important;
+                }
+
+                .rp22-report .rp22-level-pill {
+                  right: 4mm !important;
+                  bottom: 4mm !important;
+                }
+
                 .rp22-report .rp22-card-wrap {
                     display: block !important;
                     width: 100% !important;
