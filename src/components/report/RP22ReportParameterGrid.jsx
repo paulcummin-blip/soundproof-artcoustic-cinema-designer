@@ -339,7 +339,10 @@ export default function RP22ReportParameterGrid({
               const snap = getSnapshotForSeat(seat);
               const metric = snap?.rp22?.[pKey];
               const display = getMetricDisplayState(metric, pId);
-              const lvl = display.level === 'N/A' || display.text === 'N/A' ? 'N/A' : (metric?.level || "—");
+              const lvl =
+                display.level === 'N/A' || display.text === 'N/A'
+                  ? 'N/A'
+                  : (display.level || metric?.level || "—");
               const isPrimary = !!seat?.isPrimary;
               const compact = getCompactPillState(lvl);
               const compactColors = (compact.n === -1 || compact.n === -2)
