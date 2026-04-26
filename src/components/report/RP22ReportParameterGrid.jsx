@@ -322,13 +322,28 @@ export default function RP22ReportParameterGrid({
     if (!rows.length) return null;
     const pKey = `p${Number(pId)}`;
     const getCompactPillState = (lvl) => {
-      const str = String(lvl || '').toUpperCase();
+      if (typeof lvl === 'number') {
+        if (lvl === 1) return { n: 1, label: 'L1' };
+        if (lvl === 2) return { n: 2, label: 'L2' };
+        if (lvl === 3) return { n: 3, label: 'L3' };
+        if (lvl === 4) return { n: 4, label: 'L4' };
+        if (lvl === 0) return { n: 0, label: 'FAIL' };
+      }
+
+      const str = String(lvl || '').toUpperCase().trim();
+
+      if (str === '1') return { n: 1, label: 'L1' };
+      if (str === '2') return { n: 2, label: 'L2' };
+      if (str === '3') return { n: 3, label: 'L3' };
+      if (str === '4') return { n: 4, label: 'L4' };
+
       if (str === 'L1') return { n: 1, label: 'L1' };
       if (str === 'L2') return { n: 2, label: 'L2' };
       if (str === 'L3') return { n: 3, label: 'L3' };
       if (str === 'L4') return { n: 4, label: 'L4' };
       if (str === 'FAIL') return { n: 0, label: 'FAIL' };
       if (str === 'N/A') return { n: -2, label: 'N/A' };
+
       return { n: -1, label: '—' };
     };
     return (
