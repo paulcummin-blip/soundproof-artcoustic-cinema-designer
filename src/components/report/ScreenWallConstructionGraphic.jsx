@@ -604,15 +604,22 @@ export default function ScreenWallConstructionGraphic({
       });
   }, [frontSubs]);
 
-  const sharedLcrZM = useMemo(() => {
-    const fl = drawnSpeakers.find(s => s.role === 'FL');
-    const fr = drawnSpeakers.find(s => s.role === 'FR');
-    const flZ = fl && Number.isFinite(fl.zM) ? fl.zM : null;
-    const frZ = fr && Number.isFinite(fr.zM) ? fr.zM : null;
-    if (flZ !== null && frZ !== null) return (flZ + frZ) / 2;
-    if (flZ !== null) return flZ;
-    if (frZ !== null) return frZ;
-    return null;
+  const { sharedLcrZM, minXM, maxXM } = useMemo(() => {
+    if (drawnSpeakers.length === 0) return { sharedLcrZM: null, minXM: null, maxXM: null };
+    const xs = drawnSpeakers.map(s => s.xM);
+    const leftMost = drawnSpeakers.find(s => s.xM === Math.min(...xs));
+    const rightMost = drawnSpeakers.find(s => s.xM === Math.max(...xs));
+    const leftZ = leftMost && Number.isFinite(leftMost.zM) ? leftMost.zM : null;
+    const rightZ = rightMost && Number.isFinite(rightMost.zM) ? rightMost.zM : null;
+    let z = null;
+    if (leftZ !== null && rightZ !== null) z = (leftZ + rightZ) / 2;
+    else if (leftZ !== null) z = leftZ;
+    else if (rightZ !== null) z = rightZ;
+    return {
+      sharedLcrZM: z,
+      minXM: leftMost ? leftMost.xM : null,
+      maxXM: rightMost ? rightMost.xM : null,
+    };
   }, [drawnSpeakers]);
 
   const speakerCenterDims = useMemo(() => {
@@ -797,10 +804,15 @@ export default function ScreenWallConstructionGraphic({
             const w = (isQ63 ? 0.28 : isQ43 ? 0.28 : isQ45 ? 0.5 : isQ85 ? 0.5 : item.dims.widthM) * scale;
             const h = (isQ63 ? 0.28 : isQ43 ? 0.21 : isQ45 ? 0.4 : isQ85 ? 0.6 : item.dims.heightM) * scale;
             const x = mapX(item.xM) - w / 2;
-            const lcrDrawZM = ['FL', 'FC', 'FR'].includes(item.role) && sharedLcrZM !== null
-              ? sharedLcrZM
-              : item.zM;
-            const y = mapY(lcrDrawZM) - h / 2;
+            const drawZM =
+              sharedLcrZM !== null &&
+              minXM !== null &&
+              maxXM !== null &&
+              item.xM >= minXM &&
+              item.xM <= maxXM
+                ? sharedLcrZM
+                : item.zM;
+            const y = mapY(drawZM) - h / 2;
             return (
               <g key={`${item.role}-${item.xM}-${item.zM}`}>
                 {isQ63 ? (
