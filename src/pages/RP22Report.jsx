@@ -473,7 +473,7 @@ function RP22ReportInner() {
 
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
-    const frontSubs = safeArray(app?.subwoofers).filter((sub) => String(sub?.wall || '').toLowerCase() === 'front');
+    const frontSubs = safeArray(app?.subwoofers).filter((sub) => sub?.group === 'front' || String(sub?.role || '').startsWith('SUBF'));
     const mlpBasis = app?.mlpBasis || "front";
     const hasSeats = seats.length > 0;
     const hasSpeakers = placedSpeakers.length > 0;
