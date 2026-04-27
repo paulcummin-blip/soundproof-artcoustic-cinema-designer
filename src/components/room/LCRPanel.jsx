@@ -62,7 +62,7 @@ function resolveSoundbarMeta(modelLabel, screen) {
   return getSpeakerModelMeta(modelLabel, tvPresetKey);
 }
 
-function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabel, dimensions, screen, setSpeakers }) {
+function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabel, dimensions, screen, splConfig, setSpeakers }) {
   setSpeakers(prev => {
     const list = Array.isArray(prev) ? prev : [];
     const by = buildRoleMap(list);
@@ -82,7 +82,10 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
     const screenBottomM = screenHeightFromFloorM;
 
     const defaultY = 0.20;
-    const defaultZ = roomH * 0.5;
+    const lcrHeightM = Number(splConfig?.lcrHeightM);
+    const defaultZ = Number.isFinite(lcrHeightM)
+      ? lcrHeightM
+      : roomH * 0.5;
     const spread = Math.min(1.2, roomW * 0.22);
     const midX = roomW / 2;
 
@@ -118,7 +121,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
           role: 'FL',
           id: FL.id || 'FL-1',
           model: baseModelLabel,
-          position: FL.position || { x: midX - spread, y: defaultY, z: defaultZ },
+          position: { ...(FL.position || { x: midX - spread, y: defaultY, z: defaultZ }), z: defaultZ },
           rotation: FL.rotation || { x: 0, y: 0, z: 0 },
         },
         {
@@ -134,7 +137,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
           role: 'FR',
           id: FR.id || 'FR-1',
           model: baseModelLabel,
-          position: FR.position || { x: midX + spread, y: defaultY, z: defaultZ },
+          position: { ...(FR.position || { x: midX + spread, y: defaultY, z: defaultZ }), z: defaultZ },
           rotation: FR.rotation || { x: 0, y: 0, z: 0 },
         },
       ];
@@ -155,7 +158,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
         role: 'FC',
         id: FC.id || 'FC-1',
         model: baseModelLabel,
-        position: FC.position || { x: midX, y: defaultY, z: defaultZ },
+        position: { ...(FC.position || { x: midX, y: defaultY, z: defaultZ }), z: defaultZ },
         rotation: FC.rotation || { x: 0, y: 0, z: 0 },
       },
       {
@@ -251,10 +254,23 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const derivedFrontStageMode = fcMeta?.frontStageType === 'integrated_lcr' ? 'integrated_lcr' : fcMeta?.frontStageType === 'center_only' ? 'center_only' : 'standard';
   const derivedSoundbarModel = (fcMeta?.frontStageType === 'center_only' || fcMeta?.frontStageType === 'integrated_lcr') ? fcModel : '';
 
+  const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
+  const screenBottomM = Number(screen?.heightFromFloorM);
+  const visibleWidthInches = Number(screen?.visibleWidthInches);
+  const aspectRatio = String(screen?.aspectRatio || '16:9');
+  const [arW, arH] = aspectRatio.split(':').map(Number);
+  const screenRatio = (arW && arH) ? arW / arH : 16 / 9;
+  const screenHeightM = Number.isFinite(visibleWidthInches) && visibleWidthInches > 0 ? (visibleWidthInches * 0.0254) / screenRatio : null;
+  const defaultLcrHeightM = Number.isFinite(screenBottomM) && Number.isFinite(screenHeightM)
+    ? screenBottomM + screenHeightM / 2
+    : roomH * 0.5;
+  const clampLcrHeight = useCallback((value) => Math.max(0.2, Math.min(roomH - 0.2, value)), [roomH]);
+
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [frontStageMode, setFrontStageMode] = useState(derivedFrontStageMode);
   const [soundbarModel, setSoundbarModel] = useState(derivedSoundbarModel);
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
+  const [lcrHeightInputValue, setLcrHeightInputValue] = useState(String(clampLcrHeight(Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : defaultLcrHeightM).toFixed(2)));
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
@@ -268,6 +284,12 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   useEffect(() => {
     setLcrPowerInputValue(String(splConfig?.lcrW || 100));
   }, [splConfig?.lcrW]);
+
+  useEffect(() => {
+    const stored = Number(splConfig?.lcrHeightM);
+    const next = clampLcrHeight(Number.isFinite(stored) ? stored : defaultLcrHeightM);
+    setLcrHeightInputValue(String(Number(next.toFixed(2))));
+  }, [splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight]);
 
   const handleLcrPowerChange = useCallback((e) => {
     const newValue = e.target.value;
@@ -294,6 +316,45 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     }
   }, [splConfig?.lcrW, updateGlobalSpl]);
 
+  const updatePlacedLcrHeight = useCallback((heightM) => {
+    const rolesToUpdate = frontStageMode === 'standard'
+      ? new Set(['FL', 'FC', 'FR'])
+      : frontStageMode === 'center_only'
+        ? new Set(['FL', 'FR'])
+        : new Set();
+
+    if (rolesToUpdate.size === 0) return;
+
+    setSpeakers?.((prev) => (Array.isArray(prev) ? prev.map((speaker) => {
+      const role = getCanonicalRole(speaker?.role);
+      if (!rolesToUpdate.has(role) || !speaker?.position) return speaker;
+      return { ...speaker, position: { ...speaker.position, z: heightM } };
+    }) : prev));
+  }, [frontStageMode, setSpeakers]);
+
+  const handleLcrHeightChange = useCallback((e) => {
+    const newValue = e.target.value;
+    if (newValue !== '' && !/^\d*\.?\d*$/.test(newValue)) return;
+    setLcrHeightInputValue(newValue);
+    if (newValue === '' || newValue.endsWith('.')) return;
+
+    const val = Number(newValue);
+    const maxHeight = roomH - 0.2;
+    if (Number.isFinite(val) && val >= 0.2 && val <= maxHeight) {
+      updateGlobalSpl?.({ lcrHeightM: val });
+      updatePlacedLcrHeight(val);
+    }
+  }, [roomH, updateGlobalSpl, updatePlacedLcrHeight]);
+
+  const handleLcrHeightBlur = useCallback((e) => {
+    const val = Number(e.target.value);
+    const fallback = Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : defaultLcrHeightM;
+    const clamped = clampLcrHeight(Number.isFinite(val) ? val : fallback);
+    setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+    updateGlobalSpl?.({ lcrHeightM: clamped });
+    updatePlacedLcrHeight(clamped);
+  }, [clampLcrHeight, defaultLcrHeightM, splConfig?.lcrHeightM, updateGlobalSpl, updatePlacedLcrHeight]);
+
   const applyFrontStage = useCallback((nextBaseModel, nextMode, nextSoundbarModel) => {
     buildFrontStageSeed({
       baseModelLabel: nextBaseModel,
@@ -301,9 +362,10 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
       soundbarModelLabel: nextSoundbarModel,
       dimensions,
       screen,
+      splConfig,
       setSpeakers,
     });
-  }, [dimensions, screen, setSpeakers]);
+  }, [dimensions, screen, splConfig, setSpeakers]);
 
   const onChooseModel = useCallback((modelLabel) => {
     if (!standardLcrOptions.some(opt => opt.label === modelLabel)) return;
@@ -422,6 +484,24 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
             W
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-2 mt-4">
+        <Label className="text-xs text-[#625143]">LCR height from floor (to middle of speaker)</Label>
+        <div className="relative">
+          <Input
+            type="text"
+            inputMode="decimal"
+            value={lcrHeightInputValue}
+            onChange={handleLcrHeightChange}
+            onBlur={handleLcrHeightBlur}
+            disabled={disabled}
+            className="pr-8"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
+            m
           </span>
         </div>
       </div>

@@ -772,8 +772,7 @@ export default function ScreenWallConstructionGraphic({
             const w = (isQ63 ? 0.28 : isQ43 ? 0.28 : isQ45 ? 0.5 : isQ85 ? 0.5 : item.dims.widthM) * scale;
             const h = (isQ63 ? 0.28 : isQ43 ? 0.21 : isQ45 ? 0.4 : isQ85 ? 0.6 : item.dims.heightM) * scale;
             const x = mapX(item.xM) - w / 2;
-            const screenCentreZ = (screenBottom + screenTop) / 2;
-            const y = mapY(screenCentreZ) - h / 2;
+            const y = mapY(item.zM) - h / 2;
             return (
               <g key={`${item.role}-${item.xM}-${item.zM}`}>
                 {isQ63 ? (
