@@ -599,9 +599,9 @@ export default function ScreenWallConstructionGraphic({
           </text>
           <line x1={PAGE.margin + 18} y1={PAGE.margin + 36} x2={PAGE.width - PAGE.margin - 18} y2={PAGE.margin + 36} stroke={COLORS.extension} strokeWidth="0.8" />
           <text x={PAGE.margin + 18} y={PAGE.margin + 54} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Project</text>
-          <text x={PAGE.margin + 88} y={PAGE.margin + 54} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{projectName || 'Untitled Project'}</text>
+          <text x={PAGE.margin + 88} y={PAGE.margin + 54} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{projectName || ''}</text>
           <text x={PAGE.margin + 18} y={PAGE.margin + 70} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Client</text>
-          <text x={PAGE.margin + 88} y={PAGE.margin + 70} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{clientName || '—'}</text>
+          <text x={PAGE.margin + 88} y={PAGE.margin + 70} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{clientName || ''}</text>
           <text x={PAGE.width - PAGE.margin - 168} y={PAGE.margin + 54} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Drawing</text>
           <text x={PAGE.width - PAGE.margin - 104} y={PAGE.margin + 54} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>SW-01</text>
           <text x={PAGE.width - PAGE.margin - 168} y={PAGE.margin + 70} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Scale</text>
@@ -611,7 +611,7 @@ export default function ScreenWallConstructionGraphic({
         <g>
           <text
             x={wallX + wallPxW / 2}
-            y={wallY - 56}
+            y={wallY - 82}
             fontSize="10"
             fill={COLORS.muted}
             textAnchor="middle"
@@ -621,10 +621,13 @@ export default function ScreenWallConstructionGraphic({
             FRONT ELEVATION
           </text>
 
+          <DimLine x1={wallX} y1={wallY} x2={wallX + wallPxW} y2={wallY} text={[`ROOM WIDTH`, fmtM(roomW)]} offset={-62} textBackground />
+          <DimLine x1={mapX(screenOuterX)} y1={wallY} x2={mapX(screenOuterX + screenOuterW)} y2={wallY} text={[`OVERALL SCREEN WIDTH`, fmtM(screenOuterW)]} offset={-40} textBackground />
+          <DimLine x1={mapX(screenInnerX)} y1={wallY} x2={mapX(screenInnerX + screenViewW)} y2={wallY} text={[`VIEWABLE IMAGE WIDTH`, fmtM(screenViewW)]} offset={-18} textBackground />
+
           <rect x={wallX} y={wallY} width={wallPxW} height={wallPxH} fill="none" stroke={COLORS.wall} strokeWidth="1.4" />
 
-          <DimLine x1={wallX} y1={wallY} x2={wallX + wallPxW} y2={wallY} text={[`ROOM WIDTH`, fmtM(roomW)]} offset={-40} />
-          <DimLine x1={wallX} y1={wallY + wallPxH} x2={wallX} y2={wallY} text={[`ROOM`, `HEIGHT`, fmtM(roomH)]} offset={-70} vertical textOffset={12} />
+          <DimLine x1={wallX} y1={wallY + wallPxH} x2={wallX} y2={wallY} text={[`ROOM`, `HEIGHT`, fmtM(roomH)]} offset={-70} vertical textOffset={12} textBackground />
 
           <rect
             x={mapX(recess.xM)}
@@ -685,7 +688,7 @@ export default function ScreenWallConstructionGraphic({
             x2={mapX(recess.xM + recess.widthM)}
             y2={mapY(recess.yM + recess.heightM)}
             text={[`RECESS HEIGHT`, fmtM(recess.heightM)]}
-            offset={42}
+            offset={48}
             vertical
             textOffset={6}
             textY={mapY((recess.yM + recess.yM + recess.heightM) / 2)}
@@ -697,22 +700,22 @@ export default function ScreenWallConstructionGraphic({
             x2={mapX(screenInnerX + screenViewW)}
             y2={mapY(screenInnerTop)}
             text={[`VIEWABLE IMAGE HEIGHT`, fmtM(screenViewH)]}
-            offset={78}
+            offset={86}
             vertical
             textOffset={6}
             textY={mapY((screenInnerBottom + screenInnerTop) / 2)}
             textBackground
           />
           <DimLine
-            x1={wallX + wallPxW}
-            y1={mapY(0)}
-            x2={wallX + wallPxW}
-            y2={mapY(screenBottom)}
-            text={[`SCREEN BOTTOM HEIGHT`, fmtM(screenBottom)]}
-            offset={204}
+            x1={mapX(screenOuterX + screenOuterW)}
+            y1={mapY(screenOuterY)}
+            x2={mapX(screenOuterX + screenOuterW)}
+            y2={mapY(screenOuterTop)}
+            text={[`OVERALL SCREEN HEIGHT`, fmtM(screenOuterH)]}
+            offset={124}
             vertical
             textOffset={6}
-            textY={mapY(screenBottom / 2)}
+            textY={mapY((screenOuterY + screenOuterTop) / 2)}
             textBackground
           />
           <DimLine
@@ -721,23 +724,22 @@ export default function ScreenWallConstructionGraphic({
             x2={wallX + wallPxW}
             y2={mapY(screenTop)}
             text={[`SCREEN TOP HEIGHT`, fmtM(screenTop)]}
-            offset={168}
+            offset={162}
             vertical
             textOffset={6}
             textY={mapY(screenTop / 2)}
             textBackground
           />
-...
           <DimLine
-            x1={mapX(screenOuterX + screenOuterW)}
-            y1={mapY(screenOuterY)}
-            x2={mapX(screenOuterX + screenOuterW)}
-            y2={mapY(screenOuterTop)}
-            text={[`OVERALL SCREEN HEIGHT`, fmtM(screenOuterH)]}
-            offset={114}
+            x1={wallX + wallPxW}
+            y1={mapY(0)}
+            x2={wallX + wallPxW}
+            y2={mapY(screenBottom)}
+            text={[`SCREEN BOTTOM HEIGHT`, fmtM(screenBottom)]}
+            offset={200}
             vertical
             textOffset={6}
-            textY={mapY((screenOuterY + screenOuterTop) / 2)}
+            textY={mapY(screenBottom / 2)}
             textBackground
           />
 
@@ -782,7 +784,7 @@ export default function ScreenWallConstructionGraphic({
             const w = item.dims.widthM * scale;
             const h = item.dims.heightM * scale;
             const x = mapX(item.xM) - w / 2;
-            const y = mapY(item.dims.heightM);
+            const y = wallY + wallPxH - h;
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>
                 <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1.1" />
@@ -813,7 +815,7 @@ export default function ScreenWallConstructionGraphic({
           {speakerCenterDims.map((item, index) => {
             const centerX = mapX(item.xM);
             const baseY = wallY + wallPxH;
-            const offset = 50 + index * 26;
+            const offset = 46 + index * 24;
             const label = item.role === 'FC' ? ['FC CTR', fmtM(item.xM)] : [item.label, fmtM(item.xM)];
             return (
               <DimLine
@@ -824,6 +826,7 @@ export default function ScreenWallConstructionGraphic({
                 y2={baseY}
                 text={label}
                 offset={offset}
+                textBackground
               />
             );
           })}
