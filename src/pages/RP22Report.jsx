@@ -1476,8 +1476,8 @@ function RP22ReportInner() {
                                     style={{ padding: '8mm 10mm', background: '#FFFFFF' }}
                                 >
                                     <ScreenWallConstructionGraphic
-                                        projectName={app?.projectName || ''}
-                                        clientName={app?.clientName || ''}
+                                        projectName={projectDetails?.name || ''}
+                                        clientName={projectDetails?.client_name || ''}
                                         roomWidthM={stableDimensions.width}
                                         roomHeightM={stableDimensions.height}
                                         screenWidthM={sightlineScreenMetrics.screenWidthM}
