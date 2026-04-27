@@ -136,26 +136,77 @@ function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffse
 }
 
 function Q63FaceIcon({ x, y, size }) {
-  const inset = size * 0.12;
-  const driverW = size * 0.28;
-  const driverH = size * 0.18;
+  const outerInset = size * 0.005;
+  const innerInset = size * 0.095;
+  const baffleInsetX = size * 0.31;
+  const baffleInsetY = size * 0.20;
+  const baffleW = size - baffleInsetX * 2;
+  const baffleH = size - baffleInsetY * 2;
   const centerX = x + size / 2;
-  const upperY = y + size * 0.27;
-  const lowerY = y + size * 0.58;
+  const topY = y + baffleInsetY;
+  const bottomY = topY + baffleH;
+  const upperMidY = y + size * 0.37;
+  const lowerMidY = y + size * 0.63;
+  const driverHalfW = size * 0.105;
+  const driverHalfH = size * 0.105;
+  const nodeSize = size * 0.016;
+
+  const upperLeft = centerX - driverHalfW;
+  const upperRight = centerX + driverHalfW;
+  const upperTop = upperMidY - driverHalfH;
+  const upperBottom = upperMidY + driverHalfH;
+  const lowerTop = lowerMidY - driverHalfH;
+  const lowerBottom = lowerMidY + driverHalfH;
 
   return (
     <g>
-      <rect x={x} y={y} width={size} height={size} fill="none" stroke={COLORS.speaker} strokeWidth="1" />
-      <rect x={x + inset} y={y + inset} width={size - inset * 2} height={size - inset * 2} rx={8} ry={8} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
-      <line x1={centerX} y1={y + inset + 6} x2={centerX} y2={y + size - inset - 6} stroke={COLORS.speaker} strokeWidth="0.9" />
-      <path d={`M ${centerX - driverW / 2} ${upperY + driverH / 2} Q ${centerX} ${upperY - driverH / 2} ${centerX + driverW / 2} ${upperY + driverH / 2}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
-      <path d={`M ${centerX - driverW / 2} ${upperY + driverH / 2} Q ${centerX} ${upperY + driverH * 1.25} ${centerX + driverW / 2} ${upperY + driverH / 2}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
-      <path d={`M ${centerX - driverW / 2} ${lowerY + driverH / 2} Q ${centerX} ${lowerY - driverH / 2} ${centerX + driverW / 2} ${lowerY + driverH / 2}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
-      <path d={`M ${centerX - driverW / 2} ${lowerY + driverH / 2} Q ${centerX} ${lowerY + driverH * 1.25} ${centerX + driverW / 2} ${lowerY + driverH / 2}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
-      <line x1={centerX - 8} y1={upperY + driverH / 2} x2={centerX + 8} y2={upperY + driverH / 2} stroke={COLORS.speaker} strokeWidth="0.8" />
-      <line x1={centerX - 8} y1={lowerY + driverH / 2} x2={centerX + 8} y2={lowerY + driverH / 2} stroke={COLORS.speaker} strokeWidth="0.8" />
-      <line x1={centerX - 4} y1={upperY + driverH / 2 - 6} x2={centerX + 4} y2={upperY + driverH / 2 - 6} stroke={COLORS.speaker} strokeWidth="0.8" />
-      <line x1={centerX - 4} y1={lowerY + driverH / 2 + 6} x2={centerX + 4} y2={lowerY + driverH / 2 + 6} stroke={COLORS.speaker} strokeWidth="0.8" />
+      <rect
+        x={x + outerInset}
+        y={y + outerInset}
+        width={size - outerInset * 2}
+        height={size - outerInset * 2}
+        fill="none"
+        stroke={COLORS.speaker}
+        strokeWidth="0.9"
+      />
+      <rect
+        x={x + innerInset}
+        y={y + innerInset}
+        width={size - innerInset * 2}
+        height={size - innerInset * 2}
+        rx={size * 0.055}
+        ry={size * 0.055}
+        fill="none"
+        stroke={COLORS.speaker}
+        strokeWidth="0.8"
+      />
+      <rect
+        x={x + baffleInsetX}
+        y={y + baffleInsetY}
+        width={baffleW}
+        height={baffleH}
+        rx={size * 0.01}
+        ry={size * 0.01}
+        fill="none"
+        stroke={COLORS.speaker}
+        strokeWidth="0.8"
+      />
+
+      <line x1={centerX} y1={topY} x2={centerX} y2={bottomY} stroke={COLORS.speaker} strokeWidth="0.7" />
+
+      <line x1={x + baffleInsetX} y1={topY} x2={centerX} y2={topY + size * 0.04} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={x + baffleInsetX + baffleW} y1={topY} x2={centerX} y2={topY + size * 0.04} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={x + baffleInsetX} y1={bottomY} x2={centerX} y2={bottomY - size * 0.04} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={x + baffleInsetX + baffleW} y1={bottomY} x2={centerX} y2={bottomY - size * 0.04} stroke={COLORS.speaker} strokeWidth="0.7" />
+
+      <path d={`M ${centerX} ${upperTop} C ${centerX + driverHalfW * 0.95} ${upperTop + driverHalfH * 0.38}, ${centerX + driverHalfW * 1.05} ${upperBottom - driverHalfH * 0.38}, ${centerX} ${upperBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
+      <path d={`M ${centerX} ${upperTop} C ${centerX - driverHalfW * 0.95} ${upperTop + driverHalfH * 0.38}, ${centerX - driverHalfW * 1.05} ${upperBottom - driverHalfH * 0.38}, ${centerX} ${upperBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
+      <path d={`M ${centerX} ${lowerTop} C ${centerX + driverHalfW * 0.95} ${lowerTop + driverHalfH * 0.38}, ${centerX + driverHalfW * 1.05} ${lowerBottom - driverHalfH * 0.38}, ${centerX} ${lowerBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
+      <path d={`M ${centerX} ${lowerTop} C ${centerX - driverHalfW * 0.95} ${lowerTop + driverHalfH * 0.38}, ${centerX - driverHalfW * 1.05} ${lowerBottom - driverHalfH * 0.38}, ${centerX} ${lowerBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
+
+      <rect x={centerX - nodeSize} y={topY + size * 0.037 - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
+      <rect x={centerX - nodeSize} y={upperBottom - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
+      <rect x={centerX - nodeSize} y={lowerBottom - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
     </g>
   );
 }
