@@ -29,6 +29,7 @@ import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
+import ScreenWallConstructionGraphic from '../components/report/ScreenWallConstructionGraphic';
 import { fovForDistance } from '../components/utils/screenMetrics';
 import { getLevelColors } from '../components/utils/rp22Colors';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
@@ -472,6 +473,7 @@ function RP22ReportInner() {
 
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
+    const frontSubs = safeArray(app?.subwoofers).filter((sub) => String(sub?.wall || '').toLowerCase() === 'front');
     const mlpBasis = app?.mlpBasis || "front";
     const hasSeats = seats.length > 0;
     const hasSpeakers = placedSpeakers.length > 0;
@@ -1441,31 +1443,54 @@ function RP22ReportInner() {
 
                         {/* ── Sightlines & Viewing Angles (final page) ── */}
                         {canRenderSightlinePage && sightlineScreenMetrics && sightlineRowData.length > 0 && (
-                            <section id="pdf-sightlines" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
-                                <SightlineGraphic
-                                    projectName={app?.projectName || ''}
-                                    clientName={app?.clientName || ''}
-                                    roomWidthM={stableDimensions.width}
-                                    roomLengthM={stableDimensions.length}
-                                    roomHeightM={stableDimensions.height}
-                                    screenWidthM={sightlineScreenMetrics.screenWidthM}
-                                    screenHeightM={sightlineScreenMetrics.screenHeightM}
-                                    screenTotalWidthM={sightlineScreenMetrics.screenTotalWidthM}
-                                    screenTotalHeightM={sightlineScreenMetrics.screenTotalHeightM}
-                                    screenFrontPlaneY={sightlineScreenMetrics.screenFrontPlaneY}
-                                    screenCenterHeightM={sightlineScreenMetrics.screenCenterHeightM}
-                                    screenBottomHeightM={sightlineScreenMetrics.screenBottomHeightM}
-                                    screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
-                                    projectorLensX={projector?.x_lens_m}
-                                    projectorLensY={projector?.y_lens_m}
-                                    projectorLensZ={projector?.z_lens_m}
-                                    projectorBodyWidth={projector?.body_width_m}
-                                    projectorBodyHeight={projector?.body_height_m}
-                                    projectorBodyDepth={projector?.body_depth_m}
-                                    rowData={sightlineRowData}
-                                    dolbyConfig={exportSystemConfiguration || ''}
-                                />
-                            </section>
+                            <>
+                                <section id="pdf-sightlines" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                    <SightlineGraphic
+                                        projectName={app?.projectName || ''}
+                                        clientName={app?.clientName || ''}
+                                        roomWidthM={stableDimensions.width}
+                                        roomLengthM={stableDimensions.length}
+                                        roomHeightM={stableDimensions.height}
+                                        screenWidthM={sightlineScreenMetrics.screenWidthM}
+                                        screenHeightM={sightlineScreenMetrics.screenHeightM}
+                                        screenTotalWidthM={sightlineScreenMetrics.screenTotalWidthM}
+                                        screenTotalHeightM={sightlineScreenMetrics.screenTotalHeightM}
+                                        screenFrontPlaneY={sightlineScreenMetrics.screenFrontPlaneY}
+                                        screenCenterHeightM={sightlineScreenMetrics.screenCenterHeightM}
+                                        screenBottomHeightM={sightlineScreenMetrics.screenBottomHeightM}
+                                        screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
+                                        projectorLensX={projector?.x_lens_m}
+                                        projectorLensY={projector?.y_lens_m}
+                                        projectorLensZ={projector?.z_lens_m}
+                                        projectorBodyWidth={projector?.body_width_m}
+                                        projectorBodyHeight={projector?.body_height_m}
+                                        projectorBodyDepth={projector?.body_depth_m}
+                                        rowData={sightlineRowData}
+                                        dolbyConfig={exportSystemConfiguration || ''}
+                                    />
+                                </section>
+
+                                <section
+                                    id="pdf-screen-wall-construction"
+                                    className="print-page-break-before"
+                                    style={{ padding: '8mm 10mm', background: '#FFFFFF' }}
+                                >
+                                    <ScreenWallConstructionGraphic
+                                        projectName={app?.projectName || ''}
+                                        clientName={app?.clientName || ''}
+                                        roomWidthM={stableDimensions.width}
+                                        roomHeightM={stableDimensions.height}
+                                        screenWidthM={sightlineScreenMetrics.screenWidthM}
+                                        screenHeightM={sightlineScreenMetrics.screenHeightM}
+                                        screenTotalWidthM={sightlineScreenMetrics.screenTotalWidthM}
+                                        screenTotalHeightM={sightlineScreenMetrics.screenTotalHeightM}
+                                        screenBottomHeightM={sightlineScreenMetrics.screenBottomHeightM}
+                                        screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
+                                        placedSpeakers={placedSpeakers}
+                                        frontSubs={frontSubs}
+                                    />
+                                </section>
+                            </>
                         )}
 
 
