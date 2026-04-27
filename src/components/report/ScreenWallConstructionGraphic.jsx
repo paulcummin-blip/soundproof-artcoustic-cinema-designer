@@ -209,6 +209,93 @@ function Q43FaceIcon({ x, y, width, height }) {
   );
 }
 
+function Q45FaceIcon({ x, y, width, height }) {
+  const outerInset = width * 0.008;
+  const innerInsetX = width * 0.04;
+  const innerInsetY = height * 0.055;
+  const topBoxX = x + width * 0.44;
+  const topBoxY = y + height * 0.10;
+  const topBoxW = width * 0.28;
+  const topBoxH = height * 0.39;
+  const bottomTopY = y + height * 0.50;
+  const bottomBottomY = y + height * 0.91;
+  const bottomTopLeft = x + width * 0.44;
+  const bottomTopRight = x + width * 0.72;
+  const bottomBottomLeft = x + width * 0.48;
+  const bottomBottomRight = x + width * 0.68;
+  const centerX = x + width * 0.58;
+  const topUpperMidY = y + height * 0.22;
+  const topLowerMidY = y + height * 0.37;
+  const bottomUpperMidY = y + height * 0.63;
+  const bottomLowerMidY = y + height * 0.82;
+  const topDriverHalfW = width * 0.06;
+  const topDriverHalfH = height * 0.10;
+  const bottomUpperHalfW = width * 0.075;
+  const bottomUpperHalfH = height * 0.12;
+  const bottomLowerHalfW = width * 0.06;
+  const bottomLowerHalfH = height * 0.09;
+  const nodeSize = Math.min(width, height) * 0.015;
+
+  const drawLens = (midY, halfW, halfH) => (
+    <>
+      <path d={`M ${centerX} ${midY - halfH} C ${centerX + halfW * 0.95} ${midY - halfH * 0.62}, ${centerX + halfW * 1.05} ${midY + halfH * 0.62}, ${centerX} ${midY + halfH}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
+      <path d={`M ${centerX} ${midY - halfH} C ${centerX - halfW * 0.95} ${midY - halfH * 0.62}, ${centerX - halfW * 1.05} ${midY + halfH * 0.62}, ${centerX} ${midY + halfH}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
+    </>
+  );
+
+  return (
+    <g>
+      <rect
+        x={x + outerInset}
+        y={y + outerInset}
+        width={width - outerInset * 2}
+        height={height - outerInset * 2}
+        fill="none"
+        stroke={COLORS.speaker}
+        strokeWidth="0.9"
+      />
+      <rect
+        x={x + innerInsetX}
+        y={y + innerInsetY}
+        width={width - innerInsetX * 2}
+        height={height - innerInsetY * 2}
+        rx={Math.min(width, height) * 0.05}
+        ry={Math.min(width, height) * 0.05}
+        fill="none"
+        stroke={COLORS.speaker}
+        strokeWidth="0.8"
+      />
+
+      <rect x={topBoxX} y={topBoxY} width={topBoxW} height={topBoxH} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
+      <line x1={centerX} y1={topBoxY} x2={centerX} y2={topBoxY + topBoxH} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={topBoxX} y1={topBoxY} x2={x + width * 0.40} y2={y + height * 0.08} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={topBoxX + topBoxW} y1={topBoxY} x2={x + width * 0.77} y2={y + height * 0.08} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={topBoxX} y1={topBoxY + topBoxH} x2={x + width * 0.40} y2={y + height * 0.50} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={topBoxX + topBoxW} y1={topBoxY + topBoxH} x2={x + width * 0.77} y2={y + height * 0.50} stroke={COLORS.speaker} strokeWidth="0.7" />
+
+      <line x1={bottomTopLeft} y1={bottomTopY} x2={bottomBottomLeft} y2={bottomBottomY} stroke={COLORS.speaker} strokeWidth="0.8" />
+      <line x1={bottomTopRight} y1={bottomTopY} x2={bottomBottomRight} y2={bottomBottomY} stroke={COLORS.speaker} strokeWidth="0.8" />
+      <line x1={bottomTopLeft} y1={bottomTopY} x2={bottomTopRight} y2={bottomTopY} stroke={COLORS.speaker} strokeWidth="0.8" />
+      <line x1={bottomBottomLeft} y1={bottomBottomY} x2={bottomBottomRight} y2={bottomBottomY} stroke={COLORS.speaker} strokeWidth="0.8" />
+      <line x1={centerX} y1={bottomTopY} x2={centerX} y2={bottomBottomY} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={bottomTopLeft} y1={bottomTopY} x2={x + width * 0.40} y2={y + height * 0.49} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={bottomTopRight} y1={bottomTopY} x2={x + width * 0.77} y2={y + height * 0.49} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={bottomBottomLeft} y1={bottomBottomY} x2={x + width * 0.40} y2={y + height * 0.91} stroke={COLORS.speaker} strokeWidth="0.7" />
+      <line x1={bottomBottomRight} y1={bottomBottomY} x2={x + width * 0.78} y2={y + height * 0.91} stroke={COLORS.speaker} strokeWidth="0.7" />
+
+      {drawLens(topUpperMidY, topDriverHalfW, topDriverHalfH)}
+      {drawLens(topLowerMidY, topDriverHalfW, topDriverHalfH)}
+      {drawLens(bottomUpperMidY, bottomUpperHalfW, bottomUpperHalfH)}
+      {drawLens(bottomLowerMidY, bottomLowerHalfW, bottomLowerHalfH)}
+
+      <rect x={centerX - nodeSize} y={topBoxY + nodeSize * 0.4} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
+      <rect x={centerX - nodeSize} y={topLowerMidY - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
+      <rect x={centerX - nodeSize} y={bottomUpperMidY + bottomUpperHalfH - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
+      <rect x={centerX - nodeSize} y={bottomLowerMidY + bottomLowerHalfH - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
+    </g>
+  );
+}
+
 function Q63FaceIcon({ x, y, size }) {
   const outerInset = size * 0.005;
   const innerInset = size * 0.095;
@@ -476,8 +563,9 @@ export default function ScreenWallConstructionGraphic({
             const modelKey = normalizeModelKey(item.model);
             const isQ63 = modelKey === 'q6 3';
             const isQ43 = modelKey === 'q4 3';
-            const w = (isQ63 ? 0.28 : isQ43 ? 0.28 : item.dims.widthM) * scale;
-            const h = (isQ63 ? 0.28 : isQ43 ? 0.21 : item.dims.heightM) * scale;
+            const isQ45 = modelKey === 'q4 5';
+            const w = (isQ63 ? 0.28 : isQ43 ? 0.28 : isQ45 ? 0.5 : item.dims.widthM) * scale;
+            const h = (isQ63 ? 0.28 : isQ43 ? 0.21 : isQ45 ? 0.4 : item.dims.heightM) * scale;
             const x = mapX(item.xM) - w / 2;
             const y = mapY(item.zM) - h / 2;
             return (
@@ -486,6 +574,8 @@ export default function ScreenWallConstructionGraphic({
                   <Q63FaceIcon x={x} y={y} size={w} />
                 ) : isQ43 ? (
                   <Q43FaceIcon x={x} y={y} width={w} height={h} />
+                ) : isQ45 ? (
+                  <Q45FaceIcon x={x} y={y} width={w} height={h} />
                 ) : (
                   <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1" />
                 )}
