@@ -89,37 +89,56 @@ function resolveDims(modelName, fallbackMap, defaultDims) {
   };
 }
 
-function DimText({ x, y, text, anchor = 'middle', rotate = null }) {
+function DimText({ x, y, text, anchor = 'middle', rotate = null, withBackground = false }) {
   const lines = Array.isArray(text) ? text : String(text || '').split('\n');
+  const lineHeight = 10;
+  const maxChars = lines.reduce((max, line) => Math.max(max, String(line).length), 0);
+  const boxWidth = Math.max(44, maxChars * 4.8 + 10);
+  const boxHeight = Math.max(14, lines.length * lineHeight + 6);
+  const boxX = anchor === 'start' ? x - 3 : anchor === 'end' ? x - boxWidth + 3 : x - boxWidth / 2;
+  const boxY = y - 8;
+
   return (
-    <text
-      x={x}
-      y={y}
-      fontSize="9"
-      fill={COLORS.text}
-      textAnchor={anchor}
-      fontFamily={BODY_FONT}
-      transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined}
-    >
-      {lines.map((line, index) => (
-        <tspan key={`${line}-${index}`} x={x} dy={index === 0 ? 0 : 10}>
-          {line}
-        </tspan>
-      ))}
-    </text>
+    <g>
+      {withBackground && (
+        <rect
+          x={boxX}
+          y={boxY}
+          width={boxWidth}
+          height={boxHeight}
+          fill="#ffffff"
+          fillOpacity="0.92"
+        />
+      )}
+      <text
+        x={x}
+        y={y}
+        fontSize="8"
+        fill={COLORS.text}
+        textAnchor={anchor}
+        fontFamily={BODY_FONT}
+        transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined}
+      >
+        {lines.map((line, index) => (
+          <tspan key={`${line}-${index}`} x={x} dy={index === 0 ? 0 : lineHeight}>
+            {line}
+          </tspan>
+        ))}
+      </text>
+    </g>
   );
 }
 
-function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffset = 10 }) {
+function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffset = 10, textY = null, textBackground = false }) {
   if (vertical) {
     const dimX = x1 + offset;
-    const midY = (y1 + y2) / 2;
+    const midY = textY ?? (y1 + y2) / 2;
     return (
       <g>
         <line x1={x1} y1={y1} x2={dimX} y2={y1} stroke={COLORS.extension} strokeWidth="0.5" />
         <line x1={x2} y1={y2} x2={dimX} y2={y2} stroke={COLORS.extension} strokeWidth="0.5" />
         <line x1={dimX} y1={y1} x2={dimX} y2={y2} stroke={COLORS.dimension} strokeWidth="0.7" />
-        <DimText x={dimX + textOffset} y={midY - 4} text={text} anchor="start" />
+        <DimText x={dimX + textOffset} y={midY - 4} text={text} anchor="start" withBackground={textBackground} />
       </g>
     );
   }
@@ -130,7 +149,7 @@ function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffse
       <line x1={x1} y1={y1} x2={x1} y2={dimY} stroke={COLORS.extension} strokeWidth="0.5" />
       <line x1={x2} y1={y2} x2={x2} y2={dimY} stroke={COLORS.extension} strokeWidth="0.5" />
       <line x1={x1} y1={dimY} x2={x2} y2={dimY} stroke={COLORS.dimension} strokeWidth="0.7" />
-      <DimText x={(x1 + x2) / 2} y={dimY - 6} text={text} />
+      <DimText x={(x1 + x2) / 2} y={dimY - 6} text={text} withBackground={textBackground} />
     </g>
   );
 }
@@ -665,66 +684,61 @@ export default function ScreenWallConstructionGraphic({
             y1={mapY(recess.yM)}
             x2={mapX(recess.xM + recess.widthM)}
             y2={mapY(recess.yM + recess.heightM)}
-            text={[`RECESS`, `HEIGHT`, fmtM(recess.heightM)]}
-            offset={48}
+            text={[`RECESS HEIGHT`, fmtM(recess.heightM)]}
+            offset={42}
             vertical
-            textOffset={8}
+            textOffset={6}
+            textY={mapY((recess.yM + recess.yM + recess.heightM) / 2)}
+            textBackground
           />
           <DimLine
             x1={mapX(screenInnerX + screenViewW)}
             y1={mapY(screenInnerBottom)}
             x2={mapX(screenInnerX + screenViewW)}
             y2={mapY(screenInnerTop)}
-            text={[`VIEWABLE`, `IMAGE`, `HEIGHT`, fmtM(screenViewH)]}
-            offset={96}
+            text={[`VIEWABLE IMAGE HEIGHT`, fmtM(screenViewH)]}
+            offset={78}
             vertical
-            textOffset={8}
+            textOffset={6}
+            textY={mapY((screenInnerBottom + screenInnerTop) / 2)}
+            textBackground
           />
           <DimLine
             x1={wallX + wallPxW}
             y1={mapY(0)}
             x2={wallX + wallPxW}
             y2={mapY(screenBottom)}
-            text={[`SCREEN`, `BOTTOM`, `HEIGHT`, fmtM(screenBottom)]}
-            offset={192}
+            text={[`SCREEN BOTTOM HEIGHT`, fmtM(screenBottom)]}
+            offset={204}
             vertical
-            textOffset={8}
+            textOffset={6}
+            textY={mapY(screenBottom / 2)}
+            textBackground
           />
           <DimLine
             x1={wallX + wallPxW}
             y1={mapY(0)}
             x2={wallX + wallPxW}
             y2={mapY(screenTop)}
-            text={[`SCREEN`, `TOP`, `HEIGHT`, fmtM(screenTop)]}
-            offset={144}
+            text={[`SCREEN TOP HEIGHT`, fmtM(screenTop)]}
+            offset={168}
             vertical
-            textOffset={8}
+            textOffset={6}
+            textY={mapY(screenTop / 2)}
+            textBackground
           />
-          <DimLine
-            x1={mapX(screenOuterX)}
-            y1={wallY + wallPxH}
-            x2={mapX(screenOuterX + screenOuterW)}
-            y2={wallY + wallPxH}
-            text={[`OVERALL SCREEN WIDTH`, fmtM(screenOuterW)]}
-            offset={78}
-          />
-          <DimLine
-            x1={mapX(screenInnerX)}
-            y1={wallY + wallPxH}
-            x2={mapX(screenInnerX + screenViewW)}
-            y2={wallY + wallPxH}
-            text={[`VIEWABLE IMAGE WIDTH`, fmtM(screenViewW)]}
-            offset={106}
-          />
+...
           <DimLine
             x1={mapX(screenOuterX + screenOuterW)}
             y1={mapY(screenOuterY)}
             x2={mapX(screenOuterX + screenOuterW)}
             y2={mapY(screenOuterTop)}
-            text={[`OVERALL`, `SCREEN`, `HEIGHT`, fmtM(screenOuterH)]}
-            offset={240}
+            text={[`OVERALL SCREEN HEIGHT`, fmtM(screenOuterH)]}
+            offset={114}
             vertical
-            textOffset={8}
+            textOffset={6}
+            textY={mapY((screenOuterY + screenOuterTop) / 2)}
+            textBackground
           />
 
           {drawnSpeakers.map((item) => {
@@ -767,23 +781,30 @@ export default function ScreenWallConstructionGraphic({
           {drawnSubs.map((item) => {
             const w = item.dims.widthM * scale;
             const h = item.dims.heightM * scale;
-            const subBottomZ = 0;
-            const subTopZ = item.dims.heightM;
             const x = mapX(item.xM) - w / 2;
-            const y = mapY(subTopZ);
+            const y = mapY(item.dims.heightM);
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>
-                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1.2" />
+                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1.1" />
                 <text
                   x={x + w / 2}
-                  y={y + h / 2}
+                  y={y + h / 2 - 5}
                   fontSize="8"
                   fill={COLORS.text}
                   textAnchor="middle"
-                  dominantBaseline="middle"
                   fontFamily={BODY_FONT}
                 >
                   {item.label}
+                </text>
+                <text
+                  x={x + w / 2}
+                  y={y + h / 2 + 7}
+                  fontSize="7"
+                  fill={COLORS.text}
+                  textAnchor="middle"
+                  fontFamily={BODY_FONT}
+                >
+                  {`${item.dims.widthM.toFixed(2)}m x ${item.dims.heightM.toFixed(3)}m`}
                 </text>
               </g>
             );
