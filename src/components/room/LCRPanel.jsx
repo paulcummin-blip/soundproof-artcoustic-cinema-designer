@@ -108,8 +108,15 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
     const list = Array.isArray(prev) ? prev : [];
     const by = buildRoleMap(list);
 
-    const LCR_ROLES_SET = new Set(['FL', 'FC', 'FR']);
-    const filtered = list.filter(s => !LCR_ROLES_SET.has(getCanonicalRole(s.role)));
+    const isCentreLike = (role) => {
+      const r = String(role || '').trim().toUpperCase();
+      return r === 'FC' || r === 'C' || r === 'CENTER' || r === 'CENTRE';
+    };
+    const LCR_ROLES_SET = new Set(['FL', 'FR']);
+    const filtered = list.filter(s => {
+      const canon = getCanonicalRole(s.role);
+      return !LCR_ROLES_SET.has(canon) && !isCentreLike(String(s.role || '').trim().toUpperCase());
+    });
 
     const roomW = Number(dimensions?.width ?? dimensions?.widthM) || 4.5;
     const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
