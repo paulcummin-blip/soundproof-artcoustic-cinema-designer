@@ -136,9 +136,10 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
 
     const soundbarLabel = soundbarModelLabel || null;
     const soundbarMeta = soundbarLabel ? resolveSoundbarMeta(soundbarLabel, screen) : null;
-    const soundbarOffsetM = Number(soundbarMeta?.placementOffsetFromScreenBottomMm || 0) / 1000;
     const soundbarHeightM = Number(soundbarMeta?.heightM) || 0;
-    const soundbarCenterZ = soundbarMeta ? Math.max(soundbarHeightM / 2, screenBottomM - soundbarOffsetM - (soundbarHeightM / 2)) : defaultZ;
+    const soundbarCenterZ = soundbarMeta
+      ? Math.max(soundbarHeightM / 2, screenBottomM - 0.02 - (soundbarHeightM / 2))
+      : defaultZ;
 
     if (frontStageMode === 'integrated_lcr' && soundbarLabel) {
       return [
