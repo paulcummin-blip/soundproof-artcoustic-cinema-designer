@@ -18,19 +18,19 @@ const COLORS = {
 };
 
 const SPEAKER_FALLBACKS = {
-  'evolve 2-1': { widthM: 0.2, heightM: 0.082, depthM: 0.082 },
-  'evolve 3-1': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  'evolve 4-2': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  'evolve 6-3': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  'evolve 8-4': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  'spitfire q4-3': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  'spitfire q6-3': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  'spitfire q4-5': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  'spitfire q8-5': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  q4-3: { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  q6-3: { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  q4-5: { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
-  q8-5: { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'evolve 2 1': { widthM: 0.2, heightM: 0.082, depthM: 0.082 },
+  'evolve 3 1': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'evolve 4 2': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'evolve 6 3': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'evolve 8 4': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'spitfire q4 3': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'spitfire q6 3': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'spitfire q4 5': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'spitfire q8 5': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'q4 3': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'q6 3': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'q4 5': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
+  'q8 5': { widthM: 0.27, heightM: 0.082, depthM: 0.082 },
 };
 
 const SUB_FALLBACKS = {
