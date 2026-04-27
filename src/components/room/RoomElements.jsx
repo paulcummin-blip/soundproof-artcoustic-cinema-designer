@@ -391,7 +391,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     <Input
                       type="number"
                       step="0.01"
-                      value={Number.isFinite(element?.pos_m) ? element.pos_m : 0}
+                      value={Number.isFinite(element?.pos_m) ? String(element.pos_m) : ''}
                       onChange={(e) => updateElement(element.id, 'pos_m', e.target.value)}
                       className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                     />
