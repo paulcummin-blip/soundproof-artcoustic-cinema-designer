@@ -527,6 +527,7 @@ export default function ScreenWallConstructionGraphic({
       .filter((item) => finite(item?.position?.x) && finite(item?.position?.z))
       .map((item) => ({
         role: String(item.role).toUpperCase(),
+        model: item.model,
         xM: Number(item.position.x),
         zM: Number(item.position.z),
         dims: resolveDims(item.model, SPEAKER_FALLBACKS, { widthM: 0.27, heightM: 0.082, depthM: 0.082 }),
