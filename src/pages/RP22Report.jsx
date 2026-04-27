@@ -823,7 +823,39 @@ function RP22ReportInner() {
         const { screenFrontPlaneY, screenBottomHeightM, screenTopHeightM, screenWidthM } = sightlineScreenMetrics;
         const aspectRatio = app?.screen?.aspectRatio || '16:9';
         return rowCentralSeats.map(seat => {
-...
+            const eyeY = seat.y;
+            const rowNum = seat.rowNumber || 1;
+            const defaultEarHeight = rowNum === 1 ? 1.2 : rowNum === 2 ? 1.5 : rowNum === 3 ? 1.8 : 1.2 + (rowNum - 1) * 0.3;
+            const eyeZ = Number.isFinite(seat.z) && seat.z !== 1.2 ? seat.z : defaultEarHeight;
+            const viewingDistanceM = Math.abs(eyeY - screenFrontPlaneY);
+            const rawHorizontalAngle = viewingDistanceM > 0
+                ? 2 * Math.atan((screenWidthM / 2) / viewingDistanceM) * (180 / Math.PI)
+                : 0;
+            const horizontalViewingAngleDeg = rp23DisplayAngleDeg(rawHorizontalAngle);
+            const verticalAngleToTopDeg = viewingDistanceM > 0 ? Math.atan2(screenTopHeightM - eyeZ, viewingDistanceM) * (180 / Math.PI) : 0;
+            const verticalAngleToBottomDeg = viewingDistanceM > 0 ? Math.atan2(screenBottomHeightM - eyeZ, viewingDistanceM) * (180 / Math.PI) : 0;
+            const totalVerticalAngleDeg = verticalAngleToTopDeg - verticalAngleToBottomDeg;
+            const seatHud = reportSeatHudById?.[seat.id];
+            const rp23 = seatHud?.rp23;
+            const complianceNote = rp23?.level
+                ? `RP23 H: ${rp23.formatted || `${horizontalViewingAngleDeg}°`} (${rp23.level})`
+                : '—';
+            return {
+                rowNumber: seat.rowNumber || 1,
+                seatId: seat.id,
+                eyeY,
+                eyeZ,
+                viewingDistanceM,
+                rawHorizontalAngle,
+                horizontalViewingAngleDeg,
+                verticalAngleToTopDeg,
+                verticalAngleToBottomDeg,
+                totalVerticalAngleDeg,
+                complianceNote,
+                rp23Level: rp23?.level ?? null,
+                rp23Formatted: rp23?.formatted ?? null,
+            };
+        });
     }, [canRenderSightlinePage, sightlineScreenMetrics, rowCentralSeats, app?.screen?.aspectRatio, reportSeatHudById]);
 
     const frontSubsResolvedForConstruction = React.useMemo(() => {
