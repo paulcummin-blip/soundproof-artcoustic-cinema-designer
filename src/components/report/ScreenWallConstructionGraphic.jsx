@@ -658,10 +658,10 @@ export default function ScreenWallConstructionGraphic({
 
           {drawnSpeakers.map((item) => {
             const modelKey = normalizeModelKey(item.model);
-            const isQ63 = modelKey === 'q6 3';
-            const isQ43 = modelKey === 'q4 3';
-            const isQ45 = modelKey === 'q4 5';
-            const isQ85 = modelKey === 'q8 5';
+            const isQ63 = modelKey.includes('q6 3');
+            const isQ43 = modelKey.includes('q4 3');
+            const isQ45 = modelKey.includes('q4 5');
+            const isQ85 = modelKey.includes('q8 5');
             const w = (isQ63 ? 0.28 : isQ43 ? 0.28 : isQ45 ? 0.5 : isQ85 ? 0.5 : item.dims.widthM) * scale;
             const h = (isQ63 ? 0.28 : isQ43 ? 0.21 : isQ45 ? 0.4 : isQ85 ? 0.6 : item.dims.heightM) * scale;
             const x = mapX(item.xM) - w / 2;
