@@ -1,18 +1,27 @@
 import React, { useMemo } from 'react';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 
+const HEADING_FONT = '"Futura PT Light", "Century Gothic", sans-serif';
+const BODY_FONT = '"Didact Gothic", "Century Gothic", sans-serif';
+
 const PAGE = {
   width: 1120,
-  height: 720,
-  margin: 36,
-  headerH: 56,
-  footerH: 54,
+  height: 794,
+  margin: 28,
+  headerH: 92,
+  footerH: 42,
 };
 
 const COLORS = {
   bg: '#ffffff',
-  line: '#111111',
-  light: '#b8b8b8',
+  border: '#111111',
+  wall: '#111111',
+  screen: '#111111',
+  viewable: '#8d8d8d',
+  recess: '#b7b7b7',
+  dimension: '#8b8b8b',
+  extension: '#d3d3d3',
+  speaker: '#111111',
   text: '#111111',
   muted: '#5f5f5f',
 };
@@ -80,35 +89,73 @@ function resolveDims(modelName, fallbackMap, defaultDims) {
   };
 }
 
-function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false }) {
+function DimText({ x, y, text, anchor = 'middle', rotate = null }) {
+  const lines = Array.isArray(text) ? text : String(text || '').split('\n');
+  return (
+    <text
+      x={x}
+      y={y}
+      fontSize="9"
+      fill={COLORS.text}
+      textAnchor={anchor}
+      fontFamily={BODY_FONT}
+      transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined}
+    >
+      {lines.map((line, index) => (
+        <tspan key={`${line}-${index}`} x={x} dy={index === 0 ? 0 : 10}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  );
+}
+
+function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffset = 10 }) {
   if (vertical) {
+    const dimX = x1 + offset;
+    const midY = (y1 + y2) / 2;
     return (
       <g>
-        <line x1={x1} y1={y1} x2={x1 + offset} y2={y1} stroke={COLORS.light} strokeWidth="1" />
-        <line x1={x2} y1={y2} x2={x2 + offset} y2={y2} stroke={COLORS.light} strokeWidth="1" />
-        <line x1={x1 + offset} y1={y1} x2={x2 + offset} y2={y2} stroke={COLORS.line} strokeWidth="1" />
-        <text
-          x={x1 + offset + 14}
-          y={(y1 + y2) / 2}
-          fontSize="11"
-          fill={COLORS.text}
-          transform={`rotate(90 ${x1 + offset + 14} ${(y1 + y2) / 2})`}
-          textAnchor="middle"
-        >
-          {text}
-        </text>
+        <line x1={x1} y1={y1} x2={dimX} y2={y1} stroke={COLORS.extension} strokeWidth="0.8" />
+        <line x1={x2} y1={y2} x2={dimX} y2={y2} stroke={COLORS.extension} strokeWidth="0.8" />
+        <line x1={dimX} y1={y1} x2={dimX} y2={y2} stroke={COLORS.dimension} strokeWidth="0.8" />
+        <DimText x={dimX + textOffset} y={midY - 4} text={text} anchor="start" />
       </g>
     );
   }
 
+  const dimY = y1 + offset;
   return (
     <g>
-      <line x1={x1} y1={y1} x2={x1} y2={y1 + offset} stroke={COLORS.light} strokeWidth="1" />
-      <line x1={x2} y1={y2} x2={x2} y2={y2 + offset} stroke={COLORS.light} strokeWidth="1" />
-      <line x1={x1} y1={y1 + offset} x2={x2} y2={y2 + offset} stroke={COLORS.line} strokeWidth="1" />
-      <text x={(x1 + x2) / 2} y={y1 + offset - 6} fontSize="11" fill={COLORS.text} textAnchor="middle">
-        {text}
-      </text>
+      <line x1={x1} y1={y1} x2={x1} y2={dimY} stroke={COLORS.extension} strokeWidth="0.8" />
+      <line x1={x2} y1={y2} x2={x2} y2={dimY} stroke={COLORS.extension} strokeWidth="0.8" />
+      <line x1={x1} y1={dimY} x2={x2} y2={dimY} stroke={COLORS.dimension} strokeWidth="0.8" />
+      <DimText x={(x1 + x2) / 2} y={dimY - 6} text={text} />
+    </g>
+  );
+}
+
+function Q63FaceIcon({ x, y, size }) {
+  const inset = size * 0.12;
+  const driverW = size * 0.28;
+  const driverH = size * 0.18;
+  const centerX = x + size / 2;
+  const upperY = y + size * 0.27;
+  const lowerY = y + size * 0.58;
+
+  return (
+    <g>
+      <rect x={x} y={y} width={size} height={size} fill="none" stroke={COLORS.speaker} strokeWidth="1" />
+      <rect x={x + inset} y={y + inset} width={size - inset * 2} height={size - inset * 2} rx={8} ry={8} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
+      <line x1={centerX} y1={y + inset + 6} x2={centerX} y2={y + size - inset - 6} stroke={COLORS.speaker} strokeWidth="0.9" />
+      <path d={`M ${centerX - driverW / 2} ${upperY + driverH / 2} Q ${centerX} ${upperY - driverH / 2} ${centerX + driverW / 2} ${upperY + driverH / 2}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
+      <path d={`M ${centerX - driverW / 2} ${upperY + driverH / 2} Q ${centerX} ${upperY + driverH * 1.25} ${centerX + driverW / 2} ${upperY + driverH / 2}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
+      <path d={`M ${centerX - driverW / 2} ${lowerY + driverH / 2} Q ${centerX} ${lowerY - driverH / 2} ${centerX + driverW / 2} ${lowerY + driverH / 2}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
+      <path d={`M ${centerX - driverW / 2} ${lowerY + driverH / 2} Q ${centerX} ${lowerY + driverH * 1.25} ${centerX + driverW / 2} ${lowerY + driverH / 2}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
+      <line x1={centerX - 8} y1={upperY + driverH / 2} x2={centerX + 8} y2={upperY + driverH / 2} stroke={COLORS.speaker} strokeWidth="0.8" />
+      <line x1={centerX - 8} y1={lowerY + driverH / 2} x2={centerX + 8} y2={lowerY + driverH / 2} stroke={COLORS.speaker} strokeWidth="0.8" />
+      <line x1={centerX - 4} y1={upperY + driverH / 2 - 6} x2={centerX + 4} y2={upperY + driverH / 2 - 6} stroke={COLORS.speaker} strokeWidth="0.8" />
+      <line x1={centerX - 4} y1={lowerY + driverH / 2 + 6} x2={centerX + 4} y2={lowerY + driverH / 2 + 6} stroke={COLORS.speaker} strokeWidth="0.8" />
     </g>
   );
 }
@@ -137,17 +184,10 @@ export default function ScreenWallConstructionGraphic({
   const screenTop = finite(screenTopHeightM) ? Number(screenTopHeightM) : screenBottom + screenOuterH;
 
   const drawingArea = {
-    x: PAGE.margin,
-    y: PAGE.margin + PAGE.headerH,
-    width: PAGE.width - PAGE.margin * 2,
-    height: 390,
-  };
-
-  const lowerArea = {
-    x: PAGE.margin,
-    y: drawingArea.y + drawingArea.height + 34,
-    width: PAGE.width - PAGE.margin * 2,
-    height: 150,
+    x: PAGE.margin + 74,
+    y: PAGE.margin + PAGE.headerH + 18,
+    width: PAGE.width - PAGE.margin * 2 - 168,
+    height: PAGE.height - PAGE.margin * 2 - PAGE.headerH - PAGE.footerH - 84,
   };
 
   const scale = Math.min(drawingArea.width / roomW, drawingArea.height / roomH);
@@ -196,27 +236,12 @@ export default function ScreenWallConstructionGraphic({
       }));
   }, [frontSubs]);
 
-  const chamberDepthM = useMemo(() => {
-    const depths = [
-      ...drawnSpeakers.map((item) => num(item?.dims?.depthM)),
-      ...drawnSubs.map((item) => num(item?.dims?.depthM)),
-    ].filter((value) => value > 0);
-    const deepest = depths.length ? Math.max(...depths) : 0;
-    return deepest + 0.02;
+  const speakerCenterDims = useMemo(() => {
+    const items = [...drawnSpeakers, ...drawnSubs]
+      .filter((item) => item.role === 'FC' || item.label === 'SUB 1' || item.label === 'SUB 2')
+      .sort((a, b) => a.xM - b.xM);
+    return items;
   }, [drawnSpeakers, drawnSubs]);
-
-  const iso = {
-    originX: lowerArea.x + 120,
-    originY: lowerArea.y + 108,
-    wallW: 170,
-    wallH: 88,
-    skewX: 66,
-    skewY: 40,
-    depthPx: Math.max(24, chamberDepthM * 240),
-  };
-
-  const screenPlaneOffset = 18;
-  const speakerPlaneOffset = iso.depthPx;
 
   return (
     <div className="bg-white text-black w-full print:block" style={{ background: '#fff' }}>
@@ -227,24 +252,28 @@ export default function ScreenWallConstructionGraphic({
         aria-label="Screen wall construction detail"
       >
         <rect x="0" y="0" width={PAGE.width} height={PAGE.height} fill={COLORS.bg} />
+        <rect x={PAGE.margin} y={PAGE.margin} width={PAGE.width - PAGE.margin * 2} height={PAGE.height - PAGE.margin * 2} fill="none" stroke={COLORS.border} strokeWidth="0.9" />
 
         <g>
-          <text x={PAGE.margin} y={PAGE.margin + 8} fontSize="22" fill={COLORS.text} fontWeight="600">
-            Screen Wall Construction Detail
+          <text x={PAGE.margin + 18} y={PAGE.margin + 26} fontSize="19" fill={COLORS.text} fontWeight="600" fontFamily={HEADING_FONT}>
+            SCREEN WALL CONSTRUCTION DETAIL
           </text>
-          <text x={PAGE.margin} y={PAGE.margin + 28} fontSize="11" fill={COLORS.muted}>
-            {projectName || 'Untitled Project'}
-            {clientName ? `  •  ${clientName}` : ''}
-          </text>
+          <line x1={PAGE.margin + 18} y1={PAGE.margin + 36} x2={PAGE.width - PAGE.margin - 18} y2={PAGE.margin + 36} stroke={COLORS.extension} strokeWidth="0.8" />
+          <text x={PAGE.margin + 18} y={PAGE.margin + 54} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Project</text>
+          <text x={PAGE.margin + 88} y={PAGE.margin + 54} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{projectName || 'Untitled Project'}</text>
+          <text x={PAGE.margin + 18} y={PAGE.margin + 70} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Client</text>
+          <text x={PAGE.margin + 88} y={PAGE.margin + 70} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{clientName || '—'}</text>
+          <text x={PAGE.width - PAGE.margin - 168} y={PAGE.margin + 54} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Drawing</text>
+          <text x={PAGE.width - PAGE.margin - 104} y={PAGE.margin + 54} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>SW-01</text>
+          <text x={PAGE.width - PAGE.margin - 168} y={PAGE.margin + 70} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Scale</text>
+          <text x={PAGE.width - PAGE.margin - 104} y={PAGE.margin + 70} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>Proportional</text>
         </g>
 
         <g>
-          <rect x={wallX} y={wallY} width={wallPxW} height={wallPxH} fill="none" stroke={COLORS.line} strokeWidth="1.2" />
-          <line x1={wallX} y1={wallY + wallPxH} x2={wallX + wallPxW} y2={wallY + wallPxH} stroke={COLORS.line} strokeWidth="1.2" />
-          <line x1={wallX} y1={wallY} x2={wallX + wallPxW} y2={wallY} stroke={COLORS.line} strokeWidth="1.2" />
+          <rect x={wallX} y={wallY} width={wallPxW} height={wallPxH} fill="none" stroke={COLORS.wall} strokeWidth="1.2" />
 
-          <DimLine x1={wallX} y1={wallY + wallPxH} x2={wallX + wallPxW} y2={wallY + wallPxH} text={`Room width ${fmtM(roomW)}`} offset={26} />
-          <DimLine x1={wallX} y1={wallY + wallPxH} x2={wallX} y2={wallY} text={`Room height ${fmtM(roomH)}`} offset={-28} vertical />
+          <DimLine x1={wallX} y1={wallY} x2={wallX + wallPxW} y2={wallY} text={[`ROOM WIDTH`, fmtM(roomW)]} offset={-26} />
+          <DimLine x1={wallX} y1={wallY + wallPxH} x2={wallX} y2={wallY} text={[`ROOM`, `HEIGHT`, fmtM(roomH)]} offset={-48} vertical textOffset={12} />
 
           <rect
             x={mapX(recess.xM)}
@@ -252,29 +281,9 @@ export default function ScreenWallConstructionGraphic({
             width={recess.widthM * scale}
             height={recess.heightM * scale}
             fill="none"
-            stroke={COLORS.light}
-            strokeWidth="1"
+            stroke={COLORS.recess}
+            strokeWidth="0.9"
             strokeDasharray="5 4"
-          />
-          <text x={mapX(recess.xM) + 6} y={mapY(recess.yM + recess.heightM) - 8} fontSize="11" fill={COLORS.muted}>
-            Sound chamber recess
-          </text>
-          <DimLine
-            x1={mapX(recess.xM)}
-            y1={mapY(recess.yM)}
-            x2={mapX(recess.xM + recess.widthM)}
-            y2={mapY(recess.yM)}
-            text={`Recess width ${fmtM(recess.widthM)}`}
-            offset={18}
-          />
-          <DimLine
-            x1={mapX(recess.xM + recess.widthM)}
-            y1={mapY(recess.yM)}
-            x2={mapX(recess.xM + recess.widthM)}
-            y2={mapY(recess.yM + recess.heightM)}
-            text={`Recess height ${fmtM(recess.heightM)}`}
-            offset={24}
-            vertical
           />
 
           <rect
@@ -283,8 +292,8 @@ export default function ScreenWallConstructionGraphic({
             width={screenOuterW * scale}
             height={screenOuterH * scale}
             fill="none"
-            stroke={COLORS.line}
-            strokeWidth="1.4"
+            stroke={COLORS.screen}
+            strokeWidth="1.1"
           />
           <rect
             x={mapX(screenInnerX)}
@@ -292,51 +301,66 @@ export default function ScreenWallConstructionGraphic({
             width={screenViewW * scale}
             height={screenViewH * scale}
             fill="none"
-            stroke={COLORS.light}
-            strokeWidth="1"
+            stroke={COLORS.viewable}
+            strokeWidth="0.9"
+            strokeDasharray="4 4"
           />
 
           <DimLine
-            x1={mapX(screenInnerX)}
-            y1={mapY(screenInnerY)}
-            x2={mapX(screenInnerX + screenViewW)}
-            y2={mapY(screenInnerY)}
-            text={`Viewable width ${fmtM(screenViewW)}`}
-            offset={-18}
+            x1={mapX(recess.xM + recess.widthM)}
+            y1={mapY(recess.yM)}
+            x2={mapX(recess.xM + recess.widthM)}
+            y2={mapY(recess.yM + recess.heightM)}
+            text={[`RECESS`, `HEIGHT`, fmtM(recess.heightM)]}
+            offset={44}
+            vertical
+            textOffset={10}
           />
           <DimLine
             x1={mapX(screenInnerX + screenViewW)}
             y1={mapY(screenInnerY)}
             x2={mapX(screenInnerX + screenViewW)}
             y2={mapY(screenInnerY + screenViewH)}
-            text={`Viewable height ${fmtM(screenViewH)}`}
-            offset={48}
+            text={[`IMAGE`, `HEIGHT`, fmtM(screenViewH)]}
+            offset={82}
             vertical
+            textOffset={10}
           />
           <DimLine
-            x1={wallX + wallPxW} y1={mapY(0)}
-            x2={wallX + wallPxW} y2={mapY(screenBottom)}
-            text={`Screen bottom ${fmtM(screenBottom)}`}
-            offset={68}
+            x1={wallX + wallPxW}
+            y1={mapY(0)}
+            x2={wallX + wallPxW}
+            y2={mapY(screenBottom)}
+            text={[`SCREEN`, `BOTTOM`, fmtM(screenBottom)]}
+            offset={118}
             vertical
+            textOffset={10}
           />
           <DimLine
-            x1={wallX + wallPxW} y1={mapY(0)}
-            x2={wallX + wallPxW} y2={mapY(screenTop)}
-            text={`Screen top ${fmtM(screenTop)}`}
-            offset={108}
+            x1={wallX + wallPxW}
+            y1={mapY(0)}
+            x2={wallX + wallPxW}
+            y2={mapY(screenTop)}
+            text={[`SCREEN`, `TOP`, fmtM(screenTop)]}
+            offset={156}
             vertical
+            textOffset={10}
           />
 
           {drawnSpeakers.map((item) => {
-            const w = item.dims.widthM * scale;
-            const h = item.dims.heightM * scale;
+            const isQ63 = normalizeModelKey(item.model) === 'q6 3';
+            const w = (isQ63 ? 0.28 : item.dims.widthM) * scale;
+            const h = (isQ63 ? 0.28 : item.dims.heightM) * scale;
             const x = mapX(item.xM) - w / 2;
             const y = mapY(item.zM) - h / 2;
             return (
               <g key={`${item.role}-${item.xM}-${item.zM}`}>
-                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.line} strokeWidth="1" />
-                <text x={x + w / 2} y={y - 6} fontSize="10" fill={COLORS.text} textAnchor="middle">
+                {isQ63 ? (
+                  <Q63FaceIcon x={x} y={y} size={w} />
+                ) : (
+                  <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1" />
+                )}
+                <text x={x + w / 2} y={y - 8} fontSize="9" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT}>
                   {item.role}
                 </text>
               </g>
@@ -350,108 +374,44 @@ export default function ScreenWallConstructionGraphic({
             const y = mapY(item.zM) - h / 2;
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>
-                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.line} strokeWidth="1" />
-                <text x={x + w / 2} y={y + h + 12} fontSize="10" fill={COLORS.text} textAnchor="middle">
+                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1" />
+                <text x={x + w / 2} y={y + h + 11} fontSize="8.5" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT}>
                   {item.label}
                 </text>
               </g>
             );
           })}
-        </g>
 
-        <g>
-          <text x={lowerArea.x} y={lowerArea.y - 10} fontSize="13" fill={COLORS.text} fontWeight="600">
-            45° construction view
-          </text>
-
-          <polygon
-            points={[
-              `${iso.originX},${iso.originY}`,
-              `${iso.originX + iso.wallW},${iso.originY}`,
-              `${iso.originX + iso.wallW},${iso.originY - iso.wallH}`,
-              `${iso.originX},${iso.originY - iso.wallH}`,
-            ].join(' ')}
-            fill="none"
-            stroke={COLORS.line}
-            strokeWidth="1.2"
-          />
-
-          <line
-            x1={iso.originX}
-            y1={iso.originY}
-            x2={iso.originX + iso.skewX}
-            y2={iso.originY - iso.skewY}
-            stroke={COLORS.line}
-            strokeWidth="1"
-          />
-          <line
-            x1={iso.originX + iso.wallW}
-            y1={iso.originY}
-            x2={iso.originX + iso.wallW + iso.skewX}
-            y2={iso.originY - iso.skewY}
-            stroke={COLORS.line}
-            strokeWidth="1"
-          />
-          <line
-            x1={iso.originX + iso.wallW}
-            y1={iso.originY - iso.wallH}
-            x2={iso.originX + iso.wallW + iso.skewX}
-            y2={iso.originY - iso.wallH - iso.skewY}
-            stroke={COLORS.line}
-            strokeWidth="1"
-          />
-
-          <line
-            x1={iso.originX + screenPlaneOffset}
-            y1={iso.originY - 10}
-            x2={iso.originX + screenPlaneOffset + iso.skewX}
-            y2={iso.originY - iso.skewY - 10}
-            stroke={COLORS.light}
-            strokeWidth="1"
-          />
-          <line
-            x1={iso.originX + speakerPlaneOffset}
-            y1={iso.originY - 22}
-            x2={iso.originX + speakerPlaneOffset + iso.skewX}
-            y2={iso.originY - iso.skewY - 22}
-            stroke={COLORS.line}
-            strokeWidth="1"
-          />
-
-          <text x={iso.originX + iso.skewX + 12} y={iso.originY - iso.skewY - 6} fontSize="10" fill={COLORS.muted}>
-            Front wall plane
-          </text>
-          <text x={iso.originX + screenPlaneOffset + iso.skewX + 12} y={iso.originY - iso.skewY - 18} fontSize="10" fill={COLORS.muted}>
-            Screen plane
-          </text>
-          <text x={iso.originX + speakerPlaneOffset + iso.skewX + 12} y={iso.originY - iso.skewY - 30} fontSize="10" fill={COLORS.text}>
-            Speaker/sub plane
-          </text>
-
-          <DimLine
-            x1={iso.originX + screenPlaneOffset}
-            y1={iso.originY + 28}
-            x2={iso.originX + speakerPlaneOffset}
-            y2={iso.originY + 28}
-            text={`Sound chamber depth ${fmtM(chamberDepthM)}`}
-            offset={0}
-          />
+          {speakerCenterDims.map((item, index) => {
+            const centerX = mapX(item.xM);
+            const baseY = wallY + wallPxH;
+            const offset = 30 + index * 26;
+            const label = item.role === 'FC' ? ['FC CTR', fmtM(item.xM)] : [item.label, fmtM(item.xM)];
+            return (
+              <DimLine
+                key={`${item.role || item.label}-center-dim`}
+                x1={wallX}
+                y1={baseY}
+                x2={centerX}
+                y2={baseY}
+                text={label}
+                offset={offset}
+              />
+            );
+          })}
         </g>
 
         <g>
           <line
-            x1={PAGE.margin}
-            y1={PAGE.height - PAGE.footerH}
-            x2={PAGE.width - PAGE.margin}
-            y2={PAGE.height - PAGE.footerH}
-            stroke={COLORS.light}
-            strokeWidth="1"
+            x1={PAGE.margin + 18}
+            y1={PAGE.height - PAGE.margin - PAGE.footerH}
+            x2={PAGE.width - PAGE.margin - 18}
+            y2={PAGE.height - PAGE.margin - PAGE.footerH}
+            stroke={COLORS.extension}
+            strokeWidth="0.8"
           />
-          <text x={PAGE.margin} y={PAGE.height - PAGE.footerH + 18} fontSize="10" fill={COLORS.muted}>
-            Construction drawing is generated from the current room, screen, speaker and subwoofer data. Re-check dimensions if product
-          </text>
-          <text x={PAGE.margin} y={PAGE.height - PAGE.footerH + 32} fontSize="10" fill={COLORS.muted}>
-            selection or mounting method changes.
+          <text x={PAGE.margin + 18} y={PAGE.height - PAGE.margin - PAGE.footerH + 14} fontSize="8.5" fill={COLORS.muted} fontFamily={BODY_FONT}>
+            Construction drawing is generated from the current room, screen, speaker and subwoofer data. Re-check dimensions if product selection or mounting method changes.
           </text>
         </g>
       </svg>
