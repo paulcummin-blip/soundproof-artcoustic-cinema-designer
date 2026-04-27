@@ -5,6 +5,8 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import optimiseSubwooferLayout from '@/components/room/bass/SubwooferOptimiser';
+import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 
 const placementModeLabels = {
   quarter: '1/4 Points',
@@ -58,6 +60,47 @@ function formatDestructiveNulls(destructiveNulls) {
     .slice(0, 3)
     .map((nullPoint) => `${nullPoint.frequency} Hz / ${nullPoint.depth} dB`)
     .join(', ');
+}
+
+function rectsOverlap(a, b) {
+  return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
+}
+
+function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
+  const lcrRoles = new Set(['FL', 'FC', 'FR', 'FCL', 'FCR']);
+  const lcrRects = (Array.isArray(speakers) ? speakers : [])
+    .filter((speaker) => lcrRoles.has(getCanonicalRole(speaker?.role)))
+    .map((speaker) => {
+      const x = Number(speaker?.position?.x);
+      const z = Number(speaker?.position?.z);
+      const meta = getSpeakerModelMeta(speaker?.model);
+      const width = Number(meta?.widthM);
+      const height = Number(meta?.heightM);
+      if (![x, z, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+      return { left: x - width / 2, right: x + width / 2, bottom: z - height / 2, top: z + height / 2 };
+    })
+    .filter(Boolean);
+
+  const frontSubRects = (Array.isArray(frontSubs) ? frontSubs : [])
+    .filter((sub) => sub?.group === 'front' || String(sub?.role || '').toUpperCase().startsWith('SUBF'))
+    .map((sub) => {
+      const x = Number.isFinite(Number(sub?.position?.x)) ? Number(sub.position.x) : Number(sub?.x);
+      const bottom = Number.isFinite(Number(sub?.bottomHeightM))
+        ? Number(sub.bottomHeightM)
+        : Number.isFinite(Number(frontSubsCfg?.bottomHeightM))
+          ? Number(frontSubsCfg.bottomHeightM)
+          : 0.05;
+      const model = sub?.model || frontSubsCfg?.model;
+      const meta = getSpeakerModelMeta(model);
+      const width = Number(meta?.widthM);
+      const height = Number(meta?.heightM);
+      if (![x, bottom, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+      return { left: x - width / 2, right: x + width / 2, bottom, top: bottom + height };
+    })
+    .filter(Boolean);
+
+  if (lcrRects.length === 0 || frontSubRects.length === 0) return false;
+  return lcrRects.some((lcrRect) => frontSubRects.some((subRect) => rectsOverlap(lcrRect, subRect)));
 }
 
 function isSameLayout(result, frontSubsCfg, rearSubsCfg) {
@@ -140,6 +183,11 @@ function applyRecommendedLayout(result, appState) {
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
+  const hasLcrSubClash = useMemo(() => hasFrontLcrSubClash({
+    speakers: appState?.speakerSystem?.placedSpeakers,
+    frontSubs: appState?.subwoofers,
+    frontSubsCfg,
+  }), [appState?.speakerSystem?.placedSpeakers, appState?.subwoofers, frontSubsCfg]);
 
   const recommendationState = useMemo(() => {
     const hasRoom = Number.isFinite(Number(roomDimensions?.widthM ?? roomDimensions?.width))
@@ -252,6 +300,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   }}
                   className="h-10 w-full bg-white border-[#DCDBD6]"
                 />
+                {hasLcrSubClash && (
+                  <p className="mt-1 text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+                )}
               </div>
               </div>
 

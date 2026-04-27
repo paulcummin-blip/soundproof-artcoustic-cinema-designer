@@ -54,6 +54,47 @@ function buildRoleMap(list) {
   return m;
 }
 
+function rectsOverlap(a, b) {
+  return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
+}
+
+function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
+  const lcrRoles = new Set(['FL', 'FC', 'FR', 'FCL', 'FCR']);
+  const lcrRects = (Array.isArray(speakers) ? speakers : [])
+    .filter((speaker) => lcrRoles.has(getCanonicalRole(speaker?.role)))
+    .map((speaker) => {
+      const x = Number(speaker?.position?.x);
+      const z = Number(speaker?.position?.z);
+      const meta = getSpeakerModelMeta(speaker?.model);
+      const width = Number(meta?.widthM);
+      const height = Number(meta?.heightM);
+      if (![x, z, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+      return { left: x - width / 2, right: x + width / 2, bottom: z - height / 2, top: z + height / 2 };
+    })
+    .filter(Boolean);
+
+  const frontSubRects = (Array.isArray(frontSubs) ? frontSubs : [])
+    .filter((sub) => sub?.group === 'front' || String(sub?.role || '').toUpperCase().startsWith('SUBF'))
+    .map((sub) => {
+      const x = Number.isFinite(Number(sub?.position?.x)) ? Number(sub.position.x) : Number(sub?.x);
+      const bottom = Number.isFinite(Number(sub?.bottomHeightM))
+        ? Number(sub.bottomHeightM)
+        : Number.isFinite(Number(frontSubsCfg?.bottomHeightM))
+          ? Number(frontSubsCfg.bottomHeightM)
+          : 0.05;
+      const model = sub?.model || frontSubsCfg?.model;
+      const meta = getSpeakerModelMeta(model);
+      const width = Number(meta?.widthM);
+      const height = Number(meta?.heightM);
+      if (![x, bottom, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+      return { left: x - width / 2, right: x + width / 2, bottom, top: bottom + height };
+    })
+    .filter(Boolean);
+
+  if (lcrRects.length === 0 || frontSubRects.length === 0) return false;
+  return lcrRects.some((lcrRect) => frontSubRects.some((subRect) => rectsOverlap(lcrRect, subRect)));
+}
+
 const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
 const INTEGRATED_LCR_SOUNDBAR_LABELS = ['Multi (LCR)', 'HSPL (LCR)'];
 
@@ -175,7 +216,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
 
 export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Update }) {
   const appState = useAppState();
-  const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions, screen } = appState || {};
+  const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions, screen, frontSubsCfg, subwoofers } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(['FL', 'FC', 'FR']), []);
@@ -218,6 +259,12 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const lastP12SentRef = useRef(null);
 
   // Compute P12 values at component scope so the effect can depend on them
+  const hasLcrSubClash = useMemo(() => hasFrontLcrSubClash({
+    speakers: speakerSystem?.placedSpeakers,
+    frontSubs: subwoofers,
+    frontSubsCfg,
+  }), [speakerSystem?.placedSpeakers, subwoofers, frontSubsCfg]);
+
   const p12Computed = useMemo(() => {
     if (!allSeatSplMetrics) return null;
     const mlpMetrics = allSeatSplMetrics.get('mlp');
@@ -504,6 +551,9 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
             m
           </span>
         </div>
+        {hasLcrSubClash && (
+          <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+        )}
       </div>
 
       <div className="space-y-2 mt-4">
