@@ -803,8 +803,8 @@ export default function ScreenWallConstructionGraphic({
           {drawnSubs.map((item) => {
             const w = item.dims.widthM * scale;
             const bottomM = Number.isFinite(item.bottomHeightM) ? item.bottomHeightM : 0.05;
-            const y = mapY(bottomM + item.dims.heightM);
             const h = item.dims.heightM * scale;
+            const y = mapY(bottomM) - h;
             const x = mapX(item.xM) - w / 2;
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>

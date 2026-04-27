@@ -191,7 +191,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
         role: 'FL',
         id: FL.id || 'FL-1',
         model: baseModelLabel,
-        position: FL.position || { x: midX - spread, y: defaultY, z: defaultZ },
+        position: { x: midX - spread, y: defaultY, z: defaultZ },
         rotation: FL.rotation || { x: 0, y: 0, z: 0 },
       },
       {
@@ -199,7 +199,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
         role: 'FC',
         id: FC.id || 'FC-1',
         model: baseModelLabel,
-        position: { ...(FC.position || { x: midX, y: defaultY, z: defaultZ }), z: defaultZ },
+        position: { x: midX, y: defaultY, z: defaultZ },
         rotation: FC.rotation || { x: 0, y: 0, z: 0 },
       },
       {
@@ -207,7 +207,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
         role: 'FR',
         id: FR.id || 'FR-1',
         model: baseModelLabel,
-        position: FR.position || { x: midX + spread, y: defaultY, z: defaultZ },
+        position: { x: midX + spread, y: defaultY, z: defaultZ },
         rotation: FR.rotation || { x: 0, y: 0, z: 0 },
       },
     ];
