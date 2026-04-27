@@ -524,11 +524,11 @@ export default function ScreenWallConstructionGraphic({
   const middleThirdTop = screenBottom + (screenViewH * 2) / 3;
 
   const recess = {
-    widthM: Math.max(0.1, screenOuterW - 0.15),
-    heightM: Math.max(0.1, screenOuterH - 0.15),
+    widthM: Math.max(0.1, screenOuterW - 0.2),
+    heightM: Math.max(0.1, screenOuterH - 0.2),
   };
-  recess.xM = (roomW - recess.widthM) / 2;
-  recess.yM = screenBottom + (screenOuterH - recess.heightM) / 2;
+  recess.xM = screenOuterX + (screenOuterW - recess.widthM) / 2;
+  recess.yM = screenOuterY + (screenOuterH - recess.heightM) / 2;
 
   const drawnSpeakers = useMemo(() => {
     const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
@@ -666,39 +666,39 @@ export default function ScreenWallConstructionGraphic({
             x2={mapX(recess.xM + recess.widthM)}
             y2={mapY(recess.yM + recess.heightM)}
             text={[`RECESS`, `HEIGHT`, fmtM(recess.heightM)]}
-            offset={64}
+            offset={48}
             vertical
-            textOffset={10}
+            textOffset={8}
           />
           <DimLine
             x1={mapX(screenInnerX + screenViewW)}
             y1={mapY(screenInnerBottom)}
             x2={mapX(screenInnerX + screenViewW)}
             y2={mapY(screenInnerTop)}
-            text={[`VIEWABLE IMAGE`, `HEIGHT`, fmtM(screenViewH)]}
-            offset={122}
+            text={[`VIEWABLE`, `IMAGE`, `HEIGHT`, fmtM(screenViewH)]}
+            offset={96}
             vertical
-            textOffset={10}
+            textOffset={8}
           />
           <DimLine
             x1={wallX + wallPxW}
             y1={mapY(0)}
             x2={wallX + wallPxW}
             y2={mapY(screenBottom)}
-            text={[`SCREEN`, `BOTTOM HEIGHT`, fmtM(screenBottom)]}
-            offset={176}
+            text={[`SCREEN`, `BOTTOM`, `HEIGHT`, fmtM(screenBottom)]}
+            offset={192}
             vertical
-            textOffset={10}
+            textOffset={8}
           />
           <DimLine
             x1={wallX + wallPxW}
             y1={mapY(0)}
             x2={wallX + wallPxW}
             y2={mapY(screenTop)}
-            text={[`SCREEN`, `TOP HEIGHT`, fmtM(screenTop)]}
-            offset={234}
+            text={[`SCREEN`, `TOP`, `HEIGHT`, fmtM(screenTop)]}
+            offset={144}
             vertical
-            textOffset={10}
+            textOffset={8}
           />
           <DimLine
             x1={mapX(screenOuterX)}
@@ -721,10 +721,10 @@ export default function ScreenWallConstructionGraphic({
             y1={mapY(screenOuterY)}
             x2={mapX(screenOuterX + screenOuterW)}
             y2={mapY(screenOuterTop)}
-            text={[`OVERALL SCREEN`, `HEIGHT`, fmtM(screenOuterH)]}
-            offset={292}
+            text={[`OVERALL`, `SCREEN`, `HEIGHT`, fmtM(screenOuterH)]}
+            offset={240}
             vertical
-            textOffset={10}
+            textOffset={8}
           />
 
           {drawnSpeakers.map((item) => {
