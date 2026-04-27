@@ -604,6 +604,17 @@ export default function ScreenWallConstructionGraphic({
       });
   }, [frontSubs]);
 
+  const sharedLcrZM = useMemo(() => {
+    const fl = drawnSpeakers.find(s => s.role === 'FL');
+    const fr = drawnSpeakers.find(s => s.role === 'FR');
+    const flZ = fl && Number.isFinite(fl.zM) ? fl.zM : null;
+    const frZ = fr && Number.isFinite(fr.zM) ? fr.zM : null;
+    if (flZ !== null && frZ !== null) return (flZ + frZ) / 2;
+    if (flZ !== null) return flZ;
+    if (frZ !== null) return frZ;
+    return null;
+  }, [drawnSpeakers]);
+
   const speakerCenterDims = useMemo(() => {
     const items = [...drawnSpeakers, ...drawnSubs]
       .filter((item) => item.role === 'FC' || item.label === 'SUB 1' || item.label === 'SUB 2')
@@ -786,7 +797,10 @@ export default function ScreenWallConstructionGraphic({
             const w = (isQ63 ? 0.28 : isQ43 ? 0.28 : isQ45 ? 0.5 : isQ85 ? 0.5 : item.dims.widthM) * scale;
             const h = (isQ63 ? 0.28 : isQ43 ? 0.21 : isQ45 ? 0.4 : isQ85 ? 0.6 : item.dims.heightM) * scale;
             const x = mapX(item.xM) - w / 2;
-            const y = mapY(item.zM) - h / 2;
+            const lcrDrawZM = ['FL', 'FC', 'FR'].includes(item.role) && sharedLcrZM !== null
+              ? sharedLcrZM
+              : item.zM;
+            const y = mapY(lcrDrawZM) - h / 2;
             return (
               <g key={`${item.role}-${item.xM}-${item.zM}`}>
                 {isQ63 ? (
