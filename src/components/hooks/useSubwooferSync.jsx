@@ -107,7 +107,10 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const dims = getModelDimsM?.(model) || {};
       const subHeight = Number(dims?.heightM);
       const resolvedSubHeight = Number.isFinite(subHeight) && subHeight > 0 ? subHeight : 0.50;
-      const bottom = cfg?.mountMode === 'wall' ? 0.80 : 0.10;
+      const rawBottom = Number(cfg?.bottomHeightM);
+      const bottom = Number.isFinite(rawBottom)
+        ? Math.max(0, Math.min(2.5, rawBottom))
+        : (cfg?.mountMode === 'wall' ? 0.80 : 0.05);
       const z = bottom + resolvedSubHeight / 2;
       const buildCount = qty;
       return Array.from({ length: buildCount }, (_, i) => {
@@ -124,6 +127,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
           id: `sub-${group}-${i + 1}`,
           role: group === 'front' ? `SUBF${i + 1}` : `SUBR${i + 1}`,
           group, model,
+          bottomHeightM: bottom,
           position: { x: finalX, y: yPinned, z }
         };
       });
@@ -140,11 +144,12 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const same = sameLen && prevList.every((p, i) => {
         const n = next[i];
         if (!p || !n) return false;
-        const px = Number(p?.position?.x), py = Number(p?.position?.y);
-        const nx = Number(n?.position?.x), ny = Number(n?.position?.y);
+        const px = Number(p?.position?.x), py = Number(p?.position?.y), pz = Number(p?.position?.z);
+        const nx = Number(n?.position?.x), ny = Number(n?.position?.y), nz = Number(n?.position?.z);
         const close = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < 0.001;
         return String(p.id) === String(n.id) && String(p.group) === String(n.group) &&
-          String(p.model) === String(n.model) && close(px, nx) && close(py, ny);
+          String(p.model) === String(n.model) && close(px, nx) && close(py, ny) && close(pz, nz) &&
+          close(Number(p.bottomHeightM), Number(n.bottomHeightM));
       });
       return same ? prevAll : next;
     });
@@ -152,7 +157,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
     appState?.setSubwoofers,
     appState?.roomDims?.widthM, appState?.roomDims?.lengthM,
     stableDimensions?.width, stableDimensions?.length,
-    frontSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.positions, frontSubsCfg?.placementMode, frontSubsCfg?.isManual, frontSubsCfg?.mountMode,
-    rearSubsCfg?.model, rearSubsCfg?.count, rearSubsCfg?.positions, rearSubsCfg?.placementMode, rearSubsCfg?.isManual, rearSubsCfg?.mountMode,
+    frontSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.positions, frontSubsCfg?.placementMode, frontSubsCfg?.isManual, frontSubsCfg?.mountMode, frontSubsCfg?.bottomHeightM,
+    rearSubsCfg?.model, rearSubsCfg?.count, rearSubsCfg?.positions, rearSubsCfg?.placementMode, rearSubsCfg?.isManual, rearSubsCfg?.mountMode, rearSubsCfg?.bottomHeightM,
   ]);
 }

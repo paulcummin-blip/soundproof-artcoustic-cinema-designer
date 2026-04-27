@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import optimiseSubwooferLayout from '@/components/room/bass/SubwooferOptimiser';
 
@@ -233,23 +234,24 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               </div>
 
               <div className="col-span-12 mt-2">
-                <label className="block text-[12px] text-[#625143] mb-1">Mount height</label>
-                <Select
-                  value={frontSubsCfg?.mountMode ?? "floor"}
-                  onValueChange={(mountMode) => {
-                    if (appState?.setFrontSubsCfg) {
-                      appState.setFrontSubsCfg(prev => ({ ...prev, mountMode }));
+                <label className="block text-[12px] text-[#625143] mb-1">Sub bottom height (m)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="2.5"
+                  step="0.01"
+                  value={frontSubsCfg?.bottomHeightM ?? (frontSubsCfg?.mountMode === "wall" ? 0.80 : 0.05)}
+                  onChange={(e) => {
+                    const raw = Number(e.target.value);
+                    if (Number.isFinite(raw) && appState?.setFrontSubsCfg) {
+                      appState.setFrontSubsCfg(prev => ({
+                        ...prev,
+                        bottomHeightM: Math.max(0, Math.min(2.5, raw))
+                      }));
                     }
                   }}
-                >
-                  <SelectTrigger className="h-10 w-full bg-white border-[#DCDBD6]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="floor">Floor mount — bottom 10 cm</SelectItem>
-                    <SelectItem value="wall">Wall mount — bottom 80 cm</SelectItem>
-                  </SelectContent>
-                </Select>
+                  className="h-10 w-full bg-white border-[#DCDBD6]"
+                />
               </div>
               </div>
 
@@ -375,23 +377,24 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               </div>
 
               <div className="col-span-12 mt-2">
-                <label className="block text-[12px] text-[#625143] mb-1">Mount height</label>
-                <Select
-                  value={rearSubsCfg?.mountMode ?? "floor"}
-                  onValueChange={(mountMode) => {
-                    if (appState?.setRearSubsCfg) {
-                      appState.setRearSubsCfg(prev => ({ ...prev, mountMode }));
+                <label className="block text-[12px] text-[#625143] mb-1">Sub bottom height (m)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="2.5"
+                  step="0.01"
+                  value={rearSubsCfg?.bottomHeightM ?? (rearSubsCfg?.mountMode === "wall" ? 0.80 : 0.05)}
+                  onChange={(e) => {
+                    const raw = Number(e.target.value);
+                    if (Number.isFinite(raw) && appState?.setRearSubsCfg) {
+                      appState.setRearSubsCfg(prev => ({
+                        ...prev,
+                        bottomHeightM: Math.max(0, Math.min(2.5, raw))
+                      }));
                     }
                   }}
-                >
-                  <SelectTrigger className="h-10 w-full bg-white border-[#DCDBD6]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="end">
-                    <SelectItem value="floor">Floor mount — bottom 10 cm</SelectItem>
-                    <SelectItem value="wall">Wall mount — bottom 80 cm</SelectItem>
-                  </SelectContent>
-                </Select>
+                  className="h-10 w-full bg-white border-[#DCDBD6]"
+                />
               </div>
               </div>
 
