@@ -548,18 +548,31 @@ export default function ScreenWallConstructionGraphic({
   recess.xM = screenOuterX + (screenOuterW - recess.widthM) / 2;
   recess.yM = screenOuterY + (screenOuterH - recess.heightM) / 2;
 
+  const canonicalScreenRole = (role) => {
+    const r = String(role || '').trim().toUpperCase();
+    if (r === 'C' || r === 'CENTER' || r === 'CENTRE') return 'FC';
+    if (r === 'L' || r === 'LEFT') return 'FL';
+    if (r === 'R' || r === 'RIGHT') return 'FR';
+    return r;
+  };
+
   const drawnSpeakers = useMemo(() => {
     const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-    return list
-      .filter((item) => ALLOWED_SPEAKER_ROLES.has(String(item?.role || '').toUpperCase()))
+    const roleMap = new Map();
+    list
       .filter((item) => finite(item?.position?.x) && finite(item?.position?.z))
-      .map((item) => ({
-        role: String(item.role).toUpperCase(),
-        model: item.model,
-        xM: Number(item.position.x),
-        zM: Number(item.position.z),
-        dims: resolveDims(item.model, SPEAKER_FALLBACKS, { widthM: 0.27, heightM: 0.082, depthM: 0.082 }),
-      }));
+      .forEach((item) => {
+        const canon = canonicalScreenRole(item?.role);
+        if (!ALLOWED_SPEAKER_ROLES.has(canon)) return;
+        roleMap.set(canon, {
+          role: canon,
+          model: item.model,
+          xM: Number(item.position.x),
+          zM: Number(item.position.z),
+          dims: resolveDims(item.model, SPEAKER_FALLBACKS, { widthM: 0.27, heightM: 0.082, depthM: 0.082 }),
+        });
+      });
+    return Array.from(roleMap.values());
   }, [placedSpeakers]);
 
   const drawnSubs = useMemo(() => {
@@ -878,32 +891,6 @@ export default function ScreenWallConstructionGraphic({
             <tspan x={PAGE.margin + 28} dy="11">middle third of the viewable image where practical.</tspan>
             <tspan x={PAGE.margin + 28} dy="11">Angle toward the RSP where mounting allows.</tspan>
           </text>
-
-          <rect
-            x={PAGE.width - PAGE.margin - 248}
-            y={PAGE.height - PAGE.margin - PAGE.footerH - 82}
-            width="230"
-            height="56"
-            fill="none"
-            stroke={COLORS.extension}
-            strokeWidth="0.5"
-          />
-          <text x={PAGE.width - PAGE.margin - 238} y={PAGE.height - PAGE.margin - PAGE.footerH - 68} fontSize="8" fill={COLORS.text} fontFamily={BODY_FONT}>
-            LEGEND
-          </text>
-          <g transform={`translate(${PAGE.width - PAGE.margin - 238} ${PAGE.height - PAGE.margin - PAGE.footerH - 52})`}>
-            <rect x="0" y="-5" width="10" height="10" fill="none" stroke={COLORS.speaker} strokeWidth="1" />
-            <text x="18" y="3" fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>Speaker</text>
-
-            <rect x="98" y="-4" width="16" height="8" fill="none" stroke={COLORS.speaker} strokeWidth="1.2" />
-            <text x="122" y="3" fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>Subwoofer</text>
-
-            <line x1="0" y1="18" x2="16" y2="18" stroke={COLORS.viewable} strokeWidth="0.8" strokeDasharray="4 4" />
-            <text x="24" y="21" fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>Viewable image</text>
-
-            <line x1="98" y1="18" x2="114" y2="18" stroke={COLORS.recess} strokeWidth="0.7" strokeDasharray="5 4" />
-            <text x="122" y="21" fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>Recess</text>
-          </g>
 
           <line
             x1={PAGE.margin + 18}
