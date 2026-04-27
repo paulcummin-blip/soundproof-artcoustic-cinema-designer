@@ -566,13 +566,26 @@ export default function ScreenWallConstructionGraphic({
   const drawnSubs = useMemo(() => {
     const list = Array.isArray(frontSubs) ? frontSubs : [];
     return list
-      .filter((item) => finite(item?.x) && finite(item?.z))
-      .map((item, index) => ({
-        label: `SUB ${index + 1}`,
-        xM: Number(item.x),
-        zM: Number(item.z),
-        dims: resolveDims(item.model, SUB_FALLBACKS, { widthM: 0.5, heightM: 0.255, depthM: 0.255 }),
-      }));
+      .filter((item) => {
+        const x = Number.isFinite(item?.x) ? item.x : item?.position?.x;
+        const z = Number.isFinite(item?.z) ? item.z : item?.position?.z;
+        return Number.isFinite(x) && Number.isFinite(z);
+      })
+      .map((item, index) => {
+        const x = Number.isFinite(item?.x) ? item.x : item?.position?.x;
+        const z = Number.isFinite(item?.z) ? item.z : item?.position?.z;
+
+        return {
+          label: `SUB ${index + 1}`,
+          xM: Number(x),
+          zM: Number(z),
+          dims: resolveDims(item.model, SUB_FALLBACKS, {
+            widthM: 0.6,
+            heightM: 0.255,
+            depthM: 0.255,
+          }),
+        };
+      });
   }, [frontSubs]);
 
   const speakerCenterDims = useMemo(() => {
@@ -599,9 +612,9 @@ export default function ScreenWallConstructionGraphic({
           </text>
           <line x1={PAGE.margin + 18} y1={PAGE.margin + 36} x2={PAGE.width - PAGE.margin - 18} y2={PAGE.margin + 36} stroke={COLORS.extension} strokeWidth="0.8" />
           <text x={PAGE.margin + 18} y={PAGE.margin + 54} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Project</text>
-          <text x={PAGE.margin + 88} y={PAGE.margin + 54} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{projectName || ''}</text>
+          <text x={PAGE.margin + 88} y={PAGE.margin + 54} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{projectName}</text>
           <text x={PAGE.margin + 18} y={PAGE.margin + 70} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Client</text>
-          <text x={PAGE.margin + 88} y={PAGE.margin + 70} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{clientName || ''}</text>
+          <text x={PAGE.margin + 88} y={PAGE.margin + 70} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>{clientName}</text>
           <text x={PAGE.width - PAGE.margin - 168} y={PAGE.margin + 54} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Drawing</text>
           <text x={PAGE.width - PAGE.margin - 104} y={PAGE.margin + 54} fontSize="10" fill={COLORS.text} fontFamily={BODY_FONT}>SW-01</text>
           <text x={PAGE.width - PAGE.margin - 168} y={PAGE.margin + 70} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Scale</text>
@@ -690,7 +703,7 @@ export default function ScreenWallConstructionGraphic({
             text={[`RECESS HEIGHT`, fmtM(recess.heightM)]}
             offset={48}
             vertical
-            textOffset={6}
+            textOffset={10}
             textY={mapY((recess.yM + recess.yM + recess.heightM) / 2)}
             textBackground
           />
@@ -700,9 +713,9 @@ export default function ScreenWallConstructionGraphic({
             x2={mapX(screenInnerX + screenViewW)}
             y2={mapY(screenInnerTop)}
             text={[`VIEWABLE IMAGE HEIGHT`, fmtM(screenViewH)]}
-            offset={86}
+            offset={88}
             vertical
-            textOffset={6}
+            textOffset={10}
             textY={mapY((screenInnerBottom + screenInnerTop) / 2)}
             textBackground
           />
@@ -712,9 +725,9 @@ export default function ScreenWallConstructionGraphic({
             x2={mapX(screenOuterX + screenOuterW)}
             y2={mapY(screenOuterTop)}
             text={[`OVERALL SCREEN HEIGHT`, fmtM(screenOuterH)]}
-            offset={124}
+            offset={128}
             vertical
-            textOffset={6}
+            textOffset={10}
             textY={mapY((screenOuterY + screenOuterTop) / 2)}
             textBackground
           />
@@ -724,9 +737,9 @@ export default function ScreenWallConstructionGraphic({
             x2={wallX + wallPxW}
             y2={mapY(screenTop)}
             text={[`SCREEN TOP HEIGHT`, fmtM(screenTop)]}
-            offset={162}
+            offset={188}
             vertical
-            textOffset={6}
+            textOffset={10}
             textY={mapY(screenTop / 2)}
             textBackground
           />
@@ -736,9 +749,9 @@ export default function ScreenWallConstructionGraphic({
             x2={wallX + wallPxW}
             y2={mapY(screenBottom)}
             text={[`SCREEN BOTTOM HEIGHT`, fmtM(screenBottom)]}
-            offset={200}
+            offset={228}
             vertical
-            textOffset={6}
+            textOffset={10}
             textY={mapY(screenBottom / 2)}
             textBackground
           />
@@ -752,7 +765,8 @@ export default function ScreenWallConstructionGraphic({
             const w = (isQ63 ? 0.28 : isQ43 ? 0.28 : isQ45 ? 0.5 : isQ85 ? 0.5 : item.dims.widthM) * scale;
             const h = (isQ63 ? 0.28 : isQ43 ? 0.21 : isQ45 ? 0.4 : isQ85 ? 0.6 : item.dims.heightM) * scale;
             const x = mapX(item.xM) - w / 2;
-            const y = mapY(item.zM) - h / 2;
+            const screenCentreZ = (screenBottom + screenTop) / 2;
+            const y = mapY(screenCentreZ) - h / 2;
             return (
               <g key={`${item.role}-${item.xM}-${item.zM}`}>
                 {isQ63 ? (
@@ -784,7 +798,7 @@ export default function ScreenWallConstructionGraphic({
             const w = item.dims.widthM * scale;
             const h = item.dims.heightM * scale;
             const x = mapX(item.xM) - w / 2;
-            const y = wallY + wallPxH - h;
+            const y = mapY(0) - h;
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>
                 <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1.1" />
