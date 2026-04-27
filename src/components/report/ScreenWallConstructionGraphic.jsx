@@ -508,10 +508,20 @@ export default function ScreenWallConstructionGraphic({
   const mapX = (xM) => wallX + xM * scale;
   const mapY = (zM) => wallY + wallPxH - zM * scale;
 
-  const screenOuterX = (roomW - screenOuterW) / 2;
-  const screenOuterY = screenBottom;
+  const borderX = Math.max(0, (screenOuterW - screenViewW) / 2);
+  const borderY = Math.max(0, (screenOuterH - screenViewH) / 2);
+
   const screenInnerX = (roomW - screenViewW) / 2;
-  const screenInnerY = (screenBottom + screenTop - screenViewH) / 2;
+  const screenInnerBottom = screenBottom;
+  const screenInnerTop = screenTop;
+  const screenInnerY = screenInnerBottom;
+
+  const screenOuterX = screenInnerX - borderX;
+  const screenOuterY = screenInnerBottom - borderY;
+  const screenOuterTop = screenInnerTop + borderY;
+
+  const middleThirdBottom = screenBottom + screenViewH / 3;
+  const middleThirdTop = screenBottom + (screenViewH * 2) / 3;
 
   const recess = {
     widthM: Math.max(0.1, screenOuterW - 0.15),
@@ -610,7 +620,7 @@ export default function ScreenWallConstructionGraphic({
 
           <rect
             x={mapX(screenOuterX)}
-            y={mapY(screenOuterY + screenOuterH)}
+            y={mapY(screenOuterTop)}
             width={screenOuterW * scale}
             height={screenOuterH * scale}
             fill="none"
@@ -619,7 +629,7 @@ export default function ScreenWallConstructionGraphic({
           />
           <rect
             x={mapX(screenInnerX)}
-            y={mapY(screenInnerY + screenViewH)}
+            y={mapY(screenInnerTop)}
             width={screenViewW * scale}
             height={screenViewH * scale}
             fill="none"
@@ -627,6 +637,28 @@ export default function ScreenWallConstructionGraphic({
             strokeWidth="0.8"
             strokeDasharray="4 4"
           />
+
+          <rect
+            x={mapX(screenInnerX)}
+            y={mapY(middleThirdTop)}
+            width={screenViewW * scale}
+            height={(middleThirdTop - middleThirdBottom) * scale}
+            fill="#111111"
+            fillOpacity="0.04"
+            stroke={COLORS.dimension}
+            strokeWidth="0.5"
+            strokeDasharray="3 3"
+          />
+          <text
+            x={mapX(screenInnerX + screenViewW / 2)}
+            y={mapY(middleThirdTop) - 8}
+            fontSize="8"
+            fill={COLORS.muted}
+            textAnchor="middle"
+            fontFamily={BODY_FONT}
+          >
+            Recommended screen speaker acoustic centre band
+          </text>
 
           <DimLine
             x1={mapX(recess.xM + recess.widthM)}
@@ -640,10 +672,10 @@ export default function ScreenWallConstructionGraphic({
           />
           <DimLine
             x1={mapX(screenInnerX + screenViewW)}
-            y1={mapY(screenInnerY)}
+            y1={mapY(screenInnerBottom)}
             x2={mapX(screenInnerX + screenViewW)}
-            y2={mapY(screenInnerY + screenViewH)}
-            text={[`IMAGE`, `HEIGHT`, fmtM(screenViewH)]}
+            y2={mapY(screenInnerTop)}
+            text={[`VIEWABLE IMAGE`, `HEIGHT`, fmtM(screenViewH)]}
             offset={122}
             vertical
             textOffset={10}
@@ -653,7 +685,7 @@ export default function ScreenWallConstructionGraphic({
             y1={mapY(0)}
             x2={wallX + wallPxW}
             y2={mapY(screenBottom)}
-            text={[`SCREEN`, `BOTTOM`, fmtM(screenBottom)]}
+            text={[`SCREEN`, `BOTTOM HEIGHT`, fmtM(screenBottom)]}
             offset={176}
             vertical
             textOffset={10}
@@ -663,8 +695,34 @@ export default function ScreenWallConstructionGraphic({
             y1={mapY(0)}
             x2={wallX + wallPxW}
             y2={mapY(screenTop)}
-            text={[`SCREEN`, `TOP`, fmtM(screenTop)]}
+            text={[`SCREEN`, `TOP HEIGHT`, fmtM(screenTop)]}
             offset={234}
+            vertical
+            textOffset={10}
+          />
+          <DimLine
+            x1={mapX(screenOuterX)}
+            y1={wallY + wallPxH}
+            x2={mapX(screenOuterX + screenOuterW)}
+            y2={wallY + wallPxH}
+            text={[`OVERALL SCREEN WIDTH`, fmtM(screenOuterW)]}
+            offset={78}
+          />
+          <DimLine
+            x1={mapX(screenInnerX)}
+            y1={wallY + wallPxH}
+            x2={mapX(screenInnerX + screenViewW)}
+            y2={wallY + wallPxH}
+            text={[`VIEWABLE IMAGE WIDTH`, fmtM(screenViewW)]}
+            offset={106}
+          />
+          <DimLine
+            x1={mapX(screenOuterX + screenOuterW)}
+            y1={mapY(screenOuterY)}
+            x2={mapX(screenOuterX + screenOuterW)}
+            y2={mapY(screenOuterTop)}
+            text={[`OVERALL SCREEN`, `HEIGHT`, fmtM(screenOuterH)]}
+            offset={292}
             vertical
             textOffset={10}
           />
@@ -709,8 +767,10 @@ export default function ScreenWallConstructionGraphic({
           {drawnSubs.map((item) => {
             const w = item.dims.widthM * scale;
             const h = item.dims.heightM * scale;
+            const subBottomZ = 0;
+            const subTopZ = item.dims.heightM;
             const x = mapX(item.xM) - w / 2;
-            const y = item.zM < 0.3 ? mapY(0) - h : mapY(item.zM) - h / 2;
+            const y = mapY(subTopZ);
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>
                 <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1.2" />
@@ -764,7 +824,9 @@ export default function ScreenWallConstructionGraphic({
           <text x={PAGE.margin + 28} y={PAGE.height - PAGE.margin - PAGE.footerH - 52} fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>
             <tspan x={PAGE.margin + 28} dy="0">All dimensions in metres</tspan>
             <tspan x={PAGE.margin + 28} dy="11">Speaker and sub positions based on design layout</tspan>
-            <tspan x={PAGE.margin + 28} dy="11">Final construction to be verified on site</tspan>
+            <tspan x={PAGE.margin + 28} dy="11">Screen speaker acoustic centres should sit within the</tspan>
+            <tspan x={PAGE.margin + 28} dy="11">middle third of the viewable image where practical.</tspan>
+            <tspan x={PAGE.margin + 28} dy="11">Angle toward the RSP where mounting allows.</tspan>
           </text>
 
           <rect
