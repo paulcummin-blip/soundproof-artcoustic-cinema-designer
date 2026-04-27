@@ -507,6 +507,15 @@ function RP22ReportInner() {
 
     const primarySeatingPosition = app?.mlp || null;
 
+    const reportMlpAnchorEffective = React.useMemo(() => {
+        const cx = stableDimensions.width / 2;
+        const mlpY = app?.mlpY_m;
+        if (Number.isFinite(mlpY)) {
+            return { x: cx, y: mlpY, z: 1.2 };
+        }
+        return app?.mlp || null;
+    }, [app?.mlpY_m, stableDimensions.width, app?.mlp]);
+
     const rspSeatId = React.useMemo(() => {
         const greenDot = app?.mlp;
         if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
@@ -585,7 +594,7 @@ function RP22ReportInner() {
         sevenBedLayoutType: app?.sevenBedLayoutType,
         extraSurroundCount: app?.extraSurroundCount,
         seatSplMetrics: allSeatSplMetrics,
-        mlpPointOverride: app?.mlp,
+        mlpPointOverride: reportMlpAnchorEffective,
         overheadState: { globalModel: app?.overheadGlobalModel, frontOverride: app?.overheadFrontOverride, midOverride: app?.overheadMidOverride, rearOverride: app?.overheadRearOverride, useFrontGlobal: app?.useFrontGlobal ?? true, useMidGlobal: app?.useMidGlobal ?? true, useRearGlobal: app?.useRearGlobal ?? true, aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
         aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
         p15ConstructionLevel: app?.p15ConstructionLevel,
