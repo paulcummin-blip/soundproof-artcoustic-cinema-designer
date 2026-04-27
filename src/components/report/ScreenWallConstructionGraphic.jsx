@@ -669,7 +669,14 @@ export default function ScreenWallConstructionGraphic({
             return (
               <g key={`${item.role}-${item.xM}-${item.zM}`}>
                 {isQ63 ? (
-                  <Q63FaceIcon x={x} y={y} size={w} />
+                  <image
+                    href="https://media.base44.com/images/public/69624f294dc304ed40a57ee1/0e8cd191b_Screenshot2026-04-27at165517.png"
+                    x={x}
+                    y={y}
+                    width={w}
+                    height={h}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
                 ) : isQ43 ? (
                   <Q43FaceIcon x={x} y={y} width={w} height={h} />
                 ) : isQ45 ? (
