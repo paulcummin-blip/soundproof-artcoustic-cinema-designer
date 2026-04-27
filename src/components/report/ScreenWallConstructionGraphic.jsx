@@ -116,9 +116,9 @@ function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffse
     const midY = (y1 + y2) / 2;
     return (
       <g>
-        <line x1={x1} y1={y1} x2={dimX} y2={y1} stroke={COLORS.extension} strokeWidth="0.8" />
-        <line x1={x2} y1={y2} x2={dimX} y2={y2} stroke={COLORS.extension} strokeWidth="0.8" />
-        <line x1={dimX} y1={y1} x2={dimX} y2={y2} stroke={COLORS.dimension} strokeWidth="0.8" />
+        <line x1={x1} y1={y1} x2={dimX} y2={y1} stroke={COLORS.extension} strokeWidth="0.5" />
+        <line x1={x2} y1={y2} x2={dimX} y2={y2} stroke={COLORS.extension} strokeWidth="0.5" />
+        <line x1={dimX} y1={y1} x2={dimX} y2={y2} stroke={COLORS.dimension} strokeWidth="0.7" />
         <DimText x={dimX + textOffset} y={midY - 4} text={text} anchor="start" />
       </g>
     );
@@ -127,9 +127,9 @@ function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffse
   const dimY = y1 + offset;
   return (
     <g>
-      <line x1={x1} y1={y1} x2={x1} y2={dimY} stroke={COLORS.extension} strokeWidth="0.8" />
-      <line x1={x2} y1={y2} x2={x2} y2={dimY} stroke={COLORS.extension} strokeWidth="0.8" />
-      <line x1={x1} y1={dimY} x2={x2} y2={dimY} stroke={COLORS.dimension} strokeWidth="0.8" />
+      <line x1={x1} y1={y1} x2={x1} y2={dimY} stroke={COLORS.extension} strokeWidth="0.5" />
+      <line x1={x2} y1={y2} x2={x2} y2={dimY} stroke={COLORS.extension} strokeWidth="0.5" />
+      <line x1={x1} y1={dimY} x2={x2} y2={dimY} stroke={COLORS.dimension} strokeWidth="0.7" />
       <DimText x={(x1 + x2) / 2} y={dimY - 6} text={text} />
     </g>
   );
@@ -493,10 +493,10 @@ export default function ScreenWallConstructionGraphic({
   const screenTop = finite(screenTopHeightM) ? Number(screenTopHeightM) : screenBottom + screenOuterH;
 
   const drawingArea = {
-    x: PAGE.margin + 74,
-    y: PAGE.margin + PAGE.headerH + 18,
-    width: PAGE.width - PAGE.margin * 2 - 168,
-    height: PAGE.height - PAGE.margin * 2 - PAGE.headerH - PAGE.footerH - 84,
+    x: PAGE.margin + 56,
+    y: PAGE.margin + PAGE.headerH + 34,
+    width: PAGE.width - PAGE.margin * 2 - 128,
+    height: PAGE.height - PAGE.margin * 2 - PAGE.headerH - PAGE.footerH - 176,
   };
 
   const scale = Math.min(drawingArea.width / roomW, drawingArea.height / roomH);
@@ -580,10 +580,22 @@ export default function ScreenWallConstructionGraphic({
         </g>
 
         <g>
-          <rect x={wallX} y={wallY} width={wallPxW} height={wallPxH} fill="none" stroke={COLORS.wall} strokeWidth="1.2" />
+          <text
+            x={wallX + wallPxW / 2}
+            y={wallY - 56}
+            fontSize="10"
+            fill={COLORS.muted}
+            textAnchor="middle"
+            fontFamily={BODY_FONT}
+            letterSpacing="1.2"
+          >
+            FRONT ELEVATION
+          </text>
 
-          <DimLine x1={wallX} y1={wallY} x2={wallX + wallPxW} y2={wallY} text={[`ROOM WIDTH`, fmtM(roomW)]} offset={-26} />
-          <DimLine x1={wallX} y1={wallY + wallPxH} x2={wallX} y2={wallY} text={[`ROOM`, `HEIGHT`, fmtM(roomH)]} offset={-48} vertical textOffset={12} />
+          <rect x={wallX} y={wallY} width={wallPxW} height={wallPxH} fill="none" stroke={COLORS.wall} strokeWidth="1.4" />
+
+          <DimLine x1={wallX} y1={wallY} x2={wallX + wallPxW} y2={wallY} text={[`ROOM WIDTH`, fmtM(roomW)]} offset={-40} />
+          <DimLine x1={wallX} y1={wallY + wallPxH} x2={wallX} y2={wallY} text={[`ROOM`, `HEIGHT`, fmtM(roomH)]} offset={-70} vertical textOffset={12} />
 
           <rect
             x={mapX(recess.xM)}
@@ -592,7 +604,7 @@ export default function ScreenWallConstructionGraphic({
             height={recess.heightM * scale}
             fill="none"
             stroke={COLORS.recess}
-            strokeWidth="0.9"
+            strokeWidth="0.7"
             strokeDasharray="5 4"
           />
 
@@ -603,7 +615,7 @@ export default function ScreenWallConstructionGraphic({
             height={screenOuterH * scale}
             fill="none"
             stroke={COLORS.screen}
-            strokeWidth="1.1"
+            strokeWidth="1.2"
           />
           <rect
             x={mapX(screenInnerX)}
@@ -612,7 +624,7 @@ export default function ScreenWallConstructionGraphic({
             height={screenViewH * scale}
             fill="none"
             stroke={COLORS.viewable}
-            strokeWidth="0.9"
+            strokeWidth="0.8"
             strokeDasharray="4 4"
           />
 
@@ -622,7 +634,7 @@ export default function ScreenWallConstructionGraphic({
             x2={mapX(recess.xM + recess.widthM)}
             y2={mapY(recess.yM + recess.heightM)}
             text={[`RECESS`, `HEIGHT`, fmtM(recess.heightM)]}
-            offset={44}
+            offset={64}
             vertical
             textOffset={10}
           />
@@ -632,7 +644,7 @@ export default function ScreenWallConstructionGraphic({
             x2={mapX(screenInnerX + screenViewW)}
             y2={mapY(screenInnerY + screenViewH)}
             text={[`IMAGE`, `HEIGHT`, fmtM(screenViewH)]}
-            offset={82}
+            offset={122}
             vertical
             textOffset={10}
           />
@@ -642,7 +654,7 @@ export default function ScreenWallConstructionGraphic({
             x2={wallX + wallPxW}
             y2={mapY(screenBottom)}
             text={[`SCREEN`, `BOTTOM`, fmtM(screenBottom)]}
-            offset={118}
+            offset={176}
             vertical
             textOffset={10}
           />
@@ -652,7 +664,7 @@ export default function ScreenWallConstructionGraphic({
             x2={wallX + wallPxW}
             y2={mapY(screenTop)}
             text={[`SCREEN`, `TOP`, fmtM(screenTop)]}
-            offset={156}
+            offset={234}
             vertical
             textOffset={10}
           />
@@ -687,7 +699,7 @@ export default function ScreenWallConstructionGraphic({
                 ) : (
                   <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1" />
                 )}
-                <text x={x + w / 2} y={y - 8} fontSize="9" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT}>
+                <text x={x + w / 2} y={y - 10} fontSize="8.5" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT}>
                   {item.role}
                 </text>
               </g>
@@ -698,11 +710,19 @@ export default function ScreenWallConstructionGraphic({
             const w = item.dims.widthM * scale;
             const h = item.dims.heightM * scale;
             const x = mapX(item.xM) - w / 2;
-            const y = mapY(item.zM) - h / 2;
+            const y = item.zM < 0.3 ? mapY(0) - h : mapY(item.zM) - h / 2;
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>
-                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1" />
-                <text x={x + w / 2} y={y + h + 11} fontSize="8.5" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT}>
+                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1.2" />
+                <text
+                  x={x + w / 2}
+                  y={y + h / 2}
+                  fontSize="8"
+                  fill={COLORS.text}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontFamily={BODY_FONT}
+                >
                   {item.label}
                 </text>
               </g>
@@ -712,7 +732,7 @@ export default function ScreenWallConstructionGraphic({
           {speakerCenterDims.map((item, index) => {
             const centerX = mapX(item.xM);
             const baseY = wallY + wallPxH;
-            const offset = 30 + index * 26;
+            const offset = 50 + index * 26;
             const label = item.role === 'FC' ? ['FC CTR', fmtM(item.xM)] : [item.label, fmtM(item.xM)];
             return (
               <DimLine
@@ -729,6 +749,50 @@ export default function ScreenWallConstructionGraphic({
         </g>
 
         <g>
+          <rect
+            x={PAGE.margin + 18}
+            y={PAGE.height - PAGE.margin - PAGE.footerH - 82}
+            width="250"
+            height="56"
+            fill="none"
+            stroke={COLORS.extension}
+            strokeWidth="0.5"
+          />
+          <text x={PAGE.margin + 28} y={PAGE.height - PAGE.margin - PAGE.footerH - 68} fontSize="8" fill={COLORS.text} fontFamily={BODY_FONT}>
+            NOTES
+          </text>
+          <text x={PAGE.margin + 28} y={PAGE.height - PAGE.margin - PAGE.footerH - 52} fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>
+            <tspan x={PAGE.margin + 28} dy="0">All dimensions in metres</tspan>
+            <tspan x={PAGE.margin + 28} dy="11">Speaker and sub positions based on design layout</tspan>
+            <tspan x={PAGE.margin + 28} dy="11">Final construction to be verified on site</tspan>
+          </text>
+
+          <rect
+            x={PAGE.width - PAGE.margin - 248}
+            y={PAGE.height - PAGE.margin - PAGE.footerH - 82}
+            width="230"
+            height="56"
+            fill="none"
+            stroke={COLORS.extension}
+            strokeWidth="0.5"
+          />
+          <text x={PAGE.width - PAGE.margin - 238} y={PAGE.height - PAGE.margin - PAGE.footerH - 68} fontSize="8" fill={COLORS.text} fontFamily={BODY_FONT}>
+            LEGEND
+          </text>
+          <g transform={`translate(${PAGE.width - PAGE.margin - 238} ${PAGE.height - PAGE.margin - PAGE.footerH - 52})`}>
+            <rect x="0" y="-5" width="10" height="10" fill="none" stroke={COLORS.speaker} strokeWidth="1" />
+            <text x="18" y="3" fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>Speaker</text>
+
+            <rect x="98" y="-4" width="16" height="8" fill="none" stroke={COLORS.speaker} strokeWidth="1.2" />
+            <text x="122" y="3" fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>Subwoofer</text>
+
+            <line x1="0" y1="18" x2="16" y2="18" stroke={COLORS.viewable} strokeWidth="0.8" strokeDasharray="4 4" />
+            <text x="24" y="21" fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>Viewable image</text>
+
+            <line x1="98" y1="18" x2="114" y2="18" stroke={COLORS.recess} strokeWidth="0.7" strokeDasharray="5 4" />
+            <text x="122" y="21" fontSize="8" fill={COLORS.muted} fontFamily={BODY_FONT}>Recess</text>
+          </g>
+
           <line
             x1={PAGE.margin + 18}
             y1={PAGE.height - PAGE.margin - PAGE.footerH}
