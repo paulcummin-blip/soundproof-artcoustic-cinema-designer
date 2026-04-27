@@ -29,6 +29,7 @@ import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
+import ScreenWallConstructionGraphic from '../components/report/ScreenWallConstructionGraphic';
 import { fovForDistance } from '../components/utils/screenMetrics';
 import { getLevelColors } from '../components/utils/rp22Colors';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
@@ -822,41 +823,13 @@ function RP22ReportInner() {
         const { screenFrontPlaneY, screenBottomHeightM, screenTopHeightM, screenWidthM } = sightlineScreenMetrics;
         const aspectRatio = app?.screen?.aspectRatio || '16:9';
         return rowCentralSeats.map(seat => {
-            const eyeY = seat.y;
-            const rowNum = seat.rowNumber || 1;
-            // Use per-row ear heights matching SeatingLayout's getEarHeightForRow defaults.
-            // seat.z defaults to 1.2 for every row, so we apply the intended staggered heights here.
-            const defaultEarHeight = rowNum === 1 ? 1.2 : rowNum === 2 ? 1.5 : rowNum === 3 ? 1.8 : 1.2 + (rowNum - 1) * 0.3;
-            const eyeZ = Number.isFinite(seat.z) && seat.z !== 1.2 ? seat.z : defaultEarHeight;
-            const viewingDistanceM = Math.abs(eyeY - screenFrontPlaneY);
-            const rawHorizontalAngle = viewingDistanceM > 0
-                ? 2 * Math.atan((screenWidthM / 2) / viewingDistanceM) * (180 / Math.PI)
-                : 0;
-            const horizontalViewingAngleDeg = rp23DisplayAngleDeg(rawHorizontalAngle);
-            const verticalAngleToTopDeg    = viewingDistanceM > 0 ? Math.atan2(screenTopHeightM    - eyeZ, viewingDistanceM) * (180 / Math.PI) : 0;
-            const verticalAngleToBottomDeg = viewingDistanceM > 0 ? Math.atan2(screenBottomHeightM - eyeZ, viewingDistanceM) * (180 / Math.PI) : 0;
-            const totalVerticalAngleDeg    = verticalAngleToTopDeg - verticalAngleToBottomDeg;
-            const seatHud = reportSeatHudById?.[seat.id];
-            const rp23 = seatHud?.rp23;
-            const complianceNote = rp23?.level
-                ? `RP23 H: ${rp23.formatted || `${horizontalViewingAngleDeg}°`} (${rp23.level})`
-                : '—';
-            return {
-                rowNumber: seat.rowNumber || 1,
-                seatId:    seat.id,
-                eyeY, eyeZ,
-                viewingDistanceM,
-                rawHorizontalAngle,
-                horizontalViewingAngleDeg,
-                verticalAngleToTopDeg,
-                verticalAngleToBottomDeg,
-                totalVerticalAngleDeg,
-                complianceNote,
-                rp23Level: rp23?.level ?? null,
-                rp23Formatted: rp23?.formatted ?? null,
-            };
-        });
+...
     }, [canRenderSightlinePage, sightlineScreenMetrics, rowCentralSeats, app?.screen?.aspectRatio, reportSeatHudById]);
+
+    const frontSubsResolvedForConstruction = React.useMemo(() => {
+        return deriveSubwoofersFromCfg(frontSubsCfg, rearSubsCfg, roomDims, stableDimensions)
+            .filter(sub => sub?.group === 'front');
+    }, [frontSubsCfg, rearSubsCfg, roomDims, stableDimensions]);
     // ── end sightline data ───────────────────────────────────────────────────
 
     const systemSummary = React.useMemo(() => {
@@ -1468,6 +1441,27 @@ function RP22ReportInner() {
                             </section>
                         )}
 
+                        {canRenderSightlinePage && sightlineScreenMetrics && Number.isFinite(stableDimensions.width) && Number.isFinite(stableDimensions.height) && (
+                            <section id="pdf-screen-wall-construction" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                <ScreenWallConstructionGraphic
+                                    projectName={app?.projectName || ''}
+                                    clientName={app?.clientName || ''}
+                                    roomWidthM={stableDimensions.width}
+                                    roomHeightM={stableDimensions.height}
+                                    screenWidthM={sightlineScreenMetrics.screenWidthM}
+                                    screenHeightM={sightlineScreenMetrics.screenHeightM}
+                                    screenTotalWidthM={sightlineScreenMetrics.screenTotalWidthM}
+                                    screenTotalHeightM={sightlineScreenMetrics.screenTotalHeightM}
+                                    screenBottomHeightM={sightlineScreenMetrics.screenBottomHeightM}
+                                    screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
+                                    placedSpeakers={placedSpeakers}
+                                    frontSubsCfg={frontSubsCfg}
+                                    rearSubsCfg={rearSubsCfg}
+                                    frontSubs={frontSubsResolvedForConstruction}
+                                    rearSubs={[]}
+                                />
+                            </section>
+                        )}
 
                     </div>
                 </div>
