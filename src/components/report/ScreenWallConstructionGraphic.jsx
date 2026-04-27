@@ -99,7 +99,7 @@ function DimText({ x, y, text, anchor = 'middle', rotate = null, withBackground 
   const boxY = y - 8;
 
   return (
-    <g>
+    <g transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined}>
       {withBackground && (
         <rect
           x={boxX}
@@ -117,7 +117,6 @@ function DimText({ x, y, text, anchor = 'middle', rotate = null, withBackground 
         fill={COLORS.text}
         textAnchor={anchor}
         fontFamily={BODY_FONT}
-        transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined}
       >
         {lines.map((line, index) => (
           <tspan key={`${line}-${index}`} x={x} dy={index === 0 ? 0 : lineHeight}>
@@ -129,7 +128,7 @@ function DimText({ x, y, text, anchor = 'middle', rotate = null, withBackground 
   );
 }
 
-function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffset = 10, textY = null, textBackground = false }) {
+function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffset = 10, textY = null, textBackground = false, textRotate = null }) {
   if (vertical) {
     const dimX = x1 + offset;
     const midY = textY ?? (y1 + y2) / 2;
@@ -138,7 +137,7 @@ function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffse
         <line x1={x1} y1={y1} x2={dimX} y2={y1} stroke={COLORS.extension} strokeWidth="0.5" />
         <line x1={x2} y1={y2} x2={dimX} y2={y2} stroke={COLORS.extension} strokeWidth="0.5" />
         <line x1={dimX} y1={y1} x2={dimX} y2={y2} stroke={COLORS.dimension} strokeWidth="0.7" />
-        <DimText x={dimX + textOffset} y={midY - 4} text={text} anchor="start" withBackground={textBackground} />
+        <DimText x={dimX + textOffset} y={midY - 4} text={text} anchor="start" rotate={textRotate} withBackground={textBackground} />
       </g>
     );
   }
@@ -575,10 +574,13 @@ export default function ScreenWallConstructionGraphic({
         const x = Number.isFinite(item?.x) ? item.x : item?.position?.x;
         const z = Number.isFinite(item?.z) ? item.z : item?.position?.z;
 
+        const bottomHeightM = Number(item?.bottomHeightM);
+
         return {
           label: `SUB ${index + 1}`,
           xM: Number(x),
           zM: Number(z),
+          bottomHeightM: Number.isFinite(bottomHeightM) ? bottomHeightM : 0.05,
           dims: resolveDims(item.model, SUB_FALLBACKS, {
             widthM: 0.6,
             heightM: 0.255,
@@ -705,6 +707,7 @@ export default function ScreenWallConstructionGraphic({
             vertical
             textOffset={10}
             textY={mapY((recess.yM + recess.yM + recess.heightM) / 2)}
+            textRotate={-90}
             textBackground
           />
           <DimLine
@@ -717,6 +720,7 @@ export default function ScreenWallConstructionGraphic({
             vertical
             textOffset={10}
             textY={mapY((screenInnerBottom + screenInnerTop) / 2)}
+            textRotate={-90}
             textBackground
           />
           <DimLine
@@ -729,6 +733,7 @@ export default function ScreenWallConstructionGraphic({
             vertical
             textOffset={10}
             textY={mapY((screenOuterY + screenOuterTop) / 2)}
+            textRotate={-90}
             textBackground
           />
           <DimLine
@@ -741,6 +746,7 @@ export default function ScreenWallConstructionGraphic({
             vertical
             textOffset={10}
             textY={mapY(screenTop / 2)}
+            textRotate={-90}
             textBackground
           />
           <DimLine
@@ -753,6 +759,7 @@ export default function ScreenWallConstructionGraphic({
             vertical
             textOffset={10}
             textY={mapY(screenBottom / 2)}
+            textRotate={-90}
             textBackground
           />
 
@@ -796,9 +803,10 @@ export default function ScreenWallConstructionGraphic({
 
           {drawnSubs.map((item) => {
             const w = item.dims.widthM * scale;
+            const bottomM = Number.isFinite(item.bottomHeightM) ? item.bottomHeightM : 0.05;
+            const y = mapY(bottomM + item.dims.heightM);
             const h = item.dims.heightM * scale;
             const x = mapX(item.xM) - w / 2;
-            const y = mapY(0) - h;
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>
                 <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1.1" />
