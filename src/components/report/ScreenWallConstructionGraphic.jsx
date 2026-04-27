@@ -801,35 +801,39 @@ export default function ScreenWallConstructionGraphic({
             );
           })}
 
-          {drawnSubs.map((item) => {
+          {drawnSubs.map((item, idx) => {
             const w = item.dims.widthM * scale;
             const bottomM = Number.isFinite(item.bottomHeightM) ? item.bottomHeightM : 0.05;
             const h = item.dims.heightM * scale;
             const y = mapY(bottomM) - h;
             const x = mapX(item.xM) - w / 2;
+            const clipId = `sub-clip-${idx}`;
+            // 4 lines stacked: model, W, H, D — centred vertically
+            const lineHeight = 8;
+            const totalTextH = 7 + lineHeight * 3; // model line + 3 dim lines
+            const textStartY = y + h / 2 - totalTextH / 2 + 5;
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>
+                <defs>
+                  <clipPath id={clipId}>
+                    <rect x={x + 1} y={y + 1} width={w - 2} height={h - 2} />
+                  </clipPath>
+                </defs>
                 <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1.1" />
-                <text
-                  x={x + w / 2}
-                  y={y + h / 2 - 5}
-                  fontSize="8"
-                  fill={COLORS.text}
-                  textAnchor="middle"
-                  fontFamily={BODY_FONT}
-                >
-                  {item.model}
-                </text>
-                <text
-                  x={x + w / 2}
-                  y={y + h / 2 + 7}
-                  fontSize="7"
-                  fill={COLORS.text}
-                  textAnchor="middle"
-                  fontFamily={BODY_FONT}
-                >
-                  {`W ${Math.round(item.dims.widthM * 1000)}mm × H ${Math.round(item.dims.heightM * 1000)}mm × D ${Math.round(item.dims.depthM * 1000)}mm`}
-                </text>
+                <g clipPath={`url(#${clipId})`}>
+                  <text x={x + w / 2} y={textStartY} fontSize="7.5" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT} fontWeight="600">
+                    {item.model}
+                  </text>
+                  <text x={x + w / 2} y={textStartY + lineHeight} fontSize="6.5" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT}>
+                    {`W ${Math.round(item.dims.widthM * 1000)}mm`}
+                  </text>
+                  <text x={x + w / 2} y={textStartY + lineHeight * 2} fontSize="6.5" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT}>
+                    {`H ${Math.round(item.dims.heightM * 1000)}mm`}
+                  </text>
+                  <text x={x + w / 2} y={textStartY + lineHeight * 3} fontSize="6.5" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT}>
+                    {`D ${Math.round(item.dims.depthM * 1000)}mm`}
+                  </text>
+                </g>
               </g>
             );
           })}
