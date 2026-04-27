@@ -148,7 +148,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
           role: 'FC',
           id: FC.id || 'FC-1',
           model: soundbarLabel,
-          position: { x: midX, y: defaultY, z: soundbarCenterZ },
+          position: { x: midX, y: defaultY, z: defaultZ },
           rotation: FC.rotation || { x: 0, y: 0, z: 0 },
         },
       ];
@@ -170,7 +170,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
           role: 'FC',
           id: FC.id || 'FC-1',
           model: soundbarLabel,
-          position: { x: midX, y: defaultY, z: soundbarCenterZ },
+          position: { x: midX, y: defaultY, z: defaultZ },
           rotation: FC.rotation || { x: 0, y: 0, z: 0 },
         },
         {

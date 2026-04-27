@@ -578,6 +578,7 @@ export default function ScreenWallConstructionGraphic({
 
         return {
           label: `SUB ${index + 1}`,
+          model: item.model || `SUB ${index + 1}`,
           xM: Number(x),
           zM: Number(z),
           bottomHeightM: Number.isFinite(bottomHeightM) ? bottomHeightM : 0.05,
@@ -817,7 +818,7 @@ export default function ScreenWallConstructionGraphic({
                   textAnchor="middle"
                   fontFamily={BODY_FONT}
                 >
-                  {item.label}
+                  {item.model}
                 </text>
                 <text
                   x={x + w / 2}
@@ -827,7 +828,7 @@ export default function ScreenWallConstructionGraphic({
                   textAnchor="middle"
                   fontFamily={BODY_FONT}
                 >
-                  {`${item.dims.widthM.toFixed(2)}m x ${item.dims.heightM.toFixed(3)}m`}
+                  {`W ${Math.round(item.dims.widthM * 1000)}mm × H ${Math.round(item.dims.heightM * 1000)}mm × D ${Math.round(item.dims.depthM * 1000)}mm`}
                 </text>
               </g>
             );
