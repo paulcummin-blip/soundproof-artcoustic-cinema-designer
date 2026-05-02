@@ -95,6 +95,25 @@ function findMaxInWindow(series, centreHz, halfWindowHz) {
   return candidates.reduce((max, p) => (p.spl > max.spl ? p : max));
 }
 
+// Refine a detected peak/null frequency using parabolic interpolation.
+// Takes the sorted series and the detected bin point; returns interpolated Hz.
+// Falls back to the bin frequency if neighbours are unavailable.
+function parabolicRefineFrequency(sortedSeries, detectedPoint) {
+  if (!detectedPoint) return null;
+  const idx = sortedSeries.findIndex(p => p === detectedPoint);
+  if (idx <= 0 || idx >= sortedSeries.length - 1) return detectedPoint.frequency;
+  const p0 = sortedSeries[idx - 1];
+  const p1 = sortedSeries[idx];
+  const p2 = sortedSeries[idx + 1];
+  if (!Number.isFinite(p0.spl) || !Number.isFinite(p1.spl) || !Number.isFinite(p2.spl)) return p1.frequency;
+  const denom = p0.spl - 2 * p1.spl + p2.spl;
+  if (Math.abs(denom) < 1e-9) return p1.frequency;
+  const offset = 0.5 * (p0.spl - p2.spl) / denom;
+  // offset is in bin-index units; map to Hz using bin spacing
+  const binSpacingHz = (p2.frequency - p0.frequency) / 2;
+  return p1.frequency + offset * binSpacingHz;
+}
+
 // Compute null width at (nullDepth + thresholdDb) — i.e. how wide the null is above its floor.
 function computeNullWidth(series, nullCentreHz, nullDepthDb, thresholdDb = 10) {
   if (!Number.isFinite(nullDepthDb)) return null;
@@ -202,23 +221,38 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
       spl: Number.isFinite(p.spl) ? p.spl - median : null,
     }));
 
+    // Sorted norm series for parabolic refinement
+    const normSorted = [...norm].sort((a, b) => a.frequency - b.frequency);
+
     // ── 34 Hz region — anchored to REW-defined 34.3 Hz (±2 Hz) ──────────────
     const hz34Feature = findMinInWindow(norm, T.hz34.featureFrequencyHz, 2);
     const hz34PeakAlt = findMaxInWindow(norm, T.hz34.featureFrequencyHz, 2);
     // Use whichever is the stronger feature (further from 0)
-    const hz34Best = (hz34Feature && hz34PeakAlt)
+    const hz34BestBin = (hz34Feature && hz34PeakAlt)
       ? (Math.abs(hz34Feature.spl) >= Math.abs(hz34PeakAlt.spl) ? hz34Feature : hz34PeakAlt)
       : (hz34Feature || hz34PeakAlt);
+    const hz34Best = hz34BestBin
+      ? { ...hz34BestBin, frequency: parabolicRefineFrequency(normSorted, hz34BestBin) }
+      : null;
 
     // ── 40 Hz null — anchored to REW problem region (±4 Hz) ──────────────────
-    const hz40Null = findMinInWindow(norm, T.hz40.nullCentreHz, 4);
+    const hz40NullBin = findMinInWindow(norm, T.hz40.nullCentreHz, 4);
+    const hz40NullRefinedHz = hz40NullBin
+      ? parabolicRefineFrequency(normSorted, hz40NullBin)
+      : null;
+    const hz40Null = hz40NullBin
+      ? { ...hz40NullBin, frequency: hz40NullRefinedHz }
+      : null;
     const hz40NullDepth = hz40Null?.spl ?? null; // dB relative to median
     const hz40Width = hz40Null
       ? computeNullWidth(norm, hz40Null.frequency, hz40NullDepth, 10)
       : null;
 
     // ── 68 Hz region — anchored to REW-defined 68 Hz (±3 Hz) ────────────────
-    const hz68Peak = findMaxInWindow(norm, T.hz68.peakFrequencyHz, 3);
+    const hz68PeakBin = findMaxInWindow(norm, T.hz68.peakFrequencyHz, 3);
+    const hz68Peak = hz68PeakBin
+      ? { ...hz68PeakBin, frequency: parabolicRefineFrequency(normSorted, hz68PeakBin) }
+      : null;
 
     // Prominence = peak spl minus average of neighbours (±10 Hz excluding ±3 Hz)
     let hz68Prominence = null;
@@ -352,7 +386,10 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
     hz40Width:  check(r.hz40.b44NullWidthHz,     r.hz40.rewNullWidthHz,    TOL_.nullWidthHz),
     hz68Freq:   check(r.hz68.b44PeakFreqHz,      r.hz68.rewPeakFreqHz,     TOL_.featureFrequencyHz),
     hz68Prom:   check(r.hz68.b44ProminenceDb,    r.hz68.rewProminenceDb,   TOL_.featureMagnitudeDb),
-    vector:     check(r.vector.b44PhaseShiftDeg, r.vector.rewPhaseShiftDeg, TOL_.phaseShiftDeg),
+    // Phase excluded from count when no REW target is stored
+    ...(r.vector.rewPhaseShiftDeg !== null && {
+      vector: check(r.vector.b44PhaseShiftDeg, r.vector.rewPhaseShiftDeg, TOL_.phaseShiftDeg),
+    }),
   };
 
   const allChecks = Object.values(checks);
@@ -379,7 +416,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
         color: headerColor, fontWeight: 700, fontSize: 12,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
-        <span>REW-Parity Benchmark — Current Room</span>
+        <span>REW-Parity Benchmark — Current Room <span style={{ fontWeight: 400, fontSize: 10, opacity: 0.8 }}>(first selected seat)</span></span>
         <span>
           {total === 0
             ? 'AWAITING REW DATA'
@@ -426,23 +463,38 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
           {/* 68 Hz region */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#065f46', background: '#ecfdf5' }}>68 Hz region</td></tr>
           <ResultRow label="Peak frequency"   b44={r.hz68.b44PeakFreqHz}   rew={r.hz68.rewPeakFreqHz}   tol={TOL_.featureFrequencyHz} unit=" Hz" />
-          <ResultRow label="Peak prominence"  b44={r.hz68.b44ProminenceDb} rew={r.hz68.rewProminenceDb} tol={TOL_.featureMagnitudeDb} unit=" dB" />
+          <ResultRow label="Peak prominence (custom local average)"  b44={r.hz68.b44ProminenceDb} rew={r.hz68.rewProminenceDb} tol={TOL_.featureMagnitudeDb} unit=" dB" />
 
           {/* Vector / phase */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#92400e', background: '#fffbeb' }}>Vector behaviour at null</td></tr>
-          <ResultRow
-            label={`Phase shift (${r.vector.nullCentreHz.toFixed(1)}−2 → +2 Hz)`}
-            b44={r.vector.b44PhaseShiftDeg}
-            rew={r.vector.rewPhaseShiftDeg}
-            tol={TOL_.phaseShiftDeg}
-            unit="°"
-          />
+          {r.vector.rewPhaseShiftDeg === null ? (
+            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <td style={{ padding: '3px 6px', fontSize: 10, color: '#374151' }}>
+                B44 phase only — no REW target stored
+              </td>
+              <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>
+                {Number.isFinite(r.vector.b44PhaseShiftDeg) ? r.vector.b44PhaseShiftDeg.toFixed(2) + '°' : '—'}
+              </td>
+              <td colSpan={4} style={{ padding: '3px 6px', fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>
+                no REW target · not included in pass/fail count
+              </td>
+            </tr>
+          ) : (
+            <ResultRow
+              label={`Phase shift (${r.vector.nullCentreHz.toFixed(1)}−2 → +2 Hz)`}
+              b44={r.vector.b44PhaseShiftDeg}
+              rew={r.vector.rewPhaseShiftDeg}
+              tol={TOL_.phaseShiftDeg}
+              unit="°"
+            />
+          )}
         </tbody>
       </table>
 
-      {/* Phase detail */}
+      {/* Phase detail — diagnostic only, no REW comparison */}
       {(Number.isFinite(r.vector.phaseLow) || Number.isFinite(r.vector.phaseHigh)) && (
         <div style={{ marginTop: 6, fontSize: 10, color: '#92400e' }}>
+          <span style={{ fontStyle: 'italic', color: '#9ca3af' }}>Diagnostic only · </span>
           Phase low ({(r.vector.nullCentreHz - 2).toFixed(1)} Hz):{' '}
           {Number.isFinite(r.vector.phaseLow) ? r.vector.phaseLow.toFixed(1) + '°' : '—'}
           {' | '}
@@ -454,7 +506,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
       {/* Phase alignment at REW null target */}
       <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f8f0ff', border: '1px solid #d8b4fe' }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#6d28d9', marginBottom: 6 }}>
-          Phase alignment at REW null target
+          Phase alignment at REW null target <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only — no REW phase reference)</span>
         </div>
         {results.phaseAlignment ? (() => {
           const pa = results.phaseAlignment;
