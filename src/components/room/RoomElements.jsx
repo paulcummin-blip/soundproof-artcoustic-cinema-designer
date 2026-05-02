@@ -81,33 +81,8 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     onChange([...(elements || []), sanitizeProjectorElement(newElement, roomDims)]);
   };
 
-  // Fields that allow temporary typing states (empty string, ".", "0.", etc.)
-  const freeTypingFields = new Set(['length_m', 'pos_m']);
-
-  const isDecimalInProgress = (val) => {
-    if (typeof val !== 'string') return false;
-    return val === '' || val === '.' || /^\d*\.\d*$/.test(val) || /^\d+\.$/.test(val);
-  };
-
   const updateElement = (id, field, value) => {
     const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m', 'x_lens_m', 'y_lens_m', 'z_lens_m', 'body_width_m', 'body_height_m', 'body_depth_m']);
-
-    // For free-typing fields, allow raw string storage while typing
-    if (freeTypingFields.has(field)) {
-      const parsed = parseFloat(value);
-      const next = (elements || []).map(el => {
-        if (el.id !== id) return el;
-        const finalValue = Number.isFinite(parsed) ? parsed : (isDecimalInProgress(String(value)) ? String(value) : el[field]);
-        // Skip sanitizeProjectorElement for non-projector elements on these fields
-        if (el.type !== 'projector') {
-          return { ...el, [field]: finalValue };
-        }
-        return sanitizeProjectorElement({ ...el, [field]: finalValue }, roomDims);
-      });
-      onChange(next);
-      return;
-    }
-
     let parsed = numberFields.has(field) ? parseFloat(value) : value;
 
     const next = (elements || []).map(el => {
@@ -388,13 +363,9 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                   <div>
                     <Label className="text-[#3E4349]">Length (m)</Label>
                     <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={
-                        typeof element?.length_m === 'string'
-                          ? element.length_m
-                          : Number.isFinite(element?.length_m) ? String(element.length_m) : ''
-                      }
+                      type="number"
+                      step="0.01"
+                      value={Number.isFinite(element?.length_m) ? element.length_m : 0.9}
                       onChange={(e) => updateElement(element.id, 'length_m', e.target.value)}
                       className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                     />
@@ -418,13 +389,9 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       {isFrontOrRear ? 'X Position (m)' : 'Y Position (m)'}
                     </Label>
                     <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={
-                        typeof element?.pos_m === 'string'
-                          ? element.pos_m
-                          : Number.isFinite(element?.pos_m) ? String(element.pos_m) : ''
-                      }
+                      type="number"
+                      step="0.01"
+                      value={Number.isFinite(element?.pos_m) ? String(element.pos_m) : ''}
                       onChange={(e) => updateElement(element.id, 'pos_m', e.target.value)}
                       className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                     />
