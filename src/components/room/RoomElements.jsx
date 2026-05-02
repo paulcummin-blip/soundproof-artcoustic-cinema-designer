@@ -9,6 +9,38 @@ import { Plus, Trash2 } from 'lucide-react';
 import { sanitizeProjectorElement } from '@/components/utils/projectorSanitise';
 
 export default function RoomElements({ elements = [], onChange, roomDims }) {
+  const [drafts, setDrafts] = React.useState({});  // eslint-disable-line
+
+  // Returns the current draft string if one exists, otherwise the numeric element value as a string
+  const getDraftValue = (element, field, fallback) => {
+    const key = `${element.id}:${field}`;
+    if (Object.prototype.hasOwnProperty.call(drafts, key)) return drafts[key];
+    const val = element[field];
+    return Number.isFinite(val) ? String(val) : (fallback !== undefined ? String(fallback) : '');
+  };
+
+  // Only allow valid partial decimal inputs — does not call updateElement
+  const handleDraftChange = (elementId, field, raw) => {
+    if (!/^-?\d*\.?\d*$/.test(raw) && raw !== '') return;
+    setDrafts(prev => ({ ...prev, [`${elementId}:${field}`]: raw }));
+  };
+
+  // Parse draft and commit to app state, then clear the draft
+  const commitDraftValue = (elementId, field, fallback) => {
+    const key = `${elementId}:${field}`;
+    const draft = drafts[key];
+    if (draft !== undefined) {
+      const parsed = parseFloat(draft);
+      const committed = Number.isFinite(parsed) ? parsed : (fallback !== undefined ? fallback : 0);
+      updateElement(elementId, field, committed);
+      setDrafts(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+
   // Create a stable next id that won't collide if you add quickly
   const makeId = () => `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
@@ -361,15 +393,17 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
 
                   {/* LENGTH */}
                   <div>
-                    <Label className="text-[#3E4349]">Length (m)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={Number.isFinite(element?.length_m) ? element.length_m : 0.9}
-                      onChange={(e) => updateElement(element.id, 'length_m', e.target.value)}
-                      className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
-                    />
-                  </div>
+                     <Label className="text-[#3E4349]">Length (m)</Label>
+                     <Input
+                       type="text"
+                       inputMode="decimal"
+                       value={getDraftValue(element, 'length_m', 0.9)}
+                       onChange={(e) => handleDraftChange(element.id, 'length_m', e.target.value)}
+                       onBlur={() => commitDraftValue(element.id, 'length_m', 0.9)}
+                       onKeyDown={(e) => { if (e.key === 'Enter') commitDraftValue(element.id, 'length_m', 0.9); }}
+                       className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                     />
+                   </div>
 
                   {/* LABEL */}
                   <div>
@@ -385,16 +419,18 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
 
                   {/* POSITION */}
                   <div>
-                    <Label className="text-[#3E4349]">
-                      {isFrontOrRear ? 'X Position (m)' : 'Y Position (m)'}
-                    </Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={Number.isFinite(element?.pos_m) ? String(element.pos_m) : ''}
-                      onChange={(e) => updateElement(element.id, 'pos_m', e.target.value)}
-                      className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
-                    />
+                     <Label className="text-[#3E4349]">
+                       {isFrontOrRear ? 'X Position (m)' : 'Y Position (m)'}
+                     </Label>
+                     <Input
+                       type="text"
+                       inputMode="decimal"
+                       value={getDraftValue(element, 'pos_m', '')}
+                       onChange={(e) => handleDraftChange(element.id, 'pos_m', e.target.value)}
+                       onBlur={() => commitDraftValue(element.id, 'pos_m', 0)}
+                       onKeyDown={(e) => { if (e.key === 'Enter') commitDraftValue(element.id, 'pos_m', 0); }}
+                       className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                     />
                     <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
                       Origin is top-left (0,0). Position is measured from the Left wall (for X) or Front wall (for Y).
                     </div>
