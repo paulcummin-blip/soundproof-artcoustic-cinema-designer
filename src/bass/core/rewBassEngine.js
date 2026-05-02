@@ -516,13 +516,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
-      // Transfer-style modal test:
-      // treat modal sum as a complex modifier on the existing field
-      // rather than an independent additive pressure source.
-      const modalTransferRe = 1 + modalSumRe;
-      const modalTransferIm = modalSumIm;
-      sumRe = (prevRe * modalTransferRe) - (prevIm * modalTransferIm);
-      sumIm = (prevRe * modalTransferIm) + (prevIm * modalTransferRe);
+
+      // True acoustic pressure superposition:
+      // modalSumRe/modalSumIm are already scaled pressure contributions,
+      // so they must be added to the existing complex pressure field.
+      sumRe = prevRe + modalSumRe;
+      sumIm = prevIm + modalSumIm;
+
+      const modalTransferRe = null;
+      const modalTransferIm = null;
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
