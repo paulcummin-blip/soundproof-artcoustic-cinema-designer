@@ -415,7 +415,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Modal source strength at 1 m: uses source output + gain only, no seat-distance attenuation.
     // Room modes are excited by energy injected into the room from the source.
     // Seat-distance effects are already handled separately by sourceCoupling / receiverCoupling.
-    const modalSourceAmplitude1m = Math.pow(10, (curveDb + source.tuning.gainDb) / 20);
+    const modalGainScalar = 1.8;
+    const modalSourceAmplitude1m = Math.pow(10, (curveDb + source.tuning.gainDb) / 20) * modalGainScalar;
 
     const timeOfFlightPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
     const delayPhase = -2 * Math.PI * frequencyHz * (source.tuning.delayMs / 1000);
