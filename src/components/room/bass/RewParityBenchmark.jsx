@@ -456,17 +456,60 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#1e40af', background: '#eff6ff' }}>34 Hz region</td></tr>
           <ResultRow label="Feature frequency" b44={r.hz34.b44FreqHz}   rew={r.hz34.rewFreqHz}  tol={TOL_.featureFrequencyHz} unit=" Hz" />
           <ResultRow label="Feature magnitude" b44={r.hz34.b44MagDb}    rew={r.hz34.rewMagDb}   tol={TOL_.featureMagnitudeDb} unit=" dB" />
+          {(() => {
+            if (!Array.isArray(stepDebug) || stepDebug.length === 0) return null;
+            const row34 = stepDebug.reduce((best, row) => !best || Math.abs(row.frequencyHz - T.hz34.featureFrequencyHz) < Math.abs(best.frequencyHz - T.hz34.featureFrequencyHz) ? row : best, null);
+            const sm34 = row34?.strongestMode;
+            if (!sm34 || !Number.isFinite(sm34.combinedCoupling)) return null;
+            if (Math.abs(sm34.combinedCoupling) < 0.5) {
+              return (
+                <tr><td colSpan={6} style={{ padding: '3px 6px 4px', fontSize: 10, color: '#1e40af', fontStyle: 'italic', background: '#eff6ff' }}>
+                  ℹ Low response due to listener position near modal node (reduced coupling)
+                </td></tr>
+              );
+            }
+            return null;
+          })()}
 
           {/* 40 Hz null */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff' }}>40 Hz region — null</td></tr>
           <ResultRow label="Null centre"        b44={r.hz40.b44NullCentreHz}  rew={r.hz40.rewNullCentreHz}  tol={TOL_.featureFrequencyHz} unit=" Hz" />
           <ResultRow label="Null depth"         b44={r.hz40.b44NullDepthDb}   rew={r.hz40.rewNullDepthDb}   tol={TOL_.nullDepthDb}        unit=" dB" />
           <ResultRow label="Null width @−10 dB" b44={r.hz40.b44NullWidthHz}   rew={r.hz40.rewNullWidthHz}   tol={TOL_.nullWidthHz}        unit=" Hz" />
+          {(() => {
+            if (!Array.isArray(stepDebug) || stepDebug.length === 0) return null;
+            const row40 = stepDebug.reduce((best, row) => !best || Math.abs(row.frequencyHz - T.hz40.nullCentreHz) < Math.abs(best.frequencyHz - T.hz40.nullCentreHz) ? row : best, null);
+            const sm40 = row40?.strongestMode;
+            const angleDiff = results.phaseAlignment?.angleDiff;
+            if (!sm40 || !Number.isFinite(sm40.combinedCoupling)) return null;
+            if (Math.abs(sm40.combinedCoupling) > 0.8 && Number.isFinite(angleDiff) && angleDiff > 140) {
+              return (
+                <tr><td colSpan={6} style={{ padding: '3px 6px 4px', fontSize: 10, color: '#7c3aed', fontStyle: 'italic', background: '#f5f3ff' }}>
+                  ℹ Strong cancellation caused by high modal coupling and near-opposite phase
+                </td></tr>
+              );
+            }
+            return null;
+          })()}
 
           {/* 68 Hz region */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#065f46', background: '#ecfdf5' }}>68 Hz region</td></tr>
           <ResultRow label="Peak frequency"   b44={r.hz68.b44PeakFreqHz}   rew={r.hz68.rewPeakFreqHz}   tol={TOL_.featureFrequencyHz} unit=" Hz" />
           <ResultRow label="Peak prominence (custom local average)"  b44={r.hz68.b44ProminenceDb} rew={r.hz68.rewProminenceDb} tol={TOL_.featureMagnitudeDb} unit=" dB" />
+          {(() => {
+            if (!Array.isArray(stepDebug) || stepDebug.length === 0) return null;
+            const row68 = stepDebug.reduce((best, row) => !best || Math.abs(row.frequencyHz - T.hz68.peakFrequencyHz) < Math.abs(best.frequencyHz - T.hz68.peakFrequencyHz) ? row : best, null);
+            const sm68 = row68?.strongestMode;
+            if (!sm68 || !Number.isFinite(sm68.combinedCoupling)) return null;
+            if (Math.abs(sm68.combinedCoupling) > 0.8) {
+              return (
+                <tr><td colSpan={6} style={{ padding: '3px 6px 4px', fontSize: 10, color: '#065f46', fontStyle: 'italic', background: '#ecfdf5' }}>
+                  ℹ Peak dominated by strong axial mode with high coupling at seat position
+                </td></tr>
+              );
+            }
+            return null;
+          })()}
 
           {/* Vector / phase */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#92400e', background: '#fffbeb' }}>Vector behaviour at null</td></tr>
