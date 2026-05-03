@@ -111,7 +111,14 @@ function parabolicRefineFrequency(sortedSeries, detectedPoint) {
   const offset = 0.5 * (p0.spl - p2.spl) / denom;
   // offset is in bin-index units; map to Hz using bin spacing
   const binSpacingHz = (p2.frequency - p0.frequency) / 2;
-  return p1.frequency + offset * binSpacingHz;
+  const refined = p1.frequency + offset * binSpacingHz;
+  // Safety: reject if outside the three-point local range, non-finite, or out of [10, 200] Hz
+  const loHz = Math.min(p0.frequency, p2.frequency);
+  const hiHz = Math.max(p0.frequency, p2.frequency);
+  if (!Number.isFinite(refined) || refined < loHz || refined > hiHz || refined < 10 || refined > 200) {
+    return p1.frequency;
+  }
+  return refined;
 }
 
 // Compute null width at (nullDepth + thresholdDb) — i.e. how wide the null is above its floor.
