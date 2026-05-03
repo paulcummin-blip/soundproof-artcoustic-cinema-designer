@@ -156,18 +156,19 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
 function estimateModeQByType(mode) {
   const order = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
 
-  // Axial
+  // Lower Q values to simulate real-room damping and modal overlap
+  // Axial modes still dominate but are less sharp
   if (order === 1) {
-    return 14.0;
+    return 8.0;   // was 14
   }
 
   // Tangential
   if (order === 2) {
-    return 10.0;
+    return 6.0;   // was 10
   }
 
   // Oblique and higher
-  return 7.0;
+  return 4.5;     // was 7
 }
 
 function modeShapeValueLocal(mode, x, y, z, roomDims) {
