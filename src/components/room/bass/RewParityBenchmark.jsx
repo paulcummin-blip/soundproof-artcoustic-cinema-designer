@@ -551,6 +551,67 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
         )}
       </div>
 
+      {/* Strongest mode diagnostics for 34, 40, 68 Hz */}
+      {Array.isArray(stepDebug) && stepDebug.length > 0 && (() => {
+        const TARGET_HZ = [
+          { label: '34 Hz', targetHz: T.hz34.featureFrequencyHz, bg: '#eff6ff', color: '#1e40af' },
+          { label: '40 Hz', targetHz: T.hz40.nullCentreHz, bg: '#f5f3ff', color: '#7c3aed' },
+          { label: '68 Hz', targetHz: T.hz68.peakFrequencyHz, bg: '#ecfdf5', color: '#065f46' },
+        ];
+        return (
+          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#374151', marginBottom: 6 }}>
+              Strongest contributing mode <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only)</span>
+            </div>
+            {TARGET_HZ.map(({ label, targetHz, bg, color }) => {
+              const row = stepDebug.reduce((best, r) => {
+                if (!best) return r;
+                return Math.abs(r.frequencyHz - targetHz) < Math.abs(best.frequencyHz - targetHz) ? r : best;
+              }, null);
+              const sm = row?.strongestMode ?? null;
+              return (
+                <div key={label} style={{ marginBottom: 6, padding: '4px 6px', borderRadius: 4, background: bg, border: `1px solid ${color}33` }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color, marginBottom: 3 }}>
+                    {label} region — nearest debug row: {row ? row.frequencyHz.toFixed(2) + ' Hz' : '—'}
+                  </div>
+                  {sm ? (
+                    <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                      <tbody>
+                        <tr>
+                          <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px', width: '35%' }}>Mode freq</td>
+                          <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '1px 6px' }}>{Number.isFinite(sm.freq) ? sm.freq.toFixed(2) + ' Hz' : '—'}</td>
+                          <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px' }}>Indices</td>
+                          <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '1px 6px' }}>[{sm.nx},{sm.ny},{sm.nz}] {sm.type || '—'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px' }}>Q value</td>
+                          <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '1px 6px' }}>{Number.isFinite(sm.qValue) ? sm.qValue.toFixed(2) : '—'}</td>
+                          <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px' }}>Contribution mag</td>
+                          <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '1px 6px' }}>{Number.isFinite(sm.magnitude) ? sm.magnitude.toFixed(4) : '—'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px' }}>Source coupling</td>
+                          <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '1px 6px' }}>{Number.isFinite(sm.sourceCoupling) ? sm.sourceCoupling.toFixed(4) : '—'}</td>
+                          <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px' }}>Receiver coupling</td>
+                          <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '1px 6px' }}>{Number.isFinite(sm.receiverCoupling) ? sm.receiverCoupling.toFixed(4) : '—'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px' }}>Combined coupling</td>
+                          <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '1px 6px' }}>{Number.isFinite(sm.combinedCoupling) ? sm.combinedCoupling.toFixed(4) : '—'}</td>
+                          <td colSpan={2} />
+                        </tr>
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>No strongest-mode data — run simulation with modes enabled.</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Tolerance key */}
       <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e5e7eb', fontSize: 10, color: '#6b7280' }}>
         Tolerances: freq ±{TOL_.featureFrequencyHz} Hz · mag ±{TOL_.featureMagnitudeDb} dB ·

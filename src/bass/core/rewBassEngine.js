@@ -624,6 +624,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                     nx: _debugStrongestMode.nx,
                     ny: _debugStrongestMode.ny,
                     nz: _debugStrongestMode.nz,
+                    type: _debugStrongestMode.type,
+                    qValue: _debugStrongestMode.qValue,
+                    sourceCoupling: _debugStrongestMode.sourceCoupling,
+                    receiverCoupling: _debugStrongestMode.receiverCoupling,
+                    combinedCoupling: _debugStrongestMode.combinedCoupling,
                     transferRe: _debugStrongestMode.transferRe,
                     transferIm: _debugStrongestMode.transferIm,
                     magnitude: Math.sqrt(
