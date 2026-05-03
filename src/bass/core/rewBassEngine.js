@@ -189,7 +189,7 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
 // Modal Green's function: coupling = Ψ_source * Ψ_receiver, resonant transfer H(f, f0, Q).
 // pressureMagnitude = modalSourceAmplitude * combinedCoupling * resonanceMagnitude
 // modalSourceAmplitude brings the modal layer into the same pressure domain as the direct path.
-function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices) {
+function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices, sourceX, sourceY, sourceZ, seatX, seatY, seatZ) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
 
@@ -223,9 +223,25 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const transferReal = realDen / denominatorSq;
   const transferImag = -imagDen / denominatorSq;
 
+  // Approximate source-to-seat distance for phase alignment
+  const dx = sourceX - seatX;
+  const dy = sourceY - seatY;
+  const dz = sourceZ - seatZ;
+  const distanceM = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+  // Convert to phase
+  const propagationPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
+
+  // Rotate modal contribution by this phase
+  const cosP = Math.cos(propagationPhase);
+  const sinP = Math.sin(propagationPhase);
+
+  const alignedReal = (transferReal * cosP) - (transferImag * sinP);
+  const alignedImag = (transferReal * sinP) + (transferImag * cosP);
+
   return {
-    real: modalGain * transferReal,
-    imag: modalGain * transferImag,
+    real: modalGain * alignedReal,
+    imag: modalGain * alignedImag,
   };
 }
 
@@ -282,7 +298,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       mode.qValue,
       combinedCoupling,
       modalSourceAmplitude,
-      { nx: mode.nx, ny: mode.ny, nz: mode.nz }
+      { nx: mode.nx, ny: mode.ny, nz: mode.nz },
+      source.x, source.y, source.z,
+      seat.x, seat.y, seat.z
     );
 
     // True pressure accumulation: direct sum of all modal pressure contributions.
