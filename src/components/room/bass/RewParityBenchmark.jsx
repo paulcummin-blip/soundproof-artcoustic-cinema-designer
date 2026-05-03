@@ -232,12 +232,8 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
     const normSorted = [...norm].sort((a, b) => a.frequency - b.frequency);
 
     // ── 34 Hz region — anchored to REW-defined 34.3 Hz (±2 Hz) ──────────────
-    const hz34Feature = findMinInWindow(norm, T.hz34.featureFrequencyHz, 2);
-    const hz34PeakAlt = findMaxInWindow(norm, T.hz34.featureFrequencyHz, 2);
-    // Use whichever is the stronger feature (further from 0)
-    const hz34BestBin = (hz34Feature && hz34PeakAlt)
-      ? (Math.abs(hz34Feature.spl) >= Math.abs(hz34PeakAlt.spl) ? hz34Feature : hz34PeakAlt)
-      : (hz34Feature || hz34PeakAlt);
+    // REW target is a positive peak (featureMagnitudeDb: 3.6), so detect local max only.
+    const hz34BestBin = findMaxInWindow(norm, T.hz34.featureFrequencyHz, 2);
     const hz34Best = hz34BestBin
       ? { ...hz34BestBin, frequency: parabolicRefineFrequency(normSorted, hz34BestBin) }
       : null;
