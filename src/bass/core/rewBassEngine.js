@@ -219,8 +219,8 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // Real part follows realDen so it can change sign naturally across resonance.
   // Imaginary part follows imagDen but stays smooth and finite.
   // No arbitrary additive floor terms.
-  const transferReal = -(realDen * imagDen) / denominatorSq;
-  const transferImag = -(imagDen * imagDen) / denominatorSq;
+  const transferReal = realDen / denominatorSq;
+  const transferImag = -imagDen / denominatorSq;
 
   return {
     real: modalGain * transferReal,
