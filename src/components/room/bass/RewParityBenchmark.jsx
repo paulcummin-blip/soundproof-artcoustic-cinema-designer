@@ -244,18 +244,17 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
     const rawSorted = [...b44Series].sort((a, b) => a.frequency - b.frequency);
 
     // ── 34 Hz region — detect peak in raw series, measure vs local baseline ──
-    // Local baseline: ±8 Hz window, excluding ±2 Hz around the feature itself.
+    // Local baseline: 30–38 Hz window (±4 Hz around 34 Hz), excluding ±1.5 Hz around the feature.
     const hz34BestBin = findMaxInWindow(b44Series, T.hz34.featureFrequencyHz, 2);
     const hz34Best = hz34BestBin
       ? { ...hz34BestBin, frequency: parabolicRefineFrequency(rawSorted, hz34BestBin) }
       : null;
-    const hz34LocalBaseline = computeLocalBaseline(b44Series, T.hz34.featureFrequencyHz, 8, 2);
+    const hz34LocalBaseline = computeLocalBaseline(b44Series, 34, 4, 1.5);
     const hz34MagDb = (hz34Best && Number.isFinite(hz34LocalBaseline))
       ? hz34Best.spl - hz34LocalBaseline
       : null;
 
-    // ── 40 Hz null — detect minimum in raw series, measure vs local baseline ──
-    // Local baseline: ±12 Hz window, excluding ±5 Hz around the null itself.
+    // ── 40 Hz null — detect minimum in raw series, depth vs broad 40–80 Hz median trend ──
     const hz40NullBin = findMinInWindow(b44Series, T.hz40.nullCentreHz, 4);
     const hz40NullRefinedHz = hz40NullBin
       ? parabolicRefineFrequency(rawSorted, hz40NullBin)
@@ -263,11 +262,13 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
     const hz40Null = hz40NullBin
       ? { ...hz40NullBin, frequency: hz40NullRefinedHz }
       : null;
+    // Null depth measured relative to the broad 40–80 Hz median (same reference as REW).
+    const hz40NullDepthLocal = (hz40Null && Number.isFinite(median))
+      ? hz40Null.spl - median
+      : null;
+    // Local baseline still needed for null width (relative crossing threshold).
     const hz40LocalBaseline = hz40Null
       ? computeLocalBaseline(b44Series, hz40Null.frequency, 12, 5)
-      : null;
-    const hz40NullDepthLocal = (hz40Null && Number.isFinite(hz40LocalBaseline))
-      ? hz40Null.spl - hz40LocalBaseline
       : null;
     // Null width is computed on the raw series offset by local baseline so the
     // crossing threshold is relative to local trend (not the global median).
@@ -497,7 +498,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
           {/* 40 Hz null */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff' }}>40 Hz region — null</td></tr>
           <ResultRow label="Null centre"        b44={r.hz40.b44NullCentreHz}  rew={r.hz40.rewNullCentreHz}  tol={TOL_.featureFrequencyHz} unit=" Hz" />
-          <ResultRow label="Null depth (local)"    b44={r.hz40.b44NullDepthDb}   rew={r.hz40.rewNullDepthDb}   tol={TOL_.nullDepthDb}        unit=" dB" />
+          <ResultRow label="Null depth (broad trend)" b44={r.hz40.b44NullDepthDb}   rew={r.hz40.rewNullDepthDb}   tol={TOL_.nullDepthDb}        unit=" dB" />
           <ResultRow label="Null width @−10 dB" b44={r.hz40.b44NullWidthHz}   rew={r.hz40.rewNullWidthHz}   tol={TOL_.nullWidthHz}        unit=" Hz" />
           {(() => {
             if (!Array.isArray(stepDebug) || stepDebug.length === 0) return null;
