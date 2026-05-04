@@ -6,6 +6,7 @@
 // All tolerances match the agreed pass criteria from the design discussion.
 
 import React, { useMemo } from 'react';
+import WholeCurveDiagnostic from './WholeCurveDiagnostic';
 
 // ─── REW reference targets — explicit, editable, current room only ────────────
 // Replace these values whenever a new REW capture is taken for this room.
@@ -684,6 +685,9 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
         Tolerances: freq ±{TOL_.featureFrequencyHz} Hz · mag ±{TOL_.featureMagnitudeDb} dB ·
         null depth ±{TOL_.nullDepthDb} dB · null width ±{TOL_.nullWidthHz} Hz · phase ±{TOL_.phaseShiftDeg}°
       </div>
+
+      {/* Whole-curve contribution diagnostic */}
+      <WholeCurveDiagnostic b44Series={b44Series} stepDebug={stepDebug} />
     </div>
   );
 }
