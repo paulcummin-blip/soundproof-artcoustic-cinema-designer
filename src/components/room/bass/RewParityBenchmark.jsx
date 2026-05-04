@@ -67,13 +67,15 @@ function interpolateSpl(series, targetHz) {
   return null;
 }
 
-// Compute local baseline in 30–38 Hz, excluding ±excludeHz around centreFreq.
-// Used to give a local reference unaffected by the 34 Hz peak itself.
-function computeLocal30_38Baseline(series, centreFreq, excludeHz) {
+// Generic local baseline: median of raw SPL in [centreHz-outerHz, centreHz+outerHz],
+// excluding the feature region [centreHz-excludeHz, centreHz+excludeHz].
+// Works on raw series ({frequency, spl}[]) — no prior normalisation required.
+// Use this for all local feature magnitude/depth comparisons.
+function computeLocalBaseline(series, centreHz, outerHz, excludeHz) {
   const band = (series || [])
     .filter(p =>
-      p.frequency >= 30 && p.frequency <= 38 &&
-      Math.abs(p.frequency - centreFreq) > excludeHz &&
+      Math.abs(p.frequency - centreHz) <= outerHz &&
+      Math.abs(p.frequency - centreHz) > excludeHz &&
       Number.isFinite(p.spl)
     )
     .map(p => p.spl);
@@ -237,54 +239,60 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
     if (!Array.isArray(b44Series) || b44Series.length === 0) return null;
 
     const median = computeMedian(b44Series);
-    // Normalised series: subtract 40-80 Hz median so shape comparison is offset-independent
-    const norm = b44Series.map(p => ({
-      frequency: p.frequency,
-      spl: Number.isFinite(p.spl) ? p.spl - median : null,
-    }));
 
-    // Sorted norm series for parabolic refinement
-    const normSorted = [...norm].sort((a, b) => a.frequency - b.frequency);
+    // Raw sorted series for frequency detection (parabolic refinement only)
+    const rawSorted = [...b44Series].sort((a, b) => a.frequency - b.frequency);
 
-    // ── 34 Hz region — anchored to REW-defined 34.3 Hz (±2 Hz) ──────────────
-    // REW target is a positive peak (featureMagnitudeDb: 3.6), so detect local max only.
-    const hz34BestBin = findMaxInWindow(norm, T.hz34.featureFrequencyHz, 2);
+    // ── 34 Hz region — detect peak in raw series, measure vs local baseline ──
+    // Local baseline: ±8 Hz window, excluding ±2 Hz around the feature itself.
+    const hz34BestBin = findMaxInWindow(b44Series, T.hz34.featureFrequencyHz, 2);
     const hz34Best = hz34BestBin
-      ? { ...hz34BestBin, frequency: parabolicRefineFrequency(normSorted, hz34BestBin) }
+      ? { ...hz34BestBin, frequency: parabolicRefineFrequency(rawSorted, hz34BestBin) }
+      : null;
+    const hz34LocalBaseline = computeLocalBaseline(b44Series, T.hz34.featureFrequencyHz, 8, 2);
+    const hz34MagDb = (hz34Best && Number.isFinite(hz34LocalBaseline))
+      ? hz34Best.spl - hz34LocalBaseline
       : null;
 
-    // ── 40 Hz null — anchored to REW problem region (±4 Hz) ──────────────────
-    const hz40NullBin = findMinInWindow(norm, T.hz40.nullCentreHz, 4);
+    // ── 40 Hz null — detect minimum in raw series, measure vs local baseline ──
+    // Local baseline: ±12 Hz window, excluding ±5 Hz around the null itself.
+    const hz40NullBin = findMinInWindow(b44Series, T.hz40.nullCentreHz, 4);
     const hz40NullRefinedHz = hz40NullBin
-      ? parabolicRefineFrequency(normSorted, hz40NullBin)
+      ? parabolicRefineFrequency(rawSorted, hz40NullBin)
       : null;
     const hz40Null = hz40NullBin
       ? { ...hz40NullBin, frequency: hz40NullRefinedHz }
       : null;
-    const hz40NullDepth = hz40Null?.spl ?? null; // dB relative to median
-    const hz40Width = hz40Null
-      ? computeNullWidth(norm, hz40Null.frequency, hz40NullDepth, 10)
+    const hz40LocalBaseline = hz40Null
+      ? computeLocalBaseline(b44Series, hz40Null.frequency, 12, 5)
       : null;
+    const hz40NullDepthLocal = (hz40Null && Number.isFinite(hz40LocalBaseline))
+      ? hz40Null.spl - hz40LocalBaseline
+      : null;
+    // Null width is computed on the raw series offset by local baseline so the
+    // crossing threshold is relative to local trend (not the global median).
+    const hz40NullWidth = (() => {
+      if (!hz40Null || !Number.isFinite(hz40NullDepthLocal)) return null;
+      // Build a locally-normalised series for width measurement only
+      const localNorm = b44Series.map(p => ({
+        frequency: p.frequency,
+        spl: Number.isFinite(p.spl) ? p.spl - (hz40LocalBaseline ?? 0) : null,
+      }));
+      return computeNullWidth(localNorm, hz40Null.frequency, hz40NullDepthLocal, 10);
+    })();
 
-    // ── 68 Hz region — anchored to REW-defined 68 Hz (±3 Hz) ────────────────
-    const hz68PeakBin = findMaxInWindow(norm, T.hz68.peakFrequencyHz, 3);
+    // ── 68 Hz region — detect peak, measure vs local baseline ────────────────
+    // Local baseline: ±10 Hz window, excluding ±3 Hz around the peak.
+    const hz68PeakBin = findMaxInWindow(b44Series, T.hz68.peakFrequencyHz, 3);
     const hz68Peak = hz68PeakBin
-      ? { ...hz68PeakBin, frequency: parabolicRefineFrequency(normSorted, hz68PeakBin) }
+      ? { ...hz68PeakBin, frequency: parabolicRefineFrequency(rawSorted, hz68PeakBin) }
       : null;
-
-    // Prominence = peak spl minus average of neighbours (±10 Hz excluding ±3 Hz)
-    let hz68Prominence = null;
-    if (hz68Peak) {
-      const surrounds = norm.filter(p =>
-        Math.abs(p.frequency - hz68Peak.frequency) >= 3 &&
-        Math.abs(p.frequency - hz68Peak.frequency) <= 10 &&
-        Number.isFinite(p.spl)
-      );
-      if (surrounds.length >= 2) {
-        const avg = surrounds.reduce((s, p) => s + p.spl, 0) / surrounds.length;
-        hz68Prominence = hz68Peak.spl - avg;
-      }
-    }
+    const hz68LocalBaseline = hz68Peak
+      ? computeLocalBaseline(b44Series, hz68Peak.frequency, 10, 3)
+      : null;
+    const hz68Prominence = (hz68Peak && Number.isFinite(hz68LocalBaseline))
+      ? hz68Peak.spl - hz68LocalBaseline
+      : null;
 
     // ── Vector / phase at null ─────────────────────────────────────────────
     const nullCentreHz = hz40Null?.frequency ?? T.hz40.nullCentreHz;
@@ -346,15 +354,15 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
       // 34 Hz
       hz34: {
         b44FreqHz:   hz34Best?.frequency ?? null,
-        b44MagDb:    hz34Best?.spl ?? null,
+        b44MagDb:    hz34MagDb,           // raw peak minus local baseline
         rewFreqHz:   T.hz34.featureFrequencyHz,
         rewMagDb:    T.hz34.featureMagnitudeDb,
       },
       // 40 Hz null
       hz40: {
         b44NullCentreHz:  hz40Null?.frequency ?? null,
-        b44NullDepthDb:   hz40NullDepth,
-        b44NullWidthHz:   hz40Width,
+        b44NullDepthDb:   hz40NullDepthLocal,  // raw null minus local baseline
+        b44NullWidthHz:   hz40NullWidth,
         rewNullCentreHz:  T.hz40.nullCentreHz,
         rewNullDepthDb:   T.hz40.nullDepthDb,
         rewNullWidthHz:   T.hz40.nullWidthHz,
@@ -362,7 +370,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
       // 68 Hz peak
       hz68: {
         b44PeakFreqHz:    hz68Peak?.frequency ?? null,
-        b44ProminenceDb:  hz68Prominence,
+        b44ProminenceDb:  hz68Prominence,       // raw peak minus local baseline
         rewPeakFreqHz:    T.hz68.peakFrequencyHz,
         rewProminenceDb:  T.hz68.peakProminenceDb,
       },
@@ -454,42 +462,6 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
         B44 normalised: 40–80 Hz median = {results.median.toFixed(2)} dB subtracted. Null centre used: {r.vector.nullCentreHz.toFixed(2)} Hz.
       </div>
 
-      {/* ── TEMPORARY B44 NORMALISATION DIAGNOSTIC ── */}
-      {(() => {
-        const median4080 = results.median;
-        const raw34 = findMaxInWindow(b44Series, T.hz34.featureFrequencyHz, 2)?.spl ?? null;
-        const local3038 = computeLocal30_38Baseline(b44Series, T.hz34.featureFrequencyHz, 1.5);
-        const rel34toMedian = Number.isFinite(raw34) && Number.isFinite(median4080) ? raw34 - median4080 : null;
-        const rel34toLocal  = Number.isFinite(raw34) && Number.isFinite(local3038)  ? raw34 - local3038  : null;
-        const raw68 = findMaxInWindow(b44Series, T.hz68.peakFrequencyHz, 3)?.spl ?? null;
-        const fmt = v => Number.isFinite(v) ? v.toFixed(2) + ' dB' : '—';
-        const rows = [
-          ['40–80 Hz median',                           fmt(median4080)],
-          ['30–38 Hz local baseline (excl. ±1.5 Hz)',   fmt(local3038)],
-          ['Raw 34 Hz peak SPL',                        fmt(raw34)],
-          ['34 Hz peak rel. to 40–80 Hz median',        fmt(rel34toMedian)],
-          ['34 Hz peak rel. to local 30–38 Hz baseline',fmt(rel34toLocal)],
-          ['Raw 68–69 Hz peak SPL',                     fmt(raw68)],
-        ];
-        return (
-          <div style={{ marginBottom: 10, padding: '7px 10px', borderRadius: 5, background: '#e0f2fe', border: '1px solid #7dd3fc' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', marginBottom: 5 }}>
-              Temporary B44 normalisation diagnostic
-            </div>
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-              <tbody>
-                {rows.map(([label, val]) => (
-                  <tr key={label}>
-                    <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px', width: '65%' }}>{label}</td>
-                    <td style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, padding: '1px 6px', color: '#0c4a6e' }}>{val}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      })()}
-
       {/* Table */}
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
@@ -506,7 +478,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
           {/* 34 Hz region */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#1e40af', background: '#eff6ff' }}>34 Hz region</td></tr>
           <ResultRow label="Feature frequency" b44={r.hz34.b44FreqHz}   rew={r.hz34.rewFreqHz}  tol={TOL_.featureFrequencyHz} unit=" Hz" />
-          <ResultRow label="Feature magnitude" b44={r.hz34.b44MagDb}    rew={r.hz34.rewMagDb}   tol={TOL_.featureMagnitudeDb} unit=" dB" />
+          <ResultRow label="Feature magnitude (local)" b44={r.hz34.b44MagDb}    rew={r.hz34.rewMagDb}   tol={TOL_.featureMagnitudeDb} unit=" dB" />
           {(() => {
             if (!Array.isArray(stepDebug) || stepDebug.length === 0) return null;
             const row34 = stepDebug.reduce((best, row) => !best || Math.abs(row.frequencyHz - T.hz34.featureFrequencyHz) < Math.abs(best.frequencyHz - T.hz34.featureFrequencyHz) ? row : best, null);
@@ -525,7 +497,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
           {/* 40 Hz null */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff' }}>40 Hz region — null</td></tr>
           <ResultRow label="Null centre"        b44={r.hz40.b44NullCentreHz}  rew={r.hz40.rewNullCentreHz}  tol={TOL_.featureFrequencyHz} unit=" Hz" />
-          <ResultRow label="Null depth"         b44={r.hz40.b44NullDepthDb}   rew={r.hz40.rewNullDepthDb}   tol={TOL_.nullDepthDb}        unit=" dB" />
+          <ResultRow label="Null depth (local)"    b44={r.hz40.b44NullDepthDb}   rew={r.hz40.rewNullDepthDb}   tol={TOL_.nullDepthDb}        unit=" dB" />
           <ResultRow label="Null width @−10 dB" b44={r.hz40.b44NullWidthHz}   rew={r.hz40.rewNullWidthHz}   tol={TOL_.nullWidthHz}        unit=" Hz" />
           {(() => {
             if (!Array.isArray(stepDebug) || stepDebug.length === 0) return null;
@@ -546,7 +518,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
           {/* 68 Hz region */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#065f46', background: '#ecfdf5' }}>68 Hz region</td></tr>
           <ResultRow label="Peak frequency"   b44={r.hz68.b44PeakFreqHz}   rew={r.hz68.rewPeakFreqHz}   tol={TOL_.featureFrequencyHz} unit=" Hz" />
-          <ResultRow label="Peak prominence (custom local average)"  b44={r.hz68.b44ProminenceDb} rew={r.hz68.rewProminenceDb} tol={TOL_.featureMagnitudeDb} unit=" dB" />
+          <ResultRow label="Peak prominence (local)" b44={r.hz68.b44ProminenceDb} rew={r.hz68.rewProminenceDb} tol={TOL_.featureMagnitudeDb} unit=" dB" />
           {(() => {
             if (!Array.isArray(stepDebug) || stepDebug.length === 0) return null;
             const row68 = stepDebug.reduce((best, row) => !best || Math.abs(row.frequencyHz - T.hz68.peakFrequencyHz) < Math.abs(best.frequencyHz - T.hz68.peakFrequencyHz) ? row : best, null);
