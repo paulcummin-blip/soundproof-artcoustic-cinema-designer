@@ -67,6 +67,21 @@ function interpolateSpl(series, targetHz) {
   return null;
 }
 
+// Compute local baseline in 30–38 Hz, excluding ±excludeHz around centreFreq.
+// Used to give a local reference unaffected by the 34 Hz peak itself.
+function computeLocal30_38Baseline(series, centreFreq, excludeHz) {
+  const band = (series || [])
+    .filter(p =>
+      p.frequency >= 30 && p.frequency <= 38 &&
+      Math.abs(p.frequency - centreFreq) > excludeHz &&
+      Number.isFinite(p.spl)
+    )
+    .map(p => p.spl);
+  if (band.length < 2) return null;
+  const sorted = [...band].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
 // Compute 40-80 Hz median to normalise a curve.
 function computeMedian(series) {
   const band = (series || [])
@@ -438,6 +453,42 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
       <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 8 }}>
         B44 normalised: 40–80 Hz median = {results.median.toFixed(2)} dB subtracted. Null centre used: {r.vector.nullCentreHz.toFixed(2)} Hz.
       </div>
+
+      {/* ── TEMPORARY B44 NORMALISATION DIAGNOSTIC ── */}
+      {(() => {
+        const median4080 = results.median;
+        const raw34 = findMaxInWindow(b44Series, T.hz34.featureFrequencyHz, 2)?.spl ?? null;
+        const local3038 = computeLocal30_38Baseline(b44Series, T.hz34.featureFrequencyHz, 1.5);
+        const rel34toMedian = Number.isFinite(raw34) && Number.isFinite(median4080) ? raw34 - median4080 : null;
+        const rel34toLocal  = Number.isFinite(raw34) && Number.isFinite(local3038)  ? raw34 - local3038  : null;
+        const raw68 = findMaxInWindow(b44Series, T.hz68.peakFrequencyHz, 3)?.spl ?? null;
+        const fmt = v => Number.isFinite(v) ? v.toFixed(2) + ' dB' : '—';
+        const rows = [
+          ['40–80 Hz median',                           fmt(median4080)],
+          ['30–38 Hz local baseline (excl. ±1.5 Hz)',   fmt(local3038)],
+          ['Raw 34 Hz peak SPL',                        fmt(raw34)],
+          ['34 Hz peak rel. to 40–80 Hz median',        fmt(rel34toMedian)],
+          ['34 Hz peak rel. to local 30–38 Hz baseline',fmt(rel34toLocal)],
+          ['Raw 68–69 Hz peak SPL',                     fmt(raw68)],
+        ];
+        return (
+          <div style={{ marginBottom: 10, padding: '7px 10px', borderRadius: 5, background: '#e0f2fe', border: '1px solid #7dd3fc' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', marginBottom: 5 }}>
+              Temporary B44 normalisation diagnostic
+            </div>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <tbody>
+                {rows.map(([label, val]) => (
+                  <tr key={label}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '1px 6px', width: '65%' }}>{label}</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, padding: '1px 6px', color: '#0c4a6e' }}>{val}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
 
       {/* Table */}
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
