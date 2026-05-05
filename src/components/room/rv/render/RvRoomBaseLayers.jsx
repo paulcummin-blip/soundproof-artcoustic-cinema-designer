@@ -252,10 +252,10 @@ export default function RvRoomBaseLayers(props) {
               </text>
 
               {/* Projector throw distance – lens to screen front plane */}
-              {(() => {
-                const projector = Array.isArray(props.roomElements)
-                  ? props.roomElements.find(el => el?.type === 'projector')
-                  : null;
+              {props.showThrowDistance && (() => {
+              const projector = Array.isArray(props.roomElements)
+                ? props.roomElements.find(el => el?.type === 'projector')
+                : null;
                 const lensY = Number(projector?.y_lens_m);
                 const screenY = Number(props.screenFrontPlaneM);
                 const bodyDepth = Number(projector?.body_depth_m) || 0.517;

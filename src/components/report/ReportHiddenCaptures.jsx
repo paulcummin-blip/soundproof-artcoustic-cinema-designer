@@ -126,6 +126,7 @@ export default function ReportHiddenCaptures({
                     }}
                     speakerPositionsView="off"
                     showMlpRuler={false}
+                    showThrowDistance={true}
                 />
             </div>
 
@@ -138,6 +139,7 @@ export default function ReportHiddenCaptures({
                     }}
                     speakerPositionsView="off"
                     showMlpRuler={true}
+                    showThrowDistance={false}
                 />
             </div>
 
