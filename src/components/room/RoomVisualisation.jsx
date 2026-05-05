@@ -638,7 +638,7 @@ const byId = useEntitiesById({
   // ANGLE HELPERS — lcrAimMode is the single source of truth for LCR yaw.
   // lcrAimMode === 'angled' → compute yaw to green dot / RSP
   // lcrAimMode === 'flat'   → zero angles (wall-flat rendering)
-  const lcrAimAngled = appState?.lcrAimMode === 'angled';
+  const lcrAimAngled = (props.lcrAimMode || appState?.lcrAimMode) === 'angled';
 
   const lcrAngleInfo = useMemo(() => {
     if (!lcrAimAngled) return { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
