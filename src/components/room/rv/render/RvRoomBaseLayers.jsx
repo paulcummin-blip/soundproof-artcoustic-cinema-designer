@@ -259,6 +259,7 @@ export default function RvRoomBaseLayers(props) {
                 const lensY = Number(projector?.y_lens_m);
                 const screenY = Number(props.screenFrontPlaneM);
                 const bodyDepth = Number(projector?.body_depth_m) || 0.517;
+                // Lens is on the projector edge closest to the screen: lowest Y edge in plan coordinates.
                 const lensFrontY = lensY - bodyDepth / 2;
                 const throwDistanceM = lensFrontY - screenY;
                 if (!projector || !Number.isFinite(lensY) || !Number.isFinite(screenY) || throwDistanceM <= 0) return null;
