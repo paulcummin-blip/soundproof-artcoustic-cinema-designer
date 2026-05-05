@@ -6,7 +6,8 @@ export default function PlanViewDrawing({
   placedSpeakers = [],
   screenSize,
   screenWall,
-  roomOrientation
+  roomOrientation,
+  screenFrontPlaneM,
 }) {
   const { length = 6, width = 4 } = roomDimensions || {};
   const scale = 60;
@@ -33,7 +34,10 @@ export default function PlanViewDrawing({
           let sx, sy, sw, sh;
           if (roomOrientation === 'length_front') {
             sx = margin + (length - screenWidthMeters) * scale / 2;
-            sy = screenWall === 'front' ? margin : margin + width * scale - 4;
+            // Use dynamic screen front plane if available, otherwise fall back to fixed wall offset
+            sy = (Number.isFinite(screenFrontPlaneM) && screenFrontPlaneM > 0)
+              ? margin + screenFrontPlaneM * scale
+              : (screenWall === 'front' ? margin : margin + width * scale - 4);
             sw = screenWidthMeters * scale;
             sh = 4;
           } else {
