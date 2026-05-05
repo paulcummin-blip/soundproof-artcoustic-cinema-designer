@@ -74,7 +74,7 @@ export default function ReportHiddenCaptures({
 
     const screenWithDepth = {
         ...(screen || {}),
-        floatDepthM: screenFrontPlaneM ?? (Number(screen?.floatDepthM) || 0),
+        floatDepthM: Number(screen?.floatDepthM) || 0,
     };
 
     const allLiveSubs = Array.isArray(app?.subwoofers) ? app.subwoofers : [];
