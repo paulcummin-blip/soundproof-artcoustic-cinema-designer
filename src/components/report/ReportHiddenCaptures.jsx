@@ -105,7 +105,7 @@ export default function ReportHiddenCaptures({
         showBaffle: true,
         showScreen: true,
         zoomMode: "off",
-        screenPlaneMode: "fixed",
+        screenPlaneMode: "autoTight",
         lcrAimMode: app?.lcrAimMode || "flat",
         aimAtMLP: app?.aimAtMLP ?? false,
         ...NOOPS,
