@@ -250,6 +250,49 @@ export default function RvRoomBaseLayers(props) {
               >
                 {`${(lengthM ?? 0).toFixed(2)} m`}
               </text>
+
+              {/* Projector throw distance – lens to screen front plane */}
+              {(() => {
+                const projector = Array.isArray(props.roomElements)
+                  ? props.roomElements.find(el => el?.type === 'projector')
+                  : null;
+                const lensY = Number(projector?.y_lens_m);
+                const screenY = Number(props.screenFrontPlaneM);
+                const throwDistanceM = lensY - screenY;
+                if (!projector || !Number.isFinite(lensY) || !Number.isFinite(screenY) || throwDistanceM <= 0) return null;
+
+                // Right-side X for this dimension line (offset from room right edge)
+                const dimX = (roomRect?.x ?? 0) + (roomRect?.width ?? 0) + 20;
+                const y1px = meterToCanvasY(screenY);
+                const y2px = meterToCanvasY(lensY);
+                const midYpx = (y1px + y2px) / 2;
+
+                return (
+                  <g data-layer="throw-dimension" pointerEvents="none">
+                    <line
+                      x1={dimX}
+                      y1={y1px}
+                      x2={dimX}
+                      y2={y2px}
+                      stroke="#DCDBD6"
+                      strokeWidth={2}
+                      markerStart="url(#dim-arrow)"
+                      markerEnd="url(#dim-arrow)"
+                    />
+                    <text
+                      x={dimX + 8}
+                      y={midYpx}
+                      textAnchor="start"
+                      dominantBaseline="middle"
+                      fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                      fontSize={12}
+                      fill="#1B1A1A"
+                    >
+                      {`Throw: ${throwDistanceM.toFixed(2)} m`}
+                    </text>
+                  </g>
+                );
+              })()}
             </g>
           )}
 
