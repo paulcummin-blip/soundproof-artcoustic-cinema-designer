@@ -54,7 +54,7 @@ export function useScreenPlane({
       frontObjects: frontObjectsToCalculate,
       getDims: getModelDimsM,
       lcrAngles: { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
-      aimAtMLP: aimAtMLP,
+      aimAtMLP: appState?.lcrAimMode === 'angled',
     });
 
     // Guard: only update if value actually changed (prevent loops)
