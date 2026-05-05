@@ -258,13 +258,15 @@ export default function RvRoomBaseLayers(props) {
                   : null;
                 const lensY = Number(projector?.y_lens_m);
                 const screenY = Number(props.screenFrontPlaneM);
-                const throwDistanceM = lensY - screenY;
+                const bodyDepth = Number(projector?.body_depth_m) || 0.517;
+                const lensFrontY = lensY - bodyDepth / 2;
+                const throwDistanceM = lensFrontY - screenY;
                 if (!projector || !Number.isFinite(lensY) || !Number.isFinite(screenY) || throwDistanceM <= 0) return null;
 
                 // Right-side X for this dimension line (offset from room right edge)
                 const dimX = (roomRect?.x ?? 0) + (roomRect?.width ?? 0) + 20;
                 const y1px = meterToCanvasY(screenY);
-                const y2px = meterToCanvasY(lensY);
+                const y2px = meterToCanvasY(lensFrontY);
                 const midYpx = (y1px + y2px) / 2;
 
                 return (
