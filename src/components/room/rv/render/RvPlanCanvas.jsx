@@ -97,7 +97,6 @@ export default function RvPlanCanvas({
   frontSubsCfg,
   rearSubsCfg,
   showRoomModesOverlay,
-  showThrowDistance,
   handleMouseDown,
 
   rowFrontWallLabelSeatIds,
@@ -302,9 +301,6 @@ export default function RvPlanCanvas({
               mlp={mlp}
               mlpPoint={mlpPoint}
               seatingPositions={seatingPositions}
-              roomElements={roomElements}
-              screenFrontPlaneM={screenFrontPlaneM}
-              showThrowDistance={showThrowDistance}
             />
 
             {showRoomModesOverlay && (

@@ -108,7 +108,6 @@ export default function ReportHiddenCaptures({
         screenPlaneMode: "fixed",
         lcrAimMode: app?.lcrAimMode || "flat",
         aimAtMLP: app?.aimAtMLP ?? false,
-        lcrAngleInfo: app?.lcrAngleInfo || { L: 0, R: 0 },
         ...NOOPS,
     };
 
@@ -127,7 +126,6 @@ export default function ReportHiddenCaptures({
                     }}
                     speakerPositionsView="off"
                     showMlpRuler={false}
-                    showThrowDistance={true}
                 />
             </div>
 
@@ -140,7 +138,6 @@ export default function ReportHiddenCaptures({
                     }}
                     speakerPositionsView="off"
                     showMlpRuler={true}
-                    showThrowDistance={false}
                 />
             </div>
 

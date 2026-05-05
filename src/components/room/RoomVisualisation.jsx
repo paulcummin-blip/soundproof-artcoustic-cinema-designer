@@ -179,7 +179,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     exportHeightPx,
     freeMoveLcr = false,
     showRoomModesOverlay = false,
-    showThrowDistance = false,
   } = props;
 
   const appState = useAppState();
@@ -1871,7 +1870,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         frontSubsCfg={frontSubsCfg}
         rearSubsCfg={rearSubsCfg}
         showRoomModesOverlay={showRoomModesOverlay}
-        showThrowDistance={showThrowDistance}
         handleMouseDown={handleMouseDown}
         rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds}
         rowDistanceLabelSeatIds={rowDistanceLabelSeatIds}

@@ -252,22 +252,19 @@ export default function RvRoomBaseLayers(props) {
               </text>
 
               {/* Projector throw distance – lens to screen front plane */}
-              {props.showThrowDistance && (() => {
-              const projector = Array.isArray(props.roomElements)
-                ? props.roomElements.find(el => el?.type === 'projector')
-                : null;
+              {(() => {
+                const projector = Array.isArray(props.roomElements)
+                  ? props.roomElements.find(el => el?.type === 'projector')
+                  : null;
                 const lensY = Number(projector?.y_lens_m);
                 const screenY = Number(props.screenFrontPlaneM);
-                const bodyDepth = Number(projector?.body_depth_m) || 0.517;
-                // Lens is on the projector edge closest to the screen: lowest Y edge in plan coordinates.
-                const lensFrontY = lensY - bodyDepth / 2;
-                const throwDistanceM = lensFrontY - screenY;
+                const throwDistanceM = lensY - screenY;
                 if (!projector || !Number.isFinite(lensY) || !Number.isFinite(screenY) || throwDistanceM <= 0) return null;
 
                 // Right-side X for this dimension line (offset from room right edge)
                 const dimX = (roomRect?.x ?? 0) + (roomRect?.width ?? 0) + 20;
                 const y1px = meterToCanvasY(screenY);
-                const y2px = meterToCanvasY(lensFrontY);
+                const y2px = meterToCanvasY(lensY);
                 const midYpx = (y1px + y2px) / 2;
 
                 return (
