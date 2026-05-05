@@ -301,6 +301,8 @@ export default function RvPlanCanvas({
               mlp={mlp}
               mlpPoint={mlpPoint}
               seatingPositions={seatingPositions}
+              roomElements={roomElements}
+              screenFrontPlaneM={screenFrontPlaneM}
             />
 
             {showRoomModesOverlay && (
