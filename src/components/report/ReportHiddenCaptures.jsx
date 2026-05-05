@@ -108,6 +108,7 @@ export default function ReportHiddenCaptures({
         screenPlaneMode: "fixed",
         lcrAimMode: app?.lcrAimMode || "flat",
         aimAtMLP: app?.aimAtMLP ?? false,
+        lcrAngleInfo: app?.lcrAngleInfo || { L: 0, R: 0 },
         ...NOOPS,
     };
 
