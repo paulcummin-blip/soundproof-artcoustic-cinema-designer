@@ -255,60 +255,6 @@ export default function RvRoomBaseLayers(props) {
 
           {/* Screen and baffle - Layer 3 */}
           {BaffleAndScreen}
-
-          {/* Projector throw distance — only on dimensioned capture */}
-          {props.showThrowDistance === true && (() => {
-            const projector = Array.isArray(props.roomElements)
-              ? props.roomElements.find(el => el?.type === 'projector')
-              : null;
-            if (!projector) return null;
-
-            const lensY = Number.isFinite(Number(projector.y_lens_m)) ? Number(projector.y_lens_m) : null;
-            if (!Number.isFinite(lensY)) return null;
-
-            const bodyDepth = Number(projector?.body_depth_m) || 0.517;
-            const projectorFrontY = lensY - bodyDepth / 2;
-            const screenY = Number(props.screenFrontPlaneM);
-            if (!Number.isFinite(screenY) || !Number.isFinite(projectorFrontY)) return null;
-
-            const throwDistanceM = projectorFrontY - screenY;
-            if (throwDistanceM <= 0) return null;
-
-            const lensX = Number.isFinite(Number(projector.x_lens_m))
-              ? Number(projector.x_lens_m)
-              : (props.widthM || 4.5) / 2;
-
-            const xPx = props.meterToCanvasX(lensX);
-            const yScreenPx = props.meterToCanvasY(screenY);
-            const yProjPx = props.meterToCanvasY(projectorFrontY);
-            const midYPx = (yScreenPx + yProjPx) / 2;
-
-            return (
-              <g data-layer="throw-distance" pointerEvents="none">
-                <line
-                  x1={xPx}
-                  y1={yScreenPx}
-                  x2={xPx}
-                  y2={yProjPx}
-                  stroke="#1B1A1A"
-                  strokeWidth={1.5}
-                  strokeDasharray="5 4"
-                  opacity={0.7}
-                />
-                <text
-                  x={xPx + 8}
-                  y={midYPx}
-                  textAnchor="start"
-                  dominantBaseline="middle"
-                  fontFamily="Century Gothic, sans-serif"
-                  fontSize={11}
-                  fill="#1B1A1A"
-                >
-                  {`Throw: ${throwDistanceM.toFixed(2)} m`}
-                </text>
-              </g>
-            );
-          })()}
         </g>
       </g>
     </>
