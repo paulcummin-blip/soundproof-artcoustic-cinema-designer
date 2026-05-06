@@ -29,6 +29,11 @@ export default function RvRoomBaseLayers(props) {
 
     // pre-rendered JSX from the parent
     BaffleAndScreen,
+
+    // Projector throw distance (only on specific export captures)
+    showThrowDistance,
+    roomElements,
+    screenFrontPlaneM,
   } = props;
 
   return (
@@ -252,6 +257,54 @@ export default function RvRoomBaseLayers(props) {
               </text>
             </g>
           )}
+
+          {/* Projector throw distance label — only on second RP22 report drawing */}
+          {showThrowDistance === true && (() => {
+            const projector = Array.isArray(roomElements)
+              ? roomElements.find(el => el?.type === "projector")
+              : null;
+            if (!projector) return null;
+
+            const lensY = Number(projector?.y_lens_m);
+            const screenY = Number(screenFrontPlaneM);
+            const bodyDepth = Number(projector?.body_depth_m) || 0.517;
+            if (!Number.isFinite(lensY) || !Number.isFinite(screenY)) return null;
+
+            const projectorFrontY = lensY - bodyDepth / 2;
+            const throwDistanceM = projectorFrontY - screenY;
+            if (!Number.isFinite(throwDistanceM) || throwDistanceM <= 0) return null;
+
+            const lensX = Number(projector?.x_lens_m);
+            const centerX = Number.isFinite(lensX) ? lensX : (widthM / 2);
+
+            const [x1, y1] = toPx(centerX, screenY);
+            const [x2, y2] = toPx(centerX, projectorFrontY);
+            const midY = (y1 + y2) / 2;
+
+            return (
+              <g data-layer="throw-distance" pointerEvents="none">
+                <line
+                  x1={x1} y1={y1}
+                  x2={x2} y2={y2}
+                  stroke="#625143"
+                  strokeWidth={1.5}
+                  strokeDasharray="5 4"
+                />
+                <text
+                  x={x1 + 8}
+                  y={midY}
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  fontFamily="Century Gothic, sans-serif"
+                  fontSize={11}
+                  fill="#625143"
+                  fontWeight={600}
+                >
+                  {`Throw: ${throwDistanceM.toFixed(2)} m`}
+                </text>
+              </g>
+            );
+          })()}
 
           {/* Screen and baffle - Layer 3 */}
           {BaffleAndScreen}
