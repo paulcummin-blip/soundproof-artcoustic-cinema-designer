@@ -135,6 +135,7 @@ export default function ReportHiddenCaptures({
                     {...commonProps}
                     overlays={{
                         ...liveOverlays,
+                        SHOW_THROW_DISTANCE: true,
                     }}
                     speakerPositionsView="off"
                     showMlpRuler={true}
