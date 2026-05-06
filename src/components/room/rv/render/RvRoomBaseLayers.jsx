@@ -257,7 +257,7 @@ export default function RvRoomBaseLayers(props) {
           {BaffleAndScreen}
 
           {/* Projector throw distance — only on dimensioned capture */}
-          {overlaysForRendering?.SHOW_THROW_DISTANCE && (() => {
+          {props.showThrowDistance === true && (() => {
             const projector = Array.isArray(props.roomElements)
               ? props.roomElements.find(el => el?.type === 'projector')
               : null;

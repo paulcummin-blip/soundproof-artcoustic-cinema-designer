@@ -97,6 +97,7 @@ export default function RvPlanCanvas({
   frontSubsCfg,
   rearSubsCfg,
   showRoomModesOverlay,
+  showThrowDistance,
   handleMouseDown,
 
   rowFrontWallLabelSeatIds,
@@ -297,6 +298,7 @@ export default function RvPlanCanvas({
               SPEAKER_PLAN_TOP_GUTTER_PX={SPEAKER_PLAN_TOP_GUTTER_PX}
               BOTTOM_GUTTER_PX={BOTTOM_GUTTER_PX}
               SPEAKER_PLAN_BOTTOM_GUTTER_PX={SPEAKER_PLAN_BOTTOM_GUTTER_PX}
+              showThrowDistance={showThrowDistance}
               BaffleAndScreen={<RvBaffleAndScreen screen={screen} roomRect={roomRect} scale={scale} actualScreenFrontY={actualScreenFrontY} showBaffle={showBaffle} showScreen={showScreen} widthM={widthM} SCREEN_THICKNESS_M={SCREEN_THICKNESS_M} meterToCanvasX={meterToCanvasX} exportMode={exportMode} screenFrontPlaneM={screenFrontPlaneM} screenPlaneMode={screenPlaneMode} />}
               mlp={mlp}
               mlpPoint={mlpPoint}
