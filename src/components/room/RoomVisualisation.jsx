@@ -1871,7 +1871,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         frontSubsCfg={frontSubsCfg}
         rearSubsCfg={rearSubsCfg}
         showRoomModesOverlay={showRoomModesOverlay}
-        showThrowDistance={showThrowDistance}
+        showThrowDistance={showThrowDistance || overlaysForRendering?.ROOM_DIMS === true}
         handleMouseDown={handleMouseDown}
         rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds}
         rowDistanceLabelSeatIds={rowDistanceLabelSeatIds}
