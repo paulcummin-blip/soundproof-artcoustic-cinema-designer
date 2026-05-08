@@ -87,12 +87,9 @@ export function calculateTvFrontStageHeightGuidance({
       };
     }
 
-    const rawOffsetMm = Number(placementOffsetFromScreenBottomMm);
-    const placementOffsetM = Number.isFinite(rawOffsetMm) && rawOffsetMm >= 0
-      ? rawOffsetMm / 1000
-      : 0.02; // fallback: 20 mm
+    const fixedGapBelowTvM = 0.05;
 
-    const soundbarCentreHeightM = screenBottom - placementOffsetM - soundbarH / 2;
+    const soundbarCentreHeightM = screenBottom - fixedGapBelowTvM - soundbarH / 2;
 
     const TOLERANCE_M = 0.03;
 
@@ -109,10 +106,10 @@ export function calculateTvFrontStageHeightGuidance({
       mode: 'tv_soundbar',
       idealHeightM: soundbarCentreHeightM,
       currentAcousticCentreM: current,
-      placementOffsetM,
+      placementOffsetM: fixedGapBelowTvM,
       status,
       explanationText:
-        'For TV soundbar layouts, the soundbar is positioned at the fixed design offset below the TV screen.',
+        'For TV soundbar layouts, the soundbar is positioned with a fixed 5 cm gap below the TV screen.',
     };
   }
 
