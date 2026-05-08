@@ -266,6 +266,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   }, [getByRole, LCR_CANONICAL_ROLES, standardLcrOptions]);
 
   const lastP12SentRef = useRef(null);
+  const hasInitialisedLcrIdealHeightRef = useRef(false);
 
   // Compute P12 values at component scope so the effect can depend on them
   const hasLcrSubClash = useMemo(() => hasFrontLcrSubClash({
@@ -369,6 +370,26 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     screen?.aspectRatio,
     lcrHeightInputValue,
     mlpPoint?.z,
+  ]);
+
+  // First-initialisation only: seed LCR height to acoustic-centre ideal when no saved value exists.
+  useEffect(() => {
+    if (hasInitialisedLcrIdealHeightRef.current) return;
+    if (!acousticCentreGuidance?.isValid) return;
+    if (!Number.isFinite(acousticCentreGuidance.idealHeightM)) return;
+    if (Number.isFinite(Number(splConfig?.lcrHeightM))) return; // saved/user value exists — do not overwrite
+
+    const ideal = Number(acousticCentreGuidance.idealHeightM);
+    setLcrHeightInputValue(String(Number(ideal.toFixed(2))));
+    updateGlobalSpl?.({ lcrHeightM: ideal });
+    updatePlacedLcrHeight(ideal);
+    hasInitialisedLcrIdealHeightRef.current = true;
+  }, [
+    acousticCentreGuidance?.isValid,
+    acousticCentreGuidance?.idealHeightM,
+    splConfig?.lcrHeightM,
+    updateGlobalSpl,
+    updatePlacedLcrHeight,
   ]);
 
   useEffect(() => {
