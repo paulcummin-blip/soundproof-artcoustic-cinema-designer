@@ -329,69 +329,6 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
   const [lcrHeightInputValue, setLcrHeightInputValue] = useState(String(clampLcrHeight(Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : defaultLcrHeightM).toFixed(2)));
 
-  // Acoustic centre guidance (read-only, no state writes)
-  // Placed after state declarations to avoid temporal dead zone on lcrModel/frontStageMode
-  const acousticCentreGuidance = useMemo(() => {
-    try {
-      const activeModel = frontStageMode === 'integrated_lcr' ? null : lcrModel;
-      const modelMeta = activeModel ? getSpeakerModelMeta(activeModel) : null;
-      const speakerHeightM = modelMeta?.heightM || null;
-
-      const screenBottom = Number(screen?.heightFromFloorM);
-      const visWidthIn = Number(screen?.visibleWidthInches);
-      const arStr = String(screen?.aspectRatio || '16:9');
-      const [arW, arH] = arStr.split(':').map(Number);
-      const ratio = (arW && arH) ? arW / arH : 16 / 9;
-      const viewableHeightM = (Number.isFinite(visWidthIn) && visWidthIn > 0)
-        ? (visWidthIn * 0.0254) / ratio
-        : null;
-
-      const currentAcousticCentreM = Number.isFinite(Number(lcrHeightInputValue))
-        ? Number(lcrHeightInputValue)
-        : null;
-
-      const seatedEarHeightM = Number.isFinite(mlpPoint?.z) ? mlpPoint.z : 1.2;
-
-      return calculateLcrAcousticCentreBand({
-        screenBottomHeightM: Number.isFinite(screenBottom) ? screenBottom : null,
-        viewableImageHeightM: viewableHeightM,
-        seatedEarHeightM,
-        speakerHeightM,
-        currentAcousticCentreM,
-      });
-    } catch {
-      return null;
-    }
-  }, [
-    lcrModel,
-    frontStageMode,
-    screen?.heightFromFloorM,
-    screen?.visibleWidthInches,
-    screen?.aspectRatio,
-    lcrHeightInputValue,
-    mlpPoint?.z,
-  ]);
-
-  // First-initialisation only: seed LCR height to acoustic-centre ideal when no saved value exists.
-  useEffect(() => {
-    if (hasInitialisedLcrIdealHeightRef.current) return;
-    if (!acousticCentreGuidance?.isValid) return;
-    if (!Number.isFinite(acousticCentreGuidance.idealHeightM)) return;
-    if (Number.isFinite(Number(splConfig?.lcrHeightM))) return; // saved/user value exists — do not overwrite
-
-    const ideal = Number(acousticCentreGuidance.idealHeightM);
-    setLcrHeightInputValue(String(Number(ideal.toFixed(2))));
-    updateGlobalSpl?.({ lcrHeightM: ideal });
-    updatePlacedLcrHeight(ideal);
-    hasInitialisedLcrIdealHeightRef.current = true;
-  }, [
-    acousticCentreGuidance?.isValid,
-    acousticCentreGuidance?.idealHeightM,
-    splConfig?.lcrHeightM,
-    updateGlobalSpl,
-    updatePlacedLcrHeight,
-  ]);
-
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
   }, [initialModel, lcrModel]);
@@ -447,6 +384,68 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
       return { ...speaker, position: { ...speaker.position, z: heightM } };
     }) : prev));
   }, [frontStageMode, setSpeakers]);
+
+  // Acoustic centre guidance (read-only, no state writes)
+  const acousticCentreGuidance = useMemo(() => {
+    try {
+      const activeModel = frontStageMode === 'integrated_lcr' ? null : lcrModel;
+      const modelMeta = activeModel ? getSpeakerModelMeta(activeModel) : null;
+      const speakerHeightM = modelMeta?.heightM || null;
+
+      const screenBottom = Number(screen?.heightFromFloorM);
+      const visWidthIn = Number(screen?.visibleWidthInches);
+      const arStr = String(screen?.aspectRatio || '16:9');
+      const [arW2, arH2] = arStr.split(':').map(Number);
+      const ratio = (arW2 && arH2) ? arW2 / arH2 : 16 / 9;
+      const viewableHeightM = (Number.isFinite(visWidthIn) && visWidthIn > 0)
+        ? (visWidthIn * 0.0254) / ratio
+        : null;
+
+      const currentAcousticCentreM = Number.isFinite(Number(lcrHeightInputValue))
+        ? Number(lcrHeightInputValue)
+        : null;
+
+      const seatedEarHeightM = Number.isFinite(mlpPoint?.z) ? mlpPoint.z : 1.2;
+
+      return calculateLcrAcousticCentreBand({
+        screenBottomHeightM: Number.isFinite(screenBottom) ? screenBottom : null,
+        viewableImageHeightM: viewableHeightM,
+        seatedEarHeightM,
+        speakerHeightM,
+        currentAcousticCentreM,
+      });
+    } catch {
+      return null;
+    }
+  }, [
+    lcrModel,
+    frontStageMode,
+    screen?.heightFromFloorM,
+    screen?.visibleWidthInches,
+    screen?.aspectRatio,
+    lcrHeightInputValue,
+    mlpPoint?.z,
+  ]);
+
+  // First-initialisation only: seed LCR height to acoustic-centre ideal when no saved value exists.
+  useEffect(() => {
+    if (hasInitialisedLcrIdealHeightRef.current) return;
+    if (!acousticCentreGuidance?.isValid) return;
+    if (!Number.isFinite(acousticCentreGuidance.idealHeightM)) return;
+    if (Number.isFinite(Number(splConfig?.lcrHeightM))) return; // saved/user value exists — do not overwrite
+
+    const ideal = Number(acousticCentreGuidance.idealHeightM);
+    setLcrHeightInputValue(String(Number(ideal.toFixed(2))));
+    updateGlobalSpl?.({ lcrHeightM: ideal });
+    updatePlacedLcrHeight(ideal);
+    hasInitialisedLcrIdealHeightRef.current = true;
+  }, [
+    acousticCentreGuidance?.isValid,
+    acousticCentreGuidance?.idealHeightM,
+    splConfig?.lcrHeightM,
+    updateGlobalSpl,
+    updatePlacedLcrHeight,
+  ]);
 
   const handleLcrHeightChange = useCallback((e) => {
     const newValue = e.target.value;
