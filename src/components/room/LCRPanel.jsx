@@ -10,6 +10,7 @@ import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { calculateLcrAcousticCentreBand, formatHeightM } from '@/components/utils/acoustics/acousticCentreBand';
+import { calculateTvFrontStageHeightGuidance } from '@/components/utils/acoustics/tvFrontStageHeightGuidance';
 
 const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P12_THRESHOLDS_MIN = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -427,6 +428,38 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     mlpPoint?.z,
   ]);
 
+  const activeHeightGuidance = useMemo(() => {
+    const isTv = Boolean(screen?.tvPresetKey);
+    if (!isTv) return acousticCentreGuidance;
+
+    const currentAcousticCentreM = Number.isFinite(Number(lcrHeightInputValue))
+      ? Number(lcrHeightInputValue)
+      : null;
+    const activeSoundbarMeta = soundbarModel ? resolveSoundbarMeta(soundbarModel, screen) : null;
+    const soundbarHeightM = Number.isFinite(Number(activeSoundbarMeta?.heightM))
+      ? Number(activeSoundbarMeta.heightM)
+      : Number.isFinite(Number(activeSoundbarMeta?.heightMm))
+        ? Number(activeSoundbarMeta.heightMm) / 1000
+        : null;
+
+    return calculateTvFrontStageHeightGuidance({
+      isTv,
+      frontStageMode,
+      screenBottomHeightM: Number(screen?.heightFromFloorM),
+      viewableImageHeightM: screenHeightM,
+      soundbarHeightM,
+      placementOffsetFromScreenBottomMm: activeSoundbarMeta?.placementOffsetFromScreenBottomMm,
+      currentAcousticCentreM,
+    });
+  }, [
+    acousticCentreGuidance,
+    frontStageMode,
+    lcrHeightInputValue,
+    screen,
+    screenHeightM,
+    soundbarModel,
+  ]);
+
   // First-initialisation only: seed LCR height to acoustic-centre ideal when no saved value exists.
   useEffect(() => {
     if (hasInitialisedLcrIdealHeightRef.current) return;
@@ -624,26 +657,47 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         )}
       </div>
 
-      {acousticCentreGuidance?.isValid && (() => {
-        const { status, minHeightM, maxHeightM, idealHeightM, currentAcousticCentreM } = acousticCentreGuidance;
+      {activeHeightGuidance?.isValid && (() => {
+        const { status, minHeightM, maxHeightM, idealHeightM, currentAcousticCentreM, placementOffsetM, mode } = activeHeightGuidance;
         const statusColor = status === 'ideal' ? '#2d7a4f' : status === 'below' || status === 'above' ? '#b45309' : '#6b7280';
         const statusLabel = status === 'ideal' ? 'Ideal' : status === 'below' ? 'Below range' : status === 'above' ? 'Above range' : 'Unknown';
+        const guidanceTitle = mode === 'tv_soundbar'
+          ? 'TV SOUNDBAR HEIGHT GUIDANCE'
+          : mode === 'tv_separate_lcr'
+            ? 'TV L/R HEIGHT GUIDANCE'
+            : 'ACOUSTIC CENTRE GUIDANCE';
         return (
           <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#F8F8F7', border: '1px solid #E6E4DD' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#625143', marginBottom: 5, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-              Acoustic Centre Guidance
+              {guidanceTitle}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 10px' }}>
               <span style={{ fontSize: 11, color: '#888' }}>Current</span>
               <span style={{ fontSize: 11, color: '#1B1A1A', fontWeight: 600 }}>
                 {currentAcousticCentreM !== null ? formatHeightM(currentAcousticCentreM) : '—'}
               </span>
-              <span style={{ fontSize: 11, color: '#888' }}>Range</span>
-              <span style={{ fontSize: 11, color: '#1B1A1A' }}>
-                {formatHeightM(minHeightM)} – {formatHeightM(maxHeightM)}
-              </span>
-              <span style={{ fontSize: 11, color: '#888' }}>Ideal</span>
-              <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(idealHeightM)}</span>
+              {mode === 'tv_soundbar' ? (
+                <>
+                  <span style={{ fontSize: 11, color: '#888' }}>Fixed position</span>
+                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(idealHeightM)}</span>
+                  <span style={{ fontSize: 11, color: '#888' }}>Offset below TV</span>
+                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(placementOffsetM)}</span>
+                </>
+              ) : mode === 'tv_separate_lcr' ? (
+                <>
+                  <span style={{ fontSize: 11, color: '#888' }}>TV image centre</span>
+                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(idealHeightM)}</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: 11, color: '#888' }}>Range</span>
+                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>
+                    {formatHeightM(minHeightM)} – {formatHeightM(maxHeightM)}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#888' }}>Ideal</span>
+                  <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(idealHeightM)}</span>
+                </>
+              )}
               <span style={{ fontSize: 11, color: '#888' }}>Status</span>
               <span style={{ fontSize: 11, fontWeight: 600, color: statusColor }}>{statusLabel}</span>
             </div>
