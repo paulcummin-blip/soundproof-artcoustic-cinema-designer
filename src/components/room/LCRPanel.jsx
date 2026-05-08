@@ -345,8 +345,8 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         ? (visWidthIn * 0.0254) / ratio
         : null;
 
-      const currentAcousticCentreM = Number.isFinite(Number(splConfig?.lcrHeightM))
-        ? Number(splConfig.lcrHeightM)
+      const currentAcousticCentreM = Number.isFinite(Number(lcrHeightInputValue))
+        ? Number(lcrHeightInputValue)
         : null;
 
       const seatedEarHeightM = Number.isFinite(mlpPoint?.z) ? mlpPoint.z : 1.2;
@@ -367,7 +367,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     screen?.heightFromFloorM,
     screen?.visibleWidthInches,
     screen?.aspectRatio,
-    splConfig?.lcrHeightM,
+    lcrHeightInputValue,
     mlpPoint?.z,
   ]);
 
