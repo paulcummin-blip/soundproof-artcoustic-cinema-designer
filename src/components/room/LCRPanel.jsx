@@ -9,6 +9,7 @@ import { getLevelColors } from '@/components/utils/rp22Colors';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
+import { calculateLcrAcousticCentreBand, formatHeightM } from '@/components/utils/acoustics/acousticCentreBand';
 
 const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P12_THRESHOLDS_MIN = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -272,6 +273,48 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     frontSubs: subwoofers,
     frontSubsCfg,
   }), [speakerSystem?.placedSpeakers, subwoofers, frontSubsCfg]);
+
+  // Acoustic centre guidance (read-only, no state writes)
+  const acousticCentreGuidance = useMemo(() => {
+    try {
+      const activeModel = frontStageMode === 'integrated_lcr' ? null : lcrModel;
+      const modelMeta = activeModel ? getSpeakerModelMeta(activeModel) : null;
+      const speakerHeightM = modelMeta?.heightM || null;
+
+      const screenBottom = Number(screen?.heightFromFloorM);
+      const visWidthIn = Number(screen?.visibleWidthInches);
+      const arStr = String(screen?.aspectRatio || '16:9');
+      const [arW, arH] = arStr.split(':').map(Number);
+      const ratio = (arW && arH) ? arW / arH : 16 / 9;
+      const viewableHeightM = (Number.isFinite(visWidthIn) && visWidthIn > 0)
+        ? (visWidthIn * 0.0254) / ratio
+        : null;
+
+      const currentAcousticCentreM = Number.isFinite(Number(splConfig?.lcrHeightM))
+        ? Number(splConfig.lcrHeightM)
+        : null;
+
+      const seatedEarHeightM = Number.isFinite(mlpPoint?.z) ? mlpPoint.z : 1.2;
+
+      return calculateLcrAcousticCentreBand({
+        screenBottomHeightM: Number.isFinite(screenBottom) ? screenBottom : null,
+        viewableImageHeightM: viewableHeightM,
+        seatedEarHeightM,
+        speakerHeightM,
+        currentAcousticCentreM,
+      });
+    } catch {
+      return null;
+    }
+  }, [
+    lcrModel,
+    frontStageMode,
+    screen?.heightFromFloorM,
+    screen?.visibleWidthInches,
+    screen?.aspectRatio,
+    splConfig?.lcrHeightM,
+    mlpPoint?.z,
+  ]);
 
   const p12Computed = useMemo(() => {
     if (!allSeatSplMetrics) return null;
@@ -559,6 +602,33 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
           <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
         )}
       </div>
+
+      {acousticCentreGuidance?.isValid && (() => {
+        const { status, minHeightM, maxHeightM, idealHeightM, currentAcousticCentreM } = acousticCentreGuidance;
+        const statusColor = status === 'ideal' ? '#2d7a4f' : status === 'below' || status === 'above' ? '#b45309' : '#6b7280';
+        const statusLabel = status === 'ideal' ? 'Ideal' : status === 'below' ? 'Below range' : status === 'above' ? 'Above range' : 'Unknown';
+        return (
+          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#F8F8F7', border: '1px solid #E6E4DD' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#625143', marginBottom: 5, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+              Acoustic Centre Guidance
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 10px' }}>
+              <span style={{ fontSize: 11, color: '#888' }}>Current</span>
+              <span style={{ fontSize: 11, color: '#1B1A1A', fontWeight: 600 }}>
+                {currentAcousticCentreM !== null ? formatHeightM(currentAcousticCentreM) : '—'}
+              </span>
+              <span style={{ fontSize: 11, color: '#888' }}>Range</span>
+              <span style={{ fontSize: 11, color: '#1B1A1A' }}>
+                {formatHeightM(minHeightM)} – {formatHeightM(maxHeightM)}
+              </span>
+              <span style={{ fontSize: 11, color: '#888' }}>Ideal</span>
+              <span style={{ fontSize: 11, color: '#1B1A1A' }}>{formatHeightM(idealHeightM)}</span>
+              <span style={{ fontSize: 11, color: '#888' }}>Status</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: statusColor }}>{statusLabel}</span>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="space-y-2 mt-4">
         <Label className="text-xs text-[#625143]">Parameter 12. Screen speakers SPL capability at RSP</Label>
