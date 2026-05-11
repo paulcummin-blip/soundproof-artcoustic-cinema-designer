@@ -120,6 +120,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(false);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
   const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState("existing");
+  const [modalStorageMode, setModalStorageMode] = useState("none");
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -274,6 +275,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             freqMaxHz: 200,
             smoothing: 'none',
             modalSourceReferenceMode,
+            modalStorageMode,
           }
         );
 
@@ -323,7 +325,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, rewSourceCurveMode, modalSourceReferenceMode, absorptionPct, selectedSeatIds]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, rewSourceCurveMode, modalSourceReferenceMode, modalStorageMode, absorptionPct, selectedSeatIds]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -761,6 +763,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <option value="existing">Modal source: existing 1 m reference</option>
                   <option value="distance_normalized">Modal source: distance-normalised</option>
                   <option value="room_normalized">Modal source: room-normalised</option>
+                </select>
+                <select
+                  value={modalStorageMode}
+                  onChange={(event) => setModalStorageMode(event.target.value)}
+                  className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
+                  aria-label="Modal storage comparison"
+                >
+                  <option value="none">Modal storage: none</option>
+                  <option value="orderCompression">Modal storage: order compression</option>
                 </select>
               </>
             )}
