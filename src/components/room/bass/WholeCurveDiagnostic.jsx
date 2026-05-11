@@ -48,6 +48,7 @@ function buildRow(targetHz, stepDebug, b44Series, wholeCurveDebugRows) {
       modalSumMag: wholeCurveRow.modalSumMagnitude,
       postModalMag: wholeCurveRow.postModalMagnitude,
       curveDb: wholeCurveRow.curveDb,
+      modalSourceReferenceMode: wholeCurveRow.modalSourceReferenceMode,
     };
   }
 
@@ -103,13 +104,14 @@ const fmtDb  = (v) => Number.isFinite(v) ? v.toFixed(2) : '—';
 const fmtMag = (v) => Number.isFinite(v) ? v.toFixed(4) : '—';
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveDebugRows }) {
+export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveDebugRows, modalSourceReferenceMode = 'existing' }) {
   const [open, setOpen] = useState(false);
 
   if (!Array.isArray(b44Series) || b44Series.length === 0) return null;
 
   const hasWholeCurveRows = Array.isArray(wholeCurveDebugRows) && wholeCurveDebugRows.length > 0;
   const rows = TARGET_HZ.map(hz => buildRow(hz, stepDebug, b44Series, wholeCurveDebugRows));
+  const debugModalSourceReferenceMode = rows.find(row => row.modalSourceReferenceMode)?.modalSourceReferenceMode || modalSourceReferenceMode;
 
   const thBase = {
     padding: '3px 7px',
@@ -165,6 +167,7 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveD
             ) : (
               <><strong>source</strong>: legacy stepDebug fallback, sparse 30–72 Hz ·{' '}</>
             )}
+            <strong>modalSourceReference</strong>: {debugModalSourceReferenceMode} ·{' '}
             <strong>finalSPL</strong>: engine debug row when available · magnitudes are linear pressure units
           </div>
 

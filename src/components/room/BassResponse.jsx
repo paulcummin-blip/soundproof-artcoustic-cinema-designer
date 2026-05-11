@@ -119,6 +119,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [roomDamping, setRoomDamping] = useState(20);
   const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(false);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
+  const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState("existing");
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -272,6 +273,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             freqMinHz: 20,
             freqMaxHz: 200,
             smoothing: 'none',
+            modalSourceReferenceMode,
           }
         );
 
@@ -321,7 +323,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, rewSourceCurveMode, absorptionPct, selectedSeatIds]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, rewSourceCurveMode, modalSourceReferenceMode, absorptionPct, selectedSeatIds]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -739,16 +741,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
             <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
             {useRewCoreTestMode && (
-              <select
-                value={rewSourceCurveMode}
-                onChange={(event) => setRewSourceCurveMode(event.target.value)}
-                className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                aria-label="REW source curve comparison"
-              >
-                <option value="product">Current product curve</option>
-                <option value="flat90">Flat 90 dB source curve</option>
-                <option value="rew20HzPorted">Generic REW-style 20 Hz ported curve</option>
-              </select>
+              <>
+                <select
+                  value={rewSourceCurveMode}
+                  onChange={(event) => setRewSourceCurveMode(event.target.value)}
+                  className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
+                  aria-label="REW source curve comparison"
+                >
+                  <option value="product">Current product curve</option>
+                  <option value="flat90">Flat 90 dB source curve</option>
+                  <option value="rew20HzPorted">Generic REW-style 20 Hz ported curve</option>
+                </select>
+                <select
+                  value={modalSourceReferenceMode}
+                  onChange={(event) => setModalSourceReferenceMode(event.target.value)}
+                  className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
+                  aria-label="Modal source reference comparison"
+                >
+                  <option value="existing">Modal source: existing 1 m reference</option>
+                  <option value="distance_normalized">Modal source: distance-normalised</option>
+                  <option value="room_normalized">Modal source: room-normalised</option>
+                </select>
+              </>
             )}
           </div>
         </div>
@@ -854,6 +868,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             b44Series={multiSeries[0]?.data ?? []}
             stepDebug={simulationResults.stepDebug}
             wholeCurveDebugRows={simulationResults.wholeCurveDebugRows}
+            modalSourceReferenceMode={modalSourceReferenceMode}
           />
         </div>
       )}

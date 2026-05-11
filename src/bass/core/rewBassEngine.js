@@ -436,7 +436,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Room modes are excited by energy injected into the room from the source.
     // Seat-distance effects are already handled separately by sourceCoupling / receiverCoupling.
     const modalGainScalar = 1.8;
-    const modalSourceAmplitude1m = Math.pow(10, (curveDb + source.tuning.gainDb) / 20) * modalGainScalar;
+    const modalSourceReferenceMode = options?.modalSourceReferenceMode || 'existing';
+    const modalSourceAmplitudeBase = Math.pow(10, (curveDb + source.tuning.gainDb) / 20) * modalGainScalar;
+    const roomVolumeM3 = widthM * lengthM * heightM;
+    const modalSourceAmplitude1m = modalSourceReferenceMode === 'distance_normalized'
+      ? modalSourceAmplitudeBase * Math.pow(10, distanceLossDb / 20)
+      : modalSourceReferenceMode === 'room_normalized'
+        ? modalSourceAmplitudeBase / Math.sqrt(Math.max(roomVolumeM3, 1e-6))
+        : modalSourceAmplitudeBase;
 
     const timeOfFlightPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
     const delayPhase = -2 * Math.PI * frequencyHz * (source.tuning.delayMs / 1000);
@@ -672,6 +679,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSumMagnitude,
         postModalMagnitude,
         modalGainScalar,
+        modalSourceReferenceMode,
       });
     });
 
@@ -698,6 +706,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSumMagnitude: null,
         postModalMagnitude: null,
         modalGainScalar: null,
+        modalSourceReferenceMode: options?.modalSourceReferenceMode || 'existing',
       };
     }
 
