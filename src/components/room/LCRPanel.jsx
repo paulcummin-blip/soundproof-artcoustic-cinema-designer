@@ -85,7 +85,8 @@ function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
           ? Number(frontSubsCfg.bottomHeightM)
           : 0.05;
       const model = sub?.model || frontSubsCfg?.model;
-      const meta = getSpeakerModelMeta(model);
+      const orientation = sub?.orientation || frontSubsCfg?.orientation;
+      const meta = getSpeakerModelMeta(model, orientation);
       const width = Number(meta?.widthM);
       const height = Number(meta?.heightM);
       if (![x, bottom, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;

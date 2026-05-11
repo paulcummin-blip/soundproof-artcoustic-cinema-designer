@@ -596,7 +596,11 @@ export default function ScreenWallConstructionGraphic({
           model: item.model || `SUB ${index + 1}`,
           xM: Number(x),
           zM: Number(z),
-          bottomHeightM: Number.isFinite(bottomHeightM) ? bottomHeightM : 0.05,
+          bottomHeightM: Number.isFinite(bottomHeightM)
+            ? bottomHeightM
+            : Number.isFinite(Number(frontSubsCfg?.bottomHeightM))
+              ? Number(frontSubsCfg.bottomHeightM)
+              : 0.05,
           dims: resolveDims(item.model, SUB_FALLBACKS, {
             widthM: 0.6,
             heightM: 0.255,
@@ -604,7 +608,7 @@ export default function ScreenWallConstructionGraphic({
           }, orientation),
         };
       });
-  }, [frontSubs, frontSubsCfg?.orientation]);
+  }, [frontSubs, frontSubsCfg?.orientation, frontSubsCfg?.bottomHeightM]);
 
   const { sharedLcrZM, minXM, maxXM } = useMemo(() => {
     if (drawnSpeakers.length === 0) return { sharedLcrZM: null, minXM: null, maxXM: null };
