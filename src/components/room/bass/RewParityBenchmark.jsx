@@ -378,7 +378,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       },
       // 40 Hz null
       hz40: {
-        b44NullCentreHz:  hz40Null?.frequency ?? null,
+        b44NullCentreHz:  Number.isFinite(hz40NullWidthInfo.centerHz) ? hz40NullWidthInfo.centerHz : (hz40Null?.frequency ?? null),
         b44NullDepthDb:   hz40NullDepthLocal,  // raw null minus local baseline
         b44NullWidthHz:   hz40NullWidth,
         rewNullCentreHz:  T.hz40.nullCentreHz,
