@@ -8,7 +8,7 @@ function buildFrequencyAxis(freqMinHz, freqMaxHz) {
   const freqsHz = [];
 
   const octaves = Math.log2(maxHz / minHz);
-  const pointsPerOctave = 24;
+  const pointsPerOctave = 96;
   const totalPoints = Math.ceil(octaves * pointsPerOctave);
 
   for (let index = 0; index <= totalPoints; index += 1) {
