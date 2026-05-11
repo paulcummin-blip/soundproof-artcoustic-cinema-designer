@@ -15,6 +15,24 @@ import RewParityBenchmark from "@/components/room/bass/RewParityBenchmark";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
+const REW_SOURCE_CURVES = {
+  product: null,
+  flat90: [
+    { hz: 15, db: 90 },
+    { hz: 200, db: 90 },
+  ],
+  rew20HzPorted: [
+    { hz: 15, db: 78 },
+    { hz: 18, db: 84 },
+    { hz: 20, db: 87 },
+    { hz: 25, db: 90 },
+    { hz: 40, db: 90 },
+    { hz: 80, db: 90 },
+    { hz: 100, db: 89 },
+    { hz: 200, db: 89 },
+  ],
+};
+
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
   const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave } = useAppState();
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
@@ -100,6 +118,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [absorptionPct, setAbsorptionPct] = useState(30);
   const [roomDamping, setRoomDamping] = useState(20);
   const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(false);
+  const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -231,6 +250,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subsForSimulation.forEach((sub) => {
         const subCurve = getSubwooferCurve(sub.modelKey);
         if (!subCurve || subCurve.length === 0) return;
+        const diagnosticSourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
 
         const rewResult = simulateBassResponseRewCore(
           {
@@ -244,7 +264,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             z: Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2,
           },
           sub,
-          subCurve,
+          diagnosticSourceCurve,
           {
             enableReflections: true,
             enableModes: true,
@@ -301,7 +321,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, absorptionPct, selectedSeatIds]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, rewSourceCurveMode, absorptionPct, selectedSeatIds]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -715,9 +735,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
             <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
+            {useRewCoreTestMode && (
+              <select
+                value={rewSourceCurveMode}
+                onChange={(event) => setRewSourceCurveMode(event.target.value)}
+                className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
+                aria-label="REW source curve comparison"
+              >
+                <option value="product">Current product curve</option>
+                <option value="flat90">Flat 90 dB source curve</option>
+                <option value="rew20HzPorted">Generic REW-style 20 Hz ported curve</option>
+              </select>
+            )}
           </div>
         </div>
 
