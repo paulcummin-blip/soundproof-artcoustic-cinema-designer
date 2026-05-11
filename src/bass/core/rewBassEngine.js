@@ -266,6 +266,7 @@ const LOW_MODE_KEYS = [
 ];
 
 const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6];
+const WHOLE_CURVE_DEBUG_TARGETS = [20, 30, 34.3, 40, 50, 60, 68.6, 70, 80, 90, 100];
 
 function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude) {
   // Direct pressure sum — starts at zero, no identity seed.
@@ -408,6 +409,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     : [];
 
   const stepDebugRows = [];
+  const wholeCurveDebugCandidates = new Map();
 
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
@@ -530,6 +532,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Additive modal pressure contribution path.
     // legacyModalTransferLocal returns the net modal pressure sum (starts at zero).
     // Modal contributions are added directly to the pre-modal field — true superposition.
+    let modalSumMagnitude = null;
+
     if (enableModes) {
       const { modalSumRe, modalSumIm, _debugStrongestMode } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m
@@ -545,6 +549,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
       const modalTransferRe = null;
       const modalTransferIm = null;
+      modalSumMagnitude = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
@@ -558,6 +563,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         if (nearestRow && nearestRow.postModal === null) {
           const postMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
           const modalSumMag = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
+          modalSumMagnitude = modalSumMag;
           const strongestModeMagnitude = _debugStrongestMode
             ? Math.sqrt(
                 (_debugStrongestMode.transferRe || 0) * (_debugStrongestMode.transferRe || 0) +
@@ -643,12 +649,60 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       }
     }
 
+    const postModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+    const finalSplDb = 20 * Math.log10(postModalMagnitude);
+
+    WHOLE_CURVE_DEBUG_TARGETS.forEach((targetHz) => {
+      const distanceFromTarget = Math.abs(frequencyHz - targetHz);
+      if (distanceFromTarget > 1) return;
+
+      const existing = wholeCurveDebugCandidates.get(targetHz);
+      if (existing && existing.distanceFromTarget <= distanceFromTarget) return;
+
+      wholeCurveDebugCandidates.set(targetHz, {
+        distanceFromTarget,
+        targetHz,
+        frequencyHz,
+        finalSplDb,
+        curveDb,
+        directMagnitude: Math.sqrt(directRe * directRe + directIm * directIm),
+        reflectionMagnitude: Math.sqrt(reflectionRe * reflectionRe + reflectionIm * reflectionIm),
+        lateFieldMagnitude: Math.sqrt(lateFieldRe * lateFieldRe + lateFieldIm * lateFieldIm),
+        preModalMagnitude,
+        modalSumMagnitude,
+        postModalMagnitude,
+        modalGainScalar,
+      });
+    });
+
     return { re: sumRe, im: sumIm };
   });
 
   const splDbRaw = complexPressure.map(({ re, im }) => {
     const magnitude = Math.sqrt(re * re + im * im);
     return 20 * Math.log10(magnitude);
+  });
+
+  const wholeCurveDebugRows = WHOLE_CURVE_DEBUG_TARGETS.map((targetHz) => {
+    const row = wholeCurveDebugCandidates.get(targetHz);
+    if (!row) {
+      return {
+        targetHz,
+        frequencyHz: null,
+        finalSplDb: null,
+        curveDb: null,
+        directMagnitude: null,
+        reflectionMagnitude: null,
+        lateFieldMagnitude: null,
+        preModalMagnitude: null,
+        modalSumMagnitude: null,
+        postModalMagnitude: null,
+        modalGainScalar: null,
+      };
+    }
+
+    const { distanceFromTarget, ...debugRow } = row;
+    return debugRow;
   });
 
   return {
@@ -658,6 +712,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     stepDebug: stepDebugRows
       .map((row) => row.targetVectorDebug)
       .filter(Boolean),
+    wholeCurveDebugRows,
   };
 }
 
