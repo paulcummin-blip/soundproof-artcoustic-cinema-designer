@@ -141,7 +141,8 @@ function parabolicRefineFrequency(sortedSeries, detectedPoint) {
 
 // Compute null width at (nullDepth + thresholdDb) — i.e. how wide the null is above its floor.
 function computeNullWidth(series, nullCentreHz, nullDepthDb, thresholdDb = 10) {
-  if (!Number.isFinite(nullDepthDb)) return null;
+  const emptyResult = { width: null, leftHz: null, rightHz: null, centerHz: null };
+  if (!Number.isFinite(nullDepthDb)) return emptyResult;
   const target = nullDepthDb + thresholdDb; // e.g. -18 + 10 = -8 dB
   const sorted = [...(series || [])]
     .filter(p => Number.isFinite(p.spl))
@@ -169,8 +170,16 @@ function computeNullWidth(series, nullCentreHz, nullDepthDb, thresholdDb = 10) {
     }
   }
 
-  if (leftHz !== null && rightHz !== null) return rightHz - leftHz;
-  return null;
+  if (leftHz !== null && rightHz !== null) {
+    return {
+      width: rightHz - leftHz,
+      leftHz,
+      rightHz,
+      centerHz: (leftHz + rightHz) / 2,
+    };
+  }
+
+  return emptyResult;
 }
 
 // Compute phase (atan2) from a stepDebug row at a given frequency.
@@ -273,15 +282,20 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       : null;
     // Null width is computed on the raw series offset by local baseline so the
     // crossing threshold is relative to local trend (not the global median).
-    const hz40NullWidth = (() => {
-      if (!hz40Null || !Number.isFinite(hz40NullDepthLocal)) return null;
-      // Build a locally-normalised series for width measurement only
+    const hz40NullWidthInfo = (() => {
+      if (!hz40Null || !Number.isFinite(hz40NullDepthLocal)) {
+        return { width: null, leftHz: null, rightHz: null, centerHz: null };
+      }
+
       const localNorm = b44Series.map(p => ({
         frequency: p.frequency,
         spl: Number.isFinite(p.spl) ? p.spl - (hz40LocalBaseline ?? 0) : null,
       }));
+
       return computeNullWidth(localNorm, hz40Null.frequency, hz40NullDepthLocal, 10);
     })();
+
+    const hz40NullWidth = hz40NullWidthInfo.width;
 
     // ── 68 Hz region — detect peak, measure vs local baseline ────────────────
     // Local baseline: ±10 Hz window, excluding ±3 Hz around the peak.
@@ -297,7 +311,9 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       : null;
 
     // ── Vector / phase at null ─────────────────────────────────────────────
-    const nullCentreHz = hz40Null?.frequency ?? T.hz40.nullCentreHz;
+    const nullCentreHz = Number.isFinite(hz40NullWidthInfo.centerHz)
+      ? hz40NullWidthInfo.centerHz
+      : hz40Null?.frequency ?? T.hz40.nullCentreHz;
     const phaseLow  = getPhaseAtHz(stepDebug, nullCentreHz - 2);
     const phaseHigh = getPhaseAtHz(stepDebug, nullCentreHz + 2);
     let b44PhaseShift = null;
