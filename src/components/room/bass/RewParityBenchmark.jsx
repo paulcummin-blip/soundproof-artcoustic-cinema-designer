@@ -232,7 +232,7 @@ function ResultRow({ label, b44, rew, tol, unit = '', higherIsBetter = false }) 
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function RewParityBenchmark({ b44Series, stepDebug }) {
+export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDebugRows }) {
   const T = REW_TARGETS_CURRENT_ROOM;
   const TOL = T.tolerances;
 
@@ -687,7 +687,11 @@ export default function RewParityBenchmark({ b44Series, stepDebug }) {
       </div>
 
       {/* Whole-curve contribution diagnostic */}
-      <WholeCurveDiagnostic b44Series={b44Series} stepDebug={stepDebug} />
+      <WholeCurveDiagnostic
+        b44Series={b44Series}
+        stepDebug={stepDebug}
+        wholeCurveDebugRows={wholeCurveDebugRows}
+      />
     </div>
   );
 }

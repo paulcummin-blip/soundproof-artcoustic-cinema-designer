@@ -1,6 +1,6 @@
 // WholeCurveDiagnostic.jsx
 // Temporary whole-curve contribution diagnostic.
-// Reads stepDebug rows (captured 30–72 Hz by the engine) and b44Series for final SPL.
+// Reads wholeCurveDebugRows from the engine, with stepDebug as a legacy fallback.
 // Does NOT change any simulation maths, Q values, modalGainScalar, or benchmark scoring.
 
 import React, { useState } from 'react';
@@ -27,7 +27,30 @@ function interpSpl(series, hz) {
 }
 
 // ── Build one diagnostic row ───────────────────────────────────────────────────
-function buildRow(targetHz, stepDebug, b44Series) {
+function buildRow(targetHz, stepDebug, b44Series, wholeCurveDebugRows) {
+  const wholeCurveRow = Array.isArray(wholeCurveDebugRows)
+    ? wholeCurveDebugRows.find(row => Math.abs(Number(row?.targetHz) - targetHz) < 1e-9)
+    : null;
+
+  if (wholeCurveRow) {
+    const finalSplDb = Number.isFinite(wholeCurveRow.finalSplDb)
+      ? wholeCurveRow.finalSplDb
+      : interpSpl(b44Series, targetHz);
+
+    return {
+      targetHz,
+      evalHz: wholeCurveRow.frequencyHz,
+      finalSplDb,
+      directMag: wholeCurveRow.directMagnitude,
+      reflMag: wholeCurveRow.reflectionMagnitude,
+      lfMag: wholeCurveRow.lateFieldMagnitude,
+      preModalMag: wholeCurveRow.preModalMagnitude,
+      modalSumMag: wholeCurveRow.modalSumMagnitude,
+      postModalMag: wholeCurveRow.postModalMagnitude,
+      curveDb: wholeCurveRow.curveDb,
+    };
+  }
+
   const nearest = Array.isArray(stepDebug) && stepDebug.length > 0
     ? stepDebug.reduce((best, row) => {
         const d = Math.abs(row.frequencyHz - targetHz);
@@ -35,7 +58,7 @@ function buildRow(targetHz, stepDebug, b44Series) {
       }, null)
     : null;
 
-  // stepDebug is only captured 30–72 Hz; treat rows more than 15 Hz away as missing
+  // Legacy fallback: stepDebug is sparse, so reject distant rows.
   const hasRow = nearest && Math.abs(nearest.frequencyHz - targetHz) <= 15;
 
   const finalSplDb = interpSpl(b44Series, targetHz);
@@ -80,12 +103,13 @@ const fmtDb  = (v) => Number.isFinite(v) ? v.toFixed(2) : '—';
 const fmtMag = (v) => Number.isFinite(v) ? v.toFixed(4) : '—';
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function WholeCurveDiagnostic({ b44Series, stepDebug }) {
+export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveDebugRows }) {
   const [open, setOpen] = useState(false);
 
   if (!Array.isArray(b44Series) || b44Series.length === 0) return null;
 
-  const rows = TARGET_HZ.map(hz => buildRow(hz, stepDebug, b44Series));
+  const hasWholeCurveRows = Array.isArray(wholeCurveDebugRows) && wholeCurveDebugRows.length > 0;
+  const rows = TARGET_HZ.map(hz => buildRow(hz, stepDebug, b44Series, wholeCurveDebugRows));
 
   const thBase = {
     padding: '3px 7px',
@@ -136,8 +160,12 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug }) {
           {/* Meta info */}
           <div style={{ fontSize: 10, color: '#1e40af', marginBottom: 8 }}>
             <strong>modalGainScalar</strong> = {MODAL_GAIN_SCALAR} (read-only · engine constant) ·{' '}
-            <strong>stepDebug coverage</strong>: 30–72 Hz (outside this range modal columns show '—') ·{' '}
-            <strong>finalSPL</strong>: interpolated from b44Series · magnitudes are linear pressure units
+            {hasWholeCurveRows ? (
+              <><strong>source</strong>: wholeCurveDebugRows ·{' '}</>
+            ) : (
+              <><strong>source</strong>: legacy stepDebug fallback, sparse 30–72 Hz ·{' '}</>
+            )}
+            <strong>finalSPL</strong>: engine debug row when available · magnitudes are linear pressure units
           </div>
 
           <table style={{ borderCollapse: 'collapse', whiteSpace: 'nowrap', fontSize: 10 }}>
@@ -180,7 +208,7 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug }) {
           </table>
 
           <div style={{ marginTop: 8, fontSize: 10, color: '#64748b' }}>
-            ★ = REW benchmark checkpoint. Blue rows. All other columns '—' outside 30–72 Hz stepDebug capture range.
+            ★ = REW benchmark checkpoint. Blue rows. {hasWholeCurveRows ? 'Rows come from wholeCurveDebugRows captured in the REW core frequency loop.' : "Legacy fallback: columns may show '—' outside sparse stepDebug coverage."}
           </div>
         </div>
       )}

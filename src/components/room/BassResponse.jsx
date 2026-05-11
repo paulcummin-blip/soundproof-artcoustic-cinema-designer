@@ -218,6 +218,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Step debug: follow the first selected seat + first sub (matches the visible graph).
     // Use ID-based matching (not reference equality) so it is robust to seat list re-creation.
     let __b44StepDebugCapture = null;
+    let __b44WholeCurveDebugCapture = null;
     const debugSeatId = selectedSeatIds[0] || null;
     const debugSubForCapture = subsForSimulation[0] || null;
 
@@ -263,6 +264,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           rewResult.stepDebug?.length > 0
         ) {
           __b44StepDebugCapture = rewResult.stepDebug;
+          __b44WholeCurveDebugCapture = rewResult.wholeCurveDebugRows;
         }
 
         if (!freqsHz) {
@@ -297,6 +299,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       metrics: null,
       audit: null,
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
+      wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, absorptionPct, selectedSeatIds]);
 
@@ -818,6 +821,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <RewParityBenchmark
             b44Series={multiSeries[0]?.data ?? []}
             stepDebug={simulationResults.stepDebug}
+            wholeCurveDebugRows={simulationResults.wholeCurveDebugRows}
           />
         </div>
       )}
