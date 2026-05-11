@@ -289,6 +289,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         ) {
           __b44StepDebugCapture = rewResult.stepDebug;
           __b44WholeCurveDebugCapture = rewResult.wholeCurveDebugRows;
+          if (__b44WholeCurveDebugCapture) {
+            __b44WholeCurveDebugCapture.preModalSeries = rewResult.preModalSeries;
+            __b44WholeCurveDebugCapture.modalOnlySeries = rewResult.modalOnlySeries;
+            __b44WholeCurveDebugCapture.postModalSeries = rewResult.postModalSeries;
+          }
         }
 
         if (!freqsHz) {

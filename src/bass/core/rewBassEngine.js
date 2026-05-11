@@ -425,6 +425,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
   const stepDebugRows = [];
   const wholeCurveDebugCandidates = new Map();
+  const preModalSeries = [];
+  const modalOnlySeries = [];
+  const postModalSeries = [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
@@ -675,6 +678,22 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const postModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
     const finalSplDb = 20 * Math.log10(postModalMagnitude);
 
+    preModalSeries.push({
+      frequencyHz,
+      magnitude: preModalMagnitude,
+      splDb: 20 * Math.log10(Math.max(preModalMagnitude, 1e-10)),
+    });
+    modalOnlySeries.push({
+      frequencyHz,
+      magnitude: modalSumMagnitude ?? 0,
+      splDb: 20 * Math.log10(Math.max(modalSumMagnitude ?? 0, 1e-10)),
+    });
+    postModalSeries.push({
+      frequencyHz,
+      magnitude: postModalMagnitude,
+      splDb: finalSplDb,
+    });
+
     WHOLE_CURVE_DEBUG_TARGETS.forEach((targetHz) => {
       const distanceFromTarget = Math.abs(frequencyHz - targetHz);
       if (distanceFromTarget > 1) return;
@@ -732,6 +751,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     return debugRow;
   });
 
+  wholeCurveDebugRows.preModalSeries = preModalSeries;
+  wholeCurveDebugRows.modalOnlySeries = modalOnlySeries;
+  wholeCurveDebugRows.postModalSeries = postModalSeries;
+
   return {
     freqsHz,
     splDbRaw,
@@ -740,6 +763,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       .map((row) => row.targetVectorDebug)
       .filter(Boolean),
     wholeCurveDebugRows,
+    preModalSeries,
+    modalOnlySeries,
+    postModalSeries,
   };
 }
 

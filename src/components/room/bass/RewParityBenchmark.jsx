@@ -182,6 +182,67 @@ function computeNullWidth(series, nullCentreHz, nullDepthDb, thresholdDb = 10) {
   return emptyResult;
 }
 
+function normaliseStageSeries(series) {
+  return (Array.isArray(series) ? series : [])
+    .map(point => ({
+      frequency: Number(point?.frequency ?? point?.frequencyHz),
+      spl: Number(point?.spl ?? point?.splDb),
+      magnitude: Number(point?.magnitude),
+    }))
+    .filter(point => Number.isFinite(point.frequency) && Number.isFinite(point.spl))
+    .sort((a, b) => a.frequency - b.frequency);
+}
+
+function findMinBetween(series, minHz, maxHz) {
+  const candidates = normaliseStageSeries(series).filter(point => point.frequency >= minHz && point.frequency <= maxHz);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((min, point) => point.spl < min.spl ? point : min);
+}
+
+function findMaxBetween(series, minHz, maxHz) {
+  const candidates = normaliseStageSeries(series).filter(point => point.frequency >= minHz && point.frequency <= maxHz);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((max, point) => point.spl > max.spl ? point : max);
+}
+
+function computeStageDiagnosticRows(wholeCurveDebugRows) {
+  const stages = [
+    { label: 'pre-modal', series: wholeCurveDebugRows?.preModalSeries },
+    { label: 'modal-only', series: wholeCurveDebugRows?.modalOnlySeries },
+    { label: 'post-modal', series: wholeCurveDebugRows?.postModalSeries },
+  ];
+
+  return stages.map(stage => {
+    const series = normaliseStageSeries(stage.series);
+    const nullPoint = findMinBetween(series, 36.6, 44.6);
+    const peakPoint = findMaxBetween(series, 64, 72);
+    const nullBaseline = nullPoint ? computeLocalBaseline(series, nullPoint.frequency, 12, 5) : null;
+    const nullDepth = nullPoint && Number.isFinite(nullBaseline) ? nullPoint.spl - nullBaseline : null;
+    const normSeries = Number.isFinite(nullBaseline)
+      ? series.map(point => ({ frequency: point.frequency, spl: point.spl - nullBaseline }))
+      : [];
+    const basin = nullPoint && Number.isFinite(nullDepth)
+      ? computeNullWidth(normSeries, nullPoint.frequency, nullDepth, 10)
+      : { leftHz: null, rightHz: null, centerHz: null, width: null };
+
+    return {
+      label: stage.label,
+      hasSeries: series.length > 0,
+      nullHz: nullPoint?.frequency ?? null,
+      nullSpl: nullPoint?.spl ?? null,
+      basinLeftHz: basin.leftHz,
+      basinRightHz: basin.rightHz,
+      basinCenterHz: basin.centerHz,
+      peakHz: peakPoint?.frequency ?? null,
+      peakSpl: peakPoint?.spl ?? null,
+    };
+  });
+}
+
+function fmtDiagnostic(value, digits = 2, unit = '') {
+  return Number.isFinite(value) ? `${value.toFixed(digits)}${unit}` : '—';
+}
+
 // Compute phase (atan2) from a stepDebug row at a given frequency.
 // Returns degrees, or null if no row available.
 function getPhaseAtHz(stepDebug, targetHz) {
@@ -415,6 +476,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
   const r = results;
   const TOL_ = REW_TARGETS_CURRENT_ROOM.tolerances;
   const noRewData = T.hz40.nullDepthDb === null;
+  const stageDiagnosticRows = computeStageDiagnosticRows(wholeCurveDebugRows);
 
   // Compute pass/fail per region (null = no REW data yet)
   const check = (b44Val, rewVal, tol) => {
@@ -577,6 +639,41 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
           )}
         </tbody>
       </table>
+
+      {/* Stage feature detection diagnostic — diagnostic only, no benchmark scoring */}
+      <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+          Stage feature detection diagnostic <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#94a3b8' }}>(temporary · no scoring impact)</span>
+        </div>
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ ...tableHeaderStyle, textAlign: 'left' }}>Stage</th>
+              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>40 Hz min</th>
+              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>40 Hz SPL</th>
+              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>−10 dB left</th>
+              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>−10 dB right</th>
+              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>−10 dB centre</th>
+              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>68 Hz max</th>
+              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>68 Hz SPL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stageDiagnosticRows.map((row) => (
+              <tr key={row.label} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <td style={{ padding: '3px 6px', fontSize: 10, fontWeight: 700, color: row.hasSeries ? '#334155' : '#94a3b8' }}>{row.label}</td>
+                <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.nullHz, 2, ' Hz')}</td>
+                <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.nullSpl, 2, ' dB')}</td>
+                <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.basinLeftHz, 2, ' Hz')}</td>
+                <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.basinRightHz, 2, ' Hz')}</td>
+                <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>{fmtDiagnostic(row.basinCenterHz, 2, ' Hz')}</td>
+                <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.peakHz, 2, ' Hz')}</td>
+                <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.peakSpl, 2, ' dB')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {/* Phase detail — diagnostic only, no REW comparison */}
       {(Number.isFinite(r.vector.phaseLow) || Number.isFinite(r.vector.phaseHigh)) && (
