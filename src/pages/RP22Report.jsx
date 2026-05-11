@@ -505,8 +505,6 @@ function RP22ReportInner() {
         return [inchesTxt, ratioTxt].filter(Boolean).join(" ") || "Not specified";
     };
 
-    const primarySeatingPosition = app?.mlp || null;
-
     const reportMlpAnchorEffective = React.useMemo(() => {
         const cx = stableDimensions.width / 2;
         const mlpY = app?.mlpY_m;
@@ -516,8 +514,10 @@ function RP22ReportInner() {
         return app?.mlp || null;
     }, [app?.mlpY_m, stableDimensions.width, app?.mlp]);
 
+    const primarySeatingPosition = reportMlpAnchorEffective || app?.mlp || null;
+
     const rspSeatId = React.useMemo(() => {
-        const greenDot = app?.mlp;
+        const greenDot = primarySeatingPosition;
         if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
         let closestSeat = null; let minDist = Infinity;
         seats.forEach(s => {
@@ -526,7 +526,7 @@ function RP22ReportInner() {
             if (d < minDist) { minDist = d; closestSeat = s.id; }
         });
         return (minDist <= 0.05) ? closestSeat : null;
-    }, [seats, app?.mlp]);
+    }, [seats, primarySeatingPosition]);
 
     // resolveScreenMetricsSnapshot — always reads from the live screen object.
     // Used by ReportHeader to snapshot metrics at print time.
@@ -1498,6 +1498,7 @@ function RP22ReportInner() {
                                         screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
                                         placedSpeakers={placedSpeakers}
                                         frontSubs={frontSubs}
+                                        frontSubsCfg={app?.frontSubsCfg}
                                     />
                                 </section>
                             </>

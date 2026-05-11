@@ -79,8 +79,8 @@ function getFallbackDims(modelName, fallbackMap, defaultDims) {
   return fallbackMap[key] || defaultDims;
 }
 
-function resolveDims(modelName, fallbackMap, defaultDims) {
-  const meta = getSpeakerModelMeta(modelName);
+function resolveDims(modelName, fallbackMap, defaultDims, orientation) {
+  const meta = getSpeakerModelMeta(modelName, orientation);
   const fallback = getFallbackDims(modelName, fallbackMap, defaultDims);
   return {
     widthM: finite(meta?.widthM) ? Number(meta.widthM) : fallback.widthM,
@@ -500,6 +500,7 @@ export default function ScreenWallConstructionGraphic({
   screenTopHeightM,
   placedSpeakers,
   frontSubs,
+  frontSubsCfg,
 }) {
   const roomW = Math.max(0.1, num(roomWidthM, 4.5));
   const roomH = Math.max(0.1, num(roomHeightM, 2.4));
@@ -588,6 +589,7 @@ export default function ScreenWallConstructionGraphic({
         const z = Number.isFinite(item?.z) ? item.z : item?.position?.z;
 
         const bottomHeightM = Number(item?.bottomHeightM);
+        const orientation = item?.orientation || frontSubsCfg?.orientation;
 
         return {
           label: `SUB ${index + 1}`,
@@ -599,10 +601,10 @@ export default function ScreenWallConstructionGraphic({
             widthM: 0.6,
             heightM: 0.255,
             depthM: 0.255,
-          }),
+          }, orientation),
         };
       });
-  }, [frontSubs]);
+  }, [frontSubs, frontSubsCfg?.orientation]);
 
   const { sharedLcrZM, minXM, maxXM } = useMemo(() => {
     if (drawnSpeakers.length === 0) return { sharedLcrZM: null, minXM: null, maxXM: null };
