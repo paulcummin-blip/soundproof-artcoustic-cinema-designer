@@ -225,6 +225,9 @@ export function serializeProject(input = {}) {
         positions: Array.isArray(frontSubsCfg.positions) ? frontSubsCfg.positions : [],
         tuning: Array.isArray(frontSubsCfg.tuning) ? frontSubsCfg.tuning : [],
         orientation: frontSubsCfg.orientation || "vertical",
+        bottomHeightM: Number.isFinite(Number(frontSubsCfg.bottomHeightM))
+          ? Number(frontSubsCfg.bottomHeightM)
+          : undefined,
       }
     } : {}),
     ...(rearSubsCfg && typeof rearSubsCfg === "object" ? {
@@ -234,6 +237,9 @@ export function serializeProject(input = {}) {
         positions: Array.isArray(rearSubsCfg.positions) ? rearSubsCfg.positions : [],
         tuning: Array.isArray(rearSubsCfg.tuning) ? rearSubsCfg.tuning : [],
         orientation: rearSubsCfg.orientation || "vertical",
+        bottomHeightM: Number.isFinite(Number(rearSubsCfg.bottomHeightM))
+          ? Number(rearSubsCfg.bottomHeightM)
+          : undefined,
       }
     } : {}),
 
