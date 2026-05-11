@@ -268,7 +268,7 @@ const LOW_MODE_KEYS = [
 const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6];
 const WHOLE_CURVE_DEBUG_TARGETS = [20, 30, 34.3, 40, 50, 60, 68.6, 70, 80, 90, 100];
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none') {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -304,14 +304,28 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       seat.x, seat.y, seat.z
     );
 
+    const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
+    const storageFactor = modalStorageMode === 'orderCompression'
+      ? modeOrder === 1
+        ? 1.0
+        : modeOrder === 2
+          ? 0.45
+          : 0.30
+      : 1.0;
+
+    const storedModalContrib = {
+      real: modalContrib.real * storageFactor,
+      imag: modalContrib.imag * storageFactor,
+    };
+
     // True pressure accumulation: direct sum of all modal pressure contributions.
-    modalSumRe += modalContrib.real;
-    modalSumIm += modalContrib.imag;
+    modalSumRe += storedModalContrib.real;
+    modalSumIm += storedModalContrib.imag;
 
     const isInDebugRange = frequencyHz >= 30 && frequencyHz <= 72;
 
     if (isInDebugRange) {
-      const mag = Math.sqrt(modalContrib.real * modalContrib.real + modalContrib.imag * modalContrib.imag);
+      const mag = Math.sqrt(storedModalContrib.real * storedModalContrib.real + storedModalContrib.imag * storedModalContrib.imag);
 
       // Existing: strongest-mode tracking
       if (mag > _debugStrongestMag) {
@@ -326,8 +340,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           sourceCoupling,
           receiverCoupling,
           combinedCoupling,
-          transferRe: modalContrib.real,
-          transferIm: modalContrib.imag,
+          storageFactor,
+          transferRe: storedModalContrib.real,
+          transferIm: storedModalContrib.imag,
         };
       }
 
@@ -437,6 +452,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Seat-distance effects are already handled separately by sourceCoupling / receiverCoupling.
     const modalGainScalar = 1.8;
     const modalSourceReferenceMode = options?.modalSourceReferenceMode || 'existing';
+    const modalStorageMode = options?.modalStorageMode || 'none';
     const modalSourceAmplitudeBase = Math.pow(10, (curveDb + source.tuning.gainDb) / 20) * modalGainScalar;
     const roomVolumeM3 = widthM * lengthM * heightM;
     const modalSourceAmplitude1m = modalSourceReferenceMode === 'distance_normalized'
@@ -543,7 +559,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
     if (enableModes) {
       const { modalSumRe, modalSumIm, _debugStrongestMode } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode
       );
       const prevRe = sumRe;
       const prevIm = sumIm;
@@ -680,6 +696,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         postModalMagnitude,
         modalGainScalar,
         modalSourceReferenceMode,
+        modalStorageMode,
       });
     });
 
@@ -707,6 +724,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         postModalMagnitude: null,
         modalGainScalar: null,
         modalSourceReferenceMode: options?.modalSourceReferenceMode || 'existing',
+        modalStorageMode: options?.modalStorageMode || 'none',
       };
     }
 

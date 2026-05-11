@@ -49,6 +49,7 @@ function buildRow(targetHz, stepDebug, b44Series, wholeCurveDebugRows) {
       postModalMag: wholeCurveRow.postModalMagnitude,
       curveDb: wholeCurveRow.curveDb,
       modalSourceReferenceMode: wholeCurveRow.modalSourceReferenceMode,
+      modalStorageMode: wholeCurveRow.modalStorageMode,
     };
   }
 
@@ -112,6 +113,7 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveD
   const hasWholeCurveRows = Array.isArray(wholeCurveDebugRows) && wholeCurveDebugRows.length > 0;
   const rows = TARGET_HZ.map(hz => buildRow(hz, stepDebug, b44Series, wholeCurveDebugRows));
   const debugModalSourceReferenceMode = rows.find(row => row.modalSourceReferenceMode)?.modalSourceReferenceMode || modalSourceReferenceMode;
+  const debugModalStorageMode = rows.find(row => row.modalStorageMode)?.modalStorageMode || 'none';
 
   const thBase = {
     padding: '3px 7px',
@@ -168,6 +170,7 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveD
               <><strong>source</strong>: legacy stepDebug fallback, sparse 30–72 Hz ·{' '}</>
             )}
             <strong>modalSourceReference</strong>: {debugModalSourceReferenceMode} ·{' '}
+            <strong>modalStorageMode</strong>: {debugModalStorageMode} ·{' '}
             <strong>finalSPL</strong>: engine debug row when available · magnitudes are linear pressure units
           </div>
 
