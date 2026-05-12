@@ -229,13 +229,15 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const dz = sourceZ - seatZ;
   const distanceM = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
-  // TEMP REW parity diagnostic:
-  // standing-wave modal model uses resonator phase + coupling sign only.
-  // Do not rotate modal pressure by source-to-seat travelling-wave delay.
-  const propagationPhase = 0;
+  // Convert to phase
+  const propagationPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
 
-  const alignedReal = transferReal;
-  const alignedImag = transferImag;
+  // Rotate modal contribution by this phase
+  const cosP = Math.cos(propagationPhase);
+  const sinP = Math.sin(propagationPhase);
+
+  const alignedReal = (transferReal * cosP) - (transferImag * sinP);
+  const alignedImag = (transferReal * sinP) + (transferImag * cosP);
 
   return {
     real: modalGain * alignedReal,
