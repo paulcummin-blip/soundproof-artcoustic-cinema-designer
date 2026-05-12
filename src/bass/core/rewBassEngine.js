@@ -379,6 +379,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
   const enableReflections = options?.enableReflections === true;
   const enableModes = options?.enableModes === true;
+  const disableReflectionPhaseJitter = options?.disableReflectionPhaseJitter === true;
+  const disableReflectionCoherenceWeight = options?.disableReflectionCoherenceWeight === true;
+  const disableLateField = options?.disableLateField === true;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
@@ -488,11 +491,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
 
       // Deterministic frequency-dependent phase jitter — reflections only.
-      const phaseJitter = 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
+      const phaseJitter = disableReflectionPhaseJitter ? 0 : 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
       const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + phaseJitter;
 
       // Smooth coherence curve: ~0.75 at 20 Hz → ~0.25 at 200 Hz
-      const reflectionCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
+      const reflectionCoherenceWeight = disableReflectionCoherenceWeight ? 1 : 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
       const imageRe = reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
       const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       reflectionRe += imageRe;
@@ -503,10 +506,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
     // Diffuse late-field approximation
     const lateFieldDecay = Math.exp(-(frequencyHz - 20) / 120);
-    const lateFieldAmplitude = amplitude * 0.12 * lateFieldDecay;
+    const lateFieldAmplitude = disableLateField ? 0 : amplitude * 0.12 * lateFieldDecay;
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
-    lateFieldRe = lateFieldAmplitude * Math.cos(lateFieldPhase);
-    lateFieldIm = lateFieldAmplitude * Math.sin(lateFieldPhase);
+    lateFieldRe = disableLateField ? 0 : lateFieldAmplitude * Math.cos(lateFieldPhase);
+    lateFieldIm = disableLateField ? 0 : lateFieldAmplitude * Math.sin(lateFieldPhase);
     sumRe += lateFieldRe;
     sumIm += lateFieldIm;
 
@@ -525,9 +528,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
         const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
         const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
-        const debugPhaseJitter = 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
+        const debugPhaseJitter = disableReflectionPhaseJitter ? 0 : 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
         const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + debugPhaseJitter;
-        const debugCoherenceWeight = 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
+        const debugCoherenceWeight = disableReflectionCoherenceWeight ? 1 : 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
         _refSumRe += debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
         _refSumIm += debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       });
@@ -754,6 +757,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   wholeCurveDebugRows.preModalSeries = preModalSeries;
   wholeCurveDebugRows.modalOnlySeries = modalOnlySeries;
   wholeCurveDebugRows.postModalSeries = postModalSeries;
+  wholeCurveDebugRows.diagnosticToggles = {
+    disableReflectionPhaseJitter,
+    disableReflectionCoherenceWeight,
+    disableLateField,
+  };
 
   return {
     freqsHz,

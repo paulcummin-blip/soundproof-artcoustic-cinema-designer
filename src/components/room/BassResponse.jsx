@@ -121,6 +121,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
   const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState("existing");
   const [modalStorageMode, setModalStorageMode] = useState("none");
+  const [disableReflectionPhaseJitter, setDisableReflectionPhaseJitter] = useState(false);
+  const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(false);
+  const [disableLateField, setDisableLateField] = useState(false);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -276,6 +279,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             smoothing: 'none',
             modalSourceReferenceMode,
             modalStorageMode,
+            disableReflectionPhaseJitter,
+            disableReflectionCoherenceWeight,
+            disableLateField,
           }
         );
 
@@ -330,7 +336,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, rewSourceCurveMode, modalSourceReferenceMode, modalStorageMode, absorptionPct, selectedSeatIds]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, rewSourceCurveMode, modalSourceReferenceMode, modalStorageMode, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, absorptionPct, selectedSeatIds]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -778,6 +784,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <option value="none">Modal storage: none</option>
                   <option value="orderCompression">Modal storage: order compression</option>
                 </select>
+                <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                  <input
+                    type="checkbox"
+                    checked={disableReflectionPhaseJitter}
+                    onChange={(event) => setDisableReflectionPhaseJitter(event.target.checked)}
+                  />
+                  No phase jitter
+                </label>
+                <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                  <input
+                    type="checkbox"
+                    checked={disableReflectionCoherenceWeight}
+                    onChange={(event) => setDisableReflectionCoherenceWeight(event.target.checked)}
+                  />
+                  No refl weighting
+                </label>
+                <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                  <input
+                    type="checkbox"
+                    checked={disableLateField}
+                    onChange={(event) => setDisableLateField(event.target.checked)}
+                  />
+                  No late field
+                </label>
               </>
             )}
           </div>
