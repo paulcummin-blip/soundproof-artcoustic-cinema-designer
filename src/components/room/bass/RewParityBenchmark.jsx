@@ -243,6 +243,10 @@ function fmtDiagnostic(value, digits = 2, unit = '') {
   return Number.isFinite(value) ? `${value.toFixed(digits)}${unit}` : '—';
 }
 
+function formatModeIndices(row) {
+  return `[${row?.nx ?? '—'},${row?.ny ?? '—'},${row?.nz ?? '—'}]`;
+}
+
 // Compute phase (atan2) from a stepDebug row at a given frequency.
 // Returns degrees, or null if no row available.
 function getPhaseAtHz(stepDebug, targetHz) {
@@ -477,6 +481,9 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
   const TOL_ = REW_TARGETS_CURRENT_ROOM.tolerances;
   const noRewData = T.hz40.nullDepthDb === null;
   const stageDiagnosticRows = computeStageDiagnosticRows(wholeCurveDebugRows);
+  const modalContributorDebugRows = Array.isArray(wholeCurveDebugRows?.modalContributorDebugRows)
+    ? wholeCurveDebugRows.modalContributorDebugRows
+    : [];
 
   // Compute pass/fail per region (null = no REW data yet)
   const check = (b44Val, rewVal, tol) => {
@@ -674,6 +681,69 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
           </tbody>
         </table>
       </div>
+
+      {/* Temporary modal contributor ranking — diagnostic only, no benchmark scoring */}
+      {modalContributorDebugRows.length > 0 && (
+        <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9a3412', marginBottom: 6 }}>
+            Temporary modal contributor ranking <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only · no simulation maths changed)</span>
+          </div>
+          {modalContributorDebugRows.map((group) => (
+            <div key={group.targetHz} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#7c2d12', marginBottom: 3 }}>
+                Target {fmtDiagnostic(group.targetHz, 0, ' Hz')} · evaluated {fmtDiagnostic(group.frequencyHz, 2, ' Hz')}
+              </div>
+              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>#</th>
+                    <th style={{ ...tableHeaderStyle }}>Mode</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Mode Hz</th>
+                    <th style={{ ...tableHeaderStyle }}>Type</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Q</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Src</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Recv</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Comb</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Re</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Im</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Mag</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Phase</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Order</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Store</th>
+                    <th style={{ ...tableHeaderStyle }}>Mode</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(group.contributors || []).map((row, index) => (
+                    <tr key={`${group.targetHz}-${index}-${formatModeIndices(row)}`} style={{ borderBottom: '1px solid #fed7aa' }}>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{index + 1}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>{formatModeIndices(row)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.modeFrequencyHz, 2)}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 10 }}>{row.modeType || '—'}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.qValue, 2)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.sourceCoupling, 4)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.receiverCoupling, 4)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.combinedCoupling, 4)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.contributionReal, 4)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.contributionImag, 4)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>{fmtDiagnostic(row.contributionMagnitude, 4)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.contributionPhaseAngleDeg, 1, '°')}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.modeOrder, 0)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.storageFactor, 2)}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 10 }}>{row.modalStorageMode || '—'}</td>
+                    </tr>
+                  ))}
+                  {(!group.contributors || group.contributors.length === 0) && (
+                    <tr>
+                      <td colSpan={15} style={{ padding: '4px 6px', fontSize: 10, color: '#9ca3af' }}>No contributor data for this target.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Phase detail — diagnostic only, no REW comparison */}
       {(Number.isFinite(r.vector.phaseLow) || Number.isFinite(r.vector.phaseHigh)) && (

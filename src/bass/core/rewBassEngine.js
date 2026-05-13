@@ -267,6 +267,7 @@ const LOW_MODE_KEYS = [
 
 const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6];
 const WHOLE_CURVE_DEBUG_TARGETS = [20, 30, 34.3, 40, 50, 60, 68.6, 70, 80, 90, 100];
+const MODAL_CONTRIBUTOR_DEBUG_TARGETS = [40, 45, 50, 54];
 
 function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none') {
   // Direct pressure sum — starts at zero, no identity seed.
@@ -279,6 +280,12 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   let _debugStrongestMag = -1;
 
   // Debug-only strongest mode capture for target-bin summaries.
+  const contributorTargetHz = MODAL_CONTRIBUTOR_DEBUG_TARGETS.reduce((nearestTarget, targetHz) => {
+    if (Math.abs(frequencyHz - targetHz) > 1) return nearestTarget;
+    if (nearestTarget === null) return targetHz;
+    return Math.abs(frequencyHz - targetHz) < Math.abs(frequencyHz - nearestTarget) ? targetHz : nearestTarget;
+  }, null);
+  const modalContributorRows = [];
 
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
@@ -327,6 +334,29 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     if (isInDebugRange) {
       const mag = Math.sqrt(storedModalContrib.real * storedModalContrib.real + storedModalContrib.imag * storedModalContrib.imag);
 
+      if (contributorTargetHz !== null) {
+        modalContributorRows.push({
+          targetHz: contributorTargetHz,
+          frequencyHz,
+          nx: mode.nx,
+          ny: mode.ny,
+          nz: mode.nz,
+          modeFrequencyHz: mode.freq,
+          modeType: mode.type,
+          qValue: mode.qValue,
+          sourceCoupling,
+          receiverCoupling,
+          combinedCoupling,
+          contributionReal: storedModalContrib.real,
+          contributionImag: storedModalContrib.imag,
+          contributionMagnitude: mag,
+          contributionPhaseAngleDeg: (Math.atan2(storedModalContrib.imag, storedModalContrib.real) * 180) / Math.PI,
+          modeOrder,
+          storageFactor,
+          modalStorageMode,
+        });
+      }
+
       // Existing: strongest-mode tracking
       if (mag > _debugStrongestMag) {
         _debugStrongestMag = mag;
@@ -350,7 +380,17 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     }
   });
 
-  return { modalSumRe, modalSumIm, _debugStrongestMode };
+  const _debugModalContributors = contributorTargetHz !== null
+    ? {
+        targetHz: contributorTargetHz,
+        frequencyHz,
+        contributors: modalContributorRows
+          .sort((a, b) => b.contributionMagnitude - a.contributionMagnitude)
+          .slice(0, 8),
+      }
+    : null;
+
+  return { modalSumRe, modalSumIm, _debugStrongestMode, _debugModalContributors };
 }
 
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
@@ -428,6 +468,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
   const stepDebugRows = [];
   const wholeCurveDebugCandidates = new Map();
+  const modalContributorDebugCandidates = new Map();
   const preModalSeries = [];
   const modalOnlySeries = [];
   const postModalSeries = [];
@@ -564,9 +605,20 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     let modalSumMagnitude = null;
 
     if (enableModes) {
-      const { modalSumRe, modalSumIm, _debugStrongestMode } = legacyModalTransferLocal(
+      const { modalSumRe, modalSumIm, _debugStrongestMode, _debugModalContributors } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode
       );
+
+      if (_debugModalContributors) {
+        const existingContributor = modalContributorDebugCandidates.get(_debugModalContributors.targetHz);
+        const distanceFromTarget = Math.abs(_debugModalContributors.frequencyHz - _debugModalContributors.targetHz);
+        if (!existingContributor || existingContributor.distanceFromTarget > distanceFromTarget) {
+          modalContributorDebugCandidates.set(_debugModalContributors.targetHz, {
+            ..._debugModalContributors,
+            distanceFromTarget,
+          });
+        }
+      }
       const prevRe = sumRe;
       const prevIm = sumIm;
 
@@ -754,9 +806,17 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     return debugRow;
   });
 
+  const modalContributorDebugRows = MODAL_CONTRIBUTOR_DEBUG_TARGETS.map((targetHz) => {
+    const row = modalContributorDebugCandidates.get(targetHz);
+    if (!row) return { targetHz, frequencyHz: null, contributors: [] };
+    const { distanceFromTarget, ...debugRow } = row;
+    return debugRow;
+  });
+
   wholeCurveDebugRows.preModalSeries = preModalSeries;
   wholeCurveDebugRows.modalOnlySeries = modalOnlySeries;
   wholeCurveDebugRows.postModalSeries = postModalSeries;
+  wholeCurveDebugRows.modalContributorDebugRows = modalContributorDebugRows;
   wholeCurveDebugRows.diagnosticToggles = {
     disableReflectionPhaseJitter,
     disableReflectionCoherenceWeight,
@@ -771,6 +831,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       .map((row) => row.targetVectorDebug)
       .filter(Boolean),
     wholeCurveDebugRows,
+    modalContributorDebugRows,
     preModalSeries,
     modalOnlySeries,
     postModalSeries,
