@@ -242,6 +242,12 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   return {
     real: modalGain * alignedReal,
     imag: modalGain * alignedImag,
+    transferReal,
+    transferImag,
+    beta: ratio,
+    realDen,
+    imagDen,
+    denominatorSq,
   };
 }
 
@@ -320,6 +326,10 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           : 0.30
       : 1.0;
 
+    const rawMagnitudeBeforeStorage = Math.sqrt(
+      modalContrib.real * modalContrib.real + modalContrib.imag * modalContrib.imag
+    );
+
     const storedModalContrib = {
       real: modalContrib.real * storageFactor,
       imag: modalContrib.imag * storageFactor,
@@ -351,6 +361,13 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           contributionImag: storedModalContrib.imag,
           contributionMagnitude: mag,
           contributionPhaseAngleDeg: (Math.atan2(storedModalContrib.imag, storedModalContrib.real) * 180) / Math.PI,
+          transferReal: modalContrib.transferReal,
+          transferImag: modalContrib.transferImag,
+          beta: modalContrib.beta,
+          realDen: modalContrib.realDen,
+          imagDen: modalContrib.imagDen,
+          denominatorSq: modalContrib.denominatorSq,
+          rawMagnitudeBeforeStorage,
           modeOrder,
           storageFactor,
           modalStorageMode,

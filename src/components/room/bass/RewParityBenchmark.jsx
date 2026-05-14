@@ -704,8 +704,15 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                       <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Source coupling</th>
                       <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Receiver coupling</th>
                       <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Combined coupling</th>
+                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>β</th>
+                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>realDen</th>
+                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>imagDen</th>
+                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>denom²</th>
+                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>transfer Re</th>
+                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>transfer Im</th>
                       <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Storage factor</th>
-                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Magnitude</th>
+                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>raw mag</th>
+                      <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>stored mag</th>
                       <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Phase angle</th>
                     </tr>
                   </thead>
@@ -719,14 +726,21 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                         <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.sourceCoupling, 4)}</td>
                         <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.receiverCoupling, 4)}</td>
                         <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.combinedCoupling, 4)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.beta, 3)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.realDen, 4)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.imagDen, 4)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.denominatorSq, 5)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.transferReal, 5)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.transferImag, 5)}</td>
                         <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.storageFactor, 2)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.rawMagnitudeBeforeStorage, 4)}</td>
                         <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>{fmtDiagnostic(row.contributionMagnitude, 4)}</td>
                         <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.contributionPhaseAngleDeg, 1, '°')}</td>
                       </tr>
                     ))}
                     {(!group.contributors || group.contributors.length === 0) && (
                       <tr>
-                        <td colSpan={10} style={{ padding: '4px 6px', fontSize: 10, color: '#9ca3af' }}>No contributor data for this target.</td>
+                        <td colSpan={17} style={{ padding: '4px 6px', fontSize: 10, color: '#9ca3af' }}>No contributor data for this target.</td>
                       </tr>
                     )}
                   </tbody>
