@@ -154,21 +154,18 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
 }
 
 function estimateModeQByType(mode) {
-  const order = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
+  const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
 
-  // Lower Q values to simulate real-room damping and modal overlap
-  // Axial modes still dominate but are less sharp
-  if (order === 1) {
-    return 8.0;   // was 14
+  // Temporary REW parity diagnostic: Q follows modal family, not harmonic order.
+  if (activeAxes === 1) {
+    return 8.0;
   }
 
-  // Tangential
-  if (order === 2) {
-    return 6.0;   // was 10
+  if (activeAxes === 2) {
+    return 6.0;
   }
 
-  // Oblique and higher
-  return 4.5;     // was 7
+  return 4.5;
 }
 
 function modeShapeValueLocal(mode, x, y, z, roomDims) {
