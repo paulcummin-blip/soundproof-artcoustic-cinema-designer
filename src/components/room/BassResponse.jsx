@@ -620,7 +620,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {useRewCoreTestMode && (
         <details style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginBottom: 4 }}>
           <summary style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
-            Advanced seat and geometry debug
+            Runtime geometry and seat mapping
           </summary>
           <div style={{ marginTop: 8 }}>
       {/* __B44_SEAT_MAP_DEBUG__ temporary — remove after verification */}
@@ -760,64 +760,81 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
-            <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
+              <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
+              {useRewCoreTestMode && (
+                <>
+                  <select
+                    value={rewSourceCurveMode}
+                    onChange={(event) => setRewSourceCurveMode(event.target.value)}
+                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
+                    aria-label="REW source curve comparison"
+                  >
+                    <option value="product">Source curve: current product</option>
+                    <option value="flat90">Source curve: flat 90 dB</option>
+                    <option value="rew20HzPorted">Source curve: REW-style 20 Hz ported</option>
+                  </select>
+                  <select
+                    value={modalSourceReferenceMode}
+                    onChange={(event) => setModalSourceReferenceMode(event.target.value)}
+                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
+                    aria-label="Modal source reference comparison"
+                  >
+                    <option value="existing">Modal source: existing 1 m reference</option>
+                    <option value="distance_normalized">Modal source: distance-normalised</option>
+                    <option value="room_normalized">Modal source: room-normalised</option>
+                  </select>
+                  <select
+                    value={modalStorageMode}
+                    onChange={(event) => setModalStorageMode(event.target.value)}
+                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
+                    aria-label="Modal storage comparison"
+                  >
+                    <option value="none">Modal storage: none</option>
+                    <option value="orderCompression">Modal storage: order compression</option>
+                  </select>
+                </>
+              )}
+            </div>
             {useRewCoreTestMode && (
               <>
-                <select
-                  value={rewSourceCurveMode}
-                  onChange={(event) => setRewSourceCurveMode(event.target.value)}
-                  className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                  aria-label="REW source curve comparison"
-                >
-                  <option value="product">Current product curve</option>
-                  <option value="flat90">Flat 90 dB source curve</option>
-                  <option value="rew20HzPorted">Generic REW-style 20 Hz ported curve</option>
-                </select>
-                <select
-                  value={modalSourceReferenceMode}
-                  onChange={(event) => setModalSourceReferenceMode(event.target.value)}
-                  className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                  aria-label="Modal source reference comparison"
-                >
-                  <option value="existing">Modal source: existing 1 m reference</option>
-                  <option value="distance_normalized">Modal source: distance-normalised</option>
-                  <option value="room_normalized">Modal source: room-normalised</option>
-                </select>
-                <select
-                  value={modalStorageMode}
-                  onChange={(event) => setModalStorageMode(event.target.value)}
-                  className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                  aria-label="Modal storage comparison"
-                >
-                  <option value="none">Modal storage: none</option>
-                  <option value="orderCompression">Modal storage: order compression</option>
-                </select>
-                <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                  <input
-                    type="checkbox"
-                    checked={disableReflectionPhaseJitter}
-                    onChange={(event) => setDisableReflectionPhaseJitter(event.target.checked)}
-                  />
-                  No phase jitter
-                </label>
-                <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                  <input
-                    type="checkbox"
-                    checked={disableReflectionCoherenceWeight}
-                    onChange={(event) => setDisableReflectionCoherenceWeight(event.target.checked)}
-                  />
-                  No refl weighting
-                </label>
-                <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                  <input
-                    type="checkbox"
-                    checked={disableLateField}
-                    onChange={(event) => setDisableLateField(event.target.checked)}
-                  />
-                  No late field
-                </label>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                    <input
+                      type="checkbox"
+                      checked={!disableReflectionPhaseJitter}
+                      onChange={(event) => setDisableReflectionPhaseJitter(!event.target.checked)}
+                    />
+                    Reflection phase jitter
+                  </label>
+                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                    <input
+                      type="checkbox"
+                      checked={!disableReflectionCoherenceWeight}
+                      onChange={(event) => setDisableReflectionCoherenceWeight(!event.target.checked)}
+                    />
+                    Reflection weighting
+                  </label>
+                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                    <input
+                      type="checkbox"
+                      checked={!disableLateField}
+                      onChange={(event) => setDisableLateField(!event.target.checked)}
+                    />
+                    Late field
+                  </label>
+                </div>
+                <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
+                  <div className="font-bold text-[#1E293B]">Active model:</div>
+                  <div>Source: {rewSourceCurveMode}</div>
+                  <div>Modal source: {modalSourceReferenceMode}</div>
+                  <div>Storage: {modalStorageMode}</div>
+                  <div className="mt-1">Reflection phase jitter: {disableReflectionPhaseJitter ? 'OFF' : 'ON'}</div>
+                  <div>Reflection weighting: {disableReflectionCoherenceWeight ? 'OFF' : 'ON'}</div>
+                  <div>Late field: {disableLateField ? 'OFF' : 'ON'}</div>
+                </div>
               </>
             )}
           </div>
