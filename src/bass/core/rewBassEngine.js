@@ -620,9 +620,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // legacyModalTransferLocal returns the net modal pressure sum (starts at zero).
     // Modal contributions are added directly to the pre-modal field — true superposition.
     let modalSumMagnitude = null;
+    let modalCapApplied = false;
+    let modalCapRatio = 1;
+    let modalSumMagnitudeBeforeCap = null;
+    let modalSumMagnitudeAfterCap = null;
 
     if (enableModes) {
-      const { modalSumRe, modalSumIm, _debugStrongestMode, _debugModalContributors } = legacyModalTransferLocal(
+      let { modalSumRe, modalSumIm, _debugStrongestMode, _debugModalContributors } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode
       );
 
@@ -639,6 +643,18 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const prevRe = sumRe;
       const prevIm = sumIm;
 
+      // TEMP REW parity diagnostic: cap modal vector magnitude to pre-modal magnitude.
+      // Applies the same scalar to real/imaginary components to preserve modal vector angle.
+      modalSumMagnitudeBeforeCap = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
+      modalSumMagnitudeAfterCap = modalSumMagnitudeBeforeCap;
+      if (modalSumMagnitudeBeforeCap > preModalMagnitude) {
+        modalCapApplied = true;
+        modalCapRatio = preModalMagnitude / modalSumMagnitudeBeforeCap;
+        modalSumRe *= modalCapRatio;
+        modalSumIm *= modalCapRatio;
+        modalSumMagnitudeAfterCap = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
+      }
+
       // True acoustic pressure superposition:
       // modalSumRe/modalSumIm are already scaled pressure contributions,
       // so they must be added to the existing complex pressure field.
@@ -647,7 +663,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
       const modalTransferRe = null;
       const modalTransferIm = null;
-      modalSumMagnitude = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
+      modalSumMagnitude = modalSumMagnitudeAfterCap;
 
       // Fill post-modal step debug
       if (stepDebugRows.length > 0) {
@@ -683,6 +699,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 sumRe,
                 sumIm,
                 magnitude: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
+                modalCapApplied,
+                modalCapRatio,
+                modalSumMagnitudeBeforeCap,
+                modalSumMagnitudeAfterCap,
+                preModalMagnitude,
               },
               applicationComparison: {
                 prevRe,
@@ -691,6 +712,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 modalSumRe,
                 modalSumIm,
                 modalSumMag: Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm),
+                modalCapApplied,
+                modalCapRatio,
+                modalSumMagnitudeBeforeCap,
+                modalSumMagnitudeAfterCap,
                 livePostRe: sumRe,
                 livePostIm: sumIm,
                 livePostMag: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
@@ -784,6 +809,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         lateFieldMagnitude: Math.sqrt(lateFieldRe * lateFieldRe + lateFieldIm * lateFieldIm),
         preModalMagnitude,
         modalSumMagnitude,
+        modalCapApplied,
+        modalCapRatio,
+        modalSumMagnitudeBeforeCap,
+        modalSumMagnitudeAfterCap,
         postModalMagnitude,
         modalGainScalar,
         modalSourceReferenceMode,
@@ -812,6 +841,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         lateFieldMagnitude: null,
         preModalMagnitude: null,
         modalSumMagnitude: null,
+        modalCapApplied: false,
+        modalCapRatio: null,
+        modalSumMagnitudeBeforeCap: null,
+        modalSumMagnitudeAfterCap: null,
         postModalMagnitude: null,
         modalGainScalar: null,
         modalSourceReferenceMode: options?.modalSourceReferenceMode || 'existing',
