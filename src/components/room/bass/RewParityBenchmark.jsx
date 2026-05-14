@@ -684,7 +684,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
 
       {/* Temporary modal contributor ranking — diagnostic only, no benchmark scoring */}
       {modalContributorDebugRows.length > 0 && (
-        <details style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+        <details open style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa' }}>
           <summary style={{ fontSize: 10, fontWeight: 700, color: '#9a3412', cursor: 'pointer' }}>
             Temporary modal contributor ranking <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only · no simulation maths changed)</span>
           </summary>
