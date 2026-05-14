@@ -619,6 +619,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     let modalSumMagnitude = null;
     let modalCapApplied = false;
     let modalCapRatio = 1;
+    let modalCapScale = 1;
     let modalSumMagnitudeBeforeCap = null;
     let modalSumMagnitudeAfterCap = null;
 
@@ -640,10 +641,17 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const prevRe = sumRe;
       const prevIm = sumIm;
 
-      // TEMP REW parity cleanup: modal cap disabled.
-      // Keep diagnostic fields inert while preserving true uncapped modal contribution.
+      // TEMP REW parity diagnostic: cap accumulated modal vector to pre-modal magnitude.
+      // Preserves modal vector angle by scaling real/imaginary components equally.
       modalSumMagnitudeBeforeCap = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
-      modalSumMagnitudeAfterCap = modalSumMagnitudeBeforeCap;
+      if (modalSumMagnitudeBeforeCap > preModalMagnitude && modalSumMagnitudeBeforeCap > 0) {
+        modalCapApplied = true;
+        modalCapScale = preModalMagnitude / modalSumMagnitudeBeforeCap;
+        modalCapRatio = modalCapScale;
+        modalSumRe *= modalCapScale;
+        modalSumIm *= modalCapScale;
+      }
+      modalSumMagnitudeAfterCap = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
 
       // True acoustic pressure superposition:
       // modalSumRe/modalSumIm are already scaled pressure contributions,
@@ -691,6 +699,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 magnitude: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
                 modalCapApplied,
                 modalCapRatio,
+                modalCapScale,
                 modalSumMagnitudeBeforeCap,
                 modalSumMagnitudeAfterCap,
                 preModalMagnitude,
@@ -704,6 +713,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 modalSumMag: Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm),
                 modalCapApplied,
                 modalCapRatio,
+                modalCapScale,
                 modalSumMagnitudeBeforeCap,
                 modalSumMagnitudeAfterCap,
                 livePostRe: sumRe,
@@ -772,6 +782,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       frequencyHz,
       magnitude: modalSumMagnitude ?? 0,
       splDb: 20 * Math.log10(Math.max(modalSumMagnitude ?? 0, 1e-10)),
+      diagnosticLabel: 'TEMP_MODAL_CAP_ACTIVE_modalOnlySeries_uses_capped_magnitude',
     });
     postModalSeries.push({
       frequencyHz,
@@ -799,6 +810,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSumMagnitude,
         modalCapApplied,
         modalCapRatio,
+        modalCapScale,
         modalSumMagnitudeBeforeCap,
         modalSumMagnitudeAfterCap,
         postModalMagnitude,
@@ -831,6 +843,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSumMagnitude: null,
         modalCapApplied: false,
         modalCapRatio: null,
+        modalCapScale: null,
         modalSumMagnitudeBeforeCap: null,
         modalSumMagnitudeAfterCap: null,
         postModalMagnitude: null,
