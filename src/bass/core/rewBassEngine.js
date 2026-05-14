@@ -717,25 +717,23 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                       _debugStrongestMode.transferIm * _debugStrongestMode.transferIm
                     )
                   : null,
-                preModalComponents: Math.abs(nearestRow.frequencyHz - 40.4) < 0.75
-                  ? {
-                      direct: {
-                        re: directRe,
-                        im: directIm,
-                        magnitude: Math.sqrt(directRe * directRe + directIm * directIm),
-                      },
-                      reflections: {
-                        re: reflectionRe,
-                        im: reflectionIm,
-                        magnitude: Math.sqrt(reflectionRe * reflectionRe + reflectionIm * reflectionIm),
-                      },
-                      lateField: {
-                        re: lateFieldRe,
-                        im: lateFieldIm,
-                        magnitude: Math.sqrt(lateFieldRe * lateFieldRe + lateFieldIm * lateFieldIm),
-                      }
-                    }
-                  : undefined,
+                preModalComponents: {
+                  direct: {
+                    re: directRe,
+                    im: directIm,
+                    magnitude: Math.sqrt(directRe * directRe + directIm * directIm),
+                  },
+                  reflections: {
+                    re: reflectionRe,
+                    im: reflectionIm,
+                    magnitude: Math.sqrt(reflectionRe * reflectionRe + reflectionIm * reflectionIm),
+                  },
+                  lateField: {
+                    re: lateFieldRe,
+                    im: lateFieldIm,
+                    magnitude: Math.sqrt(lateFieldRe * lateFieldRe + lateFieldIm * lateFieldIm),
+                  }
+                },
               },
               strongestMode: _debugStrongestMode
                 ? {

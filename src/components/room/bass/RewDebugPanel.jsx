@@ -395,6 +395,54 @@ function AppComparisonRawRow({ stepDebug }) {
   );
 }
 
+// ── 68.6 Hz Vector Breakdown ─────────────────────────────────────────────────
+function VectorBreakdown686({ stepDebug }) {
+  const target = 68.6;
+  const nearest = stepDebug.reduce((best, row) => {
+    const d = Math.abs(row.frequencyHz - target);
+    return best === null || d < Math.abs(best.frequencyHz - target) ? row : best;
+  }, null);
+
+  if (!nearest || Math.abs(nearest.frequencyHz - target) > 8) {
+    return <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace' }}>No debug row found near 68.6 Hz</div>;
+  }
+
+  const angleDeg = (re, im) => (
+    Number.isFinite(re) && Number.isFinite(im)
+      ? (Math.atan2(im, re) * 180) / Math.PI
+      : null
+  );
+
+  const components = nearest.applicationComparison?.preModalComponents ?? {};
+  const pre = nearest.summedBeforeModes ?? {};
+  const app = nearest.applicationComparison ?? {};
+  const post = nearest.postModal ?? {};
+
+  const payload = {
+    frequencyHz: nearest.frequencyHz,
+    directMag: components.direct?.magnitude ?? null,
+    reflectedMag: components.reflections?.magnitude ?? null,
+    lateFieldMag: components.lateField?.magnitude ?? null,
+    preModalMag: pre.preModalMagnitude ?? app.preModalMagnitude ?? null,
+    modalSumMag: app.modalSumMag ?? null,
+    postModalMag: post.magnitude ?? app.livePostMag ?? null,
+    preModalAngleDeg: angleDeg(pre.sumRe ?? app.prevRe, pre.sumIm ?? app.prevIm),
+    modalSumAngleDeg: angleDeg(app.modalSumRe, app.modalSumIm),
+    postModalAngleDeg: angleDeg(post.sumRe ?? app.livePostRe, post.sumIm ?? app.livePostIm),
+  };
+
+  return (
+    <pre style={{
+      background: '#111827', color: '#d1fae5', borderRadius: 6,
+      padding: '10px 12px', fontSize: 10, fontFamily: 'monospace',
+      overflowX: 'auto', whiteSpace: 'pre', lineHeight: 1.5,
+      userSelect: 'all', cursor: 'text',
+    }}>
+      {JSON.stringify(payload, null, 2)}
+    </pre>
+  );
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function RewDebugPanel({ stepDebug, selectedSeatIds }) {
   if (!stepDebug?.length) return null;
@@ -417,7 +465,12 @@ export default function RewDebugPanel({ stepDebug, selectedSeatIds }) {
         <CompactTargetSummary stepDebug={stepDebug} />
       </DebugSection>
 
-      {/* ② Three Raw Mode Rows — closed by default */}
+      {/* ② 68.6 Hz Vector Breakdown — closed by default */}
+      <DebugSection title="68.6 Hz vector breakdown" defaultOpen={false} accentColor="#047857">
+        <VectorBreakdown686 stepDebug={stepDebug} />
+      </DebugSection>
+
+      {/* ③ Three Raw Mode Rows — closed by default */}
       <DebugSection title="Three Raw Mode Rows" defaultOpen={false} accentColor="#0f766e">
         <ThreeRawModeRows stepDebug={stepDebug} />
       </DebugSection>
