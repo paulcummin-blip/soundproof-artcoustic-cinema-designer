@@ -616,6 +616,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </Alert>
       )}
 
+      {/* Advanced REW debug — visibility only, no data changes */}
+      {useRewCoreTestMode && (
+        <details style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginBottom: 4 }}>
+          <summary style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
+            Advanced seat and geometry debug
+          </summary>
+          <div style={{ marginTop: 8 }}>
       {/* __B44_SEAT_MAP_DEBUG__ temporary — remove after verification */}
       {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
         // Compute per-seat debug rows using same logic as pill renderer
@@ -743,6 +750,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
       {/* __B44_GEOMETRY_DEBUG__ end */}
+          </div>
+        </details>
+      )}
 
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>

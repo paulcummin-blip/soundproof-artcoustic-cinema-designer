@@ -802,10 +802,11 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
           { label: '68 Hz', targetHz: T.hz68.peakFrequencyHz, bg: '#ecfdf5', color: '#065f46' },
         ];
         return (
-          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#374151', marginBottom: 6 }}>
+          <details style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
+            <summary style={{ fontSize: 10, fontWeight: 700, color: '#374151', cursor: 'pointer' }}>
               Strongest contributing mode <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only)</span>
-            </div>
+            </summary>
+            <div style={{ marginTop: 8 }}>
             {TARGET_HZ.map(({ label, targetHz, bg, color }) => {
               const row = stepDebug.reduce((best, r) => {
                 if (!best) return r;
@@ -851,7 +852,8 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                 </div>
               );
             })}
-          </div>
+            </div>
+          </details>
         );
       })()}
 

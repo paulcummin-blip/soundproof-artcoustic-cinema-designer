@@ -417,13 +417,13 @@ export default function RewDebugPanel({ stepDebug, selectedSeatIds }) {
         <CompactTargetSummary stepDebug={stepDebug} />
       </DebugSection>
 
-      {/* ② Three Raw Mode Rows — open by default */}
-      <DebugSection title="Three Raw Mode Rows" defaultOpen={true} accentColor="#0f766e">
+      {/* ② Three Raw Mode Rows — closed by default */}
+      <DebugSection title="Three Raw Mode Rows" defaultOpen={false} accentColor="#0f766e">
         <ThreeRawModeRows stepDebug={stepDebug} />
       </DebugSection>
 
-      {/* ② Strongest Active Mode — open by default */}
-      <DebugSection title="Strongest Active Mode" defaultOpen={true} accentColor="#1e40af">
+      {/* ② Strongest Active Mode — closed by default */}
+      <DebugSection title="Strongest Active Mode" defaultOpen={false} accentColor="#1e40af">
         <StrongestActiveModeTable stepDebug={stepDebug} />
       </DebugSection>
 
