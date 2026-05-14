@@ -643,17 +643,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const prevRe = sumRe;
       const prevIm = sumIm;
 
-      // TEMP REW parity diagnostic: cap modal vector magnitude to pre-modal magnitude.
-      // Applies the same scalar to real/imaginary components to preserve modal vector angle.
+      // TEMP REW parity cleanup: modal cap disabled.
+      // Keep diagnostic fields inert while preserving true uncapped modal contribution.
       modalSumMagnitudeBeforeCap = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
       modalSumMagnitudeAfterCap = modalSumMagnitudeBeforeCap;
-      if (modalSumMagnitudeBeforeCap > preModalMagnitude) {
-        modalCapApplied = true;
-        modalCapRatio = preModalMagnitude / modalSumMagnitudeBeforeCap;
-        modalSumRe *= modalCapRatio;
-        modalSumIm *= modalCapRatio;
-        modalSumMagnitudeAfterCap = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
-      }
 
       // True acoustic pressure superposition:
       // modalSumRe/modalSumIm are already scaled pressure contributions,
