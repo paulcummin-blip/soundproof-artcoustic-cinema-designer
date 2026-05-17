@@ -1544,7 +1544,6 @@ function RoomDesignerWithState() {
             border-color:transparent !important;
           }
           .brand-btn:hover{ background:#3E4349 !important; }
-          .plan-toolbar > div:first-child > div { display:none !important; }
           details[open] summary svg {
             transform: rotate(180deg) !important;
           }
@@ -1597,8 +1596,6 @@ function RoomDesignerWithState() {
             dolbyPreset={dolbyPreset}
             frontSubsCfg={_frontSubsCfg}
             rearSubsCfg={_rearSubsCfg}
-            viewEmphasis="balanced"
-            setViewEmphasis={() => {}}
             overlayRelevance={overlayRelevance}
             overlays={_overlays}
             setOverlays={_setOverlays}

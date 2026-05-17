@@ -7,8 +7,6 @@ export default function RoomDesignerPlanToolbar({
   dolbyPreset,
   frontSubsCfg,
   rearSubsCfg,
-  viewEmphasis,
-  setViewEmphasis,
   overlayRelevance,
   overlays,
   setOverlays,
@@ -59,32 +57,6 @@ export default function RoomDesignerPlanToolbar({
           })()}
         </strong>
 
-        <div style={{ display: "flex", gap: 6, marginLeft: 10 }}>
-          {[
-          { key: "plan", label: "Plan" },
-          { key: "balanced", label: "Balanced" },
-          { key: "controls", label: "Controls" }].
-          map((b) =>
-          <button
-            key={b.key}
-            type="button"
-            onClick={() => setViewEmphasis(b.key)}
-            style={{
-              fontSize: 12,
-              padding: "4px 10px",
-              borderRadius: 999,
-              border: "1px solid #DCDBD6",
-              background: viewEmphasis === b.key ? "#213428" : "#FFFFFF",
-              color: viewEmphasis === b.key ? "#FFFFFF" : "#3E4349",
-              lineHeight: 1.2,
-              cursor: "pointer"
-            }}
-            aria-pressed={viewEmphasis === b.key}>
-
-              {b.label}
-            </button>
-          )}
-        </div>
       </div>
 
       {/* PLAN TOOLS — dynamic list, only show relevant items */}
