@@ -658,6 +658,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
         b44Series={b44Series}
         partialCoherenceDiagnosticSeries={wholeCurveDebugRows?.partialCoherenceDiagnosticSeries}
         distributedCoherenceDiagnosticSeries={wholeCurveDebugRows?.distributedCoherenceDiagnosticSeries}
+        splitCoherenceDiagnosticSeries={wholeCurveDebugRows?.splitCoherenceDiagnosticSeries}
       />
 
       {/* Stage feature detection diagnostic — diagnostic only, no benchmark scoring */}

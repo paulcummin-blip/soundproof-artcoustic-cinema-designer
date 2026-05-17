@@ -55,17 +55,21 @@ export default function PartialCoherenceDiagnosticTable({ wholeCurveDebugRows, r
   const rows = TARGET_ROWS.map((target) => {
     const nearest = findNearestDiagnostic(wholeCurveDebugRows, target.targetHz);
     const distributedNearest = findNearestByTarget(wholeCurveDebugRows?.distributedCoherenceDiagnosticSeries, target.targetHz);
+    const splitNearest = findNearestByTarget(wholeCurveDebugRows?.splitCoherenceDiagnosticSeries, target.targetHz);
     const diagnostic = nearest?.diagnostic ?? null;
     const distributedDiagnostic = distributedNearest?.point ?? null;
+    const splitDiagnostic = splitNearest?.point ?? null;
 
     return {
       ...target,
-      evalHz: nearest?.frequencyHz ?? distributedNearest?.frequencyHz ?? null,
-      coherentFinalDb: diagnostic?.coherentFinalDb ?? distributedDiagnostic?.coherentFinalDb ?? null,
+      evalHz: nearest?.frequencyHz ?? distributedNearest?.frequencyHz ?? splitNearest?.frequencyHz ?? null,
+      coherentFinalDb: diagnostic?.coherentFinalDb ?? distributedDiagnostic?.coherentFinalDb ?? splitDiagnostic?.coherentFinalDb ?? null,
       partialCoherenceDiagnosticDb: diagnostic?.partialCoherenceDiagnosticDb ?? null,
       distributedCoherenceDiagnosticDb: distributedDiagnostic?.distributedCoherenceFinalDb ?? null,
+      splitCoherenceDiagnosticDb: splitDiagnostic?.splitCoherenceFinalDb ?? null,
       differenceDb: diagnostic?.differenceDb ?? null,
       distributedDifferenceDb: distributedDiagnostic?.differenceVsActiveDb ?? null,
+      splitDifferenceDb: splitDiagnostic?.differenceVsActiveDb ?? null,
       rewBenchmark: getBenchmarkValue(rewTargets, target.key),
       closerToRew: 'not available here',
     };
@@ -102,7 +106,7 @@ export default function PartialCoherenceDiagnosticTable({ wholeCurveDebugRows, r
         Modal coherence diagnostics — active simulation unchanged
       </div>
       <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6 }}>
-        Diagnostic visibility only · no scoring impact · active coherent curve, benchmark scoring, and RP22/live output unchanged.
+        Diagnostic visibility only · no scoring impact · active coherent curve, REW benchmark scoring, and RP22/live output unchanged.
       </div>
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
@@ -111,9 +115,11 @@ export default function PartialCoherenceDiagnosticTable({ wholeCurveDebugRows, r
             <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Eval Hz</th>
             <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Active coherent final dB</th>
             <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Downstream partial dB</th>
-            <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Distributed modal coherence dB</th>
+            <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Distributed phase coherence dB</th>
+            <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Per-mode split coherence dB</th>
             <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Downstream Δ vs active</th>
-            <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Distributed Δ vs active</th>
+            <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Distributed phase Δ vs active</th>
+            <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Per-mode split Δ vs active</th>
             <th style={tableHeaderStyle}>REW benchmark value</th>
             <th style={tableHeaderStyle}>Partial closer to REW?</th>
           </tr>
@@ -126,8 +132,10 @@ export default function PartialCoherenceDiagnosticTable({ wholeCurveDebugRows, r
               <td style={numberCellStyle}>{fmt(row.coherentFinalDb, 2, ' dB')}</td>
               <td style={{ ...numberCellStyle, fontWeight: 700, color: '#0369a1' }}>{fmt(row.partialCoherenceDiagnosticDb, 2, ' dB')}</td>
               <td style={{ ...numberCellStyle, fontWeight: 700, color: '#c2410c' }}>{fmt(row.distributedCoherenceDiagnosticDb, 2, ' dB')}</td>
+              <td style={{ ...numberCellStyle, fontWeight: 700, color: '#6d28d9' }}>{fmt(row.splitCoherenceDiagnosticDb, 2, ' dB')}</td>
               <td style={numberCellStyle}>{fmt(row.differenceDb, 2, ' dB')}</td>
               <td style={numberCellStyle}>{fmt(row.distributedDifferenceDb, 2, ' dB')}</td>
+              <td style={numberCellStyle}>{fmt(row.splitDifferenceDb, 2, ' dB')}</td>
               <td style={cellStyle}>{row.rewBenchmark}</td>
               <td style={{ ...cellStyle, color: '#64748b', fontStyle: 'italic' }}>{row.closerToRew}</td>
             </tr>
@@ -135,7 +143,7 @@ export default function PartialCoherenceDiagnosticTable({ wholeCurveDebugRows, r
         </tbody>
       </table>
       <div style={{ marginTop: 6, fontSize: 10, color: '#64748b' }}>
-        Distributed modal coherence is diagnostic-only and is not used for benchmark scoring; REW absolute SPL closeness is not scored in this table.
+        Distributed phase and per-mode split modal coherence curves are diagnostic-only and are not used for benchmark scoring; REW absolute SPL closeness is not scored in this table.
       </div>
     </div>
   );

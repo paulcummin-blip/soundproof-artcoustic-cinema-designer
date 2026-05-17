@@ -272,6 +272,7 @@ const LOW_MODE_KEYS = [
 const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6];
 const WHOLE_CURVE_DEBUG_TARGETS = [20, 30, 34.3, 40, 50, 60, 68.6, 70, 80, 90, 100];
 const MODAL_CONTRIBUTOR_DEBUG_TARGETS = [40, 45, 50, 54];
+const PER_MODE_SPLIT_COHERENT_FRACTION = 0.70;
 
 // Temporary REW parity diagnostic only, not final physics: deterministic per-mode phase decorrelation.
 function deterministicModalPhasePerturbationRad(mode, frequencyHz) {
@@ -343,6 +344,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   let modalSumIm = 0;
   let distributedCoherenceModalSumRe = 0;
   let distributedCoherenceModalSumIm = 0;
+  let splitCoherenceModalSumRe = 0;
+  let splitCoherenceModalSumIm = 0;
+  let splitCoherenceModalEnergySq = 0;
 
   // Step debug tracking for the strongest contributing mode
   let _debugStrongestMode = null;
@@ -406,6 +410,16 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       real: (storedModalContrib.real * modalPhaseCos) - (storedModalContrib.imag * modalPhaseSin),
       imag: (storedModalContrib.real * modalPhaseSin) + (storedModalContrib.imag * modalPhaseCos),
     };
+
+    // Diagnostic-only per-mode coherent/energetic split. Preserves each modal
+    // contribution's energy while moving only the split-off portion out of
+    // pressure-domain modal aggregation. Active modalSumRe/modalSumIm are untouched.
+    const splitModalMagSq =
+      (perturbedStoredModalContrib.real * perturbedStoredModalContrib.real) +
+      (perturbedStoredModalContrib.imag * perturbedStoredModalContrib.imag);
+    splitCoherenceModalSumRe += perturbedStoredModalContrib.real * PER_MODE_SPLIT_COHERENT_FRACTION;
+    splitCoherenceModalSumIm += perturbedStoredModalContrib.imag * PER_MODE_SPLIT_COHERENT_FRACTION;
+    splitCoherenceModalEnergySq += splitModalMagSq * (1 - (PER_MODE_SPLIT_COHERENT_FRACTION * PER_MODE_SPLIT_COHERENT_FRACTION));
 
     // Diagnostic-only distributed modal coherence sum. Uses the already-built
     // individual modal vector, preserves its magnitude, and only changes how the
@@ -499,6 +513,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     modalSumIm,
     distributedCoherenceModalSumRe,
     distributedCoherenceModalSumIm,
+    splitCoherenceModalSumRe,
+    splitCoherenceModalSumIm,
+    splitCoherenceModalEnergySq,
     _debugStrongestMode,
     _debugModalContributors,
   };
@@ -585,6 +602,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const postModalSeries = [];
   const partialCoherenceDiagnosticSeries = [];
   const distributedCoherenceDiagnosticSeries = [];
+  const splitCoherenceDiagnosticSeries = [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
@@ -724,6 +742,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     let distributedCoherenceDiagnostic = null;
     let distributedCoherenceModalSumRe = 0;
     let distributedCoherenceModalSumIm = 0;
+    let splitCoherenceDiagnostic = null;
+    let splitCoherenceModalSumRe = 0;
+    let splitCoherenceModalSumIm = 0;
+    let splitCoherenceModalEnergySq = 0;
     let modalCapApplied = false;
     let modalCapRatio = null;
     let modalCapScale = null;
@@ -736,6 +758,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSumIm,
         distributedCoherenceModalSumRe: diagnosticModalSumRe,
         distributedCoherenceModalSumIm: diagnosticModalSumIm,
+        splitCoherenceModalSumRe: diagnosticSplitModalSumRe,
+        splitCoherenceModalSumIm: diagnosticSplitModalSumIm,
+        splitCoherenceModalEnergySq: diagnosticSplitModalEnergySq,
         _debugStrongestMode,
         _debugModalContributors,
       } = legacyModalTransferLocal(
@@ -768,6 +793,30 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       partialCoherenceModalSumIm = modalSumIm;
       distributedCoherenceModalSumRe = diagnosticModalSumRe;
       distributedCoherenceModalSumIm = diagnosticModalSumIm;
+      splitCoherenceModalSumRe = diagnosticSplitModalSumRe;
+      splitCoherenceModalSumIm = diagnosticSplitModalSumIm;
+      splitCoherenceModalEnergySq = diagnosticSplitModalEnergySq;
+      const splitCoherencePressureRe = prevRe + diagnosticSplitModalSumRe;
+      const splitCoherencePressureIm = prevIm + diagnosticSplitModalSumIm;
+      const splitCoherencePressureMagSq =
+        (splitCoherencePressureRe * splitCoherencePressureRe) +
+        (splitCoherencePressureIm * splitCoherencePressureIm);
+      const splitCoherenceFinalMag = Math.sqrt(splitCoherencePressureMagSq + diagnosticSplitModalEnergySq);
+      splitCoherenceDiagnostic = {
+        label: 'Per-mode split modal coherence diagnostic — not used for scoring',
+        frequencyHz,
+        coherentFraction: PER_MODE_SPLIT_COHERENT_FRACTION,
+        preModalRe: prevRe,
+        preModalIm: prevIm,
+        splitCoherenceModalSumRe: diagnosticSplitModalSumRe,
+        splitCoherenceModalSumIm: diagnosticSplitModalSumIm,
+        splitCoherenceModalEnergySq: diagnosticSplitModalEnergySq,
+        splitCoherencePressureRe,
+        splitCoherencePressureIm,
+        splitCoherencePressureMagSq,
+        splitCoherenceFinalMag,
+        splitCoherenceFinalDb: 20 * Math.log10(Math.max(splitCoherenceFinalMag, 1e-10)),
+      };
       const distributedCoherenceFinalRe = prevRe + diagnosticModalSumRe;
       const distributedCoherenceFinalIm = prevIm + diagnosticModalSumIm;
       const distributedCoherenceFinalMag = Math.sqrt(
@@ -841,6 +890,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 magnitude: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
                 partialCoherenceDiagnostic,
                 distributedCoherenceDiagnostic,
+                splitCoherenceDiagnostic,
                 modalCapApplied,
                 modalCapRatio,
                 modalCapScale,
@@ -865,6 +915,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 livePostMag: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
                 partialCoherenceDiagnostic,
                 distributedCoherenceDiagnostic,
+                splitCoherenceDiagnostic,
                 modalTransferRe,
                 modalTransferIm,
                 strongestModeMag: _debugStrongestMode
@@ -928,6 +979,29 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         coherentFinalMag: postModalMagnitude,
       });
     }
+    if (enableModes && !splitCoherenceDiagnostic) {
+      const splitCoherencePressureRe = partialCoherencePreModalRe + splitCoherenceModalSumRe;
+      const splitCoherencePressureIm = partialCoherencePreModalIm + splitCoherenceModalSumIm;
+      const splitCoherencePressureMagSq =
+        (splitCoherencePressureRe * splitCoherencePressureRe) +
+        (splitCoherencePressureIm * splitCoherencePressureIm);
+      const splitCoherenceFinalMag = Math.sqrt(splitCoherencePressureMagSq + splitCoherenceModalEnergySq);
+      splitCoherenceDiagnostic = {
+        label: 'Per-mode split modal coherence diagnostic — not used for scoring',
+        frequencyHz,
+        coherentFraction: PER_MODE_SPLIT_COHERENT_FRACTION,
+        preModalRe: partialCoherencePreModalRe,
+        preModalIm: partialCoherencePreModalIm,
+        splitCoherenceModalSumRe,
+        splitCoherenceModalSumIm,
+        splitCoherenceModalEnergySq,
+        splitCoherencePressureRe,
+        splitCoherencePressureIm,
+        splitCoherencePressureMagSq,
+        splitCoherenceFinalMag,
+        splitCoherenceFinalDb: 20 * Math.log10(Math.max(splitCoherenceFinalMag, 1e-10)),
+      };
+    }
     if (enableModes && !distributedCoherenceDiagnostic) {
       const distributedCoherenceFinalRe = partialCoherencePreModalRe + distributedCoherenceModalSumRe;
       const distributedCoherenceFinalIm = partialCoherencePreModalIm + distributedCoherenceModalSumIm;
@@ -975,6 +1049,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         differenceVsActiveDb: distributedCoherenceDiagnostic.distributedCoherenceFinalDb - finalSplDb,
       });
     }
+    if (splitCoherenceDiagnostic) {
+      splitCoherenceDiagnosticSeries.push({
+        ...splitCoherenceDiagnostic,
+        coherentFinalDb: finalSplDb,
+        differenceVsActiveDb: splitCoherenceDiagnostic.splitCoherenceFinalDb - finalSplDb,
+      });
+    }
 
     WHOLE_CURVE_DEBUG_TARGETS.forEach((targetHz) => {
       const distanceFromTarget = Math.abs(frequencyHz - targetHz);
@@ -1005,6 +1086,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalStorageMode,
         partialCoherenceDiagnostic,
         distributedCoherenceDiagnostic,
+        splitCoherenceDiagnostic,
       });
     });
 
@@ -1036,6 +1118,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSumMagnitudeAfterCap: null,
         postModalMagnitude: null,
         partialCoherenceDiagnostic: null,
+        distributedCoherenceDiagnostic: null,
+        splitCoherenceDiagnostic: null,
         modalGainScalar: null,
         modalSourceReferenceMode: options?.modalSourceReferenceMode || 'existing',
         modalStorageMode: options?.modalStorageMode || 'none',
@@ -1058,6 +1142,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   wholeCurveDebugRows.postModalSeries = postModalSeries;
   wholeCurveDebugRows.partialCoherenceDiagnosticSeries = partialCoherenceDiagnosticSeries;
   wholeCurveDebugRows.distributedCoherenceDiagnosticSeries = distributedCoherenceDiagnosticSeries;
+  wholeCurveDebugRows.splitCoherenceDiagnosticSeries = splitCoherenceDiagnosticSeries;
   wholeCurveDebugRows.modalContributorDebugRows = modalContributorDebugRows;
   wholeCurveDebugRows.diagnosticToggles = {
     disableReflectionPhaseJitter,
@@ -1079,6 +1164,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     postModalSeries,
     partialCoherenceDiagnosticSeries,
     distributedCoherenceDiagnosticSeries,
+    splitCoherenceDiagnosticSeries,
   };
 }
 

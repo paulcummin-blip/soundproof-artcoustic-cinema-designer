@@ -32,7 +32,18 @@ function normaliseDistributedSeries(series) {
     .filter((point) => Number.isFinite(point.frequency) && Number.isFinite(point.distributedCoherenceDb));
 }
 
-function buildChartData(coherentSeries, partialSeries, distributedSeries) {
+function normaliseSplitSeries(series) {
+  return (Array.isArray(series) ? series : [])
+    .map((point) => ({
+      frequency: Number(point?.frequencyHz),
+      splitCoherenceDb: Number(point?.splitCoherenceFinalDb),
+      coherentFinalDb: Number(point?.coherentFinalDb),
+      splitDifferenceDb: Number(point?.differenceVsActiveDb),
+    }))
+    .filter((point) => Number.isFinite(point.frequency) && Number.isFinite(point.splitCoherenceDb));
+}
+
+function buildChartData(coherentSeries, partialSeries, distributedSeries, splitSeries) {
   const rowsByFrequency = new Map();
 
   coherentSeries.forEach((point) => {
@@ -62,6 +73,16 @@ function buildChartData(coherentSeries, partialSeries, distributedSeries) {
     });
   });
 
+  splitSeries.forEach((point) => {
+    const existing = rowsByFrequency.get(point.frequency) || { frequency: point.frequency };
+    rowsByFrequency.set(point.frequency, {
+      ...existing,
+      coherentFinalDb: Number.isFinite(existing.coherentFinalDb) ? existing.coherentFinalDb : point.coherentFinalDb,
+      splitCoherenceDb: point.splitCoherenceDb,
+      splitDifferenceDb: point.splitDifferenceDb,
+    });
+  });
+
   return Array.from(rowsByFrequency.values()).sort((a, b) => a.frequency - b.frequency);
 }
 
@@ -73,6 +94,7 @@ function DiagnosticTooltip({ active, payload, label }) {
   const coherent = Number(row.coherentFinalDb);
   const partial = Number(row.partialCoherenceDb);
   const distributed = Number(row.distributedCoherenceDb);
+  const split = Number(row.splitCoherenceDb);
   const diff = Number.isFinite(Number(row.differenceDb))
     ? Number(row.differenceDb)
     : Number.isFinite(partial) && Number.isFinite(coherent)
@@ -83,31 +105,41 @@ function DiagnosticTooltip({ active, payload, label }) {
     : Number.isFinite(distributed) && Number.isFinite(coherent)
       ? distributed - coherent
       : null;
+  const splitDiff = Number.isFinite(Number(row.splitDifferenceDb))
+    ? Number(row.splitDifferenceDb)
+    : Number.isFinite(split) && Number.isFinite(coherent)
+      ? split - coherent
+      : null;
 
   return (
     <div style={{ background: '#ffffff', border: '1px solid #bae6fd', borderRadius: 6, padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', color: '#0f172a', boxShadow: '0 6px 18px rgba(15, 23, 42, 0.12)' }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{Number.isFinite(frequency) ? frequency.toFixed(2) : '—'} Hz</div>
       <div>Coherent final: {Number.isFinite(coherent) ? `${coherent.toFixed(2)} dB` : '—'}</div>
       <div>Downstream partial: {Number.isFinite(partial) ? `${partial.toFixed(2)} dB` : '—'}</div>
-      <div>Distributed modal coherence: {Number.isFinite(distributed) ? `${distributed.toFixed(2)} dB` : '—'}</div>
+      <div>Distributed phase modal coherence: {Number.isFinite(distributed) ? `${distributed.toFixed(2)} dB` : '—'}</div>
+      <div>Per-mode split modal coherence: {Number.isFinite(split) ? `${split.toFixed(2)} dB` : '—'}</div>
       <div>Downstream Δ: {Number.isFinite(diff) ? `${diff >= 0 ? '+' : ''}${diff.toFixed(2)} dB` : '—'}</div>
-      <div>Distributed Δ: {Number.isFinite(distributedDiff) ? `${distributedDiff >= 0 ? '+' : ''}${distributedDiff.toFixed(2)} dB` : '—'}</div>
-      <div style={{ marginTop: 4, color: '#0369a1', fontStyle: 'italic' }}>Diagnostic only — active curve and scoring unchanged</div>
+      <div>Distributed phase Δ: {Number.isFinite(distributedDiff) ? `${distributedDiff >= 0 ? '+' : ''}${distributedDiff.toFixed(2)} dB` : '—'}</div>
+      <div>Per-mode split Δ: {Number.isFinite(splitDiff) ? `${splitDiff >= 0 ? '+' : ''}${splitDiff.toFixed(2)} dB` : '—'}</div>
+      <div style={{ marginTop: 4, color: '#0369a1', fontStyle: 'italic' }}>Diagnostic only — active curve, REW benchmark, and RP22/live output unchanged</div>
     </div>
   );
 }
 
-export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCoherenceDiagnosticSeries, distributedCoherenceDiagnosticSeries }) {
+export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCoherenceDiagnosticSeries, distributedCoherenceDiagnosticSeries, splitCoherenceDiagnosticSeries }) {
   const chartData = React.useMemo(() => {
     return buildChartData(
       normaliseCoherentSeries(b44Series),
       normalisePartialSeries(partialCoherenceDiagnosticSeries),
-      normaliseDistributedSeries(distributedCoherenceDiagnosticSeries)
+      normaliseDistributedSeries(distributedCoherenceDiagnosticSeries),
+      normaliseSplitSeries(splitCoherenceDiagnosticSeries)
     );
-  }, [b44Series, partialCoherenceDiagnosticSeries, distributedCoherenceDiagnosticSeries]);
+  }, [b44Series, partialCoherenceDiagnosticSeries, distributedCoherenceDiagnosticSeries, splitCoherenceDiagnosticSeries]);
 
   const hasDiagnosticCurve = chartData.some((point) =>
-    Number.isFinite(point.partialCoherenceDb) || Number.isFinite(point.distributedCoherenceDb)
+    Number.isFinite(point.partialCoherenceDb) ||
+    Number.isFinite(point.distributedCoherenceDb) ||
+    Number.isFinite(point.splitCoherenceDb)
   );
 
   if (!hasDiagnosticCurve) {
@@ -125,7 +157,7 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
         </div>
       </div>
       <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8 }}>
-        Shows the active coherent final curve against downstream partial coherence and distributed modal coherence diagnostics. Active scoring remains unchanged.
+        Shows the active coherent final curve against downstream partial coherence, distributed phase modal coherence, and per-mode split modal coherence diagnostics. Active scoring, REW benchmark, and RP22/live output remain unchanged.
       </div>
       <div style={{ height: 260 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -171,12 +203,24 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
               isAnimationActive={false}
             />
             <Line
-              name="Distributed modal coherence diagnostic — not used for scoring"
+              name="Distributed phase modal coherence diagnostic — not used for scoring"
               type="monotone"
               dataKey="distributedCoherenceDb"
               stroke="#f97316"
               strokeWidth={2}
               strokeDasharray="3 3"
+              dot={false}
+              activeDot={false}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+            <Line
+              name="Per-mode split modal coherence diagnostic — not used for scoring"
+              type="monotone"
+              dataKey="splitCoherenceDb"
+              stroke="#7c3aed"
+              strokeWidth={2}
+              strokeDasharray="8 3 2 3"
               dot={false}
               activeDot={false}
               connectNulls={false}
