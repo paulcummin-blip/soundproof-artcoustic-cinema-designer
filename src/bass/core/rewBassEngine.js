@@ -337,11 +337,13 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none') {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
   let modalSumIm = 0;
+  let diagnosticPerturbedModalSumRe = 0;
+  let diagnosticPerturbedModalSumIm = 0;
   let distributedCoherenceModalSumRe = 0;
   let distributedCoherenceModalSumIm = 0;
   let splitCoherenceModalSumRe = 0;
@@ -434,9 +436,16 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       (perturbedStoredModalContrib.real * distributedPhaseSin) +
       (perturbedStoredModalContrib.imag * distributedPhaseCos);
 
+    diagnosticPerturbedModalSumRe += perturbedStoredModalContrib.real;
+    diagnosticPerturbedModalSumIm += perturbedStoredModalContrib.imag;
+
+    const activeStoredModalContrib = pureDeterministicModalSum
+      ? storedModalContrib
+      : perturbedStoredModalContrib;
+
     // True pressure accumulation: direct sum of all modal pressure contributions.
-    modalSumRe += perturbedStoredModalContrib.real;
-    modalSumIm += perturbedStoredModalContrib.imag;
+    modalSumRe += activeStoredModalContrib.real;
+    modalSumIm += activeStoredModalContrib.imag;
 
     const isInDebugRange = frequencyHz >= 30 && frequencyHz <= 72;
 
@@ -511,6 +520,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   return {
     modalSumRe,
     modalSumIm,
+    diagnosticPerturbedModalSumRe,
+    diagnosticPerturbedModalSumIm,
     distributedCoherenceModalSumRe,
     distributedCoherenceModalSumIm,
     splitCoherenceModalSumRe,
@@ -550,6 +561,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const disableReflectionPhaseJitter = options?.disableReflectionPhaseJitter === true;
   const disableReflectionCoherenceWeight = options?.disableReflectionCoherenceWeight === true;
   const disableLateField = options?.disableLateField === true;
+  const pureDeterministicModalSum = options?.pureDeterministicModalSum === true || (
+    typeof window !== 'undefined' &&
+    window.localStorage?.getItem('rewCorePureDeterministicModalSum') === 'true'
+  );
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
@@ -756,6 +771,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       let {
         modalSumRe,
         modalSumIm,
+        diagnosticPerturbedModalSumRe,
+        diagnosticPerturbedModalSumIm,
         distributedCoherenceModalSumRe: diagnosticModalSumRe,
         distributedCoherenceModalSumIm: diagnosticModalSumIm,
         splitCoherenceModalSumRe: diagnosticSplitModalSumRe,
@@ -764,7 +781,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         _debugStrongestMode,
         _debugModalContributors,
       } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum
       );
 
       if (_debugModalContributors) {
@@ -789,8 +806,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       modalSumMagnitudeAfterCap = modalSumMagnitudeBeforeCap;
       partialCoherencePreModalRe = prevRe;
       partialCoherencePreModalIm = prevIm;
-      partialCoherenceModalSumRe = modalSumRe;
-      partialCoherenceModalSumIm = modalSumIm;
+      partialCoherenceModalSumRe = diagnosticPerturbedModalSumRe;
+      partialCoherenceModalSumIm = diagnosticPerturbedModalSumIm;
       distributedCoherenceModalSumRe = diagnosticModalSumRe;
       distributedCoherenceModalSumIm = diagnosticModalSumIm;
       splitCoherenceModalSumRe = diagnosticSplitModalSumRe;
@@ -863,8 +880,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             frequencyHz,
             preModalRe: prevRe,
             preModalIm: prevIm,
-            modalSumRe,
-            modalSumIm,
+            modalSumRe: diagnosticPerturbedModalSumRe,
+            modalSumIm: diagnosticPerturbedModalSumIm,
             coherentFinalMag: postMag,
           });
           const strongestModeMagnitude = _debugStrongestMode
@@ -897,6 +914,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 modalSumMagnitudeBeforeCap,
                 modalSumMagnitudeAfterCap,
                 preModalMagnitude,
+                pureDeterministicModalSum,
+                activeModalPerturbationEnabled: !pureDeterministicModalSum,
               },
               applicationComparison: {
                 prevRe,
@@ -910,6 +929,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 modalCapScale,
                 modalSumMagnitudeBeforeCap,
                 modalSumMagnitudeAfterCap,
+                pureDeterministicModalSum,
+                activeModalPerturbationEnabled: !pureDeterministicModalSum,
                 livePostRe: sumRe,
                 livePostIm: sumIm,
                 livePostMag: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
@@ -1084,6 +1105,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalGainScalar,
         modalSourceReferenceMode,
         modalStorageMode,
+        pureDeterministicModalSum,
+        activeModalPerturbationEnabled: !pureDeterministicModalSum,
         partialCoherenceDiagnostic,
         distributedCoherenceDiagnostic,
         splitCoherenceDiagnostic,
@@ -1123,6 +1146,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalGainScalar: null,
         modalSourceReferenceMode: options?.modalSourceReferenceMode || 'existing',
         modalStorageMode: options?.modalStorageMode || 'none',
+        pureDeterministicModalSum,
+        activeModalPerturbationEnabled: !pureDeterministicModalSum,
       };
     }
 
@@ -1148,6 +1173,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     disableReflectionPhaseJitter,
     disableReflectionCoherenceWeight,
     disableLateField,
+    pureDeterministicModalSum,
+    activeModalPerturbationEnabled: !pureDeterministicModalSum,
   };
 
   return {

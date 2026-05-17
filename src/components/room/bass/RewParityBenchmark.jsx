@@ -321,6 +321,17 @@ function ResultRow({ label, b44, rew, tol, unit = '', higherIsBetter = false }) 
 export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDebugRows, modalSourceReferenceMode = 'existing' }) {
   const T = REW_TARGETS_CURRENT_ROOM;
   const TOL = T.tolerances;
+  const [pureDeterministicModalSum, setPureDeterministicModalSum] = React.useState(() => (
+    typeof window !== 'undefined' && window.localStorage?.getItem('rewCorePureDeterministicModalSum') === 'true'
+  ));
+
+  const handlePureDeterministicToggle = (checked) => {
+    setPureDeterministicModalSum(checked);
+    if (typeof window !== 'undefined') {
+      window.localStorage?.setItem('rewCorePureDeterministicModalSum', checked ? 'true' : 'false');
+      window.setTimeout(() => window.location.reload(), 50);
+    }
+  };
 
   const results = useMemo(() => {
     if (!Array.isArray(b44Series) || b44Series.length === 0) return null;
@@ -496,6 +507,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
   const modalContributorDebugRows = Array.isArray(wholeCurveDebugRows?.modalContributorDebugRows)
     ? wholeCurveDebugRows.modalContributorDebugRows
     : [];
+  const activeModalPerturbationEnabled = wholeCurveDebugRows?.diagnosticToggles?.activeModalPerturbationEnabled ?? !pureDeterministicModalSum;
 
   // Compute pass/fail per region (null = no REW data yet)
   const check = (b44Val, rewVal, tol) => {
@@ -555,6 +567,18 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
           <code>RewParityBenchmark.jsx</code> with real measured values.
         </div>
       )}
+
+      <div style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 6, background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: 10, color: '#334155' }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, marginRight: 12 }}>
+          <input
+            type="checkbox"
+            checked={pureDeterministicModalSum}
+            onChange={(event) => handlePureDeterministicToggle(event.target.checked)}
+          />
+          Pure deterministic modal sum
+        </label>
+        <span>Active modal perturbation: <strong>{activeModalPerturbationEnabled ? 'ON' : 'OFF'}</strong></span>
+      </div>
 
       {/* Normalisation info */}
       <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 8 }}>
