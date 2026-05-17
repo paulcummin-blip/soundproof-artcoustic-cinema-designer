@@ -118,6 +118,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [absorptionPct, setAbsorptionPct] = useState(30);
   const [roomDamping, setRoomDamping] = useState(20);
   const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(false);
+  const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(true);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
   const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState("existing");
   const [modalStorageMode, setModalStorageMode] = useState("none");
@@ -271,7 +272,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           sub,
           diagnosticSourceCurve,
           {
-            enableReflections: true,
+            enableReflections: enableRewCoreReflections,
             enableModes: true,
             surfaceAbsorption,
             freqMinHz: 20,
@@ -336,7 +337,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, rewSourceCurveMode, modalSourceReferenceMode, modalStorageMode, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, absorptionPct, selectedSeatIds]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalStorageMode, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, absorptionPct, selectedSeatIds]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -740,7 +741,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
 
             <div style={{ borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
-              <strong>reflections:</strong> {useRewCoreTestMode ? 'true' : String(splConfig?.modesEnabled !== false)}<br/>
+              <strong>reflections:</strong> {useRewCoreTestMode ? String(enableRewCoreReflections) : String(splConfig?.modesEnabled !== false)}<br/>
               <strong>modes:</strong> {useRewCoreTestMode ? 'true' : String(splConfig?.modesEnabled !== false)}<br/>
               <strong>smoothing:</strong> {useRewCoreTestMode ? 'none' : 'n/a (live engine)'}<br/>
               <strong>freq min:</strong> 20 Hz<br/>
@@ -804,6 +805,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
                     <input
                       type="checkbox"
+                      checked={enableRewCoreReflections}
+                      onChange={(event) => setEnableRewCoreReflections(event.target.checked)}
+                    />
+                    Reflections
+                  </label>
+                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                    <input
+                      type="checkbox"
                       checked={!disableReflectionPhaseJitter}
                       onChange={(event) => setDisableReflectionPhaseJitter(!event.target.checked)}
                     />
@@ -831,7 +840,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <div>Source: {rewSourceCurveMode}</div>
                   <div>Modal source: {modalSourceReferenceMode}</div>
                   <div>Storage: {modalStorageMode}</div>
-                  <div className="mt-1">Reflection phase jitter: {disableReflectionPhaseJitter ? 'OFF' : 'ON'}</div>
+                  <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
+                  <div>Reflection phase jitter: {disableReflectionPhaseJitter ? 'OFF' : 'ON'}</div>
                   <div>Reflection weighting: {disableReflectionCoherenceWeight ? 'OFF' : 'ON'}</div>
                   <div>Late field: {disableLateField ? 'OFF' : 'ON'}</div>
                 </div>
