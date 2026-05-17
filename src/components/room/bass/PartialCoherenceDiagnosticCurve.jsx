@@ -112,7 +112,7 @@ function DiagnosticTooltip({ active, payload, label }) {
       : null;
 
   return (
-    <div style={{ background: '#ffffff', border: '1px solid #bae6fd', borderRadius: 6, padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', color: '#0f172a', boxShadow: '0 6px 18px rgba(15, 23, 42, 0.12)' }}>
+    <div style={{ background: '#ffffff', border: '1px solid #bae6fd', borderRadius: 6, padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', color: '#0f172a', boxShadow: '0 6px 18px rgba(15, 23, 42, 0.12)', width: 'min(320px, calc(100vw - 32px))', maxWidth: 'min(320px, calc(100vw - 32px))', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{Number.isFinite(frequency) ? frequency.toFixed(2) : '—'} Hz</div>
       <div>Coherent final: {Number.isFinite(coherent) ? `${coherent.toFixed(2)} dB` : '—'}</div>
       <div>Downstream partial: {Number.isFinite(partial) ? `${partial.toFixed(2)} dB` : '—'}</div>
@@ -147,8 +147,8 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
   }
 
   return (
-    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 4, minWidth: 0, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#0e7490' }}>
           Modal coherence diagnostics — not used for scoring
         </div>
@@ -159,7 +159,7 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
       <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8 }}>
         Shows the active coherent final curve against downstream partial coherence, distributed phase modal coherence, and per-mode split modal coherence diagnostics. Active scoring, REW benchmark, and RP22/live output remain unchanged.
       </div>
-      <div style={{ height: 260 }}>
+      <div style={{ height: 260, width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#cffafe" />

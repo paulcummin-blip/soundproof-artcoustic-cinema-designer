@@ -283,6 +283,16 @@ function Pill({ pass }) {
 }
 
 // ─── Single result row ────────────────────────────────────────────────────────
+function SafeTableWrap({ children, minWidth = 640 }) {
+  return (
+    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto', boxSizing: 'border-box' }}>
+      <div style={{ minWidth, maxWidth: '100%' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function ResultRow({ label, b44, rew, tol, unit = '', higherIsBetter = false }) {
   const hasData = Number.isFinite(b44) && Number.isFinite(rew);
   const err = hasData ? b44 - rew : null;
@@ -522,7 +532,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
   };
 
   return (
-    <div style={{ fontFamily: 'monospace' }}>
+    <div style={{ fontFamily: 'monospace', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
 
       {/* Overall verdict */}
       <div style={{
@@ -552,7 +562,8 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       </div>
 
       {/* Table */}
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+      <SafeTableWrap minWidth={620}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
         <thead>
           <tr>
             <th style={{ ...tableHeaderStyle, width: '35%' }}>Check</th>
@@ -648,6 +659,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
           )}
         </tbody>
       </table>
+      </SafeTableWrap>
 
       <PartialCoherenceDiagnosticTable
         wholeCurveDebugRows={wholeCurveDebugRows}
@@ -666,7 +678,8 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
         <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
           Stage feature detection diagnostic <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#94a3b8' }}>(temporary · no scoring impact)</span>
         </div>
-        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <SafeTableWrap minWidth={720}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={{ ...tableHeaderStyle, textAlign: 'left' }}>Stage</th>
@@ -694,6 +707,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
             ))}
           </tbody>
         </table>
+        </SafeTableWrap>
       </div>
 
       {/* Temporary modal contributor ranking — diagnostic only, no benchmark scoring */}
@@ -708,7 +722,8 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#7c2d12', marginBottom: 3 }}>
                   Target {fmtDiagnostic(group.targetHz, 0, ' Hz')} · evaluated {fmtDiagnostic(group.frequencyHz, 2, ' Hz')}
                 </div>
-                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <SafeTableWrap minWidth={1280}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
                   <thead>
                     <tr>
                       <th style={{ ...tableHeaderStyle }}>Mode [nx, ny, nz]</th>
@@ -759,6 +774,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                     )}
                   </tbody>
                 </table>
+                </SafeTableWrap>
               </div>
             ))}
           </div>
