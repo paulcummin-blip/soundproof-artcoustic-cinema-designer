@@ -273,6 +273,18 @@ const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6];
 const WHOLE_CURVE_DEBUG_TARGETS = [20, 30, 34.3, 40, 50, 60, 68.6, 70, 80, 90, 100];
 const MODAL_CONTRIBUTOR_DEBUG_TARGETS = [40, 45, 50, 54];
 
+// Temporary REW parity diagnostic only, not final physics: deterministic per-mode phase decorrelation.
+function deterministicModalPhasePerturbationRad(mode, frequencyHz) {
+  const stableSeed =
+    (mode.nx + 1) * 12.9898 +
+    (mode.ny + 1) * 78.233 +
+    (mode.nz + 1) * 37.719 +
+    mode.freq * 0.071 +
+    frequencyHz * 0.013;
+  const normalized = Math.sin(stableSeed) * 0.5 + 0.5;
+  return (normalized - 0.5) * 0.24;
+}
+
 function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none') {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
@@ -333,14 +345,23 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       imag: modalContrib.imag * storageFactor,
     };
 
+    // Temporary REW parity diagnostic only: rotate stored modal vector without changing magnitude.
+    const modalPhasePerturbationRad = deterministicModalPhasePerturbationRad(mode, frequencyHz);
+    const modalPhaseCos = Math.cos(modalPhasePerturbationRad);
+    const modalPhaseSin = Math.sin(modalPhasePerturbationRad);
+    const perturbedStoredModalContrib = {
+      real: (storedModalContrib.real * modalPhaseCos) - (storedModalContrib.imag * modalPhaseSin),
+      imag: (storedModalContrib.real * modalPhaseSin) + (storedModalContrib.imag * modalPhaseCos),
+    };
+
     // True pressure accumulation: direct sum of all modal pressure contributions.
-    modalSumRe += storedModalContrib.real;
-    modalSumIm += storedModalContrib.imag;
+    modalSumRe += perturbedStoredModalContrib.real;
+    modalSumIm += perturbedStoredModalContrib.imag;
 
     const isInDebugRange = frequencyHz >= 30 && frequencyHz <= 72;
 
     if (isInDebugRange) {
-      const mag = Math.sqrt(storedModalContrib.real * storedModalContrib.real + storedModalContrib.imag * storedModalContrib.imag);
+      const mag = Math.sqrt(perturbedStoredModalContrib.real * perturbedStoredModalContrib.real + perturbedStoredModalContrib.imag * perturbedStoredModalContrib.imag);
 
       if (contributorTargetHz !== null) {
         modalContributorRows.push({
@@ -355,10 +376,12 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           sourceCoupling,
           receiverCoupling,
           combinedCoupling,
-          contributionReal: storedModalContrib.real,
-          contributionImag: storedModalContrib.imag,
+          contributionReal: perturbedStoredModalContrib.real,
+          contributionImag: perturbedStoredModalContrib.imag,
           contributionMagnitude: mag,
-          contributionPhaseAngleDeg: (Math.atan2(storedModalContrib.imag, storedModalContrib.real) * 180) / Math.PI,
+          contributionPhaseAngleDeg: (Math.atan2(perturbedStoredModalContrib.imag, perturbedStoredModalContrib.real) * 180) / Math.PI,
+          modalPhasePerturbationRad,
+          modalPhasePerturbationDeg: (modalPhasePerturbationRad * 180) / Math.PI,
           transferReal: modalContrib.transferReal,
           transferImag: modalContrib.transferImag,
           beta: modalContrib.beta,
@@ -386,8 +409,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           receiverCoupling,
           combinedCoupling,
           storageFactor,
-          transferRe: storedModalContrib.real,
-          transferIm: storedModalContrib.imag,
+          transferRe: perturbedStoredModalContrib.real,
+          transferIm: perturbedStoredModalContrib.imag,
         };
       }
 
