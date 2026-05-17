@@ -157,9 +157,9 @@ function estimateModeQByType(mode) {
   const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
   const axialHarmonicOrder = Math.max(mode.nx || 0, mode.ny || 0, mode.nz || 0);
 
-  // Temporary REW parity diagnostic only, not final physics: reduce second axial harmonic Q.
+  // Temporary REW parity diagnostic only, not final physics: second axial harmonics restored to axial baseline Q.
   if (activeAxes === 1) {
-    return axialHarmonicOrder === 2 ? 6.0 : 8.0;
+    return axialHarmonicOrder === 2 ? 8.0 : 8.0;
   }
 
   if (activeAxes === 2) {
