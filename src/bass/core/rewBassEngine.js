@@ -155,10 +155,11 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
 
 function estimateModeQByType(mode) {
   const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
+  const axialHarmonicOrder = Math.max(mode.nx || 0, mode.ny || 0, mode.nz || 0);
 
-  // Temporary REW parity diagnostic: Q follows modal family, not harmonic order.
+  // Temporary REW parity diagnostic only, not final physics: reduce second axial harmonic Q.
   if (activeAxes === 1) {
-    return 8.0;
+    return axialHarmonicOrder === 2 ? 6.0 : 8.0;
   }
 
   if (activeAxes === 2) {
