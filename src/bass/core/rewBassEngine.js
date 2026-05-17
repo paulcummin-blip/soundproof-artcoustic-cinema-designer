@@ -682,8 +682,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     let partialCoherenceModalSumRe = 0;
     let partialCoherenceModalSumIm = 0;
     let modalCapApplied = false;
-    let modalCapRatio = 1;
-    let modalCapScale = 1;
+    let modalCapRatio = null;
+    let modalCapScale = null;
     let modalSumMagnitudeBeforeCap = null;
     let modalSumMagnitudeAfterCap = null;
 
@@ -705,17 +705,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const prevRe = sumRe;
       const prevIm = sumIm;
 
-      // TEMP REW parity diagnostic: cap accumulated modal vector to pre-modal magnitude.
-      // Preserves modal vector angle by scaling real/imaginary components equally.
+      // Modal cap removed from active REW parity path.
+      // Clean additive modal pressure summation: modalSumRe/modalSumIm remain uncapped.
       modalSumMagnitudeBeforeCap = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
-      if (modalSumMagnitudeBeforeCap > preModalMagnitude && modalSumMagnitudeBeforeCap > 0) {
-        modalCapApplied = true;
-        modalCapScale = preModalMagnitude / modalSumMagnitudeBeforeCap;
-        modalCapRatio = modalCapScale;
-        modalSumRe *= modalCapScale;
-        modalSumIm *= modalCapScale;
-      }
-      modalSumMagnitudeAfterCap = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
+      modalCapApplied = false;
+      modalCapRatio = null;
+      modalCapScale = null;
+      modalSumMagnitudeAfterCap = modalSumMagnitudeBeforeCap;
       partialCoherencePreModalRe = prevRe;
       partialCoherencePreModalIm = prevIm;
       partialCoherenceModalSumRe = modalSumRe;
@@ -870,7 +866,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       frequencyHz,
       magnitude: modalSumMagnitude ?? 0,
       splDb: 20 * Math.log10(Math.max(modalSumMagnitude ?? 0, 1e-10)),
-      diagnosticLabel: 'TEMP_MODAL_CAP_ACTIVE_modalOnlySeries_uses_capped_magnitude',
+      diagnosticLabel: 'modalOnlySeries_uses_uncapped_additive_modal_magnitude',
     });
     postModalSeries.push({
       frequencyHz,
