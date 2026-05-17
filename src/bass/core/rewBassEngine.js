@@ -681,8 +681,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const phaseJitter = disableReflectionPhaseJitter ? 0 : 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
       const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + phaseJitter;
 
-      // Smooth coherence curve: ~0.75 at 20 Hz → ~0.25 at 200 Hz
-      const reflectionCoherenceWeight = disableReflectionCoherenceWeight ? 1 : 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
+      // Temporary REW parity testing only, not final physics:
+      // reduce coherent reflection contribution more strongly below Schroeder/modal region.
+      const reflectionCoherenceWeight = disableReflectionCoherenceWeight
+        ? 1
+        : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
       const imageRe = reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
       const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       reflectionRe += imageRe;
@@ -717,7 +720,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
         const debugPhaseJitter = disableReflectionPhaseJitter ? 0 : 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
         const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + debugPhaseJitter;
-        const debugCoherenceWeight = disableReflectionCoherenceWeight ? 1 : 0.25 + 0.6 * Math.exp(-(frequencyHz - 20) / 70);
+        const debugCoherenceWeight = disableReflectionCoherenceWeight
+          ? 1
+          : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
         _refSumRe += debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
         _refSumIm += debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       });
