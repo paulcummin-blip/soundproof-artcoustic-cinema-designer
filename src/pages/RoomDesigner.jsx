@@ -285,12 +285,6 @@ function RoomDesignerWithState() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
 
-  // Layout emphasis: controls how wide the left plan vs right menu are.
-  // "balanced" keeps your current look.
-  // "plan" gives the plan more space (useful when talking room layout).
-  // "controls" gives the right menu more space (useful when showing the bass graph).
-  const [viewEmphasis, setViewEmphasis] = React.useState("balanced"); // "plan" | "balanced" | "controls"
-
   // --- bed rears required? (SBL/SBR) ---
   const layoutMajor = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) || 5;
   const isNineBedLayout = layoutMajor >= 9;
@@ -1550,6 +1544,7 @@ function RoomDesignerWithState() {
             border-color:transparent !important;
           }
           .brand-btn:hover{ background:#3E4349 !important; }
+          .plan-toolbar > div:first-child > div { display:none !important; }
           details[open] summary svg {
             transform: rotate(180deg) !important;
           }
@@ -1602,8 +1597,8 @@ function RoomDesignerWithState() {
             dolbyPreset={dolbyPreset}
             frontSubsCfg={_frontSubsCfg}
             rearSubsCfg={_rearSubsCfg}
-            viewEmphasis={viewEmphasis}
-            setViewEmphasis={setViewEmphasis}
+            viewEmphasis="balanced"
+            setViewEmphasis={() => {}}
             overlayRelevance={overlayRelevance}
             overlays={_overlays}
             setOverlays={_setOverlays}
