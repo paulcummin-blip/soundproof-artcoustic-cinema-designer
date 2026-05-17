@@ -285,6 +285,23 @@ function deterministicModalPhasePerturbationRad(mode, frequencyHz) {
   return (normalized - 0.5) * 0.24;
 }
 
+// Diagnostic only: deterministic per-mode phase dispersion used only for the
+// distributed modal coherence curve. Magnitude is preserved; active sums are untouched.
+function deterministicDistributedModalCoherencePhaseRad(mode, frequencyHz) {
+  const modeOrder = Math.abs(mode.nx || 0) + Math.abs(mode.ny || 0) + Math.abs(mode.nz || 0);
+  const stableSeed =
+    (mode.nx + 1) * 19.417 +
+    (mode.ny + 1) * 43.113 +
+    (mode.nz + 1) * 71.901 +
+    mode.freq * 0.113 +
+    frequencyHz * 0.029;
+  const signedNoise = Math.sin(stableSeed) * Math.cos(stableSeed * 0.37);
+  const orderSpread = modeOrder <= 1 ? 0.22 : modeOrder === 2 ? 0.42 : 0.58;
+  const frequencySpread = 0.35 + 0.45 * Math.min(1, Math.max(0, (frequencyHz - 25) / 70));
+
+  return signedNoise * orderSpread * frequencySpread;
+}
+
 function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, modalSumRe, modalSumIm, coherentFinalMag }) {
   const preModalMag = Math.sqrt(preModalRe * preModalRe + preModalIm * preModalIm);
   const modalSumMag = Math.sqrt(modalSumRe * modalSumRe + modalSumIm * modalSumIm);
@@ -324,6 +341,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
   let modalSumIm = 0;
+  let distributedCoherenceModalSumRe = 0;
+  let distributedCoherenceModalSumIm = 0;
 
   // Step debug tracking for the strongest contributing mode
   let _debugStrongestMode = null;
@@ -387,6 +406,19 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       real: (storedModalContrib.real * modalPhaseCos) - (storedModalContrib.imag * modalPhaseSin),
       imag: (storedModalContrib.real * modalPhaseSin) + (storedModalContrib.imag * modalPhaseCos),
     };
+
+    // Diagnostic-only distributed modal coherence sum. Uses the already-built
+    // individual modal vector, preserves its magnitude, and only changes how the
+    // diagnostic modal vectors combine. It does not affect modalSumRe/modalSumIm.
+    const distributedPhaseRad = deterministicDistributedModalCoherencePhaseRad(mode, frequencyHz);
+    const distributedPhaseCos = Math.cos(distributedPhaseRad);
+    const distributedPhaseSin = Math.sin(distributedPhaseRad);
+    distributedCoherenceModalSumRe +=
+      (perturbedStoredModalContrib.real * distributedPhaseCos) -
+      (perturbedStoredModalContrib.imag * distributedPhaseSin);
+    distributedCoherenceModalSumIm +=
+      (perturbedStoredModalContrib.real * distributedPhaseSin) +
+      (perturbedStoredModalContrib.imag * distributedPhaseCos);
 
     // True pressure accumulation: direct sum of all modal pressure contributions.
     modalSumRe += perturbedStoredModalContrib.real;
@@ -462,7 +494,14 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       }
     : null;
 
-  return { modalSumRe, modalSumIm, _debugStrongestMode, _debugModalContributors };
+  return {
+    modalSumRe,
+    modalSumIm,
+    distributedCoherenceModalSumRe,
+    distributedCoherenceModalSumIm,
+    _debugStrongestMode,
+    _debugModalContributors,
+  };
 }
 
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
@@ -545,6 +584,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const modalOnlySeries = [];
   const postModalSeries = [];
   const partialCoherenceDiagnosticSeries = [];
+  const distributedCoherenceDiagnosticSeries = [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
@@ -681,6 +721,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     let partialCoherencePreModalIm = sumIm;
     let partialCoherenceModalSumRe = 0;
     let partialCoherenceModalSumIm = 0;
+    let distributedCoherenceDiagnostic = null;
+    let distributedCoherenceModalSumRe = 0;
+    let distributedCoherenceModalSumIm = 0;
     let modalCapApplied = false;
     let modalCapRatio = null;
     let modalCapScale = null;
@@ -688,7 +731,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     let modalSumMagnitudeAfterCap = null;
 
     if (enableModes) {
-      let { modalSumRe, modalSumIm, _debugStrongestMode, _debugModalContributors } = legacyModalTransferLocal(
+      let {
+        modalSumRe,
+        modalSumIm,
+        distributedCoherenceModalSumRe: diagnosticModalSumRe,
+        distributedCoherenceModalSumIm: diagnosticModalSumIm,
+        _debugStrongestMode,
+        _debugModalContributors,
+      } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode
       );
 
@@ -716,6 +766,26 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       partialCoherencePreModalIm = prevIm;
       partialCoherenceModalSumRe = modalSumRe;
       partialCoherenceModalSumIm = modalSumIm;
+      distributedCoherenceModalSumRe = diagnosticModalSumRe;
+      distributedCoherenceModalSumIm = diagnosticModalSumIm;
+      const distributedCoherenceFinalRe = prevRe + diagnosticModalSumRe;
+      const distributedCoherenceFinalIm = prevIm + diagnosticModalSumIm;
+      const distributedCoherenceFinalMag = Math.sqrt(
+        distributedCoherenceFinalRe * distributedCoherenceFinalRe +
+        distributedCoherenceFinalIm * distributedCoherenceFinalIm
+      );
+      distributedCoherenceDiagnostic = {
+        label: 'Distributed modal coherence diagnostic — not used for scoring',
+        frequencyHz,
+        preModalRe: prevRe,
+        preModalIm: prevIm,
+        distributedCoherenceModalSumRe: diagnosticModalSumRe,
+        distributedCoherenceModalSumIm: diagnosticModalSumIm,
+        distributedCoherenceFinalRe,
+        distributedCoherenceFinalIm,
+        distributedCoherenceFinalMag,
+        distributedCoherenceFinalDb: 20 * Math.log10(Math.max(distributedCoherenceFinalMag, 1e-10)),
+      };
 
       // True acoustic pressure superposition:
       // modalSumRe/modalSumIm are already scaled pressure contributions,
@@ -770,6 +840,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 sumIm,
                 magnitude: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
                 partialCoherenceDiagnostic,
+                distributedCoherenceDiagnostic,
                 modalCapApplied,
                 modalCapRatio,
                 modalCapScale,
@@ -793,6 +864,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 livePostIm: sumIm,
                 livePostMag: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
                 partialCoherenceDiagnostic,
+                distributedCoherenceDiagnostic,
                 modalTransferRe,
                 modalTransferIm,
                 strongestModeMag: _debugStrongestMode
@@ -856,6 +928,26 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         coherentFinalMag: postModalMagnitude,
       });
     }
+    if (enableModes && !distributedCoherenceDiagnostic) {
+      const distributedCoherenceFinalRe = partialCoherencePreModalRe + distributedCoherenceModalSumRe;
+      const distributedCoherenceFinalIm = partialCoherencePreModalIm + distributedCoherenceModalSumIm;
+      const distributedCoherenceFinalMag = Math.sqrt(
+        distributedCoherenceFinalRe * distributedCoherenceFinalRe +
+        distributedCoherenceFinalIm * distributedCoherenceFinalIm
+      );
+      distributedCoherenceDiagnostic = {
+        label: 'Distributed modal coherence diagnostic — not used for scoring',
+        frequencyHz,
+        preModalRe: partialCoherencePreModalRe,
+        preModalIm: partialCoherencePreModalIm,
+        distributedCoherenceModalSumRe,
+        distributedCoherenceModalSumIm,
+        distributedCoherenceFinalRe,
+        distributedCoherenceFinalIm,
+        distributedCoherenceFinalMag,
+        distributedCoherenceFinalDb: 20 * Math.log10(Math.max(distributedCoherenceFinalMag, 1e-10)),
+      };
+    }
 
     preModalSeries.push({
       frequencyHz,
@@ -875,6 +967,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     });
     if (partialCoherenceDiagnostic) {
       partialCoherenceDiagnosticSeries.push(partialCoherenceDiagnostic);
+    }
+    if (distributedCoherenceDiagnostic) {
+      distributedCoherenceDiagnosticSeries.push({
+        ...distributedCoherenceDiagnostic,
+        coherentFinalDb: finalSplDb,
+        differenceVsActiveDb: distributedCoherenceDiagnostic.distributedCoherenceFinalDb - finalSplDb,
+      });
     }
 
     WHOLE_CURVE_DEBUG_TARGETS.forEach((targetHz) => {
@@ -905,6 +1004,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSourceReferenceMode,
         modalStorageMode,
         partialCoherenceDiagnostic,
+        distributedCoherenceDiagnostic,
       });
     });
 
@@ -957,6 +1057,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   wholeCurveDebugRows.modalOnlySeries = modalOnlySeries;
   wholeCurveDebugRows.postModalSeries = postModalSeries;
   wholeCurveDebugRows.partialCoherenceDiagnosticSeries = partialCoherenceDiagnosticSeries;
+  wholeCurveDebugRows.distributedCoherenceDiagnosticSeries = distributedCoherenceDiagnosticSeries;
   wholeCurveDebugRows.modalContributorDebugRows = modalContributorDebugRows;
   wholeCurveDebugRows.diagnosticToggles = {
     disableReflectionPhaseJitter,
@@ -977,6 +1078,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     modalOnlySeries,
     postModalSeries,
     partialCoherenceDiagnosticSeries,
+    distributedCoherenceDiagnosticSeries,
   };
 }
 
