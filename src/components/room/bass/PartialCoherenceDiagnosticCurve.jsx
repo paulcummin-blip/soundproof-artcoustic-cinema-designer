@@ -147,7 +147,7 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
   }
 
   return (
-    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9' }}>
+    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 4 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#0e7490' }}>
           Modal coherence diagnostics — not used for scoring
@@ -178,9 +178,9 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
               width={36}
             />
             <Tooltip content={<DiagnosticTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'monospace' }} />
+            <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'monospace', maxWidth: '100%', whiteSpace: 'normal' }} />
             <Line
-              name="Coherent final curve — active scoring curve"
+              name="Active coherent"
               type="monotone"
               dataKey="coherentFinalDb"
               stroke="#213428"
@@ -191,7 +191,7 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
               isAnimationActive={false}
             />
             <Line
-              name="Downstream partial coherence diagnostic — not used for scoring"
+              name="Downstream partial"
               type="monotone"
               dataKey="partialCoherenceDb"
               stroke="#0891b2"
@@ -203,7 +203,7 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
               isAnimationActive={false}
             />
             <Line
-              name="Distributed phase modal coherence diagnostic — not used for scoring"
+              name="Distributed phase"
               type="monotone"
               dataKey="distributedCoherenceDb"
               stroke="#f97316"
@@ -215,7 +215,7 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
               isAnimationActive={false}
             />
             <Line
-              name="Per-mode split modal coherence diagnostic — not used for scoring"
+              name="Per-mode split"
               type="monotone"
               dataKey="splitCoherenceDb"
               stroke="#7c3aed"

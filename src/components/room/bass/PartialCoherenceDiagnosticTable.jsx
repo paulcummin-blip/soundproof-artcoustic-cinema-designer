@@ -101,14 +101,14 @@ export default function PartialCoherenceDiagnosticTable({ wholeCurveDebugRows, r
   };
 
   return (
-    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f0f9ff', border: '1px solid #7dd3fc' }}>
+    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f0f9ff', border: '1px solid #7dd3fc', maxWidth: '100%', overflowX: 'auto', boxSizing: 'border-box' }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', marginBottom: 3 }}>
         Modal coherence diagnostics — active simulation unchanged
       </div>
       <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6 }}>
         Diagnostic visibility only · no scoring impact · active coherent curve, REW benchmark scoring, and RP22/live output unchanged.
       </div>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1050 }}>
         <thead>
           <tr>
             <th style={tableHeaderStyle}>Target Hz</th>
