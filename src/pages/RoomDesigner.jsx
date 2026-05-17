@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarInset } from "@/components/ui/sidebar"; // NEW: Import SidebarInset
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import ResizableTwoColumnLayout from "@/components/ui/ResizableTwoColumnLayout";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1579,22 +1580,12 @@ function RoomDesignerWithState() {
         existingProjects={existingProjects}
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-          viewEmphasis === "plan" ?
-          "minmax(720px, 62vw) 1fr" :
-          viewEmphasis === "controls" ?
-          "minmax(480px, 35vw) 1fr" :
-          "minmax(560px, 48vw) 1fr",
-          gap: 16,
-          overflow: "hidden",
-          padding: 16,
-          flex: "1 1 auto",
-          minWidth: 0,
-          minHeight: 0
-        }}>
+      <ResizableTwoColumnLayout
+        initialLeftWidth={720}
+        minLeftWidth={480}
+        minRightWidth={420}
+        leftContent={(
+          <>
 
         <section
           className="relative bg-white border border-[#DCDBD6] rounded-2xl overflow-hidden" // Change from auto to hidden since we're managing scroll inside
@@ -1678,7 +1669,10 @@ function RoomDesignerWithState() {
           </div>
 
         </section>
-
+          </>
+        )}
+        rightContent={(
+          <>
         <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0 }}>
           <div
             style={{
@@ -1955,7 +1949,9 @@ function RoomDesignerWithState() {
               </CollapsiblePanel>
           </div>
         </aside>
-      </div>
+          </>
+        )}
+      />
     </div>
     </>);
 
