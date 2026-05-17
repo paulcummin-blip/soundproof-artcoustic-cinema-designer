@@ -8,6 +8,7 @@
 import React, { useMemo } from 'react';
 import WholeCurveDiagnostic from './WholeCurveDiagnostic';
 import PartialCoherenceDiagnosticTable from './PartialCoherenceDiagnosticTable';
+import PartialCoherenceDiagnosticCurve from './PartialCoherenceDiagnosticCurve';
 
 // ─── REW reference targets — explicit, editable, current room only ────────────
 // Replace these values whenever a new REW capture is taken for this room.
@@ -651,6 +652,11 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       <PartialCoherenceDiagnosticTable
         wholeCurveDebugRows={wholeCurveDebugRows}
         rewTargets={T}
+      />
+
+      <PartialCoherenceDiagnosticCurve
+        b44Series={b44Series}
+        partialCoherenceDiagnosticSeries={wholeCurveDebugRows?.partialCoherenceDiagnosticSeries}
       />
 
       {/* Stage feature detection diagnostic — diagnostic only, no benchmark scoring */}
