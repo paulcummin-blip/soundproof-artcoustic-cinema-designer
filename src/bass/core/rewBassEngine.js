@@ -228,7 +228,12 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const distanceM = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
   // Convert to phase
-  const propagationPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
+  const propagationPhaseScale = 0.5;
+  const propagationPhase =
+    -2 * Math.PI *
+    frequencyHz *
+    (distanceM / SPEED_OF_SOUND_MPS) *
+    propagationPhaseScale;
 
   // Rotate modal contribution by this phase unless the REW Core diagnostic bypass is enabled.
   const cosP = disableModalPropagationPhase ? 1 : Math.cos(propagationPhase);
