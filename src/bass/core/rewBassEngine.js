@@ -339,7 +339,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -390,6 +390,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     );
 
     const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
+    const isMuted68HzAxialMode = mute68HzAxialMode === true && mode.type === 'axial' && Math.abs(mode.freq - 68.6) <= 0.2;
     const storageFactor = modalStorageMode === 'orderCompression'
       ? modeOrder === 1
         ? 1.0
@@ -447,8 +448,11 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       : perturbedStoredModalContrib;
 
     // True pressure accumulation: direct sum of all modal pressure contributions.
-    modalSumRe += activeStoredModalContrib.real;
-    modalSumIm += activeStoredModalContrib.imag;
+    // Temporary REW parity diagnostic: optionally mute only the 68.6 Hz axial mode from active modal sum.
+    if (!isMuted68HzAxialMode) {
+      modalSumRe += activeStoredModalContrib.real;
+      modalSumIm += activeStoredModalContrib.imag;
+    }
 
     const isInDebugRange = frequencyHz >= 30 && frequencyHz <= 72;
 
@@ -486,6 +490,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           modeOrder,
           storageFactor,
           modalStorageMode,
+          mutedFromActiveModalSum: isMuted68HzAxialMode,
+          muteReason: isMuted68HzAxialMode ? 'Temporary REW Core Test: muted 68.6 Hz axial mode' : null,
         });
       }
 
@@ -503,6 +509,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           receiverCoupling,
           combinedCoupling,
           storageFactor,
+          mutedFromActiveModalSum: isMuted68HzAxialMode,
           transferRe: perturbedStoredModalContrib.real,
           transferIm: perturbedStoredModalContrib.imag,
         };
@@ -571,6 +578,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     window.localStorage?.getItem('rewCorePureDeterministicModalSum') === 'true'
   );
   const disableModalPropagationPhase = options?.disableModalPropagationPhase === true;
+  const mute68HzAxialMode = options?.mute68HzAxialMode === true;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
@@ -795,7 +803,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         _debugStrongestMode,
         _debugModalContributors,
       } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode
       );
 
       if (_debugModalContributors) {
@@ -931,6 +939,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 pureDeterministicModalSum,
                 activeModalPerturbationEnabled: !pureDeterministicModalSum,
                 disableModalPropagationPhase,
+                mute68HzAxialMode,
               },
               applicationComparison: {
                 prevRe,
@@ -947,6 +956,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 pureDeterministicModalSum,
                 activeModalPerturbationEnabled: !pureDeterministicModalSum,
                 disableModalPropagationPhase,
+                mute68HzAxialMode,
                 livePostRe: sumRe,
                 livePostIm: sumIm,
                 livePostMag: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
@@ -1124,6 +1134,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         pureDeterministicModalSum,
         activeModalPerturbationEnabled: !pureDeterministicModalSum,
         disableModalPropagationPhase,
+        mute68HzAxialMode,
         partialCoherenceDiagnostic,
         distributedCoherenceDiagnostic,
         splitCoherenceDiagnostic,
@@ -1166,7 +1177,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         pureDeterministicModalSum,
         activeModalPerturbationEnabled: !pureDeterministicModalSum,
         disableModalPropagationPhase,
-      };
+        mute68HzAxialMode,
+        };
     }
 
     const { distanceFromTarget, ...debugRow } = row;
@@ -1194,6 +1206,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     pureDeterministicModalSum,
     activeModalPerturbationEnabled: !pureDeterministicModalSum,
     disableModalPropagationPhase,
+    mute68HzAxialMode,
   };
 
   return {

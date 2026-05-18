@@ -127,6 +127,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(false);
   const [disableLateField, setDisableLateField] = useState(false);
   const [disableModalPropagationPhase, setDisableModalPropagationPhase] = useState(false);
+  const [mute68HzAxialMode, setMute68HzAxialMode] = useState(false);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -287,6 +288,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             disableReflectionCoherenceWeight,
             disableLateField,
             disableModalPropagationPhase,
+            mute68HzAxialMode,
           }
         );
 
@@ -341,7 +343,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalStorageMode, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, absorptionPct, selectedSeatIds]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalStorageMode, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, absorptionPct, selectedSeatIds]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -857,6 +859,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     />
                     Disable modal propagation phase
                   </label>
+                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                    <input
+                      type="checkbox"
+                      checked={mute68HzAxialMode}
+                      onChange={(event) => setMute68HzAxialMode(event.target.checked)}
+                    />
+                    Mute 68.6 Hz mode
+                  </label>
                 </div>
                 <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
                   <div className="font-bold text-[#1E293B]">Active model:</div>
@@ -869,6 +879,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <div>Reflection weighting: {disableReflectionCoherenceWeight ? 'OFF' : 'ON'}</div>
                   <div>Late field: {disableLateField ? 'OFF' : 'ON'}</div>
                   <div>Modal propagation phase disabled: {disableModalPropagationPhase ? 'YES' : 'NO'}</div>
+                  <div>Mute 68.6 Hz mode: {mute68HzAxialMode ? 'ON' : 'OFF'}</div>
                 </div>
               </>
             )}
