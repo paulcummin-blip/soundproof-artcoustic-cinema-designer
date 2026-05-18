@@ -396,13 +396,16 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
 
     const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
     const isMuted68HzAxialMode = mute68HzAxialMode === true && mode.type === 'axial' && Math.abs(mode.freq - 68.6) <= 0.2;
+    const axialLightStorageFactor = modalStorageMode === 'light' && mode.type === 'axial'
+      ? 1 + (0.06 / (1 + Math.pow((frequencyHz - mode.freq) / Math.max(mode.freq * 0.08, 1e-6), 2)))
+      : 1.0;
     const storageFactor = modalStorageMode === 'orderCompression'
       ? modeOrder === 1
         ? 1.0
         : modeOrder === 2
           ? 0.45
           : 0.30
-      : 1.0;
+      : axialLightStorageFactor;
 
     const rawMagnitudeBeforeStorage = Math.sqrt(
       modalContrib.real * modalContrib.real + modalContrib.imag * modalContrib.imag

@@ -823,6 +823,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     aria-label="Modal storage comparison"
                   >
                     <option value="none">Modal storage: none</option>
+                    <option value="light">Modal storage: light</option>
                     <option value="orderCompression">Modal storage: order compression</option>
                   </select>
                 </>
