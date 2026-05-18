@@ -121,6 +121,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(true);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
   const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState("existing");
+  const [modalGainScalar, setModalGainScalar] = useState(1.0);
   const [modalStorageMode, setModalStorageMode] = useState("none");
   const [disableReflectionPhaseJitter, setDisableReflectionPhaseJitter] = useState(false);
   const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(false);
@@ -280,6 +281,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             freqMaxHz: 200,
             smoothing: 'none',
             modalSourceReferenceMode,
+            modalGainScalar,
             modalStorageMode,
             disableReflectionPhaseJitter,
             disableReflectionCoherenceWeight,
@@ -339,7 +341,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalStorageMode, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, absorptionPct, selectedSeatIds]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalStorageMode, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, absorptionPct, selectedSeatIds]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -790,6 +792,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <option value="room_normalized">Modal source: room-normalised</option>
                   </select>
                   <select
+                    value={modalGainScalar}
+                    onChange={(event) => setModalGainScalar(Number(event.target.value))}
+                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
+                    aria-label="Modal gain comparison"
+                  >
+                    <option value={1.0}>Modal gain: 1.0</option>
+                    <option value={1.2}>Modal gain: 1.2</option>
+                    <option value={1.4}>Modal gain: 1.4</option>
+                    <option value={1.6}>Modal gain: 1.6</option>
+                  </select>
+                  <select
                     value={modalStorageMode}
                     onChange={(event) => setModalStorageMode(event.target.value)}
                     className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
@@ -849,6 +862,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <div className="font-bold text-[#1E293B]">Active model:</div>
                   <div>Source: {rewSourceCurveMode}</div>
                   <div>Modal source: {modalSourceReferenceMode}</div>
+                  <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
                   <div>Storage: {modalStorageMode}</div>
                   <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
                   <div>Reflection phase jitter: {disableReflectionPhaseJitter ? 'OFF' : 'ON'}</div>
