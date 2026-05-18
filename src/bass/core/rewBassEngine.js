@@ -187,7 +187,7 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
 // Modal Green's function: coupling = Ψ_source * Ψ_receiver, resonant transfer H(f, f0, Q).
 // pressureMagnitude = modalSourceAmplitude * combinedCoupling * resonanceMagnitude
 // modalSourceAmplitude brings the modal layer into the same pressure domain as the direct path.
-function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices, sourceX, sourceY, sourceZ, seatX, seatY, seatZ, disableModalPropagationPhase = false) {
+function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices, sourceX, sourceY, sourceZ, seatX, seatY, seatZ, disableModalPropagationPhase = false, propagationPhaseScale = 0.5) {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
 
@@ -228,7 +228,6 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const distanceM = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
   // Convert to phase
-  const propagationPhaseScale = 0.5;
   const propagationPhase =
     -2 * Math.PI *
     frequencyHz *
@@ -344,7 +343,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -391,7 +390,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       { nx: mode.nx, ny: mode.ny, nz: mode.nz },
       source.x, source.y, source.z,
       seat.x, seat.y, seat.z,
-      disableModalPropagationPhase
+      disableModalPropagationPhase,
+      propagationPhaseScale
     );
 
     const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
@@ -587,6 +587,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   );
   const disableModalPropagationPhase = options?.disableModalPropagationPhase === true;
   const mute68HzAxialMode = options?.mute68HzAxialMode === true;
+  const propagationPhaseScaleOption = Number(options?.propagationPhaseScale);
+  const propagationPhaseScale = Number.isFinite(propagationPhaseScaleOption) ? propagationPhaseScaleOption : 0.5;
   const axialQOption = Number(options?.axialQ);
   const axialQ = Number.isFinite(axialQOption) ? axialQOption : 8.0;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
@@ -813,7 +815,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         _debugStrongestMode,
         _debugModalContributors,
       } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale
       );
 
       if (_debugModalContributors) {
