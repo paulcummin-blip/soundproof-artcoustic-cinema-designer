@@ -367,6 +367,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     return Math.abs(frequencyHz - targetHz) < Math.abs(frequencyHz - nearestTarget) ? targetHz : nearestTarget;
   }, null);
   const modalContributorRows = [];
+  const activeModalContributorRows = [];
 
   modes.forEach((mode) => {
     const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
@@ -455,6 +456,10 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       ? storedModalContrib
       : perturbedStoredModalContrib;
 
+    const activeMagnitude = Math.sqrt(
+      activeStoredModalContrib.real * activeStoredModalContrib.real + activeStoredModalContrib.imag * activeStoredModalContrib.imag
+    );
+
     // True pressure accumulation: direct sum of all modal pressure contributions.
     // Temporary REW parity diagnostic: optionally mute only the 68.6 Hz axial mode from active modal sum.
     if (!isMuted68HzAxialMode) {
@@ -463,6 +468,25 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     }
 
     const isInDebugRange = frequencyHz >= 30 && frequencyHz <= 72;
+
+    if (isInDebugRange) {
+      activeModalContributorRows.push({
+        frequencyHz,
+        nx: mode.nx,
+        ny: mode.ny,
+        nz: mode.nz,
+        modeFrequencyHz: mode.freq,
+        modeType: mode.type,
+        sourceCoupling,
+        receiverCoupling,
+        combinedCoupling,
+        activeReal: activeStoredModalContrib.real,
+        activeImag: activeStoredModalContrib.imag,
+        activeMagnitude,
+        activePhaseAngleDeg: (Math.atan2(activeStoredModalContrib.imag, activeStoredModalContrib.real) * 180) / Math.PI,
+        mutedFromActiveModalSum: isMuted68HzAxialMode,
+      });
+    }
 
     if (isInDebugRange) {
       const mag = Math.sqrt(perturbedStoredModalContrib.real * perturbedStoredModalContrib.real + perturbedStoredModalContrib.imag * perturbedStoredModalContrib.imag);
@@ -537,6 +561,14 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       }
     : null;
 
+  const _debugActiveModalVectorBreakdown = {
+    frequencyHz,
+    modalSumRe,
+    modalSumIm,
+    contributors: activeModalContributorRows
+      .sort((a, b) => b.activeMagnitude - a.activeMagnitude),
+  };
+
   return {
     modalSumRe,
     modalSumIm,
@@ -549,6 +581,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     splitCoherenceModalEnergySq,
     _debugStrongestMode,
     _debugModalContributors,
+    _debugActiveModalVectorBreakdown,
   };
 }
 
@@ -639,6 +672,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const stepDebugRows = [];
   const wholeCurveDebugCandidates = new Map();
   const modalContributorDebugCandidates = new Map();
+  const activeModalContributorDebugSeries = [];
   const preModalSeries = [];
   const modalOnlySeries = [];
   const postModalSeries = [];
@@ -814,9 +848,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         splitCoherenceModalEnergySq: diagnosticSplitModalEnergySq,
         _debugStrongestMode,
         _debugModalContributors,
+        _debugActiveModalVectorBreakdown,
       } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale
       );
+
+      if (_debugActiveModalVectorBreakdown) {
+        activeModalContributorDebugSeries.push(_debugActiveModalVectorBreakdown);
+      }
 
       if (_debugModalContributors) {
         const existingContributor = modalContributorDebugCandidates.get(_debugModalContributors.targetHz);
@@ -1215,6 +1254,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   wholeCurveDebugRows.distributedCoherenceDiagnosticSeries = distributedCoherenceDiagnosticSeries;
   wholeCurveDebugRows.splitCoherenceDiagnosticSeries = splitCoherenceDiagnosticSeries;
   wholeCurveDebugRows.modalContributorDebugRows = modalContributorDebugRows;
+  wholeCurveDebugRows.activeModalContributorDebugSeries = activeModalContributorDebugSeries;
   wholeCurveDebugRows.diagnosticToggles = {
     disableReflectionPhaseJitter,
     disableReflectionCoherenceWeight,
@@ -1235,6 +1275,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       .filter(Boolean),
     wholeCurveDebugRows,
     modalContributorDebugRows,
+    activeModalContributorDebugSeries,
     preModalSeries,
     modalOnlySeries,
     postModalSeries,
