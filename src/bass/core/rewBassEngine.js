@@ -153,13 +153,13 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
   return Math.max(1, Math.min(80, qSabine));
 }
 
-function estimateModeQByType(mode) {
+function estimateModeQByType(mode, axialQOverride = 8.0) {
   const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
-  const axialHarmonicOrder = Math.max(mode.nx || 0, mode.ny || 0, mode.nz || 0);
+  const axialQ = Number.isFinite(Number(axialQOverride)) ? Number(axialQOverride) : 8.0;
 
-  // Temporary REW parity diagnostic only, not final physics: second axial harmonics restored to axial baseline Q.
+  // Temporary REW parity diagnostic only: allow axial Q override in REW Core Test path.
   if (activeAxes === 1) {
-    return axialHarmonicOrder === 2 ? 8.0 : 8.0;
+    return axialQ;
   }
 
   if (activeAxes === 2) {
@@ -579,6 +579,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   );
   const disableModalPropagationPhase = options?.disableModalPropagationPhase === true;
   const mute68HzAxialMode = options?.mute68HzAxialMode === true;
+  const axialQOption = Number(options?.axialQ);
+  const axialQ = Number.isFinite(axialQOption) ? axialQOption : 8.0;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
@@ -620,7 +622,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         c: SPEED_OF_SOUND_MPS,
       }).map((mode) => ({
         ...mode,
-        qValue: estimateModeQByType(mode),
+        qValue: estimateModeQByType(mode, axialQ),
       }))
     : [];
 
@@ -940,6 +942,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 activeModalPerturbationEnabled: !pureDeterministicModalSum,
                 disableModalPropagationPhase,
                 mute68HzAxialMode,
+                axialQ,
               },
               applicationComparison: {
                 prevRe,
@@ -957,6 +960,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
                 activeModalPerturbationEnabled: !pureDeterministicModalSum,
                 disableModalPropagationPhase,
                 mute68HzAxialMode,
+                axialQ,
                 livePostRe: sumRe,
                 livePostIm: sumIm,
                 livePostMag: Math.sqrt(sumRe * sumRe + sumIm * sumIm),
@@ -1135,6 +1139,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         activeModalPerturbationEnabled: !pureDeterministicModalSum,
         disableModalPropagationPhase,
         mute68HzAxialMode,
+        axialQ,
         partialCoherenceDiagnostic,
         distributedCoherenceDiagnostic,
         splitCoherenceDiagnostic,
@@ -1178,6 +1183,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         activeModalPerturbationEnabled: !pureDeterministicModalSum,
         disableModalPropagationPhase,
         mute68HzAxialMode,
+        axialQ,
         };
     }
 
@@ -1207,6 +1213,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     activeModalPerturbationEnabled: !pureDeterministicModalSum,
     disableModalPropagationPhase,
     mute68HzAxialMode,
+    axialQ,
   };
 
   return {
