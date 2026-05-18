@@ -444,7 +444,7 @@ function VectorBreakdown686({ stepDebug }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export default function RewDebugPanel({ stepDebug, selectedSeatIds }) {
+export default function RewDebugPanel({ stepDebug, selectedSeatIds, disableModalPropagationPhase = false }) {
   if (!stepDebug?.length) return null;
 
   return (
@@ -458,6 +458,9 @@ export default function RewDebugPanel({ stepDebug, selectedSeatIds }) {
         <span style={{ background: '#213428', color: '#fff', borderRadius: 4, padding: '1px 7px' }}>
           Clean legacy transfer baseline
         </span>
+        <div style={{ marginTop: 6 }}>
+          <strong>Modal propagation phase disabled:</strong> {disableModalPropagationPhase ? 'YES' : 'NO'}
+        </div>
       </div>
 
       {/* ① Compact Target Summary — PRIMARY, open by default */}
