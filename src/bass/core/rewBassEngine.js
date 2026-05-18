@@ -586,6 +586,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const freqMinHz = options?.freqMinHz;
   const freqMaxHz = options?.freqMaxHz;
   const freqsHz = buildFrequencyAxis(freqMinHz, freqMaxHz);
+  const schroederFrequency = 2000 * Math.sqrt(0.4 / (widthM * lengthM * heightM));
 
   const imageSources = enableReflections ? [
     { x: -source.x, y: source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.left) },
@@ -695,11 +696,12 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     });
 
     // Diffuse late-field approximation
+    // Temporary REW parity diagnostic only: no late-field contribution below Schroeder.
     const lateFieldDecay = Math.exp(-(frequencyHz - 20) / 120);
-    const lateFieldAmplitude = disableLateField ? 0 : amplitude * 0.12 * lateFieldDecay;
+    const lateFieldAmplitude = (disableLateField || frequencyHz < schroederFrequency) ? 0 : amplitude * 0.12 * lateFieldDecay;
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
-    lateFieldRe = disableLateField ? 0 : lateFieldAmplitude * Math.cos(lateFieldPhase);
-    lateFieldIm = disableLateField ? 0 : lateFieldAmplitude * Math.sin(lateFieldPhase);
+    lateFieldRe = (disableLateField || frequencyHz < schroederFrequency) ? 0 : lateFieldAmplitude * Math.cos(lateFieldPhase);
+    lateFieldIm = (disableLateField || frequencyHz < schroederFrequency) ? 0 : lateFieldAmplitude * Math.sin(lateFieldPhase);
     sumRe += lateFieldRe;
     sumIm += lateFieldIm;
 
