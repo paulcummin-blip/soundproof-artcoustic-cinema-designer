@@ -814,6 +814,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   >
                     <option value={8.0}>Axial Q: 8.0</option>
                     <option value={7.0}>Axial Q: 7.0</option>
+                    <option value={6.5}>Axial Q: 6.5</option>
                   </select>
                   <select
                     value={modalStorageMode}
