@@ -3,7 +3,7 @@
 // Reads wholeCurveDebugRows from the engine, with stepDebug as a legacy fallback.
 // Does NOT change any simulation maths, Q values, modalGainScalar, or benchmark scoring.
 
-import React, { useState } from 'react';
+import React from 'react';
 
 const TARGET_HZ = [20, 30, 34.3, 40, 50, 60, 68.6, 70, 80, 90, 100];
 const BENCHMARK_HZ = new Set([34.3, 40, 68.6]);
@@ -106,8 +106,6 @@ const fmtMag = (v) => Number.isFinite(v) ? v.toFixed(4) : '—';
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveDebugRows, modalSourceReferenceMode = 'existing' }) {
-  const [open, setOpen] = useState(false);
-
   if (!Array.isArray(b44Series) || b44Series.length === 0) return null;
 
   const hasWholeCurveRows = Array.isArray(wholeCurveDebugRows) && wholeCurveDebugRows.length > 0;
@@ -139,92 +137,71 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveD
   const tdLeft = { ...tdBase(false), textAlign: 'left' };
 
   return (
-    <div id="diagnostic-whole-curve" style={{ scrollMarginTop: 54, marginTop: 12, border: '1px solid #3b82f6', borderRadius: 6, overflow: 'hidden', fontFamily: 'monospace' }}>
-      {/* Header / toggle */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%',
-          textAlign: 'left',
-          background: '#1e3a5f',
-          border: 'none',
-          padding: '6px 12px',
-          fontSize: 11,
-          fontWeight: 700,
-          color: '#bfdbfe',
-          cursor: 'pointer',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
+    <details id="diagnostic-whole-curve" style={{ scrollMarginTop: 54, marginTop: 12, border: '1px solid #3b82f6', borderRadius: 6, overflow: 'hidden', fontFamily: 'monospace' }}>
+      <summary style={{ width: '100%', textAlign: 'left', background: '#1e3a5f', border: 'none', padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#bfdbfe', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', listStyle: 'none' }}>
         <span>⚠ Temporary whole-curve contribution diagnostic <span style={{ fontWeight: 400, color: '#dbeafe' }}>{summaryText}</span></span>
-        <span style={{ fontSize: 10, opacity: 0.7 }}>{open ? '▲ collapse' : '▼ expand'}</span>
-      </button>
+      </summary>
+      <div style={{ padding: '10px 12px', background: '#f0f9ff', overflowX: 'auto' }}>
 
-      {open && (
-        <div style={{ padding: '10px 12px', background: '#f0f9ff', overflowX: 'auto' }}>
-
-          {/* Meta info */}
-          <div style={{ fontSize: 10, color: '#1e40af', marginBottom: 8 }}>
-            <strong>modalGainScalar</strong> = {MODAL_GAIN_SCALAR} (read-only · engine constant) ·{' '}
-            {hasWholeCurveRows ? (
-              <><strong>source</strong>: wholeCurveDebugRows ·{' '}</>
-            ) : (
-              <><strong>source</strong>: legacy stepDebug fallback, sparse 30–72 Hz ·{' '}</>
-            )}
-            <strong>modalSourceReference</strong>: {debugModalSourceReferenceMode} ·{' '}
-            <strong>modalStorageMode</strong>: {debugModalStorageMode} ·{' '}
-            <strong>phaseJitterDisabled</strong>: {diagnosticToggles.disableReflectionPhaseJitter ? 'true' : 'false'} ·{' '}
-            <strong>reflectionWeightDisabled</strong>: {diagnosticToggles.disableReflectionCoherenceWeight ? 'true' : 'false'} ·{' '}
-            <strong>lateFieldDisabled</strong>: {diagnosticToggles.disableLateField ? 'true' : 'false'} ·{' '}
-            <strong>finalSPL</strong>: engine debug row when available · magnitudes are linear pressure units
-          </div>
-
-          <table style={{ borderCollapse: 'collapse', whiteSpace: 'nowrap', fontSize: 10 }}>
-            <thead>
-              <tr>
-                <th style={{ ...thBase, textAlign: 'left' }}>Target Hz</th>
-                <th style={{ ...thBase }}>eval Hz</th>
-                <th style={{ ...thBase, borderLeft: '2px solid #60a5fa' }}>Final SPL (dB)</th>
-                <th style={{ ...thBase }}>product curve (dB)</th>
-                <th style={{ ...thBase, borderLeft: '2px solid #60a5fa' }}>direct mag</th>
-                <th style={{ ...thBase }}>refl mag</th>
-                <th style={{ ...thBase }}>lateField mag</th>
-                <th style={{ ...thBase, borderLeft: '2px solid #60a5fa' }}>preModal mag</th>
-                <th style={{ ...thBase }}>modalSum mag</th>
-                <th style={{ ...thBase, color: '#86efac' }}>postModal mag</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => {
-                const isBench = BENCHMARK_HZ.has(row.targetHz);
-                const bg = isBench ? '#dbeafe' : (i % 2 === 0 ? '#f8fafc' : '#ffffff');
-                return (
-                  <tr key={row.targetHz} style={{ background: bg, borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ ...tdLeft, fontWeight: isBench ? 700 : 600, color: isBench ? '#1d4ed8' : '#374151' }}>
-                      {row.targetHz} Hz{isBench ? ' ★' : ''}
-                    </td>
-                    <td style={tdBase(false)}>{row.evalHz != null ? row.evalHz.toFixed(2) : '—'}</td>
-                    <td style={{ ...tdBase(true, '#15803d'), borderLeft: '2px solid #93c5fd' }}>{fmtDb(row.finalSplDb)}</td>
-                    <td style={tdBase(false)}>{fmtDb(row.curveDb)}</td>
-                    <td style={{ ...tdBase(false), borderLeft: '2px solid #93c5fd' }}>{fmtMag(row.directMag)}</td>
-                    <td style={tdBase(false)}>{fmtMag(row.reflMag)}</td>
-                    <td style={tdBase(false)}>{fmtMag(row.lfMag)}</td>
-                    <td style={{ ...tdBase(false), borderLeft: '2px solid #93c5fd' }}>{fmtMag(row.preModalMag)}</td>
-                    <td style={tdBase(false)}>{fmtMag(row.modalSumMag)}</td>
-                    <td style={tdBase(true, '#15803d')}>{fmtMag(row.postModalMag)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div style={{ marginTop: 8, fontSize: 10, color: '#64748b' }}>
-            ★ = REW benchmark checkpoint. Blue rows. {hasWholeCurveRows ? 'Rows come from wholeCurveDebugRows captured in the REW core frequency loop.' : "Legacy fallback: columns may show '—' outside sparse stepDebug coverage."}
-          </div>
+        {/* Meta info */}
+        <div style={{ fontSize: 10, color: '#1e40af', marginBottom: 8 }}>
+          <strong>modalGainScalar</strong> = {MODAL_GAIN_SCALAR} (read-only · engine constant) ·{' '}
+          {hasWholeCurveRows ? (
+            <><strong>source</strong>: wholeCurveDebugRows ·{' '}</>
+          ) : (
+            <><strong>source</strong>: legacy stepDebug fallback, sparse 30–72 Hz ·{' '}</>
+          )}
+          <strong>modalSourceReference</strong>: {debugModalSourceReferenceMode} ·{' '}
+          <strong>modalStorageMode</strong>: {debugModalStorageMode} ·{' '}
+          <strong>phaseJitterDisabled</strong>: {diagnosticToggles.disableReflectionPhaseJitter ? 'true' : 'false'} ·{' '}
+          <strong>reflectionWeightDisabled</strong>: {diagnosticToggles.disableReflectionCoherenceWeight ? 'true' : 'false'} ·{' '}
+          <strong>lateFieldDisabled</strong>: {diagnosticToggles.disableLateField ? 'true' : 'false'} ·{' '}
+          <strong>finalSPL</strong>: engine debug row when available · magnitudes are linear pressure units
         </div>
-      )}
-    </div>
+
+        <table style={{ borderCollapse: 'collapse', whiteSpace: 'nowrap', fontSize: 10 }}>
+          <thead>
+            <tr>
+              <th style={{ ...thBase, textAlign: 'left' }}>Target Hz</th>
+              <th style={{ ...thBase }}>eval Hz</th>
+              <th style={{ ...thBase, borderLeft: '2px solid #60a5fa' }}>Final SPL (dB)</th>
+              <th style={{ ...thBase }}>product curve (dB)</th>
+              <th style={{ ...thBase, borderLeft: '2px solid #60a5fa' }}>direct mag</th>
+              <th style={{ ...thBase }}>refl mag</th>
+              <th style={{ ...thBase }}>lateField mag</th>
+              <th style={{ ...thBase, borderLeft: '2px solid #60a5fa' }}>preModal mag</th>
+              <th style={{ ...thBase }}>modalSum mag</th>
+              <th style={{ ...thBase, color: '#86efac' }}>postModal mag</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const isBench = BENCHMARK_HZ.has(row.targetHz);
+              const bg = isBench ? '#dbeafe' : (i % 2 === 0 ? '#f8fafc' : '#ffffff');
+              return (
+                <tr key={row.targetHz} style={{ background: bg, borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ ...tdLeft, fontWeight: isBench ? 700 : 600, color: isBench ? '#1d4ed8' : '#374151' }}>
+                    {row.targetHz} Hz{isBench ? ' ★' : ''}
+                  </td>
+                  <td style={tdBase(false)}>{row.evalHz != null ? row.evalHz.toFixed(2) : '—'}</td>
+                  <td style={{ ...tdBase(true, '#15803d'), borderLeft: '2px solid #93c5fd' }}>{fmtDb(row.finalSplDb)}</td>
+                  <td style={tdBase(false)}>{fmtDb(row.curveDb)}</td>
+                  <td style={{ ...tdBase(false), borderLeft: '2px solid #93c5fd' }}>{fmtMag(row.directMag)}</td>
+                  <td style={tdBase(false)}>{fmtMag(row.reflMag)}</td>
+                  <td style={tdBase(false)}>{fmtMag(row.lfMag)}</td>
+                  <td style={{ ...tdBase(false), borderLeft: '2px solid #93c5fd' }}>{fmtMag(row.preModalMag)}</td>
+                  <td style={tdBase(false)}>{fmtMag(row.modalSumMag)}</td>
+                  <td style={tdBase(true, '#15803d')}>{fmtMag(row.postModalMag)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div style={{ marginTop: 8, fontSize: 10, color: '#64748b' }}>
+          ★ = REW benchmark checkpoint. Blue rows. {hasWholeCurveRows ? 'Rows come from wholeCurveDebugRows captured in the REW core frequency loop.' : "Legacy fallback: columns may show '—' outside sparse stepDebug coverage."}
+        </div>
+      </div>
+    </details>
   );
 }

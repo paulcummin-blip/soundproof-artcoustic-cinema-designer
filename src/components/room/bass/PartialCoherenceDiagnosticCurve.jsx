@@ -127,26 +127,9 @@ function DiagnosticTooltip({ active, payload, label }) {
 }
 
 export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCoherenceDiagnosticSeries, distributedCoherenceDiagnosticSeries, splitCoherenceDiagnosticSeries }) {
-  const chartData = React.useMemo(() => {
-    return buildChartData(
-      normaliseCoherentSeries(b44Series),
-      normalisePartialSeries(partialCoherenceDiagnosticSeries),
-      normaliseDistributedSeries(distributedCoherenceDiagnosticSeries),
-      normaliseSplitSeries(splitCoherenceDiagnosticSeries)
-    );
-  }, [b44Series, partialCoherenceDiagnosticSeries, distributedCoherenceDiagnosticSeries, splitCoherenceDiagnosticSeries]);
-
-  const hasDiagnosticCurve = chartData.some((point) =>
-    Number.isFinite(point.partialCoherenceDb) ||
-    Number.isFinite(point.distributedCoherenceDb) ||
-    Number.isFinite(point.splitCoherenceDb)
-  );
-
-  if (!hasDiagnosticCurve) {
-    return null;
-  }
-
   const [open, setOpen] = React.useState(false);
+
+  const chartData = React.useMemo(() => {
 
   return (
     <details open={open} style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }} onClick={(e) => {
