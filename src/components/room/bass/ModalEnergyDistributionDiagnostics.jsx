@@ -1,5 +1,6 @@
 import React from 'react';
 import OrthogonalEnergyAnalysis from './OrthogonalEnergyAnalysis';
+import ModalResonancePersistenceDiagnostics from './ModalResonancePersistenceDiagnostics';
 
 const MODE_TYPES = ['axial', 'tangential', 'oblique'];
 
@@ -257,6 +258,11 @@ export default function ModalEnergyDistributionDiagnostics({ contributorSeries, 
         totalContributorMagnitude={totalContributorMagnitude}
         sumConstructiveMagnitudes={sumConstructiveMagnitudes}
         sumDestructiveMagnitudes={sumDestructiveMagnitudes}
+        tableHeaderStyle={tableHeaderStyle}
+      />
+
+      <ModalResonancePersistenceDiagnostics
+        contributors={contributors}
         tableHeaderStyle={tableHeaderStyle}
       />
     </details>

@@ -459,6 +459,12 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     const activeMagnitude = Math.sqrt(
       activeStoredModalContrib.real * activeStoredModalContrib.real + activeStoredModalContrib.imag * activeStoredModalContrib.imag
     );
+    const activeTransferMagnitudeAtNull = Math.sqrt(
+      modalContrib.transferReal * modalContrib.transferReal + modalContrib.transferImag * modalContrib.transferImag
+    );
+    const estimatedResonanceMagnitude = activeTransferMagnitudeAtNull > 0
+      ? activeMagnitude * (mode.qValue / activeTransferMagnitudeAtNull)
+      : null;
 
     // True pressure accumulation: direct sum of all modal pressure contributions.
     // Temporary REW parity diagnostic: optionally mute only the 68.6 Hz axial mode from active modal sum.
@@ -484,6 +490,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
         activeImag: activeStoredModalContrib.imag,
         activeMagnitude,
         activePhaseAngleDeg: (Math.atan2(activeStoredModalContrib.imag, activeStoredModalContrib.real) * 180) / Math.PI,
+        qValue: mode.qValue,
+        activeTransferMagnitudeAtNull,
+        estimatedResonanceMagnitude,
         mutedFromActiveModalSum: isMuted68HzAxialMode,
       });
     }
