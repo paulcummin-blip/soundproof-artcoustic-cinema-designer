@@ -10,6 +10,7 @@ import WholeCurveDiagnostic from './WholeCurveDiagnostic';
 import PartialCoherenceDiagnosticTable from './PartialCoherenceDiagnosticTable';
 import PartialCoherenceDiagnosticCurve from './PartialCoherenceDiagnosticCurve';
 import NullCentreActiveModalVectorBreakdown from './NullCentreActiveModalVectorBreakdown';
+import ModalEnergyDistributionDiagnostics from './ModalEnergyDistributionDiagnostics';
 
 // ─── REW reference targets — explicit, editable, current room only ────────────
 // Replace these values whenever a new REW capture is taken for this room.
@@ -687,6 +688,12 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       </SafeTableWrap>
 
       <NullCentreActiveModalVectorBreakdown
+        contributorSeries={wholeCurveDebugRows?.activeModalContributorDebugSeries}
+        nullCentreHz={r.hz40.b44NullCentreHz}
+        tableHeaderStyle={tableHeaderStyle}
+      />
+
+      <ModalEnergyDistributionDiagnostics
         contributorSeries={wholeCurveDebugRows?.activeModalContributorDebugSeries}
         nullCentreHz={r.hz40.b44NullCentreHz}
         tableHeaderStyle={tableHeaderStyle}
