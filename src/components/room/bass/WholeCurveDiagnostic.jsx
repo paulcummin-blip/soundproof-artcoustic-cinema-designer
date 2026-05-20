@@ -115,6 +115,9 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveD
   const debugModalSourceReferenceMode = rows.find(row => row.modalSourceReferenceMode)?.modalSourceReferenceMode || modalSourceReferenceMode;
   const debugModalStorageMode = rows.find(row => row.modalStorageMode)?.modalStorageMode || 'none';
   const diagnosticToggles = wholeCurveDebugRows?.diagnosticToggles || {};
+  const row40 = rows.find(row => row.targetHz === 40);
+  const row68 = rows.find(row => row.targetHz === 68.6);
+  const summaryText = `(40 Hz modal ${fmtMag(row40?.modalSumMag)} | 68 Hz modal ${fmtMag(row68?.modalSumMag)})`;
 
   const thBase = {
     padding: '3px 7px',
@@ -136,7 +139,7 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveD
   const tdLeft = { ...tdBase(false), textAlign: 'left' };
 
   return (
-    <div style={{ marginTop: 12, border: '1px solid #3b82f6', borderRadius: 6, overflow: 'hidden', fontFamily: 'monospace' }}>
+    <div id="diagnostic-whole-curve" style={{ scrollMarginTop: 54, marginTop: 12, border: '1px solid #3b82f6', borderRadius: 6, overflow: 'hidden', fontFamily: 'monospace' }}>
       {/* Header / toggle */}
       <button
         onClick={() => setOpen(o => !o)}
@@ -155,7 +158,7 @@ export default function WholeCurveDiagnostic({ b44Series, stepDebug, wholeCurveD
           alignItems: 'center',
         }}
       >
-        <span>⚠ Temporary whole-curve contribution diagnostic</span>
+        <span>⚠ Temporary whole-curve contribution diagnostic <span style={{ fontWeight: 400, color: '#dbeafe' }}>{summaryText}</span></span>
         <span style={{ fontSize: 10, opacity: 0.7 }}>{open ? '▲ collapse' : '▼ expand'}</span>
       </button>
 

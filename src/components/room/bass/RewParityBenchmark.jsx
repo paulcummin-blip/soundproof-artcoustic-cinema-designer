@@ -11,6 +11,7 @@ import PartialCoherenceDiagnosticTable from './PartialCoherenceDiagnosticTable';
 import PartialCoherenceDiagnosticCurve from './PartialCoherenceDiagnosticCurve';
 import NullCentreActiveModalVectorBreakdown from './NullCentreActiveModalVectorBreakdown';
 import ModalEnergyDistributionDiagnostics from './ModalEnergyDistributionDiagnostics';
+import DiagnosticsStickyNav from './DiagnosticsStickyNav';
 
 // ─── REW reference targets — explicit, editable, current room only ────────────
 // Replace these values whenever a new REW capture is taken for this room.
@@ -510,6 +511,12 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
     ? wholeCurveDebugRows.modalContributorDebugRows
     : [];
   const activeModalPerturbationEnabled = wholeCurveDebugRows?.diagnosticToggles?.activeModalPerturbationEnabled ?? !pureDeterministicModalSum;
+  const topModalContributor = modalContributorDebugRows
+    .flatMap(group => group.contributors || [])
+    .sort((a, b) => (Number(b.contributionMagnitude) || 0) - (Number(a.contributionMagnitude) || 0))[0] || null;
+  const contributorRankingSummary = topModalContributor
+    ? `(Top contributor ${formatModeIndices(topModalContributor)} | ${fmtDiagnostic(topModalContributor.contributionMagnitude, 0, ' mag')})`
+    : '(No contributor rows)';
 
   // Compute pass/fail per region (null = no REW data yet)
   const check = (b44Val, rewVal, tol) => {
@@ -547,9 +554,11 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
 
   return (
     <div style={{ fontFamily: 'monospace', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
+      <DiagnosticsStickyNav />
 
       {/* Overall verdict */}
-      <div style={{
+      <div id="diagnostic-rew-benchmark" style={{
+        scrollMarginTop: 54,
         padding: '6px 10px', borderRadius: 6, marginBottom: 10,
         background: headerBg, border: `1px solid ${headerColor}44`,
         color: headerColor, fontWeight: 700, fontSize: 12,
@@ -750,9 +759,9 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
 
       {/* Temporary modal contributor ranking — diagnostic only, no benchmark scoring */}
       {modalContributorDebugRows.length > 0 && (
-        <details open style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+        <details id="diagnostic-contributors" style={{ scrollMarginTop: 54, marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa' }}>
           <summary style={{ fontSize: 10, fontWeight: 700, color: '#9a3412', cursor: 'pointer' }}>
-            Temporary modal contributor ranking <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only · no simulation maths changed)</span>
+            Temporary modal contributor ranking <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only · no simulation maths changed)</span> <span style={{ fontWeight: 400, color: '#7c2d12' }}>{contributorRankingSummary}</span>
           </summary>
           <div style={{ marginTop: 8 }}>
             {modalContributorDebugRows.map((group) => (
@@ -832,7 +841,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       )}
 
       {/* Phase alignment at REW null target */}
-      <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f8f0ff', border: '1px solid #d8b4fe' }}>
+      <div id="diagnostic-phase" style={{ scrollMarginTop: 54, marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f8f0ff', border: '1px solid #d8b4fe' }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#6d28d9', marginBottom: 6 }}>
           Phase alignment at REW null target <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only — no REW phase reference)</span>
         </div>

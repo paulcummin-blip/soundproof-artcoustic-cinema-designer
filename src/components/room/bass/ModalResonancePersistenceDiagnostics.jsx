@@ -60,10 +60,12 @@ export default function ModalResonancePersistenceDiagnostics({ contributors, tab
     };
   });
 
+  const persistenceSummary = `(${groupSummaries.map(summary => `${summary.type} ${fmt(summary.averagePersistenceDb, 1, ' dB')}`).join(' | ')})`;
+
   return (
-    <details open style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fdba74' }}>
+    <details id="diagnostic-persistence" style={{ scrollMarginTop: 54, marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fdba74' }}>
       <summary style={{ fontSize: 10, fontWeight: 700, color: '#c2410c', cursor: 'pointer' }}>
-        Modal Resonance Persistence Diagnostics <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#64748b' }}>(temporary · diagnostics only)</span>
+        Modal Resonance Persistence Diagnostics <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#64748b' }}>(temporary · diagnostics only)</span> <span style={{ fontWeight: 400, color: '#9a3412' }}>{persistenceSummary}</span>
       </summary>
 
       <div style={{ marginTop: 8, fontSize: 10, color: '#9a3412', marginBottom: 6 }}>

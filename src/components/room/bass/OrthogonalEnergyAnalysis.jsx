@@ -59,7 +59,7 @@ export default function OrthogonalEnergyAnalysis({
     : null;
 
   return (
-    <details open style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f0fdf4', border: '1px solid #86efac' }}>
+    <details id="diagnostic-orthogonal" open style={{ scrollMarginTop: 54, marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f0fdf4', border: '1px solid #86efac' }}>
       <summary style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', cursor: 'pointer' }}>
         Orthogonal Energy Analysis <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#64748b' }}>(temporary · active coherent contributors only)</span>
       </summary>

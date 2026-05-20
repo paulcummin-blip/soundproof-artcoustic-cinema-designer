@@ -41,9 +41,9 @@ export default function NullCentreActiveModalVectorBreakdown({ contributorSeries
   const sumPhase = phaseDeg(sumRe, sumIm);
 
   return (
-    <details open style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f0f9ff', border: '1px solid #7dd3fc' }}>
+    <details style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f0f9ff', border: '1px solid #7dd3fc' }}>
       <summary style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', cursor: 'pointer' }}>
-        Null-centre active modal vector breakdown <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#64748b' }}>(diagnostic only · active coherent sum only)</span>
+        Null-centre active modal vector breakdown <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#64748b' }}>(diagnostic only · active coherent sum only)</span> <span style={{ fontWeight: 400, color: '#075985' }}>({contributors.length} contributors | summed mag {fmt(sumMag, 0)})</span>
       </summary>
       <div style={{ marginTop: 8 }}>
         <div style={{ fontSize: 10, color: '#075985', marginBottom: 6 }}>
