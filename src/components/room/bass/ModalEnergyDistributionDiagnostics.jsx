@@ -1,4 +1,5 @@
 import React from 'react';
+import OrthogonalEnergyAnalysis from './OrthogonalEnergyAnalysis';
 
 const MODE_TYPES = ['axial', 'tangential', 'oblique'];
 
@@ -68,7 +69,7 @@ function SafeTableWrap({ children, minWidth = 760 }) {
   );
 }
 
-function buildGroupRows(contributors, totalVectorMagnitude) {
+function buildGroupRows(contributors, totalContributorMagnitude) {
   return MODE_TYPES.map((type) => {
     const rows = contributors.filter(row => row.modeType === type);
     const sumRe = rows.reduce((sum, row) => sum + (Number(row.activeReal) || 0), 0);
@@ -87,8 +88,8 @@ function buildGroupRows(contributors, totalVectorMagnitude) {
       sumIm,
       summedMagnitude,
       magnitudeSum,
-      percentageOfTotal: Number.isFinite(summedMagnitude) && Number.isFinite(totalVectorMagnitude) && totalVectorMagnitude > 0
-        ? (summedMagnitude / totalVectorMagnitude) * 100
+      percentageOfTotal: totalContributorMagnitude > 0
+        ? (magnitudeSum / totalContributorMagnitude) * 100
         : null,
       phaseSpread: averageAbsolutePhaseSpread(rows),
       strongest,
@@ -113,11 +114,13 @@ export default function ModalEnergyDistributionDiagnostics({ contributorSeries, 
   const sumIm = Number(selected?.modalSumIm);
   const totalVectorMagnitude = vectorMagnitude(sumRe, sumIm);
   const totalPhaseAngle = phaseDeg(sumRe, sumIm);
-  const groupRows = buildGroupRows(contributors, totalVectorMagnitude);
-  const topRows = contributors.slice(0, 10).map(row => ({
+  const totalContributorMagnitude = contributors.reduce((sum, row) => sum + (Number(row.activeMagnitude) || 0), 0);
+  const groupRows = buildGroupRows(contributors, totalContributorMagnitude);
+  const contributorsWithPolarity = contributors.map(row => ({
     ...row,
     polarity: polarityFor(Number(row.activePhaseAngleDeg), totalPhaseAngle),
   }));
+  const topRows = contributorsWithPolarity.slice(0, 10);
 
   const axialMagnitudeSum = groupRows.find(row => row.type === 'axial')?.magnitudeSum ?? 0;
   const tangentialObliqueMagnitudeSum = groupRows
@@ -127,14 +130,14 @@ export default function ModalEnergyDistributionDiagnostics({ contributorSeries, 
     ? axialMagnitudeSum / tangentialObliqueMagnitudeSum
     : null;
 
-  const polaritySums = topRows.reduce((acc, row) => {
-    const mag = Number(row.activeMagnitude) || 0;
-    if (row.polarity === 'constructive') acc.constructive += mag;
-    if (row.polarity === 'destructive') acc.destructive += mag;
-    return acc;
-  }, { constructive: 0, destructive: 0 });
-  const cancellationSymmetryRatio = polaritySums.constructive > 0
-    ? polaritySums.destructive / polaritySums.constructive
+  const constructiveContributors = contributorsWithPolarity.filter(row => row.polarity === 'constructive');
+  const destructiveContributors = contributorsWithPolarity.filter(row => row.polarity === 'destructive');
+  const orthogonalContributors = contributorsWithPolarity.filter(row => row.polarity === 'orthogonal');
+  const sumConstructiveMagnitudes = constructiveContributors.reduce((sum, row) => sum + (Number(row.activeMagnitude) || 0), 0);
+  const sumDestructiveMagnitudes = destructiveContributors.reduce((sum, row) => sum + (Number(row.activeMagnitude) || 0), 0);
+  const totalOrthogonalMagnitude = orthogonalContributors.reduce((sum, row) => sum + (Number(row.activeMagnitude) || 0), 0);
+  const cancellationSymmetryRatio = sumConstructiveMagnitudes > 0
+    ? sumDestructiveMagnitudes / sumConstructiveMagnitudes
     : null;
 
   return (
@@ -178,7 +181,7 @@ export default function ModalEnergyDistributionDiagnostics({ contributorSeries, 
               <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Summed real</th>
               <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Summed imag</th>
               <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Vector mag</th>
-              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>% total vector</th>
+              <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>% total contributor mag</th>
               <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Avg phase spread</th>
               <th style={{ ...tableHeaderStyle }}>Strongest mode</th>
               <th style={{ ...tableHeaderStyle, textAlign: 'right' }}>Strongest mag</th>
@@ -247,6 +250,15 @@ export default function ModalEnergyDistributionDiagnostics({ contributorSeries, 
           <div style={{ fontSize: 9, color: '#6b7280' }}>sum destructive magnitudes / sum constructive magnitudes</div>
         </div>
       </div>
+
+      <OrthogonalEnergyAnalysis
+        orthogonalContributors={orthogonalContributors}
+        totalOrthogonalMagnitude={totalOrthogonalMagnitude}
+        totalContributorMagnitude={totalContributorMagnitude}
+        sumConstructiveMagnitudes={sumConstructiveMagnitudes}
+        sumDestructiveMagnitudes={sumDestructiveMagnitudes}
+        tableHeaderStyle={tableHeaderStyle}
+      />
     </details>
   );
 }
