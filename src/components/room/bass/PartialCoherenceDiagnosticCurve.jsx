@@ -146,89 +146,92 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
     return null;
   }
 
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 4, minWidth: 0, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#0e7490' }}>
-          Modal coherence diagnostics — not used for scoring
+    <details open={open} style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }} onClick={(e) => {
+      if (e.target.tagName === 'SUMMARY') setOpen(o => !o);
+    }}>
+      <summary style={{ fontSize: 10, fontWeight: 700, color: '#0e7490', cursor: 'pointer' }}>
+        Modal coherence diagnostics — not used for scoring <span style={{ fontWeight: 400, fontSize: 9, color: '#64748b' }}>(overlay only)</span>
+      </summary>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8 }}>
+            Shows the active coherent final curve against downstream partial coherence, distributed phase modal coherence, and per-mode split modal coherence diagnostics. Active scoring, REW benchmark, and RP22/live output remain unchanged.
+          </div>
+          <div style={{ height: 260, width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#cffafe" />
+                <XAxis
+                  dataKey="frequency"
+                  type="number"
+                  domain={[20, 200]}
+                  scale="log"
+                  ticks={[20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 200]}
+                  tickFormatter={(tick) => Number.isFinite(Number(tick)) ? Number(tick).toFixed(0) : ''}
+                  tick={{ fill: '#334155', fontSize: 10 }}
+                />
+                <YAxis
+                  tickFormatter={(tick) => Number.isFinite(Number(tick)) ? Number(tick).toFixed(0) : ''}
+                  tick={{ fill: '#334155', fontSize: 10 }}
+                  width={36}
+                />
+                <Tooltip content={<DiagnosticTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'monospace', maxWidth: '100%', whiteSpace: 'normal' }} />
+                <Line
+                  name="Active coherent"
+                  type="monotone"
+                  dataKey="coherentFinalDb"
+                  stroke="#213428"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+                <Line
+                  name="Downstream partial"
+                  type="monotone"
+                  dataKey="partialCoherenceDb"
+                  stroke="#0891b2"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  dot={false}
+                  activeDot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+                <Line
+                  name="Distributed phase"
+                  type="monotone"
+                  dataKey="distributedCoherenceDb"
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  strokeDasharray="3 3"
+                  dot={false}
+                  activeDot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+                <Line
+                  name="Per-mode split"
+                  type="monotone"
+                  dataKey="splitCoherenceDb"
+                  stroke="#7c3aed"
+                  strokeWidth={2}
+                  strokeDasharray="8 3 2 3"
+                  dot={false}
+                  activeDot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div style={{ fontSize: 9, color: '#64748b', fontFamily: 'monospace' }}>
-          Overlay only · active benchmark curve unchanged
-        </div>
-      </div>
-      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8 }}>
-        Shows the active coherent final curve against downstream partial coherence, distributed phase modal coherence, and per-mode split modal coherence diagnostics. Active scoring, REW benchmark, and RP22/live output remain unchanged.
-      </div>
-      <div style={{ height: 260, width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#cffafe" />
-            <XAxis
-              dataKey="frequency"
-              type="number"
-              domain={[20, 200]}
-              scale="log"
-              ticks={[20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 200]}
-              tickFormatter={(tick) => Number.isFinite(Number(tick)) ? Number(tick).toFixed(0) : ''}
-              tick={{ fill: '#334155', fontSize: 10 }}
-            />
-            <YAxis
-              tickFormatter={(tick) => Number.isFinite(Number(tick)) ? Number(tick).toFixed(0) : ''}
-              tick={{ fill: '#334155', fontSize: 10 }}
-              width={36}
-            />
-            <Tooltip content={<DiagnosticTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'monospace', maxWidth: '100%', whiteSpace: 'normal' }} />
-            <Line
-              name="Active coherent"
-              type="monotone"
-              dataKey="coherentFinalDb"
-              stroke="#213428"
-              strokeWidth={2}
-              dot={false}
-              activeDot={false}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-            <Line
-              name="Downstream partial"
-              type="monotone"
-              dataKey="partialCoherenceDb"
-              stroke="#0891b2"
-              strokeWidth={2}
-              strokeDasharray="6 4"
-              dot={false}
-              activeDot={false}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-            <Line
-              name="Distributed phase"
-              type="monotone"
-              dataKey="distributedCoherenceDb"
-              stroke="#f97316"
-              strokeWidth={2}
-              strokeDasharray="3 3"
-              dot={false}
-              activeDot={false}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-            <Line
-              name="Per-mode split"
-              type="monotone"
-              dataKey="splitCoherenceDb"
-              stroke="#7c3aed"
-              strokeWidth={2}
-              strokeDasharray="8 3 2 3"
-              dot={false}
-              activeDot={false}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+      )}
+    </details>
   );
 }

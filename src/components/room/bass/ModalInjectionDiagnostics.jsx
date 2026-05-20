@@ -85,15 +85,23 @@ function GroupSummary({ rows }) {
 
 export default function ModalInjectionDiagnostics({ contributorSeries, tableHeaderStyle }) {
   const series = Array.isArray(contributorSeries) ? contributorSeries : [];
+  
+  // Compute summaries for closed state
+  const summaries = TARGETS.map((targetHz) => {
+    const targetRow = findNearestTargetRow(series, targetHz);
+    const rows = buildRows(targetRow?.contributors);
+    const strongest = rows[0] || null;
+    return { targetHz, strongest, count: rows.length };
+  });
 
   return (
-    <details open style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f0f9ff', border: '1px solid #7dd3fc' }}>
+    <details style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f0f9ff', border: '1px solid #7dd3fc' }}>
       <summary style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', cursor: 'pointer' }}>
-        Modal Injection Diagnostics <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#64748b' }}>(temporary · diagnostics only)</span>
+        Modal Injection Diagnostics <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#64748b' }}>({summaries.map(s => `${fmt(s.targetHz, 0)} Hz ${s.strongest ? formatMode(s.strongest) : '—'}`).join(' | ')})</span>
       </summary>
 
       <div style={{ marginTop: 8, fontSize: 10, color: '#075985', marginBottom: 6 }}>
-        Compares raw modal magnitude, modal transfer magnitude, and final active magnitude for dominant contributors at 40 Hz and 68.6 Hz.
+        {summaries.map(s => `${fmt(s.targetHz, 0)} Hz: ${s.count} contributors`).join(' · ')}
       </div>
 
       {TARGETS.map((targetHz) => {

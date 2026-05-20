@@ -11,7 +11,6 @@ import PartialCoherenceDiagnosticTable from './PartialCoherenceDiagnosticTable';
 import PartialCoherenceDiagnosticCurve from './PartialCoherenceDiagnosticCurve';
 import NullCentreActiveModalVectorBreakdown from './NullCentreActiveModalVectorBreakdown';
 import ModalEnergyDistributionDiagnostics from './ModalEnergyDistributionDiagnostics';
-import DiagnosticsStickyNav from './DiagnosticsStickyNav';
 
 // ─── REW reference targets — explicit, editable, current room only ────────────
 // Replace these values whenever a new REW capture is taken for this room.
@@ -22,7 +21,7 @@ export const REW_TARGETS_CURRENT_ROOM = {
 
   // 34 Hz region — slight peak near 33.5–34 Hz (REW cursor: 33.5 Hz @ 93.6 dB, baseline ~90 dB)
   hz34: {
-    featureFrequencyHz: 33.5,   // Hz — REW cursor confirmed 33.5 Hz
+    featureFrequencyHz:   33.5,   // Hz — REW cursor confirmed 33.5 Hz
     featureMagnitudeDb: 3.6,    // dB relative to 40-80 Hz median — slight peak above baseline
   },
 
@@ -511,12 +510,6 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
     ? wholeCurveDebugRows.modalContributorDebugRows
     : [];
   const activeModalPerturbationEnabled = wholeCurveDebugRows?.diagnosticToggles?.activeModalPerturbationEnabled ?? !pureDeterministicModalSum;
-  const topModalContributor = modalContributorDebugRows
-    .flatMap(group => group.contributors || [])
-    .sort((a, b) => (Number(b.contributionMagnitude) || 0) - (Number(a.contributionMagnitude) || 0))[0] || null;
-  const contributorRankingSummary = topModalContributor
-    ? `(Top contributor ${formatModeIndices(topModalContributor)} | ${fmtDiagnostic(topModalContributor.contributionMagnitude, 0, ' mag')})`
-    : '(No contributor rows)';
 
   // Compute pass/fail per region (null = no REW data yet)
   const check = (b44Val, rewVal, tol) => {
@@ -554,11 +547,9 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
 
   return (
     <div style={{ fontFamily: 'monospace', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
-      <DiagnosticsStickyNav />
 
       {/* Overall verdict */}
-      <div id="diagnostic-rew-benchmark" style={{
-        scrollMarginTop: 54,
+      <div style={{
         padding: '6px 10px', borderRadius: 6, marginBottom: 10,
         background: headerBg, border: `1px solid ${headerColor}44`,
         color: headerColor, fontWeight: 700, fontSize: 12,
@@ -697,12 +688,14 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       </SafeTableWrap>
 
       <NullCentreActiveModalVectorBreakdown
+        id="diagnostic-null-centre"
         contributorSeries={wholeCurveDebugRows?.activeModalContributorDebugSeries}
         nullCentreHz={r.hz40.b44NullCentreHz}
         tableHeaderStyle={tableHeaderStyle}
       />
 
       <ModalEnergyDistributionDiagnostics
+        id="diagnostic-energy-distribution"
         contributorSeries={wholeCurveDebugRows?.activeModalContributorDebugSeries}
         nullCentreHz={r.hz40.b44NullCentreHz}
         tableHeaderStyle={tableHeaderStyle}
@@ -721,10 +714,11 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       />
 
       {/* Stage feature detection diagnostic — diagnostic only, no benchmark scoring */}
-      <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f8fafc', border: '1px solid #cbd5e1' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-          Stage feature detection diagnostic <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#94a3b8' }}>(temporary · no scoring impact)</span>
-        </div>
+      <details style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+        <summary style={{ fontSize: 10, fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+          Stage feature detection diagnostic <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#94a3b8' }}>(40 Hz centre {stageDiagnosticRows.find(r => r.label === 'modal-only')?.nullHz?.toFixed(1) ?? '—'} Hz · 68 Hz peak {stageDiagnosticRows.find(r => r.label === 'modal-only')?.peakHz?.toFixed(1) ?? '—'} Hz)</span>
+        </summary>
+        <div style={{ marginTop: 6 }}>
         <SafeTableWrap minWidth={720}>
         <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
           <thead>
@@ -755,13 +749,14 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
           </tbody>
         </table>
         </SafeTableWrap>
-      </div>
+        </div>
+      </details>
 
       {/* Temporary modal contributor ranking — diagnostic only, no benchmark scoring */}
       {modalContributorDebugRows.length > 0 && (
         <details id="diagnostic-contributors" style={{ scrollMarginTop: 54, marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa' }}>
           <summary style={{ fontSize: 10, fontWeight: 700, color: '#9a3412', cursor: 'pointer' }}>
-            Temporary modal contributor ranking <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only · no simulation maths changed)</span> <span style={{ fontWeight: 400, color: '#7c2d12' }}>{contributorRankingSummary}</span>
+            Temporary modal contributor ranking <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#9ca3af' }}>(diagnostic only · no simulation maths changed)</span>
           </summary>
           <div style={{ marginTop: 8 }}>
             {modalContributorDebugRows.map((group) => (
