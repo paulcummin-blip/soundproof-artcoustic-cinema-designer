@@ -492,6 +492,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
         activePhaseAngleDeg: (Math.atan2(activeStoredModalContrib.imag, activeStoredModalContrib.real) * 180) / Math.PI,
         qValue: mode.qValue,
         activeTransferMagnitudeAtNull,
+        modalTransferMagnitude: activeTransferMagnitudeAtNull,
+        rawModalMagnitude: rawMagnitudeBeforeStorage,
         estimatedResonanceMagnitude,
         mutedFromActiveModalSum: isMuted68HzAxialMode,
       });

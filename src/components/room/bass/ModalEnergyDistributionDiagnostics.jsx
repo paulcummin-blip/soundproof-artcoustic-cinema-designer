@@ -1,6 +1,7 @@
 import React from 'react';
 import OrthogonalEnergyAnalysis from './OrthogonalEnergyAnalysis';
 import ModalResonancePersistenceDiagnostics from './ModalResonancePersistenceDiagnostics';
+import ModalInjectionDiagnostics from './ModalInjectionDiagnostics';
 
 const MODE_TYPES = ['axial', 'tangential', 'oblique'];
 
@@ -263,6 +264,11 @@ export default function ModalEnergyDistributionDiagnostics({ contributorSeries, 
 
       <ModalResonancePersistenceDiagnostics
         contributors={contributors}
+        tableHeaderStyle={tableHeaderStyle}
+      />
+
+      <ModalInjectionDiagnostics
+        contributorSeries={series}
         tableHeaderStyle={tableHeaderStyle}
       />
     </details>
