@@ -39,6 +39,28 @@ export default function OptionsPanel({
 
   const activePriceData = commercialPriceData || priceData;
 
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !activePriceData) return;
+
+    window.__ROOM_DESIGNER_PRICE__ = {
+      showPrices,
+      baseTotal: activePriceData.baseTotal,
+      finalTotal: activePriceData.displayTotal ?? activePriceData.finalTotal,
+      displayTotal: activePriceData.displayTotal ?? activePriceData.finalTotal,
+      priceMode,
+      vatAmount: activePriceData.vatAmount,
+      difficultyMultiplier: activePriceData.difficultyMultiplier,
+    };
+  }, [
+    showPrices,
+    activePriceData?.baseTotal,
+    activePriceData?.finalTotal,
+    activePriceData?.displayTotal,
+    activePriceData?.vatAmount,
+    activePriceData?.difficultyMultiplier,
+    priceMode,
+  ]);
+
   const updateManualItem = (id, patch) => {
     setManualExtras((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
   };

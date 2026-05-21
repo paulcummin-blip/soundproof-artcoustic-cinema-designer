@@ -43,6 +43,7 @@ export default function Layout({ children, currentPageName }) {
     baseTotal: 0,
     finalTotal: 0,
     difficultyMultiplier: 1.0,
+    priceMode: "incVat",
   });
 
   // Active project meta for sidebar (name + client)
@@ -215,6 +216,7 @@ export default function Layout({ children, currentPageName }) {
                   baseTotal={priceSummary.baseTotal}
                   finalTotal={priceSummary.finalTotal}
                   difficultyMultiplier={priceSummary.difficultyMultiplier}
+                  priceMode={priceSummary.priceMode}
                 />
               </div>
             )}
