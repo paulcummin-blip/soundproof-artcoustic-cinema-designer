@@ -130,11 +130,22 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
   const [open, setOpen] = React.useState(false);
 
   const chartData = React.useMemo(() => {
+    const coherentSeries = normaliseCoherentSeries(b44Series);
+    const partialSeries = normalisePartialSeries(partialCoherenceDiagnosticSeries);
+    const distributedSeries = normaliseDistributedSeries(distributedCoherenceDiagnosticSeries);
+    const splitSeries = normaliseSplitSeries(splitCoherenceDiagnosticSeries);
+
+    return buildChartData(coherentSeries, partialSeries, distributedSeries, splitSeries);
+  }, [b44Series, partialCoherenceDiagnosticSeries, distributedCoherenceDiagnosticSeries, splitCoherenceDiagnosticSeries]);
+
+  if (chartData.length === 0) return null;
 
   return (
-    <details open={open} style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }} onClick={(e) => {
-      if (e.target.tagName === 'SUMMARY') setOpen(o => !o);
-    }}>
+    <details
+      open={open}
+      style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfeff', border: '1px solid #67e8f9', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary style={{ fontSize: 10, fontWeight: 700, color: '#0e7490', cursor: 'pointer' }}>
         Modal coherence diagnostics — not used for scoring <span style={{ fontWeight: 400, fontSize: 9, color: '#64748b' }}>(overlay only)</span>
       </summary>
@@ -163,53 +174,10 @@ export default function PartialCoherenceDiagnosticCurve({ b44Series, partialCohe
                 />
                 <Tooltip content={<DiagnosticTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'monospace', maxWidth: '100%', whiteSpace: 'normal' }} />
-                <Line
-                  name="Active coherent"
-                  type="monotone"
-                  dataKey="coherentFinalDb"
-                  stroke="#213428"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={false}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-                <Line
-                  name="Downstream partial"
-                  type="monotone"
-                  dataKey="partialCoherenceDb"
-                  stroke="#0891b2"
-                  strokeWidth={2}
-                  strokeDasharray="6 4"
-                  dot={false}
-                  activeDot={false}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-                <Line
-                  name="Distributed phase"
-                  type="monotone"
-                  dataKey="distributedCoherenceDb"
-                  stroke="#f97316"
-                  strokeWidth={2}
-                  strokeDasharray="3 3"
-                  dot={false}
-                  activeDot={false}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-                <Line
-                  name="Per-mode split"
-                  type="monotone"
-                  dataKey="splitCoherenceDb"
-                  stroke="#7c3aed"
-                  strokeWidth={2}
-                  strokeDasharray="8 3 2 3"
-                  dot={false}
-                  activeDot={false}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
+                <Line name="Active coherent" type="monotone" dataKey="coherentFinalDb" stroke="#213428" strokeWidth={2} dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />
+                <Line name="Downstream partial" type="monotone" dataKey="partialCoherenceDb" stroke="#0891b2" strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />
+                <Line name="Distributed phase" type="monotone" dataKey="distributedCoherenceDb" stroke="#f97316" strokeWidth={2} strokeDasharray="3 3" dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />
+                <Line name="Per-mode split" type="monotone" dataKey="splitCoherenceDb" stroke="#7c3aed" strokeWidth={2} strokeDasharray="8 3 2 3" dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
