@@ -26,6 +26,7 @@ export default function OptionsPanel({
   const [priceMode, setPriceMode] = React.useState('incVat');
   const [manualExtras, setManualExtras] = React.useState([]);
   const [soundbarSelections, setSoundbarSelections] = React.useState({});
+  const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
 
   const commercialPriceData = usePriceCalculation({
     placedSpeakers,
@@ -94,7 +95,7 @@ export default function OptionsPanel({
 
             <div>
               <div className="text-xs font-medium text-[#3E4349] mb-1">
-                Loudspeaker system price, {priceMode === 'incVat' ? 'inc VAT' : 'ex VAT'}
+                System Price, {priceMode === 'incVat' ? 'inc VAT' : 'ex VAT'}
               </div>
               <div className="text-2xl font-bold text-[#213428]">{formatPrice(activePriceData.displayTotal ?? activePriceData.finalTotal)}</div>
               {activePriceData.difficultyMultiplier !== 1.0 && (
@@ -154,13 +155,22 @@ export default function OptionsPanel({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium text-gray-700">Manual extras</div>
-              <button
-                type="button"
-                onClick={() => setManualExtras((items) => [...items, emptyManualItem()])}
-                className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white hover:bg-[#F3F2EF]"
-              >
-                Add manual item
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDifficultyRating((value) => !value)}
+                  className="text-[10px] px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#625143] hover:bg-[#F3F2EF]"
+                >
+                  DR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setManualExtras((items) => [...items, emptyManualItem()])}
+                  className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white hover:bg-[#F3F2EF]"
+                >
+                  Add manual item
+                </button>
+              </div>
             </div>
 
             {manualExtras.length > 0 && (
@@ -206,27 +216,29 @@ export default function OptionsPanel({
         </>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="difficulty" className="text-sm font-medium">Difficulty Rating</Label>
-        <div className="text-xs text-gray-500 mb-2">
-          Multiplies hardware prices to reflect installation difficulty (1.00 = baseline)
+      {showDifficultyRating && (
+        <div className="space-y-2">
+          <Label htmlFor="difficulty" className="text-sm font-medium">Difficulty Rating</Label>
+          <div className="text-xs text-gray-500 mb-2">
+            Multiplies hardware prices to reflect installation difficulty (1.00 = baseline)
+          </div>
+          <input
+            id="difficulty"
+            type="number"
+            step="0.01"
+            value={difficultyMultiplier.toFixed(2)}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              if (Number.isFinite(val) && val > 0) setDifficultyMultiplier(Math.round(val * 100) / 100);
+            }}
+            onBlur={(e) => {
+              const val = parseFloat(e.target.value);
+              if (!Number.isFinite(val) || val <= 0) setDifficultyMultiplier(1.0);
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          />
         </div>
-        <input
-          id="difficulty"
-          type="number"
-          step="0.01"
-          value={difficultyMultiplier.toFixed(2)}
-          onChange={(e) => {
-            const val = parseFloat(e.target.value);
-            if (Number.isFinite(val) && val > 0) setDifficultyMultiplier(Math.round(val * 100) / 100);
-          }}
-          onBlur={(e) => {
-            const val = parseFloat(e.target.value);
-            if (!Number.isFinite(val) || val <= 0) setDifficultyMultiplier(1.0);
-          }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-        />
-      </div>
+      )}
     </div>
   );
 }
