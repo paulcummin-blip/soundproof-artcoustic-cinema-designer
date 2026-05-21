@@ -39,7 +39,7 @@ export default function PriceSummary({
       }}
     >
       <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8 }}>
-        Loudspeaker system price, {priceMode === "exVat" ? "ex VAT" : "inc VAT"}
+        System Price, {priceMode === "exVat" ? "ex VAT" : "inc VAT"}
       </div>
       
       <div>
