@@ -1937,6 +1937,9 @@ function RoomDesignerWithState() {
                     difficultyMultiplier={difficultyMultiplier}
                     setDifficultyMultiplier={setDifficultyMultiplier}
                     priceData={priceData}
+                    placedSpeakers={placedSpeakers}
+                    frontSubsCfg={_frontSubsCfg}
+                    rearSubsCfg={_rearSubsCfg}
                   />
               </CollapsiblePanel>
           </div>
