@@ -236,6 +236,13 @@ function calculateSplAtPoint({
   // Step 3: Compute capped 1m SPL capability (same as SPL Calculator)
   // ─────────────────────────────────────────────────────────────────────────
   const { spl1m_capability } = getSPL1mCapability(effectiveMeta, powerW, effectiveSensitivity);
+  const ampPowerUsed = safeNum(powerW) || 0;
+  const powerHandlingUsed = safeNum(effectiveMeta?.power_handling_w) || Infinity;
+  const availablePowerUsed = Math.min(ampPowerUsed, powerHandlingUsed);
+  const spl1mAmpLimited = availablePowerUsed > 0
+    ? effectiveSensitivity + 10 * Math.log10(availablePowerUsed)
+    : null;
+  const maxContinuousSplCap = safeNum(effectiveMeta?.max_spl_cont_db_1m) || safeNum(effectiveMeta?.max_spl) || null;
   
   if (spl1m_capability === null) return null;
 
@@ -277,7 +284,25 @@ function calculateSplAtPoint({
     if (!Number.isFinite(spl_theoretical)) spl_theoretical = null;
   }
 
-  return Number.isFinite(spl) ? { spl, spl_theoretical } : null;
+  return Number.isFinite(spl) ? {
+    spl,
+    spl_theoretical,
+    debug: {
+      modelKey: speakerModel,
+      modelLabel: resolvedMeta?.label || resolvedMeta?.name || resolvedMeta?.model || speakerModel,
+      sensitivityUsedDb: effectiveSensitivity,
+      powerHandlingW: powerHandlingUsed,
+      ampPowerW: ampPowerUsed,
+      availablePowerW: availablePowerUsed,
+      maxContinuousSplCapDb: maxContinuousSplCap,
+      spl1mAmpLimitedDb: spl1mAmpLimited,
+      spl1mCappedDb: spl1m_capability,
+      distanceM: distance,
+      distanceLossDb: distanceLoss,
+      roomSupportDb,
+      finalRawSplDb: spl,
+    },
+  } : null;
 }
 
 /**
@@ -446,6 +471,11 @@ export function computeAllSeatSplMetrics({
             value: splValue,
             formatted: `${splValue.toFixed(1)} dB`,
             theoretical: Number.isFinite(splTheoretical) ? splTheoretical : null,
+            debug: {
+              ...(splResult?.debug || {}),
+              role: spk.role,
+              canonicalRole: role,
+            },
           };
         }
       }
