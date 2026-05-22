@@ -128,6 +128,10 @@ export function useSeatingRebuild({
       const rawCenters = buildRowCenters(stableBaseY, list.length, Number(_rowSpacingM) || 1.8, seatingArrangementBasis || _mlpBasis) || [];
       const centers = rawCenters.map((y) => clampY(Number(y)));
 
+      if (typeof appState?.setRowCentersM === 'function' && !arraysEqualWithin1mm(appState?.rowCentersM || [], centers)) {
+        appState.setRowCentersM(centers);
+      }
+
       const roomWidth = Number(stableDimensions?.width) || 4.5;
       const centerX = roomWidth / 2;
       const spacingX = Number(_seatSpacing) || 0.8;
@@ -193,9 +197,9 @@ export function useSeatingRebuild({
     );
 
     // 2) Row centre Y positions
-    // For loaded projects where the user has changed seating since load, always regenerate
-    // from live mlpY_m instead of preferring existing (potentially stale) rowCentersM.
-    const shouldRegenerateFromMlp = isLoadedProject && userHasChangedSeatingSinceLoad;
+    // When seating controls change, always regenerate from the live offset-derived MLP
+    // instead of preferring existing (potentially stale) rowCentersM.
+    const shouldRegenerateFromMlp = userHasChangedSeatingSinceLoad;
     let centers = (!shouldRegenerateFromMlp && Array.isArray(appState?.rowCentersM))
       ? appState.rowCentersM.slice(0, list.length)
       : [];
@@ -204,7 +208,15 @@ export function useSeatingRebuild({
     if (centers.length < list.length) {
       const rowsNeeded = list.length;
 
-      const mlpY = appState?.mlpY_m;
+      const screenFrontPlaneM = Number.isFinite(Number(appState?.screenFrontPlaneM))
+        ? Number(appState.screenFrontPlaneM)
+        : (Number.isFinite(Number(appState?.screen?.screenPlaneY_m)) && Number(appState.screen.screenPlaneY_m) > 0
+            ? Number(appState.screen.screenPlaneY_m)
+            : Number(appState?.screen?.floatDepthM) || 0.20);
+      const visibleWidthInches = Number(appState?.screen?.visibleWidthInches) || 120;
+      const liveOffsetM = Number(appState?.seatingBlockOffset) || 0;
+      const liveMlpY = screenFrontPlaneM + distanceFor57_5FromWidth(visibleWidthInches * 0.0254) + liveOffsetM;
+      const mlpY = Number.isFinite(liveMlpY) ? liveMlpY : appState?.mlpY_m;
       const rowSpacing = Number(_rowSpacingM) || 1.8;
       const mlpReference = seatingArrangementBasis || _mlpBasis;
 
@@ -299,6 +311,8 @@ export function useSeatingRebuild({
     seatingArrangementBasis,
     // Scratch-mode stable baseline deps:
     appState?.seatingBlockOffset,
+    appState?.screenFrontPlaneM,
+    appState?.screen?.screenPlaneY_m,
     appState?.screen?.floatDepthM,
     appState?.screen?.visibleWidthInches,
     _rowEarHeights,
