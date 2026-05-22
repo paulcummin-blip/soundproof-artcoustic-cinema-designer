@@ -128,7 +128,8 @@ function getSPL1mCapability(speakerMeta, ampPowerW, effectiveSensitivity = null)
   // max_spl_cont_db_1m on effectiveMeta is already resolved to anechoic via
   // the priority chain in calculateSplAtPoint / computeSingleSeatSplAtDistance.
   // ─────────────────────────────────────────────────────────────────────────
-  const hardCap = safeNum(speakerMeta?.max_spl_cont_db_1m) || 
+  const hardCap = safeNum(speakerMeta?.max_spl_cont_db_1m_halfspace) ||
+                  safeNum(speakerMeta?.max_spl_cont_db_1m) || 
                   safeNum(speakerMeta?.max_spl);
   
   // Determine final 1m capability
@@ -242,7 +243,10 @@ function calculateSplAtPoint({
   const spl1mAmpLimited = availablePowerUsed > 0
     ? effectiveSensitivity + 10 * Math.log10(availablePowerUsed)
     : null;
-  const maxContinuousSplCap = safeNum(effectiveMeta?.max_spl_cont_db_1m) || safeNum(effectiveMeta?.max_spl) || null;
+  const maxContinuousSplCap = safeNum(effectiveMeta?.max_spl_cont_db_1m_halfspace) ||
+    safeNum(effectiveMeta?.max_spl_cont_db_1m) ||
+    safeNum(effectiveMeta?.max_spl) ||
+    null;
   
   if (spl1m_capability === null) return null;
 
