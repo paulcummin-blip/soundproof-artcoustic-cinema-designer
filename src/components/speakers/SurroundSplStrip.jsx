@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Volume2 } from 'lucide-react';
 import { formatDb } from '@/components/utils/formatDb';
 import MedianAngleReset from './MedianAngleReset';
-import SideSurroundSplDebug from './SideSurroundSplDebug';
+
 
 /**
  * Displays SPL @ RSP for surround speakers.
@@ -135,13 +135,7 @@ export default function SurroundSplStrip({
                 <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
                   {hasValue ? formatDb(splValue) : 'Not Calculated'}
                 </div>
-                {group.key === 'sides' && (
-                  <SideSurroundSplDebug
-                    roles={group.roles}
-                    surrounds={mlpSplData?.surrounds || {}}
-                    displayedSpl={splValue}
-                  />
-                )}
+
               </CardContent>
             </Card>
           );
