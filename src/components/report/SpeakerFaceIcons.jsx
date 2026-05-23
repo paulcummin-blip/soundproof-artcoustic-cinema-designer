@@ -421,7 +421,7 @@ export function SpitfireQ85FaceIcon({ x, y, width, height }) {
         y="0"
         width="100"
         height="100"
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/16d67f4d6_Screenshot2026-05-23at155313.png"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/bcf265eca_Q8-5Front.png"
         preserveAspectRatio="xMidYMid meet"
       />
     </svg>
