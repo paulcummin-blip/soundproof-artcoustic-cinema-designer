@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
-import { Q43FaceIcon, Q85FaceIcon } from '@/components/report/SpeakerFaceIcons';
+import { Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon } from '@/components/report/SpeakerFaceIcons';
 
 const HEADING_FONT = '"Futura PT Light", "Century Gothic", sans-serif';
 const BODY_FONT = '"Didact Gothic", "Century Gothic", sans-serif';
@@ -154,122 +154,11 @@ function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffse
   );
 }
 
-export function Q45FaceIcon({ x, y, width, height }) {
-  const outerInset = width * 0.008;
-  const innerInsetX = width * 0.04;
-  const innerInsetY = height * 0.055;
-  const topBoxX = x + width * 0.44;
-  const topBoxY = y + height * 0.10;
-  const topBoxW = width * 0.28;
-  const topBoxH = height * 0.39;
-  const bottomTopY = y + height * 0.50;
-  const bottomBottomY = y + height * 0.91;
-  const bottomTopLeft = x + width * 0.44;
-  const bottomTopRight = x + width * 0.72;
-  const bottomBottomLeft = x + width * 0.48;
-  const bottomBottomRight = x + width * 0.68;
-  const centerX = x + width * 0.58;
-  const topUpperMidY = y + height * 0.22;
-  const topLowerMidY = y + height * 0.37;
-  const bottomUpperMidY = y + height * 0.63;
-  const bottomLowerMidY = y + height * 0.82;
-  const topDriverHalfW = width * 0.06;
-  const topDriverHalfH = height * 0.10;
-  const bottomUpperHalfW = width * 0.075;
-  const bottomUpperHalfH = height * 0.12;
-  const bottomLowerHalfW = width * 0.06;
-  const bottomLowerHalfH = height * 0.09;
-  const nodeSize = Math.min(width, height) * 0.015;
-
-  const drawLens = (midY, halfW, halfH) => (
-    <>
-      <path d={`M ${centerX} ${midY - halfH} C ${centerX + halfW * 0.95} ${midY - halfH * 0.62}, ${centerX + halfW * 1.05} ${midY + halfH * 0.62}, ${centerX} ${midY + halfH}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <path d={`M ${centerX} ${midY - halfH} C ${centerX - halfW * 0.95} ${midY - halfH * 0.62}, ${centerX - halfW * 1.05} ${midY + halfH * 0.62}, ${centerX} ${midY + halfH}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-    </>
-  );
-
-  return (
-    <g>
-      <rect x={x + outerInset} y={y + outerInset} width={width - outerInset * 2} height={height - outerInset * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
-      <rect x={x + innerInsetX} y={y + innerInsetY} width={width - innerInsetX * 2} height={height - innerInsetY * 2} rx={Math.min(width, height) * 0.05} ry={Math.min(width, height) * 0.05} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-
-      <rect x={topBoxX} y={topBoxY} width={topBoxW} height={topBoxH} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <line x1={centerX} y1={topBoxY} x2={centerX} y2={topBoxY + topBoxH} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={topBoxX} y1={topBoxY} x2={x + width * 0.40} y2={y + height * 0.08} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={topBoxX + topBoxW} y1={topBoxY} x2={x + width * 0.77} y2={y + height * 0.08} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={topBoxX} y1={topBoxY + topBoxH} x2={x + width * 0.40} y2={y + height * 0.50} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={topBoxX + topBoxW} y1={topBoxY + topBoxH} x2={x + width * 0.77} y2={y + height * 0.50} stroke={COLORS.speaker} strokeWidth="0.7" />
-
-      <line x1={bottomTopLeft} y1={bottomTopY} x2={bottomBottomLeft} y2={bottomBottomY} stroke={COLORS.speaker} strokeWidth="0.8" />
-      <line x1={bottomTopRight} y1={bottomTopY} x2={bottomBottomRight} y2={bottomBottomY} stroke={COLORS.speaker} strokeWidth="0.8" />
-      <line x1={bottomTopLeft} y1={bottomTopY} x2={bottomTopRight} y2={bottomTopY} stroke={COLORS.speaker} strokeWidth="0.8" />
-      <line x1={bottomBottomLeft} y1={bottomBottomY} x2={bottomBottomRight} y2={bottomBottomY} stroke={COLORS.speaker} strokeWidth="0.8" />
-      <line x1={centerX} y1={bottomTopY} x2={centerX} y2={bottomBottomY} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={bottomTopLeft} y1={bottomTopY} x2={x + width * 0.40} y2={y + height * 0.49} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={bottomTopRight} y1={bottomTopY} x2={x + width * 0.77} y2={y + height * 0.49} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={bottomBottomLeft} y1={bottomBottomY} x2={x + width * 0.40} y2={y + height * 0.91} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={bottomBottomRight} y1={bottomBottomY} x2={x + width * 0.78} y2={y + height * 0.91} stroke={COLORS.speaker} strokeWidth="0.7" />
-
-      {drawLens(topUpperMidY, topDriverHalfW, topDriverHalfH)}
-      {drawLens(topLowerMidY, topDriverHalfW, topDriverHalfH)}
-      {drawLens(bottomUpperMidY, bottomUpperHalfW, bottomUpperHalfH)}
-      {drawLens(bottomLowerMidY, bottomLowerHalfW, bottomLowerHalfH)}
-
-      <rect x={centerX - nodeSize} y={topBoxY + nodeSize * 0.4} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-      <rect x={centerX - nodeSize} y={topLowerMidY - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-      <rect x={centerX - nodeSize} y={bottomUpperMidY + bottomUpperHalfH - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-      <rect x={centerX - nodeSize} y={bottomLowerMidY + bottomLowerHalfH - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-    </g>
-  );
-}
+// Q45FaceIcon imported from @/components/report/SpeakerFaceIcons
 
 // Q85FaceIcon is imported from @/components/report/SpeakerFaceIcons
 
-export function Q63FaceIcon({ x, y, size }) {
-  const outerInset = size * 0.005;
-  const innerInset = size * 0.095;
-  const baffleInsetX = size * 0.31;
-  const baffleInsetY = size * 0.20;
-  const baffleW = size - baffleInsetX * 2;
-  const baffleH = size - baffleInsetY * 2;
-  const centerX = x + size / 2;
-  const topY = y + baffleInsetY;
-  const bottomY = topY + baffleH;
-  const upperMidY = y + size * 0.37;
-  const lowerMidY = y + size * 0.63;
-  const driverHalfW = size * 0.105;
-  const driverHalfH = size * 0.105;
-  const nodeSize = size * 0.016;
-
-  const upperTop = upperMidY - driverHalfH;
-  const upperBottom = upperMidY + driverHalfH;
-  const lowerTop = lowerMidY - driverHalfH;
-  const lowerBottom = lowerMidY + driverHalfH;
-
-  return (
-    <g>
-      <rect x={x + outerInset} y={y + outerInset} width={size - outerInset * 2} height={size - outerInset * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
-      <rect x={x + innerInset} y={y + innerInset} width={size - innerInset * 2} height={size - innerInset * 2} rx={size * 0.055} ry={size * 0.055} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <rect x={x + baffleInsetX} y={y + baffleInsetY} width={baffleW} height={baffleH} rx={size * 0.01} ry={size * 0.01} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-
-      <line x1={centerX} y1={topY} x2={centerX} y2={bottomY} stroke={COLORS.speaker} strokeWidth="0.7" />
-
-      <line x1={x + baffleInsetX} y1={topY} x2={centerX} y2={topY + size * 0.04} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={x + baffleInsetX + baffleW} y1={topY} x2={centerX} y2={topY + size * 0.04} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={x + baffleInsetX} y1={bottomY} x2={centerX} y2={bottomY - size * 0.04} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={x + baffleInsetX + baffleW} y1={bottomY} x2={centerX} y2={bottomY - size * 0.04} stroke={COLORS.speaker} strokeWidth="0.7" />
-
-      <path d={`M ${centerX} ${upperTop} C ${centerX + driverHalfW * 0.95} ${upperTop + driverHalfH * 0.38}, ${centerX + driverHalfW * 1.05} ${upperBottom - driverHalfH * 0.38}, ${centerX} ${upperBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <path d={`M ${centerX} ${upperTop} C ${centerX - driverHalfW * 0.95} ${upperTop + driverHalfH * 0.38}, ${centerX - driverHalfW * 1.05} ${upperBottom - driverHalfH * 0.38}, ${centerX} ${upperBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <path d={`M ${centerX} ${lowerTop} C ${centerX + driverHalfW * 0.95} ${lowerTop + driverHalfH * 0.38}, ${centerX + driverHalfW * 1.05} ${lowerBottom - driverHalfH * 0.38}, ${centerX} ${lowerBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <path d={`M ${centerX} ${lowerTop} C ${centerX - driverHalfW * 0.95} ${lowerTop + driverHalfH * 0.38}, ${centerX - driverHalfW * 1.05} ${lowerBottom - driverHalfH * 0.38}, ${centerX} ${lowerBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-
-      <rect x={centerX - nodeSize} y={topY + size * 0.037 - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-      <rect x={centerX - nodeSize} y={upperBottom - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-      <rect x={centerX - nodeSize} y={lowerBottom - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-    </g>
-  );
-}
+// Q63FaceIcon imported from @/components/report/SpeakerFaceIcons
 
 export default function ScreenWallConstructionGraphic({
   projectName,
@@ -606,14 +495,7 @@ export default function ScreenWallConstructionGraphic({
             return (
               <g key={`${item.role}-${item.xM}-${item.zM}`}>
                 {isQ63 ? (
-                  <image
-                    href="https://media.base44.com/images/public/69624f294dc304ed40a57ee1/0e8cd191b_Screenshot2026-04-27at165517.png"
-                    x={x}
-                    y={y}
-                    width={w}
-                    height={h}
-                    preserveAspectRatio="xMidYMid meet"
-                  />
+                  <Q63FaceIcon x={x} y={y} width={w} height={h} />
                 ) : isQ43 ? (
                   <Q43FaceIcon x={x} y={y} width={w} height={h} />
                 ) : isQ45 ? (
