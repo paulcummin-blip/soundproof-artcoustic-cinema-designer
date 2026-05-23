@@ -251,13 +251,28 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               <rect x={ox} y={oy} width={oW} height={oH} fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={1} rx={2} />
               {/* White viewable area */}
               <rect x={sx} y={syTop} width={sw} height={sh} fill="#fff" stroke="#555" strokeWidth={0.5} />
-              {/* Label rows: stacked, clear separation */}
-              <text x={rx(screenCenterX)} y={oy - 22} textAnchor="middle" fontSize={8} fill={DIM_COLOR}>
-                {labelOverall}
-              </text>
-              <text x={rx(screenCenterX)} y={oy - 10} textAnchor="middle" fontSize={8} fill={LABEL_COLOR} fontWeight={600}>
-                {labelViewable}
-              </text>
+              {/* Screen labels: inside white area top-left if there is room, else below frame */}
+              {sw >= 90 && sh >= 36 ? (
+                // Enough room — render inside top-left of the white viewable area
+                <g>
+                  <text x={sx + 5} y={syTop + 11} textAnchor="start" fontSize={7} fill="#888">
+                    {labelOverall}
+                  </text>
+                  <text x={sx + 5} y={syTop + 21} textAnchor="start" fontSize={7} fill="#444" fontWeight={600}>
+                    {labelViewable}
+                  </text>
+                </g>
+              ) : (
+                // Too small — render below the frame, centred
+                <g>
+                  <text x={rx(screenCenterX)} y={oy + oH + 12} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
+                    {labelOverall}
+                  </text>
+                  <text x={rx(screenCenterX)} y={oy + oH + 22} textAnchor="middle" fontSize={7} fill={LABEL_COLOR} fontWeight={600}>
+                    {labelViewable}
+                  </text>
+                </g>
+              )}
             </g>
           );
         })()}
