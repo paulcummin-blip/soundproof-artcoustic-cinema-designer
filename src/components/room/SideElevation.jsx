@@ -125,9 +125,9 @@ export default function SideElevation({
     ? Number(screen.screenPlaneY_m)
     : Number(screen?.floatDepthM) || 0.20;
   // Border thickness
-  const borderM  = Number(screen?.borderThicknessM) > 0 ? Number(screen.borderThicknessM) : 0.05;
-  const frameH   = screenData.h + borderM * 2;
-  const frameTopM = screenFloorM + frameH;
+  const borderM      = Number(screen?.borderThicknessM) > 0 ? Number(screen.borderThicknessM) : 0.05;
+  const frameTopM    = screenTopM + borderM;      // top of frame (above viewable)
+  const frameBottomM = Math.max(0, screenFloorM - borderM); // bottom of frame (below viewable)
 
   // --- Projector ---
   const projectorEl = useMemo(() => {
@@ -253,23 +253,24 @@ export default function SideElevation({
           {/* Screen frame */}
           {(() => {
             const sxPx = rx(screenFrontY);
-            const frameTopPx  = rz(frameTopM);
-            const frameH_px   = rz(screenFloorM) - rz(frameTopM);
-            const viewTopPx   = rz(screenTopM);
-            const viewH_px    = rz(screenFloorM) - rz(screenTopM);
-            const FRAME_W = 5;
+            const frameTopPx = rz(frameTopM);
+            const frameBotPx = rz(frameBottomM);
+            const frameH_px  = frameBotPx - frameTopPx;   // equal border top & bottom
+            const viewTopPx  = rz(screenTopM);
+            const viewH_px   = rz(screenFloorM) - rz(screenTopM);
+            const FRAME_W = 7;
             return (
               <g>
-                {/* Frame (dark) */}
+                {/* Frame casing — equal border on all 4 sides */}
                 <rect
                   x={sxPx - FRAME_W / 2} y={frameTopPx}
                   width={FRAME_W} height={frameH_px}
-                  fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={0.8} rx={1} />
-                {/* Viewable (white) */}
+                  fill={SCREEN_STROKE} stroke="none" rx={1} />
+                {/* Viewable image area — inset equally on all sides */}
                 <rect
-                  x={sxPx - 2} y={viewTopPx}
-                  width={4} height={viewH_px}
-                  fill="#fff" stroke="#555" strokeWidth={0.5} />
+                  x={sxPx - FRAME_W / 2 + 1.5} y={viewTopPx}
+                  width={FRAME_W - 3} height={viewH_px}
+                  fill="#fff" stroke="#999" strokeWidth={0.4} />
                 {/* Screen label */}
                 <text x={sxPx} y={offsetY - 4}
                   textAnchor="middle" fontSize={7.5} fill={SCREEN_STROKE}
@@ -292,6 +293,43 @@ export default function SideElevation({
                   fontSize={7} fill={DIM_COLOR} textAnchor="start">
                   {screenTopM.toFixed(2)}m
                 </text>
+              </g>
+            );
+          })()}
+
+          {/* LCR Speakers — faintly rendered behind screen wall */}
+          {(() => {
+            const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+            const lcrSpks = Array.isArray(placedSpeakers)
+              ? placedSpeakers.filter(s => lcrRoles.has(String(s?.role || '').toUpperCase()))
+              : [];
+            if (!lcrSpks.length) return null;
+            return (
+              <g opacity={0.35}>
+                {lcrSpks.map((spk, i) => {
+                  const spkY = Number(spk?.position?.y);
+                  const spkZ = Number(spk?.position?.z);
+                  if (!Number.isFinite(spkY) || !Number.isFinite(spkZ)) return null;
+                  // Cabinet fallback: 0.27m wide (depth in Y) × 0.37m tall
+                  const cabDepth = 0.12; // Y-axis depth → horizontal SVG extent
+                  const cabH    = 0.37; // Z-axis height → vertical SVG extent
+                  const svgX   = rx(spkY);
+                  const svgTop = rz(spkZ + cabH / 2);
+                  const svgCabH = rz(spkZ - cabH / 2) - svgTop;
+                  const svgCabW = Math.max(3, (cabDepth / roomL) * drawW);
+                  return (
+                    <g key={`lcr-sv-${i}`}>
+                      <rect
+                        x={svgX - svgCabW / 2} y={svgTop}
+                        width={svgCabW} height={svgCabH}
+                        fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
+                      <text x={svgX} y={svgTop - 4}
+                        textAnchor="middle" fontSize={6} fill={SPK_COLOR} fontWeight={600}>
+                        {spk.role}
+                      </text>
+                    </g>
+                  );
+                })}
               </g>
             );
           })()}
@@ -397,13 +435,14 @@ export default function SideElevation({
                   fill={PROJ_FILL} stroke="#222" strokeWidth={0.9} rx={1.5} />
                 <circle cx={px} cy={pz} r={Math.max(3, pbH * 0.3)}
                   fill="#888" stroke="#555" strokeWidth={0.7} />
-                <text x={px} y={pz - pbH / 2 - 4}
+                {/* PROJ label — below projector body to avoid geometry clash */}
+                <text x={px + pbW / 2} y={pz + pbH / 2 + 13}
                   textAnchor="middle" fontSize={7.5} fill={DIM_COLOR}
                   letterSpacing="0.04em">
                   PROJ
                 </text>
-                {/* Height dim */}
-                <text x={px + 10} y={pz + 3}
+                {/* Height dim — right of body, clear of body edge */}
+                <text x={px + pbW + 10} y={pz + 3}
                   fontSize={7} fill={DIM_COLOR} textAnchor="start">
                   {pZ.toFixed(2)}m
                 </text>
