@@ -320,22 +320,17 @@ export function Evolve11FaceIcon({ x, y, width, height }) {
  * Front view: 2 woofers left column, 1 tweeter right, 4 corner bolts.
  */
 export function Evolve21FaceIcon({ x, y, width, height }) {
-  const s = Math.min(width, height);
   return (
-    <g>
-      {/* Cabinet outline */}
-      <rect x={x} y={y} width={width} height={height} fill="none" stroke={STROKE} strokeWidth="0.9" />
-      {/* Inner bezel */}
-      <rect x={x + width * 0.04} y={y + height * 0.04} width={width * 0.92} height={height * 0.92} rx={s * 0.04} fill="none" stroke={STROKE} strokeWidth="0.7" />
-      {/* 4 corner bolts */}
-      <CornerBolts x={x} y={y} w={width} h={height} inset={s * 0.08} r={s * 0.034} />
-      {/* Woofer top — left */}
-      <WooferCircles cx={x + width * 0.30} cy={y + height * 0.28} r1={s * 0.17} r2={s * 0.105} r3={s * 0.047} />
-      {/* Woofer bottom — left */}
-      <WooferCircles cx={x + width * 0.30} cy={y + height * 0.72} r1={s * 0.17} r2={s * 0.105} r3={s * 0.047} />
-      {/* Tweeter — right, vertically centred */}
-      <TweeterCircles cx={x + width * 0.72} cy={y + height * 0.50} r1={s * 0.12} r2={s * 0.058} />
-    </g>
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <image
+        x="0"
+        y="0"
+        width="100"
+        height="100"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/bb66545fd_Evolve2-1front.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </svg>
   );
 }
 
@@ -344,24 +339,17 @@ export function Evolve21FaceIcon({ x, y, width, height }) {
  * Front view: 3 woofers left column, 1 tweeter right, top/bottom centre bolts.
  */
 export function Evolve31FaceIcon({ x, y, width, height }) {
-  const s = width; // width is narrower dimension for portrait
   return (
-    <g>
-      {/* Cabinet outline */}
-      <rect x={x} y={y} width={width} height={height} fill="none" stroke={STROKE} strokeWidth="0.9" />
-      {/* Inner bezel */}
-      <rect x={x + width * 0.04} y={y + height * 0.03} width={width * 0.92} height={height * 0.94} rx={s * 0.04} fill="none" stroke={STROKE} strokeWidth="0.7" />
-      {/* Top and bottom centre bolts */}
-      <CentreBolts midX={x + width * 0.50} topY={y + height * 0.06} bottomY={y + height * 0.94} r={s * 0.033} />
-      {/* Woofer 1 — top, left */}
-      <WooferCircles cx={x + width * 0.30} cy={y + height * 0.19} r1={s * 0.135} r2={s * 0.085} r3={s * 0.038} />
-      {/* Woofer 2 — mid, left */}
-      <WooferCircles cx={x + width * 0.30} cy={y + height * 0.50} r1={s * 0.135} r2={s * 0.085} r3={s * 0.038} />
-      {/* Woofer 3 — bottom, left */}
-      <WooferCircles cx={x + width * 0.30} cy={y + height * 0.81} r1={s * 0.135} r2={s * 0.085} r3={s * 0.038} />
-      {/* Tweeter — right, vertically centred */}
-      <TweeterCircles cx={x + width * 0.70} cy={y + height * 0.50} r1={s * 0.10} r2={s * 0.048} />
-    </g>
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <image
+        x="0"
+        y="0"
+        width="100"
+        height="100"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/053510389_Evolve3-1front.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </svg>
   );
 }
 
@@ -370,27 +358,17 @@ export function Evolve31FaceIcon({ x, y, width, height }) {
  * Front view: 2 rows of [woofer | tweeter | woofer], top/bottom centre bolts.
  */
 export function Evolve42FaceIcon({ x, y, width, height }) {
-  const s = width;
-  const rows = [0.27, 0.73];
   return (
-    <g>
-      {/* Cabinet outline */}
-      <rect x={x} y={y} width={width} height={height} fill="none" stroke={STROKE} strokeWidth="0.9" />
-      {/* Inner bezel */}
-      <rect x={x + width * 0.04} y={y + height * 0.03} width={width * 0.92} height={height * 0.94} rx={s * 0.04} fill="none" stroke={STROKE} strokeWidth="0.7" />
-      {/* Top and bottom centre bolts */}
-      <CentreBolts midX={x + width * 0.50} topY={y + height * 0.055} bottomY={y + height * 0.945} r={s * 0.033} />
-      {rows.map((fy, i) => {
-        const cy = y + height * fy;
-        return (
-          <g key={i}>
-            <WooferCircles cx={x + width * 0.20} cy={cy} r1={s * 0.126} r2={s * 0.080} r3={s * 0.036} />
-            <TweeterCircles cx={x + width * 0.50} cy={cy} r1={s * 0.090} r2={s * 0.043} />
-            <WooferCircles cx={x + width * 0.80} cy={cy} r1={s * 0.126} r2={s * 0.080} r3={s * 0.036} />
-          </g>
-        );
-      })}
-    </g>
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <image
+        x="0"
+        y="0"
+        width="100"
+        height="100"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/fa3b2393b_Evolve4-2front.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </svg>
   );
 }
 
@@ -399,27 +377,17 @@ export function Evolve42FaceIcon({ x, y, width, height }) {
  * Front view: 3 rows of [woofer | tweeter | woofer], top/bottom centre bolts.
  */
 export function Evolve63FaceIcon({ x, y, width, height }) {
-  const s = width;
-  const rows = [0.18, 0.50, 0.82];
   return (
-    <g>
-      {/* Cabinet outline */}
-      <rect x={x} y={y} width={width} height={height} fill="none" stroke={STROKE} strokeWidth="0.9" />
-      {/* Inner bezel */}
-      <rect x={x + width * 0.04} y={y + height * 0.03} width={width * 0.92} height={height * 0.94} rx={s * 0.04} fill="none" stroke={STROKE} strokeWidth="0.7" />
-      {/* Top and bottom centre bolts */}
-      <CentreBolts midX={x + width * 0.50} topY={y + height * 0.055} bottomY={y + height * 0.945} r={s * 0.033} />
-      {rows.map((fy, i) => {
-        const cy = y + height * fy;
-        return (
-          <g key={i}>
-            <WooferCircles cx={x + width * 0.20} cy={cy} r1={s * 0.115} r2={s * 0.072} r3={s * 0.032} />
-            <TweeterCircles cx={x + width * 0.50} cy={cy} r1={s * 0.082} r2={s * 0.040} />
-            <WooferCircles cx={x + width * 0.80} cy={cy} r1={s * 0.115} r2={s * 0.072} r3={s * 0.032} />
-          </g>
-        );
-      })}
-    </g>
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <image
+        x="0"
+        y="0"
+        width="100"
+        height="100"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/3010c90e8_Evolve6-3front.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </svg>
   );
 }
 
@@ -428,26 +396,16 @@ export function Evolve63FaceIcon({ x, y, width, height }) {
  * Front view: 4 rows of [woofer | tweeter | woofer], top/bottom centre bolts.
  */
 export function Evolve84FaceIcon({ x, y, width, height }) {
-  const s = width;
-  const rows = [0.13, 0.38, 0.62, 0.87];
   return (
-    <g>
-      {/* Cabinet outline */}
-      <rect x={x} y={y} width={width} height={height} fill="none" stroke={STROKE} strokeWidth="0.9" />
-      {/* Inner bezel */}
-      <rect x={x + width * 0.04} y={y + height * 0.03} width={width * 0.92} height={height * 0.94} rx={s * 0.04} fill="none" stroke={STROKE} strokeWidth="0.7" />
-      {/* Top and bottom centre bolts */}
-      <CentreBolts midX={x + width * 0.50} topY={y + height * 0.045} bottomY={y + height * 0.955} r={s * 0.030} />
-      {rows.map((fy, i) => {
-        const cy = y + height * fy;
-        return (
-          <g key={i}>
-            <WooferCircles cx={x + width * 0.20} cy={cy} r1={s * 0.098} r2={s * 0.062} r3={s * 0.028} />
-            <TweeterCircles cx={x + width * 0.50} cy={cy} r1={s * 0.072} r2={s * 0.034} />
-            <WooferCircles cx={x + width * 0.80} cy={cy} r1={s * 0.098} r2={s * 0.062} r3={s * 0.028} />
-          </g>
-        );
-      })}
-    </g>
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <image
+        x="0"
+        y="0"
+        width="100"
+        height="100"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/29826d0f4_Evolve8-4front.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </svg>
   );
 }
