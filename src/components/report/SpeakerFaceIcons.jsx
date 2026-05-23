@@ -301,22 +301,17 @@ export function Q63FaceIcon({ x, y, size }) {
  * Front view: woofer lower-left, tweeter upper-right, 4 corner bolts.
  */
 export function Evolve11FaceIcon({ x, y, width, height }) {
-  const s = Math.min(width, height);
   return (
-    <g>
-      {/* Cabinet outline */}
-      <rect x={x} y={y} width={width} height={height} fill="none" stroke={STROKE} strokeWidth="0.9" />
-      {/* Inner bezel */}
-      <rect x={x + width * 0.05} y={y + height * 0.05} width={width * 0.90} height={height * 0.90} rx={s * 0.05} fill="none" stroke={STROKE} strokeWidth="0.7" />
-      {/* 4 corner bolts */}
-      <CornerBolts x={x} y={y} w={width} h={height} inset={s * 0.09} r={s * 0.038} />
-      {/* Woofer — lower-left */}
-      <WooferCircles cx={x + width * 0.37} cy={y + height * 0.65} r1={s * 0.21} r2={s * 0.13} r3={s * 0.056} />
-      {/* Tweeter — upper-right */}
-      <TweeterCircles cx={x + width * 0.71} cy={y + height * 0.29} r1={s * 0.13} r2={s * 0.062} />
-      {/* Small label detail lower-right */}
-      <circle cx={x + width * 0.82} cy={y + height * 0.80} r={s * 0.030} fill="none" stroke={STROKE} strokeWidth="0.6" />
-    </g>
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <image
+        x="0"
+        y="0"
+        width="100"
+        height="100"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/590fdd26f_Screenshot2026-05-23at153725.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </svg>
   );
 }
 
