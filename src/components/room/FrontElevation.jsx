@@ -52,6 +52,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const screenData = useMemo(() => screenDimsM(screen), [screen]);
   const screenFloorM = Number(screen?.heightFromFloorM) || 0.5;
   const screenCenterX = roomW / 2;
+  // Border/frame: use persisted value, else safe visual fallback
+  const hasBorderData = Number(screen?.borderThicknessM) > 0;
+  const borderM = hasBorderData ? Number(screen.borderThicknessM) : 0.05; // 5cm fallback
+  const overallW = screenData.w + borderM * 2;
+  const overallH = screenData.h + borderM * 2;
 
   // LCR speakers
   const lcrSpeakers = useMemo(() => {
@@ -149,34 +154,53 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           {roomH.toFixed(2)}m
         </text>
 
-        {/* Screen */}
+        {/* Screen: overall frame (black), then viewable area (white) */}
         {(() => {
+          // Overall frame rect (viewable + border on all sides)
+          const oW = (overallW / roomW) * drawW;
+          const oH = (overallH / roomH) * drawH;
+          const ox = rx(screenCenterX) - oW / 2;
+          const oy = ry(screenFloorM + overallH);
+
+          // Viewable rect
           const sw = (screenData.w / roomW) * drawW;
           const sh = (screenData.h / roomH) * drawH;
           const sx = rx(screenCenterX) - sw / 2;
-          const sy = ry(screenFloorM + screenData.h);
+          const sy = ry(screenFloorM + overallH - borderM) - (sh);
+          // sy = top of viewable area in SVG coords
+          const syTop = ry(screenFloorM + overallH - borderM);
+
+          const labelViewable = `${(screenData.w * 100).toFixed(0)} × ${(screenData.h * 100).toFixed(0)} cm (viewable)`;
+          const labelOverall = `${(overallW * 100).toFixed(0)} × ${(overallH * 100).toFixed(0)} cm overall${!hasBorderData ? ' (est. frame)' : ''}`;
+
           return (
             <g>
-              <rect x={sx} y={sy} width={sw} height={sh} fill={SCREEN_FILL} stroke={SCREEN_STROKE} strokeWidth={1} rx={2} />
-              <text x={rx(screenCenterX)} y={sy + sh / 2 + 4} textAnchor="middle" fontSize={8} fill="#fff" fontWeight={600}>
-                SCREEN
+              {/* Black frame */}
+              <rect x={ox} y={oy} width={oW} height={oH} fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={1} rx={2} />
+              {/* White viewable area */}
+              <rect x={sx} y={syTop} width={sw} height={sh} fill="#fff" stroke="#555" strokeWidth={0.5} />
+              {/* Label: overall */}
+              <text x={rx(screenCenterX)} y={oy - 13} textAnchor="middle" fontSize={8} fill={DIM_COLOR}>
+                {labelOverall}
               </text>
-              <text x={rx(screenCenterX)} y={sy - 4} textAnchor="middle" fontSize={8} fill={LABEL_COLOR}>
-                {(screenData.w * 100).toFixed(0)}×{(screenData.h * 100).toFixed(0)}cm
+              {/* Label: viewable */}
+              <text x={rx(screenCenterX)} y={oy - 4} textAnchor="middle" fontSize={8} fill={LABEL_COLOR} fontWeight={600}>
+                {labelViewable}
               </text>
             </g>
           );
         })()}
 
-        {/* LCR Speakers */}
+        {/* LCR Speakers — position.z is acoustic centre height */}
         {lcrSpeakers.map((spk) => {
           const sw = Math.max(4, (spk.wM / roomW) * drawW);
           const sh = Math.max(4, (spk.hM / roomH) * drawH);
           const sx = rx(spk.x) - sw / 2;
-          const sy = ry(spk.z + spk.hM / 2);
+          // ry converts room-metres to SVG y; spk.z is centre, so offset by half height
+          const sy = ry(spk.z) - sh / 2;
           return (
             <g key={spk.role}>
-              <rect x={sx} y={sy} width={sw} height={sh} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1} rx={1} />
+              <rect x={sx} y={sy} width={sw} height={sh} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1} rx={1} opacity={0.85} />
               <text x={rx(spk.x)} y={sy - 3} textAnchor="middle" fontSize={8} fill={LABEL_COLOR} fontWeight={600}>
                 {spk.label}
               </text>
@@ -184,12 +208,13 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           );
         })}
 
-        {/* Front subwoofers */}
+        {/* Front subwoofers — position.z is cabinet centre height */}
         {subItems.map((sub, i) => {
           const sw = Math.max(4, (sub.wM / roomW) * drawW);
           const sh = Math.max(4, (sub.hM / roomH) * drawH);
           const sx = rx(sub.x) - sw / 2;
-          const sy = ry(sub.z + sub.hM / 2);
+          // ry converts room-metres to SVG y; sub.z is centre, so offset by half height
+          const sy = ry(sub.z) - sh / 2;
           return (
             <g key={`sub-${i}`}>
               <rect x={sx} y={sy} width={sw} height={sh} fill={SUB_FILL} stroke={SUB_FILL} strokeWidth={1} rx={1} opacity={0.85} />
