@@ -345,7 +345,7 @@ export default function SideElevation({
             />
           )}
 
-          {/* Ear/eye height guide line */}
+          {/* Ear-height construction line — thin dashed, passes through head centres */}
           {(seatRows.length > 0 || Number.isFinite(mlpPoint?.y)) && (() => {
             const earZ = seatRows.length > 0
               ? seatRows[Math.floor(seatRows.length / 2)].earZ
@@ -354,8 +354,9 @@ export default function SideElevation({
               <line
                 x1={offsetX} y1={rz(earZ)}
                 x2={offsetX + drawW} y2={rz(earZ)}
-                stroke={SEAT_COLOR} strokeWidth={0.5}
-                strokeDasharray="6 4" opacity={0.3} />
+                stroke="#B0AEA8" strokeWidth={0.5}
+                strokeDasharray="4 4" opacity={0.55}
+                strokeLinecap="round" />
             );
           })()}
 
