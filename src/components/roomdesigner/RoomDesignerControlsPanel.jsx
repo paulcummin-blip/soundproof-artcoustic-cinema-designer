@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import { Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
@@ -23,6 +23,8 @@ const RoomElements = React.lazy(() =>
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
 );
+
+const VIEW_BUTTONS = [['controls', 'CONTROLS'], ['isometric', 'ISOMETRIC'], ['data', 'DATA']];
 
 export default function RoomDesignerControlsPanel({
   appState,
@@ -107,14 +109,37 @@ export default function RoomDesignerControlsPanel({
   _frontSubsCfg,
   _rearSubsCfg,
 }) {
+  const [rightPanelView, setRightPanelView] = useState('controls');
+
   return (
     <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0 }}>
-      <div
-        style={{
-          height: "calc(100vh - 152px)",
-          overflow: "auto",
-          paddingRight: 8
-        }}
+      {/* Right panel view selector bar */}
+      <div style={{ display: 'flex', gap: 2, padding: '6px 10px', borderBottom: '1px solid #DCDBD6', background: '#fff' }}>
+        {VIEW_BUTTONS.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setRightPanelView(key)}
+            style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', padding: '4px 10px', borderRadius: 6, border: rightPanelView === key ? '1px solid #213428' : '1px solid transparent', background: rightPanelView === key ? '#213428' : 'transparent', color: rightPanelView === key ? '#fff' : '#625143', cursor: 'pointer', transition: 'all 0.15s' }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {rightPanelView === 'isometric' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 196px)', color: '#625143', fontSize: 14, fontWeight: 500 }}>
+          Isometric view coming next
+        </div>
+      )}
+
+      {rightPanelView === 'data' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 196px)', color: '#625143', fontSize: 14, fontWeight: 500 }}>
+          Live data dashboard coming next
+        </div>
+      )}
+
+      {rightPanelView === 'controls' && <div
+        style={{ height: "calc(100vh - 196px)", overflow: "auto", paddingRight: 8 }}
         className="space-y-3">
 
         <CollapsiblePanel
@@ -364,7 +389,7 @@ export default function RoomDesignerControlsPanel({
             rearSubsCfg={_rearSubsCfg}
           />
         </CollapsiblePanel>
-      </div>
+      </div>}
     </aside>
   );
 }
