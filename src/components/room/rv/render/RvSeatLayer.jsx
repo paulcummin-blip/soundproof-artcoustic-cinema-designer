@@ -1,10 +1,51 @@
 import React from "react";
 import RvSeatRowLabels from "@/components/room/rv/render/RvSeatRowLabels";
 
+// Top-down sofa icon — listener head coordinate is the exact anchor point
+function SofaTopViewIcon({ cx, cy, scale, isPinned, screenWall = 'front' }) {
+  const sw   = Math.max(20, 0.60 * scale);  // sofa width
+  const sfwd = Math.max(5,  0.20 * scale);  // extension toward screen
+  const srear = Math.max(14, 0.55 * scale); // extension away from screen
+  const arm  = Math.max(2,  0.07 * scale);  // armrest width
+  const headR = Math.max(4.5, sw * 0.12);
+
+  const rotMap = { front: 0, back: 180, left: -90, right: 90 };
+  const rot = rotMap[screenWall] ?? 0;
+
+  const fillBase = isPinned ? 'rgba(33,52,40,0.14)' : 'rgba(33,52,40,0.07)';
+  const fillBody = isPinned ? 'rgba(33,52,40,0.24)' : 'rgba(33,52,40,0.12)';
+  const fillHead = isPinned ? 'rgba(33,52,40,0.34)' : 'rgba(33,52,40,0.20)';
+  const sw2 = isPinned ? 1.3 : 0.85;
+
+  return (
+    <g transform={`rotate(${rot}, ${cx}, ${cy})`} pointerEvents="none">
+      {/* Left armrest */}
+      <rect x={cx - sw/2 - arm} y={cy - sfwd} width={arm} height={sfwd + srear}
+        fill={fillBase} stroke="#213428" strokeWidth={sw2 * 0.55} rx={2} />
+      {/* Right armrest */}
+      <rect x={cx + sw/2} y={cy - sfwd} width={arm} height={sfwd + srear}
+        fill={fillBase} stroke="#213428" strokeWidth={sw2 * 0.55} rx={2} />
+      {/* Sofa body */}
+      <rect x={cx - sw/2} y={cy - sfwd} width={sw} height={sfwd + srear}
+        fill={fillBase} stroke="#213428" strokeWidth={sw2} rx={3} />
+      {/* Backrest band */}
+      <rect x={cx - sw/2} y={cy + srear - srear * 0.22} width={sw} height={srear * 0.22}
+        fill={fillBody} stroke="#213428" strokeWidth={0.5} rx={2} />
+      {/* Torso oval */}
+      <ellipse cx={cx} cy={cy + srear * 0.22} rx={sw * 0.27} ry={srear * 0.28}
+        fill={fillBody} stroke="#213428" strokeWidth={0.5} />
+      {/* Head circle — exactly at listener ear coordinate */}
+      <circle cx={cx} cy={cy} r={headR}
+        fill={fillHead} stroke="#213428" strokeWidth={sw2} />
+    </g>
+  );
+}
+
 export default function RvSeatLayer({
   seatingPositions,
   toPx,
   scale,
+  screenWall = 'front',
   exportMode,
   speakerPositionsView,
   rowFrontWallLabelSeatIds,
@@ -73,18 +114,13 @@ export default function RvSeatLayer({
               }}
             />
             
-            {/* Visual seat oval */}
-            <ellipse
+            {/* Sofa icon — head circle at listener ear coordinate */}
+            <SofaTopViewIcon
               cx={seatX}
               cy={seatY}
-              rx={RX_M * scale}
-              ry={RY_M * scale}
-              fill="rgba(0,0,0,0)"
-              pointerEvents="none"
-              stroke="#213428"
-              strokeWidth={isPinned ? 2 : 1}
-              strokeDasharray={isPinned ? '4 2' : 'none'}
-              aria-label="Seat — hover for RP23 and P1 analysis"
+              scale={scale}
+              isPinned={isPinned}
+              screenWall={screenWall}
             />
           </g>
         );

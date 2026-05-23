@@ -95,6 +95,7 @@ export default function SideElevation({
   mlpPoint,
   roomElements,
   placedSpeakers,
+  rowPlatformHeights = [],
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
@@ -360,19 +361,37 @@ export default function SideElevation({
             );
           })}
 
-          {/* Seat rows */}
+          {/* Seat rows — with platform risers */}
           {seatRows.map((row, i) => {
             const isRsp = Math.abs(row.y - rspY) < 0.15;
             const label = isRsp ? "RSP" : `R${i + 1}`;
+            const platformH = Number.isFinite(rowPlatformHeights[row.rowIdx])
+              ? rowPlatformHeights[row.rowIdx]
+              : row.rowIdx * 0.30;
+            const rowX = rx(row.y);
+            const platW = Math.max(22, (0.9 / roomL) * drawW);
             return (
-              <CinemaSeatIcon
-                key={`row-${row.rowIdx}`}
-                cx={rx(row.y)}
-                cy={rz(row.earZ)}
-                scale={(drawH / roomH)}
-                label={label}
-                isRsp={isRsp}
-              />
+              <g key={`row-${row.rowIdx}`}>
+                {platformH > 0.005 && (
+                  <g opacity={0.72}>
+                    <rect
+                      x={rowX - platW / 2} y={rz(platformH)}
+                      width={platW} height={rz(0) - rz(platformH)}
+                      fill="rgba(100,85,70,0.14)" stroke="#7C6F65" strokeWidth={0.7} />
+                    <text x={rowX} y={rz(platformH) - 3}
+                      textAnchor="middle" fontSize={6} fill={DIM_COLOR}>
+                      +{platformH.toFixed(2)}m
+                    </text>
+                  </g>
+                )}
+                <CinemaSeatIcon
+                  cx={rowX}
+                  cy={rz(row.earZ)}
+                  scale={(drawH / roomH)}
+                  label={label}
+                  isRsp={isRsp}
+                />
+              </g>
             );
           })}
 
