@@ -138,10 +138,14 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     // Render product-specific shapes if provided, otherwise fallback to simple geometry
     const hasShapes = Array.isArray(shapes) && shapes.length > 0 && !isRound;
 
+    // Product-drawing palette: white-ish lines over dark cabinet body
+    const DRAWING_FILL = "rgba(255,255,255,0.10)";
+    const DRAWING_STROKE = "rgba(255,255,255,0.70)";
+
     const renderShapes = () => shapes.map((s, i) => {
       if (!s || !s.type) return null;
-      const sFill = s.specialFill ?? (s.fill ? fill : "none");
-      const sStroke = s.stroke ? stroke : "none";
+      const sFill = s.specialFill ?? (s.fill ? DRAWING_FILL : "none");
+      const sStroke = s.stroke ? DRAWING_STROKE : "none";
       if (s.type === "rect") {
         return (
           <rect

@@ -382,6 +382,7 @@ export function getSpeakerModelMeta(modelName, orientation) {
     dispersion: finalDispersion,
     frequency_response_curve: hit.frequency_response_curve ?? null,
     price_gbp_exVat: hit.price_gbp_exVat ?? null,
+    frontElevationDrawing: hit.frontElevationDrawing ?? null,
   };
 }
 
