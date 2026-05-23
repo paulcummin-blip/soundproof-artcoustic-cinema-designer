@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import SeatPersonIcon from "../roomdesigner/SeatPersonIcon";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -33,56 +34,6 @@ function screenDimsM(screen) {
   const wM = wInches * 0.0254;
   const ar = screen.aspectRatio === "2.35:1" ? (2.35 / 1) : (16 / 9);
   return { w: wM, h: wM / ar };
-}
-
-// ---------------------------------------------------------------------------
-// CinemaSeatIcon – premium side-view seat
-// cx/cy = ear/head position in SVG pixels
-// ---------------------------------------------------------------------------
-function CinemaSeatIcon({ cx, cy, scale, label, isRsp }) {
-  // Scale seat to room scale but clamp to sensible px range
-  const S = Math.max(14, Math.min(28, scale * 0.35));
-  const baseY  = cy + S * 0.45;
-  const baseX  = cx - S * 0.55;
-  const baseW  = S * 1.1;
-  const baseH  = S * 0.22;
-  const backH  = S * 0.85;
-  const backW  = S * 0.18;
-  const seatD  = S * 0.48;
-  const seatH  = S * 0.16;
-  const headR  = S * 0.20;
-
-  return (
-    <g>
-      {/* Seat base */}
-      <rect x={baseX} y={baseY - baseH} width={baseW} height={baseH}
-        fill={isRsp ? "rgba(33,52,40,0.12)" : "rgba(33,52,40,0.07)"}
-        stroke={SEAT_COLOR} strokeWidth={0.9} rx={1.5} />
-      {/* Seat cushion (horizontal) */}
-      <rect x={baseX} y={baseY - baseH - seatH} width={seatD} height={seatH}
-        fill={isRsp ? "rgba(33,52,40,0.18)" : "rgba(33,52,40,0.09)"}
-        stroke={SEAT_COLOR} strokeWidth={0.8} rx={1} />
-      {/* Seat back (vertical) */}
-      <rect x={baseX} y={baseY - baseH - seatH - backH} width={backW} height={backH}
-        fill={isRsp ? "rgba(33,52,40,0.18)" : "rgba(33,52,40,0.09)"}
-        stroke={SEAT_COLOR} strokeWidth={0.8} rx={1} />
-      {/* Head circle at ear point */}
-      <circle cx={cx} cy={cy} r={headR}
-        fill={isRsp ? "rgba(33,52,40,0.25)" : "rgba(33,52,40,0.12)"}
-        stroke={SEAT_COLOR} strokeWidth={isRsp ? 1.2 : 0.9} />
-      {/* Ear dot */}
-      <circle cx={cx} cy={cy} r={1.6}
-        fill={SEAT_COLOR} opacity={0.65} />
-      {/* Label */}
-      {label && (
-        <text x={cx + headR + 4} y={cy + 3}
-          fontSize={7.5} fill={SEAT_COLOR} fontWeight={isRsp ? 700 : 500}
-          letterSpacing="0.03em">
-          {label}
-        </text>
-      )}
-    </g>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -159,12 +110,13 @@ export default function SideElevation({
       // Pick centre seat of the row
       const centre = rowSeats[Math.floor(rowSeats.length / 2)];
       const y = Number.isFinite(centre?.y) ? centre.y : null;
-      // Ear height: prefer explicit rowEarHeight, then z, then 1.2
+      // Ear height: prefer explicit rowEarHeight, then z, then 1.10
       const earZ = Number.isFinite(centre?.rowEarHeight) ? centre.rowEarHeight
         : Number.isFinite(centre?.z) ? centre.z
-        : 1.2;
+        : 1.10;
+      const platformH = Number.isFinite(centre?.platformHeightM) ? centre.platformHeightM : 0;
       if (y === null) return;
-      rows.push({ rowIdx, y, earZ, seats: rowSeats });
+      rows.push({ rowIdx, y, earZ, platformH, seats: rowSeats });
     });
 
     return rows.sort((a, b) => a.y - b.y);
@@ -365,11 +317,14 @@ export default function SideElevation({
             const isRsp = Math.abs(row.y - rspY) < 0.15;
             const label = isRsp ? "RSP" : `R${i + 1}`;
             return (
-              <CinemaSeatIcon
+              <SeatPersonIcon
                 key={`row-${row.rowIdx}`}
+                view="side"
                 cx={rx(row.y)}
                 cy={rz(row.earZ)}
                 scale={(drawH / roomH)}
+                earHeightM={row.earZ}
+                platformHeightM={row.platformH}
                 label={label}
                 isRsp={isRsp}
               />
@@ -378,10 +333,13 @@ export default function SideElevation({
 
           {/* If no seating data, show RSP from mlpPoint */}
           {seatRows.length === 0 && Number.isFinite(mlpPoint?.y) && (
-            <CinemaSeatIcon
+            <SeatPersonIcon
+              view="side"
               cx={rx(rspY)}
               cy={rz(rspZ)}
               scale={(drawH / roomH)}
+              earHeightM={rspZ}
+              platformHeightM={0}
               label="RSP"
               isRsp={true}
             />
