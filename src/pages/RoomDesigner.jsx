@@ -65,6 +65,7 @@ import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanT
 import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerControlsPanel";
+import FrontElevation from "@/components/room/FrontElevation";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
 
 // Safe lazy imports that work with both named and default exports
@@ -1672,9 +1673,12 @@ function RoomDesignerWithState() {
                   freeMoveLcr={freeMoveLcr} />}
 
                 {leftPanelView === 'front' && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#625143', fontSize: 14, fontWeight: 500 }}>
-                    Front Elevation view coming next
-                  </div>
+                  <FrontElevation
+                    dimensions={stableDimensions}
+                    screen={_screen}
+                    placedSpeakers={placedSpeakers}
+                    frontSubs={frontSubsForRendering}
+                  />
                 )}
 
                 {leftPanelView === 'side' && (
