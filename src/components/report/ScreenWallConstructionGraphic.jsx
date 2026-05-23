@@ -153,7 +153,7 @@ function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffse
   );
 }
 
-function Q43FaceIcon({ x, y, width, height }) {
+export function Q43FaceIcon({ x, y, width, height }) {
   const outerInset = width * 0.008;
   const innerInsetX = width * 0.055;
   const innerInsetY = height * 0.07;
@@ -227,7 +227,7 @@ function Q43FaceIcon({ x, y, width, height }) {
   );
 }
 
-function Q45FaceIcon({ x, y, width, height }) {
+export function Q45FaceIcon({ x, y, width, height }) {
   const outerInset = width * 0.008;
   const innerInsetX = width * 0.04;
   const innerInsetY = height * 0.055;
@@ -314,7 +314,7 @@ function Q45FaceIcon({ x, y, width, height }) {
   );
 }
 
-function Q85FaceIcon({ x, y, width, height }) {
+export function Q85FaceIcon({ x, y, width, height }) {
   const outerInset = width * 0.008;
   const innerInsetX = width * 0.04;
   const innerInsetY = height * 0.03;
@@ -411,7 +411,7 @@ function Q85FaceIcon({ x, y, width, height }) {
   );
 }
 
-function Q63FaceIcon({ x, y, size }) {
+export function Q63FaceIcon({ x, y, size }) {
   const outerInset = size * 0.005;
   const innerInset = size * 0.095;
   const baffleInsetX = size * 0.31;
