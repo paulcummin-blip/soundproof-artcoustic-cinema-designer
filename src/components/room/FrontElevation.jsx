@@ -33,9 +33,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const roomW = Number(dimensions?.widthM ?? dimensions?.width) || 4.5;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
 
+  // Internal coordinate system — fixed virtual canvas
   const SVG_W = 640;
   const PADDING = 36;
-  const LABEL_TOP = 24;
+  const LABEL_TOP = 36; // increased for label row stack
   const LABEL_LEFT = 36;
   const drawW = SVG_W - PADDING * 2 - LABEL_LEFT;
   const drawH = Math.round(drawW * (roomH / roomW));
@@ -115,12 +116,14 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const RISER_STROKE = "#9B9890";
 
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8F8F7", padding: 16 }}>
+    <div style={{ width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
+      {/* Responsive wrapper: aspect-ratio drives height from available width */}
+      <div style={{ width: "100%", aspectRatio: `${SVG_W} / ${SVG_H}` }}>
       <svg
-        width={SVG_W}
-        height={SVG_H}
+        width="100%"
+        height="100%"
         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-        style={{ maxWidth: "100%", maxHeight: "100%" }}
+        preserveAspectRatio="xMidYMid meet"
       >
         {/* Title */}
         <text x={offsetX + drawW / 2} y={14} textAnchor="middle" fontSize={10} fontWeight={600} fill={LABEL_COLOR} letterSpacing="0.06em">
@@ -210,17 +213,23 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               <rect x={ox} y={oy} width={oW} height={oH} fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={1} rx={2} />
               {/* White viewable area */}
               <rect x={sx} y={syTop} width={sw} height={sh} fill="#fff" stroke="#555" strokeWidth={0.5} />
-              {/* Label: overall */}
-              <text x={rx(screenCenterX)} y={oy - 13} textAnchor="middle" fontSize={8} fill={DIM_COLOR}>
+              {/* Label rows: stacked, clear separation */}
+              <text x={rx(screenCenterX)} y={oy - 22} textAnchor="middle" fontSize={8} fill={DIM_COLOR}>
                 {labelOverall}
               </text>
-              {/* Label: viewable */}
-              <text x={rx(screenCenterX)} y={oy - 4} textAnchor="middle" fontSize={8} fill={LABEL_COLOR} fontWeight={600}>
+              <text x={rx(screenCenterX)} y={oy - 10} textAnchor="middle" fontSize={8} fill={LABEL_COLOR} fontWeight={600}>
                 {labelViewable}
               </text>
             </g>
           );
         })()}
+
+        {/* ── drawSpeakerFront ─────────────────────────────────────────────────
+           Internal helper: renders a single speaker in the XZ (front elevation)
+           plane. rect for rectangular models, circle for round models.
+           Designed to be the single rendering path for all front-stage speakers,
+           ready to accept product SVG art in future without changing call sites.
+           ──────────────────────────────────────────────────────────────────── */}
 
         {/* Riser outline if element exists */}
         {riserEl && (() => {
@@ -248,39 +257,50 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           );
         })()}
 
-        {/* LCR Speakers — position.z is acoustic centre height */}
+        {/* LCR Speakers — rendered via drawSpeakerFront */}
         {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk) => {
-          const sw = Math.max(10, (spk.wM / roomW) * drawW * 1.15);
-          const sh = Math.max(10, (spk.hM / roomH) * drawH * 1.15);
-          const sx = rx(spk.x) - sw / 2;
-          const sy = ry(spk.z) - sh / 2;
+          // drawSpeakerFront: rect for rectangular, circle for round
+          const isRound = spk.round === true;
+          const sw = Math.max(12, (spk.wM / roomW) * drawW * 1.20);
+          const sh = Math.max(12, (spk.hM / roomH) * drawH * 1.20);
+          const cx = rx(spk.x);
+          const cy = ry(spk.z);
+          const sx = cx - sw / 2;
+          const sy = cy - sh / 2;
           return (
             <g key={spk.role}>
-              <rect x={sx} y={sy} width={sw} height={sh} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1.2} rx={2} opacity={0.90} />
-              <circle cx={rx(spk.x)} cy={ry(spk.z)} r={1.5} fill="rgba(255,255,255,0.5)" />
-              <text x={rx(spk.x)} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
+              {isRound
+                ? <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1.2} opacity={0.90} />
+                : <rect x={sx} y={sy} width={sw} height={sh} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1.2} rx={2} opacity={0.90} />
+              }
+              <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.55)" />
+              <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
                 {spk.label}
               </text>
-              <text x={rx(spk.x)} y={ry(spk.z - spk.hM * 0.5) + 18} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
+              <text x={cx} y={sy + sh + 10} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
                 z={spk.z.toFixed(2)}m
               </text>
             </g>
           );
         })}
 
-        {/* Front subwoofers — position.z is cabinet centre height */}
+        {/* Front subwoofers — rendered via drawSpeakerFront */}
         {(Array.isArray(subItems) ? subItems : []).map((sub, i) => {
-          const sw = Math.max(10, (sub.wM / roomW) * drawW * 1.1);
-          const sh = Math.max(10, (sub.hM / roomH) * drawH * 1.1);
-          const sx = rx(sub.x) - sw / 2;
-          const sy = ry(sub.z) - sh / 2;
+          // drawSpeakerFront: subs are always rectangular
+          const sw = Math.max(12, (sub.wM / roomW) * drawW * 1.15);
+          const sh = Math.max(12, (sub.hM / roomH) * drawH * 1.15);
+          const cx = rx(sub.x);
+          const cy = ry(sub.z);
+          const sx = cx - sw / 2;
+          const sy = cy - sh / 2;
           return (
             <g key={`sub-${i}`}>
               <rect x={sx} y={sy} width={sw} height={sh} fill={SUB_FILL} stroke={SUB_STROKE} strokeWidth={1.2} rx={2} opacity={0.92} />
-              <text x={rx(sub.x)} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
+              <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.35)" />
+              <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
                 {sub.label}
               </text>
-              <text x={rx(sub.x)} y={sy + sh + 11} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
+              <text x={cx} y={sy + sh + 10} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
                 z={sub.z.toFixed(2)}m
               </text>
             </g>
@@ -316,6 +336,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           </text>
         )}
       </svg>
+      </div>
     </div>
   );
 }
