@@ -392,7 +392,7 @@ export default function SideElevation({
             return (
               <g opacity={0.88}>
                 <rect
-                  x={px - pbW / 2} y={pz - pbH / 2}
+                  x={px} y={pz - pbH / 2}
                   width={pbW} height={pbH}
                   fill={PROJ_FILL} stroke="#222" strokeWidth={0.9} rx={1.5} />
                 <circle cx={px} cy={pz} r={Math.max(3, pbH * 0.3)}
