@@ -58,7 +58,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const overallW = screenData.w + borderM * 2;
   const overallH = screenData.h + borderM * 2;
 
-  // LCR speakers
+  // LCR speakers — always returns a plain array
   const lcrSpeakers = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return [];
     return placedSpeakers
@@ -73,10 +73,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       });
   }, [placedSpeakers, roomW]);
 
-  // Front subs
+  // Front subs — always returns a plain array
   const subItems = useMemo(() => {
-    if (!Array.isArray(frontSubs)) return [];
-    return frontSubs.map((s, i) => {
+    const safeSubs = Array.isArray(frontSubs) ? frontSubs : [];
+    return safeSubs.map((s, i) => {
       const meta = getSpeakerModelMeta(s?.model);
       const wM = (meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.35;
       const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.35;
@@ -249,8 +249,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         })()}
 
         {/* LCR Speakers — position.z is acoustic centre height */}
-        {lcrSpeakers.map((spk) => {
-          // Boost rendered size slightly for visibility (min 10px wide)
+        {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk) => {
           const sw = Math.max(10, (spk.wM / roomW) * drawW * 1.15);
           const sh = Math.max(10, (spk.hM / roomH) * drawH * 1.15);
           const sx = rx(spk.x) - sw / 2;
@@ -258,7 +257,6 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           return (
             <g key={spk.role}>
               <rect x={sx} y={sy} width={sw} height={sh} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1.2} rx={2} opacity={0.90} />
-              {/* Subtle centre dot */}
               <circle cx={rx(spk.x)} cy={ry(spk.z)} r={1.5} fill="rgba(255,255,255,0.5)" />
               <text x={rx(spk.x)} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
                 {spk.label}
@@ -268,10 +266,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               </text>
             </g>
           );
-        })()}
+        })}
 
         {/* Front subwoofers — position.z is cabinet centre height */}
-        {subItems.map((sub, i) => {
+        {(Array.isArray(subItems) ? subItems : []).map((sub, i) => {
           const sw = Math.max(10, (sub.wM / roomW) * drawW * 1.1);
           const sh = Math.max(10, (sub.hM / roomH) * drawH * 1.1);
           const sx = rx(sub.x) - sw / 2;
@@ -287,7 +285,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               </text>
             </g>
           );
-        })()}
+        })}
 
         {/* Projector element if present */}
         {projectorEl && (() => {
