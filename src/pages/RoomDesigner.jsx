@@ -281,7 +281,6 @@ function RoomDesignerWithState() {
 
   // NEW: Options panel state
   const [showPrices, setShowPrices] = useState(false);
-  const [rowPlatformHeights, setRowPlatformHeights] = useState([]);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
   const [speakerPositionsView, setSpeakerPositionsView] = React.useState('off'); // 'off' | 'plan' | 'table' | 'both'
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
@@ -1692,7 +1691,6 @@ function RoomDesignerWithState() {
                     mlpPoint={mlpAnchorEffective}
                     roomElements={_roomElements}
                     placedSpeakers={placedSpeakers}
-                    rowPlatformHeights={rowPlatformHeights}
                   />
                 )}
 
@@ -1778,8 +1776,6 @@ function RoomDesignerWithState() {
             priceData={priceData}
             _frontSubsCfg={_frontSubsCfg}
             _rearSubsCfg={_rearSubsCfg}
-            rowPlatformHeights={rowPlatformHeights}
-            onRowPlatformHeightsChange={setRowPlatformHeights}
           />
         )}
       />

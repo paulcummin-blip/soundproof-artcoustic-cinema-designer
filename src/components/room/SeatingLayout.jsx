@@ -49,9 +49,6 @@ const getEarHeightForRow = (rowNumber) => {
   }
 };
 
-// Default platform height for a row by 0-based index
-const getDefaultPlatformHeight = (rowIndex) => Math.round(rowIndex * 0.30 * 100) / 100;
-
 // Normalise row spacing to a sane, monotonic numeric value in metres.
 const normaliseRowSpacing = (raw) => {
   if (raw === '' || raw == null) return '';
@@ -95,8 +92,6 @@ export default function SeatingLayout({
   onShowMlpRulerChange,
   rowEarHeights = [],
   onRowEarHeightsChange,
-  rowPlatformHeights = [],
-  onRowPlatformHeightsChange,
 }) {
   // Build rowsArray purely from props (parent is the source of truth)
   const rowsArray = React.useMemo(() => {
@@ -326,7 +321,7 @@ export default function SeatingLayout({
               className="text-sm font-medium"
               style={{ color: '#3E4349' }}>
 
-          {'Rows & Seats'}
+          Rows & Seats
         </Label>
 
         <div className="space-y-2">
@@ -396,8 +391,6 @@ export default function SeatingLayout({
                     const currentHeights = rowEarHeights.length ? [...rowEarHeights] : rowsArray.map((_, j) => getEarHeightForRow(j + 1));
                     const nextHeights = currentHeights.filter((_, j) => j !== idx);
                     onRowEarHeightsChange?.(nextHeights);
-                    const phArr = rowPlatformHeights.length ? [...rowPlatformHeights] : rowsArray.map((_, j) => getDefaultPlatformHeight(j));
-                    onRowPlatformHeightsChange?.(phArr.filter((_, j) => j !== idx));
                   }}>
 
                 Remove
@@ -432,9 +425,6 @@ export default function SeatingLayout({
                     const currentHeights = rowEarHeights.length ? [...rowEarHeights] : rowsArray.map((_, j) => getEarHeightForRow(j + 1));
                     currentHeights.push(getEarHeightForRow(next.length));
                     onRowEarHeightsChange?.(currentHeights);
-                    const phArr2 = rowPlatformHeights.length ? [...rowPlatformHeights] : rowsArray.map((_, j) => getDefaultPlatformHeight(j));
-                    phArr2.push(getDefaultPlatformHeight(next.length - 1));
-                    onRowPlatformHeightsChange?.(phArr2);
                   }}>
 
               Add Row
@@ -442,41 +432,6 @@ export default function SeatingLayout({
           </div>
         </div>
       </div>
-
-      {/* Platform Heights per row */}
-      {rowCount >= 1 &&
-        <div className="space-y-2">
-          <Label className="text-sm font-medium" style={{ color: '#3E4349' }}>Platform Heights</Label>
-          <div className="space-y-1">
-            {rowsArray.map((_, i) => {
-              const ph = Number.isFinite(rowPlatformHeights[i]) ? rowPlatformHeights[i] : getDefaultPlatformHeight(i);
-              return (
-                <div key={i} className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: '#F8F8F7', border: '1px solid #C1B6AD' }}>
-                  <span className="text-xs" style={{ color: '#1B1A1A' }}>Row {i + 1}</span>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number" step="0.01" min="0.0" max="2.0"
-                      value={ph} disabled={disabled}
-                      className="h-7 w-24 text-xs text-center"
-                      style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
-                      onChange={(e) => {
-                        if (disabled) return;
-                        const val = parseFloat(e.target.value);
-                        if (!Number.isFinite(val) || val < 0) return;
-                        const clamped = Math.max(0, Math.min(2.0, Math.round(val * 100) / 100));
-                        const base = rowPlatformHeights.length ? [...rowPlatformHeights] : rowsArray.map((_, j) => getDefaultPlatformHeight(j));
-                        base[i] = clamped;
-                        onRowPlatformHeightsChange?.(base);
-                      }}
-                    />
-                    <span className="text-xs" style={{ color: '#625143' }}>m</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      }
 
       {/* Seat Spacing (m) */}
       <div className="space-y-2">

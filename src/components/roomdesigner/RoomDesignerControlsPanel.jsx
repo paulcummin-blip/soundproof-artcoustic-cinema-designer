@@ -100,9 +100,6 @@ export default function RoomDesignerControlsPanel({
   // Report
   analysisResult,
   freeMoveLcr,
-  // Platform heights
-  rowPlatformHeights,
-  onRowPlatformHeightsChange,
   // Options
   showPrices,
   setShowPrices,
@@ -248,9 +245,7 @@ export default function RoomDesignerControlsPanel({
               showMlpRuler={showMlpRuler}
               onShowMlpRulerChange={setShowMlpRuler}
               rowEarHeights={appState?.rowEarHeights || []}
-              onRowEarHeightsChange={appState?.setRowEarHeights}
-              rowPlatformHeights={rowPlatformHeights || []}
-              onRowPlatformHeightsChange={onRowPlatformHeightsChange} />
+              onRowEarHeightsChange={appState?.setRowEarHeights} />
           </Suspense>
         </CollapsiblePanel>
 
