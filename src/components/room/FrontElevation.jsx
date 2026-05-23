@@ -70,7 +70,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.20;
         const x = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
         const z = Number.isFinite(s?.position?.z) ? s.position.z : 1.2;
-        return { role: canonFront(s.role), x, z, wM, hM, label: canonFront(s.role) };
+        const drawingShapes = Array.isArray(meta?.frontElevationDrawing?.shapes) ? meta.frontElevationDrawing.shapes : null;
+        return { role: canonFront(s.role), x, z, wM, hM, label: canonFront(s.role), drawingShapes };
       });
   }, [placedSpeakers, roomW]);
 
@@ -130,17 +131,66 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
    * @param {string}  label  - text label above speaker
    * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
    */
-  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM }) => {
+  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, shapes }) => {
     const sx = cx - sw / 2;
     const sy = cy - sh / 2;
+
+    // Render product-specific shapes if provided, otherwise fallback to simple geometry
+    const hasShapes = Array.isArray(shapes) && shapes.length > 0 && !isRound;
+
+    const renderShapes = () => shapes.map((s, i) => {
+      if (!s || !s.type) return null;
+      const sFill = s.specialFill ?? (s.fill ? fill : "none");
+      const sStroke = s.stroke ? stroke : "none";
+      if (s.type === "rect") {
+        return (
+          <rect
+            key={i}
+            x={sx + s.x * sw}
+            y={sy + s.y * sh}
+            width={s.w * sw}
+            height={s.h * sh}
+            fill={sFill}
+            stroke={sStroke}
+            strokeWidth={0.8}
+            rx={1}
+          />
+        );
+      }
+      if (s.type === "circle") {
+        const rPx = s.r * Math.min(sw, sh);
+        return (
+          <circle
+            key={i}
+            cx={sx + s.cx * sw}
+            cy={sy + s.cy * sh}
+            r={Math.max(1.5, rPx)}
+            fill={sFill}
+            stroke={sStroke}
+            strokeWidth={0.8}
+          />
+        );
+      }
+      return null;
+    });
+
     return (
       <g key={key}>
-        {isRound
-          ? <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
-          : <rect x={sx} y={sy} width={sw} height={sh} fill={fill} stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
-        }
-        {/* Acoustic centre dot */}
-        <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.55)" />
+        {/* Body: product drawing or simple fallback */}
+        {hasShapes ? (
+          <g opacity={0.92}>
+            {/* Cabinet outline */}
+            <rect x={sx} y={sy} width={sw} height={sh} fill={fill} stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
+            {/* Product-specific detail shapes */}
+            {renderShapes()}
+          </g>
+        ) : (
+          isRound
+            ? <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
+            : <rect x={sx} y={sy} width={sw} height={sh} fill={fill} stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
+        )}
+        {/* Acoustic centre dot — only when no shapes (shapes include their own marker) */}
+        {!hasShapes && <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.55)" />}
         {/* Label above */}
         <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
           {label}
@@ -323,6 +373,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             stroke: SPEAKER_STROKE,
             label: spk.label,
             zM: spk.z,
+            shapes: spk.drawingShapes ?? null,
           })
         )}
 
