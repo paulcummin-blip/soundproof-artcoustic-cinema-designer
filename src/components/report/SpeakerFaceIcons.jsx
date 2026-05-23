@@ -409,3 +409,21 @@ export function Evolve84FaceIcon({ x, y, width, height }) {
     </svg>
   );
 }
+
+/**
+ * Spitfire Q 8-5 — tall portrait cabinet
+ */
+export function SpitfireQ85FaceIcon({ x, y, width, height }) {
+  return (
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <image
+        x="0"
+        y="0"
+        width="100"
+        height="100"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/16d67f4d6_Screenshot2026-05-23at155313.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </svg>
+  );
+}
