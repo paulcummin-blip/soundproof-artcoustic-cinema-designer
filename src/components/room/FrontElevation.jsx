@@ -36,7 +36,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // Internal coordinate system — fixed virtual canvas
   const SVG_W = 640;
   const PADDING = 36;
-  const LABEL_TOP = 36; // increased for label row stack
+  const LABEL_TOP = 56; // increased top padding — title breathing room + label rows
   const LABEL_LEFT = 36;
   const drawW = SVG_W - PADDING * 2 - LABEL_LEFT;
   const drawH = Math.round(drawW * (roomH / roomW));
@@ -114,6 +114,44 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const PROJ_FILL = "#3E4349";
   const RISER_FILL = "rgba(180,170,160,0.18)";
   const RISER_STROKE = "#9B9890";
+
+  /**
+   * drawSpeakerFront — reusable helper for rendering a single speaker
+   * in the XZ front-elevation plane.
+   *
+   * @param {string}  key    - React key
+   * @param {number}  cx     - SVG centre X (pixels)
+   * @param {number}  cy     - SVG centre Y (pixels, position.z mapped via ry)
+   * @param {number}  sw     - rendered width in SVG pixels
+   * @param {number}  sh     - rendered height in SVG pixels
+   * @param {boolean} isRound - true → circle, false → rectangle
+   * @param {string}  fill   - body fill colour
+   * @param {string}  stroke - body stroke colour
+   * @param {string}  label  - text label above speaker
+   * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
+   */
+  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM }) => {
+    const sx = cx - sw / 2;
+    const sy = cy - sh / 2;
+    return (
+      <g key={key}>
+        {isRound
+          ? <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
+          : <rect x={sx} y={sy} width={sw} height={sh} fill={fill} stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
+        }
+        {/* Acoustic centre dot */}
+        <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.55)" />
+        {/* Label above */}
+        <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
+          {label}
+        </text>
+        {/* Z-height annotation below */}
+        <text x={cx} y={sy + sh + 10} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
+          z={zM.toFixed(2)}m
+        </text>
+      </g>
+    );
+  };
 
   return (
     <div style={{ width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
@@ -257,55 +295,37 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           );
         })()}
 
-        {/* LCR Speakers — rendered via drawSpeakerFront */}
-        {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk) => {
-          // drawSpeakerFront: rect for rectangular, circle for round
-          const isRound = spk.round === true;
-          const sw = Math.max(12, (spk.wM / roomW) * drawW * 1.20);
-          const sh = Math.max(12, (spk.hM / roomH) * drawH * 1.20);
-          const cx = rx(spk.x);
-          const cy = ry(spk.z);
-          const sx = cx - sw / 2;
-          const sy = cy - sh / 2;
-          return (
-            <g key={spk.role}>
-              {isRound
-                ? <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1.2} opacity={0.90} />
-                : <rect x={sx} y={sy} width={sw} height={sh} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1.2} rx={2} opacity={0.90} />
-              }
-              <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.55)" />
-              <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
-                {spk.label}
-              </text>
-              <text x={cx} y={sy + sh + 10} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
-                z={spk.z.toFixed(2)}m
-              </text>
-            </g>
-          );
-        })}
+        {/* LCR Speakers — via drawSpeakerFront helper */}
+        {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk) =>
+          drawSpeakerFront({
+            key: spk.role,
+            cx: rx(spk.x),
+            cy: ry(spk.z),
+            sw: Math.max(12, (spk.wM / roomW) * drawW * 1.20),
+            sh: Math.max(12, (spk.hM / roomH) * drawH * 1.20),
+            isRound: spk.round === true,
+            fill: SPEAKER_FILL,
+            stroke: SPEAKER_STROKE,
+            label: spk.label,
+            zM: spk.z,
+          })
+        )}
 
-        {/* Front subwoofers — rendered via drawSpeakerFront */}
-        {(Array.isArray(subItems) ? subItems : []).map((sub, i) => {
-          // drawSpeakerFront: subs are always rectangular
-          const sw = Math.max(12, (sub.wM / roomW) * drawW * 1.15);
-          const sh = Math.max(12, (sub.hM / roomH) * drawH * 1.15);
-          const cx = rx(sub.x);
-          const cy = ry(sub.z);
-          const sx = cx - sw / 2;
-          const sy = cy - sh / 2;
-          return (
-            <g key={`sub-${i}`}>
-              <rect x={sx} y={sy} width={sw} height={sh} fill={SUB_FILL} stroke={SUB_STROKE} strokeWidth={1.2} rx={2} opacity={0.92} />
-              <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.35)" />
-              <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
-                {sub.label}
-              </text>
-              <text x={cx} y={sy + sh + 10} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
-                z={sub.z.toFixed(2)}m
-              </text>
-            </g>
-          );
-        })}
+        {/* Front subwoofers — via drawSpeakerFront helper */}
+        {(Array.isArray(subItems) ? subItems : []).map((sub, i) =>
+          drawSpeakerFront({
+            key: `sub-${i}`,
+            cx: rx(sub.x),
+            cy: ry(sub.z),
+            sw: Math.max(12, (sub.wM / roomW) * drawW * 1.15),
+            sh: Math.max(12, (sub.hM / roomH) * drawH * 1.15),
+            isRound: false,
+            fill: SUB_FILL,
+            stroke: SUB_STROKE,
+            label: sub.label,
+            zM: sub.z,
+          })
+        )}
 
         {/* Projector element if present */}
         {projectorEl && (() => {
