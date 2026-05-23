@@ -64,6 +64,7 @@ import NewProjectDialog from "@/components/projects/NewProjectDialog";
 import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
 import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
+import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerControlsPanel";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
 
 // Safe lazy imports that work with both named and default exports
@@ -284,6 +285,8 @@ function RoomDesignerWithState() {
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
+  const [leftPanelView, setLeftPanelView] = useState('plan'); // 'plan' | 'front' | 'side'
+  const [rightPanelView, setRightPanelView] = useState('controls'); // 'controls' | 'isometric' | 'data'
 
   // --- bed rears required? (SBL/SBR) ---
   const layoutMajor = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) || 5;
@@ -1582,15 +1585,28 @@ function RoomDesignerWithState() {
           <>
 
         <section
-          className="relative bg-white border border-[#DCDBD6] rounded-2xl overflow-hidden" // Change from auto to hidden since we're managing scroll inside
+          className="relative bg-white border border-[#DCDBD6] rounded-2xl overflow-hidden"
           style={{
             minWidth: 0,
             minHeight: 0,
-            height: "calc(100vh - 152px)" // Preserve height constraint
+            height: "calc(100vh - 152px)"
           }}>
 
-          {/* Plan toolbar extracted to RoomDesignerPlanToolbar */}
-          <RoomDesignerPlanToolbar
+          {/* View selector bar */}
+          <div style={{ display: 'flex', gap: 2, padding: '6px 10px', borderBottom: '1px solid #DCDBD6', background: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+            {[['plan', 'PLAN VIEW'], ['front', 'FRONT ELEVATION'], ['side', 'SIDE ELEVATION']].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setLeftPanelView(key)}
+                style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', padding: '4px 10px', borderRadius: 6, border: leftPanelView === key ? '1px solid #213428' : '1px solid transparent', background: leftPanelView === key ? '#213428' : 'transparent', color: leftPanelView === key ? '#fff' : '#625143', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Plan toolbar — only shown in plan view */}
+          {leftPanelView === 'plan' && <RoomDesignerPlanToolbar
             allowExtraSurrounds={allowExtraSurrounds}
             extraSurroundCount={appState?.extraSurroundCount}
             dolbyPreset={dolbyPreset}
@@ -1605,10 +1621,10 @@ function RoomDesignerWithState() {
             setFreeMoveLcr={setFreeMoveLcr}
             zoomMode={zoomMode}
             setZoomMode={setZoomMode}
-          />
+          />}
 
-          {/* Content wrapper below the toolbar; canvas gets pushed down naturally */}
-          <div style={{ height: 'calc(100% - 36px)', overflow: 'auto' }}>
+          {/* Content area */}
+          <div style={{ height: leftPanelView === 'plan' ? 'calc(100% - 76px)' : 'calc(100% - 44px)', overflow: 'auto' }}>
             <ErrorBoundary name="RoomVisualisation">
               <Suspense fallback={<div className="p-4">Loading 3D View...</div>}>
                 {(() => {
@@ -1619,11 +1635,10 @@ function RoomDesignerWithState() {
                   });
                   return null;
                 })()}
-                <RoomVisualisation
+                {leftPanelView === 'plan' && <RoomVisualisation
                   ref={visualisationRef}
                   mlpPoint={mlpAnchorEffective}
-                  analysisResult={analysisResult || {}
-                  }
+                  analysisResult={analysisResult || {}}
                   placedSpeakers={placedSpeakers}
                   frontSubs={frontSubsForRendering}
                   rearSubs={rearSubsForRendering}
@@ -1654,7 +1669,19 @@ function RoomDesignerWithState() {
                   isDraggingRef={isDraggingRef}
                   extraSurroundCount={appState?.extraSurroundCount ?? 0}
                   showRoomModesOverlay={showRoomModesOverlay}
-                  freeMoveLcr={freeMoveLcr} />
+                  freeMoveLcr={freeMoveLcr} />}
+
+                {leftPanelView === 'front' && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#625143', fontSize: 14, fontWeight: 500 }}>
+                    Front Elevation view coming next
+                  </div>
+                )}
+
+                {leftPanelView === 'side' && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#625143', fontSize: 14, fontWeight: 500 }}>
+                    Side Elevation view coming next
+                  </div>
+                )}
 
               </Suspense>
             </ErrorBoundary>
@@ -1664,287 +1691,81 @@ function RoomDesignerWithState() {
           </>
         )}
         rightContent={(
-          <>
-        <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0 }}>
-          <div
-            style={{
-              height: "calc(100vh - 152px)",
-              overflow: "auto",
-              paddingRight: 8
-            }}
-            className="space-y-3">
-
-              <CollapsiblePanel
-              title="Room Dimensions"
-              icon={<Ruler className="w-5 h-5" />}
-              defaultOpen={true}>
-
-                  {isFrozen('dimensions') &&
-              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-                      This tab is frozen. Unlock to make changes.
-                    </div>
-              }
-                  <Suspense fallback={<div>Loading...</div>}>
-                      <RoomDimensions
-                  width_m={_roomDims?.widthM}
-                  length_m={_roomDims?.lengthM}
-                  height_m={_roomDims?.heightM}
-                  onChange={(partial) => {
-                    if (!isFrozen('dimensions') && _setRoomDims) {
-                      _setRoomDims((prev) => ({ ...prev, ...partial }));
-                    }
-                  }}
-                  disabled={isFrozen('dimensions')} />
-
-                  </Suspense>
-              </CollapsiblePanel>
-
-              <CollapsiblePanel
-              title="Room Elements"
-              icon={<Box className="w-5 h-5" />}
-              defaultOpen={false}>
-
-                  {isFrozen('elements') &&
-              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-                      This tab is frozen. Unlock to make changes.
-                    </div>
-              }
-                  <Suspense fallback={<div>Loading...</div>}>
-                      <RoomElements 
-                        elements={roomElements} 
-                        onChange={setRoomElementsGuarded} 
-                        disabled={isFrozen('elements')}
-                        roomDims={appState?.roomDims}
-                      />
-                  </Suspense>
-              </CollapsiblePanel>
-
-              <CollapsiblePanel
-              title="Screen Size"
-              icon={<Monitor className="w-5 h-5" />}
-              defaultOpen={false}>
-
-                  {isFrozen('screen') &&
-              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-                      This tab is frozen. Unlock to make changes.
-                    </div>
-              }
-                  <Suspense fallback={<div>Loading...</div>}>
-                      <ScreenConfiguration
-                  dimensions={stableDimensions}
-                  screen={_screen}
-                  onScreenChange={setScreenGuarded}
-                  seatingPositions={seatingPositions}
-                  dolbyConfig={dolbyPreset}
-                  disabled={isFrozen('screen')} />
-
-                  </Suspense>
-              </CollapsiblePanel>
-
-              <CollapsiblePanel
-              title="Seating Layout"
-              icon={<Users className="w-5 h-5" />}
-              defaultOpen={false}>
-
-                  {isFrozen('seating') &&
-              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-                      This tab is frozen. Unlock to make changes.
-                    </div>
-              }
-                  <Suspense fallback={<div>Loading...</div>}>
-                      <SeatingLayout
-                  seatingPositions={seatingPositions}
-                  onGenerateSeating={handleGenerateSeating}
-                  seatsPerRowByRow={_seatsPerRowByRow}
-                  onSeatsPerRowByRowChange={setSeatsPerRowByRowGuarded}
-                  seatsPerRow={seatsPerRow}
-                  onSeatsPerRowChange={setSeatsPerRowGuarded}
-                  seatingRows={seatingRows}
-                  onSeatingRowsChange={setSeatingRowsGuarded}
-                  seatSpacing={seatSpacing}
-                  onSeatSpacingChange={setSeatSpacingGuarded}
-                  rowSpacingM={_rowSpacingM || 1.8}
-                  onRowSpacingChange={(val) => {
-                    // Hard guard: only accept finite numbers
-                    const next = Number(val);
-                    if (!Number.isFinite(next)) return;
-
-                    // Use guarded setter (respects frozen state)
-                    if (typeof setRowSpacingGuarded === 'function') {
-                      setRowSpacingGuarded(next);
-                    }
-                  }}
-                  seatingBlockOffset={_seatingBlockOffset}
-                  onSeatingBlockOffsetChange={setSeatingBlockOffsetGuarded}
-                  mlpBasis={seatingArrangementBasis}
-                  onMlpBasisChange={setSeatingArrangementBasis}
-                  onSetSeatingPositions={appState?.setSeatingPositions}
-                  disabled={isFrozen('seating')}
-                  screen={_screen}
-                  dimensions={stableDimensions}
-                  shiftSeatsToMaintainAngle={visualisationRef.current?.shiftSeatsToMaintainAngle}
-                  showMlpRuler={showMlpRuler}
-                  onShowMlpRulerChange={setShowMlpRuler}
-                  rowEarHeights={appState?.rowEarHeights || []}
-                  onRowEarHeightsChange={appState?.setRowEarHeights} />
-
-                  </Suspense>
-              </CollapsiblePanel>
-
-              <div className="mb-6">
-                <CollapsiblePanel
-                title="Speakers"
-                icon={<Speaker className="w-5 h-5" />}
-                defaultOpen={false}>
-
-                  {isFrozen('speakers') &&
-              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-                      This tab is frozen. Unlock to make changes.
-                    </div>
-              }
-                  
-
-
-                  <Suspense fallback={<div>Loading...</div>}>
-                      <SpeakerPlacement disabled={isFrozen('speakers')}
-                dimensions={stableDimensions}
-                sevenBedLayoutType={_sevenBedLayoutType}
-                onSevenBedLayoutTypeChange={setSevenBedLayoutType}
-                dolbyPreset={dolbyPreset}
-                onDolbyPresetChange={setDolbyPreset}
-                lcrAimMode={lcrAimMode}
-                onChangeLcrAimMode={setLcrAimMode}
-                lcrAngleDeg={lcrAngleDeg}
-
-                overheadGlobalModel={overheadGlobalModelFromState}
-                setOverheadGlobalModel={setOverheadGlobalModelFromState}
-                overheadFrontOverride={overheadFrontOverrideFromState}
-                setOverheadFrontOverride={setOverheadFrontOverrideFromState}
-                overheadMidOverride={overheadMidOverrideFromState}
-                setOverheadMidOverride={setOverheadMidOverrideFromState}
-                overheadRearOverride={overheadRearOverrideFromState}
-                setOverheadRearOverride={setOverheadRearOverrideFromState}
-                useFrontGlobal={useFrontGlobalFromState}
-                setUseFrontGlobal={setUseFrontGlobalFromState}
-                useMidGlobal={useMidGlobalFromState}
-                setUseMidGlobal={setUseMidGlobalFromState}
-                useRearGlobal={useRearGlobalFromState}
-                setUseRearGlobal={setUseRearGlobalFromState}
-
-                globalSurroundModel={appState?.globalSurroundModel}
-                setGlobalSurroundModel={appState?.setGlobalSurroundModel}
-
-                allSeatSplMetrics={allSeatSplMetrics}
-                updateGlobalSpl={updateGlobalSplWithProjectSync}
-                frontWideOverlay={frontWideZones}
-                allowExtraSurrounds={isNineBedLayout}
-                extraSurroundCount={isNineBedLayout ? (appState?.extraSurroundCount ?? 0) : 0}
-                onExtraSurroundCountChange={isNineBedLayout ? appState?.setExtraSurroundCount : undefined}
-                onP12Update={undefined} />
-
-                 </Suspense>
-                  
-                  <div className="px-4 py-3 border-t border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-sm font-medium text-gray-700">Speaker Positions</div>
-                      <select
-                    value={speakerPositionsView}
-                    onChange={(e) => setSpeakerPositionsView(e.target.value)}
-                    className="text-xs px-2 py-1 border border-gray-300 rounded">
-
-                        <option value="off">Off</option>
-                        <option value="plan">Plan</option>
-                        <option value="table">Table</option>
-                        <option value="both">Both</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <SpeakerPositionsReadout
-                placedSpeakers={placedSpeakers}
-                seatingPositions={_seatingPositions}
-                roomWidth={stableDimensions.width}
-                roomLength={stableDimensions.length}
-                screenFrontPlaneM={appState?.screenFrontPlaneM}
-                view={speakerPositionsView} />
-
-                </CollapsiblePanel>
-              </div>
-              
-              <CollapsiblePanel
-              title="Bass Simulation"
-              icon={<Waves className="w-5 h-5" />}
-              defaultOpen={false}>
-
-                  {isFrozen('bass') &&
-              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-                      This tab is frozen. Unlock to make changes.
-                    </div>
-              }
-                  <Suspense fallback={<div>Loading...</div>}>
-                      <BassResponse disabled={isFrozen('bass')}
-                frontSubsCfg={frontSubsCfg}
-                setFrontSubsCfg={setFrontSubsCfg}
-                rearSubsCfg={rearSubsCfg}
-                setRearSubsCfg={setRearSubsCfg}
-                subWarnings={subWarnings}
-                frontSubsLive={frontSubsForRendering}
-                rearSubsLive={rearSubsForRendering} />
-
-                  </Suspense>
-              </CollapsiblePanel>
-              
-              <CollapsiblePanel
-              title="Compliance Report"
-              icon={<FileText className="w-5 h-5" />}
-              defaultOpen={false}>
-
-                  {isFrozen('report') &&
-              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-                      This tab is frozen. Unlock to make changes.
-                    </div>
-              }
-                  <Suspense fallback={<div>Loading...</div>}>
-                      <RP22CompliancePanel 
-                        analysisResult={analysisResult} 
-                        screen={_screen}
-                        seatingPositions={_seatingPositions}
-                        seatHudSnapshots={
-                          (appState?.seatSnapshotBySeatId && Object.keys(appState.seatSnapshotBySeatId).length > 0)
-                            ? appState.seatSnapshotBySeatId
-                            : ((appState?.seatMetricsById && Object.keys(appState.seatMetricsById).length > 0)
-                                ? appState.seatMetricsById
-                                : {})
-                        }
-                        roomHudSnapshot={appState?.roomHudSnapshot || analysisResult?.roomHudSnapshot || null}
-                        mlpSeatId={"mlp"}
-                        dolbyLayout={appState?.dolbyLayout}
-                        frontSubsCount={appState?.frontSubsCfg?.count}
-                        rearSubsCount={appState?.rearSubsCfg?.count}
-                        p15ConstructionLevel={appState?.p15ConstructionLevel}
-                        p21EarlyReflectionPreset={appState?.p21EarlyReflectionPreset}
-                        freeMoveLcr={freeMoveLcr} />
-                  </Suspense>
-              </CollapsiblePanel>
-              
-              <CollapsiblePanel
-              title="Options"
-              icon={<Box className="w-5 h-5" />}
-              defaultOpen={false}>
-                  <OptionsPanel
-                    showPrices={showPrices}
-                    setShowPrices={setShowPrices}
-                    difficultyMultiplier={difficultyMultiplier}
-                    setDifficultyMultiplier={setDifficultyMultiplier}
-                    priceData={priceData}
-                    placedSpeakers={placedSpeakers}
-                    frontSubsCfg={_frontSubsCfg}
-                    rearSubsCfg={_rearSubsCfg}
-                  />
-              </CollapsiblePanel>
-          </div>
-        </aside>
-          </>
+          <RoomDesignerControlsPanel
+            appState={appState}
+            isFrozen={isFrozen}
+            _roomDims={_roomDims}
+            _setRoomDims={_setRoomDims}
+            roomElements={roomElements}
+            setRoomElementsGuarded={setRoomElementsGuarded}
+            stableDimensions={stableDimensions}
+            _screen={_screen}
+            setScreenGuarded={setScreenGuarded}
+            seatingPositions={seatingPositions}
+            dolbyPreset={dolbyPreset}
+            handleGenerateSeating={handleGenerateSeating}
+            _seatsPerRowByRow={_seatsPerRowByRow}
+            setSeatsPerRowByRowGuarded={setSeatsPerRowByRowGuarded}
+            seatsPerRow={seatsPerRow}
+            setSeatsPerRowGuarded={setSeatsPerRowGuarded}
+            seatingRows={seatingRows}
+            setSeatingRowsGuarded={setSeatingRowsGuarded}
+            seatSpacing={seatSpacing}
+            setSeatSpacingGuarded={setSeatSpacingGuarded}
+            _rowSpacingM={_rowSpacingM}
+            setRowSpacingGuarded={setRowSpacingGuarded}
+            _seatingBlockOffset={_seatingBlockOffset}
+            setSeatingBlockOffsetGuarded={setSeatingBlockOffsetGuarded}
+            seatingArrangementBasis={seatingArrangementBasis}
+            setSeatingArrangementBasis={setSeatingArrangementBasis}
+            visualisationRef={visualisationRef}
+            showMlpRuler={showMlpRuler}
+            setShowMlpRuler={setShowMlpRuler}
+            _sevenBedLayoutType={_sevenBedLayoutType}
+            setSevenBedLayoutType={setSevenBedLayoutType}
+            setDolbyPreset={setDolbyPreset}
+            lcrAimMode={lcrAimMode}
+            setLcrAimMode={setLcrAimMode}
+            lcrAngleDeg={lcrAngleDeg}
+            overheadGlobalModelFromState={overheadGlobalModelFromState}
+            setOverheadGlobalModelFromState={setOverheadGlobalModelFromState}
+            overheadFrontOverrideFromState={overheadFrontOverrideFromState}
+            setOverheadFrontOverrideFromState={setOverheadFrontOverrideFromState}
+            overheadMidOverrideFromState={overheadMidOverrideFromState}
+            setOverheadMidOverrideFromState={setOverheadMidOverrideFromState}
+            overheadRearOverrideFromState={overheadRearOverrideFromState}
+            setOverheadRearOverrideFromState={setOverheadRearOverrideFromState}
+            useFrontGlobalFromState={useFrontGlobalFromState}
+            setUseFrontGlobalFromState={setUseFrontGlobalFromState}
+            useMidGlobalFromState={useMidGlobalFromState}
+            setUseMidGlobalFromState={setUseMidGlobalFromState}
+            useRearGlobalFromState={useRearGlobalFromState}
+            setUseRearGlobalFromState={setUseRearGlobalFromState}
+            allSeatSplMetrics={allSeatSplMetrics}
+            updateGlobalSplWithProjectSync={updateGlobalSplWithProjectSync}
+            frontWideZones={frontWideZones}
+            isNineBedLayout={isNineBedLayout}
+            speakerPositionsView={speakerPositionsView}
+            setSpeakerPositionsView={setSpeakerPositionsView}
+            placedSpeakers={placedSpeakers}
+            _seatingPositions={_seatingPositions}
+            frontSubsCfg={frontSubsCfg}
+            setFrontSubsCfg={setFrontSubsCfg}
+            rearSubsCfg={rearSubsCfg}
+            setRearSubsCfg={setRearSubsCfg}
+            subWarnings={subWarnings}
+            frontSubsForRendering={frontSubsForRendering}
+            rearSubsForRendering={rearSubsForRendering}
+            analysisResult={analysisResult}
+            freeMoveLcr={freeMoveLcr}
+            showPrices={showPrices}
+            setShowPrices={setShowPrices}
+            difficultyMultiplier={difficultyMultiplier}
+            setDifficultyMultiplier={setDifficultyMultiplier}
+            priceData={priceData}
+            _frontSubsCfg={_frontSubsCfg}
+            _rearSubsCfg={_rearSubsCfg}
+          />
         )}
       />
     </div>
