@@ -376,7 +376,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   }, [splConfig?.lcrW, updateGlobalSpl]);
 
   const updatePlacedLcrHeight = useCallback((heightM) => {
-    const rolesToUpdate = new Set(['FL', 'FC', 'FR']);
+    const rolesToUpdate = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
 
     if (rolesToUpdate.size === 0) return;
 

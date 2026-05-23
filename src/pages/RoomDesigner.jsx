@@ -1104,9 +1104,10 @@ function RoomDesignerWithState() {
       const finalCentreY = willStayAtActual ? actualCentreY : wallY;
       if (finalCentreY + halfExtentM > maxFrontExtentY) maxFrontExtentY = finalCentreY + halfExtentM;
       if (willStayAtActual) return spk;
-      if (Math.abs((spk.position?.y ?? 0) - wallY) > 0.001 || Math.abs((spk.position?.z ?? 1.2) - 1.2) > 0.001) {
+      const lcrTargetZ = Number.isFinite(appState?.splConfig?.lcrHeightM) ? appState.splConfig.lcrHeightM : 1.2;
+      if (Math.abs((spk.position?.y ?? 0) - wallY) > 0.001 || Math.abs((spk.position?.z ?? lcrTargetZ) - lcrTargetZ) > 0.001) {
         needsUpdate = true;
-        return { ...spk, position: { ...spk.position, y: wallY, z: 1.2 } };
+        return { ...spk, position: { ...spk.position, y: wallY, z: lcrTargetZ } };
       }
       return spk;
     });
@@ -1124,7 +1125,7 @@ function RoomDesignerWithState() {
         if ((Number(_screen?.speakerClearanceM) || 0) < req) _setScreen(prev => ({ ...prev, speakerClearanceM: req }));
       }
     }
-  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective, _screen, _setScreen]);
+  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective, _screen, _setScreen, appState?.splConfig?.lcrHeightM]);
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
