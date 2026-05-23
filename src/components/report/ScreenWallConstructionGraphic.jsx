@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { Q43FaceIcon } from '@/components/report/SpeakerFaceIcons';
 
 const HEADING_FONT = '"Futura PT Light", "Century Gothic", sans-serif';
 const BODY_FONT = '"Didact Gothic", "Century Gothic", sans-serif';
@@ -153,80 +154,6 @@ function DimLine({ x1, y1, x2, y2, text, offset = 0, vertical = false, textOffse
   );
 }
 
-export function Q43FaceIcon({ x, y, width, height }) {
-  const outerInset = width * 0.008;
-  const innerInsetX = width * 0.055;
-  const innerInsetY = height * 0.07;
-  const baffleInsetX = width * 0.285;
-  const baffleInsetY = height * 0.11;
-  const baffleW = width - baffleInsetX * 2;
-  const baffleH = height - baffleInsetY * 2;
-  const centerX = x + width / 2;
-  const topY = y + baffleInsetY;
-  const bottomY = topY + baffleH;
-  const upperMidY = y + height * 0.33;
-  const lowerMidY = y + height * 0.67;
-  const driverHalfW = width * 0.11;
-  const driverHalfH = height * 0.15;
-  const nodeSize = Math.min(width, height) * 0.02;
-  const flareInset = width * 0.12;
-
-  const upperTop = upperMidY - driverHalfH;
-  const upperBottom = upperMidY + driverHalfH;
-  const lowerTop = lowerMidY - driverHalfH;
-  const lowerBottom = lowerMidY + driverHalfH;
-
-  return (
-    <g>
-      <rect
-        x={x + outerInset}
-        y={y + outerInset}
-        width={width - outerInset * 2}
-        height={height - outerInset * 2}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.9"
-      />
-      <rect
-        x={x + innerInsetX}
-        y={y + innerInsetY}
-        width={width - innerInsetX * 2}
-        height={height - innerInsetY * 2}
-        rx={Math.min(width, height) * 0.06}
-        ry={Math.min(width, height) * 0.06}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.8"
-      />
-      <rect
-        x={x + baffleInsetX}
-        y={y + baffleInsetY}
-        width={baffleW}
-        height={baffleH}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.8"
-      />
-
-      <line x1={centerX} y1={topY} x2={centerX} y2={bottomY} stroke={COLORS.speaker} strokeWidth="0.7" />
-
-      <line x1={x + baffleInsetX} y1={topY} x2={x + flareInset} y2={y + innerInsetY + 1} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={x + baffleInsetX + baffleW} y1={topY} x2={x + width - flareInset} y2={y + innerInsetY + 1} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={x + baffleInsetX} y1={bottomY} x2={x + flareInset} y2={y + height - innerInsetY - 1} stroke={COLORS.speaker} strokeWidth="0.7" />
-      <line x1={x + baffleInsetX + baffleW} y1={bottomY} x2={x + width - flareInset} y2={y + height - innerInsetY - 1} stroke={COLORS.speaker} strokeWidth="0.7" />
-
-      <path d={`M ${centerX} ${upperTop} C ${centerX + driverHalfW * 0.95} ${upperTop + driverHalfH * 0.34}, ${centerX + driverHalfW * 1.08} ${upperBottom - driverHalfH * 0.34}, ${centerX} ${upperBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <path d={`M ${centerX} ${upperTop} C ${centerX - driverHalfW * 0.95} ${upperTop + driverHalfH * 0.34}, ${centerX - driverHalfW * 1.08} ${upperBottom - driverHalfH * 0.34}, ${centerX} ${upperBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <path d={`M ${centerX} ${lowerTop} C ${centerX + driverHalfW * 0.95} ${lowerTop + driverHalfH * 0.34}, ${centerX + driverHalfW * 1.08} ${lowerBottom - driverHalfH * 0.34}, ${centerX} ${lowerBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-      <path d={`M ${centerX} ${lowerTop} C ${centerX - driverHalfW * 0.95} ${lowerTop + driverHalfH * 0.34}, ${centerX - driverHalfW * 1.08} ${lowerBottom - driverHalfH * 0.34}, ${centerX} ${lowerBottom}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
-
-      <rect x={centerX - nodeSize} y={topY + nodeSize * 0.2} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-      <rect x={centerX - nodeSize} y={upperBottom - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-      <rect x={centerX - nodeSize} y={lowerBottom - nodeSize} width={nodeSize * 2} height={nodeSize * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.7" />
-    </g>
-  );
-}
-
 export function Q45FaceIcon({ x, y, width, height }) {
   const outerInset = width * 0.008;
   const innerInsetX = width * 0.04;
@@ -263,26 +190,8 @@ export function Q45FaceIcon({ x, y, width, height }) {
 
   return (
     <g>
-      <rect
-        x={x + outerInset}
-        y={y + outerInset}
-        width={width - outerInset * 2}
-        height={height - outerInset * 2}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.9"
-      />
-      <rect
-        x={x + innerInsetX}
-        y={y + innerInsetY}
-        width={width - innerInsetX * 2}
-        height={height - innerInsetY * 2}
-        rx={Math.min(width, height) * 0.05}
-        ry={Math.min(width, height) * 0.05}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.8"
-      />
+      <rect x={x + outerInset} y={y + outerInset} width={width - outerInset * 2} height={height - outerInset * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
+      <rect x={x + innerInsetX} y={y + innerInsetY} width={width - innerInsetX * 2} height={height - innerInsetY * 2} rx={Math.min(width, height) * 0.05} ry={Math.min(width, height) * 0.05} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
 
       <rect x={topBoxX} y={topBoxY} width={topBoxW} height={topBoxH} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
       <line x1={centerX} y1={topBoxY} x2={centerX} y2={topBoxY + topBoxH} stroke={COLORS.speaker} strokeWidth="0.7" />
@@ -342,26 +251,8 @@ export function Q85FaceIcon({ x, y, width, height }) {
 
   return (
     <g>
-      <rect
-        x={x + outerInset}
-        y={y + outerInset}
-        width={width - outerInset * 2}
-        height={height - outerInset * 2}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.9"
-      />
-      <rect
-        x={x + innerInsetX}
-        y={y + innerInsetY}
-        width={width - innerInsetX * 2}
-        height={height - innerInsetY * 2}
-        rx={Math.min(width, height) * 0.04}
-        ry={Math.min(width, height) * 0.04}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.8"
-      />
+      <rect x={x + outerInset} y={y + outerInset} width={width - outerInset * 2} height={height - outerInset * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
+      <rect x={x + innerInsetX} y={y + innerInsetY} width={width - innerInsetX * 2} height={height - innerInsetY * 2} rx={Math.min(width, height) * 0.04} ry={Math.min(width, height) * 0.04} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
 
       <line x1={x + innerInsetX} y1={y + innerInsetY} x2={x + width * 0.34} y2={y + height * 0.05} stroke={COLORS.speaker} strokeWidth="0.6" />
       <path d={`M ${x + width * 0.34} ${y + height * 0.05} Q ${x + width * 0.37} ${y + height * 0.06} ${topBoxX} ${topBoxTop}`} fill="none" stroke={COLORS.speaker} strokeWidth="0.6" />
@@ -427,8 +318,6 @@ export function Q63FaceIcon({ x, y, size }) {
   const driverHalfH = size * 0.105;
   const nodeSize = size * 0.016;
 
-  const upperLeft = centerX - driverHalfW;
-  const upperRight = centerX + driverHalfW;
   const upperTop = upperMidY - driverHalfH;
   const upperBottom = upperMidY + driverHalfH;
   const lowerTop = lowerMidY - driverHalfH;
@@ -436,37 +325,9 @@ export function Q63FaceIcon({ x, y, size }) {
 
   return (
     <g>
-      <rect
-        x={x + outerInset}
-        y={y + outerInset}
-        width={size - outerInset * 2}
-        height={size - outerInset * 2}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.9"
-      />
-      <rect
-        x={x + innerInset}
-        y={y + innerInset}
-        width={size - innerInset * 2}
-        height={size - innerInset * 2}
-        rx={size * 0.055}
-        ry={size * 0.055}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.8"
-      />
-      <rect
-        x={x + baffleInsetX}
-        y={y + baffleInsetY}
-        width={baffleW}
-        height={baffleH}
-        rx={size * 0.01}
-        ry={size * 0.01}
-        fill="none"
-        stroke={COLORS.speaker}
-        strokeWidth="0.8"
-      />
+      <rect x={x + outerInset} y={y + outerInset} width={size - outerInset * 2} height={size - outerInset * 2} fill="none" stroke={COLORS.speaker} strokeWidth="0.9" />
+      <rect x={x + innerInset} y={y + innerInset} width={size - innerInset * 2} height={size - innerInset * 2} rx={size * 0.055} ry={size * 0.055} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
+      <rect x={x + baffleInsetX} y={y + baffleInsetY} width={baffleW} height={baffleH} rx={size * 0.01} ry={size * 0.01} fill="none" stroke={COLORS.speaker} strokeWidth="0.8" />
 
       <line x1={centerX} y1={topY} x2={centerX} y2={bottomY} stroke={COLORS.speaker} strokeWidth="0.7" />
 
@@ -853,9 +714,8 @@ export default function ScreenWallConstructionGraphic({
             const y = mapY(bottomM) - h;
             const x = mapX(item.xM) - w / 2;
             const clipId = `sub-clip-${idx}`;
-            // 4 lines stacked: model, W, H, D — centred vertically
             const lineHeight = 8;
-            const totalTextH = 7 + lineHeight * 3; // model line + 3 dim lines
+            const totalTextH = 7 + lineHeight * 3;
             const textStartY = y + h / 2 - totalTextH / 2 + 5;
             return (
               <g key={`${item.label}-${item.xM}-${item.zM}`}>

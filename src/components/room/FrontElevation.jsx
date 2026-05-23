@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon } from "@/components/report/ScreenWallConstructionGraphic";
+import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon } from "@/components/report/SpeakerFaceIcons";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -142,17 +142,32 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isQ45 = mk.includes("q4-5");
     const isQ85 = mk.includes("q8-5");
     const isQ63 = mk.includes("q6-3");
-    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63;
+    const isEv11 = mk.includes("evolve-1-1");
+    const isEv21 = !isEv11 && mk.includes("evolve-2-1");
+    const isEv31 = !isEv11 && mk.includes("evolve-3-1");
+    const isEv42 = mk.includes("evolve-4-2");
+    const isEv63 = !isEv31 && mk.includes("evolve-6-3");
+    const isEv84 = mk.includes("evolve-8-4");
+    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84;
+
+    const renderFaceIcon = () => {
+      if (isQ43) return <Q43FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isQ45) return <Q45FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isQ85) return <Q85FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isQ63) return <Q63FaceIcon x={sx} y={sy} size={Math.min(sw, sh)} />;
+      if (isEv11) return <Evolve11FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isEv21) return <Evolve21FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isEv31) return <Evolve31FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isEv42) return <Evolve42FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isEv63) return <Evolve63FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isEv84) return <Evolve84FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      return null;
+    };
 
     return (
       <g key={key}>
         {/* Body */}
-        {hasFaceIcon ? (
-          isQ43 ? <Q43FaceIcon x={sx} y={sy} width={sw} height={sh} /> :
-          isQ45 ? <Q45FaceIcon x={sx} y={sy} width={sw} height={sh} /> :
-          isQ85 ? <Q85FaceIcon x={sx} y={sy} width={sw} height={sh} /> :
-          <Q63FaceIcon x={sx} y={sy} size={Math.min(sw, sh)} />
-        ) : isRound ? (
+        {hasFaceIcon ? renderFaceIcon() : isRound ? (
           <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
         ) : (
           <rect x={sx} y={sy} width={sw} height={sh} fill={fill} stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
