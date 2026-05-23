@@ -29,14 +29,14 @@ function screenDimsM(screen) {
   return { w: wM, h: wM / ar };
 }
 
-export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [] }) {
+export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], roomElements = [] }) {
   const roomW = Number(dimensions?.widthM ?? dimensions?.width) || 4.5;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
 
-  const SVG_W = 600;
+  const SVG_W = 640;
   const PADDING = 36;
-  const LABEL_TOP = 20; // space above for room width label
-  const LABEL_LEFT = 32; // space left for room height label
+  const LABEL_TOP = 24;
+  const LABEL_LEFT = 36;
   const drawW = SVG_W - PADDING * 2 - LABEL_LEFT;
   const drawH = Math.round(drawW * (roomH / roomW));
   const SVG_H = drawH + PADDING * 2 + LABEL_TOP;
@@ -86,16 +86,33 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     });
   }, [frontSubs, roomW]);
 
-  // Artcoustic colour palette matching plan view
-  const ROOM_FILL = "#F8F8F7";
-  const ROOM_STROKE = "#213428";
+  // Projector element from roomElements
+  const projectorEl = useMemo(() => {
+    if (!Array.isArray(roomElements)) return null;
+    return roomElements.find(el => el?.type === 'projector') || null;
+  }, [roomElements]);
+
+  // Riser element from roomElements
+  const riserEl = useMemo(() => {
+    if (!Array.isArray(roomElements)) return null;
+    return roomElements.find(el => el?.type === 'riser') || null;
+  }, [roomElements]);
+
+  // Engineering drawing palette — premium technical style
+  const ROOM_FILL = "#F4F3F0";
+  const ROOM_STROKE = "#B0AEA8";  // lighter grey, less dominant
   const SCREEN_FILL = "#2C2C2C";
   const SCREEN_STROKE = "#1a1a1a";
   const SPEAKER_FILL = "#213428";
-  const SPEAKER_STROKE = "#213428";
-  const SUB_FILL = "#625143";
-  const LABEL_COLOR = "#625143";
-  const DIM_COLOR = "#888";
+  const SPEAKER_STROKE = "#152420";
+  const SUB_FILL = "#4A3B30";      // darker than before for contrast
+  const SUB_STROKE = "#2E241D";
+  const FLOOR_COLOR = "#8C8880";   // construction floor line
+  const LABEL_COLOR = "#4A4540";
+  const DIM_COLOR = "#9B9890";
+  const PROJ_FILL = "#3E4349";
+  const RISER_FILL = "rgba(180,170,160,0.18)";
+  const RISER_STROKE = "#9B9890";
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8F8F7", padding: 16 }}>
@@ -110,7 +127,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           FRONT ELEVATION
         </text>
 
-        {/* Room rectangle */}
+        {/* Room rectangle — lighter stroke, thinner */}
         <rect
           x={offsetX}
           y={offsetY}
@@ -118,18 +135,32 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           height={drawH}
           fill={ROOM_FILL}
           stroke={ROOM_STROKE}
-          strokeWidth={1.5}
+          strokeWidth={0.8}
         />
 
-        {/* Floor line (heavy) */}
+        {/* Floor construction line */}
         <line
-          x1={offsetX}
+          x1={offsetX - 6}
           y1={offsetY + drawH}
-          x2={offsetX + drawW}
+          x2={offsetX + drawW + 6}
           y2={offsetY + drawH}
-          stroke={ROOM_STROKE}
-          strokeWidth={3}
+          stroke={FLOOR_COLOR}
+          strokeWidth={2}
+          strokeLinecap="square"
         />
+        {/* Floor hatch marks (engineering convention) */}
+        {Array.from({ length: Math.floor(drawW / 14) + 1 }, (_, i) => (
+          <line
+            key={`hatch-${i}`}
+            x1={offsetX + i * 14}
+            y1={offsetY + drawH}
+            x2={offsetX + i * 14 - 6}
+            y2={offsetY + drawH + 7}
+            stroke={FLOOR_COLOR}
+            strokeWidth={0.7}
+            opacity={0.55}
+          />
+        ))}
 
         {/* Dimension: room width */}
         <line x1={offsetX} y1={offsetY - 10} x2={offsetX + drawW} y2={offsetY - 10} stroke={DIM_COLOR} strokeWidth={0.8} />
@@ -191,39 +222,94 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           );
         })()}
 
+        {/* Riser outline if element exists */}
+        {riserEl && (() => {
+          const rW_m = Number(riserEl.length_m) || Number(riserEl.width) || roomW * 0.6;
+          const rH_m = Number(riserEl.height_m) || 0.20;
+          const rX_m = Number(riserEl.pos_m) || (roomW / 2 - rW_m / 2);
+          const rPx_w = (rW_m / roomW) * drawW;
+          const rPx_h = (rH_m / roomH) * drawH;
+          return (
+            <g opacity={0.9}>
+              <rect
+                x={rx(rX_m)}
+                y={ry(rH_m)}
+                width={rPx_w}
+                height={rPx_h}
+                fill={RISER_FILL}
+                stroke={RISER_STROKE}
+                strokeWidth={0.8}
+                strokeDasharray="3 2"
+              />
+              <text x={rx(rX_m + rW_m / 2)} y={ry(rH_m) - 3} textAnchor="middle" fontSize={7} fill={DIM_COLOR} letterSpacing="0.05em">
+                RISER
+              </text>
+            </g>
+          );
+        })()}
+
         {/* LCR Speakers — position.z is acoustic centre height */}
         {lcrSpeakers.map((spk) => {
-          const sw = Math.max(4, (spk.wM / roomW) * drawW);
-          const sh = Math.max(4, (spk.hM / roomH) * drawH);
+          // Boost rendered size slightly for visibility (min 10px wide)
+          const sw = Math.max(10, (spk.wM / roomW) * drawW * 1.15);
+          const sh = Math.max(10, (spk.hM / roomH) * drawH * 1.15);
           const sx = rx(spk.x) - sw / 2;
-          // ry converts room-metres to SVG y; spk.z is centre, so offset by half height
           const sy = ry(spk.z) - sh / 2;
           return (
             <g key={spk.role}>
-              <rect x={sx} y={sy} width={sw} height={sh} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1} rx={1} opacity={0.85} />
-              <text x={rx(spk.x)} y={sy - 3} textAnchor="middle" fontSize={8} fill={LABEL_COLOR} fontWeight={600}>
+              <rect x={sx} y={sy} width={sw} height={sh} fill={SPEAKER_FILL} stroke={SPEAKER_STROKE} strokeWidth={1.2} rx={2} opacity={0.90} />
+              {/* Subtle centre dot */}
+              <circle cx={rx(spk.x)} cy={ry(spk.z)} r={1.5} fill="rgba(255,255,255,0.5)" />
+              <text x={rx(spk.x)} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
                 {spk.label}
+              </text>
+              <text x={rx(spk.x)} y={ry(spk.z - spk.hM * 0.5) + 18} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
+                z={spk.z.toFixed(2)}m
               </text>
             </g>
           );
-        })}
+        })()}
 
         {/* Front subwoofers — position.z is cabinet centre height */}
         {subItems.map((sub, i) => {
-          const sw = Math.max(4, (sub.wM / roomW) * drawW);
-          const sh = Math.max(4, (sub.hM / roomH) * drawH);
+          const sw = Math.max(10, (sub.wM / roomW) * drawW * 1.1);
+          const sh = Math.max(10, (sub.hM / roomH) * drawH * 1.1);
           const sx = rx(sub.x) - sw / 2;
-          // ry converts room-metres to SVG y; sub.z is centre, so offset by half height
           const sy = ry(sub.z) - sh / 2;
           return (
             <g key={`sub-${i}`}>
-              <rect x={sx} y={sy} width={sw} height={sh} fill={SUB_FILL} stroke={SUB_FILL} strokeWidth={1} rx={1} opacity={0.85} />
-              <text x={rx(sub.x)} y={sy - 3} textAnchor="middle" fontSize={8} fill={LABEL_COLOR}>
+              <rect x={sx} y={sy} width={sw} height={sh} fill={SUB_FILL} stroke={SUB_STROKE} strokeWidth={1.2} rx={2} opacity={0.92} />
+              <text x={rx(sub.x)} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
                 {sub.label}
+              </text>
+              <text x={rx(sub.x)} y={sy + sh + 11} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
+                z={sub.z.toFixed(2)}m
               </text>
             </g>
           );
-        })}
+        })()}
+
+        {/* Projector element if present */}
+        {projectorEl && (() => {
+          const pX_m = Number.isFinite(Number(projectorEl.x_lens_m)) ? Number(projectorEl.x_lens_m) : (roomW / 2);
+          const pZ_m = Number.isFinite(Number(projectorEl.z_lens_m)) ? Number(projectorEl.z_lens_m) : (roomH - 0.3);
+          const pW_m = Number(projectorEl.body_width_m) || 0.35;
+          const pD_m = Number(projectorEl.body_depth_m) || 0.25;
+          const pW_px = Math.max(16, (pW_m / roomW) * drawW);
+          const pD_px = Math.max(10, (pD_m / roomH) * drawH);
+          const pX_px = rx(pX_m) - pW_px / 2;
+          const pY_px = ry(pZ_m) - pD_px / 2;
+          return (
+            <g opacity={0.88}>
+              <rect x={pX_px} y={pY_px} width={pW_px} height={pD_px} fill={PROJ_FILL} stroke="#222" strokeWidth={1} rx={2} />
+              {/* Lens circle */}
+              <circle cx={rx(pX_m)} cy={ry(pZ_m)} r={Math.max(3, pD_px * 0.28)} fill="#888" stroke="#555" strokeWidth={0.8} />
+              <text x={rx(pX_m)} y={pY_px - 4} textAnchor="middle" fontSize={8} fill={DIM_COLOR} letterSpacing="0.05em">
+                PROJ
+              </text>
+            </g>
+          );
+        })()}
 
         {/* Empty state hint */}
         {lcrSpeakers.length === 0 && frontSubs.length === 0 && (
