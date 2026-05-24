@@ -360,20 +360,42 @@ export default function SideElevation({
             );
           })()}
 
-          {/* Speaker height markers */}
-          {speakerMarkers.map((spk, i) => (
-            <g key={`spk-${i}`} opacity={0.55}>
-              <line
-                x1={rx(spk.y) - 5} y1={rz(spk.z)}
-                x2={rx(spk.y) + 5} y2={rz(spk.z)}
-                stroke={SPK_COLOR} strokeWidth={1.2} />
-              <text
-                x={rx(spk.y) - 7} y={rz(spk.z) - 2}
-                textAnchor="end" fontSize={6.5} fill={SPK_COLOR} fontWeight={500}>
-                {spk.role}
-              </text>
-            </g>
-          ))}
+          {/* Speaker height markers (non-LCR surrounds/wides) */}
+          {speakerMarkers.map((spk, i) => {
+            // Skip LCR roles — they are rendered separately above
+            const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+            if (lcrRoles.has(String(spk.role || '').toUpperCase())) return null;
+
+            const rectW = 12;  // ~10–14 px wide
+            const rectH = 20;  // ~18–24 px tall
+            const spkX = rx(spk.y);
+            const spkZ = rz(spk.z);
+
+            return (
+              <g key={`spk-${i}`} opacity={0.75}>
+                {/* Speaker rectangle */}
+                <rect
+                  x={spkX - rectW / 2}
+                  y={spkZ - rectH / 2}
+                  width={rectW}
+                  height={rectH}
+                  fill={SPK_COLOR}
+                  stroke={SPK_COLOR}
+                  strokeWidth={1}
+                  rx={2} />
+                {/* Role label above */}
+                <text
+                  x={spkX}
+                  y={spkZ - rectH / 2 - 4}
+                  textAnchor="middle"
+                  fontSize={6}
+                  fill={SPK_COLOR}
+                  fontWeight={500}>
+                  {spk.role}
+                </text>
+              </g>
+            );
+          })}
 
           {/* Projector */}
           {projectorEl && (() => {
