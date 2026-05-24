@@ -1,11 +1,10 @@
 // SeatPersonIcon.jsx
-// Premium architectural CAD silhouette — Side Elevation only.
+// Simple cinema seat icon + round head — Side Elevation only.
 //
-// cx / cy  = SVG pixel coordinates of the listener EAR/HEAD CENTRE.
-//            This is the immovable geometric anchor. Everything derives from it.
-// scale    = px per metre (drawH / roomHeightM from SideElevation).
-// All vertical geometry radiates DOWNWARD from cy.
-// Person faces LEFT (toward screen in SVG space).
+// cx / cy  = SVG pixel coordinates of the listener HEAD CENTRE (immovable anchor).
+// scale    = px per metre (drawH / roomHeightM).
+// earHeightM, platformHeightM = vertical positioning (unchanged from original).
+// All geometry anchors to cy (ear position).
 
 import React from "react";
 
@@ -14,10 +13,10 @@ const SECONDARY = "#625143";
 const NEUTRAL   = "#DCDBD6";
 const BG        = "#F8F8F7";
 
-// ── One consistent stroke weight throughout ───────────────────────────────────
+// Single consistent stroke weight
 const SW = 1.1;
 
-// Shared SVG presentation (applied to every path / circle)
+// SVG shared props
 const PS = { strokeLinecap: "round", strokeLinejoin: "round" };
 
 export default function SeatPersonIcon({
@@ -34,160 +33,120 @@ export default function SeatPersonIcon({
 
   const p   = (m) => m * scale;
   const str = isRsp ? PRIMARY : SECONDARY;
+  const fil = isRsp ? "rgba(33,52,40,0.08)" : "rgba(98,81,67,0.12)";
 
-  // Fills: chair body gets visual mass, person silhouette slightly lighter
-  const chairFill  = isRsp ? "rgba(33,52,40,0.10)"  : "rgba(98,81,67,0.09)";
-  const bodyFill   = isRsp ? "rgba(33,52,40,0.22)"  : "rgba(98,81,67,0.19)";
-
-  // Ear-to-floor/platform height → controls vertical grounding
+  // Vertical grounding
   const earToBaseM = Math.max(0.4, (earHeightM || 1.10) - (platformHeightM || 0));
+  const baseY      = cy + p(earToBaseM);
 
-  // ── Head radius — clamped for small/large scale legibility ───────────────────
+  // Head
   const headR = Math.max(5, Math.min(18, p(0.105)));
 
-  // ══ VERTICAL KEY POSITIONS (all downward from cy) ═══════════════════════════
-  const baseY      = cy + p(earToBaseM);   // floor / platform surface
-  const plinthH    = p(0.075);
+  // ── Simple seat geometry ──────────────────────────────────────────────────────
+  // All measurements relative to cy anchor
+
+  const plinthH    = p(0.070);
   const plinthTopY = baseY - plinthH;
-  const seatBotY   = cy + p(0.63);         // underside of seat cushion
-  const seatTopY   = cy + p(0.49);         // top surface of seat cushion
-  const cushH      = seatBotY - seatTopY;
-  const shoulderY  = cy + p(0.17);         // shoulder / top of backrest slab
-  const backTopY   = cy + p(0.045);        // headrest top (just below head centre)
 
-  // ══ HORIZONTAL KEY POSITIONS ═════════════════════════════════════════════════
-  // Person faces LEFT (screen side). Rear = SVG right.
-  const lean        = p(0.050);             // backrest recline lean (rightward at top)
-  const backW       = p(0.210);             // backrest slab thickness
-  const cushW       = p(0.450);             // seat cushion depth (front-to-back)
+  // Seat cushion
+  const seatH      = p(0.135);
+  const seatTopY   = baseY - plinthH - seatH;
+  const seatBotY   = seatTopY + seatH;
 
-  const backRearX   = cx + p(0.095);        // rear face of backrest at seat level
-  const backFrontX  = backRearX - backW;    // front face of backrest at seat level
-  const cushFrontX  = backFrontX - cushW;   // front edge of seat cushion
-  const plinthFrontX = cushFrontX - p(0.018);
-  const plinthRearX  = backRearX  + p(0.040);
+  // Backrest (angled slightly)
+  const backW      = p(0.18);
+  const backH      = p(0.38);
+  const backBotY   = seatTopY;
+  const backTopY   = backBotY - backH;
+  const backLean   = p(0.035);  // lean angle (rightward at top)
 
-  // ══ CHAIR SILHOUETTE — single closed path ════════════════════════════════════
-  //
-  // Traced clockwise starting from plinth front-bottom.
-  // Rear face runs straight up; backrest angles rearward (lean) as it rises.
-  // Headrest top is gently curved.  Seat-to-back junction is a smooth Q arc.
-  // Seat front edge is rounded. The entire shape is one SVG fill = visual mass.
-  //
-  const chairPath = [
-    // ── Plinth bottom edge ───────────────────────────────────────────────────
-    `M ${plinthFrontX},${baseY}`,
-    `L ${plinthRearX},${baseY}`,
-    // ── Rear face up to backrest ─────────────────────────────────────────────
-    `L ${plinthRearX},${seatBotY}`,
-    `L ${backRearX},${seatBotY}`,
-    // ── Angled rear face of backrest rising to headrest ──────────────────────
-    `L ${backRearX + lean},${backTopY}`,
-    // ── Curve over headrest top ───────────────────────────────────────────────
-    `Q ${backRearX + lean * 0.4},${backTopY - p(0.045)} ${backFrontX + lean * 0.85},${backTopY - p(0.018)}`,
-    // ── Angled front face of headrest / backrest down to seat junction ────────
-    `L ${backFrontX + lean},${backTopY}`,
-    `L ${backFrontX},${seatBotY}`,
-    // ── Smooth curve from back into seat top surface ─────────────────────────
-    `Q ${backFrontX - p(0.01)},${seatTopY + cushH * 0.15} ${backFrontX - p(0.035)},${seatTopY}`,
-    // ── Seat top surface toward front ────────────────────────────────────────
-    `L ${cushFrontX + p(0.028)},${seatTopY}`,
-    // ── Rounded front-top corner of seat ────────────────────────────────────
-    `Q ${cushFrontX},${seatTopY} ${cushFrontX},${seatTopY + p(0.030)}`,
-    // ── Seat front face ──────────────────────────────────────────────────────
-    `L ${cushFrontX},${seatBotY - p(0.022)}`,
-    // ── Rounded front-bottom corner of seat ─────────────────────────────────
-    `Q ${cushFrontX},${seatBotY} ${cushFrontX + p(0.022)},${seatBotY}`,
-    // ── Seat underside back to plinth top ───────────────────────────────────
-    `L ${plinthFrontX},${seatBotY}`,
-    // ── Plinth front face back to start ─────────────────────────────────────
-    `L ${plinthFrontX},${baseY}`,
+  // Horizontal positions
+  const backRearX  = cx + p(0.08);
+  const backFrontX = backRearX - backW;
+  const seatLeftX  = backFrontX - p(0.32);
+  const seatRightX = backRearX + p(0.05);
+  const plinthLeftX  = seatLeftX - p(0.015);
+  const plinthRightX = seatRightX + p(0.025);
+
+  // ── Plinth / base ────────────────────────────────────────────────────────────
+  const plinthPath = [
+    `M ${plinthLeftX},${baseY}`,
+    `L ${plinthRightX},${baseY}`,
+    `L ${plinthRightX},${plinthTopY}`,
+    `L ${plinthLeftX},${plinthTopY}`,
     `Z`,
   ].join(" ");
 
-  // ── Armrest — thin integrated protrusion at the seat/backrest junction ───────
-  // Reads as a subtle rail rather than a separate block.
-  const armY   = seatTopY - p(0.030);
-  const armH   = p(0.042);
+  // ── Seat cushion ─────────────────────────────────────────────────────────────
+  const seatPath = [
+    `M ${seatLeftX},${seatBotY}`,
+    `L ${seatRightX},${seatBotY}`,
+    `L ${seatRightX},${seatTopY}`,
+    `L ${seatLeftX},${seatTopY}`,
+    `Z`,
+  ].join(" ");
+
+  // ── Backrest (angled parallelogram) ──────────────────────────────────────────
+  const backPath = [
+    `M ${backFrontX},${backBotY}`,
+    `L ${backRearX},${backBotY}`,
+    `L ${backRearX + backLean},${backTopY}`,
+    `L ${backFrontX + backLean},${backTopY}`,
+    `Z`,
+  ].join(" ");
+
+  // ── Armrest accent ──────────────────────────────────────────────────────────
+  // Small rounded bar at seat-back junction
+  const armY   = seatTopY - p(0.025);
+  const armH   = p(0.035);
   const armPath = [
-    `M ${backFrontX - p(0.005)},${armY + armH}`,
-    `L ${backFrontX + p(0.005)},${armY}`,
-    `L ${backFrontX + backW * 0.55 + lean * 0.5},${armY}`,
-    `Q ${backFrontX + backW * 0.55 + lean * 0.5 + p(0.02)},${armY} ${backFrontX + backW * 0.55 + lean * 0.5 + p(0.02)},${armY + armH * 0.5}`,
-    `L ${backFrontX + p(0.005) + p(0.02)},${armY + armH}`,
-    `Z`,
-  ].join(" ");
-
-  // ══ BODY SILHOUETTE — single closed path ═════════════════════════════════════
-  //
-  // Natural reclined cinema posture. Spine tilts with chair lean.
-  // Front edge curves outward (shoulder forward); rear edge rests on backrest.
-  // Thighs extend toward the screen (left).
-  // Body is a FILLED silhouette — no stick-figure lines.
-  //
-  const neckW       = p(0.035);   // half-width at neck
-  const shFwdProj   = p(0.038);   // how far the front shoulder projects forward
-  const torsoW      = p(0.060);   // half-width of torso mid-point
-
-  // Spine centre at hip (where back meets seat), follows backrest lean
-  const hipX        = backFrontX + lean * 0.45 + backW * 0.50;
-  const hipY        = seatTopY + cushH * 0.18;
-
-  // Thigh end (front of visible thigh on seat)
-  const thighEndX   = cushFrontX + p(0.18);
-  const thighTopY   = seatTopY + cushH * 0.20;
-  const thighBotY   = seatTopY + cushH * 0.60;
-
-  const bodyPath = [
-    // ── Front (screen-side) edge ─────────────────────────────────────────────
-    // Start: front of neck base
-    `M ${cx - neckW},${cy + headR + p(0.008)}`,
-    // Front shoulder projection (curves outward toward screen)
-    `C ${cx - neckW - shFwdProj},${shoulderY} ${hipX - torsoW},${hipY - p(0.12)} ${hipX - torsoW},${hipY}`,
-    // Hip front → transition onto thigh (nearly horizontal)
-    `C ${hipX - torsoW - p(0.02)},${hipY + p(0.03)} ${thighEndX + p(0.02)},${thighTopY} ${thighEndX},${thighTopY}`,
-    // ── Thigh end (leg tip, near front of seat) ──────────────────────────────
-    `Q ${thighEndX - p(0.025)},${(thighTopY + thighBotY) * 0.5} ${thighEndX},${thighBotY}`,
-    // ── Rear (backrest-side) edge ─────────────────────────────────────────────
-    // Back along underside of thigh → hip rear
-    `C ${thighEndX + p(0.02)},${thighBotY} ${hipX + torsoW * 0.3},${hipY + cushH * 0.15} ${hipX + torsoW * 0.3},${hipY}`,
-    // Hip rear → shoulder rear (follows backrest lean, curves gently)
-    `C ${hipX + torsoW * 0.3},${hipY - p(0.10)} ${cx + neckW + p(0.008)},${shoulderY + p(0.02)} ${cx + neckW},${cy + headR + p(0.008)}`,
-    // ── Close at rear of neck base ───────────────────────────────────────────
+    `M ${backFrontX},${armY + armH}`,
+    `L ${backFrontX},${armY}`,
+    `L ${backFrontX + backW * 0.6 + backLean * 0.4},${armY}`,
+    `L ${backFrontX + backW * 0.6 + backLean * 0.4},${armY + armH}`,
     `Z`,
   ].join(" ");
 
   return (
     <g>
-      {/* ── CHAIR SILHOUETTE — single flowing shape ──────────────────────── */}
+      {/* ── Plinth ──────────────────────────────────────────────────────────── */}
       <path
-        d={chairPath}
-        fill={chairFill}
+        d={plinthPath}
+        fill={fil}
         stroke={str}
         strokeWidth={SW}
         {...PS}
       />
 
-      {/* ── ARMREST — subtle integrated rail ─────────────────────────────── */}
+      {/* ── Seat cushion ────────────────────────────────────────────────────────*/}
+      <path
+        d={seatPath}
+        fill={fil}
+        stroke={str}
+        strokeWidth={SW}
+        {...PS}
+      />
+
+      {/* ── Backrest ────────────────────────────────────────────────────────────*/}
+      <path
+        d={backPath}
+        fill={fil}
+        stroke={str}
+        strokeWidth={SW}
+        {...PS}
+      />
+
+      {/* ── Armrest accent ──────────────────────────────────────────────────────*/}
       <path
         d={armPath}
-        fill={chairFill}
+        fill={fil}
         stroke={str}
-        strokeWidth={SW * 0.85}
+        strokeWidth={SW * 0.9}
         {...PS}
-        opacity={0.80}
+        opacity={0.75}
       />
 
-      {/* ── BODY SILHOUETTE — natural reclined posture ────────────────────── */}
-      <path
-        d={bodyPath}
-        fill={bodyFill}
-        stroke={str}
-        strokeWidth={SW}
-        {...PS}
-      />
-
-      {/* ── HEAD — perfect circle, ALWAYS centred at (cx, cy) ─────────────── */}
+      {/* ── Head — perfect circle, centred at (cx, cy) ──────────────────────────*/}
       <circle
         cx={cx} cy={cy} r={headR}
         fill={BG}
@@ -195,7 +154,7 @@ export default function SeatPersonIcon({
         strokeWidth={SW}
       />
 
-      {/* ── EAR ANCHOR DOT — precise filled accent at the immovable anchor ── */}
+      {/* ── Ear anchor dot ─────────────────────────────────────────────────────*/}
       <circle
         cx={cx} cy={cy}
         r={Math.max(1.5, headR * 0.20)}
@@ -203,7 +162,7 @@ export default function SeatPersonIcon({
         opacity={0.92}
       />
 
-      {/* ── LABEL ─────────────────────────────────────────────────────────── */}
+      {/* ── Row label ──────────────────────────────────────────────────────────*/}
       {label && (
         <text
           x={cx + headR + 4}
