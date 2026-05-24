@@ -1,10 +1,21 @@
 // SeatPersonIcon.jsx
-// Simple cinema seat icon + round head — Side Elevation only.
+// Side elevation — clean technical cinema chair icon, no person silhouette.
 //
-// cx / cy  = SVG pixel coordinates of the listener HEAD CENTRE (immovable anchor).
-// scale    = px per metre (drawH / roomHeightM).
-// earHeightM, platformHeightM = vertical positioning (unchanged from original).
-// All geometry anchors to cy (ear position).
+// Reference dimensions (mm → metres):
+//   Total depth:        980  = 0.98m
+//   Main panel width:   880  = 0.88m
+//   Feet span:          780  = 0.78m
+//   Side arm height:    600  = 0.60m
+//   Seat height:        420  = 0.42m
+//   Rear back rise:     280  = 0.28m  (above 600mm side arm)
+//   Headrest:           100  = 0.10m  (above 880mm level)
+//   Round feet diam:     40  = 0.04m
+//
+// cx / cy  = listener EAR/HEAD centre — the immovable acoustic anchor.
+//            Normally ~1.10m above floor/platform.
+//            Chair headrest top sits just below this point (0.99m).
+// scale    = px per metre.
+// All vertical positions derived from baseY = cy + p(earToBaseM).
 
 import React from "react";
 
@@ -13,11 +24,11 @@ const SECONDARY = "#625143";
 const NEUTRAL   = "#DCDBD6";
 const BG        = "#F8F8F7";
 
-// Single consistent stroke weight
-const SW = 1.1;
-
-// SVG shared props
-const PS = { strokeLinecap: "round", strokeLinejoin: "round" };
+const SW  = 1.2;                                        // single stroke weight
+const PS  = { strokeLinecap: "round", strokeLinejoin: "round" };
+const STR = PRIMARY;                                    // main outline colour
+const FIL = NEUTRAL;                                    // main panel fill
+const FIL2 = BG;                                       // lighter inner fill
 
 export default function SeatPersonIcon({
   cx,
@@ -31,146 +42,158 @@ export default function SeatPersonIcon({
 }) {
   if (view !== "side") return null;
 
-  const p   = (m) => m * scale;
-  const str = isRsp ? PRIMARY : SECONDARY;
-  const fil = isRsp ? "rgba(33,52,40,0.08)" : "rgba(98,81,67,0.12)";
+  const p = (m) => m * scale;
 
-  // Vertical grounding
+  // Listener reference marker colour
+  const dotFill = isRsp ? PRIMARY : SECONDARY;
+
+  // ── Ear-to-floor distance ─────────────────────────────────────────────────
   const earToBaseM = Math.max(0.4, (earHeightM || 1.10) - (platformHeightM || 0));
-  const baseY      = cy + p(earToBaseM);
+  const baseY      = cy + p(earToBaseM);      // floor / platform surface
 
-  // Head
-  const headR = Math.max(5, Math.min(18, p(0.105)));
+  // ══ VERTICAL KEY POSITIONS (from floor upward) ════════════════════════════
+  const feetR        = p(0.020);              // foot radius = 40mm ÷ 2
+  const feetBotY     = baseY;                 // feet on floor
+  const feetTopY     = baseY - feetR * 2;
 
-  // ── Simple seat geometry ──────────────────────────────────────────────────────
-  // All measurements relative to cy anchor
+  const panelBotY    = feetTopY;              // main panel bottom
+  const panelTopY    = baseY - p(0.600);      // side arm top = 600mm
+  const seatLineY    = baseY - p(0.420);      // seat cushion top = 420mm
 
-  const plinthH    = p(0.070);
-  const plinthTopY = baseY - plinthH;
+  const backBotY     = panelTopY;             // backrest connects at panel top
+  const backTopY     = baseY - p(0.880);      // 600 + 280 = 880mm
+  const headTopY     = baseY - p(0.990);      // 880 + 100 + small gap ≈ 990mm
 
-  // Seat cushion
-  const seatH      = p(0.135);
-  const seatTopY   = baseY - plinthH - seatH;
-  const seatBotY   = seatTopY + seatH;
+  // ══ HORIZONTAL KEY POSITIONS ═════════════════════════════════════════════
+  // Person faces LEFT (toward screen). Rear of chair = SVG right side.
+  //
+  // cx sits above the headrest. The headrest top is approx at the ear level.
+  // We offset the chair so the headrest rear is ~p(0.05) to the right of cx.
+  const backRearX   = cx + p(0.08);           // rear face of chair (outermost)
+  const chairFrontX = backRearX - p(0.98);    // front of chair = 980mm back
+  const panelFrontX = chairFrontX;            // main panel front = chair front
+  const panelRearX  = chairFrontX + p(0.88);  // main panel rear = 880mm
 
-  // Backrest (angled slightly)
-  const backW      = p(0.18);
-  const backH      = p(0.38);
-  const backBotY   = seatTopY;
-  const backTopY   = backBotY - backH;
-  const backLean   = p(0.035);  // lean angle (rightward at top)
+  // Feet positions (780mm span, centred under the 880mm panel)
+  const foot1X = chairFrontX + p(0.10);       // front foot
+  const foot2X = chairFrontX + p(0.88) - p(0.10); // rear foot
 
-  // Horizontal positions
-  const backRearX  = cx + p(0.08);
-  const backFrontX = backRearX - backW;
-  const seatLeftX  = backFrontX - p(0.32);
-  const seatRightX = backRearX + p(0.05);
-  const plinthLeftX  = seatLeftX - p(0.015);
-  const plinthRightX = seatRightX + p(0.025);
+  // Backrest slab:
+  //   Width = panelRearX → backRearX ≈ 0.10m
+  //   It leans rearward by ~0.05m over 0.38m height
+  const backLean  = p(0.040);
+  const backFrontBot = panelRearX;            // front face at bottom
+  const backRearBot  = backRearX;             // rear face at bottom
+  // At headrest top, everything shifts rearward by backLean:
+  const backFrontTop = backFrontBot + backLean;
+  const backRearTop  = backRearBot  + backLean;
 
-  // ── Plinth / base ────────────────────────────────────────────────────────────
-  const plinthPath = [
-    `M ${plinthLeftX},${baseY}`,
-    `L ${plinthRightX},${baseY}`,
-    `L ${plinthRightX},${plinthTopY}`,
-    `L ${plinthLeftX},${plinthTopY}`,
-    `Z`,
-  ].join(" ");
+  // Headrest: slightly narrower, same lean continues
+  const headExtraLean = p(0.012);
+  const hBotFront = backFrontTop;
+  const hBotRear  = backRearTop;
+  const hTopFront = hBotFront + headExtraLean;
+  const hTopRear  = hBotRear  + headExtraLean;
 
-  // ── Seat cushion ─────────────────────────────────────────────────────────────
-  const seatPath = [
-    `M ${seatLeftX},${seatBotY}`,
-    `L ${seatRightX},${seatBotY}`,
-    `L ${seatRightX},${seatTopY}`,
-    `L ${seatLeftX},${seatTopY}`,
-    `Z`,
-  ].join(" ");
+  // ── Main panel rounded-rect path ─────────────────────────────────────────
+  // Large rounded rectangle for the sofa side panel.
+  const rx = Math.max(2, p(0.025));    // corner radius ≈ 25mm
+  const panelW  = panelRearX - panelFrontX;
+  const panelH  = panelBotY  - panelTopY;
 
-  // ── Backrest (angled parallelogram) ──────────────────────────────────────────
+  // ── Backrest path (angled parallelogram) ─────────────────────────────────
   const backPath = [
-    `M ${backFrontX},${backBotY}`,
-    `L ${backRearX},${backBotY}`,
-    `L ${backRearX + backLean},${backTopY}`,
-    `L ${backFrontX + backLean},${backTopY}`,
+    `M ${backFrontBot},${backBotY}`,
+    `L ${backRearBot},${backBotY}`,
+    `L ${backRearTop},${backTopY}`,
+    `L ${backFrontTop},${backTopY}`,
     `Z`,
   ].join(" ");
 
-  // ── Armrest accent ──────────────────────────────────────────────────────────
-  // Small rounded bar at seat-back junction
-  const armY   = seatTopY - p(0.025);
-  const armH   = p(0.035);
-  const armPath = [
-    `M ${backFrontX},${armY + armH}`,
-    `L ${backFrontX},${armY}`,
-    `L ${backFrontX + backW * 0.6 + backLean * 0.4},${armY}`,
-    `L ${backFrontX + backW * 0.6 + backLean * 0.4},${armY + armH}`,
+  // ── Headrest path ────────────────────────────────────────────────────────
+  const headPath = [
+    `M ${hBotFront},${backTopY}`,
+    `L ${hBotRear},${backTopY}`,
+    `L ${hTopRear},${headTopY}`,
+    `L ${hTopFront},${headTopY}`,
     `Z`,
   ].join(" ");
+
+  // ── Seat-line indicator (subtle dashed line inside panel) ─────────────────
+  // Shows the seat cushion top height — matches 420mm reference line.
+  const seatLineX1 = panelFrontX + rx;
+  const seatLineX2 = panelRearX  - rx * 0.5;
 
   return (
     <g>
-      {/* ── Plinth ──────────────────────────────────────────────────────────── */}
-      <path
-        d={plinthPath}
-        fill={fil}
-        stroke={str}
+      {/* ── Round feet ──────────────────────────────────────────────────── */}
+      <circle
+        cx={foot1X} cy={feetBotY - feetR}
+        r={feetR}
+        fill={FIL} stroke={STR} strokeWidth={SW}
+      />
+      <circle
+        cx={foot2X} cy={feetBotY - feetR}
+        r={feetR}
+        fill={FIL} stroke={STR} strokeWidth={SW}
+      />
+
+      {/* ── Main side panel (large rounded rectangle) ───────────────────── */}
+      <rect
+        x={panelFrontX} y={panelTopY}
+        width={panelW}  height={panelH}
+        rx={rx} ry={rx}
+        fill={FIL}
+        stroke={STR}
         strokeWidth={SW}
         {...PS}
       />
 
-      {/* ── Seat cushion ────────────────────────────────────────────────────────*/}
-      <path
-        d={seatPath}
-        fill={fil}
-        stroke={str}
-        strokeWidth={SW}
-        {...PS}
+      {/* ── Seat-height indicator line ───────────────────────────────────── */}
+      <line
+        x1={seatLineX1} y1={seatLineY}
+        x2={seatLineX2} y2={seatLineY}
+        stroke={SECONDARY}
+        strokeWidth={SW * 0.6}
+        strokeDasharray="2,2"
+        opacity={0.45}
       />
 
-      {/* ── Backrest ────────────────────────────────────────────────────────────*/}
+      {/* ── Backrest slab ────────────────────────────────────────────────── */}
       <path
         d={backPath}
-        fill={fil}
-        stroke={str}
+        fill={FIL2}
+        stroke={STR}
         strokeWidth={SW}
         {...PS}
       />
 
-      {/* ── Armrest accent ──────────────────────────────────────────────────────*/}
+      {/* ── Headrest ─────────────────────────────────────────────────────── */}
       <path
-        d={armPath}
-        fill={fil}
-        stroke={str}
-        strokeWidth={SW * 0.9}
-        {...PS}
-        opacity={0.75}
-      />
-
-      {/* ── Head — perfect circle, centred at (cx, cy) ──────────────────────────*/}
-      <circle
-        cx={cx} cy={cy} r={headR}
-        fill={BG}
-        stroke={str}
+        d={headPath}
+        fill={FIL}
+        stroke={STR}
         strokeWidth={SW}
+        {...PS}
       />
 
-      {/* ── Ear anchor dot ─────────────────────────────────────────────────────*/}
+      {/* ── Listener anchor dot at cx/cy (ear reference point) ───────────── */}
       <circle
         cx={cx} cy={cy}
-        r={Math.max(1.5, headR * 0.20)}
-        fill={isRsp ? PRIMARY : SECONDARY}
-        opacity={0.92}
+        r={Math.max(1.8, p(0.018))}
+        fill={dotFill}
+        opacity={0.85}
       />
 
-      {/* ── Row label ──────────────────────────────────────────────────────────*/}
+      {/* ── Row label ────────────────────────────────────────────────────── */}
       {label && (
         <text
-          x={cx + headR + 4}
-          y={cy + 3.5}
-          fontSize={6.5}
+          x={cx + p(0.025)}
+          y={cy - p(0.030)}
+          fontSize={Math.max(6, p(0.060))}
           fill={PRIMARY}
           fontWeight={isRsp ? 700 : 500}
-          letterSpacing="0.05em"
+          letterSpacing="0.04em"
         >
           {label}
         </text>
