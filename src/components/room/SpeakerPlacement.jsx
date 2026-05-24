@@ -526,6 +526,18 @@ function SpeakerPlacementImpl(props) {
     )?.mlp || null;
   }, [seatingPositions, effectiveDims?.width, effectiveDims?.widthM, effectiveDims?.length, effectiveDims?.lengthM]);
 
+  const computeAutoSurroundHeight = useCallback((seatingPos, roomH) => {
+    const seats = Array.isArray(seatingPos) ? seatingPos : [];
+    const earHeights = seats.map(s =>
+      Number.isFinite(s.rowEarHeight) ? s.rowEarHeight :
+      Number.isFinite(s.z) ? s.z : 1.1
+    );
+    const maxEarH = earHeights.length > 0 ? Math.max(...earHeights) : 1.1;
+    const raw = maxEarH + 0.05;
+    const maxH = (Number.isFinite(roomH) ? roomH : 2.8) - 0.30;
+    return Math.max(1.10, Math.min(maxH, raw));
+  }, []);
+
   const setSpeakers = useCallback((updater) => {
     setSpeakerSystem(prev => {
       const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
@@ -567,6 +579,11 @@ function SpeakerPlacementImpl(props) {
       value: { master, side: master, rear: master, wide: master },
       override: { side: false, rear: false, wide: false },
     };
+  });
+
+  const [surroundHeightConfig, setSurroundHeightConfig] = useState({
+    side: { mode: 'auto', value: null },
+    rear: { mode: 'auto', value: null },
   });
 
   // Rehydrate local surroundConfig when appState.globalSurroundModel is restored
@@ -1314,6 +1331,49 @@ function SpeakerPlacementImpl(props) {
 
   useFinalSafetyPass({ placedSpeakers, effectivePreset, useWides, effectiveDims, allowedRoles, setSpeakers, surroundConfig });
 
+  // Apply surround heights (z only) based on surroundHeightConfig — preserves x/y
+  useEffect(() => {
+    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return;
+    const roomH = Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8;
+    const autoH = computeAutoSurroundHeight(seatingPositions, roomH);
+    const maxH = roomH - 0.30;
+
+    const sideH = surroundHeightConfig.side.mode === 'auto'
+      ? autoH
+      : Math.max(0.80, Math.min(maxH, Number(surroundHeightConfig.side.value) || autoH));
+    const rearH = surroundHeightConfig.rear.mode === 'auto'
+      ? autoH
+      : Math.max(0.80, Math.min(maxH, Number(surroundHeightConfig.rear.value) || autoH));
+
+    const SIDE_ROLES = new Set(['SL', 'SR', 'SL1', 'SR1', 'SL2', 'SR2']);
+    const REAR_ROLES = new Set(['SBL', 'SBR', 'SBL1', 'SBR1', 'SBL2', 'SBR2']);
+
+    setSpeakers(prev => {
+      if (!Array.isArray(prev) || prev.length === 0) return prev;
+      let changed = false;
+      const next = prev.map(s => {
+        const canon = getCanonicalRole(s.role);
+        const r = String(s.role || '').toUpperCase();
+        let targetH = null;
+        if (SIDE_ROLES.has(canon) || SIDE_ROLES.has(r)) targetH = sideH;
+        else if (REAR_ROLES.has(canon) || REAR_ROLES.has(r)) targetH = rearH;
+        if (targetH === null || !s.position) return s;
+        if (Math.abs((s.position.z || 0) - targetH) < 0.001) return s;
+        changed = true;
+        return { ...s, position: { ...s.position, z: targetH } };
+      });
+      return changed ? next : prev;
+    });
+  }, [
+    surroundHeightConfig,
+    seatingPositions,
+    effectiveDims?.height,
+    effectiveDims?.heightM,
+    computeAutoSurroundHeight,
+    setSpeakers,
+    placedSpeakers?.length,
+  ]);
+
   return (
     <div className="space-y-4 font-sans" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
       <div className="space-y-3 mt-4">
@@ -1408,6 +1468,10 @@ function SpeakerPlacementImpl(props) {
           extraSurroundCount={extraSurroundCount}
           onExtraSurroundCountChange={onExtraSurroundCountChange}
           allowExtraSurrounds={allowExtraSurrounds}
+          surroundHeightConfig={surroundHeightConfig}
+          setSurroundHeightConfig={setSurroundHeightConfig}
+          autoSurroundHeight={computeAutoSurroundHeight(seatingPositions, Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8)}
+          roomHeight={Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8}
         />
 
         {/* NEW: Surround SPL @ RSP strip */}
