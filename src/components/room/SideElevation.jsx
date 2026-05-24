@@ -1,5 +1,10 @@
 import React, { useMemo } from "react";
 import SeatPersonIcon from "../roomdesigner/SeatPersonIcon";
+import {
+  Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon,
+  Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon,
+  Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon,
+} from "../report/SpeakerFaceIcons";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -18,6 +23,21 @@ const SEAT_COLOR    = "#213428";
 const SPK_COLOR     = "#213428";
 const DOOR_STROKE   = "#7C6F65";
 const DOOR_FILL     = "rgba(180,168,155,0.18)";
+
+// Speaker model → face icon component map (normalise key: lowercase, spaces→hyphens, strip _s)
+const normModelKey = (m) => String(m || '').toLowerCase().replace(/\s+/g, '-').replace(/_s$/, '');
+const FACE_ICON_MAP = {
+  'evolve-1-1': Evolve11FaceIcon,
+  'evolve-2-1': Evolve21FaceIcon,
+  'evolve-3-1': Evolve31FaceIcon,
+  'evolve-4-2': Evolve42FaceIcon,
+  'evolve-6-3': Evolve63FaceIcon,
+  'evolve-8-4': Evolve84FaceIcon,
+  'q4-3': Q43FaceIcon,        'spitfire-q4-3': Q43FaceIcon,
+  'q4-5': Q45FaceIcon,        'spitfire-q4-5': Q45FaceIcon,
+  'q6-3': Q63FaceIcon,        'spitfire-q6-3': Q63FaceIcon,
+  'q8-5': Q85FaceIcon,        'spitfire-q8-5': Q85FaceIcon,
+};
 
 // Derive screen dimensions from screen config (same logic as FrontElevation)
 function screenDimsM(screen) {
@@ -137,6 +157,7 @@ export default function SideElevation({
       .filter(s => Number.isFinite(s?.position?.y) && Number.isFinite(s?.position?.z))
       .map(s => ({
         role: String(s.role || ""),
+        model: String(s.model || ""),
         y: s.position.y,
         z: s.position.z,
       }));
@@ -362,35 +383,36 @@ export default function SideElevation({
 
           {/* Speaker height markers (non-LCR surrounds/wides) */}
           {speakerMarkers.map((spk, i) => {
-            // Skip LCR roles — they are rendered separately above
             const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
             if (lcrRoles.has(String(spk.role || '').toUpperCase())) return null;
 
-            const rectW = 12;  // ~10–14 px wide
-            const rectH = 20;  // ~18–24 px tall
+            const iconW = 22;
+            const iconH = 22;
             const spkX = rx(spk.y);
             const spkZ = rz(spk.z);
+            const ix = spkX - iconW / 2;
+            const iy = spkZ - iconH / 2;
+
+            const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
 
             return (
-              <g key={`spk-${i}`} opacity={0.75}>
-                {/* Speaker rectangle */}
-                <rect
-                  x={spkX - rectW / 2}
-                  y={spkZ - rectH / 2}
-                  width={rectW}
-                  height={rectH}
-                  fill={SPK_COLOR}
-                  stroke={SPK_COLOR}
-                  strokeWidth={1}
-                  rx={2} />
-                {/* Role label above */}
+              <g key={`spk-${i}`} opacity={0.85}>
+                {FaceIcon ? (
+                  <FaceIcon x={ix} y={iy} width={iconW} height={iconH} />
+                ) : (
+                  // Fallback: generic dark rectangle
+                  <rect
+                    x={ix} y={iy}
+                    width={iconW} height={iconH}
+                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2} />
+                )}
                 <text
                   x={spkX}
-                  y={spkZ - rectH / 2 - 4}
+                  y={iy - 3}
                   textAnchor="middle"
                   fontSize={6}
                   fill={SPK_COLOR}
-                  fontWeight={500}>
+                  fontWeight={600}>
                   {spk.role}
                 </text>
               </g>
