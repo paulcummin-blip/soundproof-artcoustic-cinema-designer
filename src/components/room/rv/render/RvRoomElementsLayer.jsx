@@ -239,22 +239,28 @@ export default function RvRoomElementsLayer({
         const fill = isNearSpeaker ? WARN_FILL : NORMAL_FILL;
         const stroke = isNearSpeaker ? WARN_STROKE : NORMAL_STROKE;
 
-        let labelXM = 0;
-        let labelYM = 0;
+        // Label: 0.10m inside room boundary, centred on the element
+        let labelXM, labelYM, labelRotate = 0;
 
         if (e.wall === 'front') {
-          labelXM = rectM.x + 0.02;
-          labelYM = rectM.y + T + LABEL_INSET_M;
+          labelXM = rectM.x + rectM.w / 2;
+          labelYM = LABEL_INSET_M;
         } else if (e.wall === 'rear') {
-          labelXM = rectM.x + 0.02;
-          labelYM = rectM.y - LABEL_INSET_M;
+          labelXM = rectM.x + rectM.w / 2;
+          labelYM = lengthM - LABEL_INSET_M;
         } else if (e.wall === 'left') {
-          labelXM = rectM.x + T + LABEL_INSET_M;
-          labelYM = rectM.y + 0.18;
+          labelXM = LABEL_INSET_M;
+          labelYM = rectM.y + rectM.h / 2;
+          labelRotate = -90;
         } else if (e.wall === 'right') {
-          labelXM = rectM.x - LABEL_INSET_M - 0.10;
-          labelYM = rectM.y + 0.18;
+          labelXM = widthM - LABEL_INSET_M;
+          labelYM = rectM.y + rectM.h / 2;
+          labelRotate = 90;
         }
+
+        // Clamp to room interior
+        labelXM = Math.max(LABEL_INSET_M, Math.min(widthM - LABEL_INSET_M, labelXM));
+        labelYM = Math.max(LABEL_INSET_M, Math.min(lengthM - LABEL_INSET_M, labelYM));
 
         const xPx = meterToCanvasX(rectM.x);
         const yPx = meterToCanvasY(rectM.y);
@@ -286,8 +292,9 @@ export default function RvRoomElementsLayer({
               fontSize={11}
               fontWeight={700}
               style={{ userSelect: 'none' }}
-              textAnchor="end"
-              dominantBaseline="hanging"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              transform={labelRotate !== 0 ? `rotate(${labelRotate}, ${labelXpx}, ${labelYpx})` : undefined}
             >
               {label}
             </text>
