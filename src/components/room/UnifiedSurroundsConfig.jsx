@@ -310,84 +310,87 @@ export default function UnifiedSurroundsConfig({
 
       {/* Surround Heights */}
       {(canSides || canRears) && (
-        <div className="space-y-3 mt-3 border-t border-[#E6E4DD] pt-3">
+        <div className="mt-3 border-t border-[#E6E4DD] pt-3 space-y-3">
           <p className="text-xs text-[#625143]">
             RP22 Auto: acoustic centre at or slightly above listener ear plane, raised only where needed for acoustic clearance.
           </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
-          {/* Side Surround Height */}
-          {canSides && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium text-[#3E4349]">Side Surround Height</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button" size="sm"
-                  className={surroundHeightConfig?.side?.mode !== 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
-                  onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, side: { ...prev.side, mode: 'auto' } }))}
-                  disabled={disabled}
-                >Auto RP22</Button>
-                <Button
-                  type="button" size="sm"
-                  className={surroundHeightConfig?.side?.mode === 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
-                  onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, side: { mode: 'manual', value: prev.side?.value ?? autoSurroundHeight ?? 1.2 } }))}
-                  disabled={disabled}
-                >Manual</Button>
+            {/* Side Surround Height */}
+            {canSides && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-[#3E4349]">Side Surround Height</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button" size="sm"
+                    className={surroundHeightConfig?.side?.mode !== 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
+                    onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, side: { ...prev.side, mode: 'auto' } }))}
+                    disabled={disabled}
+                  >Auto RP22</Button>
+                  <Button
+                    type="button" size="sm"
+                    className={surroundHeightConfig?.side?.mode === 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
+                    onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, side: { mode: 'manual', value: prev.side?.value ?? autoSurroundHeight ?? 1.2 } }))}
+                    disabled={disabled}
+                  >Manual</Button>
+                </div>
+                <div className="relative">
+                  <Input
+                    type="number" step="0.01"
+                    min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
+                    value={surroundHeightConfig?.side?.mode === 'manual'
+                      ? (surroundHeightConfig.side.value ?? autoSurroundHeight ?? 1.2)
+                      : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.2}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, side: { mode: 'manual', value: v } }));
+                    }}
+                    disabled={disabled}
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
+                </div>
               </div>
-              <div className="relative">
-                <Input
-                  type="number" step="0.01"
-                  min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
-                  value={surroundHeightConfig?.side?.mode === 'manual'
-                    ? (surroundHeightConfig.side.value ?? autoSurroundHeight ?? 1.2)
-                    : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.2}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, side: { mode: 'manual', value: v } }));
-                  }}
-                  disabled={disabled}
-                  className="pr-8"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Rear Surround Height */}
-          {canRears && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium text-[#3E4349]">Rear Surround Height</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button" size="sm"
-                  className={surroundHeightConfig?.rear?.mode !== 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
-                  onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, rear: { ...prev.rear, mode: 'auto' } }))}
-                  disabled={disabled}
-                >Auto RP22</Button>
-                <Button
-                  type="button" size="sm"
-                  className={surroundHeightConfig?.rear?.mode === 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
-                  onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, rear: { mode: 'manual', value: prev.rear?.value ?? autoSurroundHeight ?? 1.2 } }))}
-                  disabled={disabled}
-                >Manual</Button>
+            {/* Rear Surround Height */}
+            {canRears && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-[#3E4349]">Rear Surround Height</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button" size="sm"
+                    className={surroundHeightConfig?.rear?.mode !== 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
+                    onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, rear: { ...prev.rear, mode: 'auto' } }))}
+                    disabled={disabled}
+                  >Auto RP22</Button>
+                  <Button
+                    type="button" size="sm"
+                    className={surroundHeightConfig?.rear?.mode === 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
+                    onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, rear: { mode: 'manual', value: prev.rear?.value ?? autoSurroundHeight ?? 1.2 } }))}
+                    disabled={disabled}
+                  >Manual</Button>
+                </div>
+                <div className="relative">
+                  <Input
+                    type="number" step="0.01"
+                    min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
+                    value={surroundHeightConfig?.rear?.mode === 'manual'
+                      ? (surroundHeightConfig.rear.value ?? autoSurroundHeight ?? 1.2)
+                      : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.2}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, rear: { mode: 'manual', value: v } }));
+                    }}
+                    disabled={disabled}
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
+                </div>
               </div>
-              <div className="relative">
-                <Input
-                  type="number" step="0.01"
-                  min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
-                  value={surroundHeightConfig?.rear?.mode === 'manual'
-                    ? (surroundHeightConfig.rear.value ?? autoSurroundHeight ?? 1.2)
-                    : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.2}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, rear: { mode: 'manual', value: v } }));
-                  }}
-                  disabled={disabled}
-                  className="pr-8"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
-              </div>
-            </div>
-          )}
+            )}
+
+          </div>
         </div>
       )}
     </div>
