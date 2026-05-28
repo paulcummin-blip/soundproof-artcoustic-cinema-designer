@@ -346,7 +346,7 @@ export default function UnifiedSurroundsConfig({
                       if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, side: { mode: 'manual', value: v } }));
                     }}
                     disabled={disabled}
-                    className="pr-8"
+                    className="pr-8 bg-white text-[#1B1A1A]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
                 </div>
@@ -383,7 +383,7 @@ export default function UnifiedSurroundsConfig({
                       if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, rear: { mode: 'manual', value: v } }));
                     }}
                     disabled={disabled}
-                    className="pr-8"
+                    className="pr-8 bg-white text-[#1B1A1A]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
                 </div>
