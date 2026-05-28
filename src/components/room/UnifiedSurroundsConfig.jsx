@@ -333,21 +333,22 @@ export default function UnifiedSurroundsConfig({
                   disabled={disabled}
                 >Manual</Button>
               </div>
-              {surroundHeightConfig?.side?.mode === 'manual' ? (
-                <div className="relative">
-                  <Input
-                    type="number" step="0.01"
-                    min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
-                    value={surroundHeightConfig.side.value ?? autoSurroundHeight ?? 1.2}
-                    onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, side: { ...prev.side, value: v } })); }}
-                    disabled={disabled}
-                    className="pr-8"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
-                </div>
-              ) : (
-                <p className="text-xs text-[#625143]">Auto: {Number.isFinite(autoSurroundHeight) ? autoSurroundHeight.toFixed(2) : '—'}m</p>
-              )}
+              <div className="relative">
+                <Input
+                  type="number" step="0.01"
+                  min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
+                  value={surroundHeightConfig?.side?.mode === 'manual'
+                    ? (surroundHeightConfig.side.value ?? autoSurroundHeight ?? 1.2)
+                    : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.2}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, side: { mode: 'manual', value: v } }));
+                  }}
+                  disabled={disabled}
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
+              </div>
             </div>
           )}
 
@@ -369,21 +370,22 @@ export default function UnifiedSurroundsConfig({
                   disabled={disabled}
                 >Manual</Button>
               </div>
-              {surroundHeightConfig?.rear?.mode === 'manual' ? (
-                <div className="relative">
-                  <Input
-                    type="number" step="0.01"
-                    min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
-                    value={surroundHeightConfig.rear.value ?? autoSurroundHeight ?? 1.2}
-                    onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, rear: { ...prev.rear, value: v } })); }}
-                    disabled={disabled}
-                    className="pr-8"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
-                </div>
-              ) : (
-                <p className="text-xs text-[#625143]">Auto: {Number.isFinite(autoSurroundHeight) ? autoSurroundHeight.toFixed(2) : '—'}m</p>
-              )}
+              <div className="relative">
+                <Input
+                  type="number" step="0.01"
+                  min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
+                  value={surroundHeightConfig?.rear?.mode === 'manual'
+                    ? (surroundHeightConfig.rear.value ?? autoSurroundHeight ?? 1.2)
+                    : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.2}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, rear: { mode: 'manual', value: v } }));
+                  }}
+                  disabled={disabled}
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
+              </div>
             </div>
           )}
         </div>
