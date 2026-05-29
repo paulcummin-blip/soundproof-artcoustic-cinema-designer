@@ -86,7 +86,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.35;
       const x = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
       const z = Number.isFinite(s?.position?.z) ? s.position.z : hM / 2;
-      return { x, z, wM, hM, label: `SUB${i + 1}` };
+      return { x, z, wM, hM, label: "SUB" };
     });
   }, [frontSubs, roomW]);
 
@@ -132,8 +132,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
    * @param {string}  stroke - body stroke colour
    * @param {string}  label  - text label above speaker
    * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
+   * @param {boolean} labelInsideBox - if true, centre label inside the shape; if false, above
    */
-  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey }) => {
+  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, labelInsideBox = false }) => {
     const sx = cx - sw / 2;
     const sy = cy - sh / 2;
 
@@ -183,14 +184,22 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         )}
         {/* Acoustic centre dot — fallback only (face icons include their own markers) */}
         {!hasFaceIcon && <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.55)" />}
-        {/* Label above */}
-        <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
-          {label}
-        </text>
-        {/* Z-height annotation below */}
-        <text x={cx} y={sy + sh + 10} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
-          z={zM.toFixed(2)}m
-        </text>
+        {/* Label: above for speakers, inside for subs */}
+        {labelInsideBox ? (
+          <text x={cx} y={cy + 3} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em" dominantBaseline="middle">
+            {label}
+          </text>
+        ) : (
+          <>
+            <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
+              {label}
+            </text>
+            {/* Z-height annotation below (speakers only) */}
+            <text x={cx} y={sy + sh + 10} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
+              z={zM.toFixed(2)}m
+            </text>
+          </>
+        )}
       </g>
     );
   };
@@ -382,6 +391,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             stroke: "#4A4540",
             label: sub.label,
             zM: sub.z,
+            labelInsideBox: true,
           })
         )}
 
