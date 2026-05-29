@@ -16,6 +16,7 @@ import RvSeatLayer from "@/components/room/rv/render/RvSeatLayer";
 import PlanMessages from "@/components/room/PlanMessages";
 import RvSeatHudLayer from "@/components/room/rv/render/RvSeatHudLayer";
 import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
+import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 
 export default function RvPlanCanvas({
   svgRef,
@@ -141,6 +142,7 @@ export default function RvPlanCanvas({
   handleIconEnter,
   handleIconMove,
   handleIconLeave,
+  seatingDragImpact,
 }) {
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
@@ -571,6 +573,14 @@ export default function RvPlanCanvas({
 
         {/* SPEAKER TOOLTIP - Light style, non-interfering */}
         <RvSpeakerTooltip speakerTooltip={speakerTooltip} />
+
+        {/* SEATING DRAG RP22 IMPACT CARD */}
+        {seatingDragImpact?.isActive && (
+          <SeatingDragImpactCard
+            baseline={seatingDragImpact.baseline}
+            live={seatingDragImpact.live}
+          />
+        )}
 
       </div>
     </div>

@@ -84,6 +84,8 @@ import { computeAllSeatSplMetrics, getSeatSplMetrics, getMlpSeat } from "@/compo
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
 import { useTooltipData } from '@/components/room/hooks/useTooltipData';
+import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
+import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 
 import {
   SIDE_ALLOW_OVERHANG,
@@ -1078,7 +1080,54 @@ const byId = useEntitiesById({
     handleSpeakerDragUpdate(speakerId, newCanvasPos);
   }, [handleSpeakerDragUpdate]);
 
-  const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom });
+  const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, lengthM });
+
+  // ── Live RP22 impact for seat-block dragging ─────────────────────────────
+  const engineDimensions = useMemo(() => ({ widthM, lengthM, heightM }), [widthM, lengthM, heightM]);
+  const engineState = useMemo(() => ({
+    lcrAimMode: appState?.lcrAimMode,
+    globalModel: overheadGlobalModel,
+    frontOverride: overheadFrontOverride,
+    midOverride: overheadMidOverride,
+    rearOverride: overheadRearOverride,
+    useFrontGlobal, useMidGlobal, useRearGlobal,
+    aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP,
+    speakerSystem: appState?.speakerSystem,
+    getSpeakerVisibility,
+  }), [
+    appState?.lcrAimMode, appState?.speakerSystem,
+    overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
+    useFrontGlobal, useMidGlobal, useRearGlobal,
+    aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, getSpeakerVisibility,
+  ]);
+  const liveRp22 = useRP22AnalysisEngine({
+    placedSpeakers,
+    seatingPositions,
+    dimensions: engineDimensions,
+    mlpBasis,
+    mlpPointOverride: mlpPoint,
+    seatSplMetrics: allSeatSplMetricsProp,
+    overheadState: engineState,
+    aimState: engineState,
+    p15ConstructionLevel: appState?.p15ConstructionLevel ?? null,
+    screen,
+    visiblePlanSpeakers,
+  });
+  const [baselineRp22, setBaselineRp22] = useState(null);
+  const baselineCapturedRef = useRef(false);
+  useEffect(() => {
+    if (dragging && dragType === 'seat') {
+      if (!baselineCapturedRef.current) {
+        baselineCapturedRef.current = true;
+        setBaselineRp22(liveRp22);
+      }
+    } else {
+      baselineCapturedRef.current = false;
+      setBaselineRp22(null);
+    }
+  // liveRp22 intentionally excluded — captures the pre-drag snapshot
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging, dragType]);
 
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
@@ -1912,6 +1961,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         subDragTick={subDragTick}
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
+        seatingDragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: dragging && dragType === 'seat' }}
       />
   );
 });
