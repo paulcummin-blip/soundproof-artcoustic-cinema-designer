@@ -401,7 +401,7 @@ export default function SideElevation({
             );
           })()}
 
-          {/* Front subwoofers — side profile behind screen, same source of truth as Plan View */}
+          {/* Front subwoofers — side profile behind screen, orientation-aware, grouped by depth+height */}
           {(() => {
             const SUB_ROLE = /^(LFE|SUB|FSUB)/i;
             const frontSubs = Array.isArray(placedSpeakers)
@@ -411,30 +411,49 @@ export default function SideElevation({
                 })
               : [];
             if (!frontSubs.length) return null;
+
+            // Build groups: subs that share the same side-view silhouette (same depth ±5cm, same bottom ±5cm)
+            const groups = [];
+            frontSubs.forEach((sub, idx) => {
+              const subY = Number(sub.position.y);
+              // Orientation-aware dimensions (Vertical / Horizontal)
+              const meta = getSpeakerModelMeta(sub.model, sub.orientation) || {};
+              const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
+              const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
+              // Bottom edge: bottomHeightM is the configured floor height; fall back to z-centre
+              const bottomZ = Number.isFinite(sub.bottomHeightM) ? sub.bottomHeightM
+                : Number.isFinite(sub.position?.z) ? sub.position.z - subHeightM / 2
+                : 0;
+              // Use role as label (LFE1, LFE2…) or synthesise SUBn
+              const label = String(sub.role || `SUB${idx + 1}`).toUpperCase();
+              const match = groups.find(g =>
+                Math.abs(g.subY - subY) < 0.05 && Math.abs(g.bottomZ - bottomZ) < 0.05
+              );
+              if (match) {
+                match.labels.push(label);
+              } else {
+                groups.push({ subY, bottomZ, subHeightM, subDepthM, labels: [label] });
+              }
+            });
+
             return (
               <g opacity={0.88}>
-                {frontSubs.map((sub, i) => {
-                  const subY = Number(sub.position.y);
-                  const meta = getSpeakerModelMeta(sub.model, sub.orientation) || {};
-                  const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
-                  const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
-                  // Bottom edge: use bottomHeightM if available, else derive from position.z
-                  const bottomZ = Number.isFinite(sub.bottomHeightM) ? sub.bottomHeightM
-                    : Number.isFinite(sub.position?.z) ? sub.position.z - subHeightM / 2
-                    : 0;
-                  const topZ = bottomZ + subHeightM;
-                  const frontX = rx(subY - subDepthM / 2);
-                  const backX  = rx(subY + subDepthM / 2);
+                {groups.map((grp, i) => {
+                  const topZ   = grp.bottomZ + grp.subHeightM;
+                  const frontX = rx(grp.subY - grp.subDepthM / 2);
+                  const backX  = rx(grp.subY + grp.subDepthM / 2);
                   const svgW   = Math.max(4, backX - frontX);
                   const svgTop = rz(topZ);
-                  const svgBot = rz(bottomZ);
+                  const svgBot = rz(grp.bottomZ);
                   const svgH   = Math.max(4, svgBot - svgTop);
+                  const label  = grp.labels.join('/');
                   return (
                     <g key={`fsub-${i}`}>
                       <rect
                         x={frontX} y={svgTop}
                         width={svgW} height={svgH}
                         fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                      {/* Front face baffle line */}
                       <line
                         x1={frontX} y1={svgTop}
                         x2={frontX} y2={svgBot}
@@ -443,7 +462,7 @@ export default function SideElevation({
                         x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
                         textAnchor="end" fontSize={6}
                         fill={LABEL_COLOR} fontWeight={600}>
-                        SUB
+                        {label}
                       </text>
                     </g>
                   );
