@@ -151,17 +151,25 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isEv84 = mk.includes("evolve-8-4");
     const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84;
 
+    // Artcoustic PNG assets contain internal transparent padding; enlarge the icon so
+    // the visible cabinet drawing fills the speaker boundary box with ~2–4px clearance.
+    const FACE_ICON_VISIBLE_RATIO = 0.72;
+    const adjustedW = hasFaceIcon ? sw / FACE_ICON_VISIBLE_RATIO : sw;
+    const adjustedH = hasFaceIcon ? sh / FACE_ICON_VISIBLE_RATIO : sh;
+    const adjustedX = hasFaceIcon ? sx - (adjustedW - sw) / 2 : sx;
+    const adjustedY = hasFaceIcon ? sy - (adjustedH - sh) / 2 : sy;
+
     const renderFaceIcon = () => {
-      if (isQ43) return <Q43FaceIcon x={sx} y={sy} width={sw} height={sh} />;
-      if (isQ45) return <Q45FaceIcon x={sx} y={sy} width={sw} height={sh} />;
-      if (isQ85) return <Q85FaceIcon x={sx} y={sy} width={sw} height={sh} />;
-      if (isQ63) return <Q63FaceIcon x={sx} y={sy} size={Math.min(sw, sh)} />;
-      if (isEv11) return <Evolve11FaceIcon x={sx} y={sy} width={sw} height={sh} />;
-      if (isEv21) return <Evolve21FaceIcon x={sx} y={sy} width={sw} height={sh} />;
-      if (isEv31) return <Evolve31FaceIcon x={sx} y={sy} width={sw} height={sh} />;
-      if (isEv42) return <Evolve42FaceIcon x={sx} y={sy} width={sw} height={sh} />;
-      if (isEv63) return <Evolve63FaceIcon x={sx} y={sy} width={sw} height={sh} />;
-      if (isEv84) return <Evolve84FaceIcon x={sx} y={sy} width={sw} height={sh} />;
+      if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isQ85) return <Q85FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isQ63) return <Q63FaceIcon x={adjustedX} y={adjustedY} size={Math.min(adjustedW, adjustedH)} />;
+      if (isEv11) return <Evolve11FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isEv21) return <Evolve21FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isEv31) return <Evolve31FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isEv42) return <Evolve42FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isEv63) return <Evolve63FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isEv84) return <Evolve84FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       return null;
     };
 

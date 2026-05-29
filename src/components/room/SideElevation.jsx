@@ -464,7 +464,7 @@ export default function SideElevation({
             // Product dimensions are the source of truth for the visible cabinet box.
             // The FaceIcon PNG assets contain internal transparent padding, so the outer SVG icon
             // is enlarged beyond the cabinet box (then clipped) so the visible artwork fills it exactly.
-            const FACE_ICON_VISIBLE_RATIO = 0.82; // fraction of the PNG canvas occupied by visible artwork
+            const FACE_ICON_VISIBLE_RATIO = 0.72; // fraction of the PNG canvas occupied by visible artwork; scaled down to enlarge internal cabinet drawing closer to box edges (~2–4px clearance)
             const clipId = `spk-clip-${i}`;
 
             // True-size cabinet box (product heightM × widthM)
