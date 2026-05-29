@@ -150,6 +150,13 @@ export default function SeatingLayout({
   }, [rowCount]); // Changed seatingRows to rowCount
 
   // Validate current mlpBasis against available options
+  // Live viewing offset: derived from current seat positions vs the ideal 57.5° MLP Y.
+  const liveViewingOffset = useMemo(() => {
+    if (!mlpOverride || !Number.isFinite(mlpOverride.y) || !screen) return seatingBlockOffset;
+    const idealY = targetMlpY57_5(screen, 0);
+    return Math.round((mlpOverride.y - idealY) * 100) / 100;
+  }, [mlpOverride, screen, seatingBlockOffset]);
+
   const validMlpBasis = useMemo(() => {
     const validValues = mlpOptions.map((opt) => opt.value);
     return validValues.includes(mlpBasis) ? mlpBasis : 'front';
@@ -321,7 +328,7 @@ export default function SeatingLayout({
               className="text-sm font-medium"
               style={{ color: '#3E4349' }}>
 
-          Rows & Seats
+          Rows &amp; Seats
         </Label>
 
         <div className="space-y-2">
@@ -661,7 +668,7 @@ export default function SeatingLayout({
                 min="-2.0"
                 max="2.0"
                 step="0.1"
-                value={seatingBlockOffset}
+                value={liveViewingOffset}
                 onChange={(e) => {
                   if (disabled) return;
                   const raw = e.target.value;

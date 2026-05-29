@@ -32,10 +32,12 @@ export default function ViewingAnglePanel({
       : Number(screen?.floatDepthM ?? 0);
 
   const rp23Data = useMemo(() => {
-    // Use only the true RSP Y value (mlpY_m from app state).
-    // Seat layout changes must NOT affect this panel — only the true RSP
-    // position (driven by screen geometry + Viewing Offset) should.
-    const effectiveViewerY = Number.isFinite(mlpY_m) ? mlpY_m : null;
+    // Prefer live mlpOverride.y (from current seatingPositions — updates live during drag).
+    // Fall back to mlpY_m from app state when no override is present.
+    const effectiveViewerY =
+      mlpOverride && Number.isFinite(Number(mlpOverride.y))
+        ? Number(mlpOverride.y)
+        : Number.isFinite(mlpY_m) ? mlpY_m : null;
 
     if (effectiveViewerY === null || !Number.isFinite(screenFrontPlaneM)) {
       return null;
