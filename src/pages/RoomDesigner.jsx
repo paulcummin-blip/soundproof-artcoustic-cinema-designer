@@ -289,6 +289,7 @@ function RoomDesignerWithState() {
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
   const [leftPanelView, setLeftPanelView] = useState('plan'); // 'plan' | 'front' | 'side'
   const [rightPanelView, setRightPanelView] = useState('controls'); // 'controls' | 'isometric' | 'data'
+  const [sideElevationWall, setSideElevationWall] = useState('right'); // 'left' | 'right'
 
   // --- bed rears required? (SBL/SBR) ---
   const layoutMajor = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) || 5;
@@ -1685,14 +1686,30 @@ function RoomDesignerWithState() {
                 )}
 
                 {leftPanelView === 'side' && (
-                  <SideElevation
-                    dimensions={stableDimensions}
-                    screen={_screen}
-                    seatingPositions={_seatingPositions}
-                    mlpPoint={mlpAnchorEffective}
-                    roomElements={_roomElements}
-                    placedSpeakers={placedSpeakers}
-                  />
+                  <>
+                    {/* Left/Right wall toggle */}
+                    <div style={{ display: 'flex', gap: 4, padding: '6px 12px', borderBottom: '1px solid #DCDBD6', background: '#FAFAF8' }}>
+                      <span style={{ fontSize: 10, color: '#9B9890', fontWeight: 600, letterSpacing: '0.06em', alignSelf: 'center', marginRight: 4 }}>VIEWING WALL:</span>
+                      {['left', 'right'].map(w => (
+                        <button
+                          key={w}
+                          onClick={() => setSideElevationWall(w)}
+                          style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 5, border: sideElevationWall === w ? '1px solid #213428' : '1px solid #DCDBD6', background: sideElevationWall === w ? '#213428' : '#fff', color: sideElevationWall === w ? '#fff' : '#625143', cursor: 'pointer' }}
+                        >
+                          {w.toUpperCase()} WALL
+                        </button>
+                      ))}
+                    </div>
+                    <SideElevation
+                      dimensions={stableDimensions}
+                      screen={_screen}
+                      seatingPositions={_seatingPositions}
+                      mlpPoint={mlpAnchorEffective}
+                      roomElements={_roomElements}
+                      placedSpeakers={placedSpeakers}
+                      wall={sideElevationWall}
+                    />
+                  </>
                 )}
 
               </Suspense>

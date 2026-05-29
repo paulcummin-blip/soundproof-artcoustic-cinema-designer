@@ -60,6 +60,14 @@ function screenDimsM(screen) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
+// Determine which wall-side a speaker role belongs to
+const getRoleSide = (role) => {
+  const r = String(role || '').toUpperCase();
+  if (r.endsWith('R')) return 'right';
+  if (r.endsWith('L')) return 'left';
+  return null; // centre / ambiguous
+};
+
 export default function SideElevation({
   dimensions,
   screen,
@@ -67,6 +75,7 @@ export default function SideElevation({
   mlpPoint,
   roomElements,
   placedSpeakers,
+  wall = 'right', // 'left' | 'right' — which side wall is being viewed
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
@@ -107,11 +116,16 @@ export default function SideElevation({
     return roomElements.find(el => el?.type === 'projector') ?? null;
   }, [roomElements]);
 
-  // --- Doors / windows ---
+  // --- Doors / windows: only show elements on the viewed wall ---
   const openingEls = useMemo(() => {
     if (!Array.isArray(roomElements)) return [];
-    return roomElements.filter(el => el?.type === 'door' || el?.type === 'window');
-  }, [roomElements]);
+    return roomElements.filter(el => {
+      if (el?.type !== 'door' && el?.type !== 'window') return false;
+      // If the element has a wall property, filter strictly; otherwise include it
+      if (el.wall) return el.wall === wall;
+      return true;
+    });
+  }, [roomElements, wall]);
 
   // --- Seat rows: pick one representative Y per row from seatingPositions ---
   const seatRows = useMemo(() => {
@@ -151,29 +165,43 @@ export default function SideElevation({
     : seatRows.length ? seatRows[Math.floor(seatRows.length / 2)].earZ
     : 1.2;
 
-  // --- Speakers: LCR + surround y/z markers ---
+  // --- Speakers: LCR + surround y/z markers, filtered to viewed wall ---
   const speakerMarkers = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return [];
     return placedSpeakers
-      .filter(s => Number.isFinite(s?.position?.y) && Number.isFinite(s?.position?.z))
+      .filter(s => {
+        if (!Number.isFinite(s?.position?.y) || !Number.isFinite(s?.position?.z)) return false;
+        const role = String(s.role || '').toUpperCase();
+        const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+        // LCR speakers are front-wall — always include them (shown faintly)
+        if (lcrRoles.has(role)) return true;
+        // For side/surround/overhead speakers, filter by which wall side they're on
+        const side = getRoleSide(role);
+        if (side === null) return true; // centre roles: SC etc — always show
+        return side === wall;
+      })
       .map(s => ({
         role: String(s.role || ""),
         model: String(s.model || ""),
         y: s.position.y,
         z: s.position.z,
       }));
-  }, [placedSpeakers]);
+  }, [placedSpeakers, wall]);
 
   // Rear-wall surround roles (overlap in side elevation)
   const REAR_ROLES = new Set(['SBL','SBR','SCL','SCR','SC']);
 
-  // Group rear-wall speakers by similar height (tolerance 0.02m)
+  // Group rear-wall speakers by similar height — filtered to viewed wall side
   const rearWallGroups = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return [];
-    const rearSpks = placedSpeakers.filter(s =>
-      REAR_ROLES.has(String(s?.role || '').toUpperCase()) &&
-      Number.isFinite(s?.position?.z)
-    );
+    const rearSpks = placedSpeakers.filter(s => {
+      const role = String(s?.role || '').toUpperCase();
+      if (!REAR_ROLES.has(role)) return false;
+      if (!Number.isFinite(s?.position?.z)) return false;
+      const side = getRoleSide(role);
+      if (side === null) return true; // SC (centre) — show on both
+      return side === wall;
+    });
     const groups = [];
     rearSpks.forEach(s => {
       const z = s.position.z;
