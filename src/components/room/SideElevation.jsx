@@ -323,35 +323,72 @@ export default function SideElevation({
             );
           })()}
 
-          {/* LCR Speakers — faintly rendered behind screen wall */}
+          {/* Front-stage speakers — architectural side profile, wall-filtered */}
           {(() => {
-            const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
-            const lcrSpks = Array.isArray(placedSpeakers)
-              ? placedSpeakers.filter(s => lcrRoles.has(String(s?.role || '').toUpperCase()))
+            const LCR_ROLES = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+            const allLcr = Array.isArray(placedSpeakers)
+              ? placedSpeakers.filter(s => LCR_ROLES.has(String(s?.role || '').toUpperCase()))
               : [];
-            if (!lcrSpks.length) return null;
+            if (!allLcr.length) return null;
+
+            const canon = (s) => String(s?.role || '').toUpperCase().replace(/^L$/, 'FL').replace(/^C$/, 'FC').replace(/^R$/, 'FR');
+            const hasFL = allLcr.some(s => canon(s) === 'FL');
+            const hasFR = allLcr.some(s => canon(s) === 'FR');
+            const hasFC = allLcr.some(s => canon(s) === 'FC');
+            const isIntegrated = hasFC && !hasFL && !hasFR;
+
+            // Determine which roles to render for this wall view
+            const visibleRoles = new Set();
+            if (isIntegrated) {
+              visibleRoles.add('FC');
+            } else {
+              // Separate LCR or soundbar-override: show wall-appropriate main speaker only
+              // FC (centre) is hidden because it cannot be meaningfully shown in side profile
+              if (wall === 'right') visibleRoles.add('FR');
+              else visibleRoles.add('FL');
+            }
+
+            const toRender = allLcr.filter(s => visibleRoles.has(canon(s)));
+            if (!toRender.length) return null;
+
             return (
-              <g opacity={0.35}>
-                {lcrSpks.map((spk, i) => {
+              <g opacity={0.82}>
+                {toRender.map((spk, i) => {
                   const spkY = Number(spk?.position?.y);
                   const spkZ = Number(spk?.position?.z);
                   if (!Number.isFinite(spkY) || !Number.isFinite(spkZ)) return null;
-                  // Cabinet fallback: 0.27m wide (depth in Y) × 0.37m tall
-                  const cabDepth = 0.12; // Y-axis depth → horizontal SVG extent
-                  const cabH    = 0.37; // Z-axis height → vertical SVG extent
-                  const svgX   = rx(spkY);
-                  const svgTop = rz(spkZ + cabH / 2);
-                  const svgCabH = rz(spkZ - cabH / 2) - svgTop;
-                  const svgCabW = Math.max(3, (cabDepth / roomL) * drawW);
+
+                  // Use product dimensions as source of truth
+                  const meta = getSpeakerModelMeta(spk.model) || {};
+                  const spkDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.10;
+                  const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.30;
+
+                  // Side profile: depth along Y axis (horizontal), height along Z (vertical)
+                  const frontX = rx(spkY - spkDepthM / 2); // front face of cabinet
+                  const backX  = rx(spkY + spkDepthM / 2); // rear of cabinet
+                  const svgW   = Math.max(3, backX - frontX);
+                  const svgTop = rz(spkZ + spkHeightM / 2);
+                  const svgBot = rz(spkZ - spkHeightM / 2);
+                  const svgH   = Math.max(3, svgBot - svgTop);
+
+                  const role = canon(spk);
                   return (
-                    <g key={`lcr-sv-${i}`}>
+                    <g key={`lcr-side-${i}`}>
+                      {/* Cabinet outline — white fill, clean dark stroke */}
                       <rect
-                        x={svgX - svgCabW / 2} y={svgTop}
-                        width={svgCabW} height={svgCabH}
-                        fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
-                      <text x={svgX} y={svgTop - 4}
-                        textAnchor="middle" fontSize={6} fill={SPK_COLOR} fontWeight={600}>
-                        {spk.role}
+                        x={frontX} y={svgTop}
+                        width={svgW} height={svgH}
+                        fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                      {/* Front-face baffle line (left edge = front of speaker facing into room) */}
+                      <line
+                        x1={frontX} y1={svgTop}
+                        x2={frontX} y2={svgBot}
+                        stroke="#4A4540" strokeWidth={1.4} />
+                      <text
+                        x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
+                        textAnchor="end" fontSize={6}
+                        fill={LABEL_COLOR} fontWeight={600}>
+                        {role}
                       </text>
                     </g>
                   );
