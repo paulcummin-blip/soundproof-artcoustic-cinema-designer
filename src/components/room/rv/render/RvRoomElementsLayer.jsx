@@ -13,7 +13,8 @@ export default function RvRoomElementsLayer({
   getSpeakerVisibility,
   getCanonicalRole,
   appState,
-  rolesForLayout
+  rolesForLayout,
+  handleMouseDown,
 }) {
   if (!hasRoomRect) return null;
 
@@ -277,8 +278,19 @@ export default function RvRoomElementsLayer({
 
         const label = String(e.__label || `Element ${idx + 1}`);
 
+        const isProjector = element?.type === 'projector';
+        const dragId = element?.id ?? `el-${idx}`;
+
         return (
-          <g key={String(element?.id ?? `el-${idx}`)}>
+          <g
+            key={String(dragId)}
+            style={isProjector && handleMouseDown ? { cursor: 'grab', pointerEvents: 'all' } : undefined}
+            onPointerDown={isProjector && handleMouseDown ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleMouseDown(e, dragId, 'projector');
+            } : undefined}
+          >
             <rect
               x={xPx}
               y={yPx}
@@ -288,8 +300,9 @@ export default function RvRoomElementsLayer({
               stroke={stroke}
               strokeWidth={2}
               vectorEffect="non-scaling-stroke"
+              pointerEvents={isProjector && handleMouseDown ? 'all' : 'none'}
             />
-            <text
+          <text
               x={labelXpx}
               y={labelYpx}
               fill="#1B1A1A"
@@ -300,6 +313,7 @@ export default function RvRoomElementsLayer({
               textAnchor="middle"
               dominantBaseline="middle"
               transform={labelRotate !== 0 ? `rotate(${labelRotate}, ${labelXpx}, ${labelYpx})` : undefined}
+              pointerEvents="none"
             >
               {label}
             </text>

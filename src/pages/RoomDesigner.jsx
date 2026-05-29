@@ -1658,6 +1658,7 @@ function RoomDesignerWithState() {
                   onScreenPlaneYChange={(y) => _setScreen?.((prev) => ({ ...prev, screenPlaneY_m: y }))}
                   overlays={overlaysForRendering}
                   roomElements={_roomElements}
+                  onSetRoomElements={appState?.setRoomElements}
                   dolbyLayout={dolbyPreset}
                   aimAtMLP={lcrAimMode === "angled"}
                   onLcrAngleComputed={setLcrAngleDeg}

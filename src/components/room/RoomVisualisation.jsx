@@ -153,6 +153,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     seatingPositions = [],
     mlpPoint,
     roomElements = [],
+    onSetRoomElements,
     frontSubs = [],
     rearSubs = [],
     frontSubsCfg,
@@ -906,6 +907,7 @@ const byId = useEntitiesById({
     draftFrontSubsRef, draftRearSubsRef, idleCommitTimerRef,
     frontSubs, rearSubs, frontSubsCfg, rearSubsCfg,
     isRenderableSpeaker, isDraggable,
+    roomElements,
   });
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
@@ -1082,6 +1084,24 @@ const byId = useEntitiesById({
 
   const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, lengthM });
 
+  // Projector drag — Y-axis only, clamped to room bounds
+  const handleProjectorDrag = useCallback((projectorId, canvasPos) => {
+    if (!onSetRoomElements || !canvasToRoom) return;
+    const roomPos = canvasToRoom(canvasPos);
+    const rawY = roomPos.y + dragOffsetRoomRef.current.y;
+    const projEl = Array.isArray(roomElements)
+      ? roomElements.find(e => e?.type === 'projector')
+      : null;
+    const bodyD = Number(projEl?.body_depth_m) || 0.517;
+    const halfD = bodyD / 2;
+    const clampedY = Math.max(halfD, Math.min(lengthM - halfD, rawY));
+    onSetRoomElements(prev =>
+      (Array.isArray(prev) ? prev : []).map(el =>
+        el?.type === 'projector' ? { ...el, y_lens_m: clampedY } : el
+      )
+    );
+  }, [onSetRoomElements, canvasToRoom, roomElements, lengthM]);
+
   // ── Live RP22 impact for seat-block dragging ─────────────────────────────
   const engineDimensions = useMemo(() => ({ widthM, lengthM, heightM }), [widthM, lengthM, heightM]);
   const engineState = useMemo(() => ({
@@ -1111,7 +1131,7 @@ const byId = useEntitiesById({
     aimState: engineState,
     p15ConstructionLevel: appState?.p15ConstructionLevel ?? null,
     screen,
-    // visiblePlanSpeakers omitted here — declared later in the component
+    visiblePlanSpeakers,
   });
   const [baselineRp22, setBaselineRp22] = useState(null);
   const baselineCapturedRef = useRef(false);
@@ -1184,6 +1204,7 @@ const byId = useEntitiesById({
     handleSpeakerDrag,
     handleSeatDrag,
     handleSubDrag,
+    handleProjectorDrag,
   });
 
   const { handleMouseUp } = useMouseUpHandler({

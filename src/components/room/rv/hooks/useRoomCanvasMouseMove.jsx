@@ -24,6 +24,7 @@ export function useRoomCanvasMouseMove({
   handleSpeakerDrag,
   handleSeatDrag,
   handleSubDrag,
+  handleProjectorDrag,
 }) {
   const handleMouseMove = useCallback((e) => {
     if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
@@ -62,12 +63,14 @@ export function useRoomCanvasMouseMove({
     } else if (dragType === 'sub') {
       handleSubDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
       setDragState(s => (s && s.dragging ? { ...s } : s));
+    } else if (dragType === 'projector') {
+      handleProjectorDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     }
   }, [
     dragging, draggedItemId, dragType, dragState,
     setDragWarning, svgRef, canvasToRoom, roomToCanvas,
     dragOffsetRoomRef, roomRect, placedSpeakers,
-    handleSpeakerDrag, handleSeatDrag, handleSubDrag,
+    handleSpeakerDrag, handleSeatDrag, handleSubDrag, handleProjectorDrag,
     setDragState,
   ]);
 
