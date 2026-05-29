@@ -283,7 +283,7 @@ export function useMouseDownHandler({
         }
       }
     },
-    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomElements]
   );
 
   return { handleMouseDown };
