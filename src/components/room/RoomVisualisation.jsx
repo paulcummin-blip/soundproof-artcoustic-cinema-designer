@@ -1102,6 +1102,9 @@ const byId = useEntitiesById({
     );
   }, [onSetRoomElements, canvasToRoom, roomElements, lengthM]);
 
+  // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
+  const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
+
   // ── Live RP22 impact for seat-block dragging ─────────────────────────────
   const engineDimensions = useMemo(() => ({ widthM, lengthM, heightM }), [widthM, lengthM, heightM]);
   const engineState = useMemo(() => ({
@@ -1772,9 +1775,6 @@ useEffect(() => {
     appState,
     getCanonicalRole,
   });
-
-  // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
-  const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
   // Removed: renderSpeakers function (now RvSpeakerLayer component)
 
