@@ -2,12 +2,10 @@ import React from 'react';
 import { getLevelColor, getLevelText } from '@/components/utils/rp22LevelCalculation';
 
 // Parameters monitored during seat-block dragging (in priority order for display)
-// 23 = RP23 viewing angle (treated as a special param, read from perSeatRp23)
-const MONITORED_PARAMS = [23, 1, 5, 6, 9, 10, 12, 13, 16, 17];
+const MONITORED_PARAMS = [1, 5, 6, 9, 10, 12, 13, 16, 17];
 const MAX_SHOWN = 5;
 
 const PARAM_LABELS = {
-  23: 'Viewing angle (RP23)',
   1:  'Nearest boundary distance',
   5:  'Surround gap (largest)',
   6:  'Surround SPL consistency',
@@ -48,13 +46,6 @@ function getLevelColors(level) {
 function extractParam(rp22, paramNum) {
   if (!rp22) return null;
 
-  // RP23 viewing angle — read from perSeatRp23
-  if (paramNum === 23) {
-    const p = rp22.perSeatRp23?.['mlp'] ?? null;
-    if (!p || p.level == null) return null;
-    return { level: p.level, formatted: p.formatted ?? null, numericValue: p.angleDeg ?? null };
-  }
-
   // Global (room-level) params
   if (paramNum === 12 || paramNum === 13) {
     const p = rp22.gradedParameters?.primary?.[paramNum];
@@ -81,7 +72,6 @@ function extractParam(rp22, paramNum) {
 
 // Per-parameter numeric tolerance for raw-value change detection
 const NUMERIC_TOLERANCE = {
-  23: 0.5,   // RP23: viewing angle — 0.5°
   1:  0.01,  // P1: nearest wall — 1cm
   5:  0.5,   // P5: surround gap — 0.5°
   6:  0.1,   // P6: surround SPL consistency — 0.1 dB

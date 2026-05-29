@@ -149,20 +149,6 @@ button:focus-visible {
 
 
 @layer base {
-  :root {
-    /* RP22 level colour tokens (shared by HUD, compliance report, PDF, drag card) */
-    --rp22-l4-fill: #DCFCE7;
-    --rp22-l4-text: #166534;
-    --rp22-l3-fill: #DBEAFE;
-    --rp22-l3-text: #1E40AF;
-    --rp22-l2-fill: #FEF9C3;
-    --rp22-l2-text: #854D0E;
-    --rp22-l1-fill: #FEE2E2;
-    --rp22-l1-text: #991B1B;
-    --rp22-na-fill: #374151;
-    --rp22-na-text: #9CA3AF;
-  }
-
   * {
     @apply border-border outline-ring/50;
   }
