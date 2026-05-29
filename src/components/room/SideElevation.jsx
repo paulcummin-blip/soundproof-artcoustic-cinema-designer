@@ -448,28 +448,32 @@ export default function SideElevation({
               );
             }
 
-            const iconW = 22;
-            const iconH = 22;
-            const spkX = rx(spk.y);
-            const spkZ = rz(spk.z);
-            const ix = spkX - iconW / 2;
-            const iy = spkZ - iconH / 2;
+            const meta = getSpeakerModelMeta(spk.model) || {};
+            const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
+            const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
+
+            const spkX   = rx(spk.y);
+            const svgTop = rz(spk.z + spkHeightM / 2);
+            const svgBot = rz(spk.z - spkHeightM / 2);
+            const svgH   = Math.max(3, svgBot - svgTop);
+            const svgW   = Math.max(3, (spkWidthM / roomL) * drawW);
+            const ix     = spkX - svgW / 2;
 
             const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
 
             return (
               <g key={`spk-${i}`} opacity={0.85}>
                 {FaceIcon ? (
-                  <FaceIcon x={ix} y={iy} width={iconW} height={iconH} />
+                  <FaceIcon x={ix} y={svgTop} width={svgW} height={svgH} />
                 ) : (
                   <rect
-                    x={ix} y={iy}
-                    width={iconW} height={iconH}
+                    x={ix} y={svgTop}
+                    width={svgW} height={svgH}
                     fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2} />
                 )}
                 <text
                   x={spkX}
-                  y={iy - 3}
+                  y={svgTop - 3}
                   textAnchor="middle"
                   fontSize={6}
                   fill={SPK_COLOR}
