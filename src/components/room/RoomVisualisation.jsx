@@ -329,6 +329,10 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const isDraggingSpeakerRef = useRef(false);
   const isAnyDraggingRef = React.useRef(false);
   const dragOffsetRoomRef = useRef({ x: 0, y: 0 });
+  // Seating block group drag refs
+  const seatingBlockDragStartRoomPosRef = useRef(null);
+  const seatingBlockInitialPositionsRef = useRef(null);
+  const isDraggingSeatingBlockRef = useRef(false);
   const draggedSubWallRef = useRef(null);
   const draggedSubTypeRef = useRef(null);
   const lastSentRef = useRef(null);
@@ -1113,6 +1117,51 @@ const byId = useEntitiesById({
   });
 
   // Mouse handling — delegated to extracted hook
+  // Seating block drag: move all seats together by the same delta
+  const handleSeatingBlockMouseDown = useCallback((e) => {
+    if (!svgRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const point = svgRef.current.createSVGPoint();
+    point.x = e.clientX;
+    point.y = e.clientY;
+    const ctm = svgRef.current.getScreenCTM();
+    if (!ctm) return;
+    const svgPt = point.matrixTransform(ctm.inverse());
+    const cursorRoom = canvasToRoom({ x: svgPt.x, y: svgPt.y });
+    seatingBlockDragStartRoomPosRef.current = { x: cursorRoom.x, y: cursorRoom.y };
+    seatingBlockInitialPositionsRef.current = (seatingPositions || []).map(s => ({
+      id: s.id,
+      x: Number(s.x ?? s.position?.x ?? 0),
+      y: Number(s.y ?? s.position?.y ?? 0),
+    }));
+    isDraggingSeatingBlockRef.current = true;
+    isAnyDraggingRef.current = true;
+    setDragState({ dragging: true, draggedItemId: 'seat-block', dragType: 'seat-block' });
+    setDragWarning({ show: false });
+  }, [svgRef, canvasToRoom, seatingPositions, isAnyDraggingRef, setDragState, setDragWarning]);
+
+  const handleSeatingBlockDrag = useCallback((cursorRoom) => {
+    if (!isDraggingSeatingBlockRef.current) return;
+    const start = seatingBlockDragStartRoomPosRef.current;
+    const initial = seatingBlockInitialPositionsRef.current;
+    if (!start || !initial || !initial.length) return;
+    const dx = cursorRoom.x - start.x;
+    const dy = cursorRoom.y - start.y;
+    const MARGIN = 0.3;
+    const initialMinX = Math.min(...initial.map(s => s.x));
+    const initialMaxX = Math.max(...initial.map(s => s.x));
+    const initialMinY = Math.min(...initial.map(s => s.y));
+    const initialMaxY = Math.max(...initial.map(s => s.y));
+    const clampedDx = Math.max(MARGIN - initialMinX, Math.min((widthM - MARGIN) - initialMaxX, dx));
+    const clampedDy = Math.max(MARGIN - initialMinY, Math.min((lengthM - MARGIN) - initialMaxY, dy));
+    onSetSeatingPositions(prev => (prev || []).map(seat => {
+      const init = initial.find(s => s.id === seat.id);
+      if (!init) return seat;
+      return { ...seat, x: init.x + clampedDx, y: init.y + clampedDy };
+    }));
+  }, [widthM, lengthM, onSetSeatingPositions]);
+
   const { handleMouseMove } = useRoomCanvasMouseMove({
     dragging,
     draggedItemId,
@@ -1135,9 +1184,10 @@ const byId = useEntitiesById({
     handleSpeakerDrag,
     handleSeatDrag,
     handleSubDrag,
+    handleSeatingBlockDrag,
   });
 
-  const { handleMouseUp } = useMouseUpHandler({
+  const { handleMouseUp: _handleMouseUp } = useMouseUpHandler({
     dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers,
     setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW,
     isDraggingSubRef, isAnyDraggingRef, isDraggingSpeakerRef, dragOffsetRoomRef,
@@ -1146,6 +1196,16 @@ const byId = useEntitiesById({
     widthM, getModelDimsM, commitDraftSubPositions,
     _lastValidDraftFrontSubsRef, _lastValidDraftRearSubsRef,
   });
+
+  // Wrap to also clean up seating block drag refs on mouse up
+  const handleMouseUp = useCallback((e) => {
+    if (isDraggingSeatingBlockRef.current) {
+      isDraggingSeatingBlockRef.current = false;
+      seatingBlockDragStartRoomPosRef.current = null;
+      seatingBlockInitialPositionsRef.current = null;
+    }
+    _handleMouseUp(e);
+  }, [_handleMouseUp]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
@@ -1880,6 +1940,8 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         handleSeatMouseEnter={handleSeatMouseEnter}
         handleSeatMouseLeave={handleSeatMouseLeave}
         handleSeatClick={handleSeatClick}
+        onSeatingBlockMouseDown={handleSeatingBlockMouseDown}
+        isDraggingBlock={dragType === 'seat-block'}
         clampMlpY={clampMlpY}
         MLPMarker={MLPMarker}
         overheadIconElements={overheadIconElements}

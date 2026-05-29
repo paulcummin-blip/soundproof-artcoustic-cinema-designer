@@ -17,6 +17,8 @@ export default function RvSeatLayer({
   handleSeatClick,
   clampMlpY,
   MLPMarker,
+  onSeatingBlockMouseDown,
+  isDraggingBlock,
 }) {
   if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
     if (globalThis.__B44_LOGS) console.log('RvSeatLayer: rendering seats = 0');
@@ -28,8 +30,54 @@ export default function RvSeatLayer({
 
   if (globalThis.__B44_LOGS) console.log('RvSeatLayer: rendering seats =', seatingPositions.length);
 
+  // Compute seating group bounding box for block drag handle
+  const PAD_M = 0.25;
+  let blockBounds = null;
+  if (seatingPositions.length > 0 && onSeatingBlockMouseDown) {
+    const seatXs = seatingPositions.map(s => Number(s.x ?? s.position?.x ?? 0));
+    const seatYs = seatingPositions.map(s => clampMlpY(Number(s.y ?? s.position?.y ?? 0)));
+    const bbMinX = Math.min(...seatXs) - RX_M - PAD_M;
+    const bbMaxX = Math.max(...seatXs) + RX_M + PAD_M;
+    const bbMinY = Math.min(...seatYs) - RY_M - PAD_M;
+    const bbMaxY = Math.max(...seatYs) + RY_M + PAD_M;
+    const [bx1, by1] = toPx(bbMinX, bbMinY);
+    const [bx2, by2] = toPx(bbMaxX, bbMaxY);
+    blockBounds = { x: bx1, y: by1, w: bx2 - bx1, h: by2 - by1,
+      labelX: (bx1 + bx2) / 2, labelY: by1 - 6 };
+  }
+
   return (
     <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
+      {/* Seating block group drag handle */}
+      {blockBounds && (
+        <g data-layer="seat-block-handle">
+          <rect
+            x={blockBounds.x}
+            y={blockBounds.y}
+            width={blockBounds.w}
+            height={blockBounds.h}
+            fill={isDraggingBlock ? 'rgba(33,52,40,0.06)' : 'rgba(33,52,40,0.02)'}
+            stroke="#213428"
+            strokeWidth={1}
+            strokeDasharray="5 3"
+            rx={4}
+            style={{ cursor: isDraggingBlock ? 'grabbing' : 'grab', pointerEvents: 'all' }}
+            onMouseDown={onSeatingBlockMouseDown}
+          />
+          <text
+            x={blockBounds.labelX}
+            y={blockBounds.labelY}
+            textAnchor="middle"
+            fontSize={Math.max(8, scale * 0.12)}
+            fill="#213428"
+            opacity={0.6}
+            style={{ pointerEvents: 'none', userSelect: 'none', fontWeight: 500, letterSpacing: '0.03em' }}
+          >
+            Move seating layout
+          </text>
+        </g>
+      )}
+
       {/* MLP marker MUST live in the same layer as seats to prevent transform drift */}
       {MLPMarker}
 
