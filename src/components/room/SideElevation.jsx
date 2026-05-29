@@ -461,10 +461,17 @@ export default function SideElevation({
 
             const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
 
+            // The FaceIcon PNG assets contain internal transparent padding, so the outer SVG is
+            // enlarged only in Side Elevation to make the visible artwork match the true product height.
+            const FACE_ICON_VISIBLE_HEIGHT_RATIO = 0.82;
+            const adjustedIconH = FaceIcon ? svgH / FACE_ICON_VISIBLE_HEIGHT_RATIO : svgH;
+            // Re-centre: the enlarged icon must remain centred on spk.z
+            const adjustedIconY = rz(spk.z) - adjustedIconH / 2;
+
             return (
               <g key={`spk-${i}`} opacity={0.85}>
                 {FaceIcon ? (
-                  <FaceIcon x={ix} y={svgTop} width={svgW} height={svgH} />
+                  <FaceIcon x={ix} y={adjustedIconY} width={svgW} height={adjustedIconH} />
                 ) : (
                   <rect
                     x={ix} y={svgTop}
