@@ -689,8 +689,6 @@ export default function SideElevation({
                   x={px} y={pz - pbH / 2}
                   width={pbW} height={pbH}
                   fill={PROJ_FILL} stroke="#222" strokeWidth={0.9} rx={1.5} />
-                <circle cx={px} cy={pz} r={Math.max(3, pbH * 0.3)}
-                  fill="#888" stroke="#555" strokeWidth={0.7} />
                 {/* PROJ label — below projector body to avoid geometry clash */}
                 <text x={px + pbW / 2} y={pz + pbH / 2 + 13}
                   textAnchor="middle" fontSize={7.5} fill={DIM_COLOR}
