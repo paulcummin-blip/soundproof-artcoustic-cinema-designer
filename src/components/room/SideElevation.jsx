@@ -101,10 +101,14 @@ export default function SideElevation({
   const screenData  = useMemo(() => screenDimsM(screen), [screen]);
   const screenFloorM = Number(screen?.heightFromFloorM) || 0.5;
   const screenTopM   = screenFloorM + screenData.h;
-  // Screen front plane Y
+  // Screen front plane Y — same source of truth as Plan View
   const screenFrontY = Number(screen?.screenPlaneY_m) > 0
     ? Number(screen.screenPlaneY_m)
-    : Number(screen?.floatDepthM) || 0.20;
+    : Number(screen?.screenFrontPlane_m) > 0
+      ? Number(screen.screenFrontPlane_m)
+      : Number(screen?.screen_front_plane_m) > 0
+        ? Number(screen.screen_front_plane_m)
+        : Number(screen?.floatDepthM) || 0.20;
   // Border thickness
   const borderM      = Number(screen?.borderThicknessM) > 0 ? Number(screen.borderThicknessM) : 0.05;
   const frameTopM    = screenTopM + borderM;      // top of frame (above viewable)
@@ -389,6 +393,57 @@ export default function SideElevation({
                         textAnchor="end" fontSize={6}
                         fill={LABEL_COLOR} fontWeight={600}>
                         {role}
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })()}
+
+          {/* Front subwoofers — side profile behind screen, same source of truth as Plan View */}
+          {(() => {
+            const SUB_ROLE = /^(LFE|SUB|FSUB)/i;
+            const frontSubs = Array.isArray(placedSpeakers)
+              ? placedSpeakers.filter(s => {
+                  const role = String(s?.role || '').toUpperCase();
+                  return SUB_ROLE.test(role) && Number.isFinite(s?.position?.y);
+                })
+              : [];
+            if (!frontSubs.length) return null;
+            return (
+              <g opacity={0.88}>
+                {frontSubs.map((sub, i) => {
+                  const subY = Number(sub.position.y);
+                  const meta = getSpeakerModelMeta(sub.model, sub.orientation) || {};
+                  const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
+                  const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
+                  // Bottom edge: use bottomHeightM if available, else derive from position.z
+                  const bottomZ = Number.isFinite(sub.bottomHeightM) ? sub.bottomHeightM
+                    : Number.isFinite(sub.position?.z) ? sub.position.z - subHeightM / 2
+                    : 0;
+                  const topZ = bottomZ + subHeightM;
+                  const frontX = rx(subY - subDepthM / 2);
+                  const backX  = rx(subY + subDepthM / 2);
+                  const svgW   = Math.max(4, backX - frontX);
+                  const svgTop = rz(topZ);
+                  const svgBot = rz(bottomZ);
+                  const svgH   = Math.max(4, svgBot - svgTop);
+                  return (
+                    <g key={`fsub-${i}`}>
+                      <rect
+                        x={frontX} y={svgTop}
+                        width={svgW} height={svgH}
+                        fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                      <line
+                        x1={frontX} y1={svgTop}
+                        x2={frontX} y2={svgBot}
+                        stroke="#4A4540" strokeWidth={1.4} />
+                      <text
+                        x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
+                        textAnchor="end" fontSize={6}
+                        fill={LABEL_COLOR} fontWeight={600}>
+                        SUB
                       </text>
                     </g>
                   );
