@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { getSpeakerModelMeta } from "../models/speakers/registry";
 import SeatPersonIcon from "../roomdesigner/SeatPersonIcon";
 import {
   Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon,
@@ -386,6 +387,42 @@ export default function SideElevation({
             const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
             if (lcrRoles.has(String(spk.role || '').toUpperCase())) return null;
 
+            const role = String(spk.role || '').toUpperCase();
+            const isCeiling = /^T[A-Z]/.test(role);
+
+            if (isCeiling) {
+              // Side-profile ceiling insert: body sits ABOVE ceiling line, grille flush with ceiling
+              const meta = getSpeakerModelMeta(spk.model) || {};
+              const widthM = Number(meta.widthM) > 0 ? Number(meta.widthM) : 0.165;
+              const depthM = 0.074;
+              const svgGrille = rz(roomH);                          // ceiling line
+              const svgBodyTop = svgGrille - (depthM / roomH) * drawH; // above ceiling
+              const svgBodyH   = svgGrille - svgBodyTop;
+              const svgHalfW   = Math.max(4, (widthM / roomL) * drawW / 2);
+              const cx = rx(spk.y);
+              return (
+                <g key={`spk-${i}`} opacity={0.88}>
+                  {/* Body above ceiling */}
+                  <rect
+                    x={cx - svgHalfW} y={svgBodyTop}
+                    width={svgHalfW * 2} height={svgBodyH}
+                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
+                  {/* Grille line flush with ceiling */}
+                  <line
+                    x1={cx - svgHalfW} y1={svgGrille}
+                    x2={cx + svgHalfW} y2={svgGrille}
+                    stroke="#fff" strokeWidth={1} opacity={0.6} />
+                  {/* Label above body */}
+                  <text
+                    x={cx} y={svgBodyTop - 3}
+                    textAnchor="middle" fontSize={6}
+                    fill={SPK_COLOR} fontWeight={600}>
+                    {spk.role}
+                  </text>
+                </g>
+              );
+            }
+
             const iconW = 22;
             const iconH = 22;
             const spkX = rx(spk.y);
@@ -400,7 +437,6 @@ export default function SideElevation({
                 {FaceIcon ? (
                   <FaceIcon x={ix} y={iy} width={iconW} height={iconH} />
                 ) : (
-                  // Fallback: generic dark rectangle
                   <rect
                     x={ix} y={iy}
                     width={iconW} height={iconH}
