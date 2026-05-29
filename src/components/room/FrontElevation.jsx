@@ -30,7 +30,7 @@ function screenDimsM(screen) {
   return { w: wM, h: wM / ar };
 }
 
-export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], roomElements = [] }) {
+export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], frontSubsCfg, roomElements = [] }) {
   const roomW = Number(dimensions?.widthM ?? dimensions?.width) || 4.5;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
 
@@ -80,7 +80,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const subItems = useMemo(() => {
     const safeSubs = Array.isArray(frontSubs) ? frontSubs : [];
     return safeSubs.map((s, i) => {
-      const meta = getSpeakerModelMeta(s?.model);
+      const orientation = s?.orientation || frontSubsCfg?.orientation;
+      const meta = getSpeakerModelMeta(s?.model, orientation);
       const wM = (meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.35;
       const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.35;
       const x = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
