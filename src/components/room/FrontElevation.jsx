@@ -190,15 +190,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             {label}
           </text>
         ) : (
-          <>
-            <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
-              {label}
-            </text>
-            {/* Z-height annotation below (speakers only) */}
-            <text x={cx} y={sy + sh + 10} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
-              z={zM.toFixed(2)}m
-            </text>
-          </>
+          <text x={cx} y={sy - 5} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
+            {label}
+          </text>
         )}
       </g>
     );
