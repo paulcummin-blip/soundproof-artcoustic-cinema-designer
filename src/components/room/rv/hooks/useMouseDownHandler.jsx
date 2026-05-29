@@ -37,6 +37,18 @@ export function useMouseDownHandler({
       e.preventDefault();
       e.stopPropagation();
 
+      // Shared cursor calculation — must come first so all branches can use cursorRoom
+      if (!svgRef.current) return;
+      const svgElement = svgRef.current;
+      const point = svgElement.createSVGPoint();
+      point.x = e.clientX;
+      point.y = e.clientY;
+      const ctm = svgElement.getScreenCTM();
+      if (!ctm) return;
+      const inverseCTM = ctm.inverse();
+      const svgPoint = point.matrixTransform(inverseCTM);
+      const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
+
       let target = byId.get(id);
 
       // If it's a sub id like "rear-sub-0" / "front-sub-0", it might only exist
@@ -111,20 +123,6 @@ export function useMouseDownHandler({
       }
 
       if (globalThis.__B44_LOGS) console.log("[DRAG] START", { id, type, role: target?.role, hasTarget: !!target });
-
-      // Get SVG point for offset calculation
-      if (!svgRef.current) return;
-      const svgElement = svgRef.current;
-      const point = svgElement.createSVGPoint();
-      point.x = e.clientX;
-      point.y = e.clientY;
-      const ctm = svgElement.getScreenCTM();
-      if (!ctm) return;
-      const inverseCTM = ctm.inverse();
-      const svgPoint = point.matrixTransform(inverseCTM);
-
-      // Convert cursor position to room coords
-      const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
 
       // Store offset between speaker center and cursor
       if (type === "speaker" && target.position) {

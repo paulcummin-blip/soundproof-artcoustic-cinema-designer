@@ -165,7 +165,7 @@ export default function RvRoomElementsLayer({
     });
 
   return (
-    <g data-layer="room-elements" pointerEvents="none">
+    <g data-layer="room-elements">
       {roomElements.map((element, idx) => {
         const e = normalizeElement(element);
 
