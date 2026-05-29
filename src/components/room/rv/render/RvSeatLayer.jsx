@@ -63,7 +63,7 @@ export default function RvSeatLayer({
               ry={RY_M * scale * 2}
               fill="transparent"
               pointerEvents="all"
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'grab' }}
               onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
               onMouseEnter={() => handleSeatMouseEnter(seat)}
               onMouseLeave={handleSeatMouseLeave}
