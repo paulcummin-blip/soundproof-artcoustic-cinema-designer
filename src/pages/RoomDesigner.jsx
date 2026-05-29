@@ -1692,6 +1692,8 @@ function RoomDesignerWithState() {
                     mlpPoint={mlpAnchorEffective}
                     roomElements={_roomElements}
                     placedSpeakers={placedSpeakers}
+                    frontSubs={frontSubsForRendering}
+                    frontSubsCfg={frontSubsCfg}
                   />
                 )}
 
