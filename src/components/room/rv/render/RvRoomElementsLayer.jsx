@@ -285,7 +285,7 @@ export default function RvRoomElementsLayer({
           <g
             key={String(dragId)}
             style={isProjector && handleMouseDown ? { cursor: 'grab', pointerEvents: 'all' } : undefined}
-            onPointerDown={isProjector && handleMouseDown ? (e) => {
+            onMouseDown={isProjector && handleMouseDown ? (e) => {
               e.preventDefault();
               e.stopPropagation();
               handleMouseDown(e, dragId, 'projector');
