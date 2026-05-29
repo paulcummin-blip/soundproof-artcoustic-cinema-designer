@@ -416,11 +416,10 @@ export default function SideElevation({
                   const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
                   const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
 
-                  // position.y is the depth of the sub's front face from the front wall (plan-view Y)
-                  // Draw: front face at position.y, back face at position.y + depthM
-                  const subFrontY = Number.isFinite(sub?.position?.y) ? Number(sub.position.y) : 0.01;
-                  const frontX = rx(subFrontY);
-                  const backX  = rx(subFrontY + subDepthM);
+                  // position.y is the cabinet CENTRE (same convention as Plan View)
+                  const subCentreY = Number.isFinite(sub?.position?.y) ? Number(sub.position.y) : 0.01;
+                  const frontX = rx(subCentreY - subDepthM / 2);
+                  const backX  = rx(subCentreY + subDepthM / 2);
                   const svgW   = Math.max(4, backX - frontX);
 
                   // Vertical position: bottomHeightM if available, else derive from z-centre, else floor
