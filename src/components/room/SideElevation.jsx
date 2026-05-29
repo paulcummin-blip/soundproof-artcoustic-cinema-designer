@@ -63,6 +63,9 @@ function screenDimsM(screen) {
 // Determine which wall-side a speaker role belongs to
 const getRoleSide = (role) => {
   const r = String(role || '').toUpperCase();
+  // Explicit wide-speaker overrides (LW/RW end in W, not L/R)
+  if (r === 'LW') return 'left';
+  if (r === 'RW') return 'right';
   if (r.endsWith('R')) return 'right';
   if (r.endsWith('L')) return 'left';
   return null; // centre / ambiguous
