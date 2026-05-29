@@ -461,20 +461,45 @@ export default function SideElevation({
 
             const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
 
-            // The FaceIcon PNG assets contain internal transparent padding, so the outer SVG is
-            // enlarged only in Side Elevation to make the visible artwork match the true product height.
-            const FACE_ICON_VISIBLE_HEIGHT_RATIO = 0.82;
-            const adjustedIconH = FaceIcon ? svgH / FACE_ICON_VISIBLE_HEIGHT_RATIO : svgH;
-            // Re-centre: the enlarged icon must remain centred on spk.z
+            // Product dimensions are the source of truth for the visible cabinet box.
+            // The FaceIcon PNG assets contain internal transparent padding, so the outer SVG icon
+            // is enlarged beyond the cabinet box (then clipped) so the visible artwork fills it exactly.
+            const FACE_ICON_VISIBLE_RATIO = 0.82; // fraction of the PNG canvas occupied by visible artwork
+            const clipId = `spk-clip-${i}`;
+
+            // True-size cabinet box (product heightM × widthM)
+            const cabinetX = ix;       // = spkX - svgW / 2
+            const cabinetY = svgTop;   // = rz(spk.z + spkHeightM / 2)
+
+            // Enlarged icon dimensions so visible artwork fills the cabinet box
+            const adjustedIconW = svgW / FACE_ICON_VISIBLE_RATIO;
+            const adjustedIconH = svgH / FACE_ICON_VISIBLE_RATIO;
+            const adjustedIconX = spkX - adjustedIconW / 2;
             const adjustedIconY = rz(spk.z) - adjustedIconH / 2;
 
             return (
               <g key={`spk-${i}`} opacity={0.85}>
                 {FaceIcon ? (
-                  <FaceIcon x={ix} y={adjustedIconY} width={svgW} height={adjustedIconH} />
+                  <>
+                    {/* Define clip region = true cabinet box */}
+                    <defs>
+                      <clipPath id={clipId}>
+                        <rect x={cabinetX} y={cabinetY} width={svgW} height={svgH} />
+                      </clipPath>
+                    </defs>
+                    {/* True-size white cabinet background */}
+                    <rect
+                      x={cabinetX} y={cabinetY}
+                      width={svgW} height={svgH}
+                      fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                    {/* FaceIcon enlarged so its visible artwork fills the cabinet box, clipped to it */}
+                    <g clipPath={`url(#${clipId})`}>
+                      <FaceIcon x={adjustedIconX} y={adjustedIconY} width={adjustedIconW} height={adjustedIconH} />
+                    </g>
+                  </>
                 ) : (
                   <rect
-                    x={ix} y={svgTop}
+                    x={cabinetX} y={cabinetY}
                     width={svgW} height={svgH}
                     fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2} />
                 )}
