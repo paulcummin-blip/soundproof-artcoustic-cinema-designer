@@ -584,6 +584,7 @@ function SpeakerPlacementImpl(props) {
   const [surroundHeightConfig, setSurroundHeightConfig] = useState({
     side: { mode: 'auto', value: null },
     rear: { mode: 'auto', value: null },
+    wide: { mode: 'auto', value: null },
   });
 
   // Rehydrate local surroundConfig when appState.globalSurroundModel is restored
@@ -1344,9 +1345,13 @@ function SpeakerPlacementImpl(props) {
     const rearH = surroundHeightConfig.rear.mode === 'auto'
       ? autoH
       : Math.max(0.80, Math.min(maxH, Number(surroundHeightConfig.rear.value) || autoH));
+    const wideH = (surroundHeightConfig.wide?.mode ?? 'auto') === 'auto'
+      ? autoH
+      : Math.max(0.80, Math.min(maxH, Number(surroundHeightConfig.wide?.value) || autoH));
 
     const SIDE_ROLES = new Set(['SL', 'SR', 'SL1', 'SR1', 'SL2', 'SR2']);
     const REAR_ROLES = new Set(['SBL', 'SBR', 'SBL1', 'SBR1', 'SBL2', 'SBR2']);
+    const WIDE_ROLES = new Set(['LW', 'RW']);
 
     setSpeakers(prev => {
       if (!Array.isArray(prev) || prev.length === 0) return prev;
@@ -1357,6 +1362,7 @@ function SpeakerPlacementImpl(props) {
         let targetH = null;
         if (SIDE_ROLES.has(canon) || SIDE_ROLES.has(r)) targetH = sideH;
         else if (REAR_ROLES.has(canon) || REAR_ROLES.has(r)) targetH = rearH;
+        else if (WIDE_ROLES.has(canon) || WIDE_ROLES.has(r)) targetH = wideH;
         if (targetH === null || !s.position) return s;
         if (Math.abs((s.position.z || 0) - targetH) < 0.001) return s;
         changed = true;

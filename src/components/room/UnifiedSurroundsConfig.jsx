@@ -309,7 +309,7 @@ export default function UnifiedSurroundsConfig({
       />
 
       {/* Surround Heights */}
-      {(canSides || canRears) && (
+      {(canSides || canRears || canWides) && (
         <div className="mt-3 border-t border-[#E6E4DD] pt-3 space-y-3">
           <p className="text-xs text-[#625143]">
             RP22 Auto: acoustic centre at or slightly above listener ear plane, raised only where needed for acoustic clearance.
@@ -360,13 +360,36 @@ export default function UnifiedSurroundsConfig({
                     className="pr-8 bg-white text-[#1B1A1A]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
-                </div>
-              </div>
-            )}
+                  </div>
+                  </div>
+                  )}
 
-          </div>
-        </div>
-      )}
+                  {/* Front Wide Height */}
+                  {canWides && (
+                  <div className="space-y-2">
+                  <Label className="text-xs font-medium text-[#3E4349]">Front Wide Height</Label>
+                  <div className="relative">
+                  <Input
+                    type="number" step="0.01"
+                    min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
+                    value={surroundHeightConfig?.wide?.mode === 'manual'
+                      ? (surroundHeightConfig.wide.value ?? autoSurroundHeight ?? 1.25)
+                      : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.25}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, wide: { mode: 'manual', value: v } }));
+                    }}
+                    disabled={disabled}
+                    className="pr-8 bg-white text-[#1B1A1A]"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
+                  </div>
+                  </div>
+                  )}
+
+                  </div>
+                  </div>
+                  )}
     </div>
   );
 }
