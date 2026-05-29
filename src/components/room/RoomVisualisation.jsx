@@ -1111,7 +1111,7 @@ const byId = useEntitiesById({
     aimState: engineState,
     p15ConstructionLevel: appState?.p15ConstructionLevel ?? null,
     screen,
-    visiblePlanSpeakers,
+    // visiblePlanSpeakers omitted here — declared later in the component
   });
   const [baselineRp22, setBaselineRp22] = useState(null);
   const baselineCapturedRef = useRef(false);

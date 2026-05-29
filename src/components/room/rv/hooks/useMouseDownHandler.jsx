@@ -30,6 +30,7 @@ export function useMouseDownHandler({
   rearSubsCfg,
   isRenderableSpeaker,
   isDraggable,
+  roomElements,
 }) {
   const handleMouseDown = useCallback(
     (e, id, type) => {
@@ -70,6 +71,20 @@ export function useMouseDownHandler({
             _subType: "front",
           };
         }
+      }
+
+      // Projector drag: handled separately (not in byId)
+      if (type === 'projector') {
+        const projEl = Array.isArray(roomElements)
+          ? roomElements.find(e => e?.type === 'projector')
+          : null;
+        const lensY = Number(projEl?.y_lens_m) || lengthM * 0.8;
+        dragOffsetRoomRef.current = { x: 0, y: lensY - cursorRoom.y };
+        isAnyDraggingRef.current = true;
+        setDragState({ dragging: true, draggedItemId: id, dragType: 'projector' });
+        setDragWarning({ show: false });
+        rsDragLockRef.current = null;
+        return;
       }
 
       if (!target) return;
