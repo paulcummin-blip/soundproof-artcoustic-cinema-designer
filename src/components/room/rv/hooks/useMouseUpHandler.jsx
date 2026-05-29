@@ -75,7 +75,7 @@ export function useMouseUpHandler({
      }
 
      // Release pointer capture
-     if (dragType === 'speaker' && e?.target) {
+     if ((dragType === 'speaker' || dragType === 'projector') && e?.target) {
        try {
          if (typeof e.target.releasePointerCapture === 'function' && e.pointerId) {
            e.target.releasePointerCapture(e.pointerId);

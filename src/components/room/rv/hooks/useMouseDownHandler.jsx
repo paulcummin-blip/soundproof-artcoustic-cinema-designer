@@ -96,6 +96,12 @@ export function useMouseDownHandler({
         setDragState({ dragging: true, draggedItemId: id, dragType: 'projector' });
         setDragWarning({ show: false });
         rsDragLockRef.current = null;
+        // Capture pointer so move/up fire even when cursor leaves the element
+        try {
+          if (e.target && typeof e.target.setPointerCapture === 'function') {
+            e.target.setPointerCapture(e.pointerId);
+          }
+        } catch (err) { /* ignore */ }
         return;
       }
 
