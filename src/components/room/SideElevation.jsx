@@ -696,12 +696,7 @@ export default function SideElevation({
                   x={px} y={pz - pbH / 2}
                   width={pbW} height={pbH}
                   fill={PROJ_FILL} stroke="#222" strokeWidth={0.9} rx={1.5} />
-                {/* PROJ label — below projector body to avoid geometry clash */}
-                <text x={px + pbW / 2} y={pz + pbH / 2 + 13}
-                  textAnchor="middle" fontSize={7.5} fill={DIM_COLOR}
-                  letterSpacing="0.04em">
-                  PROJ
-                </text>
+
                 {/* Height dim — right of body, clear of body edge */}
                 <text x={px + pbW + 10} y={pz + 3}
                   fontSize={7} fill={DIM_COLOR} textAnchor="start">
