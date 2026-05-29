@@ -239,10 +239,15 @@ export default function RvRoomElementsLayer({
         const fill = isNearSpeaker ? WARN_FILL : NORMAL_FILL;
         const stroke = isNearSpeaker ? WARN_STROKE : NORMAL_STROKE;
 
-        // Label: 0.10m inside room boundary, centred on the element
+        // Label: 0.10m from the element body, centred on the element
         let labelXM, labelYM, labelRotate = 0;
 
-        if (e.wall === 'front') {
+        if (element?.type === 'projector') {
+          // Projector: label sits 0.10m to the LEFT of the body, vertically centred, rotated 90°
+          labelXM = rectM.x - LABEL_INSET_M;
+          labelYM = rectM.y + rectM.h / 2;
+          labelRotate = -90;
+        } else if (e.wall === 'front') {
           labelXM = rectM.x + rectM.w / 2;
           labelYM = LABEL_INSET_M;
         } else if (e.wall === 'rear') {
