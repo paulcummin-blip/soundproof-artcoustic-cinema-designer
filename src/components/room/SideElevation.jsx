@@ -440,8 +440,12 @@ export default function SideElevation({
               <g opacity={0.88}>
                 {groups.map((grp, i) => {
                   const topZ   = grp.bottomZ + grp.subHeightM;
-                  const frontX = rx(grp.subY - grp.subDepthM / 2);
-                  const backX  = rx(grp.subY + grp.subDepthM / 2);
+                  const naturalFrontY_m = grp.subY - grp.subDepthM / 2;
+                  const drawSubFrontY_m = naturalFrontY_m <= screenFrontY
+                    ? screenFrontY + 0.01
+                    : naturalFrontY_m;
+                  const frontX = rx(drawSubFrontY_m);
+                  const backX  = rx(drawSubFrontY_m + grp.subDepthM);
                   const svgW   = Math.max(4, backX - frontX);
                   const svgTop = rz(topZ);
                   const svgBot = rz(grp.bottomZ);
