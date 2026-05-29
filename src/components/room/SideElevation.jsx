@@ -450,33 +450,31 @@ export default function SideElevation({
 
             const meta = getSpeakerModelMeta(spk.model) || {};
             const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
-            const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
+            const spkDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.082;
 
             const spkX   = rx(spk.y);
             const svgTop = rz(spk.z + spkHeightM / 2);
             const svgBot = rz(spk.z - spkHeightM / 2);
             const svgH   = Math.max(3, svgBot - svgTop);
-            const svgW   = Math.max(3, (spkWidthM / roomL) * drawW);
+            const svgW   = Math.max(3, (spkDepthM / roomL) * drawW);
             const ix     = spkX - svgW / 2;
-
-            const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
 
             return (
               <g key={`spk-${i}`} opacity={0.85}>
-                {FaceIcon ? (
-                  <FaceIcon x={ix} y={svgTop} width={svgW} height={svgH} />
-                ) : (
-                  <rect
-                    x={ix} y={svgTop}
-                    width={svgW} height={svgH}
-                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2} />
-                )}
+                <rect
+                  x={ix} y={svgTop}
+                  width={svgW} height={svgH}
+                  fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                <line
+                  x1={ix} y1={svgTop}
+                  x2={ix} y2={svgBot}
+                  stroke="#4A4540" strokeWidth={1.4} />
                 <text
                   x={spkX}
                   y={svgTop - 3}
                   textAnchor="middle"
                   fontSize={6}
-                  fill={SPK_COLOR}
+                  fill={LABEL_COLOR}
                   fontWeight={600}>
                   {spk.role}
                 </text>
