@@ -1,4 +1,5 @@
 import React from 'react';
+import { getLevelColor, getLevelText } from '@/components/utils/rp22LevelCalculation';
 
 // Parameters monitored during seat-block dragging (in priority order for display)
 const MONITORED_PARAMS = [1, 5, 6, 9, 10, 12, 13, 16, 17];
@@ -29,21 +30,19 @@ function normalizeLevel(level) {
   return isNaN(n) ? null : n;
 }
 
-function getLevelColors(level) {
-  const n = normalizeLevel(level);
-  if (n === 4) return { bg: '#DCFCE7', text: '#166534' };
-  if (n === 3) return { bg: '#DBEAFE', text: '#1E40AF' };
-  if (n === 2) return { bg: '#FEF9C3', text: '#854D0E' };
-  if (n === 1) return { bg: '#FEE2E2', text: '#991B1B' };
-  return { bg: '#374151', text: '#9CA3AF' };
-}
-
 function getLevelLabel(level) {
   const n = normalizeLevel(level);
-  return n !== null ? `Level ${n}` : '—';
+  if (n === null) return '—';
+  return getLevelText(n) || `Level ${n}`;
 }
 
-// Extract a single param's { level, formatted } from the full RP22 result
+function getLevelColors(level) {
+  const n = normalizeLevel(level);
+  const colors = getLevelColor(n);
+  return { bg: colors.fill, text: colors.text };
+}
+
+// Extract a single param's { level, formatted, numericValue } from the full RP22 result
 function extractParam(rp22, paramNum) {
   if (!rp22) return null;
 
@@ -51,7 +50,7 @@ function extractParam(rp22, paramNum) {
   if (paramNum === 12 || paramNum === 13) {
     const p = rp22.gradedParameters?.primary?.[paramNum];
     if (!p || p.level == null) return null;
-    return { level: p.level, formatted: p.formatted ?? (p.value != null ? String(p.value) : null) };
+    return { level: p.level, formatted: p.formatted ?? (p.value != null ? String(p.value) : null), numericValue: p.value ?? null };
   }
 
   // Per-seat: prefer synthetic 'mlp' RSP seat, fallback to first primary seat
@@ -65,8 +64,24 @@ function extractParam(rp22, paramNum) {
   const p = seat.rp22?.[paramNum];
   if (!p) return null;
 
-  return { level: p.level, formatted: p.formatted ?? null };
+  // Extract the best available raw numeric value
+  const numericValue = p.valueM ?? p.valueDeg ?? p.valueDb ?? p.value ?? null;
+
+  return { level: p.level, formatted: p.formatted ?? null, numericValue };
 }
+
+// Per-parameter numeric tolerance for raw-value change detection
+const NUMERIC_TOLERANCE = {
+  1:  0.01,  // P1: nearest wall — 1cm
+  5:  0.5,   // P5: surround gap — 0.5°
+  6:  0.1,   // P6: surround SPL consistency — 0.1 dB
+  9:  0.5,   // P9: overhead vertical gap — 0.5°
+  10: 0.1,   // P10: overhead SPL spread — 0.1 dB
+  12: 0.5,   // P12: screen SPL — 0.5 dB
+  13: 0.5,   // P13: non-screen SPL — 0.5 dB
+  16: 0.1,   // P16: LCR HF off-axis — 0.1 dB
+  17: 0.1,   // P17: surround HF off-axis — 0.1 dB
+};
 
 function didChange(baseline, live, paramNum) {
   const b = extractParam(baseline, paramNum);
@@ -77,8 +92,13 @@ function didChange(baseline, live, paramNum) {
   const lLvl = normalizeLevel(l.level);
   if (bLvl !== lLvl) return true;
 
-  // Also flag if the formatted value string changed (metric moved even within same level)
+  // Flag if the formatted value string changed
   if (b.formatted && l.formatted && b.formatted !== l.formatted) return true;
+
+  // Flag if raw numeric value changed beyond tolerance
+  const tol = NUMERIC_TOLERANCE[paramNum] ?? 0.1;
+  if (b.numericValue != null && l.numericValue != null &&
+      Math.abs(b.numericValue - l.numericValue) >= tol) return true;
 
   return false;
 }
