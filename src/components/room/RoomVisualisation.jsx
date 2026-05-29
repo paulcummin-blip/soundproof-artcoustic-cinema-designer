@@ -60,6 +60,7 @@ import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler"
 import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler";
 import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement";
 import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
+import { useShiftSeatsToAngle } from "@/components/room/rv/hooks/useShiftSeatsToAngle";
 import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver";
 import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation";
 import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic";
@@ -1220,6 +1221,22 @@ const byId = useEntitiesById({
     _lastValidDraftFrontSubsRef, _lastValidDraftRearSubsRef,
   });
 
+  // Window-level drag cleanup — fires for ALL drag types when mouse is released outside the SVG
+  useEffect(() => {
+    const onWindowMouseUp = (e) => {
+      if (isAnyDraggingRef.current) handleMouseUp(e);
+    };
+    const onWindowBlur = () => {
+      if (isAnyDraggingRef.current) handleMouseUp({});
+    };
+    window.addEventListener('mouseup', onWindowMouseUp);
+    window.addEventListener('blur', onWindowBlur);
+    return () => {
+      window.removeEventListener('mouseup', onWindowMouseUp);
+      window.removeEventListener('blur', onWindowBlur);
+    };
+  }, [handleMouseUp]);
+
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
     setDraggingRole(null);
@@ -1567,66 +1584,8 @@ useEffect(() => {
   });
 
 
-  // constants for seating block shift
-  const TARGET_ANGLE_DEG = 57.5;
-  const SAFETY_MARGIN_M = 0.05;
-
-  // seating row helpers
-  const findFrontRowY = useCallback((seats = []) => {
-    if (!seats.length) return null;
-    return Math.min(...seats.map(s => Number(s.y) || 0));
-  }, []);
-
-  const findBackRowY = useCallback((seats = []) => {
-    if (!seats.length) return null;
-    return Math.max(...seats.map(s => Number(s.y) || 0));
-  }, []);
-
-  // This function shifts all seats as a block to align the specified row (front or back)
-  // with the target 57.5 degree MLP from the screen.
-  const shiftSeatsToMaintainAngle = useCallback((mlpRefKey) => {
-    // room + screen
-    const roomLenM = lengthM || 6.0; // Use new lengthM
-    // target MLP y (from front wall): now directly using the shared utility
-    const targetMLP_Y = targetMlpY57_5(screen, 0);
-
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return;
-
-    // find current MLP row y
-    const currentRowY = (mlpRefKey === "BACK_ROW_CENTER")
-      ? findBackRowY(seatingPositions)
-      : findFrontRowY(seatingPositions);
-
-    if (currentRowY == null) return;
-
-    // compute delta to apply to ALL seats as a rigid block
-    let deltaY = targetMLP_Y - currentRowY;
-
-    // clamp block movement so we don't cross front/back walls
-    const minY = Math.min(...seatingPositions.map(s => Number(s.y) || 0));
-    const maxY = Math.max(...seatingPositions.map(s => Number(s.y) || 0));
-
-    // after shifting, enforce bounds [SAFETY, roomLen - SAFETY]
-    const newMinY = minY + deltaY;
-    const newMaxY = maxY + deltaY;
-    const minAllowed = SAFETY_MARGIN_M;
-    const maxAllowed = roomLenM - SAFETY_MARGIN_M;
-
-    if (newMinY < minAllowed) {
-      deltaY += (minAllowed - newMinY);
-    }
-    if (newMaxY > maxAllowed) {
-      deltaY -= (newMaxY - maxAllowed);
-    }
-
-    // apply translation
-    onSetSeatingPositions?.((prev) =>
-      (prev || []).map(s => ({
-        ...s,
-        y: (Number(s.y) || 0) + deltaY
-      }))
-    );
-  }, [lengthM, screen, seatingPositions, onSetSeatingPositions, findFrontRowY, findBackRowY]); // Use new lengthM
+  // Seating shift helper — extracted to hook
+  const { shiftSeatsToMaintainAngle } = useShiftSeatsToAngle({ lengthM, screen, seatingPositions, onSetSeatingPositions });
 
   // UPDATED: Reset side surrounds to their cached default positions
   const resetSideSurroundsToDefault = useCallback(() => {
