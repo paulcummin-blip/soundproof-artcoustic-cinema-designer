@@ -320,20 +320,7 @@ export default function UnifiedSurroundsConfig({
             {canSides && (
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-[#3E4349]">Side Surround Height</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button" size="sm"
-                    className={surroundHeightConfig?.side?.mode !== 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
-                    onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, side: { ...prev.side, mode: 'auto' } }))}
-                    disabled={disabled}
-                  >Auto RP22</Button>
-                  <Button
-                    type="button" size="sm"
-                    className={surroundHeightConfig?.side?.mode === 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
-                    onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, side: { mode: 'manual', value: prev.side?.value ?? autoSurroundHeight ?? 1.2 } }))}
-                    disabled={disabled}
-                  >Manual</Button>
-                </div>
+
                 <div className="relative">
                   <Input
                     type="number" step="0.01"
@@ -357,20 +344,7 @@ export default function UnifiedSurroundsConfig({
             {canRears && (
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-[#3E4349]">Rear Surround Height</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button" size="sm"
-                    className={surroundHeightConfig?.rear?.mode !== 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
-                    onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, rear: { ...prev.rear, mode: 'auto' } }))}
-                    disabled={disabled}
-                  >Auto RP22</Button>
-                  <Button
-                    type="button" size="sm"
-                    className={surroundHeightConfig?.rear?.mode === 'manual' ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90' : 'flex-1 border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7]'}
-                    onClick={() => setSurroundHeightConfig?.(prev => ({ ...prev, rear: { mode: 'manual', value: prev.rear?.value ?? autoSurroundHeight ?? 1.2 } }))}
-                    disabled={disabled}
-                  >Manual</Button>
-                </div>
+
                 <div className="relative">
                   <Input
                     type="number" step="0.01"
