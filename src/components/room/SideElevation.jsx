@@ -267,7 +267,7 @@ export default function SideElevation({
             stroke={DIM_COLOR} strokeWidth={0.8} />
           <line x1={offsetX + drawW} y1={offsetY - 44} x2={offsetX + drawW} y2={offsetY - 36}
             stroke={DIM_COLOR} strokeWidth={0.8} />
-          <text x={offsetX + drawW / 2} y={offsetY - 39}
+          <text x={offsetX + drawW / 2} y={offsetY - 51}
             textAnchor="middle" fontSize={9} fill={DIM_COLOR}>
             {roomL.toFixed(2)}m
           </text>
@@ -279,9 +279,9 @@ export default function SideElevation({
             stroke={DIM_COLOR} strokeWidth={0.8} />
           <line x1={offsetX - 44} y1={offsetY + drawH} x2={offsetX - 36} y2={offsetY + drawH}
             stroke={DIM_COLOR} strokeWidth={0.8} />
-          <text x={offsetX - 48} y={offsetY + drawH / 2}
+          <text x={offsetX - 60} y={offsetY + drawH / 2}
             textAnchor="middle" fontSize={9} fill={DIM_COLOR}
-            transform={`rotate(-90, ${offsetX - 48}, ${offsetY + drawH / 2})`}>
+            transform={`rotate(-90, ${offsetX - 60}, ${offsetY + drawH / 2})`}>
             {roomH.toFixed(2)}m
           </text>
 
