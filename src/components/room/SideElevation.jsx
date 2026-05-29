@@ -261,27 +261,27 @@ export default function SideElevation({
           ))}
 
           {/* Dimension: room length (horizontal) */}
-          <line x1={offsetX} y1={offsetY - 10} x2={offsetX + drawW} y2={offsetY - 10}
+          <line x1={offsetX} y1={offsetY - 40} x2={offsetX + drawW} y2={offsetY - 40}
             stroke={DIM_COLOR} strokeWidth={0.8} />
-          <line x1={offsetX} y1={offsetY - 14} x2={offsetX} y2={offsetY - 6}
+          <line x1={offsetX} y1={offsetY - 44} x2={offsetX} y2={offsetY - 36}
             stroke={DIM_COLOR} strokeWidth={0.8} />
-          <line x1={offsetX + drawW} y1={offsetY - 14} x2={offsetX + drawW} y2={offsetY - 6}
+          <line x1={offsetX + drawW} y1={offsetY - 44} x2={offsetX + drawW} y2={offsetY - 36}
             stroke={DIM_COLOR} strokeWidth={0.8} />
-          <text x={offsetX + drawW / 2} y={offsetY - 13}
+          <text x={offsetX + drawW / 2} y={offsetY - 39}
             textAnchor="middle" fontSize={9} fill={DIM_COLOR}>
             {roomL.toFixed(2)}m
           </text>
 
           {/* Dimension: room height (vertical, left side) */}
-          <line x1={offsetX - 10} y1={offsetY} x2={offsetX - 10} y2={offsetY + drawH}
+          <line x1={offsetX - 40} y1={offsetY} x2={offsetX - 40} y2={offsetY + drawH}
             stroke={DIM_COLOR} strokeWidth={0.8} />
-          <line x1={offsetX - 14} y1={offsetY} x2={offsetX - 6} y2={offsetY}
+          <line x1={offsetX - 44} y1={offsetY} x2={offsetX - 36} y2={offsetY}
             stroke={DIM_COLOR} strokeWidth={0.8} />
-          <line x1={offsetX - 14} y1={offsetY + drawH} x2={offsetX - 6} y2={offsetY + drawH}
+          <line x1={offsetX - 44} y1={offsetY + drawH} x2={offsetX - 36} y2={offsetY + drawH}
             stroke={DIM_COLOR} strokeWidth={0.8} />
-          <text x={offsetX - 18} y={offsetY + drawH / 2}
+          <text x={offsetX - 48} y={offsetY + drawH / 2}
             textAnchor="middle" fontSize={9} fill={DIM_COLOR}
-            transform={`rotate(-90, ${offsetX - 18}, ${offsetY + drawH / 2})`}>
+            transform={`rotate(-90, ${offsetX - 48}, ${offsetY + drawH / 2})`}>
             {roomH.toFixed(2)}m
           </text>
 
