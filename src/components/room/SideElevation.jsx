@@ -495,20 +495,21 @@ export default function SideElevation({
               ? grp.roles.join('/')
               : grp.roles[0];
             return (
-              <g key={`rear-${i}`} opacity={0.88}>
+              <g key={`rear-${i}`} opacity={0.92}>
+                {/* Cabinet outline — white fill, clean dark stroke */}
                 <rect
                   x={frontX} y={svgTop}
                   width={svgW} height={svgH}
-                  fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
-                {/* Front grille line */}
+                  fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                {/* Front face line (the visible baffle edge) */}
                 <line
                   x1={frontX} y1={svgTop}
                   x2={frontX} y2={svgBot}
-                  stroke="#fff" strokeWidth={1} opacity={0.5} />
+                  stroke="#4A4540" strokeWidth={1.4} />
                 <text
                   x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
                   textAnchor="end" fontSize={6}
-                  fill={SPK_COLOR} fontWeight={600}>
+                  fill={LABEL_COLOR} fontWeight={600}>
                   {label}
                 </text>
               </g>
