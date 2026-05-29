@@ -75,6 +75,8 @@ export default function SideElevation({
   mlpPoint,
   roomElements,
   placedSpeakers,
+  frontSubs = [],        // same array as FrontElevation receives (appState.subwoofers filtered group==='front')
+  frontSubsCfg = null,   // for orientation fallback
   wall = 'right', // 'left' | 'right' — which side wall is being viewed
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
@@ -401,56 +403,36 @@ export default function SideElevation({
             );
           })()}
 
-          {/* Front subwoofers — side profile behind screen, orientation-aware, grouped by depth+height */}
+          {/* Front subwoofers — side profile, sourced from frontSubs (same as FrontElevation / Plan View) */}
           {(() => {
-            const SUB_ROLE = /^(LFE|SUB|FSUB)/i;
-            const frontSubs = Array.isArray(placedSpeakers)
-              ? placedSpeakers.filter(s => {
-                  const role = String(s?.role || '').toUpperCase();
-                  return SUB_ROLE.test(role) && Number.isFinite(s?.position?.y);
-                })
-              : [];
-            if (!frontSubs.length) return null;
-
-            // Build groups: subs that share the same side-view silhouette (same depth ±5cm, same bottom ±5cm)
-            const groups = [];
-            frontSubs.forEach((sub, idx) => {
-              const subY = Number(sub.position.y);
-              // Orientation-aware dimensions (Vertical / Horizontal)
-              const meta = getSpeakerModelMeta(sub.model, sub.orientation) || {};
-              const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
-              const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
-              // Bottom edge: bottomHeightM is the configured floor height; fall back to z-centre
-              const bottomZ = Number.isFinite(sub.bottomHeightM) ? sub.bottomHeightM
-                : Number.isFinite(sub.position?.z) ? sub.position.z - subHeightM / 2
-                : 0;
-              // Use role as label (LFE1, LFE2…) or synthesise SUBn
-              const label = String(sub.role || `SUB${idx + 1}`).toUpperCase();
-              const match = groups.find(g =>
-                Math.abs(g.subY - subY) < 0.05 && Math.abs(g.bottomZ - bottomZ) < 0.05
-              );
-              if (match) {
-                match.labels.push(label);
-              } else {
-                groups.push({ subY, bottomZ, subHeightM, subDepthM, labels: [label] });
-              }
-            });
+            const safeSubs = Array.isArray(frontSubs) ? frontSubs : [];
+            if (!safeSubs.length) return null;
 
             return (
               <g opacity={0.88}>
-                {groups.map((grp, i) => {
-                  const topZ   = grp.bottomZ + grp.subHeightM;
-                  const naturalFrontY_m = grp.subY - grp.subDepthM / 2;
-                  const drawSubFrontY_m = naturalFrontY_m <= screenFrontY
-                    ? screenFrontY + 0.01
-                    : naturalFrontY_m;
-                  const frontX = rx(drawSubFrontY_m);
-                  const backX  = rx(drawSubFrontY_m + grp.subDepthM);
+                {safeSubs.map((sub, i) => {
+                  const orientation = sub?.orientation || frontSubsCfg?.orientation;
+                  const meta = getSpeakerModelMeta(sub?.model, orientation) || {};
+                  const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
+                  const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
+
+                  // position.y is the depth of the sub's front face from the front wall (plan-view Y)
+                  // Draw: front face at position.y, back face at position.y + depthM
+                  const subFrontY = Number.isFinite(sub?.position?.y) ? Number(sub.position.y) : 0.01;
+                  const frontX = rx(subFrontY);
+                  const backX  = rx(subFrontY + subDepthM);
                   const svgW   = Math.max(4, backX - frontX);
+
+                  // Vertical position: bottomHeightM if available, else derive from z-centre, else floor
+                  const bottomZ = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
+                    : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2
+                    : 0;
+                  const topZ   = bottomZ + subHeightM;
                   const svgTop = rz(topZ);
-                  const svgBot = rz(grp.bottomZ);
+                  const svgBot = rz(bottomZ);
                   const svgH   = Math.max(4, svgBot - svgTop);
-                  const label  = grp.labels.join('/');
+                  const label  = `SUB${i + 1}`;
+
                   return (
                     <g key={`fsub-${i}`}>
                       <rect
