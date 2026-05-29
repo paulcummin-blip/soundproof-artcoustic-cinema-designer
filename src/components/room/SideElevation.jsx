@@ -1,13 +1,17 @@
 import React, { useMemo } from "react";
 import SeatPersonIcon from "../roomdesigner/SeatPersonIcon";
-import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import {
+  Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon,
+  Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon,
+  Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon,
+} from "../report/SpeakerFaceIcons";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
 // Plane: Y (room depth) → horizontal, Z (height) → vertical
 // ---------------------------------------------------------------------------
 
-const ROOM_FILL     = "#FFFFFF";
+const ROOM_FILL     = "#F4F3F0";
 const ROOM_STROKE   = "#B0AEA8";
 const FLOOR_COLOR   = "#8C8880";
 const SCREEN_FILL   = "#2C2C2C";
@@ -20,7 +24,20 @@ const SPK_COLOR     = "#213428";
 const DOOR_STROKE   = "#7C6F65";
 const DOOR_FILL     = "rgba(180,168,155,0.18)";
 
-
+// Speaker model → face icon component map (normalise key: lowercase, spaces→hyphens, strip _s)
+const normModelKey = (m) => String(m || '').toLowerCase().replace(/\s+/g, '-').replace(/_s$/, '');
+const FACE_ICON_MAP = {
+  'evolve-1-1': Evolve11FaceIcon,
+  'evolve-2-1': Evolve21FaceIcon,
+  'evolve-3-1': Evolve31FaceIcon,
+  'evolve-4-2': Evolve42FaceIcon,
+  'evolve-6-3': Evolve63FaceIcon,
+  'evolve-8-4': Evolve84FaceIcon,
+  'q4-3': Q43FaceIcon,        'spitfire-q4-3': Q43FaceIcon,
+  'q4-5': Q45FaceIcon,        'spitfire-q4-5': Q45FaceIcon,
+  'q6-3': Q63FaceIcon,        'spitfire-q6-3': Q63FaceIcon,
+  'q8-5': Q85FaceIcon,        'spitfire-q8-5': Q85FaceIcon,
+};
 
 // Derive screen dimensions from screen config (same logic as FrontElevation)
 function screenDimsM(screen) {
@@ -49,8 +66,6 @@ export default function SideElevation({
   mlpPoint,
   roomElements,
   placedSpeakers,
-  frontSubs = [],
-  frontSubsCfg,
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
@@ -94,9 +109,7 @@ export default function SideElevation({
   // --- Doors / windows ---
   const openingEls = useMemo(() => {
     if (!Array.isArray(roomElements)) return [];
-    return roomElements.filter(el =>
-      (el?.type === 'door' || el?.type === 'window') && el?.wall === 'right'
-    );
+    return roomElements.filter(el => el?.type === 'door' || el?.type === 'window');
   }, [roomElements]);
 
   // --- Seat rows: pick one representative Y per row from seatingPositions ---
@@ -257,7 +270,7 @@ export default function SideElevation({
             );
           })()}
 
-          {/* LCR Speakers — side profile behind screen wall */}
+          {/* LCR Speakers — faintly rendered behind screen wall */}
           {(() => {
             const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
             const lcrSpks = Array.isArray(placedSpeakers)
@@ -265,60 +278,28 @@ export default function SideElevation({
               : [];
             if (!lcrSpks.length) return null;
             return (
-              <g opacity={0.4}>
+              <g opacity={0.35}>
                 {lcrSpks.map((spk, i) => {
                   const spkY = Number(spk?.position?.y);
                   const spkZ = Number(spk?.position?.z);
                   if (!Number.isFinite(spkY) || !Number.isFinite(spkZ)) return null;
-                  const meta = getSpeakerModelMeta(spk.model);
-                  const cabDepth = (meta && !meta.notFound && meta.depthM) ? meta.depthM : 0.10;
-                  const cabH    = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.37;
-                  const svgX    = rx(spkY);
-                  const svgTop  = rz(spkZ + cabH / 2);
+                  // Cabinet fallback: 0.27m wide (depth in Y) × 0.37m tall
+                  const cabDepth = 0.12; // Y-axis depth → horizontal SVG extent
+                  const cabH    = 0.37; // Z-axis height → vertical SVG extent
+                  const svgX   = rx(spkY);
+                  const svgTop = rz(spkZ + cabH / 2);
                   const svgCabH = rz(spkZ - cabH / 2) - svgTop;
                   const svgCabW = Math.max(3, (cabDepth / roomL) * drawW);
                   return (
                     <g key={`lcr-sv-${i}`}>
                       <rect
                         x={svgX - svgCabW / 2} y={svgTop}
-                        width={svgCabW} height={Math.max(2, svgCabH)}
+                        width={svgCabW} height={svgCabH}
                         fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
                       <text x={svgX} y={svgTop - 4}
                         textAnchor="middle" fontSize={6} fill={SPK_COLOR} fontWeight={600}>
                         {spk.role}
                       </text>
-                    </g>
-                  );
-                })}
-              </g>
-            );
-          })()}
-
-          {/* Front Subwoofers — side profile behind screen wall */}
-          {(() => {
-            const subs = Array.isArray(frontSubs) ? frontSubs : [];
-            if (!subs.length) return null;
-            const model = frontSubsCfg?.model;
-            const bottomH = Number(frontSubsCfg?.bottomHeightM) || 0;
-            return (
-              <g opacity={0.4}>
-                {subs.map((s, i) => {
-                  const subY = Number(s?.position?.y);
-                  if (!Number.isFinite(subY)) return null;
-                  const orientation = s?.orientation || frontSubsCfg?.orientation;
-                  const meta = getSpeakerModelMeta(model, orientation);
-                  const subDepth = (meta && !meta.notFound && meta.depthM) ? meta.depthM : 0.40;
-                  const subH    = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.40;
-                  const svgX    = rx(subY);
-                  const svgCabW = Math.max(4, (subDepth / roomL) * drawW);
-                  const svgTop  = rz(bottomH + subH);
-                  const svgCabH = rz(bottomH) - svgTop;
-                  return (
-                    <g key={`fsub-${i}`}>
-                      <rect
-                        x={svgX - svgCabW / 2} y={svgTop}
-                        width={svgCabW} height={Math.max(2, svgCabH)}
-                        fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
                     </g>
                   );
                 })}
@@ -400,73 +381,38 @@ export default function SideElevation({
             );
           })()}
 
-          {/* Speaker markers (non-LCR) — ceiling, rear wall, or side profile */}
+          {/* Speaker height markers (non-LCR surrounds/wides) */}
           {speakerMarkers.map((spk, i) => {
-            const roleUC = String(spk.role || '').toUpperCase();
             const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
-            if (lcrRoles.has(roleUC)) return null;
+            if (lcrRoles.has(String(spk.role || '').toUpperCase())) return null;
 
-            const spkXpx = rx(spk.y);
-            const meta = getSpeakerModelMeta(spk.model);
-            const CEIL_SPK_DEPTH = 0.074; // Architect in-ceiling visible depth (74mm)
+            const iconW = 22;
+            const iconH = 22;
+            const spkX = rx(spk.y);
+            const spkZ = rz(spk.z);
+            const ix = spkX - iconW / 2;
+            const iy = spkZ - iconH / 2;
 
-            // Ceiling / overhead speakers (role starts with T)
-            if (roleUC.startsWith('T')) {
-              const visDepth = (meta && !meta.notFound && meta.depthM) ? meta.depthM : CEIL_SPK_DEPTH;
-              const ceilPx   = rz(roomH);
-              const spkBotPx = rz(roomH - visDepth);
-              const spkH_px  = Math.max(2, spkBotPx - ceilPx);
-              const spkW_px  = 10;
-              return (
-                <g key={`spk-${i}`} opacity={0.8}>
-                  <rect
-                    x={spkXpx - spkW_px / 2} y={ceilPx}
-                    width={spkW_px} height={spkH_px}
-                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
-                  <text x={spkXpx} y={ceilPx - 3}
-                    textAnchor="middle" fontSize={6} fill={SPK_COLOR} fontWeight={600}>
-                    {spk.role}
-                  </text>
-                </g>
-              );
-            }
+            const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
 
-            // Rear wall speakers (SBL, SBR) — side profile sitting against rear wall
-            const rearRoles = new Set(['SBL', 'SBR']);
-            if (rearRoles.has(roleUC)) {
-              const cabDepth  = (meta && !meta.notFound && meta.depthM) ? meta.depthM : 0.082;
-              const cabH      = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.27;
-              const svgTop    = rz(spk.z + cabH / 2);
-              const svgCabH   = rz(spk.z - cabH / 2) - svgTop;
-              const svgCabW   = Math.max(3, (cabDepth / roomL) * drawW);
-              const rearWallPx = rx(roomL);
-              return (
-                <g key={`spk-${i}`} opacity={0.8}>
-                  <rect
-                    x={rearWallPx - svgCabW} y={svgTop}
-                    width={svgCabW} height={Math.max(2, svgCabH)}
-                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
-                  <text x={rearWallPx - svgCabW / 2} y={svgTop - 3}
-                    textAnchor="middle" fontSize={6} fill={SPK_COLOR} fontWeight={600}>
-                    {spk.role}
-                  </text>
-                </g>
-              );
-            }
-
-            // Other (side surrounds etc) — small generic rect at position
-            const iconW = 14;
-            const iconH = 14;
-            const ix = spkXpx - iconW / 2;
-            const iy = rz(spk.z) - iconH / 2;
             return (
-              <g key={`spk-${i}`} opacity={0.7}>
-                <rect
-                  x={ix} y={iy}
-                  width={iconW} height={iconH}
-                  fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={2} />
-                <text x={spkXpx} y={iy - 3}
-                  textAnchor="middle" fontSize={6} fill={SPK_COLOR} fontWeight={600}>
+              <g key={`spk-${i}`} opacity={0.85}>
+                {FaceIcon ? (
+                  <FaceIcon x={ix} y={iy} width={iconW} height={iconH} />
+                ) : (
+                  // Fallback: generic dark rectangle
+                  <rect
+                    x={ix} y={iy}
+                    width={iconW} height={iconH}
+                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2} />
+                )}
+                <text
+                  x={spkX}
+                  y={iy - 3}
+                  textAnchor="middle"
+                  fontSize={6}
+                  fill={SPK_COLOR}
+                  fontWeight={600}>
                   {spk.role}
                 </text>
               </g>
