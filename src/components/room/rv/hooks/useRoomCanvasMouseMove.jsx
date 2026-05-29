@@ -24,7 +24,6 @@ export function useRoomCanvasMouseMove({
   handleSpeakerDrag,
   handleSeatDrag,
   handleSubDrag,
-  handleSeatingBlockDrag,
 }) {
   const handleMouseMove = useCallback((e) => {
     if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
@@ -60,9 +59,6 @@ export function useRoomCanvasMouseMove({
       handleSpeakerDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'seat') {
       handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
-    } else if (dragType === 'seat-block') {
-      // Pass raw cursor room position — block drag handler computes its own delta
-      if (handleSeatingBlockDrag) handleSeatingBlockDrag(cursorRoom);
     } else if (dragType === 'sub') {
       handleSubDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
       setDragState(s => (s && s.dragging ? { ...s } : s));
@@ -72,7 +68,6 @@ export function useRoomCanvasMouseMove({
     setDragWarning, svgRef, canvasToRoom, roomToCanvas,
     dragOffsetRoomRef, roomRect, placedSpeakers,
     handleSpeakerDrag, handleSeatDrag, handleSubDrag,
-    handleSeatingBlockDrag,
     setDragState,
   ]);
 
