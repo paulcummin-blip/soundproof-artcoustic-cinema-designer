@@ -60,7 +60,7 @@ export default function SeatPersonIcon({
   const panelTopY    = baseY - p(0.600);      // side arm top = 600mm
   const seatLineY    = baseY - p(0.420);      // seat cushion top = 420mm
 
-  const backBotY     = panelTopY;             // backrest connects at panel top
+  const backBotY     = seatLineY;             // backrest extends down to seat line
   const backTopY     = baseY - p(0.880);      // 600 + 280 = 880mm
   const headTopY     = baseY - p(0.990);      // 880 + 100 + small gap ≈ 990mm
 
@@ -162,7 +162,7 @@ export default function SeatPersonIcon({
       {/* ── Backrest slab ────────────────────────────────────────────────── */}
       <path
         d={backPath}
-        fill={FIL2}
+        fill={FIL}
         stroke={STR}
         strokeWidth={SW}
         {...PS}
