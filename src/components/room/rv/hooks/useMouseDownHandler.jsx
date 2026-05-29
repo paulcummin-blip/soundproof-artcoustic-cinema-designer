@@ -91,7 +91,7 @@ export function useMouseDownHandler({
           ? roomElements.find(e => e?.type === 'projector')
           : null;
         const lensY = Number(projEl?.y_lens_m) || lengthM * 0.8;
-        dragOffsetRoomRef.current = { x: 0, y: lensY - cursorRoom.y };
+        dragOffsetRoomRef.current = { x: (Number(projEl?.x_lens_m) || widthM / 2) - cursorRoom.x, y: lensY - cursorRoom.y };
         isAnyDraggingRef.current = true;
         setDragState({ dragging: true, draggedItemId: id, dragType: 'projector' });
         setDragWarning({ show: false });
