@@ -164,6 +164,30 @@ export default function SideElevation({
       }));
   }, [placedSpeakers]);
 
+  // Rear-wall surround roles (overlap in side elevation)
+  const REAR_ROLES = new Set(['SBL','SBR','SCL','SCR','SC']);
+
+  // Group rear-wall speakers by similar height (tolerance 0.02m)
+  const rearWallGroups = useMemo(() => {
+    if (!Array.isArray(placedSpeakers)) return [];
+    const rearSpks = placedSpeakers.filter(s =>
+      REAR_ROLES.has(String(s?.role || '').toUpperCase()) &&
+      Number.isFinite(s?.position?.z)
+    );
+    const groups = [];
+    rearSpks.forEach(s => {
+      const z = s.position.z;
+      const existing = groups.find(g => Math.abs(g.z - z) <= 0.02);
+      if (existing) {
+        existing.roles.push(String(s.role).toUpperCase());
+        existing.model = existing.model || s.model;
+      } else {
+        groups.push({ z, roles: [String(s.role).toUpperCase()], model: s.model || '' });
+      }
+    });
+    return groups;
+  }, [placedSpeakers]);
+
   // Hatch count for floor line
   const hatchCount = Math.floor(drawW / 14) + 1;
 
@@ -389,6 +413,7 @@ export default function SideElevation({
 
             const role = String(spk.role || '').toUpperCase();
             const isCeiling = /^T[A-Z]/.test(role);
+            if (REAR_ROLES.has(role)) return null; // drawn separately as side-profile
 
             if (isCeiling) {
               // Side-profile ceiling insert: body sits ABOVE ceiling line, grille flush with ceiling
@@ -450,6 +475,41 @@ export default function SideElevation({
                   fill={SPK_COLOR}
                   fontWeight={600}>
                   {spk.role}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Rear-wall surround speakers — side profile, one per height group */}
+          {rearWallGroups.map((grp, i) => {
+            const meta = getSpeakerModelMeta(grp.model) || {};
+            const spkDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.082;
+            const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
+            const frontX = rx(roomL - spkDepthM); // front face of speaker
+            const backX  = rx(roomL);             // rear wall
+            const svgW   = Math.max(3, backX - frontX);
+            const svgTop  = rz(grp.z + spkHeightM / 2);
+            const svgBot  = rz(grp.z - spkHeightM / 2);
+            const svgH   = Math.max(3, svgBot - svgTop);
+            const label  = grp.roles.length > 1
+              ? grp.roles.join('/')
+              : grp.roles[0];
+            return (
+              <g key={`rear-${i}`} opacity={0.88}>
+                <rect
+                  x={frontX} y={svgTop}
+                  width={svgW} height={svgH}
+                  fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
+                {/* Front grille line */}
+                <line
+                  x1={frontX} y1={svgTop}
+                  x2={frontX} y2={svgBot}
+                  stroke="#fff" strokeWidth={1} opacity={0.5} />
+                <text
+                  x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
+                  textAnchor="end" fontSize={6}
+                  fill={SPK_COLOR} fontWeight={600}>
+                  {label}
                 </text>
               </g>
             );
