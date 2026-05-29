@@ -64,11 +64,6 @@ export function useRoomCanvasMouseMove({
       handleSubDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
       setDragState(s => (s && s.dragging ? { ...s } : s));
     } else if (dragType === 'projector') {
-      // Guard: if primary button is no longer held, stop drag immediately
-      if (e.buttons !== 1) {
-        setDragState({ dragging: false, draggedItemId: null, dragType: null });
-        return;
-      }
       handleProjectorDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     }
   }, [
