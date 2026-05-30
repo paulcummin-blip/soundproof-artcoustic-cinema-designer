@@ -210,6 +210,33 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   lcrSpeakersRef.current = lcrSpeakers;
   subItemsRef.current = subItems;
 
+  // Clash detection — recalculates live (also during drag via lcrSpeakers/subItems reactivity)
+  const clashes = useMemo(() => {
+    const T = 0.05; // 50 mm threshold
+    const items = [
+      ...lcrSpeakers.map(s => ({
+        label: s.label || s.role,
+        xMin: s.x - s.wM / 2, xMax: s.x + s.wM / 2,
+        zMin: s.z - s.hM / 2, zMax: s.z + s.hM / 2,
+      })),
+      ...subItems.map(s => ({
+        label: s.label || 'SUB',
+        xMin: s.x - s.wM / 2, xMax: s.x + s.wM / 2,
+        zMin: s.z - s.hM / 2, zMax: s.z + s.hM / 2,
+      })),
+    ].filter(it => it.xMin != null && it.zMin != null);
+    const pairs = [];
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i], b = items[j];
+        const gapX = Math.max(0, Math.max(a.xMin, b.xMin) - Math.min(a.xMax, b.xMax));
+        const gapZ = Math.max(0, Math.max(a.zMin, b.zMin) - Math.min(a.zMax, b.zMax));
+        if (gapX < T && gapZ < T) pairs.push(`${a.label} and ${b.label}`);
+      }
+    }
+    return pairs;
+  }, [lcrSpeakers, subItems]);
+
   // Projector element from roomElements
   const projectorEl = useMemo(() => {
     if (!Array.isArray(roomElements)) return null;
@@ -597,6 +624,28 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               )}
               <rect x={sx + 7} y={sz - 8} width={32} height={13} fill={SNAP_COLOR} rx={2} />
               <text x={sx + 23} y={sz + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.06em">SNAP</text>
+            </g>
+          );
+        })()}
+
+        {/* Clash warning — amber popup when objects are within 50 mm */}
+        {clashes.length > 0 && (() => {
+          const warnW = 162;
+          const warnH = 28 + clashes.length * 13;
+          const wx = offsetX + drawW - warnW - 6;
+          const wy = offsetY + 6;
+          return (
+            <g key="clash-warning" style={{ pointerEvents: 'none' }}>
+              <rect x={wx} y={wy} width={warnW} height={warnH} rx={4}
+                fill="#FFFBEB" stroke="#F59E0B" strokeWidth={1.2} />
+              <text x={wx + warnW / 2} y={wy + 13} textAnchor="middle" fontSize={8} fill="#92400E" fontWeight={700}>
+                ⚠ Speaker/subwoofer clash detected
+              </text>
+              {clashes.map((pair, ci) => (
+                <text key={ci} x={wx + warnW / 2} y={wy + 24 + ci * 13} textAnchor="middle" fontSize={7} fill="#78350F">
+                  {pair}
+                </text>
+              ))}
             </g>
           );
         })()}
