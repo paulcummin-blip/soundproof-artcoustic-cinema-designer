@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon } from "@/components/report/SpeakerFaceIcons";
 
@@ -58,6 +58,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const onMovedRef = useRef(onLcrSpeakerMoved);
   useEffect(() => { onMovedRef.current = onLcrSpeakerMoved; }, [onLcrSpeakerMoved]);
 
+  // Alignment guide state
+  const [alignGuide, setAlignGuide] = useState(null); // { draggingRole, liveZ } | null
+  const setAlignGuideRef = useRef(setAlignGuide);
+
   const clientToRoom = useCallback((clientX, clientY) => {
     const svg = svgRef.current;
     if (!svg) return null;
@@ -96,12 +100,17 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const newX = Math.max(0, Math.min(rW, drag.speakerMX + (drag.axisLocked === 'x' ? dX : 0)));
       const newZ = Math.max(0, Math.min(rH, drag.speakerMZ + (drag.axisLocked === 'z' ? dZ : 0)));
       onMovedRef.current?.({ role: drag.role, newX, newZ, axis: drag.axisLocked });
+      // Update alignment guide when dragging vertically
+      if (drag.axisLocked === 'z') {
+        setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: newZ });
+      }
     };
     const onMouseUp = () => {
       if (!dragRef.current) return;
       dragRef.current = null;
       if (isDraggingRef) isDraggingRef.current = false;
       document.body.style.cursor = '';
+      setAlignGuideRef.current?.(null);
     };
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
@@ -468,6 +477,50 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               <text x={rx(pX_m)} y={pY_px - 4} textAnchor="middle" fontSize={8} fill={DIM_COLOR} letterSpacing="0.05em">
                 PROJ
               </text>
+            </g>
+          );
+        })()}
+
+        {/* Vertical alignment guide — visible only during vertical LCR drag, within 5 cm */}
+        {alignGuide && (() => {
+          const fc = lcrSpeakers.find(s => s.role === 'FC');
+          const fl = lcrSpeakers.find(s => s.role === 'FL');
+          if (!fc || !fl) return null;
+          const isDraggingFC = alignGuide.draggingRole === 'FC';
+          const fcZ = isDraggingFC ? alignGuide.liveZ : fc.z;
+          const lrZ = (!isDraggingFC) ? alignGuide.liveZ : fl.z;
+          const diffM = fcZ - lrZ; // positive = FC is higher than L/R
+          if (Math.abs(diffM) > 0.05) return null; // outside 5 cm threshold — hide guide
+          const diffCm = Math.round(diffM * 100);
+          const isAligned = diffCm === 0;
+          const fcY = ry(fcZ);
+          const lrY = ry(lrZ);
+          const x1 = offsetX + 8;
+          const x2 = offsetX + drawW - 8;
+          const midX = offsetX + drawW / 2;
+          const labelY = (fcY + lrY) / 2;
+          const guideColor = isAligned ? '#F59E0B' : '#6B7280';
+          const label = isAligned ? 'Aligned' : diffCm > 0 ? `FC ${Math.abs(diffCm)} cm above` : `FC ${Math.abs(diffCm)} cm below`;
+          return (
+            <g key="align-guide" opacity={0.88}>
+              {/* Guide line at L/R height */}
+              <line x1={x1} y1={lrY} x2={x2} y2={lrY}
+                stroke={guideColor} strokeWidth={isAligned ? 1.5 : 0.9}
+                strokeDasharray={isAligned ? '5 2' : '4 3'} />
+              {/* Guide line at FC height (only when not aligned) */}
+              {!isAligned && (
+                <line x1={x1} y1={fcY} x2={x2} y2={fcY}
+                  stroke={guideColor} strokeWidth={0.9} strokeDasharray="4 3" />
+              )}
+              {/* Vertical callout between the two lines */}
+              {!isAligned && (
+                <line x1={midX} y1={Math.min(fcY, lrY)} x2={midX} y2={Math.max(fcY, lrY)}
+                  stroke={guideColor} strokeWidth={0.8} />
+              )}
+              {/* Label background + text */}
+              <rect x={midX - 32} y={labelY - 8} width={64} height={13} fill="white" opacity={0.9} rx={2} />
+              <text x={midX} y={labelY + 2} textAnchor="middle" fontSize={8}
+                fill={guideColor} fontWeight={isAligned ? 700 : 500}>{label}</text>
             </g>
           );
         })()}
