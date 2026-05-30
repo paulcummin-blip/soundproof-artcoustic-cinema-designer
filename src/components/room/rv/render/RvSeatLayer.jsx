@@ -67,7 +67,7 @@ export default function RvSeatLayer({
               onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
               onMouseEnter={() => handleSeatMouseEnter(seat)}
               onMouseLeave={handleSeatMouseLeave}
-              onClick={(e) => {
+              onDoubleClick={(e) => {
                 e.stopPropagation();
                 handleSeatClick(seat);
               }}
