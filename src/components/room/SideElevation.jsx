@@ -241,6 +241,18 @@ export default function SideElevation({
   // --- Drag handlers for vertical screen dragging ---
   const svgRef = useRef(null);
   const dragStartRef = useRef(null);
+  const listenersRef = useRef(null); // tracks active window listeners for unmount cleanup
+
+  // Cleanup: remove any active drag listeners if component unmounts mid-drag
+  useEffect(() => {
+    return () => {
+      if (listenersRef.current) {
+        window.removeEventListener('mousemove', listenersRef.current.move);
+        window.removeEventListener('mouseup', listenersRef.current.up);
+        listenersRef.current = null;
+      }
+    };
+  }, []);
 
   const handleScreenMouseDown = useCallback((e) => {
     if (!onScreenHeightFromFloorChange) return;
@@ -264,6 +276,7 @@ export default function SideElevation({
 
     const handleUp = (me) => {
       isDraggingRef.current = false;
+      listenersRef.current = null;
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
       const svgRect = svgEl.getBoundingClientRect();
@@ -278,6 +291,7 @@ export default function SideElevation({
       onScreenHeightFromFloorChange(rounded);
     };
 
+    listenersRef.current = { move: handleMove, up: handleUp };
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
   }, [onScreenHeightFromFloorChange, liveFloorM, roomH, screenData.h, drawH, SVG_H]);
