@@ -30,7 +30,7 @@ function screenDimsM(screen) {
   return { w: wM, h: wM / ar };
 }
 
-export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], frontSubsCfg, roomElements = [], onLcrSpeakerMoved, isDraggingRef }) {
+export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], frontSubsCfg, roomElements = [], onLcrSpeakerMoved, onFrontSubMoved, isDraggingRef }) {
   const roomW = Number(dimensions?.widthM ?? dimensions?.width) || 4.5;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
 
@@ -57,6 +57,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   geomRef.current = { offsetX, offsetY, drawW, drawH, roomW, roomH };
   const onMovedRef = useRef(onLcrSpeakerMoved);
   useEffect(() => { onMovedRef.current = onLcrSpeakerMoved; }, [onLcrSpeakerMoved]);
+  const onSubMovedRef = useRef(onFrontSubMoved);
+  useEffect(() => { onSubMovedRef.current = onFrontSubMoved; }, [onFrontSubMoved]);
 
   // Alignment guide state
   const [alignGuide, setAlignGuide] = useState(null); // { draggingRole, liveZ } | null
@@ -88,6 +90,15 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     document.body.style.cursor = 'grabbing';
   }, [clientToRoom, isDraggingRef]);
 
+  const handleSubMouseDown = useCallback((e, subIndex, speakerMX, speakerMZ) => {
+    e.preventDefault();
+    const start = clientToRoom(e.clientX, e.clientY);
+    if (!start) return;
+    dragRef.current = { type: 'sub', subIndex, speakerMX, speakerMZ, startRoomX: start.mX, startRoomZ: start.mZ, axisLocked: null };
+    if (isDraggingRef) isDraggingRef.current = true;
+    document.body.style.cursor = 'grabbing';
+  }, [clientToRoom, isDraggingRef]);
+
   useEffect(() => {
     const THRESHOLD_PX = 4;
     const onMouseMove = (e) => {
@@ -108,30 +119,38 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const rawZ = Math.max(0, Math.min(rH, drag.speakerMZ + (drag.axisLocked === 'z' ? dZ : 0)));
       // Magnetic snap (50 mm threshold, room-space metres)
       const SNAP_M = 0.05;
-      const allSpks = [...lcrSpeakersRef.current, ...subItemsRef.current];
+      const isDragSub = drag.type === 'sub';
+      const isDraggedItem = (s) => isDragSub
+        ? (typeof s.index === 'number' && s.index === drag.subIndex)
+        : (s.role || s.label) === drag.role;
+      const allOtherSpks = [...lcrSpeakersRef.current, ...subItemsRef.current].filter(s => !isDraggedItem(s));
       let snappedX = rawX, snappedZ = rawZ, snapResult = null;
       if (drag.axisLocked === 'x') {
         const xTargets = [
           { value: rW / 2, type: 'centre' },
-          ...allSpks.filter(s => (s.role || s.label) !== drag.role).map(s => ({ value: s.x, type: 'speaker' })),
+          ...allOtherSpks.map(s => ({ value: s.x, type: 'speaker' })),
         ];
         let best = null, bestD = SNAP_M;
         xTargets.forEach(t => { const d = Math.abs(rawX - t.value); if (d < bestD) { bestD = d; best = t; } });
         if (best) { snappedX = best.value; snapResult = { axis: 'x', value: best.value }; }
       }
       if (drag.axisLocked === 'z') {
-        const isLRPair = drag.role === 'FL' || drag.role === 'FR';
-        const zTargets = allSpks
-          .filter(s => { const sr = s.role || s.label; return sr !== drag.role && !(isLRPair && (sr === 'FL' || sr === 'FR')); })
+        const isLRPair = !isDragSub && (drag.role === 'FL' || drag.role === 'FR');
+        const zTargets = allOtherSpks
+          .filter(s => !(isLRPair && (s.role === 'FL' || s.role === 'FR')))
           .map(s => ({ value: s.z, type: 'speaker' }));
         let best = null, bestD = SNAP_M;
         zTargets.forEach(t => { const d = Math.abs(rawZ - t.value); if (d < bestD) { bestD = d; best = t; } });
         if (best) { snappedZ = best.value; snapResult = { axis: 'z', value: best.value }; }
       }
       setActiveSnapRef.current?.(snapResult);
-      onMovedRef.current?.({ role: drag.role, newX: snappedX, newZ: snappedZ, axis: drag.axisLocked });
-      if (drag.axisLocked === 'z') {
-        setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: snappedZ });
+      if (isDragSub) {
+        onSubMovedRef.current?.({ index: drag.subIndex, newX: snappedX, newZ: snappedZ, axis: drag.axisLocked });
+      } else {
+        onMovedRef.current?.({ role: drag.role, newX: snappedX, newZ: snappedZ, axis: drag.axisLocked });
+        if (drag.axisLocked === 'z') {
+          setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: snappedZ });
+        }
       }
     };
     const onMouseUp = () => {
@@ -184,7 +203,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.35;
       const x = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
       const z = Number.isFinite(s?.position?.z) ? s.position.z : hM / 2;
-      return { x, z, wM, hM, label: "SUB" };
+      return { x, z, wM, hM, label: "SUB", index: i };
     });
   }, [frontSubs, roomW]);
   // Keep snap refs current on every render
@@ -489,6 +508,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             label: sub.label,
             zM: sub.z,
             labelInsideBox: true,
+            onMouseDown: onFrontSubMoved ? (e) => handleSubMouseDown(e, i, sub.x, sub.z) : undefined,
           })
         )}
 
