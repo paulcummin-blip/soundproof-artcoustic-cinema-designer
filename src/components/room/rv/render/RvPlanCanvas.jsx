@@ -579,6 +579,10 @@ export default function RvPlanCanvas({
           <SeatingDragImpactCard
             baseline={seatingDragImpact.baseline}
             live={seatingDragImpact.live}
+            screen={seatingDragImpact.screen}
+            screenFrontPlaneM={seatingDragImpact.screenFrontPlaneM}
+            baselineMlp={seatingDragImpact.baselineMlp}
+            liveMlp={seatingDragImpact.liveMlp}
           />
         )}
 

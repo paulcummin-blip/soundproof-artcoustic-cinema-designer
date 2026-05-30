@@ -1138,16 +1138,19 @@ const byId = useEntitiesById({
     visiblePlanSpeakers,
   });
   const [baselineRp22, setBaselineRp22] = useState(null);
+  const [baselineMlp, setBaselineMlp] = useState(null);
   const baselineCapturedRef = useRef(false);
   useEffect(() => {
     if (dragging && dragType === 'seat') {
       if (!baselineCapturedRef.current) {
         baselineCapturedRef.current = true;
         setBaselineRp22(liveRp22);
+        setBaselineMlp(mlp ? { ...mlp } : null);
       }
     } else {
       baselineCapturedRef.current = false;
       setBaselineRp22(null);
+      setBaselineMlp(null);
     }
   // liveRp22 intentionally excluded — captures the pre-drag snapshot
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1941,7 +1944,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         subDragTick={subDragTick}
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
-        seatingDragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: dragging && dragType === 'seat' }}
+        seatingDragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: dragging && dragType === 'seat', screen, screenFrontPlaneM, baselineMlp, liveMlp: mlp }}
       />
   );
 });

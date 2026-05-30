@@ -1,4 +1,5 @@
 import React from 'react';
+import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 
 // Parameters monitored during seat-block dragging (in priority order for display)
@@ -104,10 +105,42 @@ function didChange(baseline, live, paramNum) {
   return false;
 }
 
-export default function SeatingDragImpactCard({ baseline, live }) {
+export default function SeatingDragImpactCard({ baseline, live, screen, screenFrontPlaneM, baselineMlp, liveMlp }) {
   if (!baseline || !live) return null;
 
-  const changed = MONITORED_PARAMS.filter(p => didChange(baseline, live, p));
+  // Local RP23 calculation — mirrors buildSeatHudSnapshot, uses live screen + MLP data
+  const calcRp23 = (mlpPt) => {
+    if (!mlpPt || !screen || !Number.isFinite(screenFrontPlaneM)) return null;
+    const screenWidthM = ((screen.visibleWidthInches || 0) * 0.0254);
+    const dist = Math.abs(mlpPt.y - screenFrontPlaneM);
+    if (dist <= 0.1 || screenWidthM <= 0) return null;
+    const angleDeg = 2 * Math.atan((screenWidthM / 2) / dist) * (180 / Math.PI);
+    const displayDeg = rp23DisplayAngleDeg(angleDeg);
+    const level = rp23LevelForAngleDeg(angleDeg) || 'FAIL';
+    return { level, formatted: displayDeg != null ? `${displayDeg}°` : '—', numericValue: angleDeg };
+  };
+
+  const bRp23Calc = calcRp23(baselineMlp);
+  const lRp23Calc = calcRp23(liveMlp);
+
+  const extractParamFull = (rp22data, paramNum, isBaseline) => {
+    if (paramNum === 23) return isBaseline ? bRp23Calc : lRp23Calc;
+    return extractParam(rp22data, paramNum);
+  };
+
+  const changed = MONITORED_PARAMS.filter(p => {
+    const b = extractParamFull(baseline, p, true);
+    const l = extractParamFull(live, p, false);
+    if (!b || !l) return false;
+    const bLvl = normalizeLevel(b.level);
+    const lLvl = normalizeLevel(l.level);
+    if (bLvl !== lLvl) return true;
+    if (b.formatted && l.formatted && b.formatted !== l.formatted) return true;
+    const tol = NUMERIC_TOLERANCE[p] ?? 0.1;
+    if (b.numericValue != null && l.numericValue != null &&
+        Math.abs(b.numericValue - l.numericValue) >= tol) return true;
+    return false;
+  });
   if (changed.length === 0) return null;
 
   const shown = changed.slice(0, MAX_SHOWN);
@@ -136,8 +169,8 @@ export default function SeatingDragImpactCard({ baseline, live }) {
       </div>
 
       {shown.map(paramNum => {
-        const b = extractParam(baseline, paramNum);
-        const l = extractParam(live, paramNum);
+        const b = extractParamFull(baseline, paramNum, true);
+        const l = extractParamFull(live, paramNum, false);
         if (!b || !l) return null;
 
         const bLvl = normalizeLevel(b.level);
@@ -195,8 +228,8 @@ export default function SeatingDragImpactCard({ baseline, live }) {
 
       {/* TEMPORARY DEBUG ROW */}
       {(() => {
-        const bRp23 = extractParam(baseline, 23);
-        const lRp23 = extractParam(live, 23);
+        const bRp23 = extractParamFull(baseline, 23, true);
+        const lRp23 = extractParamFull(live, 23, false);
         const bP1   = extractParam(baseline, 1);
         const lP1   = extractParam(live, 1);
         const rp23B = bRp23?.numericValue;
