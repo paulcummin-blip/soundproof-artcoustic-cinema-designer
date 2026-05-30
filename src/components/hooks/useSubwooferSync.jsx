@@ -112,13 +112,14 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
         ? Math.max(0, Math.min(2.5, rawBottom))
         : (cfg?.mountMode === 'wall' ? 0.80 : 0.05);
       const z = bottom + resolvedSubHeight / 2;
+      const countChanged = qty !== (existingSubs?.length ?? 0);
       const buildCount = qty;
       return Array.from({ length: buildCount }, (_, i) => {
         const prev = existingSubs?.[i] || null;
         const xFromCfg = Number(cfgPos?.[i]?.x);
         const xFromPrev = Number(prev?.position?.x);
         const xFromDefault = Number(defaultsX?.[i]);
-        const pickedX = isManual || placementMode === 'default'
+        const pickedX = (isManual || placementMode === 'default') && !countChanged
           ? (Number.isFinite(xFromCfg) ? xFromCfg : (Number.isFinite(xFromPrev) ? xFromPrev : xFromDefault))
           : xFromDefault;
         const finalX = clamp(pickedX, minX, maxX);

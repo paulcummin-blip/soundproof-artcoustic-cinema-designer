@@ -1451,26 +1451,17 @@ function RoomDesignerWithState() {
 
   // Front Elevation subwoofer drag callback
   const handleFrontSubMoved = useCallback(({ index, newX, newZ, axis }) => {
-    const rW = stableDimensions.widthM || stableDimensions.width || 4.5;
-    const numFrontSubs = frontSubsForRendering.length;
     setSubwoofers(prev => {
       if (!Array.isArray(prev)) return prev;
       let frontCount = -1;
       return prev.map(sub => {
         if (sub?.group !== 'front') return sub;
         frontCount++;
-        const isTarget = frontCount === index;
-        if (isTarget) {
-          return { ...sub, position: { ...(sub.position || {}), ...(axis === 'x' ? { x: newX } : {}), ...(axis === 'z' ? { z: newZ } : {}) } };
-        }
-        if (numFrontSubs === 2) {
-          if (axis === 'x') return { ...sub, position: { ...(sub.position || {}), x: rW - newX } };
-          if (axis === 'z') return { ...sub, position: { ...(sub.position || {}), z: newZ } };
-        }
-        return sub;
+        if (frontCount !== index) return sub;
+        return { ...sub, position: { ...(sub.position || {}), ...(axis === 'x' ? { x: newX } : {}), ...(axis === 'z' ? { z: newZ } : {}) } };
       });
     });
-  }, [setSubwoofers, frontSubsForRendering.length, stableDimensions.widthM, stableDimensions.width]);
+  }, [setSubwoofers]);
 
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
