@@ -264,6 +264,9 @@ export default function SideElevation({
   const speakerDragRef = useRef(null);
   const speakerListenersRef = useRef(null);
   const [liveSpeakerDrag, setLiveSpeakerDrag] = useState(null); // { role, z } | null
+  const [activeSnapZ, setActiveSnapZ] = useState(null); // snapped Z in room-metres while dragging, null when not snapping
+  const activeSnapZRef = useRef(null);
+  const speakersForSnapRef = useRef([]); // draggable side speaker z values — updated each render
 
   const handleSpeakerMouseDown = useCallback((e, role, startZ) => {
     if (!onSideSpeakerMoved) return;
@@ -277,8 +280,21 @@ export default function SideElevation({
       const svgRect = svgEl.getBoundingClientRect();
       const svgScale = svgRect.height / SVG_H;
       const deltaZ = -((me.clientY - speakerDragRef.current.startClientY) / svgScale / drawH) * roomH;
-      const newZ = Math.max(0.05, Math.min(roomH - 0.05, speakerDragRef.current.startZ + deltaZ));
-      setLiveSpeakerDrag({ role, z: newZ });
+      const rawZ = Math.max(0.05, Math.min(roomH - 0.05, speakerDragRef.current.startZ + deltaZ));
+      // Magnetic snap — same 50 mm threshold as Front Elevation
+      const SNAP_M = 0.05;
+      const others = speakersForSnapRef.current.filter(s => s.role !== role);
+      let snapHit = null;
+      for (const other of others) {
+        if (Math.abs(rawZ - other.z) < SNAP_M) {
+          if (snapHit === null || Math.abs(rawZ - other.z) < Math.abs(rawZ - snapHit)) {
+            snapHit = other.z;
+          }
+        }
+      }
+      activeSnapZRef.current = snapHit;
+      setActiveSnapZ(snapHit);
+      setLiveSpeakerDrag({ role, z: snapHit !== null ? snapHit : rawZ });
     };
     const handleUp = (me) => {
       window.removeEventListener('mousemove', handleMove);
@@ -287,10 +303,14 @@ export default function SideElevation({
       const svgRect = svgEl.getBoundingClientRect();
       const svgScale = svgRect.height / SVG_H;
       const deltaZ = -((me.clientY - speakerDragRef.current.startClientY) / svgScale / drawH) * roomH;
-      const newZ = Math.max(0.05, Math.min(roomH - 0.05, speakerDragRef.current.startZ + deltaZ));
+      const rawZ = Math.max(0.05, Math.min(roomH - 0.05, speakerDragRef.current.startZ + deltaZ));
+      // Use snapped value if a snap was active at release
+      const finalZ = activeSnapZRef.current !== null ? activeSnapZRef.current : rawZ;
       speakerDragRef.current = null;
+      activeSnapZRef.current = null;
+      setActiveSnapZ(null);
       setLiveSpeakerDrag(null);
-      onSideSpeakerMoved({ role, newZ: Math.round(newZ * 1000) / 1000 });
+      onSideSpeakerMoved({ role, newZ: Math.round(finalZ * 1000) / 1000 });
     };
     speakerListenersRef.current = { move: handleMove, up: handleUp };
     window.addEventListener('mousemove', handleMove);
@@ -338,6 +358,14 @@ export default function SideElevation({
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
   }, [onScreenHeightFromFloorChange, liveFloorM, roomH, screenData.h, drawH, SVG_H]);
+
+  // Populate snap targets — draggable side/rear surround speakers, updated every render
+  const DRAGGABLE_SIDE_ROLES = new Set(['LW','RW','SL','SR','SBL','SBR']);
+  speakersForSnapRef.current = Array.isArray(placedSpeakers)
+    ? placedSpeakers
+        .filter(s => DRAGGABLE_SIDE_ROLES.has(String(s?.role || '').toUpperCase()) && Number.isFinite(s?.position?.z))
+        .map(s => ({ role: String(s.role).toUpperCase(), z: s.position.z }))
+    : [];
 
   return (
     <div style={{ width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
@@ -826,6 +854,18 @@ export default function SideElevation({
               </g>
             );
           })}
+
+          {/* Magnetic snap guide — same style as Front Elevation */}
+          {activeSnapZ !== null && (
+            <g key="snap-guide-z" opacity={0.85}>
+              <line
+                x1={offsetX} y1={rz(activeSnapZ)}
+                x2={offsetX + drawW} y2={rz(activeSnapZ)}
+                stroke="#10B981" strokeWidth={1.2} strokeDasharray="6 3" />
+              <rect x={offsetX + drawW - 38} y={rz(activeSnapZ) - 8} width={34} height={13} fill="#10B981" rx={2} />
+              <text x={offsetX + drawW - 21} y={rz(activeSnapZ) + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.06em">SNAP</text>
+            </g>
+          )}
 
           {/* Projector */}
           {projectorEl && (() => {
