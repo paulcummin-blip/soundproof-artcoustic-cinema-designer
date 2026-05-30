@@ -1419,6 +1419,36 @@ function RoomDesignerWithState() {
     } catch (e) { if (globalThis.__B44_LOGS) console.error("[OptimiseAll] failed:", e); }
   }, [placedSpeakers, stableDimensions, _seatingPositions, seatingArrangementBasis, _isFrozen, setSpeakers, mlpAnchorEffective]);
 
+  // Front Elevation LCR drag callback
+  const handleLcrSpeakerMoved = useCallback(({ role, newX, newZ, axis }) => {
+    const rW = stableDimensions.widthM || stableDimensions.width || 4.5;
+    setSpeakers(prev => prev.map(spk => {
+      const canon = safeCanon(spk.role);
+      if (canon === role) {
+        return {
+          ...spk,
+          position: {
+            ...spk.position,
+            ...(axis === 'x' ? { x: newX } : {}),
+            ...(axis === 'z' ? { z: newZ } : {}),
+          },
+        };
+      }
+      // FL <-> FR horizontal symmetry
+      if (axis === 'x' && role === 'FL' && canon === 'FR') {
+        return { ...spk, position: { ...spk.position, x: rW - newX } };
+      }
+      if (axis === 'x' && role === 'FR' && canon === 'FL') {
+        return { ...spk, position: { ...spk.position, x: rW - newX } };
+      }
+      // FL / FR vertical — keep both at same height
+      if (axis === 'z' && (role === 'FL' || role === 'FR') && (canon === 'FL' || canon === 'FR')) {
+        return { ...spk, position: { ...spk.position, z: newZ } };
+      }
+      return spk;
+    }));
+  }, [setSpeakers, stableDimensions.widthM, stableDimensions.width]);
+
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
     // If no active project, save locally instead
@@ -1683,6 +1713,8 @@ function RoomDesignerWithState() {
                     placedSpeakers={placedSpeakers}
                     frontSubs={frontSubsForRendering}
                     frontSubsCfg={frontSubsCfg}
+                    onLcrSpeakerMoved={handleLcrSpeakerMoved}
+                    isDraggingRef={isDraggingRef}
                   />
                 )}
 

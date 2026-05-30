@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useEffect, useCallback } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon } from "@/components/report/SpeakerFaceIcons";
 
@@ -30,7 +30,7 @@ function screenDimsM(screen) {
   return { w: wM, h: wM / ar };
 }
 
-export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], frontSubsCfg, roomElements = [] }) {
+export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], frontSubsCfg, roomElements = [], onLcrSpeakerMoved, isDraggingRef }) {
   const roomW = Number(dimensions?.widthM ?? dimensions?.width) || 4.5;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
 
@@ -49,6 +49,65 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // room-metres → SVG px
   const rx = (m) => offsetX + (m / roomW) * drawW;
   const ry = (m) => offsetY + drawH - (m / roomH) * drawH; // y=0 is floor
+
+  // ── Front Elevation drag machinery ──────────────────────────────────────
+  const svgRef = useRef(null);
+  const dragRef = useRef(null);
+  const geomRef = useRef({});
+  geomRef.current = { offsetX, offsetY, drawW, drawH, roomW, roomH };
+  const onMovedRef = useRef(onLcrSpeakerMoved);
+  useEffect(() => { onMovedRef.current = onLcrSpeakerMoved; }, [onLcrSpeakerMoved]);
+
+  const clientToRoom = useCallback((clientX, clientY) => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+    const { offsetX: ox, offsetY: oy, drawW: dW, drawH: dH, roomW: rW, roomH: rH } = geomRef.current;
+    return { mX: (svgP.x - ox) * rW / dW, mZ: (oy + dH - svgP.y) * rH / dH };
+  }, []);
+
+  const handleLcrMouseDown = useCallback((e, role, speakerMX, speakerMZ) => {
+    e.preventDefault();
+    const start = clientToRoom(e.clientX, e.clientY);
+    if (!start) return;
+    dragRef.current = { role, speakerMX, speakerMZ, startRoomX: start.mX, startRoomZ: start.mZ, axisLocked: null };
+    if (isDraggingRef) isDraggingRef.current = true;
+    document.body.style.cursor = 'grabbing';
+  }, [clientToRoom, isDraggingRef]);
+
+  useEffect(() => {
+    const THRESHOLD_PX = 4;
+    const onMouseMove = (e) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const curr = clientToRoom(e.clientX, e.clientY);
+      if (!curr) return;
+      const dX = curr.mX - drag.startRoomX;
+      const dZ = curr.mZ - drag.startRoomZ;
+      const { drawW: dW, drawH: dH, roomW: rW, roomH: rH } = geomRef.current;
+      const dXpx = Math.abs(dX / rW * dW);
+      const dZpx = Math.abs(dZ / rH * dH);
+      if (!drag.axisLocked) {
+        if (Math.max(dXpx, dZpx) < THRESHOLD_PX) return;
+        drag.axisLocked = drag.role === 'FC' ? 'z' : (dXpx >= dZpx ? 'x' : 'z');
+      }
+      const newX = Math.max(0, Math.min(rW, drag.speakerMX + (drag.axisLocked === 'x' ? dX : 0)));
+      const newZ = Math.max(0, Math.min(rH, drag.speakerMZ + (drag.axisLocked === 'z' ? dZ : 0)));
+      onMovedRef.current?.({ role: drag.role, newX, newZ, axis: drag.axisLocked });
+    };
+    const onMouseUp = () => {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      if (isDraggingRef) isDraggingRef.current = false;
+      document.body.style.cursor = '';
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => { window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); };
+  }, [clientToRoom, isDraggingRef]);
+  // ────────────────────────────────────────────────────────────────────────
 
   // Screen
   const screenData = useMemo(() => screenDimsM(screen), [screen]);
@@ -134,7 +193,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
    * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
    * @param {boolean} labelInsideBox - if true, centre label inside the shape; if false, above
    */
-  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, labelInsideBox = false }) => {
+  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, labelInsideBox = false, onMouseDown }) => {
     const sx = cx - sw / 2;
     const sy = cy - sh / 2;
 
@@ -175,7 +234,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     };
 
     return (
-      <g key={key}>
+      <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
         {/* Body */}
         {hasFaceIcon ? renderFaceIcon() : isRound ? (
           <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
@@ -203,6 +262,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       {/* Responsive wrapper: aspect-ratio drives height from available width */}
       <div style={{ width: "100%", aspectRatio: `${SVG_W} / ${SVG_H}` }}>
       <svg
+        ref={svgRef}
         width="100%"
         height="100%"
         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -369,6 +429,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             label: spk.label,
             zM: spk.z,
             modelKey: spk.modelKey ?? "",
+            onMouseDown: onLcrSpeakerMoved ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
           })
         )}
 
