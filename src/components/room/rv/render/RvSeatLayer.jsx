@@ -12,8 +12,6 @@ export default function RvSeatLayer({
   _overlays,
   hudPinnedSeatId,
   handleMouseDown,
-  handleSeatMouseEnter,
-  handleSeatMouseLeave,
   handleSeatClick,
   clampMlpY,
   MLPMarker,
@@ -65,8 +63,6 @@ export default function RvSeatLayer({
               pointerEvents="all"
               style={{ cursor: 'grab' }}
               onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
-              onMouseEnter={() => handleSeatMouseEnter(seat)}
-              onMouseLeave={handleSeatMouseLeave}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 handleSeatClick(seat);
