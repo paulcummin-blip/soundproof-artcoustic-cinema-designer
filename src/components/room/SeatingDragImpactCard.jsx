@@ -192,6 +192,27 @@ export default function SeatingDragImpactCard({ baseline, live }) {
           + {extra} more affected
         </div>
       )}
+
+      {/* TEMPORARY DEBUG ROW */}
+      {(() => {
+        const bRp23 = extractParam(baseline, 23);
+        const lRp23 = extractParam(live, 23);
+        const bP1   = extractParam(baseline, 1);
+        const lP1   = extractParam(live, 1);
+        const rp23B = bRp23?.numericValue;
+        const rp23L = lRp23?.numericValue;
+        const p1B   = bP1?.numericValue;
+        const p1L   = lP1?.numericValue;
+        const rp23Delta = (rp23B != null && rp23L != null) ? Math.abs(rp23B - rp23L) : null;
+        const p1Delta   = (p1B   != null && p1L   != null) ? Math.abs(p1B   - p1L)   : null;
+        const fmt = (v) => v != null ? v.toFixed(2) : 'null';
+        return (
+          <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.07)', fontSize: 9, color: '#6B7280', fontFamily: 'monospace', lineHeight: 1.6 }}>
+            RP23: {fmt(rp23B)} → {fmt(rp23L)} Δ{fmt(rp23Delta)}<br/>
+            P1: {fmt(p1B)} → {fmt(p1L)} Δ{fmt(p1Delta)}
+          </div>
+        );
+      })()}
     </div>
   );
 }
