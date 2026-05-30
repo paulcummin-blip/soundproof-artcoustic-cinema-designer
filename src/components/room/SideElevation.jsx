@@ -721,7 +721,7 @@ export default function SideElevation({
             const adjustedIconW = svgW / FACE_ICON_VISIBLE_RATIO;
             const adjustedIconH = svgH / FACE_ICON_VISIBLE_RATIO;
             const adjustedIconX = spkX - adjustedIconW / 2;
-            const adjustedIconY = rz(spk.z) - adjustedIconH / 2;
+            const adjustedIconY = rz(effectiveZ) - adjustedIconH / 2;
 
             return (
               <g key={`spk-${i}`} opacity={0.85}
@@ -761,6 +761,16 @@ export default function SideElevation({
                   fontWeight={600}>
                   {spk.role}
                 </text>
+                {isDraggable && (
+                  <rect
+                    x={cabinetX - 7} y={cabinetY - 7}
+                    width={svgW + 14} height={svgH + 14}
+                    fill="transparent"
+                    pointerEvents="all"
+                    style={{ cursor: 'ns-resize' }}
+                    onMouseDown={(e) => handleSpeakerMouseDown(e, roleUp, effectiveZ)}
+                  />
+                )}
               </g>
             );
           })}
@@ -803,6 +813,16 @@ export default function SideElevation({
                   fill={LABEL_COLOR} fontWeight={600}>
                   {label}
                 </text>
+                {isDraggableGrp && (
+                  <rect
+                    x={frontX - 7} y={svgTop - 7}
+                    width={svgW + 14} height={svgH + 14}
+                    fill="transparent"
+                    pointerEvents="all"
+                    style={{ cursor: 'ns-resize' }}
+                    onMouseDown={(e) => handleSpeakerMouseDown(e, grpRole, effectiveGrpZ)}
+                  />
+                )}
               </g>
             );
           })}
