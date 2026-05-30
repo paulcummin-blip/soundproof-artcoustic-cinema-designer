@@ -1,11 +1,12 @@
 import React from 'react';
-import { getLevelColor, getLevelText } from '@/components/utils/rp22LevelCalculation';
+import RP22GradingPill from '@/components/ui/RP22GradingPill';
 
 // Parameters monitored during seat-block dragging (in priority order for display)
-const MONITORED_PARAMS = [1, 5, 6, 9, 10, 12, 13, 16, 17];
+const MONITORED_PARAMS = [23, 1, 5, 6, 9, 10, 12, 13, 16, 17];
 const MAX_SHOWN = 5;
 
 const PARAM_LABELS = {
+  23: 'RP23 Viewing Angle',
   1:  'Nearest boundary distance',
   5:  'Surround gap (largest)',
   6:  'Surround SPL consistency',
@@ -30,21 +31,20 @@ function normalizeLevel(level) {
   return isNaN(n) ? null : n;
 }
 
-function getLevelLabel(level) {
-  const n = normalizeLevel(level);
-  if (n === null) return '—';
-  return getLevelText(n) || `Level ${n}`;
-}
-
-function getLevelColors(level) {
-  const n = normalizeLevel(level);
-  const colors = getLevelColor(n);
-  return { bg: colors.fill, text: colors.text };
-}
-
 // Extract a single param's { level, formatted, numericValue } from the full RP22 result
 function extractParam(rp22, paramNum) {
   if (!rp22) return null;
+
+  // RP23 viewing angle
+  if (paramNum === 23) {
+    const p = rp22.perSeatRp23?.['mlp'];
+    if (!p || p.level == null) return null;
+    return {
+      level: p.level,
+      formatted: p.formatted ?? (Number.isFinite(p.angleDeg) ? `${p.angleDeg.toFixed(1)}°` : null),
+      numericValue: Number.isFinite(p.angleDeg) ? p.angleDeg : null,
+    };
+  }
 
   // Global (room-level) params
   if (paramNum === 12 || paramNum === 13) {
@@ -72,6 +72,7 @@ function extractParam(rp22, paramNum) {
 
 // Per-parameter numeric tolerance for raw-value change detection
 const NUMERIC_TOLERANCE = {
+  23: 0.5,   // RP23: viewing angle — 0.5°
   1:  0.01,  // P1: nearest wall — 1cm
   5:  0.5,   // P5: surround gap — 0.5°
   6:  0.1,   // P6: surround SPL consistency — 0.1 dB
@@ -144,8 +145,6 @@ export default function SeatingDragImpactCard({ baseline, live }) {
         const levelChanged = bLvl !== lLvl;
         const improving = levelChanged && lLvl > bLvl;
         const worsening = levelChanged && lLvl < bLvl;
-        const bColors = getLevelColors(b.level);
-        const lColors = getLevelColors(l.level);
         const valueChanged = b.formatted && l.formatted && b.formatted !== l.formatted;
 
         return (
@@ -166,21 +165,11 @@ export default function SeatingDragImpactCard({ baseline, live }) {
             {/* Level change */}
             {levelChanged && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: valueChanged ? 2 : 0 }}>
-                <span style={{
-                  fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                  backgroundColor: bColors.bg, color: bColors.text, fontWeight: 600,
-                }}>
-                  {getLevelLabel(b.level)}
-                </span>
+                <RP22GradingPill level={b.level} />
                 <span style={{ color: improving ? '#4ADE80' : '#F87171', fontSize: 13, lineHeight: 1 }}>
                   {improving ? '↑' : '↓'}
                 </span>
-                <span style={{
-                  fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                  backgroundColor: lColors.bg, color: lColors.text, fontWeight: 600,
-                }}>
-                  {getLevelLabel(l.level)}
-                </span>
+                <RP22GradingPill level={l.level} />
               </div>
             )}
 
