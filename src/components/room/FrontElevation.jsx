@@ -62,6 +62,13 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const [alignGuide, setAlignGuide] = useState(null); // { draggingRole, liveZ } | null
   const setAlignGuideRef = useRef(setAlignGuide);
 
+  // Magnetic snap state
+  const [activeSnap, setActiveSnap] = useState(null); // { axis: 'x'|'z', value: number } | null
+  const setActiveSnapRef = useRef(setActiveSnap);
+  // Live refs so mousemove handler can read current speaker positions without stale closure
+  const lcrSpeakersRef = useRef([]);
+  const subItemsRef = useRef([]);
+
   const clientToRoom = useCallback((clientX, clientY) => {
     const svg = svgRef.current;
     if (!svg) return null;
@@ -97,12 +104,34 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         if (Math.max(dXpx, dZpx) < THRESHOLD_PX) return;
         drag.axisLocked = drag.role === 'FC' ? 'z' : (dXpx >= dZpx ? 'x' : 'z');
       }
-      const newX = Math.max(0, Math.min(rW, drag.speakerMX + (drag.axisLocked === 'x' ? dX : 0)));
-      const newZ = Math.max(0, Math.min(rH, drag.speakerMZ + (drag.axisLocked === 'z' ? dZ : 0)));
-      onMovedRef.current?.({ role: drag.role, newX, newZ, axis: drag.axisLocked });
-      // Update alignment guide when dragging vertically
+      const rawX = Math.max(0, Math.min(rW, drag.speakerMX + (drag.axisLocked === 'x' ? dX : 0)));
+      const rawZ = Math.max(0, Math.min(rH, drag.speakerMZ + (drag.axisLocked === 'z' ? dZ : 0)));
+      // Magnetic snap (50 mm threshold, room-space metres)
+      const SNAP_M = 0.05;
+      const allSpks = [...lcrSpeakersRef.current, ...subItemsRef.current];
+      let snappedX = rawX, snappedZ = rawZ, snapResult = null;
+      if (drag.axisLocked === 'x') {
+        const xTargets = [
+          { value: rW / 2, type: 'centre' },
+          ...allSpks.filter(s => (s.role || s.label) !== drag.role).map(s => ({ value: s.x, type: 'speaker' })),
+        ];
+        let best = null, bestD = SNAP_M;
+        xTargets.forEach(t => { const d = Math.abs(rawX - t.value); if (d < bestD) { bestD = d; best = t; } });
+        if (best) { snappedX = best.value; snapResult = { axis: 'x', value: best.value }; }
+      }
       if (drag.axisLocked === 'z') {
-        setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: newZ });
+        const isLRPair = drag.role === 'FL' || drag.role === 'FR';
+        const zTargets = allSpks
+          .filter(s => { const sr = s.role || s.label; return sr !== drag.role && !(isLRPair && (sr === 'FL' || sr === 'FR')); })
+          .map(s => ({ value: s.z, type: 'speaker' }));
+        let best = null, bestD = SNAP_M;
+        zTargets.forEach(t => { const d = Math.abs(rawZ - t.value); if (d < bestD) { bestD = d; best = t; } });
+        if (best) { snappedZ = best.value; snapResult = { axis: 'z', value: best.value }; }
+      }
+      setActiveSnapRef.current?.(snapResult);
+      onMovedRef.current?.({ role: drag.role, newX: snappedX, newZ: snappedZ, axis: drag.axisLocked });
+      if (drag.axisLocked === 'z') {
+        setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: snappedZ });
       }
     };
     const onMouseUp = () => {
@@ -111,6 +140,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       if (isDraggingRef) isDraggingRef.current = false;
       document.body.style.cursor = '';
       setAlignGuideRef.current?.(null);
+      setActiveSnapRef.current?.(null);
     };
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
@@ -157,6 +187,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       return { x, z, wM, hM, label: "SUB" };
     });
   }, [frontSubs, roomW]);
+  // Keep snap refs current on every render
+  lcrSpeakersRef.current = lcrSpeakers;
+  subItemsRef.current = subItems;
 
   // Projector element from roomElements
   const projectorEl = useMemo(() => {
@@ -521,6 +554,29 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               <rect x={midX - 32} y={labelY - 8} width={64} height={13} fill="white" opacity={0.9} rx={2} />
               <text x={midX} y={labelY + 2} textAnchor="middle" fontSize={8}
                 fill={guideColor} fontWeight={isAligned ? 700 : 500}>{label}</text>
+            </g>
+          );
+        })()}
+
+        {/* Magnetic snap guide — visible only during active snap */}
+        {activeSnap && (() => {
+          const SNAP_COLOR = '#10B981';
+          const dragRole = dragRef.current?.role;
+          const draggedSpk = lcrSpeakers.find(s => s.role === dragRole);
+          const sx = draggedSpk ? rx(draggedSpk.x) : offsetX + drawW / 2;
+          const sz = draggedSpk ? ry(draggedSpk.z) : offsetY + drawH / 2;
+          return (
+            <g key="snap-guide" opacity={0.85}>
+              {activeSnap.axis === 'x' && (
+                <line x1={rx(activeSnap.value)} y1={offsetY} x2={rx(activeSnap.value)} y2={offsetY + drawH}
+                  stroke={SNAP_COLOR} strokeWidth={1.2} strokeDasharray="6 3" />
+              )}
+              {activeSnap.axis === 'z' && (
+                <line x1={offsetX} y1={ry(activeSnap.value)} x2={offsetX + drawW} y2={ry(activeSnap.value)}
+                  stroke={SNAP_COLOR} strokeWidth={1.2} strokeDasharray="6 3" />
+              )}
+              <rect x={sx + 7} y={sz - 8} width={32} height={13} fill={SNAP_COLOR} rx={2} />
+              <text x={sx + 23} y={sz + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.06em">SNAP</text>
             </g>
           );
         })()}
