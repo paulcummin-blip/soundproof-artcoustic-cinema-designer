@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { getSpeakerModelMeta } from "../models/speakers/registry";
 import SeatPersonIcon from "../roomdesigner/SeatPersonIcon";
 import {
@@ -81,6 +81,7 @@ export default function SideElevation({
   frontSubs = [],        // same array as FrontElevation receives (appState.subwoofers filtered group==='front')
   frontSubsCfg = null,   // for orientation fallback
   wall = 'right', // 'left' | 'right' — which side wall is being viewed
+  onScreenHeightFromFloorChange = null,
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
@@ -104,7 +105,16 @@ export default function SideElevation({
 
   // --- Screen ---
   const screenData  = useMemo(() => screenDimsM(screen), [screen]);
-  const screenFloorM = Number(screen?.heightFromFloorM) || 0.5;
+
+  // Draggable floor height — local state for live updates, synced from prop when not dragging
+  const isDraggingRef = useRef(false);
+  const [liveFloorM, setLiveFloorM] = useState(() => Number(screen?.heightFromFloorM) || 0.5);
+  useEffect(() => {
+    if (!isDraggingRef.current) {
+      setLiveFloorM(Number(screen?.heightFromFloorM) || 0.5);
+    }
+  }, [screen?.heightFromFloorM]);
+  const screenFloorM = liveFloorM;
   const screenTopM   = screenFloorM + screenData.h;
   // Screen front plane Y — same source of truth as Plan View
   const screenFrontY = Number(screen?.screenPlaneY_m) > 0
@@ -228,10 +238,55 @@ export default function SideElevation({
   // Hatch count for floor line
   const hatchCount = Math.floor(drawW / 14) + 1;
 
+  // --- Drag handlers for vertical screen dragging ---
+  const svgRef = useRef(null);
+  const dragStartRef = useRef(null);
+
+  const handleScreenMouseDown = useCallback((e) => {
+    if (!onScreenHeightFromFloorChange) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    isDraggingRef.current = true;
+    dragStartRef.current = { clientY: e.clientY, floorM: liveFloorM };
+
+    const handleMove = (me) => {
+      const svgRect = svgEl.getBoundingClientRect();
+      const svgScale = svgRect.height / SVG_H;
+      const deltaClientY = me.clientY - dragStartRef.current.clientY;
+      const deltaM = -(deltaClientY / svgScale / drawH) * roomH;
+      const minFloor = 0.05;
+      const maxFloor = roomH - screenData.h - 0.05;
+      const newFloor = Math.max(minFloor, Math.min(maxFloor, dragStartRef.current.floorM + deltaM));
+      setLiveFloorM(newFloor);
+    };
+
+    const handleUp = (me) => {
+      isDraggingRef.current = false;
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      const svgRect = svgEl.getBoundingClientRect();
+      const svgScale = svgRect.height / SVG_H;
+      const deltaClientY = me.clientY - dragStartRef.current.clientY;
+      const deltaM = -(deltaClientY / svgScale / drawH) * roomH;
+      const minFloor = 0.05;
+      const maxFloor = roomH - screenData.h - 0.05;
+      const newFloor = Math.max(minFloor, Math.min(maxFloor, dragStartRef.current.floorM + deltaM));
+      const rounded = Math.round(newFloor * 100) / 100;
+      setLiveFloorM(rounded);
+      onScreenHeightFromFloorChange(rounded);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [onScreenHeightFromFloorChange, liveFloorM, roomH, screenData.h, drawH, SVG_H]);
+
   return (
     <div style={{ width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
       <div style={{ width: "100%", aspectRatio: `${SVG_W} / ${SVG_H}` }}>
         <svg
+          ref={svgRef}
           width="100%"
           height="100%"
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -295,8 +350,12 @@ export default function SideElevation({
             const viewH_px   = rz(screenFloorM) - rz(screenTopM);
             const FRAME_W = 7;
             return (
-              <g>
-                {/* Frame casing — equal border on all 4 sides */}
+              <g
+                onMouseDown={handleScreenMouseDown}
+                style={{ cursor: onScreenHeightFromFloorChange ? 'ns-resize' : 'default' }}
+                title="Drag screen up/down"
+              >
+              {/* Frame casing — equal border on all 4 sides */}
                 <rect
                   x={sxPx - FRAME_W / 2} y={frameTopPx}
                   width={FRAME_W} height={frameH_px}

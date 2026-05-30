@@ -1711,6 +1711,7 @@ function RoomDesignerWithState() {
                       frontSubs={frontSubsForRendering}
                       frontSubsCfg={frontSubsCfg}
                       wall={sideElevationWall}
+                      onScreenHeightFromFloorChange={(h) => setScreenGuarded(prev => ({ ...prev, heightFromFloorM: h }))}
                     />
                   </>
                 )}
