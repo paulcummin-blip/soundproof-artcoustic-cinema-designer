@@ -82,6 +82,7 @@ export default function SideElevation({
   frontSubsCfg = null,   // for orientation fallback
   wall = 'right', // 'left' | 'right' — which side wall is being viewed
   onScreenHeightFromFloorChange = null,
+  onSideSpeakerMoved = null,
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
@@ -251,8 +252,50 @@ export default function SideElevation({
         window.removeEventListener('mouseup', listenersRef.current.up);
         listenersRef.current = null;
       }
+      if (speakerListenersRef.current) {
+        window.removeEventListener('mousemove', speakerListenersRef.current.move);
+        window.removeEventListener('mouseup', speakerListenersRef.current.up);
+        speakerListenersRef.current = null;
+      }
     };
   }, []);
+
+  // Speaker vertical drag state
+  const speakerDragRef = useRef(null);
+  const speakerListenersRef = useRef(null);
+  const [liveSpeakerDrag, setLiveSpeakerDrag] = useState(null); // { role, z } | null
+
+  const handleSpeakerMouseDown = useCallback((e, role, startZ) => {
+    if (!onSideSpeakerMoved) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    speakerDragRef.current = { role, startClientY: e.clientY, startZ };
+    setLiveSpeakerDrag({ role, z: startZ });
+    const handleMove = (me) => {
+      const svgRect = svgEl.getBoundingClientRect();
+      const svgScale = svgRect.height / SVG_H;
+      const deltaZ = -((me.clientY - speakerDragRef.current.startClientY) / svgScale / drawH) * roomH;
+      const newZ = Math.max(0.05, Math.min(roomH - 0.05, speakerDragRef.current.startZ + deltaZ));
+      setLiveSpeakerDrag({ role, z: newZ });
+    };
+    const handleUp = (me) => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      speakerListenersRef.current = null;
+      const svgRect = svgEl.getBoundingClientRect();
+      const svgScale = svgRect.height / SVG_H;
+      const deltaZ = -((me.clientY - speakerDragRef.current.startClientY) / svgScale / drawH) * roomH;
+      const newZ = Math.max(0.05, Math.min(roomH - 0.05, speakerDragRef.current.startZ + deltaZ));
+      speakerDragRef.current = null;
+      setLiveSpeakerDrag(null);
+      onSideSpeakerMoved({ role, newZ: Math.round(newZ * 1000) / 1000 });
+    };
+    speakerListenersRef.current = { move: handleMove, up: handleUp };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [onSideSpeakerMoved, roomH, drawH, SVG_H]);
 
   const handleScreenMouseDown = useCallback((e) => {
     if (!onScreenHeightFromFloorChange) return;
@@ -652,9 +695,12 @@ export default function SideElevation({
             const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
             const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
 
+            const roleUp = String(spk.role || '').toUpperCase();
+            const isDraggable = !!onSideSpeakerMoved && ['LW','RW','SL','SR'].includes(roleUp);
+            const effectiveZ = (liveSpeakerDrag && liveSpeakerDrag.role === roleUp) ? liveSpeakerDrag.z : spk.z;
             const spkX   = rx(spk.y);
-            const svgTop = rz(spk.z + spkHeightM / 2);
-            const svgBot = rz(spk.z - spkHeightM / 2);
+            const svgTop = rz(effectiveZ + spkHeightM / 2);
+            const svgBot = rz(effectiveZ - spkHeightM / 2);
             const svgH   = Math.max(3, svgBot - svgTop);
             const svgW   = Math.max(3, (spkWidthM / roomL) * drawW);
             const ix     = spkX - svgW / 2;
@@ -678,7 +724,10 @@ export default function SideElevation({
             const adjustedIconY = rz(spk.z) - adjustedIconH / 2;
 
             return (
-              <g key={`spk-${i}`} opacity={0.85}>
+              <g key={`spk-${i}`} opacity={0.85}
+                onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, effectiveZ) : undefined}
+                style={{ cursor: isDraggable ? 'ns-resize' : 'default' }}
+              >
                 {FaceIcon ? (
                   <>
                     {/* Define clip region = true cabinet box */}
@@ -721,17 +770,23 @@ export default function SideElevation({
             const meta = getSpeakerModelMeta(grp.model) || {};
             const spkDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.082;
             const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
+            const grpRole = grp.roles[0] || '';
+            const isDraggableGrp = !!onSideSpeakerMoved && grp.roles.some(r => ['SBL','SBR'].includes(r));
+            const effectiveGrpZ = (liveSpeakerDrag && grp.roles.includes(liveSpeakerDrag.role)) ? liveSpeakerDrag.z : grp.z;
             const frontX = rx(roomL - spkDepthM); // front face of speaker
             const backX  = rx(roomL);             // rear wall
             const svgW   = Math.max(3, backX - frontX);
-            const svgTop  = rz(grp.z + spkHeightM / 2);
-            const svgBot  = rz(grp.z - spkHeightM / 2);
+            const svgTop  = rz(effectiveGrpZ + spkHeightM / 2);
+            const svgBot  = rz(effectiveGrpZ - spkHeightM / 2);
             const svgH   = Math.max(3, svgBot - svgTop);
             const label  = grp.roles.length > 1
               ? grp.roles.join('/')
               : grp.roles[0];
             return (
-              <g key={`rear-${i}`} opacity={0.92}>
+              <g key={`rear-${i}`} opacity={0.92}
+                onMouseDown={isDraggableGrp ? (e) => handleSpeakerMouseDown(e, grpRole, effectiveGrpZ) : undefined}
+                style={{ cursor: isDraggableGrp ? 'ns-resize' : 'default' }}
+              >
                 {/* Cabinet outline — white fill, clean dark stroke */}
                 <rect
                   x={frontX} y={svgTop}
