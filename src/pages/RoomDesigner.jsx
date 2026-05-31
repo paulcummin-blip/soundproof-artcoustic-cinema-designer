@@ -1451,6 +1451,7 @@ function RoomDesignerWithState() {
 
   // Front Elevation subwoofer drag callback
   const handleFrontSubMoved = useCallback(({ index, newX, newZ, axis }) => {
+    // 1. Immediate visual update on the derived array
     setSubwoofers(prev => {
       if (!Array.isArray(prev)) return prev;
       let frontCount = -1;
@@ -1461,7 +1462,26 @@ function RoomDesignerWithState() {
         return { ...sub, position: { ...(sub.position || {}), ...(axis === 'x' ? { x: newX } : {}), ...(axis === 'z' ? { z: newZ } : {}) } };
       });
     });
-  }, [setSubwoofers]);
+
+    // 2. Persist to config source-of-truth so useSubwooferSync reads back the drag
+    if (axis === 'x' && typeof appState?.setFrontSubsCfg === 'function') {
+      appState.setFrontSubsCfg(prev => {
+        const positions = Array.isArray(prev?.positions) ? [...prev.positions] : [];
+        while (positions.length <= index) positions.push({});
+        positions[index] = { ...(positions[index] || {}), x: newX };
+        return { ...prev, positions, isManual: true };
+      });
+    }
+
+    if (axis === 'z' && typeof appState?.setFrontSubsCfg === 'function') {
+      const model = _frontSubsCfg?.model || '';
+      const dims = getModelDimsM?.(model) || {};
+      const subH = Number(dims?.heightM);
+      const resolvedH = Number.isFinite(subH) && subH > 0 ? subH : 0.50;
+      const bottomHeightM = Math.max(0, newZ - resolvedH / 2);
+      appState.setFrontSubsCfg(prev => ({ ...prev, bottomHeightM }));
+    }
+  }, [setSubwoofers, appState?.setFrontSubsCfg, _frontSubsCfg]);
 
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
