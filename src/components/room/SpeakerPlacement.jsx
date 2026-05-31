@@ -1351,7 +1351,7 @@ function SpeakerPlacementImpl(props) {
 
     const SIDE_ROLES = new Set(['SL', 'SR', 'SL1', 'SR1', 'SL2', 'SR2']);
     const REAR_ROLES = new Set(['SBL', 'SBR', 'SBL1', 'SBR1', 'SBL2', 'SBR2']);
-    const WIDE_ROLES = new Set(['LW', 'RW']);
+    // WIDE_ROLES (LW, RW) intentionally excluded — Front Wide heights must not be auto-adjusted
 
     setSpeakers(prev => {
       if (!Array.isArray(prev) || prev.length === 0) return prev;
@@ -1362,7 +1362,7 @@ function SpeakerPlacementImpl(props) {
         let targetH = null;
         if (SIDE_ROLES.has(canon) || SIDE_ROLES.has(r)) targetH = sideH;
         else if (REAR_ROLES.has(canon) || REAR_ROLES.has(r)) targetH = rearH;
-        else if (WIDE_ROLES.has(canon) || WIDE_ROLES.has(r)) targetH = wideH;
+        // Front Wides (LW/RW): targetH remains null — height preserved as-is
         if (targetH === null || !s.position) return s;
         if (Math.abs((s.position.z || 0) - targetH) < 0.001) return s;
         changed = true;
