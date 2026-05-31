@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Project } from '@/entities/Project';
 import { Button } from '@/components/ui/button';
@@ -237,6 +236,49 @@ export default function PrintableReport() {
                 />
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Elevation Drawings Page */}
+        <section className="mb-12 page-break-before">
+          <h2 className="text-2xl font-bold text-center mb-6 text-gray-900">Elevation Drawings</h2>
+
+          {/* Front Elevation — full width at top */}
+          <div className="mb-6 page-break-inside-avoid">
+            <ElevationDrawing
+              wall="front"
+              roomDimensions={{ length: roomLength, width: roomWidth, height: roomHeight }}
+              placedSpeakers={selectedSpeakers}
+              screenSize={screenSize}
+              screenWall={screenWall}
+              roomOrientation={roomOrientation}
+              screenHeight={screenHeight}
+              aspectRatio={aspectRatio}
+            />
+          </div>
+
+          {/* Left and Right Side Elevations — side by side */}
+          <div className="grid grid-cols-2 gap-6 page-break-inside-avoid">
+            <ElevationDrawing
+              wall="left"
+              roomDimensions={{ length: roomLength, width: roomWidth, height: roomHeight }}
+              placedSpeakers={selectedSpeakers}
+              screenSize={screenSize}
+              screenWall={screenWall}
+              roomOrientation={roomOrientation}
+              screenHeight={screenHeight}
+              aspectRatio={aspectRatio}
+            />
+            <ElevationDrawing
+              wall="right"
+              roomDimensions={{ length: roomLength, width: roomWidth, height: roomHeight }}
+              placedSpeakers={selectedSpeakers}
+              screenSize={screenSize}
+              screenWall={screenWall}
+              roomOrientation={roomOrientation}
+              screenHeight={screenHeight}
+              aspectRatio={aspectRatio}
+            />
           </div>
         </section>
 
