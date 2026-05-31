@@ -608,10 +608,19 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         {/* Magnetic snap guide — visible only during active snap */}
         {activeSnap && (() => {
           const SNAP_COLOR = '#10B981';
-          const dragRole = dragRef.current?.role;
+          const drag = dragRef.current;
+          const dragRole = drag?.role;
+          const isDragSub = drag?.type === 'sub';
           const draggedSpk = lcrSpeakers.find(s => s.role === dragRole);
-          const sx = draggedSpk ? rx(draggedSpk.x) : offsetX + drawW / 2;
-          const sz = draggedSpk ? ry(draggedSpk.z) : offsetY + drawH / 2;
+          const draggedSub = isDragSub ? (subItems[drag?.subIndex] ?? null) : null;
+          const sx = draggedSpk ? rx(draggedSpk.x) : (draggedSub ? rx(draggedSub.x) : offsetX + drawW / 2);
+          const sz = draggedSpk ? ry(draggedSpk.z) : (draggedSub ? ry(draggedSub.z) : offsetY + drawH / 2);
+          // AFF: bottom of the dragged cabinet at the snapped position
+          const draggedItem = draggedSpk ?? draggedSub;
+          const itemHM = draggedItem?.hM ?? 0;
+          const snapZCentre = activeSnap.axis === 'z' ? activeSnap.value : (draggedItem?.z ?? 0);
+          const bottomAFF = Math.max(0, snapZCentre - itemHM / 2);
+          const affText = `${bottomAFF.toFixed(2)}m AFF`;
           return (
             <g key="snap-guide" opacity={0.85}>
               {activeSnap.axis === 'x' && (
@@ -622,8 +631,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 <line x1={offsetX} y1={ry(activeSnap.value)} x2={offsetX + drawW} y2={ry(activeSnap.value)}
                   stroke={SNAP_COLOR} strokeWidth={1.2} strokeDasharray="6 3" />
               )}
-              <rect x={sx + 7} y={sz - 8} width={32} height={13} fill={SNAP_COLOR} rx={2} />
-              <text x={sx + 23} y={sz + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.06em">SNAP</text>
+              <rect x={sx + 7} y={sz - 8} width={44} height={23} fill={SNAP_COLOR} rx={2} />
+              <text x={sx + 29} y={sz + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.06em">SNAP</text>
+              <text x={sx + 29} y={sz + 13} textAnchor="middle" fontSize={6.5} fill="white" fontWeight={600}>{affText}</text>
             </g>
           );
         })()}

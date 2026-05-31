@@ -856,16 +856,27 @@ export default function SideElevation({
           })}
 
           {/* Magnetic snap guide — same style as Front Elevation */}
-          {activeSnapZ !== null && (
-            <g key="snap-guide-z" opacity={0.85}>
-              <line
-                x1={offsetX} y1={rz(activeSnapZ)}
-                x2={offsetX + drawW} y2={rz(activeSnapZ)}
-                stroke="#10B981" strokeWidth={1.2} strokeDasharray="6 3" />
-              <rect x={offsetX + drawW - 42} y={rz(activeSnapZ) - 8} width={38} height={13} fill="#10B981" rx={2} />
-              <text x={offsetX + drawW - 23} y={rz(activeSnapZ) + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.04em">{activeSnapZ.toFixed(2)}m</text>
-            </g>
-          )}
+          {activeSnapZ !== null && (() => {
+            // AFF: bottom of dragged cabinet at snapped height
+            const draggedSp = liveSpeakerDrag && Array.isArray(placedSpeakers)
+              ? placedSpeakers.find(s => String(s?.role || '').toUpperCase() === liveSpeakerDrag.role)
+              : null;
+            const snapMeta = draggedSp ? (getSpeakerModelMeta(draggedSp.model) || {}) : {};
+            const snapItemHM = Number(snapMeta.heightM) > 0 ? Number(snapMeta.heightM) : 0.27;
+            const snapBottomAFF = Math.max(0, activeSnapZ - snapItemHM / 2);
+            const snapAffText = `${snapBottomAFF.toFixed(2)}m AFF`;
+            return (
+              <g key="snap-guide-z" opacity={0.85}>
+                <line
+                  x1={offsetX} y1={rz(activeSnapZ)}
+                  x2={offsetX + drawW} y2={rz(activeSnapZ)}
+                  stroke="#10B981" strokeWidth={1.2} strokeDasharray="6 3" />
+                <rect x={offsetX + drawW - 48} y={rz(activeSnapZ) - 8} width={44} height={23} fill="#10B981" rx={2} />
+                <text x={offsetX + drawW - 26} y={rz(activeSnapZ) + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.04em">{activeSnapZ.toFixed(2)}m</text>
+                <text x={offsetX + drawW - 26} y={rz(activeSnapZ) + 13} textAnchor="middle" fontSize={6.5} fill="white" fontWeight={600}>{snapAffText}</text>
+              </g>
+            );
+          })()}
 
           {/* Projector */}
           {projectorEl && (() => {
