@@ -1451,24 +1451,48 @@ function RoomDesignerWithState() {
 
   // Front Elevation subwoofer drag callback
   const handleFrontSubMoved = useCallback(({ index, newX, newZ, axis }) => {
-    // 1. Immediate visual update on the derived array
+    const roomW = stableDimensions.widthM || stableDimensions.width || 4.5;
+
+    // 1. Immediate visual update
     setSubwoofers(prev => {
       if (!Array.isArray(prev)) return prev;
+      const frontSubs = prev.filter(s => s?.group === 'front');
+      const isPaired = frontSubs.length === 2;
       let frontCount = -1;
       return prev.map(sub => {
         if (sub?.group !== 'front') return sub;
         frontCount++;
+        if (axis === 'x' && isPaired) {
+          // Paired x: dragged sub gets newX, other gets mirror
+          const mirrorX = roomW - newX;
+          const thisX = frontCount === index ? newX : mirrorX;
+          return { ...sub, position: { ...(sub.position || {}), x: thisX } };
+        }
+        if (axis === 'z' && isPaired) {
+          // Paired z: both get same height
+          return { ...sub, position: { ...(sub.position || {}), z: newZ } };
+        }
+        // Independent: only update the dragged sub
         if (frontCount !== index) return sub;
         return { ...sub, position: { ...(sub.position || {}), ...(axis === 'x' ? { x: newX } : {}), ...(axis === 'z' ? { z: newZ } : {}) } };
       });
     });
 
-    // 2. Persist to config source-of-truth so useSubwooferSync reads back the drag
+    // 2. Persist to config source-of-truth
     if (axis === 'x' && typeof appState?.setFrontSubsCfg === 'function') {
       appState.setFrontSubsCfg(prev => {
+        const frontCount = (appState?.subwoofers || []).filter(s => s?.group === 'front').length;
+        const isPaired = frontCount === 2;
         const positions = Array.isArray(prev?.positions) ? [...prev.positions] : [];
-        while (positions.length <= index) positions.push({});
-        positions[index] = { ...(positions[index] || {}), x: newX };
+        if (isPaired) {
+          while (positions.length < 2) positions.push({});
+          const mirrorX = roomW - newX;
+          positions[index] = { ...(positions[index] || {}), x: newX };
+          positions[1 - index] = { ...(positions[1 - index] || {}), x: mirrorX };
+        } else {
+          while (positions.length <= index) positions.push({});
+          positions[index] = { ...(positions[index] || {}), x: newX };
+        }
         return { ...prev, positions, isManual: true };
       });
     }
@@ -1482,7 +1506,7 @@ function RoomDesignerWithState() {
       const bottomHeightM = Math.max(0, newZ - resolvedH / 2);
       appState.setFrontSubsCfg(prev => ({ ...prev, bottomHeightM }));
     }
-  }, [setSubwoofers, appState?.setFrontSubsCfg, _frontSubsCfg, _frontSubsCfg?.orientation]);
+  }, [setSubwoofers, appState?.setFrontSubsCfg, _frontSubsCfg, _frontSubsCfg?.orientation, stableDimensions.widthM, stableDimensions.width, appState?.subwoofers]);
 
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
