@@ -747,8 +747,8 @@ export default function SideElevation({
             // Seat icon spans: front = cx - 0.90m, back = cx + 0.08m (from SeatPersonIcon geometry)
             const SEAT_FRONT_M = 0.90;
             const SEAT_BACK_M = 0.08;
-            const x1 = rx(prevRow.y + SEAT_BACK_M);  // rear of previous row chair
-            const x2 = rx(row.y - SEAT_FRONT_M);      // front of raised row chair
+            const x1 = rx(prevRow.y + SEAT_BACK_M);  // back edge of row-in-front chair → riser front
+            const x2 = rx(row.y + SEAT_BACK_M);       // back edge of raised row chair → riser back
             if (x2 <= x1 + 2) return null; // skip if rows are too close
             const platformTopY = rz(row.platformH);
             const floorY = rz(0);
