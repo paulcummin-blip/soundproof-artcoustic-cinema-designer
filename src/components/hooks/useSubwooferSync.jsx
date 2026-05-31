@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const WALL_BUFFER_M = 0.01;
@@ -105,7 +106,9 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
       const minX = WALL_BUFFER_M + subWidth / 2;
       const maxX = widthM - WALL_BUFFER_M - subWidth / 2;
       const dims = getModelDimsM?.(model) || {};
-      const subHeight = Number(dims?.heightM);
+      // Use orientation-aware metadata for heightM so position.z matches what FrontElevation/SideElevation render
+      const subMeta = getSpeakerModelMeta(model, cfg?.orientation) || {};
+      const subHeight = Number(subMeta.heightM);
       const resolvedSubHeight = Number.isFinite(subHeight) && subHeight > 0 ? subHeight : 0.50;
       const rawBottom = Number(cfg?.bottomHeightM);
       const bottom = Number.isFinite(rawBottom)
