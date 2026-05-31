@@ -1457,14 +1457,14 @@ function RP22ReportInner() {
                         {/* ── Elevation Drawings page ── */}
                         <section id="pdf-elevation-drawings" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
                             <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>Elevation Drawings</div>
-                            <div style={{ marginBottom: 16 }}>
+                            <div style={{ marginBottom: 48 }}>
                                 <FrontElevation
                                     dimensions={stableDimensions}
                                     screen={screen}
                                     placedSpeakers={placedSpeakers}
                                     frontSubs={frontSubs}
                                     frontSubsCfg={frontSubsCfg}
-                                    roomElements={app?.roomElements || []}
+                                    roomElements={(app?.roomElements || []).filter(el => el?.type !== 'projector')}
                                 />
                             </div>
                             <div style={{ marginBottom: 16 }}>
