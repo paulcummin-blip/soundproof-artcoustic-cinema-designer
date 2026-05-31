@@ -67,6 +67,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // Magnetic snap state
   const [activeSnap, setActiveSnap] = useState(null); // { axis: 'x'|'z', value: number } | null
   const setActiveSnapRef = useRef(setActiveSnap);
+  // Local live drag state for sub dragging — avoids calling onFrontSubMoved on every mousemove
+  const [liveDragSubs, setLiveDragSubs] = useState(null); // { [index]: {x, z} } | null
+  const liveDragSubsRef = useRef(null); // readable in mouseup without stale closure
   // Live refs so mousemove handler can read current speaker positions without stale closure
   const lcrSpeakersRef = useRef([]);
   const subItemsRef = useRef([]);
@@ -145,7 +148,21 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       }
       setActiveSnapRef.current?.(snapResult);
       if (isDragSub) {
-        onSubMovedRef.current?.({ index: drag.subIndex, newX: snappedX, newZ: snappedZ, axis: drag.axisLocked });
+        // Build local live map — do NOT call onFrontSubMoved here
+        const { roomW: rW } = geomRef.current;
+        const totalFrontSubs = subItemsRef.current.length;
+        const liveMap = { [drag.subIndex]: { x: snappedX, z: snappedZ } };
+        if (totalFrontSubs === 2 && drag.axisLocked === 'x') {
+          const otherIdx = 1 - drag.subIndex;
+          const otherCurrent = subItemsRef.current[otherIdx];
+          liveMap[otherIdx] = { x: rW - snappedX, z: liveDragSubsRef.current?.[otherIdx]?.z ?? otherCurrent?.z ?? snappedZ };
+        } else if (totalFrontSubs === 2 && drag.axisLocked === 'z') {
+          const otherIdx = 1 - drag.subIndex;
+          const otherCurrent = subItemsRef.current[otherIdx];
+          liveMap[otherIdx] = { x: liveDragSubsRef.current?.[otherIdx]?.x ?? otherCurrent?.x ?? snappedX, z: snappedZ };
+        }
+        liveDragSubsRef.current = liveMap;
+        setLiveDragSubs({ ...liveMap });
       } else {
         onMovedRef.current?.({ role: drag.role, newX: snappedX, newZ: snappedZ, axis: drag.axisLocked });
         if (drag.axisLocked === 'z') {
@@ -154,7 +171,17 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       }
     };
     const onMouseUp = () => {
-      if (!dragRef.current) return;
+      const drag = dragRef.current;
+      if (!drag) return;
+      // Commit final sub position once on mouseup
+      if (drag.type === 'sub') {
+        const finalPos = liveDragSubsRef.current?.[drag.subIndex];
+        if (finalPos && drag.axisLocked) {
+          onSubMovedRef.current?.({ index: drag.subIndex, newX: finalPos.x, newZ: finalPos.z, axis: drag.axisLocked });
+        }
+        liveDragSubsRef.current = null;
+        setLiveDragSubs(null);
+      }
       dragRef.current = null;
       if (isDraggingRef) isDraggingRef.current = false;
       document.body.style.cursor = '';
@@ -201,11 +228,14 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const meta = getSpeakerModelMeta(s?.model, orientation);
       const wM = (meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.35;
       const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.35;
-      const x = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
-      const z = Number.isFinite(s?.position?.z) ? s.position.z : hM / 2;
+      const baseX = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
+      const baseZ = Number.isFinite(s?.position?.z) ? s.position.z : hM / 2;
+      const liveOverride = liveDragSubs?.[i];
+      const x = liveOverride ? liveOverride.x : baseX;
+      const z = liveOverride ? liveOverride.z : baseZ;
       return { x, z, wM, hM, label: "SUB", index: i };
     });
-  }, [frontSubs, roomW]);
+  }, [frontSubs, roomW, liveDragSubs]);
   // Keep snap refs current on every render
   lcrSpeakersRef.current = lcrSpeakers;
   subItemsRef.current = subItems;
