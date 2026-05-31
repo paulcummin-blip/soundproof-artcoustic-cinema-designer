@@ -1475,13 +1475,14 @@ function RoomDesignerWithState() {
 
     if (axis === 'z' && typeof appState?.setFrontSubsCfg === 'function') {
       const model = _frontSubsCfg?.model || '';
-      const dims = getModelDimsM?.(model) || {};
-      const subH = Number(dims?.heightM);
+      const orientation = _frontSubsCfg?.orientation;
+      const meta = getSpeakerModelMeta(model, orientation) || {};
+      const subH = Number(meta.heightM);
       const resolvedH = Number.isFinite(subH) && subH > 0 ? subH : 0.50;
       const bottomHeightM = Math.max(0, newZ - resolvedH / 2);
       appState.setFrontSubsCfg(prev => ({ ...prev, bottomHeightM }));
     }
-  }, [setSubwoofers, appState?.setFrontSubsCfg, _frontSubsCfg]);
+  }, [setSubwoofers, appState?.setFrontSubsCfg, _frontSubsCfg, _frontSubsCfg?.orientation]);
 
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
@@ -1777,6 +1778,8 @@ function RoomDesignerWithState() {
                       placedSpeakers={placedSpeakers}
                       frontSubs={frontSubsForRendering}
                       frontSubsCfg={frontSubsCfg}
+                      rearSubs={rearSubsForRendering}
+                      rearSubsCfg={rearSubsCfg}
                       wall={sideElevationWall}
                       onScreenHeightFromFloorChange={(h) => setScreenGuarded(prev => ({ ...prev, heightFromFloorM: h }))}
                       onSideSpeakerMoved={({ role, newZ }) => setSpeakers(prev => prev.map(s => String(s.role).toUpperCase() === role ? { ...s, position: { ...s.position, z: newZ } } : s))}

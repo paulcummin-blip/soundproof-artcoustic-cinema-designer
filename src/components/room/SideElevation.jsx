@@ -80,6 +80,8 @@ export default function SideElevation({
   placedSpeakers,
   frontSubs = [],        // same array as FrontElevation receives (appState.subwoofers filtered group==='front')
   frontSubsCfg = null,   // for orientation fallback
+  rearSubs = [],         // appState.subwoofers filtered group==='rear'
+  rearSubsCfg = null,    // for orientation fallback
   wall = 'right', // 'left' | 'right' — which side wall is being viewed
   onScreenHeightFromFloorChange = null,
   onSideSpeakerMoved = null,
@@ -581,6 +583,60 @@ export default function SideElevation({
 
                   return (
                     <g key={`fsub-${i}`}>
+                      <rect
+                        x={frontX} y={svgTop}
+                        width={svgW} height={svgH}
+                        fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                      {/* Front face baffle line */}
+                      <line
+                        x1={frontX} y1={svgTop}
+                        x2={frontX} y2={svgBot}
+                        stroke="#4A4540" strokeWidth={1.4} />
+                      <text
+                        x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
+                        textAnchor="end" fontSize={6}
+                        fill={LABEL_COLOR} fontWeight={600}>
+                        {label}
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })()}
+
+          {/* Rear subwoofers — side profile, mirroring front sub style, against rear wall */}
+          {(() => {
+            const safeRearSubs = Array.isArray(rearSubs) ? rearSubs : [];
+            if (!safeRearSubs.length) return null;
+            return (
+              <g opacity={0.88}>
+                {safeRearSubs.map((sub, i) => {
+                  const orientation = sub?.orientation || rearSubsCfg?.orientation;
+                  const meta = getSpeakerModelMeta(sub?.model, orientation) || {};
+                  const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
+                  const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
+
+                  // position.y is cabinet centre; fallback pushes cabinet against rear wall
+                  const subCentreY = Number.isFinite(sub?.position?.y)
+                    ? Number(sub.position.y)
+                    : roomL - subDepthM / 2;
+                  const frontX = rx(subCentreY - subDepthM / 2);
+                  const backX  = rx(subCentreY + subDepthM / 2);
+                  const svgW   = Math.max(4, backX - frontX);
+
+                  // Vertical position: prefer bottomHeightM, else derive from z-centre, else floor
+                  const bottomZ = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
+                    : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2
+                    : 0;
+                  const topZ   = bottomZ + subHeightM;
+                  const svgTop = rz(topZ);
+                  const svgBot = rz(bottomZ);
+                  const svgH   = Math.max(4, svgBot - svgTop);
+                  const label  = `RSUB${i + 1}`;
+
+                  return (
+                    <g key={`rsub-${i}`}>
                       <rect
                         x={frontX} y={svgTop}
                         width={svgW} height={svgH}
