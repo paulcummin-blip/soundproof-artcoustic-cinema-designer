@@ -277,6 +277,9 @@ export default function SideElevation({
   const [liveSubDrag, setLiveSubDrag] = useState(null); // { group, liveBottomHeightM } | null
   const liveSubDragRef = useRef(null);
 
+  // Sightline overlay toggle
+  const [showSightlines, setShowSightlines] = useState(false);
+
   const handleSpeakerMouseDown = useCallback((e, role, startZ) => {
     if (!onSideSpeakerMoved) return;
     e.preventDefault();
@@ -409,6 +412,14 @@ export default function SideElevation({
 
   return (
     <div style={{ width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+        <button
+          onClick={() => setShowSightlines(s => !s)}
+          style={{ fontSize: 10, padding: '3px 10px', borderRadius: 4, border: '1px solid #B0AEA8', background: showSightlines ? '#213428' : '#F4F3F0', color: showSightlines ? '#fff' : '#4A4540', cursor: 'pointer', letterSpacing: '0.03em' }}
+        >
+          {showSightlines ? '◉ Hide Sightlines' : '○ Show Sightlines'}
+        </button>
+      </div>
       <div style={{ width: "100%", aspectRatio: `${SVG_W} / ${SVG_H}` }}>
         <svg
           ref={svgRef}
@@ -1058,6 +1069,52 @@ export default function SideElevation({
                   x2={rx(screenFrontY)} y2={rz(screenFloorM)}
                   stroke="#B45309" strokeWidth={0.6}
                   strokeDasharray="5 3" opacity={0.55} />
+              </g>
+            );
+          })()}
+
+          {/* ── Sightline overlay ── */}
+          {showSightlines && seatRows.length > 0 && (() => {
+            const ROW_COLORS = ['#213428', '#625143', '#3E4349', '#B45309', '#1B1A1A'];
+            const stx = rx(screenFrontY);
+            const sTop = rz(screenTopM);
+            const sBot = rz(screenFloorM);
+            return (
+              <g key="sightline-overlay">
+                {/* Sightlines + eye points per row */}
+                {seatRows.map((row, i) => {
+                  const ex = rx(row.y);
+                  const ez = rz(row.earZ);
+                  const col = ROW_COLORS[i % ROW_COLORS.length];
+                  return (
+                    <g key={`sl-row-${i}`}>
+                      {/* Sightline to top of viewable image */}
+                      <line x1={ex} y1={ez} x2={stx} y2={sTop}
+                        stroke={col} strokeWidth={0.7} strokeDasharray="5 3" opacity={0.6} fill="none" />
+                      {/* Sightline to bottom of viewable image */}
+                      <line x1={ex} y1={ez} x2={stx} y2={sBot}
+                        stroke={col} strokeWidth={0.7} strokeDasharray="3 3" opacity={0.6} fill="none" />
+                      {/* Eye point */}
+                      <circle cx={ex} cy={ez} r={3.5} fill={col} opacity={0.9} />
+                      <text x={ex + 6} y={ez + 1} fontSize={7} fill={col} fontWeight={600}>
+                        R{i + 1}
+                      </text>
+                    </g>
+                  );
+                })}
+                {/* Projector throw lines */}
+                {projectorEl && Number.isFinite(projectorEl.y_lens_m) && Number.isFinite(projectorEl.z_lens_m) && (
+                  <g>
+                    <line
+                      x1={rx(projectorEl.y_lens_m)} y1={rz(projectorEl.z_lens_m)}
+                      x2={stx} y2={sTop}
+                      stroke="#B45309" strokeWidth={0.8} strokeDasharray="6 2" opacity={0.8} fill="none" />
+                    <line
+                      x1={rx(projectorEl.y_lens_m)} y1={rz(projectorEl.z_lens_m)}
+                      x2={stx} y2={sBot}
+                      stroke="#B45309" strokeWidth={0.8} strokeDasharray="6 2" opacity={0.8} fill="none" />
+                  </g>
+                )}
               </g>
             );
           })()}
