@@ -85,6 +85,8 @@ export default function SideElevation({
   wall = 'right', // 'left' | 'right' — which side wall is being viewed
   onScreenHeightFromFloorChange = null,
   onSideSpeakerMoved = null,
+  onFrontSubHeightChange = null,
+  onRearSubHeightChange = null,
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
@@ -270,6 +272,10 @@ export default function SideElevation({
   const activeSnapZRef = useRef(null);
   const speakersForSnapRef = useRef([]); // draggable side speaker z values — updated each render
 
+  // Sub vertical-only drag state — local only, committed once on mouseup
+  const [liveSubDrag, setLiveSubDrag] = useState(null); // { group, liveBottomHeightM } | null
+  const liveSubDragRef = useRef(null);
+
   const handleSpeakerMouseDown = useCallback((e, role, startZ) => {
     if (!onSideSpeakerMoved) return;
     e.preventDefault();
@@ -318,6 +324,37 @@ export default function SideElevation({
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
   }, [onSideSpeakerMoved, roomH, drawH, SVG_H]);
+
+  const handleSubMouseDown = useCallback((e, group, startBottomHeightM, subHeightM) => {
+    const handler = group === 'front' ? onFrontSubHeightChange : onRearSubHeightChange;
+    if (!handler) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    const startClientY = e.clientY;
+    liveSubDragRef.current = { group, liveBottomHeightM: startBottomHeightM };
+    setLiveSubDrag({ group, liveBottomHeightM: startBottomHeightM });
+    const handleMove = (me) => {
+      const svgRect = svgEl.getBoundingClientRect();
+      const svgScale = svgRect.height / SVG_H;
+      const deltaZ = -((me.clientY - startClientY) / svgScale / drawH) * roomH;
+      const raw = startBottomHeightM + deltaZ;
+      const clamped = Math.max(0, Math.min(roomH - subHeightM, raw));
+      liveSubDragRef.current = { group, liveBottomHeightM: clamped };
+      setLiveSubDrag({ group, liveBottomHeightM: clamped });
+    };
+    const handleUp = () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      const final = liveSubDragRef.current?.liveBottomHeightM ?? startBottomHeightM;
+      handler(Math.round(final * 1000) / 1000);
+      liveSubDragRef.current = null;
+      setLiveSubDrag(null);
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [onFrontSubHeightChange, onRearSubHeightChange, roomH, drawH, SVG_H]);
 
   const handleScreenMouseDown = useCallback((e) => {
     if (!onScreenHeightFromFloorChange) return;
@@ -556,7 +593,7 @@ export default function SideElevation({
           {(() => {
             const safeSubs = Array.isArray(frontSubs) ? frontSubs : [];
             if (!safeSubs.length) return null;
-
+            const isDraggingFront = liveSubDrag?.group === 'front';
             return (
               <g opacity={0.88}>
                 {safeSubs.map((sub, i) => {
@@ -564,25 +601,24 @@ export default function SideElevation({
                   const meta = getSpeakerModelMeta(sub?.model, orientation) || {};
                   const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
                   const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
-
-                  // position.y is the cabinet CENTRE (same convention as Plan View)
                   const subCentreY = Number.isFinite(sub?.position?.y) ? Number(sub.position.y) : 0.01;
                   const frontX = rx(subCentreY - subDepthM / 2);
                   const backX  = rx(subCentreY + subDepthM / 2);
                   const svgW   = Math.max(4, backX - frontX);
-
-                  // Vertical position: bottomHeightM if available, else derive from z-centre, else floor
-                  const bottomZ = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
+                  const staticBottom = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
                     : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2
                     : 0;
+                  const bottomZ = isDraggingFront ? liveSubDrag.liveBottomHeightM : staticBottom;
                   const topZ   = bottomZ + subHeightM;
                   const svgTop = rz(topZ);
                   const svgBot = rz(bottomZ);
                   const svgH   = Math.max(4, svgBot - svgTop);
                   const label  = `SUB${i + 1}`;
-
+                  const canDrag = !!onFrontSubHeightChange;
                   return (
-                    <g key={`fsub-${i}`}>
+                    <g key={`fsub-${i}`}
+                      onMouseDown={canDrag ? (e) => handleSubMouseDown(e, 'front', staticBottom, subHeightM) : undefined}
+                      style={{ cursor: canDrag ? 'ns-resize' : 'default' }}>
                       <rect
                         x={frontX} y={svgTop}
                         width={svgW} height={svgH}
@@ -598,6 +634,15 @@ export default function SideElevation({
                         fill={LABEL_COLOR} fontWeight={600}>
                         {label}
                       </text>
+                      {canDrag && (
+                        <rect
+                          x={frontX - 7} y={svgTop - 7}
+                          width={svgW + 14} height={svgH + 14}
+                          fill="transparent" pointerEvents="all"
+                          style={{ cursor: 'ns-resize' }}
+                          onMouseDown={(e) => handleSubMouseDown(e, 'front', staticBottom, subHeightM)}
+                        />
+                      )}
                     </g>
                   );
                 })}
@@ -609,6 +654,7 @@ export default function SideElevation({
           {(() => {
             const safeRearSubs = Array.isArray(rearSubs) ? rearSubs : [];
             if (!safeRearSubs.length) return null;
+            const isDraggingRear = liveSubDrag?.group === 'rear';
             return (
               <g opacity={0.88}>
                 {safeRearSubs.map((sub, i) => {
@@ -616,27 +662,26 @@ export default function SideElevation({
                   const meta = getSpeakerModelMeta(sub?.model, orientation) || {};
                   const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
                   const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
-
-                  // position.y is cabinet centre; fallback pushes cabinet against rear wall
                   const subCentreY = Number.isFinite(sub?.position?.y)
                     ? Number(sub.position.y)
                     : roomL - subDepthM / 2;
                   const frontX = rx(subCentreY - subDepthM / 2);
                   const backX  = rx(subCentreY + subDepthM / 2);
                   const svgW   = Math.max(4, backX - frontX);
-
-                  // Vertical position: prefer bottomHeightM, else derive from z-centre, else floor
-                  const bottomZ = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
+                  const staticBottom = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
                     : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2
                     : 0;
+                  const bottomZ = isDraggingRear ? liveSubDrag.liveBottomHeightM : staticBottom;
                   const topZ   = bottomZ + subHeightM;
                   const svgTop = rz(topZ);
                   const svgBot = rz(bottomZ);
                   const svgH   = Math.max(4, svgBot - svgTop);
                   const label  = `RSUB${i + 1}`;
-
+                  const canDrag = !!onRearSubHeightChange;
                   return (
-                    <g key={`rsub-${i}`}>
+                    <g key={`rsub-${i}`}
+                      onMouseDown={canDrag ? (e) => handleSubMouseDown(e, 'rear', staticBottom, subHeightM) : undefined}
+                      style={{ cursor: canDrag ? 'ns-resize' : 'default' }}>
                       <rect
                         x={frontX} y={svgTop}
                         width={svgW} height={svgH}
@@ -652,6 +697,15 @@ export default function SideElevation({
                         fill={LABEL_COLOR} fontWeight={600}>
                         {label}
                       </text>
+                      {canDrag && (
+                        <rect
+                          x={frontX - 7} y={svgTop - 7}
+                          width={svgW + 14} height={svgH + 14}
+                          fill="transparent" pointerEvents="all"
+                          style={{ cursor: 'ns-resize' }}
+                          onMouseDown={(e) => handleSubMouseDown(e, 'rear', staticBottom, subHeightM)}
+                        />
+                      )}
                     </g>
                   );
                 })}

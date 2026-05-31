@@ -1807,6 +1807,8 @@ function RoomDesignerWithState() {
                       wall={sideElevationWall}
                       onScreenHeightFromFloorChange={(h) => setScreenGuarded(prev => ({ ...prev, heightFromFloorM: h }))}
                       onSideSpeakerMoved={({ role, newZ }) => setSpeakers(prev => prev.map(s => String(s.role).toUpperCase() === role ? { ...s, position: { ...s.position, z: newZ } } : s))}
+                      onFrontSubHeightChange={(bottomHeightM) => setFrontSubsCfg(prev => ({ ...prev, bottomHeightM }))}
+                      onRearSubHeightChange={(bottomHeightM) => setRearSubsCfg(prev => ({ ...prev, bottomHeightM }))}
                     />
                   </>
                 )}
