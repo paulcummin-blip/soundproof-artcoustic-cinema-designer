@@ -314,7 +314,7 @@ export default function SeatingLayout({
                           max="2.0"
                           value={currentPlatformH}
                           disabled={disabled}
-                          className="h-7 w-16 text-xs text-center"
+                          className="h-7 w-20 text-xs text-center"
                           style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
                           onChange={(e) => {
                             if (disabled) return;
