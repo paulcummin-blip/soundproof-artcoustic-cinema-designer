@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
+import HeightInput from '@/components/ui/HeightInput';
 import optimiseSubwooferLayout from '@/components/room/bass/SubwooferOptimiser';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
@@ -284,15 +285,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
               <div className="col-span-12 mt-2">
                 <label className="block text-[12px] text-[#625143] mb-1">Sub bottom height (m)</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="2.5"
-                  step="0.01"
+                <HeightInput
                   value={frontSubsCfg?.bottomHeightM ?? (frontSubsCfg?.mountMode === "wall" ? 0.80 : 0.05)}
-                  onChange={(e) => {
-                    const raw = Number(e.target.value);
-                    if (Number.isFinite(raw) && appState?.setFrontSubsCfg) {
+                  onChange={(raw) => {
+                    if (appState?.setFrontSubsCfg) {
                       appState.setFrontSubsCfg(prev => ({
                         ...prev,
                         bottomHeightM: Math.max(0, Math.min(2.5, raw))
@@ -430,15 +426,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
               <div className="col-span-12 mt-2">
                 <label className="block text-[12px] text-[#625143] mb-1">Sub bottom height (m)</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="2.5"
-                  step="0.01"
+                <HeightInput
                   value={rearSubsCfg?.bottomHeightM ?? (rearSubsCfg?.mountMode === "wall" ? 0.80 : 0.05)}
-                  onChange={(e) => {
-                    const raw = Number(e.target.value);
-                    if (Number.isFinite(raw) && appState?.setRearSubsCfg) {
+                  onChange={(raw) => {
+                    if (appState?.setRearSubsCfg) {
                       appState.setRearSubsCfg(prev => ({
                         ...prev,
                         bottomHeightM: Math.max(0, Math.min(2.5, raw))
