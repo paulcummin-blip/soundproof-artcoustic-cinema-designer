@@ -647,10 +647,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           const sz = draggedSpk ? ry(draggedSpk.z) : (draggedSub ? ry(draggedSub.z) : offsetY + drawH / 2);
           // AFF: bottom of the dragged cabinet at the snapped position
           const draggedItem = draggedSpk ?? draggedSub;
-          const itemHM = draggedItem?.hM ?? 0;
           const snapZCentre = activeSnap.axis === 'z' ? activeSnap.value : (draggedItem?.z ?? 0);
-          const bottomAFF = Math.max(0, snapZCentre - itemHM / 2);
-          const affText = `${bottomAFF.toFixed(2)}m AFF`;
+          const affText = `${snapZCentre.toFixed(2)}m AFF`;
           return (
             <g key="snap-guide" opacity={0.85}>
               {activeSnap.axis === 'x' && (
@@ -664,6 +662,23 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               <rect x={sx + 7} y={sz - 8} width={44} height={23} fill={SNAP_COLOR} rx={2} />
               <text x={sx + 29} y={sz + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.06em">SNAP</text>
               <text x={sx + 29} y={sz + 13} textAnchor="middle" fontSize={6.5} fill="white" fontWeight={600}>{affText}</text>
+            </g>
+          );
+        })()}
+
+        {/* Centre height AFF badge — visible during any vertical drag (non-snap) */}
+        {alignGuide && (() => {
+          const spk = lcrSpeakers.find(s => s.role === alignGuide.draggingRole);
+          if (!spk) return null;
+          const affZ = alignGuide.liveZ;
+          const px = rx(spk.x);
+          const pz = ry(affZ);
+          return (
+            <g key="aff-badge" opacity={0.92}>
+              <rect x={px - 26} y={pz - 19} width={52} height={14} fill="#213428" rx={2} />
+              <text x={px} y={pz - 8} textAnchor="middle" fontSize={7.5} fill="white" fontWeight={700} letterSpacing="0.04em">
+                {affZ.toFixed(2)}m AFF
+              </text>
             </g>
           );
         })()}

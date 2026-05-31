@@ -996,8 +996,7 @@ export default function SideElevation({
               : null;
             const snapMeta = draggedSp ? (getSpeakerModelMeta(draggedSp.model) || {}) : {};
             const snapItemHM = Number(snapMeta.heightM) > 0 ? Number(snapMeta.heightM) : 0.27;
-            const snapBottomAFF = Math.max(0, activeSnapZ - snapItemHM / 2);
-            const snapAffText = `${snapBottomAFF.toFixed(2)}m AFF`;
+            const snapAffText = `${activeSnapZ.toFixed(2)}m AFF`;
             return (
               <g key="snap-guide-z" opacity={0.85}>
                 <line
@@ -1007,6 +1006,20 @@ export default function SideElevation({
                 <rect x={offsetX + drawW - 48} y={rz(activeSnapZ) - 8} width={44} height={23} fill="#10B981" rx={2} />
                 <text x={offsetX + drawW - 26} y={rz(activeSnapZ) + 2} textAnchor="middle" fontSize={7} fill="white" fontWeight={700} letterSpacing="0.04em">{activeSnapZ.toFixed(2)}m</text>
                 <text x={offsetX + drawW - 26} y={rz(activeSnapZ) + 13} textAnchor="middle" fontSize={6.5} fill="white" fontWeight={600}>{snapAffText}</text>
+              </g>
+            );
+          })()}
+
+          {/* Centre height AFF badge — visible during any vertical speaker drag */}
+          {liveSpeakerDrag && (() => {
+            const affZ = liveSpeakerDrag.z;
+            const py = rz(affZ);
+            return (
+              <g key="spk-aff-badge" opacity={0.92}>
+                <rect x={offsetX + drawW - 54} y={py - 9} width={50} height={14} fill="#213428" rx={2} />
+                <text x={offsetX + drawW - 29} y={py + 1} textAnchor="middle" fontSize={7.5} fill="white" fontWeight={700} letterSpacing="0.04em">
+                  {affZ.toFixed(2)}m AFF
+                </text>
               </g>
             );
           })()}
