@@ -31,6 +31,7 @@ import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
 import ScreenWallConstructionGraphic from '../components/report/ScreenWallConstructionGraphic';
 import { fovForDistance } from '../components/utils/screenMetrics';
+import ElevationDrawing from '../components/report/ElevationDrawing';
 import { getLevelColors } from '../components/utils/rp22Colors';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
 
@@ -1448,6 +1449,45 @@ function RP22ReportInner() {
                                  <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
                                 <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
                                 <RP22ReportParameterGrid {...parameterGridProps} />
+                            </div>
+                        </section>
+
+                        {/* ── Elevation Drawings page ── */}
+                        <section id="pdf-elevation-drawings" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                            <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>Elevation Drawings</div>
+                            <div style={{ marginBottom: 12 }}>
+                                <ElevationDrawing
+                                    wall="front"
+                                    roomDimensions={{ length: stableDimensions.length, width: stableDimensions.width, height: stableDimensions.height }}
+                                    placedSpeakers={placedSpeakers}
+                                    screenSize={Number(app?.screen?.visibleWidthInches) || null}
+                                    screenWall={app?.screen?.screenWall || 'front'}
+                                    roomOrientation={app?.roomOrientation || 'length_front'}
+                                    screenHeight={Number(app?.screen?.heightFromFloorM ?? app?.screenHeight ?? 0.5)}
+                                    aspectRatio={app?.screen?.aspectRatio || '16:9'}
+                                />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <ElevationDrawing
+                                    wall="left"
+                                    roomDimensions={{ length: stableDimensions.length, width: stableDimensions.width, height: stableDimensions.height }}
+                                    placedSpeakers={placedSpeakers}
+                                    screenSize={Number(app?.screen?.visibleWidthInches) || null}
+                                    screenWall={app?.screen?.screenWall || 'front'}
+                                    roomOrientation={app?.roomOrientation || 'length_front'}
+                                    screenHeight={Number(app?.screen?.heightFromFloorM ?? app?.screenHeight ?? 0.5)}
+                                    aspectRatio={app?.screen?.aspectRatio || '16:9'}
+                                />
+                                <ElevationDrawing
+                                    wall="right"
+                                    roomDimensions={{ length: stableDimensions.length, width: stableDimensions.width, height: stableDimensions.height }}
+                                    placedSpeakers={placedSpeakers}
+                                    screenSize={Number(app?.screen?.visibleWidthInches) || null}
+                                    screenWall={app?.screen?.screenWall || 'front'}
+                                    roomOrientation={app?.roomOrientation || 'length_front'}
+                                    screenHeight={Number(app?.screen?.heightFromFloorM ?? app?.screenHeight ?? 0.5)}
+                                    aspectRatio={app?.screen?.aspectRatio || '16:9'}
+                                />
                             </div>
                         </section>
 
