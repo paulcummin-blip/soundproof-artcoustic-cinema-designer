@@ -159,7 +159,8 @@ export default function SideElevation({
     // Group by row index
     const byRow = new Map();
     seats.forEach(seat => {
-      const rowIdx = seat.rowIndex ?? seat.row ?? 0;
+      // seatingPositions uses rowNumber (1-based); fall back to rowIndex/row for legacy
+      const rowIdx = seat.rowNumber ?? seat.rowIndex ?? seat.row ?? 0;
       if (!byRow.has(rowIdx)) byRow.set(rowIdx, []);
       byRow.get(rowIdx).push(seat);
     });
