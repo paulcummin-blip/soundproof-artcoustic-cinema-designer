@@ -262,40 +262,76 @@ export default function SeatingLayout({
           <div className="grid grid-cols-1 gap-2">
             {Array.from({ length: rowCount }, (_, i) => {
               const currentZ = Number.isFinite(rowEarHeights[i]) ? rowEarHeights[i] : getEarHeightForRow(i + 1);
+              // Platform height: read from seat objects if available, otherwise derive from ear height difference
+              const currentPlatformH = (() => {
+                const seat = Array.isArray(seatingPositions) ? seatingPositions.find(s => s.rowNumber === i + 1) : null;
+                if (seat && Number.isFinite(seat.platformHeightM)) return seat.platformHeightM;
+                if (i === 0) return 0;
+                const ear0 = Number.isFinite(rowEarHeights[0]) ? rowEarHeights[0] : getEarHeightForRow(1);
+                return Math.max(0, Math.round((currentZ - ear0) * 100) / 100);
+              })();
               return (
                 <div key={i + 1} className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: '#F8F8F7', border: '1px solid #C1B6AD' }}>
                   <span className="text-xs" style={{ color: '#1B1A1A' }}>Row {i + 1}</span>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      max="3.0"
-                      value={currentZ}
-                      disabled={disabled}
-                      className="h-7 w-20 text-xs text-center"
-                      style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
-                      onChange={(e) => {
-                        if (disabled) return;
-                        const val = parseFloat(e.target.value);
-                        if (!Number.isFinite(val) || val <= 0) return;
-                        const clamped = Math.max(0.1, Math.min(3.0, Math.round(val * 10) / 10));
-                        // 1. Update rowEarHeights array
-                        const next = [...(rowEarHeights.length ? rowEarHeights : Array.from({ length: rowCount }, (_, j) => getEarHeightForRow(j + 1)))];
-                        // Ensure array is long enough
-                        while (next.length < rowCount) next.push(getEarHeightForRow(next.length + 1));
-                        next[i] = clamped;
-                        onRowEarHeightsChange?.(next);
-                        // 2. Immediately update z for all seats in this row
-                        if (typeof onSetSeatingPositions === 'function' && Array.isArray(seatingPositions)) {
-                          const updated = seatingPositions.map(seat =>
-                            seat.rowNumber === i + 1 ? { ...seat, z: clamped } : seat
-                          );
-                          onSetSeatingPositions(updated);
-                        }
-                      }}
-                    />
-                    <span className="text-xs" style={{ color: '#625143' }}>m</span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs" style={{ color: '#625143' }}>Ear</span>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        max="3.0"
+                        value={currentZ}
+                        disabled={disabled}
+                        className="h-7 w-16 text-xs text-center"
+                        style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
+                        onChange={(e) => {
+                          if (disabled) return;
+                          const val = parseFloat(e.target.value);
+                          if (!Number.isFinite(val) || val <= 0) return;
+                          const clamped = Math.max(0.1, Math.min(3.0, Math.round(val * 10) / 10));
+                          const next = [...(rowEarHeights.length ? rowEarHeights : Array.from({ length: rowCount }, (_, j) => getEarHeightForRow(j + 1)))];
+                          while (next.length < rowCount) next.push(getEarHeightForRow(next.length + 1));
+                          next[i] = clamped;
+                          onRowEarHeightsChange?.(next);
+                          if (typeof onSetSeatingPositions === 'function' && Array.isArray(seatingPositions)) {
+                            const updated = seatingPositions.map(seat =>
+                              seat.rowNumber === i + 1 ? { ...seat, z: clamped } : seat
+                            );
+                            onSetSeatingPositions(updated);
+                          }
+                        }}
+                      />
+                      <span className="text-xs" style={{ color: '#625143' }}>m</span>
+                    </div>
+                    {i > 0 && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs" style={{ color: '#625143' }}>Platform</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="2.0"
+                          value={currentPlatformH}
+                          disabled={disabled}
+                          className="h-7 w-16 text-xs text-center"
+                          style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
+                          onChange={(e) => {
+                            if (disabled) return;
+                            const val = parseFloat(e.target.value);
+                            if (!Number.isFinite(val)) return;
+                            const clamped = Math.max(0, Math.min(2.0, Math.round(val * 100) / 100));
+                            if (typeof onSetSeatingPositions === 'function' && Array.isArray(seatingPositions)) {
+                              const updated = seatingPositions.map(seat =>
+                                seat.rowNumber === i + 1 ? { ...seat, platformHeightM: clamped } : seat
+                              );
+                              onSetSeatingPositions(updated);
+                            }
+                          }}
+                        />
+                        <span className="text-xs" style={{ color: '#625143' }}>m</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

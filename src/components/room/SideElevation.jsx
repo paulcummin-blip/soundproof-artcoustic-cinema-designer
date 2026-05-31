@@ -739,6 +739,28 @@ export default function SideElevation({
             );
           })}
 
+          {/* Platform risers — drawn before seat icons so they appear behind */}
+          {seatRows.map((row, i) => {
+            if (i === 0 || row.platformH <= 0) return null;
+            const prevRow = seatRows[i - 1];
+            // Seat icon spans: front = cx - 0.90m, back = cx + 0.08m (from SeatPersonIcon geometry)
+            const SEAT_FRONT_M = 0.90;
+            const SEAT_BACK_M = 0.08;
+            const x1 = rx(prevRow.y + SEAT_BACK_M);  // rear of previous row chair
+            const x2 = rx(row.y - SEAT_FRONT_M);      // front of raised row chair
+            if (x2 <= x1 + 2) return null; // skip if rows are too close
+            const platformTopY = rz(row.platformH);
+            const floorY = rz(0);
+            return (
+              <rect key={`plat-${i}`}
+                x={x1} y={platformTopY}
+                width={x2 - x1} height={floorY - platformTopY}
+                fill="#EAE8E3" stroke="#B0AEA8" strokeWidth={0.7}
+                opacity={0.80}
+              />
+            );
+          })}
+
           {/* Seat rows */}
           {seatRows.map((row, i) => {
             const isRsp = Math.abs(row.y - rspY) < 0.15;

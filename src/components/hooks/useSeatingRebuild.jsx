@@ -21,6 +21,7 @@ const seatsEqualWithin1mm = (prev = [], next = []) => {
     if (Number(a?.rowNumber) !== Number(b?.rowNumber)) return false;
     if (Boolean(a?.isPrimary) !== Boolean(b?.isPrimary)) return false;
     if (Boolean(a?.isSecondary) !== Boolean(b?.isSecondary)) return false;
+    if (Math.abs(Number(a?.platformHeightM ?? 0) - Number(b?.platformHeightM ?? 0)) > EQ_EPS) return false;
   }
   return true;
 };
@@ -135,6 +136,7 @@ export function useSeatingRebuild({
       const roomWidth = Number(stableDimensions?.width) || 4.5;
       const centerX = roomWidth / 2;
       const spacingX = Number(_seatSpacing) || 0.8;
+      const scratchPrevById = new Map(currentSeats.map(s => [s.id, s]));
 
       const seats = [];
       list.forEach((rawCount, rowIndex) => {
@@ -142,13 +144,17 @@ export function useSeatingRebuild({
         const y = centers[rowIndex] ?? clampY(stableBaseY);
         const totalWidth = (count - 1) * spacingX;
         const startX = centerX - totalWidth / 2;
+        const defaultPlatformH = rowIndex === 0 ? 0 : Math.max(0, getRowZ(rowIndex) - getRowZ(0));
         for (let i = 0; i < count; i++) {
+          const seatId = `seat-r${rowIndex + 1}-c${i + 1}`;
+          const scratchPrev = scratchPrevById.get(seatId);
           seats.push({
-            id: `seat-r${rowIndex + 1}-c${i + 1}`,
+            id: seatId,
             x: startX + i * spacingX,
             y,
             z: getRowZ(rowIndex),
             rowNumber: rowIndex + 1,
+            platformHeightM: Number.isFinite(scratchPrev?.platformHeightM) ? scratchPrev.platformHeightM : defaultPlatformH,
           });
         }
       });
@@ -268,6 +274,7 @@ export function useSeatingRebuild({
         const seatId = `seat-r${rowIndex + 1}-c${i + 1}`;
         const prev = prevSeatById.get(seatId);
 
+        const defaultPlatformH = rowIndex === 0 ? 0 : Math.max(0, getRowZ(rowIndex) - getRowZ(0));
         seats.push({
           id: seatId,
           x: startX + i * spacingX,
@@ -275,7 +282,8 @@ export function useSeatingRebuild({
           z: getRowZ(rowIndex),
           rowNumber: rowIndex + 1,
           isPrimary: prev?.isPrimary || false,
-          isSecondary: prev?.isSecondary || false
+          isSecondary: prev?.isSecondary || false,
+          platformHeightM: Number.isFinite(prev?.platformHeightM) ? prev.platformHeightM : defaultPlatformH,
         });
       }
     });
