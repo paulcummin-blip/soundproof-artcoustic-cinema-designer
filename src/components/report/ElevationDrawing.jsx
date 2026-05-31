@@ -95,7 +95,7 @@ export default function ElevationDrawing({
           return (
             <g key={index}>
               <circle cx={cx} cy={cy} r="6" fill="#c53030" />
-              <text x={cx} y={cy - 10} textAnchor="middle" fontSize="8">{speaker.position?.replace(/_/g, ' ') ?? 'Spk'}</text>
+              <text x={cx} y={cy - 10} textAnchor="middle" fontSize="8">{String(speaker.role ?? 'Spk').replace(/_/g, ' ')}</text>
             </g>
           )
         })}
