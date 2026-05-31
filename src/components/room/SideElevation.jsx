@@ -421,7 +421,7 @@ export default function SideElevation({
           <text x={offsetX + drawW / 2} y={14}
             textAnchor="middle" fontSize={10} fontWeight={600}
             fill={LABEL_COLOR} letterSpacing="0.06em">
-            SIDE ELEVATION
+            {`${String(wall || 'left').toUpperCase()} WALL ELEVATION`}
           </text>
 
           {/* Room rectangle */}
