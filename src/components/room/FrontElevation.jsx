@@ -539,7 +539,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             key: spk.role,
             cx: rx(spk.x),
             cy: ry(spk.z),
-            sw: Math.max(12, (spk.wM / roomW) * drawW * 1.20),
+            sw: Math.max(12, (spk.wM / roomW) * drawW),
             sh: Math.max(12, (spk.hM / roomH) * drawH * 1.20),
             isRound: spk.round === true,
             fill: SPEAKER_FILL,
