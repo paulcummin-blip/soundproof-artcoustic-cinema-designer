@@ -1,0 +1,89 @@
+{
+  "name": "RoomElement",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the project this element belongs to"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "door",
+        "window",
+        "fireplace",
+        "built_in",
+        "projector"
+      ],
+      "description": "Type of room element"
+    },
+    "wall": {
+      "type": "string",
+      "enum": [
+        "front",
+        "back",
+        "left",
+        "right"
+      ],
+      "description": "Which wall the element is on"
+    },
+    "width": {
+      "type": "number",
+      "description": "Width of the element in meters"
+    },
+    "height": {
+      "type": "number",
+      "description": "Height of the element in meters"
+    },
+    "x_position": {
+      "type": "number",
+      "description": "Position along the wall (0-1, where 0 is left/top edge)"
+    },
+    "z_position": {
+      "type": "number",
+      "default": 0,
+      "description": "Height from floor in meters"
+    },
+    "clearance": {
+      "type": "number",
+      "default": 0.5,
+      "description": "Required clearance around element in meters"
+    },
+    "name": {
+      "type": "string",
+      "description": "Custom name for the element"
+    },
+    "x_lens_m": {
+      "type": "number",
+      "description": "Projector lens centre X position in room space (meters)"
+    },
+    "y_lens_m": {
+      "type": "number",
+      "description": "Projector lens centre Y position in room space (meters)"
+    },
+    "z_lens_m": {
+      "type": "number",
+      "description": "Projector lens centre Z (height) position in room space (meters)"
+    },
+    "body_width_m": {
+      "type": "number",
+      "description": "Projector body width in meters (X-axis)"
+    },
+    "body_height_m": {
+      "type": "number",
+      "description": "Projector body height in meters (Z-axis)"
+    },
+    "body_depth_m": {
+      "type": "number",
+      "description": "Projector body depth in meters (Y-axis, front to back)"
+    }
+  },
+  "required": [
+    "project_id",
+    "type",
+    "wall",
+    "width",
+    "height",
+    "x_position"
+  ]
+}

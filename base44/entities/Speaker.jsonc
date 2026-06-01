@@ -1,0 +1,94 @@
+{
+  "name": "Speaker",
+  "type": "object",
+  "properties": {
+    "brand": {
+      "type": "string",
+      "description": "Speaker brand"
+    },
+    "model": {
+      "type": "string",
+      "description": "Speaker model"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "main",
+        "center",
+        "surround",
+        "height",
+        "subwoofer"
+      ],
+      "description": "Speaker type"
+    },
+    "sensitivity": {
+      "type": "number",
+      "description": "Sensitivity in dB @ 1W/1m"
+    },
+    "max_power": {
+      "type": "number",
+      "description": "Maximum power handling in watts"
+    },
+    "frequency_response_low": {
+      "type": "number",
+      "description": "Lowest frequency response in Hz (-3dB)"
+    },
+    "frequency_response_high": {
+      "type": "number",
+      "description": "Highest frequency response in Hz"
+    },
+    "impedance": {
+      "type": "number",
+      "description": "Impedance in ohms"
+    },
+    "horizontal_dispersion_angle": {
+      "type": "number",
+      "default": 60,
+      "description": "Horizontal dispersion angle in degrees for -6dB falloff"
+    },
+    "vertical_dispersion_angle": {
+      "type": "number",
+      "default": 45,
+      "description": "Vertical dispersion angle in degrees for -6dB falloff"
+    },
+    "max_spl": {
+      "type": "number",
+      "description": "Maximum SPL at 1m in dB"
+    },
+    "xmax": {
+      "type": "number",
+      "description": "Maximum linear excursion in mm (for subwoofers)"
+    },
+    "displacement": {
+      "type": "number",
+      "description": "Maximum air displacement in cubic meters (for subwoofers)"
+    },
+    "frequency_response_curve": {
+      "type": "string",
+      "description": "JSON string containing frequency response data points"
+    },
+    "directivity_data": {
+      "type": "string",
+      "description": "JSON string containing off-axis response data"
+    },
+    "is_artcoustic": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this is an Artcoustic speaker"
+    },
+    "price": {
+      "type": "number",
+      "description": "Speaker price"
+    },
+    "description": {
+      "type": "string",
+      "description": "Speaker description"
+    }
+  },
+  "required": [
+    "brand",
+    "model",
+    "type",
+    "sensitivity"
+  ]
+}

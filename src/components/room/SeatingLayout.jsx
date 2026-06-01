@@ -704,7 +704,7 @@ export default function SeatingLayout({
                 min="-2.0"
                 max="2.0"
                 step="0.1"
-                value={liveViewingOffset}
+                value={seatingBlockOffset}
                 onChange={(e) => {
                   if (disabled) return;
                   const raw = e.target.value;

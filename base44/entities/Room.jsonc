@@ -1,0 +1,101 @@
+{
+  "name": "Room",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the project this room belongs to"
+    },
+    "name": {
+      "type": "string",
+      "description": "Room name"
+    },
+    "width_m": {
+      "type": "number",
+      "description": "Room width in meters"
+    },
+    "length_m": {
+      "type": "number",
+      "description": "Room length in meters"
+    },
+    "height_m": {
+      "type": "number",
+      "description": "Room height in meters"
+    },
+    "dimensions": {
+      "type": "object",
+      "description": "Nested dimensions object for compatibility",
+      "properties": {
+        "width_m": {
+          "type": "number"
+        },
+        "length_m": {
+          "type": "number"
+        },
+        "height_m": {
+          "type": "number"
+        }
+      }
+    },
+    "selectedSpeakersByRole": {
+      "type": "object",
+      "description": "Selected speaker models by role for SPL handoff",
+      "properties": {
+        "L": {
+          "type": "object"
+        },
+        "C": {
+          "type": "object"
+        },
+        "R": {
+          "type": "object"
+        },
+        "Ls": {
+          "type": "object"
+        },
+        "Rs": {
+          "type": "object"
+        }
+      }
+    },
+    "speakerNodes": {
+      "type": "array",
+      "description": "Speaker placement nodes for Room Designer hydration",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "z": {
+            "type": "number"
+          },
+          "rotation_deg": {
+            "type": "number"
+          },
+          "isLineSource": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "project_id"
+  ]
+}
