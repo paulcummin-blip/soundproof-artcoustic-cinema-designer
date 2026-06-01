@@ -351,13 +351,29 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       return null;
     };
 
+    const clipId = `fe-cab-clip-${key}`;
+
     return (
       <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
+        {/* Cabinet clip — constrains FaceIcon artwork to the true sw×sh boundary */}
+        {hasFaceIcon && (
+          <defs>
+            <clipPath id={clipId}>
+              <rect x={sx} y={sy} width={sw} height={sh} />
+            </clipPath>
+          </defs>
+        )}
         {/* Body */}
-        {hasFaceIcon ? renderFaceIcon() : isRound ? (
+        {hasFaceIcon ? (
+          <g clipPath={`url(#${clipId})`}>{renderFaceIcon()}</g>
+        ) : isRound ? (
           <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
         ) : (
           <rect x={sx} y={sy} width={sw} height={sh} fill={fill} stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
+        )}
+        {/* Cabinet outline — always drawn from true sw/sh, never from icon size */}
+        {hasFaceIcon && (
+          <rect x={sx} y={sy} width={sw} height={sh} fill="none" stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
         )}
         {/* Acoustic centre dot — fallback only (face icons include their own markers) */}
         {!hasFaceIcon && <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.55)" />}
