@@ -1156,6 +1156,31 @@ const byId = useEntitiesById({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging, dragType]);
 
+  // ── Live RP22 impact for surround speaker dragging ───────────────────────
+  const [baselineRp22Speaker, setBaselineRp22Speaker] = useState(null);
+  const baselineCapturedSpeakerRef = useRef(false);
+  const isSurroundRole = (role) => /^(SL|SR|SBL|SBR)\d*$/i.test(String(role || ''));
+
+  useEffect(() => {
+    if (dragging && dragType === 'speaker' && draggedItemId) {
+      const spk = byId.get(draggedItemId);
+      if (spk && isSurroundRole(spk.role)) {
+        if (!baselineCapturedSpeakerRef.current) {
+          baselineCapturedSpeakerRef.current = true;
+          setBaselineRp22Speaker(liveRp22);
+        }
+      } else {
+        baselineCapturedSpeakerRef.current = false;
+        setBaselineRp22Speaker(null);
+      }
+    } else {
+      baselineCapturedSpeakerRef.current = false;
+      setBaselineRp22Speaker(null);
+    }
+  // liveRp22 intentionally excluded — captures the pre-drag snapshot
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging, dragType, draggedItemId]);
+
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
     if (draftFrontSubsRef.current && onSetFrontSubs) {
@@ -1945,6 +1970,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
         seatingDragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: dragging && dragType === 'seat', screen, screenFrontPlaneM, baselineMlp, liveMlp: mlp }}
+        speakerDragImpact={{ baseline: baselineRp22Speaker, live: liveRp22, isActive: dragging && dragType === 'speaker' && baselineRp22Speaker != null }}
       />
   );
 });

@@ -7,6 +7,10 @@ const DRAG_PARAMS = [23, 1, 16, 17];
 const PARAM_LABELS = {
   23: 'RP23 Viewing Angle',
   1:  'P1 Nearest Boundary',
+  5:  'P5 Surround Gap',
+  6:  'P6 Surround Consistency',
+  11: 'P11 Zone Compliance',
+  13: 'P13 Non-screen SPL',
   16: 'P16 LCR Off-axis HF',
   17: 'P17 Surround Off-axis HF',
 };
@@ -175,7 +179,7 @@ function ParamRow({ paramNum, baseLevels, liveLevels, isLast }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function SeatingDragImpactCard({ baseline, live }) {
+export default function SeatingDragImpactCard({ baseline, live, impactParamIds, cardTitle }) {
   if (!baseline || !live) return null;
 
   // Ordered real-seat arrays (index-based to handle coordinate-derived IDs during drag)
@@ -200,15 +204,8 @@ export default function SeatingDragImpactCard({ baseline, live }) {
   const seatCountForParam = (paramNum) => paramNum === 23 ? rp23Count : rp22Count;
 
   // Build data for all params, then filter to those with actual level changes
-  const paramData = DRAG_PARAMS
-    .map(paramNum => {
-      const count = seatCountForParam(paramNum);
-      const baseLevels = Array.from({ length: count }, (_, i) => getLevel(true, paramNum, i));
-      const liveLevels = Array.from({ length: count }, (_, i) => getLevel(false, paramNum, i));
-      const summary    = buildChangeSummary(baseLevels, liveLevels);
-      return { paramNum, baseLevels, liveLevels, summary };
-    })
-    .filter(d => d.summary.changed > 0);
+  const paramsToShow = impactParamIds || DRAG_PARAMS;
+  const paramData = paramsToShow
 
   if (paramData.length === 0) return null;
 
@@ -242,10 +239,10 @@ export default function SeatingDragImpactCard({ baseline, live }) {
           fontSize: 10, fontWeight: 800, color: '#111827',
           letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2,
         }}>
-          Live Seating Impact
+          {cardTitle || 'Live Seating Impact'}
         </div>
         <div style={{ fontSize: 10, color: '#6B7280', fontWeight: 400 }}>
-          Parameters affected by current seat movement
+          Parameters affected by current movement
         </div>
       </div>
 
