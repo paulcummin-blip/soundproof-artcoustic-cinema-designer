@@ -63,7 +63,7 @@ export default function StepperInput({
   };
 
   const step_ = (dir) => {
-    if (disabled) return;
+    if (disabled || readOnly || typeof onChange !== 'function') return;
     const current = Number.isFinite(value) ? value : 0;
     const next = clamp(round(current + dir * step));
     setDraft(null);
