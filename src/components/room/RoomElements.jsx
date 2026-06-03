@@ -406,8 +406,8 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                      />
                    </div>
 
-                  {/* LABEL */}
-                  <div>
+                  {/* LABEL — spans both columns */}
+                  <div className="col-span-2">
                     <Label className="text-[#3E4349]">Label</Label>
                     <Input
                       type="text"
