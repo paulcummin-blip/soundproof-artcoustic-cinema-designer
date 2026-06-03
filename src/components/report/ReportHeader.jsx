@@ -12,6 +12,8 @@ export default function ReportHeader({
     primarySeatingPosition,
     frontSubsCfg,
     rearSubsCfg,
+    roomElements,
+    projector,
     debugPlanCapture,
     setDebugPlanCapture,
     showCadExportMenu,
@@ -87,6 +89,8 @@ export default function ReportHeader({
             mlp: primarySeatingPosition,
             frontSubsCfg,
             rearSubsCfg,
+            roomElements: roomElements || [],
+            projector: projector || null,
         });
         downloadTextFile(svgContent, filename, 'image/svg+xml');
         setShowCadExportMenu(false);
@@ -103,6 +107,8 @@ export default function ReportHeader({
             mlp: primarySeatingPosition,
             frontSubsCfg,
             rearSubsCfg,
+            roomElements: roomElements || [],
+            projector: projector || null,
         });
         downloadTextFile(dxfContent, filename, 'application/dxf');
         setShowCadExportMenu(false);

@@ -1066,6 +1066,8 @@ function RP22ReportInner() {
                         primarySeatingPosition={primarySeatingPosition}
                         frontSubsCfg={frontSubsCfg}
                         rearSubsCfg={rearSubsCfg}
+                        roomElements={app?.roomElements || []}
+                        projector={projector || null}
                         debugPlanCapture={debugPlanCapture}
                         setDebugPlanCapture={setDebugPlanCapture}
                         showCadExportMenu={showCadExportMenu}
