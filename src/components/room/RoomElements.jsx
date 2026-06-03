@@ -448,6 +448,15 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       ));
                     };
 
+                    const setDistB = (newDistB) => {
+                      const maxDistB = Math.max(0, wallLen - elLen);
+                      const clamped = Math.max(0, Math.min(newDistB, maxDistB));
+                      const newPosM = wallLen - elLen - clamped;
+                      onChange((elements || []).map(el =>
+                        el.id === element.id ? { ...el, pos_m: Math.max(0, newPosM) } : el
+                      ));
+                    };
+
                     return (
                       <>
                         <div>
@@ -467,8 +476,8 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                             value={distB}
                             step={0.01}
                             min={0}
-                            max={maxDistA}
-                            readOnly
+                            max={Math.max(0, wallLen - elLen)}
+                            onChange={setDistB}
                           />
                           <div className="text-[10px] mt-1" style={{ color: '#625143' }}>{hintB}</div>
                         </div>
