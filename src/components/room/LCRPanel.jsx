@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import StepperInput from '@/components/ui/StepperInput';
 import { getModelsByCategoryOrdered, getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
@@ -639,20 +640,19 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
       <div className="space-y-2 mt-4">
         <Label className="text-xs text-[#625143]">LCR height from floor (to middle of speaker)</Label>
-        <div className="relative">
-          <Input
-            type="text"
-            inputMode="decimal"
-            value={lcrHeightInputValue}
-            onChange={handleLcrHeightChange}
-            onBlur={handleLcrHeightBlur}
-            disabled={disabled}
-            className="pr-8"
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
-            m
-          </span>
-        </div>
+        <StepperInput
+          value={Number(lcrHeightInputValue) || 0}
+          step={0.01}
+          min={0.2}
+          max={roomH - 0.2}
+          disabled={disabled}
+          onChange={(val) => {
+            const clamped = clampLcrHeight(val);
+            setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+            updateGlobalSpl?.({ lcrHeightM: clamped });
+            updatePlacedLcrHeight(clamped);
+          }}
+        />
         {hasLcrSubClash && (
           <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
         )}

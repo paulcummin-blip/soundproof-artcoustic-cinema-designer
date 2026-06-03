@@ -1422,8 +1422,21 @@ function RoomDesignerWithState() {
   // Front Elevation LCR drag callback
   const handleLcrSpeakerMoved = useCallback(({ role, newX, newZ, axis }) => {
     const rW = stableDimensions.widthM || stableDimensions.width || 4.5;
+
+    // Determine if all three LCR speakers share the same model (locked-together mode)
+    const getModel = (r) => {
+      const spk = placedSpeakers.find(s => safeCanon(s.role) === r);
+      return spk?.model || null;
+    };
+    const flModel = getModel('FL');
+    const fcModel = getModel('FC');
+    const frModel = getModel('FR');
+    const allSameModel = flModel && fcModel && frModel && flModel === fcModel && fcModel === frModel;
+
     setSpeakers(prev => prev.map(spk => {
       const canon = safeCanon(spk.role);
+      const isLcrRole = canon === 'FL' || canon === 'FC' || canon === 'FR';
+
       if (canon === role) {
         return {
           ...spk,
@@ -1441,13 +1454,25 @@ function RoomDesignerWithState() {
       if (axis === 'x' && role === 'FR' && canon === 'FL') {
         return { ...spk, position: { ...spk.position, x: rW - newX } };
       }
-      // FL / FR vertical — keep both at same height
-      if (axis === 'z' && (role === 'FL' || role === 'FR') && (canon === 'FL' || canon === 'FR')) {
-        return { ...spk, position: { ...spk.position, z: newZ } };
+      // Vertical: if all same model, lock all three LCR together
+      if (axis === 'z' && isLcrRole) {
+        if (allSameModel) {
+          return { ...spk, position: { ...spk.position, z: newZ } };
+        }
+        // Different models: only keep FL/FR paired
+        if ((role === 'FL' || role === 'FR') && (canon === 'FL' || canon === 'FR')) {
+          return { ...spk, position: { ...spk.position, z: newZ } };
+        }
       }
       return spk;
     }));
-  }, [setSpeakers, stableDimensions.widthM, stableDimensions.width]);
+
+    // When dragging vertically, update the shared lcrHeightM so the field
+    // and Acoustic Centre Guidance stay in sync with the drag
+    if (axis === 'z') {
+      appState?.updateGlobalSpl?.({ lcrHeightM: newZ });
+    }
+  }, [setSpeakers, stableDimensions.widthM, stableDimensions.width, placedSpeakers, appState?.updateGlobalSpl]);
 
   // Front Elevation subwoofer drag callback
   const handleFrontSubMoved = useCallback(({ index, newX, newZ, axis }) => {
