@@ -31,8 +31,11 @@ import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { resolveSpeakerYaw } from '@/components/utils/speakerAimResolver';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 
-// ─── Screen constants (match RvBaffleAndScreen) ────────────────────────────
-const SCREEN_THICKNESS_M = 0.005; // 5 mm physical screen body
+// ─── Screen constants ──────────────────────────────────────────────────────
+// CAD_SCREEN_DEPTH_MM: minimum visible depth for the screen body rectangle in CAD.
+// The physical screen panel is ~5 mm, but that is invisible at room scale.
+// We use a 120 mm representation so the screen reads clearly as a rectangle.
+const CAD_SCREEN_DEPTH_MM = 120;
 
 // ─── Coordinate helpers ────────────────────────────────────────────────────
 
@@ -201,14 +204,23 @@ function computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles = {}) {
         aimRearSurroundsAtMLP: !!aimToggles.aimRearSurroundsAtMLP,
     };
 
+    // Build speaker object for resolveSpeakerYaw.
+    // Do NOT forward positionSource='user' for CAD export — auto-placed speakers
+    // must not have their MLP-aim overridden by any stale stored rotation field.
     const speakerWithPos = {
         ...spk,
         position: spk.position ?? { x: spk.x, y: spk.y },
+        positionSource: undefined, // suppress manual-rotation guard in resolveSpeakerYaw
     };
+
+    // Ensure mlp has the {x, y} shape resolveSpeakerYaw expects
+    const mlpPos = (mlp && Number.isFinite(mlp.x) && Number.isFinite(mlp.y))
+        ? { x: mlp.x, y: mlp.y }
+        : null;
 
     const planAngle = resolveSpeakerYaw({
         speaker: speakerWithPos,
-        mlpPos: mlp,
+        mlpPos,
         appState,
         getCanonicalRole,
     });
@@ -332,7 +344,7 @@ function resolveScreenGeomMm(screenMetrics, screenFrontPlaneM, roomWidthM, roomL
     const frontWallYcad  = roomLenMm; // CAD Y of front wall (y_app=0 → y_cad=roomLenMm)
 
     const baffleDepthMm  = Math.round(screenFrontPlaneM * M_TO_MM);
-    const screenThickMm  = Math.round(SCREEN_THICKNESS_M * M_TO_MM);
+    const screenThickMm  = CAD_SCREEN_DEPTH_MM;
 
     const visibleWidthMm = Math.round(viewWm    * M_TO_MM);
     const overallWidthMm = Math.round(overallWm * M_TO_MM);
@@ -439,21 +451,21 @@ export function generateSVG({
             svg.push(`  </g>`);
         }
 
-        // SCREEN_FRAME — overall width rectangle at screen face
+        // SCREEN_FRAME — overall frame width as a solid rectangle (front face + depth)
         svg.push(`  <g id="SCREEN_FRAME">`);
-        svg.push(`    ${svgRect(overallXLeftMm, screenFaceYcad, overallWidthMm, screenThickMm, '#1a1a1a', '#333', 1)}`);
+        svg.push(`    ${svgRect(overallXLeftMm, screenFaceYcad, overallWidthMm, screenThickMm, 'rgba(30,30,30,0.85)', '#333', 2)}`);
         svg.push(`  </g>`);
 
-        // SCREEN_VIEWABLE — inner viewable area indicator
+        // SCREEN_VIEWABLE — inner viewable area as a distinct filled rect
         svg.push(`  <g id="SCREEN_VIEWABLE">`);
-        svg.push(`    ${svgLine(visibleXLeftMm, screenFaceYcad, visibleXLeftMm + visibleWidthMm, screenFaceYcad, '#1B4FBB', 3)}`);
+        svg.push(`    ${svgRect(visibleXLeftMm, screenFaceYcad, visibleWidthMm, screenThickMm, 'rgba(27,79,187,0.15)', '#1B4FBB', 2.5)}`);
         svg.push(`  </g>`);
 
         // SCREEN_LABELS
         svg.push(`  <g id="SCREEN_LABELS">`);
         svg.push(`    ${svgText(centreXmm, screenFaceYcad - 50, 'SCREEN', 75, 'middle', '#1B4FBB')}`);
         if (visibleWidthMm > 0) {
-            svg.push(`    ${svgText(centreXmm, screenFaceYcad + screenThickMm + 90, `VIEWABLE: ${Math.round(visibleWidthMm)} mm`, 70, 'middle', '#1B4FBB')}`);
+            svg.push(`    ${svgText(centreXmm, screenFaceYcad + screenThickMm + 90, `VIEWABLE: ${Math.round(visibleWidthMm)} mm  |  FRAME: ${Math.round(overallWidthMm)} mm`, 70, 'middle', '#1B4FBB')}`);
         }
         svg.push(`  </g>`);
     }
@@ -661,11 +673,11 @@ export function generateDXF({
             dxf.push(dxfRect('SCREEN_WALL_BUILDUP', visibleXLeftMm, screenFaceYcad, visibleWidthMm, baffleDepthMm));
         }
 
-        // SCREEN_FRAME — full frame width at screen face
-        dxf.push(dxfRect('SCREEN_FRAME', overallXLeftMm, screenFaceYcad - screenThickMm, overallWidthMm, screenThickMm));
+        // SCREEN_FRAME — full frame width as rectangle (depth = CAD_SCREEN_DEPTH_MM)
+        dxf.push(dxfRect('SCREEN_FRAME', overallXLeftMm, screenFaceYcad, overallWidthMm, screenThickMm));
 
-        // SCREEN_VIEWABLE — viewable face line
-        dxf.push(dxfLine('SCREEN_VIEWABLE', visibleXLeftMm, screenFaceYcad, visibleXLeftMm + visibleWidthMm, screenFaceYcad));
+        // SCREEN_VIEWABLE — viewable area as inner rectangle on SCREEN_VIEWABLE layer
+        dxf.push(dxfRect('SCREEN_VIEWABLE', visibleXLeftMm, screenFaceYcad, visibleWidthMm, screenThickMm));
 
         // SCREEN_LABELS
         dxf.push(dxfText('SCREEN_LABELS', centreXmm - 200, screenFaceYcad + 80, 80, 'SCREEN'));
