@@ -102,19 +102,56 @@ function roomElementLayer(type) {
     return 'ROOM_ELEMENTS';
 }
 
-// ─── Room element → app-space coords ──────────────────────────────────────
+// ─── Room element → CAD coords (mm) ───────────────────────────────────────
+//
+// Returns the four CAD-space corners of a room element rectangle.
+// CAD convention: front wall = top (high Y in DXF, low Y in SVG).
+// We return { x, y, w, h } in CAD mm where:
+//   x = CAD X of left edge
+//   y = CAD Y of bottom edge (lower value)
+//   w = width in mm (always positive)
+//   h = height in mm (always positive)
+//
+// x_position is a 0-1 ratio along the wall:
+//   front/back walls → ratio of roomWidthM from left
+//   left/right walls → ratio of roomLengthM from FRONT wall
+//
+// CAD_Y = (roomLengthM - appY) * 1000  (front wall is high Y in DXF)
+//
+function roomElementToCADRect(el, roomWidthMm, roomLengthMm) {
+    const wall     = String(el.wall || '');
+    const elWMm    = Math.round(Number(el.width || 0) * 1000);  // element span along wall
+    const posRatio = Number(el.x_position || 0);
+    const WALL_D   = 150; // wall representation depth in mm
 
-function roomElementToRoomCoords(el, roomWidthM, roomLengthM) {
-    const wall      = el.wall;
-    const elWidthM  = Number(el.width || 0);
-    const posRatio  = Number(el.x_position || 0);
-    const WALL_D    = 0.15; // wall representation depth (m)
+    if (elWMm <= 0) return null;
 
     switch (wall) {
-        case 'front': { const x = posRatio * roomWidthM - elWidthM / 2; return { x, y: 0,                     w: elWidthM, h: WALL_D }; }
-        case 'back':  { const x = posRatio * roomWidthM - elWidthM / 2; return { x, y: roomLengthM - WALL_D,  w: elWidthM, h: WALL_D }; }
-        case 'left':  { const y = posRatio * roomLengthM - elWidthM / 2; return { x: 0,                      y, w: WALL_D, h: elWidthM }; }
-        case 'right': { const y = posRatio * roomLengthM - elWidthM / 2; return { x: roomWidthM - WALL_D,    y, w: WALL_D, h: elWidthM }; }
+        case 'front': {
+            // Front wall: CAD Y = roomLengthMm (top). Element hangs downward into room.
+            const x = Math.round(posRatio * roomWidthMm - elWMm / 2);
+            const y = roomLengthMm - WALL_D; // bottom of element rect
+            return { x, y, w: elWMm, h: WALL_D };
+        }
+        case 'back': {
+            // Rear wall: CAD Y = 0 (bottom). Element sits above y=0.
+            const x = Math.round(posRatio * roomWidthMm - elWMm / 2);
+            const y = 0; // bottom of element rect = rear wall
+            return { x, y, w: elWMm, h: WALL_D };
+        }
+        case 'left': {
+            // Left wall: CAD X = 0. posRatio is from front wall → appY = posRatio * roomLengthMm
+            // CAD_Y = roomLengthMm - appY
+            const appYmm = Math.round(posRatio * roomLengthMm);
+            const cadY   = roomLengthMm - appYmm - Math.round(elWMm / 2);
+            return { x: 0, y: cadY, w: WALL_D, h: elWMm };
+        }
+        case 'right': {
+            // Right wall: CAD X = roomWidthMm - WALL_D.
+            const appYmm = Math.round(posRatio * roomLengthMm);
+            const cadY   = roomLengthMm - appYmm - Math.round(elWMm / 2);
+            return { x: roomWidthMm - WALL_D, y: cadY, w: WALL_D, h: elWMm };
+        }
         default: return null;
     }
 }
@@ -353,18 +390,29 @@ export function generateSVG({
     }
 
     // ── ROOM_ELEMENTS ─────────────────────────────────────────────────────────
+    // All room element sub-types share the same SVG group for rendering;
+    // individual layer grouping is handled by the DXF. SVG uses colour by type.
     svg.push(`  <g id="ROOM_ELEMENTS">`);
     roomElements.filter(el => el.type !== 'projector').forEach(el => {
-        const coords = roomElementToRoomCoords(el, roomW, roomL);
-        if (!coords) return;
-        const { x, y, w, h } = coords;
-        const ex = cx(x);
-        const ey = cy(y + h);
-        const ew = Math.round(w * 1000);
-        const eh = Math.round(h * 1000);
+        const rect = roomElementToCADRect(el, W, L);
+        if (!rect) return;
+        const { x, y, w, h } = rect;
+        // CAD rect is already in CAD mm coords (DXF convention: Y=0 at rear, Y=L at front).
+        // SVG Y is inverted relative to DXF Y (SVG Y=0 is top = front wall).
+        // SVG_Y = L - CAD_Y_top = L - (y + h)
+        const svgX = x;
+        const svgY = L - (y + h);
         const layerCol = el.type === 'door' ? '#8B4513' : el.type === 'window' ? '#4169E1' : '#7B4E1E';
-        svg.push(`    ${svgRect(ex, ey, ew, eh, 'rgba(180,120,60,0.12)', layerCol, 1.5)}`);
-        svg.push(`    ${svgText(ex + ew / 2, ey + eh + 85, String(el.type || el.name || 'ELEMENT').toUpperCase(), 70, 'middle', layerCol)}`);
+        svg.push(`    ${svgRect(svgX, svgY, w, h, 'rgba(180,120,60,0.12)', layerCol, 1.5)}`);
+        // Label: offset away from the wall, into the room
+        const wall = String(el.wall || '');
+        let labelX = svgX + w / 2;
+        let labelY = svgY + h + 85;
+        if (wall === 'front')  labelY = svgY + h + 85;   // below element (into room)
+        if (wall === 'back')   labelY = svgY - 30;        // above element (into room)
+        if (wall === 'left')   { labelX = svgX + w + 30; labelY = svgY + h / 2 + 25; }
+        if (wall === 'right')  { labelX = svgX - 30; labelY = svgY + h / 2 + 25; }
+        svg.push(`    ${svgText(labelX, labelY, String(el.type || el.name || 'ELEMENT').toUpperCase(), 70, wall === 'right' ? 'end' : 'start', layerCol)}`);
     });
     svg.push(`  </g>`);
 
@@ -402,6 +450,9 @@ export function generateSVG({
     svg.push(`  </g>`);
 
     // ── SPEAKERS ──────────────────────────────────────────────────────────────
+    // Rotation priority: rotation_deg → yaw_deg → 0 (no fallback by role)
+    // SVG applies rotation via transform="rotate(deg, cx, cy)" on a group.
+    // CAD Y-flip means CW rotation in app = CW rotation in SVG (both Y-down).
     svg.push(`  <g id="SPEAKERS">`);
     (placedSpeakers || []).forEach(spk => {
         if (!Number.isFinite(spk?.position?.x) || !Number.isFinite(spk?.position?.y)) return;
@@ -412,6 +463,11 @@ export function generateSVG({
         const spy = cy(spk.position.y);
         const modelName = spk.model || spk.brand_model || '';
         const wall = classifyWall(role);
+
+        // Resolve rotation — use explicit value if present, else 0
+        const rotDeg = Number.isFinite(spk.rotation_deg) ? spk.rotation_deg
+                     : Number.isFinite(spk.yaw_deg)      ? spk.yaw_deg
+                     : 0;
 
         if (wall === 'overhead') {
             const hs = OVERHEAD_MARKER_HS;
@@ -426,13 +482,22 @@ export function generateSVG({
         const hd = planDepthMm / 2;
 
         if (isRound) {
+            // Circles don't rotate
             const r = diameterMm / 2;
             svg.push(`    <circle cx="${spx}" cy="${spy}" r="${r}" fill="rgba(0,0,0,0.04)" stroke="black" stroke-width="1.5"/>`);
             svg.push(`    ${svgCross(spx, spy, r * 0.45, '#333', 1)}`);
+        } else if (rotDeg !== 0) {
+            // Rotated footprint — wrap in a rotate group, draw axis-aligned inside
+            svg.push(`    <g transform="rotate(${rotDeg}, ${spx}, ${spy})">`);
+            svg.push(`      ${svgRect(spx - hw, spy - hd, planWidthMm, planDepthMm, 'rgba(0,0,0,0.04)', 'black', 1.5)}`);
+            svg.push(`      ${svgCross(spx, spy, Math.min(hw, hd) * 0.4, '#333', 1)}`);
+            svg.push(`    </g>`);
         } else {
+            // Axis-aligned (no rotation)
             svg.push(`    ${svgRect(spx - hw, spy - hd, planWidthMm, planDepthMm, 'rgba(0,0,0,0.04)', 'black', 1.5)}`);
             svg.push(`    ${svgCross(spx, spy, Math.min(hw, hd) * 0.4, '#333', 1)}`);
         }
+        // Label always horizontal for readability
         svg.push(`    ${svgText(spx + hw + LABEL_OFFSET, spy + 30, role, TEXT_H, 'start', '#1B1A1A')}`);
     });
     svg.push(`  </g>`);
@@ -549,19 +614,22 @@ export function generateDXF({
     }
 
     // ROOM_ELEMENTS (per-type sublayers)
+    // roomElementToCADRect returns coords already in DXF mm space (Y=0 at rear, Y=L at front).
     (roomElements || []).filter(el => el.type !== 'projector').forEach(el => {
-        const coords = roomElementToRoomCoords(el, roomW, roomL);
-        if (!coords) return;
-        const { x, y, w, h } = coords;
-        const ex = cx(x);
-        const ey_top = cy(y);
-        const ey_bot = cy(y + h);
-        const ew = Math.round(w * 1000);
-        const eh = Math.abs(ey_top - ey_bot);
-        const ey_lower = Math.min(ey_top, ey_bot);
+        const rect = roomElementToCADRect(el, W, L);
+        if (!rect) return;
+        const { x, y, w, h } = rect;
         const layer = roomElementLayer(el.type);
-        dxf.push(dxfRect(layer, ex, ey_lower, ew, eh));
-        dxf.push(dxfText('ROOM_ELEMENT_LABELS', ex, ey_lower - 50, 70, String(el.type || el.name || 'ELEMENT').toUpperCase()));
+        dxf.push(dxfRect(layer, x, y, w, h));
+        // Label offset: push away from wall into room
+        const wall = String(el.wall || '');
+        let labelX = x;
+        let labelY = y - 50;
+        if (wall === 'front')  { labelX = x + w / 2; labelY = y - 80; }         // into room (lower Y)
+        if (wall === 'back')   { labelX = x + w / 2; labelY = y + h + 80; }     // into room (higher Y)
+        if (wall === 'left')   { labelX = x + w + 30; labelY = y + h / 2; }     // into room (right)
+        if (wall === 'right')  { labelX = x - 30;    labelY = y + h / 2; }      // into room (left)
+        dxf.push(dxfText('ROOM_ELEMENT_LABELS', labelX, labelY, 70, String(el.type || el.name || 'ELEMENT').toUpperCase()));
     });
 
     // PROJECTOR
@@ -589,7 +657,10 @@ export function generateDXF({
         dxf.push(dxfText('LABELS', sx + 160, sy + 40, TEXT_H, isMLP ? 'MLP' : `S${idx + 1}`));
     });
 
-    // SPEAKERS — true product footprints
+    // SPEAKERS — true product footprints with rotation
+    // Rotation priority: rotation_deg → yaw_deg → 0
+    // Rotated footprints are drawn as four DXF LINE segments (closed polyline equivalent).
+    // DXF R12 does not have a native rotate-rect entity, so we rotate the four corners manually.
     (placedSpeakers || []).forEach(spk => {
         if (!Number.isFinite(spk?.position?.x) || !Number.isFinite(spk?.position?.y)) return;
         const role = String(spk?.role || '').toUpperCase();
@@ -599,6 +670,14 @@ export function generateDXF({
         const spy = cy(spk.position.y);
         const modelName = spk.model || spk.brand_model || '';
         const wall = classifyWall(role);
+
+        // Resolve rotation
+        const rotDeg = Number.isFinite(spk.rotation_deg) ? spk.rotation_deg
+                     : Number.isFinite(spk.yaw_deg)      ? spk.yaw_deg
+                     : 0;
+        const rotRad = (rotDeg * Math.PI) / 180;
+        const cosR = Math.cos(rotRad);
+        const sinR = Math.sin(rotRad);
 
         if (wall === 'overhead') {
             const hs = OVERHEAD_MARKER_HS;
@@ -611,10 +690,32 @@ export function generateDXF({
         const { planWidthMm, planDepthMm, isRound, diameterMm } = getSpeakerFootprintMm(modelName, role);
 
         if (isRound) {
+            // Circles don't rotate
             const r = Math.round(diameterMm / 2);
             dxf.push(`0\nCIRCLE\n8\nSPEAKERS\n10\n${spx}\n20\n${spy}\n40\n${r}`);
             dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(r * 0.45)));
+        } else if (rotDeg !== 0) {
+            // Rotated rectangle: compute four rotated corners around centre (spx, spy)
+            const hw = planWidthMm / 2;
+            const hd = planDepthMm / 2;
+            // Unrotated corners relative to centre
+            const corners = [
+                [-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd],
+            ];
+            // Rotate each corner
+            const rotated = corners.map(([dx, dy]) => [
+                Math.round(spx + dx * cosR - dy * sinR),
+                Math.round(spy + dx * sinR + dy * cosR),
+            ]);
+            // Draw four line segments forming closed rectangle
+            for (let i = 0; i < 4; i++) {
+                const [x1, y1] = rotated[i];
+                const [x2, y2] = rotated[(i + 1) % 4];
+                dxf.push(dxfLine('SPEAKERS', x1, y1, x2, y2));
+            }
+            dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(Math.min(hw, hd) * 0.4)));
         } else {
+            // Axis-aligned (no rotation)
             const hw = Math.round(planWidthMm / 2);
             const hd = Math.round(planDepthMm / 2);
             dxf.push(dxfRect('SPEAKERS', spx - hw, spy - hd, planWidthMm, planDepthMm));
