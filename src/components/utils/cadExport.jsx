@@ -226,6 +226,20 @@ function computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles = {}) {
     });
 
     if (typeof planAngle === 'number' && Number.isFinite(planAngle)) {
+        // ── Side-surround special case ────────────────────────────────────────
+        // getSpeakerFootprintMm already swaps width↔depth for left/right wall roles,
+        // producing a rect that is correctly flat to the wall with no rotation needed.
+        // resolveSpeakerYaw returns +90 (SL) / -90 (SR) for the flat-wall default.
+        // Applying that rotation on top of the already-swapped rect causes a double
+        // 90° error. Fix: when the angle IS the flat-wall default (±90), return 0
+        // so the pre-swapped footprint is used as-is.
+        // When aimSideSurroundsAtMLP is ON, the angle is computed from position→MLP
+        // and will NOT be ±90, so the real MLP-aimed rotation is still applied.
+        const isSideRole = (classifyWall(role) === 'left' || classifyWall(role) === 'right');
+        if (isSideRole && (planAngle === 90 || planAngle === -90)) {
+            return 0; // footprint swap already handles wall-flat orientation
+        }
+
         return -planAngle; // negate for Y-flip
     }
 
