@@ -305,7 +305,11 @@ function wallBufferShift(corners, wallSide, W, L, role = '') {
     if (wallSide === 'overhead') {
         // Ceiling-mounted circles — no wall buffer required.
     } else if (wallSide === 'front') {
-        guardFront();
+        // FL/FR/L/R positions are already correctly placed by the Plan View
+        // (which applies its own screen/baffle clearance). Applying an extra
+        // CAD front-wall buffer here over-shifts them into the room.
+        const skipFrontGuard = (r === 'FL' || r === 'FR' || r === 'L' || r === 'R');
+        if (!skipFrontGuard) guardFront();
         // Front Wides also sit against a side wall — guard that side too.
         if (r === 'FWL' || r === 'LW') guardLeft();
         if (r === 'FWR' || r === 'RW') guardRight();
