@@ -117,9 +117,9 @@ export function calculateLcrAcousticCentreBand({
   const minHeightM = Math.max(earGuidanceMinM, imageMiddleThirdBottomM);
   const maxHeightM = imageMiddleThirdTopM;
 
-  // Ideal: slightly above ear height, clamped to the valid band.
-  // If the band is inverted (ear level is above the middle third), minHeightM === maxHeightM === imageMiddleThirdTopM.
-  const idealHeightM = clamp(earHeight + 0.1, minHeightM, maxHeightM);
+  // Ideal: midpoint of the RP22 Recommended Zone.
+  // Scales automatically with screen size — no ear-height assumption.
+  const idealHeightM = (minHeightM + maxHeightM) / 2;
 
   // ── Status ───────────────────────────────────────────────────────────────
   let status;
