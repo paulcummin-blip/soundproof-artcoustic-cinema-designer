@@ -17,6 +17,7 @@ import PlanMessages from "@/components/room/PlanMessages";
 import RvSeatHudLayer from "@/components/room/rv/render/RvSeatHudLayer";
 import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
+import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
 
 export default function RvPlanCanvas({
   svgRef,
@@ -143,7 +144,7 @@ export default function RvPlanCanvas({
   handleIconMove,
   handleIconLeave,
   dragImpact,
-  roomElementDragLabel,
+  roomElementDragInfo,
   dragType,
 }) {
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
@@ -354,6 +355,18 @@ export default function RvPlanCanvas({
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             <RvRoomElementsLayer hasRoomRect={hasRoomRect} roomElements={roomElements} widthM={widthM} lengthM={lengthM} scale={scale} meterToCanvasX={meterToCanvasX} meterToCanvasY={meterToCanvasY} placedSpeakers={placedSpeakers} getModelDimsM={getModelDimsM} getSpeakerVisibility={getSpeakerVisibility} getCanonicalRole={getCanonicalRole} appState={appState} rolesForLayout={rolesForLayout} handleMouseDown={handleMouseDown} />
+
+            {/* Room Element drag dimension lines (only visible during drag) */}
+            {dragType === 'roomElement' && roomElementDragInfo?.visible && (
+              <RvRoomElementDragDims
+                dragInfo={roomElementDragInfo}
+                widthM={widthM}
+                lengthM={lengthM}
+                scale={scale}
+                meterToCanvasX={meterToCanvasX}
+                meterToCanvasY={meterToCanvasY}
+              />
+            )}
 
             {/* Layer 7.5: MLP Position Ruler (when enabled) */}
             <RvMlpRuler
@@ -584,25 +597,30 @@ export default function RvPlanCanvas({
           />
         )}
 
-        {/* ROOM ELEMENT DRAG MEASUREMENT LABEL */}
-        {dragType === 'roomElement' && roomElementDragLabel && (
+        {/* ROOM ELEMENT DRAG DISTANCE PANEL */}
+        {dragType === 'roomElement' && roomElementDragInfo?.visible && (
           <div style={{
             position: 'absolute',
             bottom: 14,
             left: '50%',
             transform: 'translateX(-50%)',
-            backgroundColor: 'rgba(27,26,26,0.85)',
+            backgroundColor: 'rgba(27,26,26,0.88)',
             color: '#FFFFFF',
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 600,
-            padding: '4px 10px',
-            borderRadius: 6,
+            padding: '6px 14px',
+            borderRadius: 7,
             pointerEvents: 'none',
             letterSpacing: '0.03em',
             whiteSpace: 'nowrap',
             zIndex: 50,
+            display: 'flex',
+            gap: 18,
+            alignItems: 'center',
           }}>
-            {roomElementDragLabel}
+            <span>← {roomElementDragInfo.labelA}: <strong>{roomElementDragInfo.distA.toFixed(2)} m</strong></span>
+            <span style={{ opacity: 0.4 }}>|</span>
+            <span><strong>{roomElementDragInfo.distB.toFixed(2)} m</strong> {roomElementDragInfo.labelB} →</span>
           </div>
         )}
 

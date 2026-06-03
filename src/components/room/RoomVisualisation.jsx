@@ -1085,15 +1085,14 @@ const byId = useEntitiesById({
 
   const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, lengthM });
 
-  // Room element measurement label (only visible during roomElement drag)
-  const [roomElementDragLabel, setRoomElementDragLabel] = useState(null);
+  // Room element drag info (structured, only visible during roomElement drag)
+  const [roomElementDragInfo, setRoomElementDragInfo] = useState(null);
 
-  // Clear label when not dragging a room element
   useEffect(() => {
-    if (dragType !== 'roomElement') setRoomElementDragLabel(null);
+    if (dragType !== 'roomElement') setRoomElementDragInfo(null);
   }, [dragType]);
 
-  // Room Element drag — wall-constrained movement, updates pos_m live
+  // Room Element drag — wall-constrained movement, updates pos_m + drag info live
   const handleRoomElementDrag = useCallback((elementId, canvasPos) => {
     if (!onSetRoomElements || !canvasToRoom) return;
     const roomPos = canvasToRoom(canvasPos);
@@ -1105,13 +1104,18 @@ const byId = useEntitiesById({
     const isFrontRear = wall === 'front' || wall === 'rear';
     const elLen = Number(el?.length_m) || 0.9;
     const wallLength = isFrontRear ? widthM : lengthM;
-    // cursor pos + stored offset gives element left/top edge centre-corrected
     const raw = isFrontRear
       ? (roomPos.x + dragOffsetRoomRef.current.x)
       : (roomPos.y + dragOffsetRoomRef.current.y);
     const clamped = Math.max(0, Math.min(wallLength - elLen, raw - elLen / 2));
-    const endRef = isFrontRear ? 'left end' : 'front end';
-    setRoomElementDragLabel(`${clamped.toFixed(2)} m from ${endRef}`);
+    const distA = clamped;
+    const distB = Math.max(0, wallLength - elLen - clamped);
+    setRoomElementDragInfo({
+      visible: true, wall, posM: clamped, lengthM: elLen,
+      distA, distB,
+      labelA: isFrontRear ? 'Left Distance' : 'Front Distance',
+      labelB: isFrontRear ? 'Right Distance' : 'Rear Distance',
+    });
     onSetRoomElements(prev =>
       (Array.isArray(prev) ? prev : []).map(re =>
         String(re?.id) === String(elementId)
@@ -1985,7 +1989,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
         dragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: !!dragging }}
-        roomElementDragLabel={roomElementDragLabel}
+        roomElementDragInfo={roomElementDragInfo}
         dragType={dragType}
       />
   );
