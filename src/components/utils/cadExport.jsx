@@ -251,34 +251,36 @@ function computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles = {}) {
 
 // ─── Wall buffer correction ────────────────────────────────────────────────
 //
-// After rotating a speaker footprint, the bounding box of the rotated corners
-// may violate the 10 mm wall buffer. This function:
-//   1. Computes the AABB of the rotated corners (in CAD space).
-//   2. Checks each relevant wall boundary for the speaker's assigned wall.
-//   3. Returns { shiftX, shiftY } to translate the footprint centre so the
-//      rotated bounding box is at least WALL_BUFFER_MM from the wall.
-//
 // CAD coordinate convention (shared by both DXF and SVG paths):
-//   X: 0 = left wall, W = right wall
-//   Y: 0 = rear wall, L = front wall
+//   X: 0 = left wall,  W = right wall
+//   Y: 0 = rear wall,  L = front/screen wall
 //
-// The shift is applied to (spx, spy) before drawing — stored positions are untouched.
+// For a rotated footprint AABB:
+//   minX = closest to left wall    maxX = closest to right wall
+//   minY = closest to rear wall    maxY = closest to front wall
+//
+// Rule: for each wall relevant to the speaker's mounting side, if the rotated
+// AABB violates the 10 mm buffer, shift the entire footprint just enough to
+// restore clearance. Math.max/Math.min accumulate safely when multiple walls
+// apply (e.g. FWL/FWR sits at front wall AND a side wall).
+//
+// Wall applicability by role group:
+//   front wall (FL/FC/FR/L/C/R)    → front wall check only
+//   front wides (FWL/FWR/LW/RW)   → front wall + respective side wall
+//   left surrounds (SL/SSL/…)     → left wall check only
+//   right surrounds (SR/SSR/…)    → right wall check only
+//   rear surrounds (RL/RC/RR/…)   → rear wall check only
+//   overheads                      → no buffer needed (ceiling-mounted circles)
+//   unknown / default              → all four walls (conservative fallback)
 
 const WALL_BUFFER_MM = 10;
 
 /**
- * @param {Array<[number,number]>} corners - rotated corner coords in CAD mm
- * @param {string} wallSide - 'front'|'rear'|'left'|'right'|'unknown'
+ * @param {Array<[number,number]>} corners  - rotated corner coords in CAD mm
+ * @param {string} wallSide - 'front'|'rear'|'left'|'right'|'overhead'|'unknown'
  * @param {number} W - room width in mm
  * @param {number} L - room length in mm
- * @returns {{ shiftX: number, shiftY: number }}
- */
-/**
- * @param {Array<[number,number]>} corners - rotated corner coords in CAD mm
- * @param {string} wallSide - 'front'|'rear'|'left'|'right'|'unknown'
- * @param {number} W - room width in mm
- * @param {number} L - room length in mm
- * @param {string} [role] - canonical role string, used to detect FWL/FWR side-wall case
+ * @param {string} [role] - canonical role (used for FWL/FWR dual-wall check)
  * @returns {{ shiftX: number, shiftY: number }}
  */
 function wallBufferShift(corners, wallSide, W, L, role = '') {
@@ -293,49 +295,29 @@ function wallBufferShift(corners, wallSide, W, L, role = '') {
 
     const r = String(role).toUpperCase();
 
-    // Front wall: CAD Y = L (top). Footprint must not exceed L - WALL_BUFFER_MM.
-    if (wallSide === 'front') {
-        const excess = maxY - (L - WALL_BUFFER_MM);
-        if (excess > 0) shiftY = -excess;
-    }
-    // Rear wall: CAD Y = 0 (bottom). Footprint must not go below WALL_BUFFER_MM.
-    if (wallSide === 'rear') {
-        const excess = WALL_BUFFER_MM - minY;
-        if (excess > 0) shiftY = excess;
-    }
-    // Left wall: CAD X = 0. Footprint must not go below WALL_BUFFER_MM.
-    if (wallSide === 'left') {
-        const excess = WALL_BUFFER_MM - minX;
-        if (excess > 0) shiftX = excess;
-    }
-    // Right wall: CAD X = W. Footprint must not exceed W - WALL_BUFFER_MM.
-    if (wallSide === 'right') {
-        const excess = maxX - (W - WALL_BUFFER_MM);
-        if (excess > 0) shiftX = -excess;
-    }
+    // ── helpers (clean min/max accumulation) ─────────────────────────────────
+    const guardLeft  = () => { if (minX < WALL_BUFFER_MM)        shiftX = Math.max(shiftX, WALL_BUFFER_MM - minX); };
+    const guardRight = () => { if (maxX > W - WALL_BUFFER_MM)    shiftX = Math.min(shiftX, (W - WALL_BUFFER_MM) - maxX); };
+    const guardRear  = () => { if (minY < WALL_BUFFER_MM)        shiftY = Math.max(shiftY, WALL_BUFFER_MM - minY); };
+    const guardFront = () => { if (maxY > L - WALL_BUFFER_MM)    shiftY = Math.min(shiftY, (L - WALL_BUFFER_MM) - maxY); };
 
-    // Front Wide speakers (FWL/FWR) sit near the side walls even though their
-    // wall classification is 'front'. After rotation their corners can cross the
-    // left or right room boundary. Guard both side walls for these roles.
-    if (r === 'FWL' || r === 'LW') {
-        // LW lives near the left wall — enforce left wall buffer.
-        const excess = WALL_BUFFER_MM - minX;
-        if (excess > 0) shiftX = Math.max(shiftX, excess);
-    }
-    if (r === 'FWR' || r === 'RW') {
-        // RW lives near the right wall — enforce right wall buffer.
-        const excess = maxX - (W - WALL_BUFFER_MM);
-        if (excess > 0) shiftX = Math.min(shiftX, -excess);
-    }
-
-    // FL/FR: role-explicit front-wall guard. After rotation their nearmost
-    // corners (maxY in CAD space, where front wall = Y=L) must stay <= L - 10 mm.
-    // This duplicates the wallSide==='front' check but is explicit by role so it
-    // is immune to any future wallSide misclassification and survives both the
-    // SVG and DXF coordinate paths unchanged.
-    if (r === 'FL' || r === 'FR' || r === 'L' || r === 'R') {
-        const excess = maxY - (L - WALL_BUFFER_MM);
-        if (excess > 0) shiftY = Math.min(shiftY, -excess);
+    // ── apply checks by wall ──────────────────────────────────────────────────
+    if (wallSide === 'overhead') {
+        // Ceiling-mounted circles — no wall buffer required.
+    } else if (wallSide === 'front') {
+        guardFront();
+        // Front Wides also sit against a side wall — guard that side too.
+        if (r === 'FWL' || r === 'LW') guardLeft();
+        if (r === 'FWR' || r === 'RW') guardRight();
+    } else if (wallSide === 'rear') {
+        guardRear();
+    } else if (wallSide === 'left') {
+        guardLeft();
+    } else if (wallSide === 'right') {
+        guardRight();
+    } else {
+        // Unknown / fallback — guard all four walls conservatively.
+        guardLeft(); guardRight(); guardRear(); guardFront();
     }
 
     return { shiftX: Math.round(shiftX), shiftY: Math.round(shiftY) };
