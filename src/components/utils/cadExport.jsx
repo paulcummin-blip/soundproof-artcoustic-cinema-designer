@@ -273,7 +273,15 @@ const WALL_BUFFER_MM = 10;
  * @param {number} L - room length in mm
  * @returns {{ shiftX: number, shiftY: number }}
  */
-function wallBufferShift(corners, wallSide, W, L) {
+/**
+ * @param {Array<[number,number]>} corners - rotated corner coords in CAD mm
+ * @param {string} wallSide - 'front'|'rear'|'left'|'right'|'unknown'
+ * @param {number} W - room width in mm
+ * @param {number} L - room length in mm
+ * @param {string} [role] - canonical role string, used to detect FWL/FWR side-wall case
+ * @returns {{ shiftX: number, shiftY: number }}
+ */
+function wallBufferShift(corners, wallSide, W, L, role = '') {
     let shiftX = 0;
     let shiftY = 0;
     const xs = corners.map(([x]) => x);
@@ -282,6 +290,8 @@ function wallBufferShift(corners, wallSide, W, L) {
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
+
+    const r = String(role).toUpperCase();
 
     // Front wall: CAD Y = L (top). Footprint must not exceed L - WALL_BUFFER_MM.
     if (wallSide === 'front') {
@@ -302,6 +312,20 @@ function wallBufferShift(corners, wallSide, W, L) {
     if (wallSide === 'right') {
         const excess = maxX - (W - WALL_BUFFER_MM);
         if (excess > 0) shiftX = -excess;
+    }
+
+    // Front Wide speakers (FWL/FWR) sit near the side walls even though their
+    // wall classification is 'front'. After rotation their corners can cross the
+    // left or right room boundary. Guard both side walls for these roles.
+    if (r === 'FWL' || r === 'LW') {
+        // LW lives near the left wall — enforce left wall buffer.
+        const excess = WALL_BUFFER_MM - minX;
+        if (excess > 0) shiftX = Math.max(shiftX, excess);
+    }
+    if (r === 'FWR' || r === 'RW') {
+        // RW lives near the right wall — enforce right wall buffer.
+        const excess = maxX - (W - WALL_BUFFER_MM);
+        if (excess > 0) shiftX = Math.min(shiftX, -excess);
     }
 
     return { shiftX: Math.round(shiftX), shiftY: Math.round(shiftY) };
@@ -664,7 +688,7 @@ export function generateSVG({
                 spx + dx * cosR - dy * sinR,
                 spy + dx * sinR + dy * cosR,
             ]);
-            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
             const cx0 = spx + shiftX;
             const cy0 = spy + shiftY;
             svg.push(`    <g transform="rotate(${rotDeg}, ${cx0}, ${cy0})">`);
@@ -676,7 +700,7 @@ export function generateSVG({
         } else {
             // Axis-aligned (no rotation) — apply buffer using unrotated AABB
             const rawCorners = [[spx - hw, spy - hd], [spx + hw, spy - hd], [spx + hw, spy + hd], [spx - hw, spy + hd]];
-            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
             const cx0 = spx + shiftX;
             const cy0 = spy + shiftY;
             svg.push(`    ${svgRect(cx0 - hw, cy0 - hd, planWidthMm, planDepthMm, 'rgba(0,0,0,0.04)', 'black', 1.5)}`);
@@ -891,7 +915,7 @@ export function generateDXF({
                 spx + dx * cosR - dy * sinR,
                 spy + dx * sinR + dy * cosR,
             ]);
-            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
             const cx0 = spx + shiftX;
             const cy0 = spy + shiftY;
             // Re-compute shifted corners
@@ -911,7 +935,7 @@ export function generateDXF({
             const hw = Math.round(planWidthMm / 2);
             const hd = Math.round(planDepthMm / 2);
             const rawCorners = [[spx - hw, spy - hd], [spx + hw, spy - hd], [spx + hw, spy + hd], [spx - hw, spy + hd]];
-            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
             const cx0 = spx + shiftX;
             const cy0 = spy + shiftY;
             dxf.push(dxfRect('SPEAKERS', cx0 - hw, cy0 - hd, planWidthMm, planDepthMm));
