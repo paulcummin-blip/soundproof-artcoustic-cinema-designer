@@ -308,7 +308,9 @@ function wallBufferShift(corners, wallSide, W, L, role = '') {
         // FL/FR/L/R positions are already correctly placed by the Plan View
         // (which applies its own screen/baffle clearance). Applying an extra
         // CAD front-wall buffer here over-shifts them into the room.
-        const skipFrontGuard = (r === 'FL' || r === 'FR' || r === 'L' || r === 'R');
+        // All LCR roles use lcrRenderYm() which already builds in 10 mm clearance.
+        // Applying guardFront() on top would double-correct and push them into the room.
+        const skipFrontGuard = LCR_ROLES_SET.has(r);
         if (!skipFrontGuard) guardFront();
         // Front Wides also sit against a side wall — guard that side too.
         if (r === 'FWL' || r === 'LW') guardLeft();
@@ -342,6 +344,39 @@ function getOverheadRadiusMm(modelName) {
     if (meta.diameterM > 0)                return Math.round((meta.diameterM / 2) * 1000);
     if (meta.widthM > 0)                   return Math.round((meta.widthM   / 2) * 1000);
     return OVERHEAD_FALLBACK_R_MM;
+}
+
+// ─── LCR renderY helper ────────────────────────────────────────────────────
+//
+// Mirrors RvSpeakerLayer.jsx lines 109–122 exactly.
+// For FL/FC/FR/L/C/R the stored speaker.position.y is a wall-anchor reference,
+// NOT the cabinet centre. Plan View ignores it and recalculates the drawing Y
+// so the rotated footprint maintains exactly FRONT_WALL_GAP_M clearance from
+// the physical front wall (y=0).
+//
+// renderY_m = FRONT_WALL_GAP_M + projectedHalfExtentY_m
+//
+// projectedHalfExtentY = the maximum Y-extent of the rotated cabinet from its
+// centre, which for an axis-aligned cabinet at angle θ is:
+//   halfDepth × |cos θ|  +  halfWidth × |sin θ|
+//
+// @param {number} yawDeg      - Plan View rotation angle (app-space, before CAD Y-flip negate)
+// @param {number} widthM      - cabinet width in metres
+// @param {number} depthM      - cabinet depth in metres
+// @returns {number}           - renderY in app metres (cabinet centre)
+
+const FRONT_WALL_GAP_M = 0.01; // matches Plan View RvSpeakerLayer.jsx
+
+const LCR_ROLES_SET = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+
+function lcrRenderYm(yawDeg, widthM, depthM) {
+    const yawRad = (yawDeg || 0) * (Math.PI / 180);
+    const halfDepth = depthM / 2;
+    const halfWidth = widthM / 2;
+    const projectedHalfExtentY =
+        halfDepth * Math.abs(Math.cos(yawRad)) +
+        halfWidth * Math.abs(Math.sin(yawRad));
+    return FRONT_WALL_GAP_M + projectedHalfExtentY;
 }
 
 // ─── MLP seat finder ───────────────────────────────────────────────────────
@@ -650,12 +685,26 @@ export function generateSVG({
         if (!role || role === 'LFE') return;
 
         const spx = cx(spk.position.x);
-        const spy = cy(spk.position.y);
         const modelName = spk.model || spk.brand_model || '';
         const wall = classifyWall(role);
 
         // Resolve rotation — use Plan View computed angle (same source as RvSpeakerLayer)
         const rotDeg = computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles);
+
+        // For LCR roles, compute renderY the same way Plan View does (RvSpeakerLayer.jsx L109-122).
+        // speaker.position.y is a wall-anchor reference, not the cabinet centre.
+        // We must reconstruct the cabinet centre Y from the rotated footprint geometry.
+        // Note: rotDeg is already negated for CAD Y-flip, so we un-negate it to get the
+        // app-space yaw that Plan View uses for the projection calculation.
+        let spy;
+        if (LCR_ROLES_SET.has(role)) {
+            const { planWidthMm, planDepthMm } = getSpeakerFootprintMm(modelName, role);
+            const appYawDeg = -(rotDeg); // undo CAD Y-flip negation → back to app-space angle
+            const renderY_m = lcrRenderYm(appYawDeg, planWidthMm / 1000, planDepthMm / 1000);
+            spy = cy(renderY_m);
+        } else {
+            spy = cy(spk.position.y);
+        }
 
         if (wall === 'overhead') {
             // In-ceiling speakers: true-scale round symbol from product metadata
@@ -876,13 +925,23 @@ export function generateDXF({
         if (!role || role === 'LFE') return;
 
         const spx = cx(spk.position.x);
-        const spy = cy(spk.position.y);
         const modelName = spk.model || spk.brand_model || '';
         const wall = classifyWall(role);
 
         // Resolve rotation — use Plan View computed angle (same source as RvSpeakerLayer)
         const rotDeg = computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles);
         const rotRad = (rotDeg * Math.PI) / 180;
+
+        // For LCR roles, compute renderY the same way Plan View does (RvSpeakerLayer.jsx L109-122).
+        let spy;
+        if (LCR_ROLES_SET.has(role)) {
+            const { planWidthMm, planDepthMm } = getSpeakerFootprintMm(modelName, role);
+            const appYawDeg = -(rotDeg);
+            const renderY_m = lcrRenderYm(appYawDeg, planWidthMm / 1000, planDepthMm / 1000);
+            spy = cy(renderY_m);
+        } else {
+            spy = cy(spk.position.y);
+        }
         const cosR = Math.cos(rotRad);
         const sinR = Math.sin(rotRad);
 
