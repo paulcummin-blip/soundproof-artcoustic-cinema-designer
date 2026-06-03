@@ -356,17 +356,7 @@ export default function RvPlanCanvas({
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             <RvRoomElementsLayer hasRoomRect={hasRoomRect} roomElements={roomElements} widthM={widthM} lengthM={lengthM} scale={scale} meterToCanvasX={meterToCanvasX} meterToCanvasY={meterToCanvasY} placedSpeakers={placedSpeakers} getModelDimsM={getModelDimsM} getSpeakerVisibility={getSpeakerVisibility} getCanonicalRole={getCanonicalRole} appState={appState} rolesForLayout={rolesForLayout} handleMouseDown={handleMouseDown} />
 
-            {/* Room Element drag dimension lines (only visible during drag) */}
-            {dragType === 'roomElement' && roomElementDragInfo?.visible && (
-              <RvRoomElementDragDims
-                dragInfo={roomElementDragInfo}
-                widthM={widthM}
-                lengthM={lengthM}
-                scale={scale}
-                meterToCanvasX={meterToCanvasX}
-                meterToCanvasY={meterToCanvasY}
-              />
-            )}
+            {/* Room Element drag dimension lines moved outside RvZoomGroup — see below */}
 
             {/* Layer 7.5: MLP Position Ruler (when enabled) */}
             <RvMlpRuler
@@ -567,6 +557,21 @@ export default function RvPlanCanvas({
             )}
 
             </RvZoomGroup>
+
+            {/* Room Element drag dimensions — rendered OUTSIDE RvZoomGroup so the
+                clipPath on the zoom group cannot clip annotation text near wall edges */}
+            {dragType === 'roomElement' && roomElementDragInfo?.visible && (
+              <RvRoomElementDragDims
+                dragInfo={roomElementDragInfo}
+                widthM={widthM}
+                lengthM={lengthM}
+                scale={scale}
+                meterToCanvasX={meterToCanvasX}
+                meterToCanvasY={meterToCanvasY}
+                svgW={svgWSafe}
+                svgH={svgHSafe}
+              />
+            )}
             </>
           )}
         </svg>
