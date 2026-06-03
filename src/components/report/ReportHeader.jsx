@@ -32,6 +32,9 @@ export default function ReportHeader({
     setPlanDimsImageDataUrl,
     setPlanSpeakerDimsImageDataUrl,
     setIsPrinting,
+    // Plan View aiming state — passed to cadExport so CAD angles match Plan View
+    lcrAngleInfo,
+    aimToggles,
 }) {
     const navigate = useNavigate();
 
@@ -93,6 +96,8 @@ export default function ReportHeader({
             rearSubsCfg,
             roomElements: roomElements || [],
             projector: projector || null,
+            lcrAngleInfo: lcrAngleInfo || null,
+            aimToggles: aimToggles || {},
         });
         downloadTextFile(svgContent, filename, 'image/svg+xml');
         setShowCadExportMenu(false);
@@ -112,6 +117,8 @@ export default function ReportHeader({
             rearSubsCfg,
             roomElements: roomElements || [],
             projector: projector || null,
+            lcrAngleInfo: lcrAngleInfo || null,
+            aimToggles: aimToggles || {},
         });
         downloadTextFile(dxfContent, filename, 'application/dxf');
         setShowCadExportMenu(false);

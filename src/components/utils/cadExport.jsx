@@ -28,6 +28,8 @@
  */
 
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { resolveSpeakerYaw } from '@/components/utils/speakerAimResolver';
+import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 
 // ─── Screen constants (match RvBaffleAndScreen) ────────────────────────────
 const SCREEN_THICKNESS_M = 0.005; // 5 mm physical screen body
@@ -154,6 +156,71 @@ function roomElementToCADRect(el, roomWidthMm, roomLengthMm) {
         }
         default: return null;
     }
+}
+
+// ─── Speaker aim angle resolver ────────────────────────────────────────────
+//
+// Mirrors the Plan View's getPlanAimDeg logic exactly:
+//   - LCR (FL/FC/FR): read from lcrAngleInfo.L / .R (0 when flat, computed when angled)
+//   - Front wides / surrounds: delegate to resolveSpeakerYaw (same fn used by RvSpeakerLayer)
+//   - Fallback: speaker.rotation_deg → speaker.yaw_deg → 0
+//
+// CAD Y-axis is FLIPPED relative to the app (CAD_Y = roomL - appY).
+// A speaker aimed "forward" (positive app Y direction) must rotate in the
+// opposite direction in CAD space to look the same on paper.
+// Therefore we negate the computed angle before applying it in CAD/SVG.
+//
+// @param {object} spk           - placed speaker object
+// @param {object|null} mlp      - MLP/RSP point { x, y }
+// @param {object|null} lcrAngleInfo  - { L, R } angles in degrees from Plan View
+// @param {object} aimToggles    - { aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP }
+// @returns {number} CAD rotation angle in degrees (already sign-corrected for Y-flip)
+
+function computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles = {}) {
+    if (!spk) return 0;
+
+    const role = getCanonicalRole
+        ? String(getCanonicalRole(spk.role || '') || '').toUpperCase()
+        : String(spk.role || '').toUpperCase();
+
+    // ── LCR: authoritative from lcrAngleInfo ──────────────────────────────
+    if (role === 'FL' || role === 'L') {
+        const planAngle = lcrAngleInfo?.L ?? 0;
+        return -planAngle; // negate for Y-flip
+    }
+    if (role === 'FC' || role === 'C') return 0;
+    if (role === 'FR' || role === 'R') {
+        const planAngle = lcrAngleInfo?.R ?? 0;
+        return -planAngle; // negate for Y-flip
+    }
+
+    // ── Surrounds / Wides: resolveSpeakerYaw (same single source of truth) ─
+    const appState = {
+        aimFrontWidesAtMLP:    !!aimToggles.aimFrontWidesAtMLP,
+        aimSideSurroundsAtMLP: !!aimToggles.aimSideSurroundsAtMLP,
+        aimRearSurroundsAtMLP: !!aimToggles.aimRearSurroundsAtMLP,
+    };
+
+    const speakerWithPos = {
+        ...spk,
+        position: spk.position ?? { x: spk.x, y: spk.y },
+    };
+
+    const planAngle = resolveSpeakerYaw({
+        speaker: speakerWithPos,
+        mlpPos: mlp,
+        appState,
+        getCanonicalRole,
+    });
+
+    if (typeof planAngle === 'number' && Number.isFinite(planAngle)) {
+        return -planAngle; // negate for Y-flip
+    }
+
+    // ── Fallback: stored manual rotation values ────────────────────────────
+    if (Number.isFinite(spk.rotation_deg)) return -spk.rotation_deg;
+    if (Number.isFinite(spk.yaw_deg))      return -spk.yaw_deg;
+    return 0;
 }
 
 // ─── MLP seat finder ───────────────────────────────────────────────────────
@@ -326,6 +393,8 @@ export function generateSVG({
     rearSubsCfg,
     roomElements = [],
     projector = null,
+    lcrAngleInfo = null,
+    aimToggles = {},
 }) {
     const roomW = Number(roomDims?.widthM || roomDims?.width || 4.5);
     const roomL = Number(roomDims?.lengthM || roomDims?.length || 6.0);
@@ -464,10 +533,8 @@ export function generateSVG({
         const modelName = spk.model || spk.brand_model || '';
         const wall = classifyWall(role);
 
-        // Resolve rotation — use explicit value if present, else 0
-        const rotDeg = Number.isFinite(spk.rotation_deg) ? spk.rotation_deg
-                     : Number.isFinite(spk.yaw_deg)      ? spk.yaw_deg
-                     : 0;
+        // Resolve rotation — use Plan View computed angle (same source as RvSpeakerLayer)
+        const rotDeg = computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles);
 
         if (wall === 'overhead') {
             const hs = OVERHEAD_MARKER_HS;
@@ -543,6 +610,8 @@ export function generateDXF({
     rearSubsCfg,
     roomElements = [],
     projector = null,
+    lcrAngleInfo = null,
+    aimToggles = {},
 }) {
     const roomW = Number(roomDims?.widthM || roomDims?.width || 4.5);
     const roomL = Number(roomDims?.lengthM || roomDims?.length || 6.0);
@@ -671,10 +740,8 @@ export function generateDXF({
         const modelName = spk.model || spk.brand_model || '';
         const wall = classifyWall(role);
 
-        // Resolve rotation
-        const rotDeg = Number.isFinite(spk.rotation_deg) ? spk.rotation_deg
-                     : Number.isFinite(spk.yaw_deg)      ? spk.yaw_deg
-                     : 0;
+        // Resolve rotation — use Plan View computed angle (same source as RvSpeakerLayer)
+        const rotDeg = computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles);
         const rotRad = (rotDeg * Math.PI) / 180;
         const cosR = Math.cos(rotRad);
         const sinR = Math.sin(rotRad);

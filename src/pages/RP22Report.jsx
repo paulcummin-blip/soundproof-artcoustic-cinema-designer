@@ -1087,6 +1087,26 @@ function RP22ReportInner() {
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
                         exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId)}
+                        lcrAngleInfo={(() => {
+                            // Compute LCR angles exactly as Plan View does:
+                            // lcrAimMode === 'angled' → compute yaw from speaker position to MLP
+                            // lcrAimMode === 'flat'   → L=0, R=0
+                            const lcrAimMode = app?.lcrAimMode || 'flat';
+                            const info = { L: 0, R: 0 };
+                            if (lcrAimMode === 'angled' && primarySeatingPosition) {
+                                const mlpTarget = { x: primarySeatingPosition.x, y: primarySeatingPosition.y };
+                                const fl = placedSpeakers.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FL' || c === 'L') && s?.position; });
+                                const fr = placedSpeakers.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FR' || c === 'R') && s?.position; });
+                                if (fl?.position) info.L = safeYawToMLP(fl.position, mlpTarget) ?? 0;
+                                if (fr?.position) info.R = safeYawToMLP(fr.position, mlpTarget) ?? 0;
+                            }
+                            return info;
+                        })()}
+                        aimToggles={{
+                            aimFrontWidesAtMLP:    !!app?.aimFrontWidesAtMLP,
+                            aimSideSurroundsAtMLP: !!app?.aimSideSurroundsAtMLP,
+                            aimRearSurroundsAtMLP: !!app?.aimRearSurroundsAtMLP,
+                        }}
                     />
 
                     <div className="border-b border-[#E6E4DD]" />
