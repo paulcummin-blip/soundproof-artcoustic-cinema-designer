@@ -1,21 +1,31 @@
 import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 
-// Parameters monitored during seating drag — extend here to add future params
-const DRAG_PARAMS = [23, 1, 16, 17];
+const MAX_VISIBLE_ROWS = 5;
+
+// Room-level params (from gradedParameters.primary — single aggregate value per room)
+// P5 deliberately excluded: it also exists at seat-level and is handled there
+const ROOM_LEVEL_PARAMS = new Set([3, 7, 11, 12, 13, 15]);
 
 const PARAM_LABELS = {
-  23: 'RP23 Viewing Angle',
   1:  'P1 Nearest Boundary',
+  3:  'P3 Screen Speaker Zones',
+  4:  'P4 Screen SPL Balance',
   5:  'P5 Surround Gap',
   6:  'P6 Surround Consistency',
+  7:  'P7 Front Wide Angle',
+  9:  'P9 Overhead Vertical Gap',
+  10: 'P10 Overhead SPL Spread',
   11: 'P11 Zone Compliance',
+  12: 'P12 Screen SPL Capability',
   13: 'P13 Non-screen SPL',
+  15: 'P15 Noise Floor',
   16: 'P16 LCR Off-axis HF',
   17: 'P17 Surround Off-axis HF',
+  23: 'RP23 Viewing Angle',
 };
 
-// ─── Pure data helpers (unchanged from previous version) ─────────────────────
+// ─── Pure data helpers ────────────────────────────────────────────────────────
 
 function normalizeLevel(level) {
   if (level === null || level === undefined || level === '—') return null;
@@ -33,9 +43,8 @@ function getRealSeats(perSeatMap) {
   return Object.values(perSeatMap || {}).filter(entry => entry?.seatId !== 'mlp');
 }
 
-// ─── Change summary helpers ───────────────────────────────────────────────────
+// ─── Change summary — compares levels only, ignores numeric value changes ─────
 
-// Returns { changed: number, total: number, maxDelta: number, direction: 'up'|'down'|'mixed' }
 function buildChangeSummary(baseLevels, liveLevels) {
   let changed = 0;
   let upCount = 0;
@@ -45,6 +54,7 @@ function buildChangeSummary(baseLevels, liveLevels) {
   baseLevels.forEach((bl, i) => {
     const bLvl = normalizeLevel(bl);
     const lLvl = normalizeLevel(liveLevels[i]);
+    // Only count as changed if both levels are known AND the level itself changed
     if (bLvl == null || lLvl == null || bLvl === lLvl) return;
     changed++;
     const delta = lLvl - bLvl;
@@ -58,6 +68,79 @@ function buildChangeSummary(baseLevels, liveLevels) {
     downCount > 0 && upCount === 0 ? 'down' : 'mixed';
 
   return { changed, total: baseLevels.length, maxDelta, direction };
+}
+
+// ─── Auto-discover all changed parameters ────────────────────────────────────
+// Works for any drag type — seats, speakers, subs, room elements.
+// Level-only: numeric value changes within the same level are not shown.
+
+function buildAllParamData(baseline, live) {
+  if (!baseline || !live) return [];
+
+  const bRp22seats = getRealSeats(baseline.perSeatRp22);
+  const lRp22seats = getRealSeats(live.perSeatRp22);
+  const bRp23 = Object.values(baseline.perSeatRp23 || {});
+  const lRp23 = Object.values(live.perSeatRp23 || {});
+  const rp22Count = Math.min(bRp22seats.length, lRp22seats.length);
+  const rp23Count = Math.min(bRp23.length, lRp23.length);
+
+  const results = [];
+
+  // 1. Seat-level RP22 params (auto-discovered from perSeatRp22)
+  const seatParamNums = new Set();
+  for (const seat of [...bRp22seats, ...lRp22seats]) {
+    Object.keys(seat.rp22 || {}).forEach(k => seatParamNums.add(Number(k)));
+  }
+
+  for (const paramNum of seatParamNums) {
+    if (rp22Count === 0) continue;
+    const baseLevels = bRp22seats.slice(0, rp22Count).map(s => s.rp22?.[paramNum]?.level ?? null);
+    const liveLevels = lRp22seats.slice(0, rp22Count).map(s => s.rp22?.[paramNum]?.level ?? null);
+    const summary = buildChangeSummary(baseLevels, liveLevels);
+    if (summary.changed > 0) {
+      results.push({ paramNum, baseLevels, liveLevels, summary, scope: 'seat' });
+    }
+  }
+
+  // 2. Room-level RP22 params (from gradedParameters.primary, excluding seat-level params)
+  const bPrimary = baseline.gradedParameters?.primary || {};
+  const lPrimary = live.gradedParameters?.primary || {};
+  const roomParamNums = new Set(
+    [...Object.keys(bPrimary), ...Object.keys(lPrimary)]
+      .map(Number)
+      .filter(n => ROOM_LEVEL_PARAMS.has(n))
+  );
+
+  for (const paramNum of roomParamNums) {
+    const bLevel = bPrimary[paramNum]?.level ?? null;
+    const lLevel = lPrimary[paramNum]?.level ?? null;
+    const baseLevels = [bLevel];
+    const liveLevels = [lLevel];
+    const summary = buildChangeSummary(baseLevels, liveLevels);
+    if (summary.changed > 0) {
+      results.push({ paramNum, baseLevels, liveLevels, summary, scope: 'room' });
+    }
+  }
+
+  // 3. RP23 viewing angle (per seat)
+  if (rp23Count > 0) {
+    const baseLevels = bRp23.slice(0, rp23Count).map(s => s.level ?? null);
+    const liveLevels = lRp23.slice(0, rp23Count).map(s => s.level ?? null);
+    const summary = buildChangeSummary(baseLevels, liveLevels);
+    if (summary.changed > 0) {
+      results.push({ paramNum: 23, baseLevels, liveLevels, summary, scope: 'seat' });
+    }
+  }
+
+  // Sort: biggest absolute level change first; improvements before regressions of equal magnitude
+  results.sort((a, b) => {
+    const aDelta = Math.abs(a.summary.maxDelta);
+    const bDelta = Math.abs(b.summary.maxDelta);
+    if (bDelta !== aDelta) return bDelta - aDelta;
+    return b.summary.direction === 'up' ? 1 : -1;
+  });
+
+  return results;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -83,9 +166,7 @@ function ChangeIndicator({ summary }) {
 
   return (
     <div style={{ textAlign: 'center', minWidth: 36 }}>
-      <div style={{ fontSize: 16, lineHeight: 1, color, fontWeight: 700 }}>
-        {arrow}
-      </div>
+      <div style={{ fontSize: 16, lineHeight: 1, color, fontWeight: 700 }}>{arrow}</div>
       <div style={{ fontSize: 10, color, fontWeight: 600, marginTop: 1 }}>
         {sign}{maxDelta}
       </div>
@@ -93,7 +174,20 @@ function ChangeIndicator({ summary }) {
   );
 }
 
-function SeatCountBadge({ changed, total }) {
+function ScopeBadge({ scope, changed, total }) {
+  if (scope === 'room') {
+    return (
+      <span style={{
+        fontSize: 9, fontWeight: 600, letterSpacing: '0.04em',
+        backgroundColor: '#EFF6FF', color: '#1D4ED8',
+        borderRadius: 4, padding: '1px 5px',
+        border: '1px solid #BFDBFE',
+      }}>
+        Room
+      </span>
+    );
+  }
+  // Seat-level
   if (changed === total) {
     return (
       <span style={{
@@ -118,7 +212,7 @@ function SeatCountBadge({ changed, total }) {
   );
 }
 
-function ParamRow({ paramNum, baseLevels, liveLevels, isLast }) {
+function ParamRow({ paramNum, baseLevels, liveLevels, scope, isLast }) {
   const summary = buildChangeSummary(baseLevels, liveLevels);
   if (summary.changed === 0) return null;
 
@@ -128,11 +222,9 @@ function ParamRow({ paramNum, baseLevels, liveLevels, isLast }) {
       marginBottom: isLast ? 0 : 10,
       borderBottom: isLast ? 'none' : '1px solid #F3F4F6',
     }}>
-      {/* Row: left content + right indicator */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         {/* Left: label + before/after */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Param name + seat count */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <span style={{
               fontSize: 10, fontWeight: 700, color: '#374151',
@@ -140,7 +232,7 @@ function ParamRow({ paramNum, baseLevels, liveLevels, isLast }) {
             }}>
               {PARAM_LABELS[paramNum] || `Param ${paramNum}`}
             </span>
-            <SeatCountBadge changed={summary.changed} total={summary.total} />
+            <ScopeBadge scope={scope} changed={summary.changed} total={summary.total} />
           </div>
 
           {/* BEFORE row */}
@@ -179,44 +271,14 @@ function ParamRow({ paramNum, baseLevels, liveLevels, isLast }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function SeatingDragImpactCard({ baseline, live, impactParamIds, cardTitle }) {
+export default function SeatingDragImpactCard({ baseline, live, cardTitle }) {
   if (!baseline || !live) return null;
 
-  // Ordered real-seat arrays (index-based to handle coordinate-derived IDs during drag)
-  const bRp22 = getRealSeats(baseline.perSeatRp22);
-  const lRp22 = getRealSeats(live.perSeatRp22);
-  const bRp23 = Object.values(baseline.perSeatRp23 || {});
-  const lRp23 = Object.values(live.perSeatRp23 || {});
-
-  const rp22Count = Math.min(bRp22.length, lRp22.length);
-  const rp23Count = Math.min(bRp23.length, lRp23.length);
-  if (rp22Count === 0 && rp23Count === 0) return null;
-
-  const getLevel = (isBaseline, paramNum, idx) => {
-    if (paramNum === 23) {
-      if (idx >= rp23Count) return null;
-      return (isBaseline ? bRp23[idx] : lRp23[idx])?.level ?? null;
-    }
-    if (idx >= rp22Count) return null;
-    return (isBaseline ? bRp22[idx] : lRp22[idx])?.rp22?.[paramNum]?.level ?? null;
-  };
-
-  const seatCountForParam = (paramNum) => paramNum === 23 ? rp23Count : rp22Count;
-
-  // Build data for all params, then filter to those with actual level changes
-  const paramsToShow = impactParamIds || DRAG_PARAMS;
-  const paramData = paramsToShow
-
+  const paramData = buildAllParamData(baseline, live);
   if (paramData.length === 0) return null;
 
-  // Sort: biggest absolute change first; improvements before regressions of equal magnitude
-  paramData.sort((a, b) => {
-    const aDelta = Math.abs(a.summary.maxDelta);
-    const bDelta = Math.abs(b.summary.maxDelta);
-    if (bDelta !== aDelta) return bDelta - aDelta;
-    // Tie-break: improvements first
-    return b.summary.direction === 'up' ? 1 : -1;
-  });
+  const visibleParams = paramData.slice(0, MAX_VISIBLE_ROWS);
+  const hiddenCount = paramData.length - visibleParams.length;
 
   return (
     <div style={{
@@ -239,23 +301,40 @@ export default function SeatingDragImpactCard({ baseline, live, impactParamIds, 
           fontSize: 10, fontWeight: 800, color: '#111827',
           letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2,
         }}>
-          {cardTitle || 'Live Seating Impact'}
+          {cardTitle || 'Live Impact'}
         </div>
         <div style={{ fontSize: 10, color: '#6B7280', fontWeight: 400 }}>
           Parameters affected by current movement
         </div>
       </div>
 
-      {/* Parameter rows */}
-      {paramData.map((d, idx) => (
+      {/* Parameter rows (level changes only) */}
+      {visibleParams.map((d, idx) => (
         <ParamRow
           key={d.paramNum}
           paramNum={d.paramNum}
           baseLevels={d.baseLevels}
           liveLevels={d.liveLevels}
-          isLast={idx === paramData.length - 1}
+          scope={d.scope}
+          isLast={idx === visibleParams.length - 1 && hiddenCount === 0}
         />
       ))}
+
+      {/* Overflow indicator */}
+      {hiddenCount > 0 && (
+        <div style={{
+          marginTop: 8,
+          paddingTop: 8,
+          borderTop: '1px solid #F3F4F6',
+          fontSize: 9,
+          color: '#9CA3AF',
+          fontWeight: 600,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+        }}>
+          + {hiddenCount} more affected
+        </div>
+      )}
     </div>
   );
 }

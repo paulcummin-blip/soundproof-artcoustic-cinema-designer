@@ -1106,7 +1106,7 @@ const byId = useEntitiesById({
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
-  // ── Live RP22 impact for seat-block dragging ─────────────────────────────
+  // ── Live RP22 analysis (always running) ──────────────────────────────────
   const engineDimensions = useMemo(() => ({ widthM, lengthM, heightM }), [widthM, lengthM, heightM]);
   const engineState = useMemo(() => ({
     lcrAimMode: appState?.lcrAimMode,
@@ -1137,11 +1137,14 @@ const byId = useEntitiesById({
     screen,
     visiblePlanSpeakers,
   });
+
+  // ── Universal drag impact baseline — captured at ANY Plan View drag start ─
   const [baselineRp22, setBaselineRp22] = useState(null);
   const [baselineMlp, setBaselineMlp] = useState(null);
   const baselineCapturedRef = useRef(false);
+
   useEffect(() => {
-    if (dragging && dragType === 'seat') {
+    if (dragging) {
       if (!baselineCapturedRef.current) {
         baselineCapturedRef.current = true;
         setBaselineRp22(liveRp22);
@@ -1152,34 +1155,9 @@ const byId = useEntitiesById({
       setBaselineRp22(null);
       setBaselineMlp(null);
     }
-  // liveRp22 intentionally excluded — captures the pre-drag snapshot
+  // liveRp22 intentionally excluded — captures the pre-drag snapshot only
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging, dragType]);
-
-  // ── Live RP22 impact for surround speaker dragging ───────────────────────
-  const [baselineRp22Speaker, setBaselineRp22Speaker] = useState(null);
-  const baselineCapturedSpeakerRef = useRef(false);
-  const isSurroundRole = (role) => /^(SL|SR|SBL|SBR)\d*$/i.test(String(role || ''));
-
-  useEffect(() => {
-    if (dragging && dragType === 'speaker' && draggedItemId) {
-      const spk = byId.get(draggedItemId);
-      if (spk && isSurroundRole(spk.role)) {
-        if (!baselineCapturedSpeakerRef.current) {
-          baselineCapturedSpeakerRef.current = true;
-          setBaselineRp22Speaker(liveRp22);
-        }
-      } else {
-        baselineCapturedSpeakerRef.current = false;
-        setBaselineRp22Speaker(null);
-      }
-    } else {
-      baselineCapturedSpeakerRef.current = false;
-      setBaselineRp22Speaker(null);
-    }
-  // liveRp22 intentionally excluded — captures the pre-drag snapshot
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging, dragType, draggedItemId]);
+  }, [dragging]);
 
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
@@ -1969,8 +1947,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         subDragTick={subDragTick}
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
-        seatingDragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: dragging && dragType === 'seat', screen, screenFrontPlaneM, baselineMlp, liveMlp: mlp }}
-        speakerDragImpact={{ baseline: baselineRp22Speaker, live: liveRp22, isActive: dragging && dragType === 'speaker' && baselineRp22Speaker != null }}
+        dragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: !!dragging }}
       />
   );
 });
