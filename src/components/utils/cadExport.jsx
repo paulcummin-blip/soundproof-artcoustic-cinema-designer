@@ -281,12 +281,9 @@ const WALL_BUFFER_MM = 10;
  * @param {number} W - room width in mm
  * @param {number} L - room length in mm
  * @param {string} [role] - canonical role (used for FWL/FWR dual-wall check)
- * @param {number} [frontBufferYcad] - CAD Y reference for front-wall buffer (defaults to L = physical wall).
- *   Pass screenFaceYcad when available so LCR clearance is measured from the screen/baffle plane,
- *   matching the app Plan View behaviour.
  * @returns {{ shiftX: number, shiftY: number }}
  */
-function wallBufferShift(corners, wallSide, W, L, role = '', frontBufferYcad = L) {
+function wallBufferShift(corners, wallSide, W, L, role = '') {
     let shiftX = 0;
     let shiftY = 0;
     const xs = corners.map(([x]) => x);
@@ -302,7 +299,7 @@ function wallBufferShift(corners, wallSide, W, L, role = '', frontBufferYcad = L
     const guardLeft  = () => { if (minX < WALL_BUFFER_MM)        shiftX = Math.max(shiftX, WALL_BUFFER_MM - minX); };
     const guardRight = () => { if (maxX > W - WALL_BUFFER_MM)    shiftX = Math.min(shiftX, (W - WALL_BUFFER_MM) - maxX); };
     const guardRear  = () => { if (minY < WALL_BUFFER_MM)        shiftY = Math.max(shiftY, WALL_BUFFER_MM - minY); };
-    const guardFront = () => { if (maxY > frontBufferYcad - WALL_BUFFER_MM)    shiftY = Math.min(shiftY, (frontBufferYcad - WALL_BUFFER_MM) - maxY); };
+    const guardFront = () => { if (maxY > L - WALL_BUFFER_MM)    shiftY = Math.min(shiftY, (L - WALL_BUFFER_MM) - maxY); };
 
     // ── apply checks by wall ──────────────────────────────────────────────────
     if (wallSide === 'overhead') {
@@ -683,7 +680,7 @@ export function generateSVG({
                 spx + dx * cosR - dy * sinR,
                 spy + dx * sinR + dy * cosR,
             ]);
-            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role, sg?.hasScreen ? sg.screenFaceYcad : L);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
             const cx0 = spx + shiftX;
             const cy0 = spy + shiftY;
             svg.push(`    <g transform="rotate(${rotDeg}, ${cx0}, ${cy0})">`);
@@ -695,7 +692,7 @@ export function generateSVG({
         } else {
             // Axis-aligned (no rotation) — apply buffer using unrotated AABB
             const rawCorners = [[spx - hw, spy - hd], [spx + hw, spy - hd], [spx + hw, spy + hd], [spx - hw, spy + hd]];
-            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role, sg?.hasScreen ? sg.screenFaceYcad : L);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
             const cx0 = spx + shiftX;
             const cy0 = spy + shiftY;
             svg.push(`    ${svgRect(cx0 - hw, cy0 - hd, planWidthMm, planDepthMm, 'rgba(0,0,0,0.04)', 'black', 1.5)}`);
@@ -910,7 +907,7 @@ export function generateDXF({
                 spx + dx * cosR - dy * sinR,
                 spy + dx * sinR + dy * cosR,
             ]);
-            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role, sg?.hasScreen ? sg.screenFaceYcad : L);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
             const cx0 = spx + shiftX;
             const cy0 = spy + shiftY;
             // Re-compute shifted corners
@@ -930,7 +927,7 @@ export function generateDXF({
             const hw = Math.round(planWidthMm / 2);
             const hd = Math.round(planDepthMm / 2);
             const rawCorners = [[spx - hw, spy - hd], [spx + hw, spy - hd], [spx + hw, spy + hd], [spx - hw, spy + hd]];
-            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role, sg?.hasScreen ? sg.screenFaceYcad : L);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L, role);
             const cx0 = spx + shiftX;
             const cy0 = spy + shiftY;
             dxf.push(dxfRect('SPEAKERS', cx0 - hw, cy0 - hd, planWidthMm, planDepthMm));
