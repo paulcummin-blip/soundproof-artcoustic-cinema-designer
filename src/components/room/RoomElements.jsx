@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2 } from 'lucide-react';
 import { sanitizeProjectorElement } from '@/components/utils/projectorSanitise';
 import { fmtM } from '@/components/utils/formatMetres';
+import StepperInput from '@/components/ui/StepperInput';
 
 export default function RoomElements({ elements = [], onChange, roomDims }) {
   const [drafts, setDrafts] = React.useState({});  // eslint-disable-line
@@ -367,7 +368,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                   </div>
                 </>
               ) : (
-                /* NON-PROJECTOR layout stays as before (including Wall selector etc.) */
+                /* NON-PROJECTOR layout */
                 <div className="grid grid-cols-2 gap-3">
                   {/* WALL */}
                   <div>
@@ -392,19 +393,26 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     </div>
                   </div>
 
-                  {/* LENGTH */}
+                  {/* LENGTH — stepper */}
                   <div>
-                     <Label className="text-[#3E4349]">Length (m)</Label>
-                     <Input
-                       type="text"
-                       inputMode="decimal"
-                       value={getDraftValue(element, 'length_m', 0.9)}
-                       onChange={(e) => handleDraftChange(element.id, 'length_m', e.target.value)}
-                       onBlur={() => commitDraftValue(element.id, 'length_m', 0.9)}
-                       onKeyDown={(e) => { if (e.key === 'Enter') commitDraftValue(element.id, 'length_m', 0.9); }}
-                       className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
-                     />
-                   </div>
+                    <Label className="text-[#3E4349]">Length (m)</Label>
+                    <StepperInput
+                      value={Number(element?.length_m) || 0.9}
+                      step={0.01}
+                      min={0.05}
+                      onChange={(newLen) => {
+                        // Keep pos_m clamped so element stays in room when length grows
+                        const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+                        const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
+                        const wallLen = isFrontOrRear ? roomW : roomL;
+                        const posM = Number(element?.pos_m ?? element?.x_m ?? element?.y_m ?? 0) || 0;
+                        const maxPos = wallLen > 0 ? Math.max(0, wallLen - newLen) : posM;
+                        const clampedPos = Math.min(posM, maxPos);
+                        const next = { ...element, length_m: newLen, pos_m: clampedPos };
+                        onChange((elements || []).map(el => el.id === element.id ? next : el));
+                      }}
+                    />
+                  </div>
 
                   {/* LABEL — spans both columns */}
                   <div className="col-span-2">
@@ -418,46 +426,51 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     />
                   </div>
 
-                  {/* DUAL DISTANCE — primary positioning controls (replaces X Position) */}
+                  {/* DUAL DISTANCE — editable steppers */}
                   {(() => {
                     const posM = Number(element?.pos_m ?? element?.x_m ?? element?.y_m ?? 0) || 0;
-                    const elLen = parseFloat(getDraftValue(element, 'length_m', '0.9')) || 0.9;
+                    const elLen = Number(element?.length_m) || 0.9;
                     const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
                     const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
                     const wallLen = isFrontOrRear ? roomW : roomL;
-                    const distA = wallLen > 0 ? Math.max(0, posM) : null;
-                    const distB = wallLen > 0 ? Math.max(0, wallLen - posM - elLen) : null;
+                    const distA = wallLen > 0 ? Math.max(0, posM) : 0;
+                    const distB = wallLen > 0 ? Math.max(0, wallLen - posM - elLen) : 0;
+                    const maxDistA = wallLen > 0 ? Math.max(0, wallLen - elLen) : 0;
                     const labelA = isFrontOrRear ? 'Left Distance' : 'Front Distance';
                     const labelB = isFrontOrRear ? 'Right Distance' : 'Rear Distance';
+                    const hintA = isFrontOrRear ? 'From left wall to element edge' : 'From front wall to element edge';
+                    const hintB = isFrontOrRear ? 'From element edge to right wall' : 'From element edge to rear wall';
+
+                    const setDistA = (newDistA) => {
+                      const clamped = Math.max(0, Math.min(newDistA, maxDistA));
+                      onChange((elements || []).map(el =>
+                        el.id === element.id ? { ...el, pos_m: clamped } : el
+                      ));
+                    };
+
                     return (
                       <>
                         <div>
                           <Label className="text-[#3E4349]">{labelA} (m)</Label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            readOnly
-                            value={distA !== null ? distA.toFixed(2) : '—'}
-                            className="bg-[#F8F8F7] border-[#DCDBD6] text-[#1B1A1A]"
-                            style={{ cursor: 'default' }}
+                          <StepperInput
+                            value={distA}
+                            step={0.01}
+                            min={0}
+                            max={maxDistA}
+                            onChange={setDistA}
                           />
-                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
-                            {isFrontOrRear ? 'From left wall to element edge' : 'From front wall to element edge'}
-                          </div>
+                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>{hintA}</div>
                         </div>
                         <div>
                           <Label className="text-[#3E4349]">{labelB} (m)</Label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
+                          <StepperInput
+                            value={distB}
+                            step={0.01}
+                            min={0}
+                            max={maxDistA}
                             readOnly
-                            value={distB !== null ? distB.toFixed(2) : '—'}
-                            className="bg-[#F8F8F7] border-[#DCDBD6] text-[#1B1A1A]"
-                            style={{ cursor: 'default' }}
                           />
-                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
-                            {isFrontOrRear ? 'From element edge to right wall' : 'From element edge to rear wall'}
-                          </div>
+                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>{hintB}</div>
                         </div>
                       </>
                     );
