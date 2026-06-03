@@ -1068,6 +1068,7 @@ function RP22ReportInner() {
                         rearSubsCfg={rearSubsCfg}
                         roomElements={app?.roomElements || []}
                         projector={projector || null}
+                        screenMetrics={resolveScreenMetricsSnapshot()}
                         debugPlanCapture={debugPlanCapture}
                         setDebugPlanCapture={setDebugPlanCapture}
                         showCadExportMenu={showCadExportMenu}
