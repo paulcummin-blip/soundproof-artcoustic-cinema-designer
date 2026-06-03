@@ -43,8 +43,7 @@ export default function RvRoomElementDragDims({ dragInfo, widthM, lengthM, scale
   const midBodyX = (bodyX1 + bodyX2) / 2;
   const midBodyY = (bodyY1 + bodyY2) / 2;
 
-  const TICK = 5;         // tick-mark half-length in px
-  const TEXT_OFF = 10;    // text offset from dim line in px
+  const TICK = 5;
   const STROKE = '#3E6B4F';
   const STROKE_W = 1;
   const DASH = '3,3';
@@ -56,34 +55,29 @@ export default function RvRoomElementDragDims({ dragInfo, widthM, lengthM, scale
   if (wall === 'front' || wall === 'rear') {
     const wallX_left  = meterToCanvasX(0);
     const wallX_right = meterToCanvasX(widthM);
-
-    // Dim line runs at the wall edge
-    const dimY = wall === 'front'
-      ? meterToCanvasY(0) - 28
-      : meterToCanvasY(lengthM) + 28;
-
-    // Left distance: wall left corner → element left edge
     const leftEdgeX = bodyX1;
     const rightEdgeX = bodyX2;
 
+    // Dim line sits 28px outside the room wall — well within the 60px PADDING margin
+    const dimY = wall === 'front'
+      ? meterToCanvasY(0) - 28
+      : meterToCanvasY(lengthM) + 28;
+    // Text sits another 14px further out from the dim line
+    const textY = wall === 'front' ? dimY - 14 : dimY + 14;
+
     return (
       <g data-layer="room-element-drag-dims" pointerEvents="none">
-        {/* LEFT segment: left wall → left body edge */}
         {distA > 0.005 && (
           <g>
-            {/* Dim line */}
             <line x1={wallX_left} y1={dimY} x2={leftEdgeX} y2={dimY}
               stroke={STROKE} strokeWidth={STROKE_W} strokeDasharray={DASH} />
-            {/* Tick at wall */}
             <line x1={wallX_left} y1={dimY - TICK} x2={wallX_left} y2={dimY + TICK}
               stroke={STROKE} strokeWidth={STROKE_W} />
-            {/* Tick at element left edge */}
             <line x1={leftEdgeX} y1={dimY - TICK} x2={leftEdgeX} y2={dimY + TICK}
               stroke={STROKE} strokeWidth={STROKE_W} />
-            {/* Label */}
             <text
               x={(wallX_left + leftEdgeX) / 2}
-              y={wall === 'front' ? dimY - TEXT_OFF : dimY + TEXT_OFF + TEXT_SIZE}
+              y={textY}
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize={TEXT_SIZE}
@@ -95,8 +89,6 @@ export default function RvRoomElementDragDims({ dragInfo, widthM, lengthM, scale
             </text>
           </g>
         )}
-
-        {/* RIGHT segment: right body edge → right wall */}
         {distB > 0.005 && (
           <g>
             <line x1={rightEdgeX} y1={dimY} x2={wallX_right} y2={dimY}
@@ -107,7 +99,7 @@ export default function RvRoomElementDragDims({ dragInfo, widthM, lengthM, scale
               stroke={STROKE} strokeWidth={STROKE_W} />
             <text
               x={(rightEdgeX + wallX_right) / 2}
-              y={wall === 'front' ? dimY - TEXT_OFF : dimY + TEXT_OFF + TEXT_SIZE}
+              y={textY}
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize={TEXT_SIZE}
@@ -119,8 +111,6 @@ export default function RvRoomElementDragDims({ dragInfo, widthM, lengthM, scale
             </text>
           </g>
         )}
-
-        {/* Element centre crosshair */}
         <line x1={midBodyX} y1={meterToCanvasY(0) - 3} x2={midBodyX} y2={meterToCanvasY(0) + 3}
           stroke={STROKE} strokeWidth={1} />
       </g>
@@ -130,18 +120,19 @@ export default function RvRoomElementDragDims({ dragInfo, widthM, lengthM, scale
   // ── Vertical walls (left / right) ──────────────────────────────────────────
   const wallY_top    = meterToCanvasY(0);
   const wallY_bottom = meterToCanvasY(lengthM);
+  const topEdgeY     = bodyY1;
+  const bottomEdgeY  = bodyY2;
 
-  const topEdgeY    = bodyY1;
-  const bottomEdgeY = bodyY2;
-
-  // Dim line runs at the wall edge
+  // Dim line sits 32px outside the room wall — fits within the 60px PADDING margin
+  // Text is placed inline (non-rotated) beside the dim line for readability
   const dimX = wall === 'left'
-    ? meterToCanvasX(0) - 28
-    : meterToCanvasX(widthM) + 28;
+    ? meterToCanvasX(0) - 32
+    : meterToCanvasX(widthM) + 32;
+  const textAnchor = wall === 'left' ? 'end' : 'start';
+  const textX = wall === 'left' ? dimX - 6 : dimX + 6;
 
   return (
     <g data-layer="room-element-drag-dims" pointerEvents="none">
-      {/* TOP segment: front wall → element top edge */}
       {distA > 0.005 && (
         <g>
           <line x1={dimX} y1={wallY_top} x2={dimX} y2={topEdgeY}
@@ -151,22 +142,19 @@ export default function RvRoomElementDragDims({ dragInfo, widthM, lengthM, scale
           <line x1={dimX - TICK} y1={topEdgeY} x2={dimX + TICK} y2={topEdgeY}
             stroke={STROKE} strokeWidth={STROKE_W} />
           <text
-            x={wall === 'left' ? dimX - TEXT_OFF : dimX + TEXT_OFF}
+            x={textX}
             y={(wallY_top + topEdgeY) / 2}
-            textAnchor={wall === 'left' ? 'end' : 'start'}
+            textAnchor={textAnchor}
             dominantBaseline="middle"
             fontSize={TEXT_SIZE}
             fontWeight={TEXT_WEIGHT}
             fill={TEXT_FILL}
             style={{ userSelect: 'none' }}
-            transform={`rotate(-90, ${wall === 'left' ? dimX - TEXT_OFF : dimX + TEXT_OFF}, ${(wallY_top + topEdgeY) / 2})`}
           >
-            ↑ {distA.toFixed(2)} m
+            {distA.toFixed(2)} m
           </text>
         </g>
       )}
-
-      {/* BOTTOM segment: element bottom edge → rear wall */}
       {distB > 0.005 && (
         <g>
           <line x1={dimX} y1={bottomEdgeY} x2={dimX} y2={wallY_bottom}
@@ -176,17 +164,16 @@ export default function RvRoomElementDragDims({ dragInfo, widthM, lengthM, scale
           <line x1={dimX - TICK} y1={wallY_bottom} x2={dimX + TICK} y2={wallY_bottom}
             stroke={STROKE} strokeWidth={STROKE_W} />
           <text
-            x={wall === 'left' ? dimX - TEXT_OFF : dimX + TEXT_OFF}
+            x={textX}
             y={(bottomEdgeY + wallY_bottom) / 2}
-            textAnchor={wall === 'left' ? 'end' : 'start'}
+            textAnchor={textAnchor}
             dominantBaseline="middle"
             fontSize={TEXT_SIZE}
             fontWeight={TEXT_WEIGHT}
             fill={TEXT_FILL}
             style={{ userSelect: 'none' }}
-            transform={`rotate(-90, ${wall === 'left' ? dimX - TEXT_OFF : dimX + TEXT_OFF}, ${(bottomEdgeY + wallY_bottom) / 2})`}
           >
-            {distB.toFixed(2)} m ↓
+            {distB.toFixed(2)} m
           </text>
         </g>
       )}
