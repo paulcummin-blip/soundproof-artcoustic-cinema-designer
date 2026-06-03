@@ -279,18 +279,34 @@ export default function RvRoomElementsLayer({
         const label = String(e.__label || `Element ${idx + 1}`);
 
         const isProjector = element?.type === 'projector';
+        const isGenericEl = !isProjector;
         const dragId = element?.id ?? `el-${idx}`;
+        const isDraggable = !!handleMouseDown;
+
+        const onDown = isDraggable ? (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          handleMouseDown(ev, dragId, isProjector ? 'projector' : 'roomElement');
+        } : undefined;
 
         return (
           <g
             key={String(dragId)}
-            style={isProjector && handleMouseDown ? { cursor: 'grab', pointerEvents: 'all' } : undefined}
-            onMouseDown={isProjector && handleMouseDown ? (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleMouseDown(e, dragId, 'projector');
-            } : undefined}
+            style={isDraggable ? { cursor: 'grab', pointerEvents: 'all' } : undefined}
+            onMouseDown={onDown}
           >
+            {/* Larger invisible hit target for easier grabbing */}
+            {isGenericEl && isDraggable && (
+              <rect
+                x={xPx - 6}
+                y={yPx - 6}
+                width={Math.max(0, wPx + 12)}
+                height={Math.max(0, hPx + 12)}
+                fill="transparent"
+                stroke="none"
+                pointerEvents="all"
+              />
+            )}
             <rect
               x={xPx}
               y={yPx}
@@ -300,7 +316,7 @@ export default function RvRoomElementsLayer({
               stroke={stroke}
               strokeWidth={2}
               vectorEffect="non-scaling-stroke"
-              pointerEvents={isProjector && handleMouseDown ? 'all' : 'none'}
+              pointerEvents={isDraggable ? 'all' : 'none'}
             />
           <text
               x={labelXpx}

@@ -143,6 +143,8 @@ export default function RvPlanCanvas({
   handleIconMove,
   handleIconLeave,
   dragImpact,
+  roomElementDragLabel,
+  dragType,
 }) {
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
@@ -580,6 +582,28 @@ export default function RvPlanCanvas({
             baseline={dragImpact.baseline}
             live={dragImpact.live}
           />
+        )}
+
+        {/* ROOM ELEMENT DRAG MEASUREMENT LABEL */}
+        {dragType === 'roomElement' && roomElementDragLabel && (
+          <div style={{
+            position: 'absolute',
+            bottom: 14,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(27,26,26,0.85)',
+            color: '#FFFFFF',
+            fontSize: 12,
+            fontWeight: 600,
+            padding: '4px 10px',
+            borderRadius: 6,
+            pointerEvents: 'none',
+            letterSpacing: '0.03em',
+            whiteSpace: 'nowrap',
+            zIndex: 50,
+          }}>
+            {roomElementDragLabel}
+          </div>
         )}
 
       </div>

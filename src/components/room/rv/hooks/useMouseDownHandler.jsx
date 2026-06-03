@@ -99,6 +99,31 @@ export function useMouseDownHandler({
         return;
       }
 
+      // Room element drag (non-projector wall elements)
+      if (type === 'roomElement') {
+        const el = Array.isArray(roomElements)
+          ? roomElements.find(re => String(re?.id) === String(id))
+          : null;
+        if (!el) return;
+        const wall = String(el?.wall || 'front').toLowerCase();
+        const isFrontRear = wall === 'front' || wall === 'rear';
+        const posM = Number.isFinite(Number(el?.pos_m)) ? Number(el.pos_m) :
+                     Number.isFinite(Number(el?.x_m)) ? Number(el.x_m) :
+                     Number.isFinite(Number(el?.y_m)) ? Number(el.y_m) : 0;
+        // Compute room coords of element centre for offset
+        const L = Number(el?.length_m) || 0.9;
+        const centerPosM = posM + L / 2;
+        dragOffsetRoomRef.current = {
+          x: isFrontRear ? (centerPosM - cursorRoom.x) : 0,
+          y: isFrontRear ? 0 : (centerPosM - cursorRoom.y),
+        };
+        isAnyDraggingRef.current = true;
+        setDragState({ dragging: true, draggedItemId: String(id), dragType: 'roomElement' });
+        setDragWarning({ show: false });
+        rsDragLockRef.current = null;
+        return;
+      }
+
       if (!target) return;
 
       const canonicalRole = getCanonicalRole(target.role);

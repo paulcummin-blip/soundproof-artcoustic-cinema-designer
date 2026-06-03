@@ -1085,6 +1085,42 @@ const byId = useEntitiesById({
 
   const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, lengthM });
 
+  // Room element measurement label (only visible during roomElement drag)
+  const [roomElementDragLabel, setRoomElementDragLabel] = useState(null);
+
+  // Clear label when not dragging a room element
+  useEffect(() => {
+    if (dragType !== 'roomElement') setRoomElementDragLabel(null);
+  }, [dragType]);
+
+  // Room Element drag — wall-constrained movement, updates pos_m live
+  const handleRoomElementDrag = useCallback((elementId, canvasPos) => {
+    if (!onSetRoomElements || !canvasToRoom) return;
+    const roomPos = canvasToRoom(canvasPos);
+    const el = Array.isArray(roomElements)
+      ? roomElements.find(re => String(re?.id) === String(elementId))
+      : null;
+    if (!el) return;
+    const wall = String(el?.wall || 'front').toLowerCase();
+    const isFrontRear = wall === 'front' || wall === 'rear';
+    const elLen = Number(el?.length_m) || 0.9;
+    const wallLength = isFrontRear ? widthM : lengthM;
+    // cursor pos + stored offset gives element left/top edge centre-corrected
+    const raw = isFrontRear
+      ? (roomPos.x + dragOffsetRoomRef.current.x)
+      : (roomPos.y + dragOffsetRoomRef.current.y);
+    const clamped = Math.max(0, Math.min(wallLength - elLen, raw - elLen / 2));
+    const endRef = isFrontRear ? 'left end' : 'front end';
+    setRoomElementDragLabel(`${clamped.toFixed(2)} m from ${endRef}`);
+    onSetRoomElements(prev =>
+      (Array.isArray(prev) ? prev : []).map(re =>
+        String(re?.id) === String(elementId)
+          ? { ...re, pos_m: clamped, x_m: clamped, y_m: clamped }
+          : re
+      )
+    );
+  }, [onSetRoomElements, canvasToRoom, roomElements, widthM, lengthM, dragOffsetRoomRef]);
+
   // Projector drag — Y-axis only, clamped to room bounds
   const handleProjectorDrag = useCallback((projectorId, canvasPos) => {
     if (!onSetRoomElements || !canvasToRoom) return;
@@ -1215,6 +1251,7 @@ const byId = useEntitiesById({
     handleSeatDrag,
     handleSubDrag,
     handleProjectorDrag,
+    handleRoomElementDrag,
   });
 
   const { handleMouseUp } = useMouseUpHandler({
@@ -1948,6 +1985,8 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
         dragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: !!dragging }}
+        roomElementDragLabel={roomElementDragLabel}
+        dragType={dragType}
       />
   );
 });
