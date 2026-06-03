@@ -7,16 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { sanitizeProjectorElement } from '@/components/utils/projectorSanitise';
+import { fmtM } from '@/components/utils/formatMetres';
 
 export default function RoomElements({ elements = [], onChange, roomDims }) {
   const [drafts, setDrafts] = React.useState({});  // eslint-disable-line
 
-  // Returns the current draft string if one exists, otherwise the numeric element value as a string
+  // Returns the current draft string if one exists, otherwise the value rounded to 2dp (cm resolution)
   const getDraftValue = (element, field, fallback) => {
     const key = `${element.id}:${field}`;
     if (Object.prototype.hasOwnProperty.call(drafts, key)) return drafts[key];
     const val = element[field];
-    return Number.isFinite(val) ? String(val) : (fallback !== undefined ? String(fallback) : '');
+    return fmtM(val, fallback !== undefined ? String(fallback) : '');
   };
 
   // Only allow valid partial decimal inputs — does not call updateElement
@@ -277,7 +278,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.x_lens_m) ? element.x_lens_m : ''}
+                        value={fmtM(element?.x_lens_m, '')}
                         onChange={(e) => updateElement(element.id, 'x_lens_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
@@ -306,7 +307,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.y_lens_m) ? element.y_lens_m : ''}
+                        value={fmtM(element?.y_lens_m, '')}
                         onChange={(e) => updateElement(element.id, 'y_lens_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
@@ -318,7 +319,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.z_lens_m) ? element.z_lens_m : ''}
+                        value={fmtM(element?.z_lens_m, '')}
                         onChange={(e) => updateElement(element.id, 'z_lens_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
@@ -335,7 +336,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.body_width_m) ? element.body_width_m : ''}
+                        value={fmtM(element?.body_width_m, '')}
                         onChange={(e) => updateElement(element.id, 'body_width_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
@@ -346,7 +347,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.body_height_m) ? element.body_height_m : ''}
+                        value={fmtM(element?.body_height_m, '')}
                         onChange={(e) => updateElement(element.id, 'body_height_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
@@ -357,7 +358,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={Number.isFinite(element?.body_depth_m) ? element.body_depth_m : ''}
+                        value={fmtM(element?.body_depth_m, '')}
                         onChange={(e) => updateElement(element.id, 'body_depth_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                         placeholder="—"
