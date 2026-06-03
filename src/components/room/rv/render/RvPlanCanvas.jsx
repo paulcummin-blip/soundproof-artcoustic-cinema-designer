@@ -597,32 +597,7 @@ export default function RvPlanCanvas({
           />
         )}
 
-        {/* ROOM ELEMENT DRAG DISTANCE PANEL */}
-        {dragType === 'roomElement' && roomElementDragInfo?.visible && (
-          <div style={{
-            position: 'absolute',
-            bottom: 14,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: 'rgba(27,26,26,0.88)',
-            color: '#FFFFFF',
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '6px 14px',
-            borderRadius: 7,
-            pointerEvents: 'none',
-            letterSpacing: '0.03em',
-            whiteSpace: 'nowrap',
-            zIndex: 50,
-            display: 'flex',
-            gap: 18,
-            alignItems: 'center',
-          }}>
-            <span>← {roomElementDragInfo.labelA}: <strong>{roomElementDragInfo.distA.toFixed(2)} m</strong></span>
-            <span style={{ opacity: 0.4 }}>|</span>
-            <span><strong>{roomElementDragInfo.distB.toFixed(2)} m</strong> {roomElementDragInfo.labelB} →</span>
-          </div>
-        )}
+
 
       </div>
     </div>

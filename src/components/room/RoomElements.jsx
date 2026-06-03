@@ -418,48 +418,50 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     />
                   </div>
 
-                  {/* POSITION + DUAL DISTANCE READOUT */}
-                  <div className="col-span-2">
-                     <Label className="text-[#3E4349]">
-                       {isFrontOrRear ? 'X Position (m)' : 'Y Position (m)'}
-                     </Label>
-                     <Input
-                       type="text"
-                       inputMode="decimal"
-                       value={getDraftValue(element, 'pos_m', '')}
-                       onChange={(e) => handleDraftChange(element.id, 'pos_m', e.target.value)}
-                       onBlur={() => commitDraftValue(element.id, 'pos_m', 0)}
-                       onKeyDown={(e) => { if (e.key === 'Enter') commitDraftValue(element.id, 'pos_m', 0); }}
-                       className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
-                     />
-                    {/* Dual distance readout */}
-                    {(() => {
-                      const posM = parseFloat(getDraftValue(element, 'pos_m', '0')) || 0;
-                      const elLen = parseFloat(getDraftValue(element, 'length_m', '0.9')) || 0.9;
-                      const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
-                      const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
-                      const wallLen = isFrontOrRear ? roomW : roomL;
-                      if (wallLen <= 0) return null;
-                      const distA = Math.max(0, posM);
-                      const distB = Math.max(0, wallLen - posM - elLen);
-                      const labelA = isFrontOrRear ? 'Left' : 'Front';
-                      const labelB = isFrontOrRear ? 'Right' : 'Rear';
-                      return (
-                        <div className="mt-2 flex items-center gap-3 rounded-md px-3 py-2"
-                          style={{ background: 'rgba(33,52,40,0.06)', border: '1px solid #D0CFCA' }}>
-                          <div className="flex flex-col items-center flex-1">
-                            <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: '#625143' }}>{labelA} Distance</span>
-                            <span className="text-sm font-bold" style={{ color: '#213428' }}>{distA.toFixed(2)} m</span>
-                          </div>
-                          <div style={{ width: 1, height: 28, background: '#D0CFCA' }} />
-                          <div className="flex flex-col items-center flex-1">
-                            <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: '#625143' }}>{labelB} Distance</span>
-                            <span className="text-sm font-bold" style={{ color: '#213428' }}>{distB.toFixed(2)} m</span>
+                  {/* DUAL DISTANCE — primary positioning controls (replaces X Position) */}
+                  {(() => {
+                    const posM = Number(element?.pos_m ?? element?.x_m ?? element?.y_m ?? 0) || 0;
+                    const elLen = parseFloat(getDraftValue(element, 'length_m', '0.9')) || 0.9;
+                    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+                    const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
+                    const wallLen = isFrontOrRear ? roomW : roomL;
+                    const distA = wallLen > 0 ? Math.max(0, posM) : null;
+                    const distB = wallLen > 0 ? Math.max(0, wallLen - posM - elLen) : null;
+                    const labelA = isFrontOrRear ? 'Left Distance' : 'Front Distance';
+                    const labelB = isFrontOrRear ? 'Right Distance' : 'Rear Distance';
+                    return (
+                      <>
+                        <div>
+                          <Label className="text-[#3E4349]">{labelA} (m)</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            readOnly
+                            value={distA !== null ? distA.toFixed(2) : '—'}
+                            className="bg-[#F8F8F7] border-[#DCDBD6] text-[#1B1A1A]"
+                            style={{ cursor: 'default' }}
+                          />
+                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
+                            {isFrontOrRear ? 'From left wall to element edge' : 'From front wall to element edge'}
                           </div>
                         </div>
-                      );
-                    })()}
-                  </div>
+                        <div>
+                          <Label className="text-[#3E4349]">{labelB} (m)</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            readOnly
+                            value={distB !== null ? distB.toFixed(2) : '—'}
+                            className="bg-[#F8F8F7] border-[#DCDBD6] text-[#1B1A1A]"
+                            style={{ cursor: 'default' }}
+                          />
+                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
+                            {isFrontOrRear ? 'From element edge to right wall' : 'From element edge to rear wall'}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
