@@ -249,6 +249,81 @@ function computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles = {}) {
     return 0;
 }
 
+// ─── Wall buffer correction ────────────────────────────────────────────────
+//
+// After rotating a speaker footprint, the bounding box of the rotated corners
+// may violate the 10 mm wall buffer. This function:
+//   1. Computes the AABB of the rotated corners (in CAD space).
+//   2. Checks each relevant wall boundary for the speaker's assigned wall.
+//   3. Returns { shiftX, shiftY } to translate the footprint centre so the
+//      rotated bounding box is at least WALL_BUFFER_MM from the wall.
+//
+// CAD coordinate convention (shared by both DXF and SVG paths):
+//   X: 0 = left wall, W = right wall
+//   Y: 0 = rear wall, L = front wall
+//
+// The shift is applied to (spx, spy) before drawing — stored positions are untouched.
+
+const WALL_BUFFER_MM = 10;
+
+/**
+ * @param {Array<[number,number]>} corners - rotated corner coords in CAD mm
+ * @param {string} wallSide - 'front'|'rear'|'left'|'right'|'unknown'
+ * @param {number} W - room width in mm
+ * @param {number} L - room length in mm
+ * @returns {{ shiftX: number, shiftY: number }}
+ */
+function wallBufferShift(corners, wallSide, W, L) {
+    let shiftX = 0;
+    let shiftY = 0;
+    const xs = corners.map(([x]) => x);
+    const ys = corners.map(([, y]) => y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    // Front wall: CAD Y = L (top). Footprint must not exceed L - WALL_BUFFER_MM.
+    if (wallSide === 'front') {
+        const excess = maxY - (L - WALL_BUFFER_MM);
+        if (excess > 0) shiftY = -excess;
+    }
+    // Rear wall: CAD Y = 0 (bottom). Footprint must not go below WALL_BUFFER_MM.
+    if (wallSide === 'rear') {
+        const excess = WALL_BUFFER_MM - minY;
+        if (excess > 0) shiftY = excess;
+    }
+    // Left wall: CAD X = 0. Footprint must not go below WALL_BUFFER_MM.
+    if (wallSide === 'left') {
+        const excess = WALL_BUFFER_MM - minX;
+        if (excess > 0) shiftX = excess;
+    }
+    // Right wall: CAD X = W. Footprint must not exceed W - WALL_BUFFER_MM.
+    if (wallSide === 'right') {
+        const excess = maxX - (W - WALL_BUFFER_MM);
+        if (excess > 0) shiftX = -excess;
+    }
+
+    return { shiftX: Math.round(shiftX), shiftY: Math.round(shiftY) };
+}
+
+// ─── Overhead speaker resolver ─────────────────────────────────────────────
+//
+// Returns true-scale circle radius for in-ceiling / overhead speakers.
+// Priority: meta.diameterM (round=true) → meta.widthM fallback → 120 mm fallback.
+
+const OVERHEAD_FALLBACK_R_MM = 60; // 120 mm diameter → 60 mm radius
+
+function getOverheadRadiusMm(modelName) {
+    if (!modelName) return OVERHEAD_FALLBACK_R_MM;
+    const meta = getSpeakerModelMeta(modelName);
+    if (!meta || meta.notFound) return OVERHEAD_FALLBACK_R_MM;
+    if (meta.round && meta.diameterM > 0)  return Math.round((meta.diameterM / 2) * 1000);
+    if (meta.diameterM > 0)                return Math.round((meta.diameterM / 2) * 1000);
+    if (meta.widthM > 0)                   return Math.round((meta.widthM   / 2) * 1000);
+    return OVERHEAD_FALLBACK_R_MM;
+}
+
 // ─── MLP seat finder ───────────────────────────────────────────────────────
 
 function findMlpSeatId(mlp, seats) {
@@ -563,10 +638,11 @@ export function generateSVG({
         const rotDeg = computeCadRotDeg(spk, mlp, lcrAngleInfo, aimToggles);
 
         if (wall === 'overhead') {
-            const hs = OVERHEAD_MARKER_HS;
-            svg.push(`    ${svgRect(spx - hs, spy - hs, hs * 2, hs * 2, 'rgba(80,80,200,0.06)', '#5050C8', 1)}`);
-            svg.push(`    ${svgCross(spx, spy, hs * 0.55, '#5050C8', 0.8)}`);
-            svg.push(`    ${svgText(spx + hs + LABEL_OFFSET, spy + 30, role, TEXT_H, 'start', '#5050C8')}`);
+            // In-ceiling speakers: true-scale round symbol from product metadata
+            const r = getOverheadRadiusMm(modelName);
+            svg.push(`    <circle cx="${spx}" cy="${spy}" r="${r}" fill="rgba(80,80,200,0.06)" stroke="#5050C8" stroke-width="1.5"/>`);
+            svg.push(`    ${svgCross(spx, spy, Math.round(r * 0.45), '#5050C8', 0.8)}`);
+            svg.push(`    ${svgText(spx + r + LABEL_OFFSET, spy + 30, role, TEXT_H, 'start', '#5050C8')}`);
             return;
         }
 
@@ -575,22 +651,40 @@ export function generateSVG({
         const hd = planDepthMm / 2;
 
         if (isRound) {
-            // Circles don't rotate
+            // Round wall speakers (e.g. round in-wall): no rotation needed
             const r = diameterMm / 2;
             svg.push(`    <circle cx="${spx}" cy="${spy}" r="${r}" fill="rgba(0,0,0,0.04)" stroke="black" stroke-width="1.5"/>`);
             svg.push(`    ${svgCross(spx, spy, r * 0.45, '#333', 1)}`);
         } else if (rotDeg !== 0) {
-            // Rotated footprint — wrap in a rotate group, draw axis-aligned inside
-            svg.push(`    <g transform="rotate(${rotDeg}, ${spx}, ${spy})">`);
-            svg.push(`      ${svgRect(spx - hw, spy - hd, planWidthMm, planDepthMm, 'rgba(0,0,0,0.04)', 'black', 1.5)}`);
-            svg.push(`      ${svgCross(spx, spy, Math.min(hw, hd) * 0.4, '#333', 1)}`);
+            // Rotated footprint: compute corners, apply wall buffer, then draw
+            const rotRad = (rotDeg * Math.PI) / 180;
+            const cosR = Math.cos(rotRad);
+            const sinR = Math.sin(rotRad);
+            const rawCorners = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([dx, dy]) => [
+                spx + dx * cosR - dy * sinR,
+                spy + dx * sinR + dy * cosR,
+            ]);
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L);
+            const cx0 = spx + shiftX;
+            const cy0 = spy + shiftY;
+            svg.push(`    <g transform="rotate(${rotDeg}, ${cx0}, ${cy0})">`);
+            svg.push(`      ${svgRect(cx0 - hw, cy0 - hd, planWidthMm, planDepthMm, 'rgba(0,0,0,0.04)', 'black', 1.5)}`);
+            svg.push(`      ${svgCross(cx0, cy0, Math.min(hw, hd) * 0.4, '#333', 1)}`);
             svg.push(`    </g>`);
+            svg.push(`    ${svgText(cx0 + hw + LABEL_OFFSET, cy0 + 30, role, TEXT_H, 'start', '#1B1A1A')}`);
+            return;
         } else {
-            // Axis-aligned (no rotation)
-            svg.push(`    ${svgRect(spx - hw, spy - hd, planWidthMm, planDepthMm, 'rgba(0,0,0,0.04)', 'black', 1.5)}`);
-            svg.push(`    ${svgCross(spx, spy, Math.min(hw, hd) * 0.4, '#333', 1)}`);
+            // Axis-aligned (no rotation) — apply buffer using unrotated AABB
+            const rawCorners = [[spx - hw, spy - hd], [spx + hw, spy - hd], [spx + hw, spy + hd], [spx - hw, spy + hd]];
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L);
+            const cx0 = spx + shiftX;
+            const cy0 = spy + shiftY;
+            svg.push(`    ${svgRect(cx0 - hw, cy0 - hd, planWidthMm, planDepthMm, 'rgba(0,0,0,0.04)', 'black', 1.5)}`);
+            svg.push(`    ${svgCross(cx0, cy0, Math.min(hw, hd) * 0.4, '#333', 1)}`);
+            svg.push(`    ${svgText(cx0 + hw + LABEL_OFFSET, cy0 + 30, role, TEXT_H, 'start', '#1B1A1A')}`);
+            return;
         }
-        // Label always horizontal for readability
+        // Label for round wall speakers (no early return above)
         svg.push(`    ${svgText(spx + hw + LABEL_OFFSET, spy + 30, role, TEXT_H, 'start', '#1B1A1A')}`);
     });
     svg.push(`  </g>`);
@@ -773,48 +867,57 @@ export function generateDXF({
         const sinR = Math.sin(rotRad);
 
         if (wall === 'overhead') {
-            const hs = OVERHEAD_MARKER_HS;
-            dxf.push(dxfRect('SPEAKERS', spx - hs, spy - hs, hs * 2, hs * 2));
-            dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(hs * 0.5)));
-            dxf.push(dxfText('LABELS', spx + hs + LABEL_OFFSET, spy + 30, TEXT_H, role));
+            // In-ceiling speakers: true-scale round symbol from product metadata
+            const r = getOverheadRadiusMm(modelName);
+            dxf.push(`0\nCIRCLE\n8\nSPEAKERS\n10\n${spx}\n20\n${spy}\n40\n${r}`);
+            dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(r * 0.45)));
+            dxf.push(dxfText('LABELS', spx + r + LABEL_OFFSET, spy + 30, TEXT_H, role));
             return;
         }
 
         const { planWidthMm, planDepthMm, isRound, diameterMm } = getSpeakerFootprintMm(modelName, role);
 
         if (isRound) {
-            // Circles don't rotate
+            // Round wall speakers: no rotation needed
             const r = Math.round(diameterMm / 2);
             dxf.push(`0\nCIRCLE\n8\nSPEAKERS\n10\n${spx}\n20\n${spy}\n40\n${r}`);
             dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(r * 0.45)));
+            dxf.push(dxfText('LABELS', spx + r + LABEL_OFFSET, spy + 30, TEXT_H, role));
         } else if (rotDeg !== 0) {
-            // Rotated rectangle: compute four rotated corners around centre (spx, spy)
+            // Rotated rectangle: compute corners, apply wall buffer, then draw
             const hw = planWidthMm / 2;
             const hd = planDepthMm / 2;
-            // Unrotated corners relative to centre
-            const corners = [
-                [-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd],
-            ];
-            // Rotate each corner
-            const rotated = corners.map(([dx, dy]) => [
-                Math.round(spx + dx * cosR - dy * sinR),
-                Math.round(spy + dx * sinR + dy * cosR),
+            const rawCorners = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([dx, dy]) => [
+                spx + dx * cosR - dy * sinR,
+                spy + dx * sinR + dy * cosR,
             ]);
-            // Draw four line segments forming closed rectangle
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L);
+            const cx0 = spx + shiftX;
+            const cy0 = spy + shiftY;
+            // Re-compute shifted corners
+            const rotated = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([dx, dy]) => [
+                Math.round(cx0 + dx * cosR - dy * sinR),
+                Math.round(cy0 + dx * sinR + dy * cosR),
+            ]);
             for (let i = 0; i < 4; i++) {
                 const [x1, y1] = rotated[i];
                 const [x2, y2] = rotated[(i + 1) % 4];
                 dxf.push(dxfLine('SPEAKERS', x1, y1, x2, y2));
             }
-            dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(Math.min(hw, hd) * 0.4)));
+            dxf.push(dxfCross('CABLE_POINTS', cx0, cy0, Math.round(Math.min(hw, hd) * 0.4)));
+            dxf.push(dxfText('LABELS', cx0 + Math.round(planWidthMm / 2) + LABEL_OFFSET, cy0 + 30, TEXT_H, role));
         } else {
-            // Axis-aligned (no rotation)
+            // Axis-aligned: apply buffer using AABB
             const hw = Math.round(planWidthMm / 2);
             const hd = Math.round(planDepthMm / 2);
-            dxf.push(dxfRect('SPEAKERS', spx - hw, spy - hd, planWidthMm, planDepthMm));
-            dxf.push(dxfCross('CABLE_POINTS', spx, spy, Math.round(Math.min(hw, hd) * 0.4)));
+            const rawCorners = [[spx - hw, spy - hd], [spx + hw, spy - hd], [spx + hw, spy + hd], [spx - hw, spy + hd]];
+            const { shiftX, shiftY } = wallBufferShift(rawCorners, wall, W, L);
+            const cx0 = spx + shiftX;
+            const cy0 = spy + shiftY;
+            dxf.push(dxfRect('SPEAKERS', cx0 - hw, cy0 - hd, planWidthMm, planDepthMm));
+            dxf.push(dxfCross('CABLE_POINTS', cx0, cy0, Math.round(Math.min(hw, hd) * 0.4)));
+            dxf.push(dxfText('LABELS', cx0 + hw + LABEL_OFFSET, cy0 + 30, TEXT_H, role));
         }
-        dxf.push(dxfText('LABELS', spx + Math.round(planWidthMm / 2) + LABEL_OFFSET, spy + 30, TEXT_H, role));
     });
 
     // SUBWOOFERS — true product footprints with orientation
