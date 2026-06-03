@@ -328,6 +328,16 @@ function wallBufferShift(corners, wallSide, W, L, role = '') {
         if (excess > 0) shiftX = Math.min(shiftX, -excess);
     }
 
+    // FL/FR: role-explicit front-wall guard. After rotation their nearmost
+    // corners (maxY in CAD space, where front wall = Y=L) must stay <= L - 10 mm.
+    // This duplicates the wallSide==='front' check but is explicit by role so it
+    // is immune to any future wallSide misclassification and survives both the
+    // SVG and DXF coordinate paths unchanged.
+    if (r === 'FL' || r === 'FR' || r === 'L' || r === 'R') {
+        const excess = maxY - (L - WALL_BUFFER_MM);
+        if (excess > 0) shiftY = Math.min(shiftY, -excess);
+    }
+
     return { shiftX: Math.round(shiftX), shiftY: Math.round(shiftY) };
 }
 
