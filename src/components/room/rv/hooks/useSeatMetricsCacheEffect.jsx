@@ -103,13 +103,10 @@ export function useSeatMetricsCacheEffect({
         ? `${Math.round(mlpX * 1000)}:${Math.round(mlpY * 1000)}:${Math.round((Number.isFinite(mlpZ) ? mlpZ : 1.2) * 1000)}`
         : "na";
 
-    const screenRounded      = Math.round((screenFrontPlaneM || 0) * 1000);
-    const screenPlaneYRounded = Math.round((screen?.screenPlaneY_m || 0) * 1000);
-    const frontPlaneRounded   = Math.round((screen?.frontPlaneM    || 0) * 1000);
-    const floatDepthRounded   = Math.round((screen?.floatDepthM    || 0) * 1000);
+    const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
 
     const signature =
-      `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|MLP${mlpFingerprint}|SCR${screenRounded}:${screenPlaneYRounded}:${frontPlaneRounded}:${floatDepthRounded}|7B${sevenBedMode}|A${analysisRev}|S${splRev}|LCR${Math.round(lcrL*10)}:${Math.round(lcrR*10)}`;
+      `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|MLP${mlpFingerprint}|SCR${screenRounded}|7B${sevenBedMode}|A${analysisRev}|S${splRev}|LCR${Math.round(lcrL*10)}:${Math.round(lcrR*10)}`;
 
     if (lastCacheSignatureRef.current === signature) {
       return;
@@ -181,9 +178,6 @@ export function useSeatMetricsCacheEffect({
     heightM,
     screenFrontPlaneM,
     screen?.visibleWidthInches,
-    screen?.screenPlaneY_m,
-    screen?.frontPlaneM,
-    screen?.floatDepthM,
     analysisRev,
     splRev,
     mlpX,

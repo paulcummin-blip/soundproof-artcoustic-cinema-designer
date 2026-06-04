@@ -154,14 +154,8 @@ export function buildSeatHudSnapshot({
   const roomHeight = finite(heightM, 2.4);
   const halfW = roomWidth / 2;
 
-  // Distance to screen — prioritise the live visual plane over the cached appState value
-  const actualScreenFrontY =
-    Number.isFinite(screen?.screenPlaneY_m) ? screen.screenPlaneY_m :
-    Number.isFinite(screenFrontPlaneM)      ? screenFrontPlaneM :
-    Number.isFinite(screen?.frontPlaneM)    ? screen.frontPlaneM :
-    Number.isFinite(screen?.floatDepthM)    ? screen.floatDepthM :
-    0;
-  const distanceToScreen = Math.abs(seatY - actualScreenFrontY);
+  // Distance to screen (from screen plane)
+  const distanceToScreen = Math.abs(seatY - screenFrontPlaneM);
 
   // Distance to MLP
   let distanceToMLP = null;

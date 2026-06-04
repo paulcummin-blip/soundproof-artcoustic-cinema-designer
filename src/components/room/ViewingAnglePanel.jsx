@@ -19,20 +19,17 @@ export default function ViewingAnglePanel({
   // Pull derived MLP from app state
   const { mlpY_m, screenFrontPlaneM: appScreenFrontPlaneM } = useAppState() || {};
 
-  // Use the live visual screen plane first.
+  // Use the published final screen front plane first.
   // Priority:
-  // 1) screen.screenPlaneY_m  (live visual plane — most accurate)
-  // 2) appState.screenFrontPlaneM
-  // 3) screen.frontPlaneM
-  // 4) screen.floatDepthM
-  // 5) 0
-  const screenFrontPlaneM = Number.isFinite(Number(screen?.screenPlaneY_m))
-    ? Number(screen.screenPlaneY_m)
-    : Number.isFinite(Number(appScreenFrontPlaneM))
-      ? Number(appScreenFrontPlaneM)
-      : Number.isFinite(Number(screen?.frontPlaneM))
-        ? Number(screen.frontPlaneM)
-        : Number(screen?.floatDepthM ?? 0);
+  // 1) appState.screenFrontPlaneM
+  // 2) screen.screenPlaneY_m
+  // 3) screen.floatDepthM
+  // 4) 0
+  const screenFrontPlaneM = Number.isFinite(Number(appScreenFrontPlaneM))
+    ? Number(appScreenFrontPlaneM)
+    : Number.isFinite(Number(screen?.screenPlaneY_m))
+      ? Number(screen.screenPlaneY_m)
+      : Number(screen?.floatDepthM ?? 0);
 
   const rp23Data = useMemo(() => {
     // Prefer live mlpOverride.y (from current seatingPositions — updates live during drag).
@@ -137,7 +134,7 @@ export default function ViewingAnglePanel({
         levelCode, // 'L1'|'L2'|'L3'|'L4'|null
       };
     });
-  }, [seatingPositions, screenFrontPlaneM, screen?.screenPlaneY_m, screen?.frontPlaneM, screen?.floatDepthM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
+  }, [seatingPositions, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
 
   if (!rp23Data) {
     return (
