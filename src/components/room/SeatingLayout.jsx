@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { clampViewingOffset } from "@/components/utils/screenMetrics";
 import RP22GradingPill from '../ui/RP22GradingPill';
 import ViewingAnglePanel from './ViewingAnglePanel';
+import { useAppState } from '@/components/AppStateProvider';
 
 // Single source of truth for target MLP Y computation - now using WIDTH for horizontal FOV
 const RAD = Math.PI / 180;
@@ -149,13 +150,20 @@ export default function SeatingLayout({
     return options;
   }, [rowCount]); // Changed seatingRows to rowCount
 
+  // Pull live screenFrontPlaneM from AppState so liveViewingOffset measures from screen plane, not wall.
+  const { screenFrontPlaneM: appScreenFrontPlaneM } = useAppState() || {};
+  const screenFrontPlaneM = Number.isFinite(Number(appScreenFrontPlaneM))
+    ? Number(appScreenFrontPlaneM)
+    : Number(screen?.floatDepthM ?? 0);
+
   // Validate current mlpBasis against available options
   // Live viewing offset: derived from current seat positions vs the ideal 57.5° MLP Y.
+  // Uses screenFrontPlaneM as roomFrontY so the target distance is measured from the screen face.
   const liveViewingOffset = useMemo(() => {
     if (!mlpOverride || !Number.isFinite(mlpOverride.y) || !screen) return seatingBlockOffset;
-    const idealY = targetMlpY57_5(screen, 0);
+    const idealY = targetMlpY57_5(screen, screenFrontPlaneM);
     return Math.round((mlpOverride.y - idealY) * 100) / 100;
-  }, [mlpOverride, screen, seatingBlockOffset]);
+  }, [mlpOverride, screen, seatingBlockOffset, screenFrontPlaneM]);
 
   const validMlpBasis = useMemo(() => {
     const validValues = mlpOptions.map((opt) => opt.value);
@@ -746,6 +754,13 @@ export default function SeatingLayout({
           </Button>
         </div>
       </div>
+
+      {/* Live Viewing Offset read-out (updates during seat drag) */}
+      {mlpOverride && Number.isFinite(liveViewingOffset) && (
+        <div className="col-span-2 text-xs px-1" style={{ color: '#625143' }}>
+          Live offset from 57.5° target: <span style={{ color: '#1B1A1A', fontWeight: 600 }}>{liveViewingOffset.toFixed(2)} m</span>
+        </div>
+      )}
 
       {/* RSP Reference */}
       <div className="space-y-2">

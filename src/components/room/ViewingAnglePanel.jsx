@@ -83,7 +83,10 @@ export default function ViewingAnglePanel({
       label: rp23Level.label,
       color: rp23Level.color
     };
-  }, [mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio]);
+  // mlpOverride drives effectiveViewerY live during seat drag — must be in deps.
+  // mlpY_m is the fallback when no override exists (updated after mouseup).
+  // seatingPositions triggers recompute on every drag tick via mlpOverride.
+  }, [mlpOverride, mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
 
   if (!rp23Data) {
     return (
@@ -124,7 +127,7 @@ export default function ViewingAnglePanel({
         </div>
 
         <div className="p-4 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7' }}>
-          <div className="text-xs mb-1" style={{ color: '#625143' }}>Viewing Distance</div>
+          <div className="text-xs mb-1" style={{ color: '#625143' }}>Viewing Distance to Screen</div>
           <div className="text-2xl font-bold" style={{ color: '#1B1A1A' }}>
             {rp23Data.distance.toFixed(2)}m
           </div>
