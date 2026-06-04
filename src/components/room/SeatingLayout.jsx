@@ -755,12 +755,7 @@ export default function SeatingLayout({
         </div>
       </div>
 
-      {/* Live Viewing Offset read-out (updates during seat drag) */}
-      {mlpOverride && Number.isFinite(liveViewingOffset) && (
-        <div className="col-span-2 text-xs px-1" style={{ color: '#625143' }}>
-          Live offset from 57.5° target: <span style={{ color: '#1B1A1A', fontWeight: 600 }}>{liveViewingOffset.toFixed(2)} m</span>
-        </div>
-      )}
+
 
       {/* RSP Reference */}
       <div className="space-y-2">
