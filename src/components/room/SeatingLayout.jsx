@@ -151,10 +151,16 @@ export default function SeatingLayout({
   }, [rowCount]); // Changed seatingRows to rowCount
 
   // Pull live screenFrontPlaneM from AppState so liveViewingOffset measures from screen plane, not wall.
+  // Priority order matches ViewingAnglePanel.jsx:
+  // 1. screen.screenPlaneY_m  2. appScreenFrontPlaneM  3. screen.frontPlaneM  4. screen.floatDepthM  5. 0
   const { screenFrontPlaneM: appScreenFrontPlaneM } = useAppState() || {};
-  const screenFrontPlaneM = Number.isFinite(Number(appScreenFrontPlaneM))
-    ? Number(appScreenFrontPlaneM)
-    : Number(screen?.floatDepthM ?? 0);
+  const screenFrontPlaneM = (() => {
+    if (Number.isFinite(Number(screen?.screenPlaneY_m))) return Number(screen.screenPlaneY_m);
+    if (Number.isFinite(Number(appScreenFrontPlaneM))) return Number(appScreenFrontPlaneM);
+    if (Number.isFinite(Number(screen?.frontPlaneM))) return Number(screen.frontPlaneM);
+    if (Number.isFinite(Number(screen?.floatDepthM))) return Number(screen.floatDepthM);
+    return 0;
+  })();
 
   // Validate current mlpBasis against available options
   // Live viewing offset: derived from current seat positions vs the ideal 57.5° MLP Y.
@@ -163,7 +169,8 @@ export default function SeatingLayout({
     if (!mlpOverride || !Number.isFinite(mlpOverride.y) || !screen) return seatingBlockOffset;
     const idealY = targetMlpY57_5(screen, screenFrontPlaneM);
     return Math.round((mlpOverride.y - idealY) * 100) / 100;
-  }, [mlpOverride, screen, seatingBlockOffset, screenFrontPlaneM]);
+  }, [mlpOverride, screen, seatingBlockOffset, screenFrontPlaneM,
+      screen?.screenPlaneY_m, screen?.frontPlaneM, screen?.floatDepthM, appScreenFrontPlaneM]);
 
   const validMlpBasis = useMemo(() => {
     const validValues = mlpOptions.map((opt) => opt.value);
