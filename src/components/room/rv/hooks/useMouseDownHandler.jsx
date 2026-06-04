@@ -249,8 +249,19 @@ export function useMouseDownHandler({
         const seedFront = normaliseSubs(frontSubs, 'front', frontSubsCfg, 0);
         const seedRear  = normaliseSubs(rearSubs,  'rear',  rearSubsCfg,  lengthM);
 
-        draftFrontSubsRef.current = seedFront.map(s => ({ ...s, position: { ...s.position } }));
-        draftRearSubsRef.current = seedRear.map(s => ({ ...s, position: { ...s.position } }));
+        // Normalise draft order so index 0 is always the leftmost sub and index 1
+        // is always the rightmost. This ensures the mirror logic in useSubDragHandler
+        // (which assumes draftArray[0]=left, draftArray[1]=right) is always correct
+        // on the very first grab, before any commit has normalised the stored order.
+        const sortByX = (arr) => {
+          if (arr.length <= 1) return arr;
+          const allValid = arr.every(s => Number.isFinite(s?.position?.x));
+          if (!allValid) return arr;
+          return [...arr].sort((a, b) => a.position.x - b.position.x);
+        };
+
+        draftFrontSubsRef.current = sortByX(seedFront).map(s => ({ ...s, position: { ...s.position } }));
+        draftRearSubsRef.current  = sortByX(seedRear).map(s => ({ ...s, position: { ...s.position } }));
 
         // Signal BassResponse that dragging started
         if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
