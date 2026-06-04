@@ -161,14 +161,14 @@ export default function ViewingAnglePanel({
 
       </div>
 
-      <h3 className="text-base font-medium flex items-center gap-2" style={{ color: '#1B1A1A' }}>
+      <h3 className="text-base font-medium flex items-center gap-2 mb-4" style={{ color: '#1B1A1A' }}>
         <Eye className="w-5 h-5" style={{ color: '#625143' }} />
         Viewing Angle Analysis
       </h3>
 
       {/* Row table — always shown (1 row = single row, 2+ rows = all rows) */}
       {perRowData.length >= 1 && (
-        <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, overflow: 'hidden', marginTop: 4 }}>
+        <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, overflow: 'hidden' }}>
           {/* Header */}
           <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr 70px', gap: 0, backgroundColor: '#EDECEA', padding: '5px 10px' }}>
             {['Row', 'Viewing Angle', 'Distance to Screen', 'RP23'].map(h => (
@@ -202,20 +202,20 @@ export default function ViewingAnglePanel({
                   {`${row.distToScreen.toFixed(2)} m`}
                 </div>
                 <div style={{
-                  fontSize: 17,
-                  fontWeight: 700,
+                  fontSize: '13px',
+                  fontWeight: 600,
                   color: colors.text,
                   backgroundColor: colors.bg,
                   border: `1px solid ${colors.border || colors.bg}`,
-                  borderRadius: 6,
-                  padding: '6px 8px',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
                   textAlign: 'center',
                   whiteSpace: 'nowrap',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minHeight: '36px',
-                  minWidth: '60px'
+                  lineHeight: '1.2',
+                  minWidth: '40px'
                 }}>
                   {levelLabel}
                 </div>
