@@ -166,29 +166,11 @@ export default function ViewingAnglePanel({
         Viewing Angle Analysis
       </h3>
 
-      {(() => {
-        const colors = getLevelColors(rp23Data.level);
-        const label = rp23Data.level >= 1 && rp23Data.level <= 4 ?
-        `RP23 Viewing Angle: Level ${rp23Data.level}` :
-        'RP23 Viewing Angle: FAIL';
-        return (
-          <div style={{
-            border: `1px solid ${colors.border || '#E6E4DD'}`,
-            background: colors.bg,
-            borderRadius: 8,
-            padding: '12px'
-          }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>
-              {label}
-            </div>
-          </div>);
-      })()}
-
       {/* Row table — always shown (1 row = single row, 2+ rows = all rows) */}
       {perRowData.length >= 1 && (
         <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, overflow: 'hidden', marginTop: 4 }}>
           {/* Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr 44px', gap: 0, backgroundColor: '#EDECEA', padding: '5px 10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr 70px', gap: 0, backgroundColor: '#EDECEA', padding: '5px 10px' }}>
             {['Row', 'Viewing Angle', 'Distance to Screen', 'RP23'].map(h => (
               <div key={h} style={{ fontSize: 10, fontWeight: 600, color: '#625143', textAlign: h === 'RP23' ? 'center' : 'left' }}>{h}</div>
             ))}
@@ -204,7 +186,7 @@ export default function ViewingAnglePanel({
                 key={row.rowNumber}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '44px 1fr 1fr 44px',
+                  gridTemplateColumns: '44px 1fr 1fr 70px',
                   gap: 0,
                   padding: '8px 10px',
                   backgroundColor: isEven ? '#F8F8F7' : '#FFFFFF',
@@ -220,15 +202,20 @@ export default function ViewingAnglePanel({
                   {`${row.distToScreen.toFixed(2)} m`}
                 </div>
                 <div style={{
-                  fontSize: 10,
+                  fontSize: 17,
                   fontWeight: 700,
                   color: colors.text,
                   backgroundColor: colors.bg,
                   border: `1px solid ${colors.border || colors.bg}`,
-                  borderRadius: 4,
-                  padding: '2px 4px',
+                  borderRadius: 6,
+                  padding: '6px 8px',
                   textAlign: 'center',
                   whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '36px',
+                  minWidth: '60px'
                 }}>
                   {levelLabel}
                 </div>
