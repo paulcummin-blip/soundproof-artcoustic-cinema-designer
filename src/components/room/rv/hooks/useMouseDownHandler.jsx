@@ -260,8 +260,58 @@ export function useMouseDownHandler({
           return [...arr].sort((a, b) => a.position.x - b.position.x);
         };
 
-        draftFrontSubsRef.current = sortByX(seedFront).map(s => ({ ...s, position: { ...s.position } }));
-        draftRearSubsRef.current  = sortByX(seedRear).map(s => ({ ...s, position: { ...s.position } }));
+        // --- Remap subIndex after sorting ---
+        // The rendered id (e.g. "front-sub-1") maps to the UNSORTED array order.
+        // After sorting, the same physical sub may be at a different index.
+        // We must update `id` to match its new sorted position so that
+        // useSubDragHandler parses the correct index from the canonical id.
+        const mClickedFront = typeof id === 'string' && id.match(/^front-sub-(\d+)$/);
+        const mClickedRear  = typeof id === 'string' && id.match(/^rear-sub-(\d+)$/);
+
+        if (mClickedFront) {
+          const originalIndex = Number(mClickedFront[1]);
+          // Capture the clicked sub object from the unsorted seed (by original index)
+          const clickedSubObj = seedFront[originalIndex];
+          // Sort and assign draft
+          const sortedFront = sortByX(seedFront);
+          draftFrontSubsRef.current = sortedFront.map(s => ({ ...s, position: { ...s.position } }));
+          // Find the new index of the clicked sub in the sorted array (by position.x identity)
+          if (clickedSubObj) {
+            const newIndex = sortedFront.findIndex(
+              s => s === clickedSubObj || (
+                Number.isFinite(clickedSubObj.position?.x) &&
+                Math.abs(s.position.x - clickedSubObj.position.x) < 0.0001
+              )
+            );
+            if (newIndex !== -1 && newIndex !== originalIndex) {
+              // Rewrite id so useSubDragHandler uses the correct sorted index
+              id = `front-sub-${newIndex}`;
+            }
+          }
+        } else {
+          draftFrontSubsRef.current = sortByX(seedFront).map(s => ({ ...s, position: { ...s.position } }));
+        }
+
+        if (mClickedRear) {
+          const originalIndex = Number(mClickedRear[1]);
+          const clickedSubObj = seedRear[originalIndex];
+          const sortedRear = sortByX(seedRear);
+          draftRearSubsRef.current = sortedRear.map(s => ({ ...s, position: { ...s.position } }));
+          if (clickedSubObj) {
+            const newIndex = sortedRear.findIndex(
+              s => s === clickedSubObj || (
+                Number.isFinite(clickedSubObj.position?.x) &&
+                Math.abs(s.position.x - clickedSubObj.position.x) < 0.0001
+              )
+            );
+            if (newIndex !== -1 && newIndex !== originalIndex) {
+              id = `rear-sub-${newIndex}`;
+            }
+          }
+        } else if (!mClickedFront) {
+          // Not a front or rear sub click — still sort rear draft for consistency
+          draftRearSubsRef.current = sortByX(seedRear).map(s => ({ ...s, position: { ...s.position } }));
+        }
 
         // Signal BassResponse that dragging started
         if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
