@@ -1265,8 +1265,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const screenWidthM = screenWidthInches * 0.0254;
       
       // Distance from seat to screen (screen is at Y coordinate near front of room)
-      // Priority: live visual plane > saved front plane > float depth > 0
-      const screenFrontY = screen?.screenPlaneY_m || screen?.frontPlaneM || screen?.floatDepthM || 0;
+      const screenFrontY = screen?.frontPlaneM || 0;
       const seatY = seat.y || 0;
       const distanceToScreenM = Math.abs(seatY - screenFrontY);
       
@@ -1344,8 +1343,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     p15ConstructionLevel,
     screen?.mountMode,
     screen?.floatDepthM,
-    screen?.screenPlaneY_m,
-    screen?.frontPlaneM,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };
