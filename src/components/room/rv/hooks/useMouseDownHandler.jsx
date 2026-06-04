@@ -287,6 +287,17 @@ export function useMouseDownHandler({
               // Rewrite id so useSubDragHandler uses the correct sorted index
               id = `front-sub-${newIndex}`;
             }
+            // Recalculate dragOffsetRoomRef from the selected sorted draft sub.
+            // This must happen AFTER sorting and id remap so the offset matches
+            // the physical sub that handleSubDrag will actually move.
+            const remappedIndex = newIndex !== -1 ? newIndex : originalIndex;
+            const selectedDraftSub = draftFrontSubsRef.current[remappedIndex];
+            if (selectedDraftSub?.position) {
+              dragOffsetRoomRef.current = {
+                x: selectedDraftSub.position.x - cursorRoom.x,
+                y: 0, // front wall: y is always pinned by handleSubDrag
+              };
+            }
           }
         } else {
           draftFrontSubsRef.current = sortByX(seedFront).map(s => ({ ...s, position: { ...s.position } }));
@@ -306,6 +317,15 @@ export function useMouseDownHandler({
             );
             if (newIndex !== -1 && newIndex !== originalIndex) {
               id = `rear-sub-${newIndex}`;
+            }
+            // Recalculate dragOffsetRoomRef from the selected sorted draft sub.
+            const remappedIndex = newIndex !== -1 ? newIndex : originalIndex;
+            const selectedDraftSub = draftRearSubsRef.current[remappedIndex];
+            if (selectedDraftSub?.position) {
+              dragOffsetRoomRef.current = {
+                x: selectedDraftSub.position.x - cursorRoom.x,
+                y: 0, // rear wall: y is always pinned by handleSubDrag
+              };
             }
           }
         } else if (!mClickedFront) {
