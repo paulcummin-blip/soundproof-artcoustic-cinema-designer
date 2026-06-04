@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Eye, Ruler } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
-import { calculateViewingAngle, assignRP23Level } from '@/components/utils/viewingAngleUtils';
+import { calculateViewingAngle, assignRP23Level, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { Switch } from '@/components/ui/switch';
@@ -88,6 +88,55 @@ export default function ViewingAnglePanel({
   // seatingPositions triggers recompute on every drag tick via mlpOverride.
   }, [mlpOverride, mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
 
+  // Per-row analysis — groups seatingPositions by rowNumber, computes row centre, FOV, distance, level.
+  // Updates live because seatingPositions changes on every drag tick (via mlpOverride path upstream).
+  const perRowData = useMemo(() => {
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return [];
+
+    const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
+    const tvKey = screen?.tvPresetKey;
+    const tvMm = Number(screen?.tvWidthMm);
+    const visibleWidthInches = (() => {
+      if (tvKey && TV_KEY_TO_INCHES[tvKey]) return TV_KEY_TO_INCHES[tvKey];
+      if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
+      return Number(screen?.visibleWidthInches) || 100;
+    })();
+
+    // Group seats by rowNumber (key used: seat.rowNumber, integer 1-based)
+    const byRow = {};
+    for (const seat of seatingPositions) {
+      const rn = seat.rowNumber ?? 1;
+      if (!byRow[rn]) byRow[rn] = [];
+      byRow[rn].push(seat);
+    }
+
+    const rowNumbers = Object.keys(byRow).map(Number).sort((a, b) => a - b);
+    if (rowNumbers.length < 2) return []; // only show table for 2+ rows
+
+    return rowNumbers.map(rn => {
+      const seats = byRow[rn];
+      // Row centre = average X and Y of all seats in that row
+      const centreX = seats.reduce((s, seat) => s + (Number(seat.x) || 0), 0) / seats.length;
+      const centreY = seats.reduce((s, seat) => s + (Number(seat.y) || 0), 0) / seats.length;
+
+      const distToScreen = Math.max(0, centreY - screenFrontPlaneM);
+      const angle = calculateViewingAngle(
+        { y: centreY },
+        visibleWidthInches,
+        screen?.aspectRatio || '16:9',
+        { y: screenFrontPlaneM }
+      );
+      const levelCode = angle != null ? rp23LevelForAngleDeg(angle) : null;
+
+      return {
+        rowNumber: rn,
+        angle,
+        distToScreen,
+        levelCode, // 'L1'|'L2'|'L3'|'L4'|null
+      };
+    });
+  }, [seatingPositions, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
+
   if (!rp23Data) {
     return (
       <div className="p-4 rounded-lg border border-gray-200 bg-gray-50">
@@ -150,8 +199,61 @@ export default function ViewingAnglePanel({
               {label}
             </div>
           </div>);
-
       })()}
+
+      {/* Multi-row table — only rendered when 2+ rows exist */}
+      {perRowData.length >= 2 && (
+        <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, overflow: 'hidden', marginTop: 4 }}>
+          {/* Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 1fr 48px', gap: 0, backgroundColor: '#EDECEA', padding: '5px 10px' }}>
+            {['Row', 'H FOV', 'Dist. to Screen', 'RP23'].map(h => (
+              <div key={h} style={{ fontSize: 10, fontWeight: 600, color: '#625143', textAlign: h === 'RP23' ? 'center' : 'left' }}>{h}</div>
+            ))}
+          </div>
+          {/* Rows */}
+          {perRowData.map((row, idx) => {
+            const levelNum = row.levelCode ? parseInt(row.levelCode.replace('L', ''), 10) : 0;
+            const colors = getLevelColors(levelNum);
+            const levelLabel = row.levelCode ?? 'Fail';
+            const isEven = idx % 2 === 1;
+            return (
+              <div
+                key={row.rowNumber}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '48px 1fr 1fr 48px',
+                  gap: 0,
+                  padding: '6px 10px',
+                  backgroundColor: isEven ? '#F8F8F7' : '#FFFFFF',
+                  borderTop: '1px solid #E6E4DD',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ fontSize: 11, color: '#1B1A1A', fontWeight: 600 }}>R{row.rowNumber}</div>
+                <div style={{ fontSize: 12, color: '#1B1A1A' }}>
+                  {row.angle != null ? `${row.angle.toFixed(1)}°` : '—'}
+                </div>
+                <div style={{ fontSize: 12, color: '#1B1A1A' }}>
+                  {`${row.distToScreen.toFixed(2)} m`}
+                </div>
+                <div style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: colors.text,
+                  backgroundColor: colors.bg,
+                  border: `1px solid ${colors.border || colors.bg}`,
+                  borderRadius: 4,
+                  padding: '2px 4px',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {levelLabel}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>);
 
 }
