@@ -20,8 +20,8 @@ export function useSubDragHandler({
   draftFrontSubsRef,
   draftRearSubsRef,
   setSubDragTick,
-  idleCommitTimerRef,
-  commitDraftSubPositions,
+  // idleCommitTimerRef and commitDraftSubPositions intentionally omitted:
+  // config is committed once on mouseup via useMouseUpHandler, not during drag.
 }) {
   const handleSubDrag = useCallback((subId, newCanvasPos) => {
     // subId is canonical: "front-sub-0", "rear-sub-1", etc.
@@ -118,17 +118,11 @@ export function useSubDragHandler({
       }
     }
 
-    // Reset 200ms idle timer (semi-live commit)
-    if (idleCommitTimerRef.current) {
-      clearTimeout(idleCommitTimerRef.current);
-    }
-
-    idleCommitTimerRef.current = setTimeout(() => {
-      commitDraftSubPositions();
-    }, 200);
+    // No config commit during mousemove — draft refs are the live render source.
+    // commitDraftSubPositions() is called once on mouseup via useMouseUpHandler.
   }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM,
       draggedSubTypeRef, draggedSubWallRef, draftFrontSubsRef, draftRearSubsRef,
-      setSubDragTick, idleCommitTimerRef, commitDraftSubPositions]);
+      setSubDragTick]);
 
   return { handleSubDrag };
 }
