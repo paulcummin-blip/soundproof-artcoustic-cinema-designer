@@ -343,6 +343,20 @@ function RoomDesignerWithState() {
     appState?.setExtraSurroundCount
   ]);
 
+  // Sync screenFrontPlaneM -> screen.screenPlaneY_m so ViewingAnglePanel always reads live value
+  const _lastSyncedScreenPlaneRef = useRef(null);
+  useEffect(() => {
+    const v = appState?.screenFrontPlaneM;
+    if (!Number.isFinite(v)) return;
+    const rounded = Math.round(v * 1000) / 1000;
+    if (_lastSyncedScreenPlaneRef.current === rounded) return;
+    _lastSyncedScreenPlaneRef.current = rounded;
+    _setScreen?.((prev) => {
+      if (!prev || prev.screenPlaneY_m === rounded) return prev;
+      return { ...prev, screenPlaneY_m: rounded };
+    });
+  }, [appState?.screenFrontPlaneM, _setScreen]);
+
   // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
 
   // ⚠️ Hoisted memos so they’re initialized before any effects that depend on them
