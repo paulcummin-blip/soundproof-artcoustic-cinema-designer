@@ -73,7 +73,12 @@ export default function getSpeakerWallDepthCm({
   const modelDepthM = _isNum(meta?.depthM) ? meta.depthM : 0.082;
 
   if (isLcrRole(role)) {
-    const totalDepthM = WALL_BUFFER_M + modelDepthM;
+    const yawDeg = getSpeakerYawDeg({ speaker, role, mlp, appState });
+    const yawRad = (yawDeg || 0) * (Math.PI / 180);
+    const projectedIntrusionM =
+      modelDepthM * Math.abs(Math.cos(yawRad)) +
+      modelWidthM * Math.abs(Math.sin(yawRad));
+    const totalDepthM = WALL_BUFFER_M + projectedIntrusionM;
     return _isNum(totalDepthM) ? Math.round(totalDepthM * 100) : null;
   }
 
