@@ -111,7 +111,6 @@ export default function ViewingAnglePanel({
     }
 
     const rowNumbers = Object.keys(byRow).map(Number).sort((a, b) => a - b);
-    if (rowNumbers.length < 2) return []; // only show table for 2+ rows
 
     return rowNumbers.map(rn => {
       const seats = byRow[rn];
@@ -167,22 +166,6 @@ export default function ViewingAnglePanel({
         Viewing Angle Analysis
       </h3>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-4 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7' }}>
-          <div className="text-xs mb-1" style={{ color: '#625143' }}>Horizontal FOV</div>
-          <div className="text-2xl font-bold" style={{ color: '#1B1A1A' }}>
-            {rp23Data.angle.toFixed(1)}°
-          </div>
-        </div>
-
-        <div className="p-4 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7' }}>
-          <div className="text-xs mb-1" style={{ color: '#625143' }}>Viewing Distance to Screen</div>
-          <div className="text-2xl font-bold" style={{ color: '#1B1A1A' }}>
-            {rp23Data.distance.toFixed(2)}m
-          </div>
-        </div>
-      </div>
-
       {(() => {
         const colors = getLevelColors(rp23Data.level);
         const label = rp23Data.level >= 1 && rp23Data.level <= 4 ?
@@ -201,12 +184,12 @@ export default function ViewingAnglePanel({
           </div>);
       })()}
 
-      {/* Multi-row table — only rendered when 2+ rows exist */}
-      {perRowData.length >= 2 && (
+      {/* Row table — always shown (1 row = single row, 2+ rows = all rows) */}
+      {perRowData.length >= 1 && (
         <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, overflow: 'hidden', marginTop: 4 }}>
           {/* Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 1fr 48px', gap: 0, backgroundColor: '#EDECEA', padding: '5px 10px' }}>
-            {['Row', 'H FOV', 'Dist. to Screen', 'RP23'].map(h => (
+          <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr 44px', gap: 0, backgroundColor: '#EDECEA', padding: '5px 10px' }}>
+            {['Row', 'Viewing Angle', 'Distance to Screen', 'RP23'].map(h => (
               <div key={h} style={{ fontSize: 10, fontWeight: 600, color: '#625143', textAlign: h === 'RP23' ? 'center' : 'left' }}>{h}</div>
             ))}
           </div>
@@ -221,19 +204,19 @@ export default function ViewingAnglePanel({
                 key={row.rowNumber}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '48px 1fr 1fr 48px',
+                  gridTemplateColumns: '44px 1fr 1fr 44px',
                   gap: 0,
-                  padding: '6px 10px',
+                  padding: '8px 10px',
                   backgroundColor: isEven ? '#F8F8F7' : '#FFFFFF',
                   borderTop: '1px solid #E6E4DD',
                   alignItems: 'center',
                 }}
               >
-                <div style={{ fontSize: 11, color: '#1B1A1A', fontWeight: 600 }}>R{row.rowNumber}</div>
-                <div style={{ fontSize: 12, color: '#1B1A1A' }}>
+                <div style={{ fontSize: 13, color: '#625143', fontWeight: 600 }}>R{row.rowNumber}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#1B1A1A', letterSpacing: '-0.5px' }}>
                   {row.angle != null ? `${row.angle.toFixed(1)}°` : '—'}
                 </div>
-                <div style={{ fontSize: 12, color: '#1B1A1A' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#1B1A1A', letterSpacing: '-0.5px' }}>
                   {`${row.distToScreen.toFixed(2)} m`}
                 </div>
                 <div style={{
