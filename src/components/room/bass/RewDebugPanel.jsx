@@ -444,11 +444,27 @@ function VectorBreakdown686({ stepDebug }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export default function RewDebugPanel({ stepDebug, selectedSeatIds, disableModalPropagationPhase = false }) {
+export default function RewDebugPanel({ stepDebug, selectedSeatIds, disableModalPropagationPhase = false, propagationPhaseScale }) {
   if (!stepDebug?.length) return null;
 
   return (
     <div style={{ border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb', padding: 12, fontSize: 11, fontFamily: 'monospace' }}>
+      {/* Temporary experiment banner */}
+      {propagationPhaseScale === 1.0 && (
+        <div style={{
+          marginBottom: 10,
+          padding: '6px 10px',
+          borderRadius: 5,
+          background: '#fef08a',
+          border: '2px solid #ca8a04',
+          color: '#713f12',
+          fontWeight: 700,
+          fontSize: 11,
+          letterSpacing: '0.02em',
+        }}>
+          ⚗ Propagation Phase Test Active (1.0) — Temporary REW parity experiment only
+        </div>
+      )}
       {/* Header */}
       <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 2 }}>
         REW Step Debug — seat [{selectedSeatIds?.[0] ?? '—'}], sub[0]
