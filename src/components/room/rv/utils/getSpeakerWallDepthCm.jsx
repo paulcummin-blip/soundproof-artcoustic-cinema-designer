@@ -46,6 +46,10 @@ function getSpeakerYawDeg({ speaker, role, mlp, appState }) {
   const aimSideSurrounds = appState?.aimSideSurroundsAtMLP || false;
   const aimRearSurrounds = appState?.aimRearSurroundsAtMLP || false;
 
+  if (isLcrRole(role)) {
+    return appState?.lcrAimMode === "angled" ? getAimYawDeg(speaker, mlp) : 0;
+  }
+
   if (isFrontWideRole(role) && aimFrontWides) return getAimYawDeg(speaker, mlp);
   if (isSurroundRole(role) && aimSideSurrounds) return getAimYawDeg(speaker, mlp);
   if (isRearRole(role) && aimRearSurrounds) return getAimYawDeg(speaker, mlp);
