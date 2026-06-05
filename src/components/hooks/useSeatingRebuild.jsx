@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { buildRowCenters, distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 
 const EQ_EPS = 0.001;
@@ -48,6 +48,9 @@ export function useSeatingRebuild({
   stableDimensions,
   _rowEarHeights,
 }) {
+  // Tracks the last MLP Y seen by this hook so we can detect screen-plane shifts
+  const prevMlpYRef = useRef(null);
+
   // Helper: get ear height for a 1-based row index, falling back to step pattern
   const getRowZ = (rowIndex) => {
     const h = _rowEarHeights?.[rowIndex];
@@ -180,6 +183,53 @@ export function useSeatingRebuild({
     }
 
     const isLoadedProject = loadState?.phase === "loaded" && !!hasProjectId;
+
+    // ── SCREEN-PLANE DELTA SHIFT ───────────────────────────────────────────────
+    // When the MLP moves because the screen plane shifted (e.g. LCR angling),
+    // shift the existing seating block by the same delta instead of rebuilding.
+    // This preserves all manual X positions, row shape, IDs, and flags.
+    // Runs BEFORE the loaded-project guard so it fires even for protected projects.
+    const currentMlpY = Number.isFinite(appState?.mlpY_m) ? appState.mlpY_m : null;
+    if (
+      currentMlpY !== null &&
+      prevMlpYRef.current !== null &&
+      currentSeats.length > 0 &&
+      !userHasChangedSeatingSinceLoad &&
+      !didUserRequestResetRef.current &&
+      !(appState?.roomResetEpoch > 0)
+    ) {
+      const deltaY = currentMlpY - prevMlpYRef.current;
+      if (Math.abs(deltaY) > EQ_EPS) {
+        const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
+        const MIN_Y = 0.40;
+        const MAX_Y = len - 0.40;
+        const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
+
+        const shiftedSeats = currentSeats.map(s => ({
+          ...s,
+          y: clampY(Number(s.y) + deltaY),
+        }));
+
+        if (typeof appState?.setSeatingPositions === 'function') {
+          appState.setSeatingPositions(prev => seatsEqualWithin1mm(prev, shiftedSeats) ? prev : shiftedSeats);
+        }
+
+        if (typeof appState?.setRowCentersM === 'function' && Array.isArray(appState?.rowCentersM)) {
+          const shiftedCenters = appState.rowCentersM.map(c => clampY(Number(c) + deltaY));
+          if (!arraysEqualWithin1mm(appState.rowCentersM, shiftedCenters)) {
+            appState.setRowCentersM(shiftedCenters);
+          }
+        }
+
+        prevMlpYRef.current = currentMlpY;
+        return;
+      }
+    }
+    // Always keep prevMlpYRef in sync after any hydrated render
+    if (currentMlpY !== null) {
+      prevMlpYRef.current = currentMlpY;
+    }
+    // ── END SCREEN-PLANE DELTA SHIFT ──────────────────────────────────────────
 
     if (
       isLoadedProject &&
