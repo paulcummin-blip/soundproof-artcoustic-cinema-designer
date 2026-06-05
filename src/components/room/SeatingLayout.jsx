@@ -753,9 +753,6 @@ export default function SeatingLayout({
             +
           </Button>
         </div>
-        <div className="text-xs text-gray-500 mt-1">
-          Actual offset from 57.5° target: {liveViewingOffset >= 0 ? '+' : ''}{liveViewingOffset.toFixed(2)} m
-        </div>
       </div>
 
 
