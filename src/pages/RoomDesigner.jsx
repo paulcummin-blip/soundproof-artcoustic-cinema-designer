@@ -1778,6 +1778,8 @@ function RoomDesignerWithState() {
                   onLcrAngleComputed={setLcrAngleDeg}
                   rowTarget={null}
                   viewingDistanceOffsetM={_seatingBlockOffset}
+                  seatingBlockOffset={_seatingBlockOffset}
+                  onSeatingBlockOffsetChange={setSeatingBlockOffsetGuarded}
                   mlpBasis={seatingArrangementBasis}
                   rp22AnglesEnabled={_overlays?.RP22_ANGLES}
                   allSeatSplMetrics={allSeatSplMetrics}

@@ -7,7 +7,7 @@ const SEAT_MARGIN_M = 0.3;
  * Drags ALL seats as one rigid block, forward/backward only (Y-axis).
  * X values are never changed. Clamped so no seat exits the room.
  */
-export function useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, lengthM }) {
+export function useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, lengthM, onSeatingBlockOffsetChange, seatingBlockOffset }) {
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
 
@@ -41,13 +41,22 @@ export function useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, length
 
       if (Math.abs(deltaY) < 0.0001) return prev;
 
+      // Update seatingBlockOffset by the same deltaY — only during actual seat drag
+      if (typeof onSeatingBlockOffsetChange === 'function' && Math.abs(deltaY) > 0.005) {
+        const currentOffset = Number.isFinite(Number(seatingBlockOffset)) ? Number(seatingBlockOffset) : 0;
+        const nextOffset = Math.round((currentOffset + deltaY) * 100) / 100;
+        if (Number.isFinite(nextOffset)) {
+          onSeatingBlockOffsetChange(nextOffset);
+        }
+      }
+
       // Apply deltaY to every seat's Y; never touch X
       return prev.map(seat => ({
         ...seat,
         y: Number(seat.y ?? seat.position?.y ?? 0) + deltaY,
       }));
     });
-  }, [onSetSeatingPositions, canvasToRoom, lengthM]);
+  }, [onSetSeatingPositions, canvasToRoom, lengthM, onSeatingBlockOffsetChange, seatingBlockOffset]);
 
   return { handleSeatDrag };
 }
