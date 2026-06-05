@@ -144,3 +144,32 @@ export function Evolve84FaceIcon({ x, y, width, height }) {
     </svg>
   );
 }
+
+// ─── Artcoustic C Series face icons ──────────────────────────────────────────
+
+/**
+ * Artcoustic C4-1 soundbar — physical 1711 × 120 mm
+ * viewBox aspect ratio 1711:120 preserves exact proportions at all zoom levels.
+ */
+export function C41FaceIcon({ x, y, width, height }) {
+  return (
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox="0 0 1711 120"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <image
+        x="0"
+        y="0"
+        width="1711"
+        height="120"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/2adee2973_Screenshot2026-06-05at132314.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </svg>
+  );
+}
