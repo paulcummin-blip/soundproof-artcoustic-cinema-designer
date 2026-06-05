@@ -400,11 +400,14 @@ function RoomDesignerWithState() {
     const screenFrontPlaneM_raw = appState?.screenFrontPlaneM;
     // Use real value when available; otherwise derive a first-pass fallback so the
     // green dot is positioned correctly on first load without waiting for RV to publish.
-    const screenFrontPlaneM = Number.isFinite(screenFrontPlaneM_raw)
-      ? Number(screenFrontPlaneM_raw)
-      : (Number.isFinite(Number(_screen?.screenPlaneY_m)) && Number(_screen?.screenPlaneY_m) > 0
-          ? Number(_screen?.screenPlaneY_m)
-          : Number(_screen?.floatDepthM) || 0.20);
+    const screenFrontPlaneM =
+      (Number.isFinite(screenFrontPlaneM_raw) && screenFrontPlaneM_raw > 0)
+        ? Number(screenFrontPlaneM_raw)
+        : (Number.isFinite(Number(_screen?.screenPlaneY_m)) && Number(_screen?.screenPlaneY_m) > 0
+            ? Number(_screen?.screenPlaneY_m)
+            : (Number.isFinite(Number(_screen?.floatDepthM)) && Number(_screen?.floatDepthM) > 0
+                ? Number(_screen?.floatDepthM)
+                : 0.20));
 
     const screenVisibleWidthM =
       Number(screenVisibleWidthInchesEffective) * 0.0254;
@@ -1778,8 +1781,6 @@ function RoomDesignerWithState() {
                   onLcrAngleComputed={setLcrAngleDeg}
                   rowTarget={null}
                   viewingDistanceOffsetM={_seatingBlockOffset}
-                  seatingBlockOffset={_seatingBlockOffset}
-                  onSeatingBlockOffsetChange={setSeatingBlockOffsetGuarded}
                   mlpBasis={seatingArrangementBasis}
                   rp22AnglesEnabled={_overlays?.RP22_ANGLES}
                   allSeatSplMetrics={allSeatSplMetrics}
