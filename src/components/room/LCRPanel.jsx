@@ -135,9 +135,12 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
 
     const defaultY = 0.20;
     const lcrHeightM = Number(splConfig?.lcrHeightM);
-    const defaultZ = Number.isFinite(lcrHeightM)
-      ? lcrHeightM
-      : roomH * 0.5;
+    const lcrLRHeightM = Number(splConfig?.lcrLRHeightM);
+    const defaultZ = Number.isFinite(lcrHeightM) ? lcrHeightM : roomH * 0.5;
+    // In center_only mode, L/R use their own stored height if available
+    const defaultLRZ = (frontStageMode === 'center_only' && Number.isFinite(lcrLRHeightM))
+      ? lcrLRHeightM
+      : defaultZ;
     const spread = Math.min(1.2, roomW * 0.22);
     const midX = roomW / 2;
 
@@ -174,7 +177,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
           role: 'FL',
           id: FL.id || 'FL-1',
           model: baseModelLabel,
-          position: { ...(FL.position || { x: midX - spread, y: defaultY, z: defaultZ }), z: defaultZ },
+          position: { ...(FL.position || { x: midX - spread, y: defaultY, z: defaultLRZ }), z: defaultLRZ },
           rotation: FL.rotation || { x: 0, y: 0, z: 0 },
         },
         {
@@ -190,7 +193,7 @@ function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabe
           role: 'FR',
           id: FR.id || 'FR-1',
           model: baseModelLabel,
-          position: { ...(FR.position || { x: midX + spread, y: defaultY, z: defaultZ }), z: defaultZ },
+          position: { ...(FR.position || { x: midX + spread, y: defaultY, z: defaultLRZ }), z: defaultLRZ },
           rotation: FR.rotation || { x: 0, y: 0, z: 0 },
         },
       ];
@@ -331,6 +334,8 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const [soundbarModel, setSoundbarModel] = useState(derivedSoundbarModel);
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
   const [lcrHeightInputValue, setLcrHeightInputValue] = useState(String(clampLcrHeight(Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : defaultLcrHeightM).toFixed(2)));
+  // Separate L/R height for center_only mode (FC uses lcrHeightInputValue)
+  const [lrHeightInputValue, setLrHeightInputValue] = useState(String(clampLcrHeight(Number.isFinite(Number(splConfig?.lcrLRHeightM)) ? Number(splConfig.lcrLRHeightM) : defaultLcrHeightM).toFixed(2)));
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
@@ -350,6 +355,15 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     const next = clampLcrHeight(Number.isFinite(stored) ? stored : defaultLcrHeightM);
     setLcrHeightInputValue(String(Number(next.toFixed(2))));
   }, [splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight]);
+
+  useEffect(() => {
+    // Prefer saved lcrLRHeightM, fall back to actual FL speaker z, then default
+    const stored = Number(splConfig?.lcrLRHeightM);
+    const flZ = Number(getByRole('FL')?.position?.z);
+    const fallback = Number.isFinite(flZ) ? flZ : defaultLcrHeightM;
+    const next = clampLcrHeight(Number.isFinite(stored) ? stored : fallback);
+    setLrHeightInputValue(String(Number(next.toFixed(2))));
+  }, [splConfig?.lcrLRHeightM, defaultLcrHeightM, clampLcrHeight, getByRole]);
 
   const handleLcrPowerChange = useCallback((e) => {
     const newValue = e.target.value;
@@ -378,15 +392,31 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
   const updatePlacedLcrHeight = useCallback((heightM) => {
     const rolesToUpdate = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
-
-    if (rolesToUpdate.size === 0) return;
-
     setSpeakers?.((prev) => (Array.isArray(prev) ? prev.map((speaker) => {
       const role = getCanonicalRole(speaker?.role);
       if (!rolesToUpdate.has(role) || !speaker?.position) return speaker;
       return { ...speaker, position: { ...speaker.position, z: heightM } };
     }) : prev));
-  }, [frontStageMode, setSpeakers]);
+  }, [setSpeakers]);
+
+  // Update only FL/FR heights (used in center_only mode)
+  const updatePlacedLRHeight = useCallback((heightM) => {
+    const lrRoles = new Set(['FL', 'FR', 'L', 'R']);
+    setSpeakers?.((prev) => (Array.isArray(prev) ? prev.map((speaker) => {
+      const role = getCanonicalRole(speaker?.role);
+      if (!lrRoles.has(role) || !speaker?.position) return speaker;
+      return { ...speaker, position: { ...speaker.position, z: heightM } };
+    }) : prev));
+  }, [setSpeakers]);
+
+  // Update only FC height (used in center_only mode)
+  const updatePlacedFCHeight = useCallback((heightM) => {
+    setSpeakers?.((prev) => (Array.isArray(prev) ? prev.map((speaker) => {
+      const role = getCanonicalRole(speaker?.role);
+      if ((role !== 'FC' && role !== 'C') || !speaker?.position) return speaker;
+      return { ...speaker, position: { ...speaker.position, z: heightM } };
+    }) : prev));
+  }, [setSpeakers]);
 
   // Acoustic centre guidance (read-only, no state writes)
   const acousticCentreGuidance = useMemo(() => {
@@ -531,10 +561,17 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         ? (CENTER_ONLY_SOUNDBAR_LABELS.includes(soundbarModel) ? soundbarModel : CENTER_ONLY_SOUNDBAR_LABELS[0])
         : (INTEGRATED_LCR_SOUNDBAR_LABELS.includes(soundbarModel) ? soundbarModel : INTEGRATED_LCR_SOUNDBAR_LABELS[0]);
 
+    // When entering center_only mode, seed L/R height from the current shared height if not yet set
+    if (nextMode === 'center_only' && !Number.isFinite(Number(splConfig?.lcrLRHeightM))) {
+      const currentH = clampLcrHeight(Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : defaultLcrHeightM);
+      setLrHeightInputValue(String(Number(currentH.toFixed(2))));
+      updateGlobalSpl?.({ lcrLRHeightM: currentH });
+    }
+
     setFrontStageMode(nextMode);
     setSoundbarModel(nextSoundbarModel);
     applyFrontStage(lcrModel, nextMode, nextSoundbarModel);
-  }, [applyFrontStage, lcrModel, soundbarModel]);
+  }, [applyFrontStage, lcrModel, soundbarModel, splConfig?.lcrLRHeightM, splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight, updateGlobalSpl]);
 
   const onChooseSoundbarModel = useCallback((modelLabel) => {
     if (!soundbarOptions.some(opt => opt.label === modelLabel)) return;
@@ -638,27 +675,67 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
         </div>
       </div>
 
-      <div className="space-y-2 mt-4">
-        <Label className="text-xs text-[#625143]">LCR height from floor (to middle of speaker)</Label>
-        <StepperInput
-          value={Number(lcrHeightInputValue) || 0}
-          step={0.01}
-          min={0.2}
-          max={roomH - 0.2}
-          disabled={disabled}
-          onChange={(val) => {
-            const clamped = clampLcrHeight(val);
-            setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
-            updateGlobalSpl?.({ lcrHeightM: clamped });
-            updatePlacedLcrHeight(clamped);
-          }}
-        />
-        {hasLcrSubClash && (
-          <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
-        )}
-      </div>
+      {frontStageMode === 'center_only' ? (
+        <div className="space-y-3 mt-4">
+          <div className="space-y-2">
+            <Label className="text-xs text-[#625143]">Left / Right height from floor (to middle of speaker)</Label>
+            <StepperInput
+              value={Number(lrHeightInputValue) || 0}
+              step={0.01}
+              min={0.2}
+              max={roomH - 0.2}
+              disabled={disabled}
+              onChange={(val) => {
+                const clamped = clampLcrHeight(val);
+                setLrHeightInputValue(String(Number(clamped.toFixed(2))));
+                updateGlobalSpl?.({ lcrLRHeightM: clamped });
+                updatePlacedLRHeight(clamped);
+              }}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>
+            <StepperInput
+              value={Number(lcrHeightInputValue) || 0}
+              step={0.01}
+              min={0.2}
+              max={roomH - 0.2}
+              disabled={disabled}
+              onChange={(val) => {
+                const clamped = clampLcrHeight(val);
+                setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+                updateGlobalSpl?.({ lcrHeightM: clamped });
+                updatePlacedFCHeight(clamped);
+              }}
+            />
+          </div>
+          {hasLcrSubClash && (
+            <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2 mt-4">
+          <Label className="text-xs text-[#625143]">LCR height from floor (to middle of speaker)</Label>
+          <StepperInput
+            value={Number(lcrHeightInputValue) || 0}
+            step={0.01}
+            min={0.2}
+            max={roomH - 0.2}
+            disabled={disabled}
+            onChange={(val) => {
+              const clamped = clampLcrHeight(val);
+              setLcrHeightInputValue(String(Number(clamped.toFixed(2))));
+              updateGlobalSpl?.({ lcrHeightM: clamped });
+              updatePlacedLcrHeight(clamped);
+            }}
+          />
+          {hasLcrSubClash && (
+            <p className="text-xs font-medium text-red-600">⚠ Speaker and subwoofer clashing</p>
+          )}
+        </div>
+      )}
 
-      {activeHeightGuidance?.isValid && (() => {
+      {frontStageMode !== 'center_only' && activeHeightGuidance?.isValid && (() => {
         const { status, minHeightM, maxHeightM, idealHeightM, currentAcousticCentreM, placementOffsetM, mode } = activeHeightGuidance;
         const statusColor = status === 'ideal' ? '#2d7a4f' : status === 'below' || status === 'above' ? '#b45309' : '#6b7280';
         const statusLabel = status === 'ideal' ? 'Ideal' : status === 'below' ? 'Below range' : status === 'above' ? 'Above range' : 'Unknown';

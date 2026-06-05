@@ -981,7 +981,10 @@ function useDesignerState() {
         globalEqHeadroomDb: autosaveConfig.globalEqHeadroomDb || 0,
         radiationMode: autosaveConfig.radiationMode || 'half-space',
         p13Mode: autosaveConfig.p13Mode || 'minimum',
-        perRole: autosaveConfig.perRole || {}
+        perRole: autosaveConfig.perRole || {},
+        // Separate L/R and centre heights for center_only soundbar override mode
+        lcrHeightM: autosaveConfig.lcrHeightM,
+        lcrLRHeightM: autosaveConfig.lcrLRHeightM,
       };
     });
 
