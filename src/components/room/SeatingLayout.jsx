@@ -165,15 +165,6 @@ export default function SeatingLayout({
     return Math.round((mlpOverride.y - idealY) * 100) / 100;
   }, [mlpOverride, screen, seatingBlockOffset, screenFrontPlaneM]);
 
-  // Two-way sync: when seats are dragged, liveViewingOffset reflects the new position.
-  // Write it back into seatingBlockOffset so the input stays in sync with dragged state.
-  useEffect(() => {
-    if (!Number.isFinite(liveViewingOffset)) return;
-    if (typeof onSeatingBlockOffsetChange !== 'function') return;
-    if (Math.abs(liveViewingOffset - seatingBlockOffset) <= 0.005) return;
-    onSeatingBlockOffsetChange(Math.round(liveViewingOffset * 100) / 100);
-  }, [liveViewingOffset]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const validMlpBasis = useMemo(() => {
     const validValues = mlpOptions.map((opt) => opt.value);
     return validValues.includes(mlpBasis) ? mlpBasis : 'front';
