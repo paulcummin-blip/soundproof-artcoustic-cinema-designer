@@ -678,28 +678,6 @@ function useDesignerState() {
     setMlpOverride(null);
   }, []);
 
-  // Clear stale mlpOverride when any seating layout control changes.
-  // When seats are rebuilt at new positions, any saved mlpOverride would show
-  // the green RSP dot at the old position. Clearing it makes the dot fall back
-  // to the selected RSP seat in seatingPositions so they always align.
-  const _mlpClearHydratedRef = useRef(false);
-  useEffect(() => {
-    if (!_mlpClearHydratedRef.current) { _mlpClearHydratedRef.current = true; return; }
-    setMlpOverride(null);
-  }, [
-    seatingBlockOffset,
-    seatingRows,
-    seatsPerRow,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    JSON.stringify(seatsPerRowByRow),
-    seatSpacing,
-    rowSpacingM,
-    mlpBasis,
-    screen?.visibleWidthInches,
-    screen?.floatDepthM,
-    screen?.mountMode,
-  ]);
-
   const [extraSurroundCount, _setExtraSurroundCount] = useState(() => (
     (!__isFreeUse && __autosavePayload && typeof __autosavePayload.extraSurroundCount === 'number') ? __autosavePayload.extraSurroundCount : 0
   ));
@@ -1600,11 +1578,70 @@ function useDesignerState() {
   }, []);
 
   const saveWorkingCopyNow = useCallback(() => {
-    try { saveAutosave({ roomDims, seatingPositions, speakerSystem, screen }); } catch (e) { console.warn("Autosave failed:", e); }
-  }, [roomDims, seatingPositions, speakerSystem, screen]);
+    const payload = {
+      roomDims,
+      dimensions,
+      seatingPositions,
+      speakerSystem,
+      // Ensure sub configs are always serialised explicitly
+      frontSubsCfg: {
+        ...frontSubsCfg,
+        model: frontSubsCfg?.model || "SUB2-12",
+        count: Number(frontSubsCfg?.count) || 0,
+        positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
+        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : [],
+        orientation: frontSubsCfg?.orientation || "vertical",
+        placementMode: frontSubsCfg?.placementMode || "default"
+      },
+      rearSubsCfg: {
+        ...rearSubsCfg,
+        model: rearSubsCfg?.model || "SUB2-12",
+        count: Number(rearSubsCfg?.count) || 0,
+        positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
+        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : [],
+        orientation: rearSubsCfg?.orientation || "vertical",
+        placementMode: rearSubsCfg?.placementMode || "default"
+      },
+      dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
+      dolbyConfig,
+      screen,
+      screenHeight,
+      seatingRows,
+      seatsPerRow,
+      seatsPerRowByRow,
+      seatSpacing,
+      rowSpacingM,
+      mlpBasis,
+      autoSeatByRP23,
+      seatingBlockOffset,
+      rowEarHeights,
+      aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP,
+      lcrAimMode,
+      globalSurroundModel,
+      sevenBedLayoutType,
+      overheadGlobalModel,
+      overheadFrontOverride,
+      overheadMidOverride,
+      overheadRearOverride,
+      useFrontGlobal,
+      useMidGlobal,
+      useRearGlobal
+    };
+    try {
+      saveAutosave(payload);
+    } catch (e) {
+      console.warn("Autosave failed:", e);
+    }
+  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]);
 
   const clearWorkingCopy = useCallback(() => {
-    try { clearAutosaveStorage(); } catch (e) { console.warn("Clear autosave failed:", e); }
+    try {
+      clearAutosaveStorage();
+    } catch (e) {
+      console.warn("Clear autosave failed:", e);
+    }
   }, []);
 
   const setPerSeatMetricsForSeat = useCallback((seatId, data) => {
