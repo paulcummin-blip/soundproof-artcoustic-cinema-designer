@@ -1,6 +1,21 @@
 import { useEffect, useRef } from "react";
 import { buildRowCenters, distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 
+const TV_KEY_TO_INCHES = {
+  tv65: 55.55,
+  tv77: 67.36,
+  tv83: 72.52,
+  tv100: 87.80,
+};
+function resolveVisibleWidthInches(screen) {
+  const tvKey = screen?.tvPresetKey;
+  const tvMm = Number(screen?.tvWidthMm);
+  if (tvKey && TV_KEY_TO_INCHES[tvKey]) return TV_KEY_TO_INCHES[tvKey];
+  if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
+  const visible = Number(screen?.visibleWidthInches);
+  return Number.isFinite(visible) && visible > 0 ? visible : 100;
+}
+
 const EQ_EPS = 0.001;
 const arraysEqualWithin1mm = (a = [], b = []) => {
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
@@ -112,7 +127,7 @@ export function useSeatingRebuild({
             ? Number(appState.screen.screenPlaneY_m)
             : Number(appState?.screen?.floatDepthM) || 0.20);
 
-      const visibleWidthInches = Number(appState?.screen?.visibleWidthInches) || 120;
+      const visibleWidthInches = resolveVisibleWidthInches(appState?.screen);
       const viewingOffsetM = Number(appState?.seatingBlockOffset) || 0;
       const idealDistM = distanceFor57_5FromWidth(visibleWidthInches * 0.0254);
       const stableBaseY = screenFrontPlaneM + idealDistM + viewingOffsetM;
@@ -269,7 +284,7 @@ export function useSeatingRebuild({
         : (Number.isFinite(Number(appState?.screen?.screenPlaneY_m)) && Number(appState.screen.screenPlaneY_m) > 0
             ? Number(appState.screen.screenPlaneY_m)
             : Number(appState?.screen?.floatDepthM) || 0.20);
-      const visibleWidthInches = Number(appState?.screen?.visibleWidthInches) || 120;
+      const visibleWidthInches = resolveVisibleWidthInches(appState?.screen);
       const liveOffsetM = Number(appState?.seatingBlockOffset) || 0;
       const liveMlpY = screenFrontPlaneM + distanceFor57_5FromWidth(visibleWidthInches * 0.0254) + liveOffsetM;
       const mlpY = Number.isFinite(liveMlpY) ? liveMlpY : appState?.mlpY_m;
@@ -373,6 +388,8 @@ export function useSeatingRebuild({
     appState?.screen?.screenPlaneY_m,
     appState?.screen?.floatDepthM,
     appState?.screen?.visibleWidthInches,
+    appState?.screen?.tvPresetKey,
+    appState?.screen?.tvWidthMm,
     _rowEarHeights,
   ]);
 }
