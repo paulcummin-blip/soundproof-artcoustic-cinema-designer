@@ -205,12 +205,15 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const overallH = screenData.h + borderM * 2;
 
   // LCR speakers — always returns a plain array
+  // Pass the TV preset key as `orientation` so tv_linked models (e.g. C4-1) resolve
+  // the correct width from their tvWidthMap instead of falling back to undefined/0.
+  const tvPresetKey = screen?.tvPresetKey || null;
   const lcrSpeakers = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return [];
     return placedSpeakers
       .filter(s => canonFront(s?.role))
       .map(s => {
-        const meta = getSpeakerModelMeta(s?.model);
+        const meta = getSpeakerModelMeta(s?.model, tvPresetKey);
         const wM = (meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.20;
         const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.20;
         const x = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
@@ -218,7 +221,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         const modelKey = normaliseModelKey(s?.model);
         return { role: canonFront(s.role), x, z, wM, hM, label: canonFront(s.role), modelKey };
       });
-  }, [placedSpeakers, roomW]);
+  }, [placedSpeakers, roomW, tvPresetKey]);
 
   // Front subs — always returns a plain array
   const subItems = useMemo(() => {
@@ -537,13 +540,16 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         })()}
 
         {/* LCR Speakers — via drawSpeakerFront helper */}
-        {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk) =>
-          drawSpeakerFront({
+        {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk) => {
+          // C4-1 is a wide flat soundbar — use exact physical dimensions, no height fudge factor
+          const isC41Spk = (spk.modelKey || "").includes("c4-1");
+          const hMultiplier = isC41Spk ? 1.0 : 1.20;
+          return drawSpeakerFront({
             key: spk.role,
             cx: rx(spk.x),
             cy: ry(spk.z),
             sw: Math.max(12, (spk.wM / roomW) * drawW),
-            sh: Math.max(12, (spk.hM / roomH) * drawH * 1.20),
+            sh: Math.max(12, (spk.hM / roomH) * drawH * hMultiplier),
             isRound: spk.round === true,
             fill: SPEAKER_FILL,
             stroke: SPEAKER_STROKE,
@@ -551,8 +557,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             zM: spk.z,
             modelKey: spk.modelKey ?? "",
             onMouseDown: onLcrSpeakerMoved ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
-          })
-        )}
+          });
+        })}
 
         {/* Front subwoofers — via drawSpeakerFront helper */}
         {(Array.isArray(subItems) ? subItems : []).map((sub, i) =>
