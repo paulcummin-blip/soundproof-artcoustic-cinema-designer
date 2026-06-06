@@ -395,6 +395,12 @@ function RoomDesignerWithState() {
 
   // Compute MLP (green dot) and row centers from screen plane
   useEffect(() => {
+    // In manual_position mode, manualRspY_m is the sole authority for mlpY_m.
+    // The effectiveRspY_m write-back effect (below) handles updates.
+    // This screen-geometry writer must not run or it will overwrite the manual RSP.
+    const currentRspMode = appState?.rspMode || "auto_from_screen";
+    if (currentRspMode === "manual_position") return;
+
     // Pull needed values
     // Prefer the published screen front plane from RV.
     // IMPORTANT: Do NOT calculate/store mlpY_m until this is a real finite number,
@@ -1969,28 +1975,5 @@ function RoomDesignerWithState() {
 
 }
 
-export default function RoomDesignerPage() {
-  const disabled = typeof window !== "undefined" && window.__DISABLE_ROOM_DESIGNER === true;
-  
-  // Calculate project ID at page level to use as remount key
-  const sessionActiveProjectId = useActiveProjectId();
-  const { projectId: initialProjectIdFromUrl } = useUrlQuery();
-  // Only use an explicit URL project param — not stale session state.
-  const resolvedProjectId = initialProjectIdFromUrl || null;
-  
-  if (disabled) {
-    return <div className="p-6 text-sm">Room Designer is temporarily disabled.</div>;
-  }
-
-  return (
-    <SidebarInset>
-      <div className="flex flex-col gap-4 px-4 md:px-6">
-        <Suspense fallback={<div className="p-6">Loading…</div>}>
-          <ErrorBoundary fallback={<div className="p-6">Failed to mount Room Designer.</div>}>
-            <RoomDesignerWithState />
-          </ErrorBoundary>
-        </Suspense>
-      </div>
-    </SidebarInset>);
-
-}
+// RoomDesignerPage shell is in pages/RoomDesignerPage.jsx
+export default RoomDesignerWithState;
