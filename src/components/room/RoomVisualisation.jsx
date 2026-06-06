@@ -923,6 +923,7 @@ const byId = useEntitiesById({
     isRenderableSpeaker, isDraggable,
     roomElements,
     rspMode,
+    mlpDotY_m,
   });
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
@@ -1101,6 +1102,7 @@ const byId = useEntitiesById({
     canvasToRoom,
     lengthM,
     setManualRspY_m: onSetManualRspY_m,
+    dragOffsetRoomRef,
   });
 
   const { handleSeatDrag, isSnapping: isSeatSnapping, clearSnap: clearSeatSnap } = useSeatDragHandler({

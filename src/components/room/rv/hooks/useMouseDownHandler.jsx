@@ -33,6 +33,7 @@ export function useMouseDownHandler({
   roomElements,
   // RSP marker drag (manual_position mode only)
   rspMode,
+  mlpDotY_m,
 }) {
   const handleMouseDown = useCallback(
     (e, id, type) => {
@@ -90,7 +91,10 @@ export function useMouseDownHandler({
       // RSP marker drag — only active in manual_position mode
       if (type === 'mlpMarker') {
         if (rspMode !== 'manual_position') return;
-        dragOffsetRoomRef.current = { x: 0, y: 0 };
+        dragOffsetRoomRef.current = {
+          x: 0,
+          y: Number.isFinite(mlpDotY_m) ? (mlpDotY_m - cursorRoom.y) : 0,
+        };
         isAnyDraggingRef.current = true;
         setDragState({ dragging: true, draggedItemId: id, dragType: 'mlpMarker' });
         setDragWarning({ show: false });

@@ -20,6 +20,7 @@ export function useMlpDragHandler({
   canvasToRoom,
   lengthM,
   setManualRspY_m,
+  dragOffsetRoomRef,
 }) {
   /**
    * Called on every mousemove when dragType === 'mlpMarker'.
@@ -36,9 +37,13 @@ export function useMlpDragHandler({
     const roomPos = canvasToRoom(canvasPos);
     const roomLen = Number(lengthM) || 6.0;
 
+    // Apply initial cursor-to-marker offset to prevent jump on drag start
+    const offsetY = Number(dragOffsetRoomRef?.current?.y) || 0;
+    const rawY = roomPos.y + offsetY;
+
     // Clamp to room bounds with a small margin
     const MARGIN = 0.20;
-    const clampedY = Math.max(MARGIN, Math.min(roomLen - MARGIN, roomPos.y));
+    const clampedY = Math.max(MARGIN, Math.min(roomLen - MARGIN, rawY));
 
     // 1 cm resolution
     const rounded = Math.round(clampedY * 100) / 100;
