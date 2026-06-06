@@ -4,9 +4,9 @@
  * Focused hook for computing the effective RSP (Reference Seating Position) Y
  * coordinate from the chosen rspMode and its associated inputs.
  *
- * Phase 1: only auto_from_screen is implemented.
- * All other modes return currentMlpY_m as a passthrough fallback so the hook
- * can be wired without changing any existing behaviour.
+ * Phase 1: auto_from_screen implemented.
+ * Phase 2: manual_position implemented.
+ * Phase 3A: row-derived modes implemented via rowDerivedRspYByMode input.
  *
  * Returns:
  *   { effectiveRspY_m: number|null, rspSourceLabel: string }
@@ -17,15 +17,25 @@ import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 
 /**
  * @param {object} params
- * @param {string}      params.rspMode          - e.g. "auto_from_screen"
- * @param {number|null} params.manualRspY_m      - explicit Y when mode is manual_position
- * @param {number}      params.screenFrontPlaneM - Y of screen front face (metres)
- * @param {number}      params.screenWidthM      - viewable screen width in metres
- * @param {number[]}    params.rowCentersM       - array of row-centre Y values (unused in Phase 1)
- * @param {object[]}    params.seatingPositions  - seat objects (unused in Phase 1)
- * @param {number|null} params.currentMlpY_m     - existing mlpY_m, used as fallback
+ * @param {string}      params.rspMode              - e.g. "auto_from_screen"
+ * @param {number|null} params.manualRspY_m          - explicit Y when mode is manual_position
+ * @param {number}      params.screenFrontPlaneM     - Y of screen front face (metres)
+ * @param {number}      params.screenWidthM          - viewable screen width in metres
+ * @param {number[]}    params.rowCentersM           - array of row-centre Y values (reserved)
+ * @param {object[]}    params.seatingPositions      - seat objects (reserved)
+ * @param {number|null} params.currentMlpY_m         - existing mlpY_m, used as fallback
+ * @param {object}      params.rowDerivedRspYByMode  - precomputed Y per row-derived mode:
+ *                        { front_row_center, middle_row_center, back_row_center, all_rows_average }
  * @returns {{ effectiveRspY_m: number|null, rspSourceLabel: string }}
  */
+/** Maps row-derived rspMode values to their display label. */
+const ROW_MODE_LABELS = {
+  front_row_center:  "Front Row Centre",
+  middle_row_center: "Middle Row Centre",
+  back_row_center:   "Back Row Centre",
+  all_rows_average:  "All Rows Average",
+};
+
 export function useEffectiveRsp({
   rspMode,
   manualRspY_m,
@@ -34,6 +44,7 @@ export function useEffectiveRsp({
   rowCentersM,
   seatingPositions,
   currentMlpY_m,
+  rowDerivedRspYByMode = {},
 }) {
   return useMemo(() => {
     // ── auto_from_screen ────────────────────────────────────────────────────
@@ -63,9 +74,21 @@ export function useEffectiveRsp({
       // manualRspY_m not yet set — fall through to currentMlpY_m fallback
     }
 
+    // ── Row-derived modes ────────────────────────────────────────────────────
+    if (rspMode in ROW_MODE_LABELS) {
+      const precomputed = Number((rowDerivedRspYByMode ?? {})[rspMode]);
+      if (Number.isFinite(precomputed)) {
+        return {
+          effectiveRspY_m: precomputed,
+          rspSourceLabel: ROW_MODE_LABELS[rspMode],
+        };
+      }
+      // Precomputed value not yet available — fall through to currentMlpY_m fallback
+    }
+
     // ── Fallback / unsupported modes ─────────────────────────────────────────
-    // Return currentMlpY_m unchanged so wiring this hook has zero behaviour impact
-    // for all modes not yet implemented.
+    // Return currentMlpY_m unchanged so wiring has zero behaviour impact
+    // for modes whose inputs are not yet computed.
     const fallbackY = Number.isFinite(Number(currentMlpY_m))
       ? Number(currentMlpY_m)
       : null;
@@ -80,7 +103,7 @@ export function useEffectiveRsp({
     screenFrontPlaneM,
     screenWidthM,
     currentMlpY_m,
-    // rowCentersM, seatingPositions intentionally not reactive yet
-    // — they will be added when row-derived modes are implemented.
+    rowDerivedRspYByMode,
+    // rowCentersM, seatingPositions reserved for future use
   ]);
 }
