@@ -132,7 +132,11 @@ export function useSeatingRebuild({
       const visibleWidthInches = resolveVisibleWidthInches(appState?.screen);
       const viewingOffsetM = Number(appState?.seatingBlockOffset) || 0;
       const idealDistM = distanceFor57_5FromWidth(visibleWidthInches * 0.0254);
-      const stableBaseY = screenFrontPlaneM + idealDistM + viewingOffsetM;
+      const _screenDerivedBaseY = screenFrontPlaneM + idealDistM + viewingOffsetM;
+      const stableBaseY =
+        appState?.rspMode === "auto_from_screen" && Number.isFinite(appState?.mlpY_m)
+          ? appState.mlpY_m
+          : _screenDerivedBaseY;
 
       const list = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
         ? _seatsPerRowByRow
@@ -384,7 +388,10 @@ export function useSeatingRebuild({
       const visibleWidthInches = resolveVisibleWidthInches(appState?.screen);
       const liveOffsetM = Number(appState?.seatingBlockOffset) || 0;
       const liveMlpY = screenFrontPlaneM + distanceFor57_5FromWidth(visibleWidthInches * 0.0254) + liveOffsetM;
-      const mlpY = Number.isFinite(liveMlpY) ? liveMlpY : appState?.mlpY_m;
+      const mlpY =
+        appState?.rspMode === "auto_from_screen" && Number.isFinite(appState?.mlpY_m)
+          ? appState.mlpY_m
+          : (Number.isFinite(liveMlpY) ? liveMlpY : appState?.mlpY_m);
       const rowSpacing = Number(_rowSpacingM) || 1.8;
       const mlpReference = seatingArrangementBasis || _mlpBasis;
 
@@ -488,5 +495,6 @@ export function useSeatingRebuild({
     appState?.screen?.tvPresetKey,
     appState?.screen?.tvWidthMm,
     _rowEarHeights,
+    appState?.rspMode,
   ]);
 }
