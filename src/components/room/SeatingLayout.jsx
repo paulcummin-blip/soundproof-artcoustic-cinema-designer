@@ -690,10 +690,11 @@ export default function SeatingLayout({
                 size="icon"
                 disabled={disabled}
                 onClick={() => {
-                  if (disabled) return;
-                  const base = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
-                  const next = Math.round((base - 0.1) * 100) / 100;
-                  onSeatingBlockOffsetChange?.(clampViewingOffset(next));
+                 if (disabled) return;
+                 const base = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
+                 // Snap to next lower 0.10 m boundary
+                 const next = Math.floor(Math.round(base * 100) / 100 / 0.1 - 1e-9) / 10;
+                 onSeatingBlockOffsetChange?.(clampViewingOffset(Math.round(next * 100) / 100));
                 }}
                 style={{
                   minWidth: 32,
@@ -737,10 +738,11 @@ export default function SeatingLayout({
                 size="icon"
                 disabled={disabled}
                 onClick={() => {
-                  if (disabled) return;
-                  const base = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
-                  const next = Math.round((base + 0.1) * 100) / 100;
-                  onSeatingBlockOffsetChange?.(clampViewingOffset(next));
+                 if (disabled) return;
+                 const base = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
+                 // Snap to next higher 0.10 m boundary
+                 const next = Math.ceil(Math.round(base * 100) / 100 / 0.1 + 1e-9) / 10;
+                 onSeatingBlockOffsetChange?.(clampViewingOffset(Math.round(next * 100) / 100));
                 }}
                 style={{
                   minWidth: 32,
