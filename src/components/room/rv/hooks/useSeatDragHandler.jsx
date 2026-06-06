@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const SEAT_MARGIN_M = 0.3;
 const SNAP_THRESHOLD_M = 0.03; // ±3 cm snap-to-zero zone
@@ -24,6 +24,17 @@ export function useSeatDragHandler({
   setSeatingBlockOffset,
 }) {
   const [isSnapping, setIsSnapping] = useState(false);
+  const snapTimerRef = useRef(null);
+
+  // Auto-clear the "RSP aligned" label after 5 seconds
+  const triggerSnap = useCallback(() => {
+    setIsSnapping(true);
+    if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = setTimeout(() => setIsSnapping(false), 5000);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => { if (snapTimerRef.current) clearTimeout(snapTimerRef.current); }, []);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions && !setSeatingBlockOffset) return;
@@ -63,15 +74,13 @@ export function useSeatDragHandler({
 
         // Magnetic snap-to-zero within ±SNAP_THRESHOLD_M
         const snapping = Math.abs(raw) <= SNAP_THRESHOLD_M;
-        setIsSnapping(snapping);
+        if (snapping) triggerSnap();
         const nextOffset = snapping ? 0 : Math.round(raw * 100) / 100;
 
         setSeatingBlockOffset(nextOffset);
         // Return prev unchanged — the rebuild hook will recompute seat positions
         return prev;
       }
-
-      setIsSnapping(false);
 
       // ── Fallback: directly move every seat Y (legacy) ──
       return prev.map(seat => ({
@@ -81,7 +90,10 @@ export function useSeatDragHandler({
     });
   }, [onSetSeatingPositions, canvasToRoom, lengthM, currentSeatingBlockOffset, setSeatingBlockOffset]);
 
-  const clearSnap = useCallback(() => setIsSnapping(false), []);
+  const clearSnap = useCallback(() => {
+    if (snapTimerRef.current) { clearTimeout(snapTimerRef.current); snapTimerRef.current = null; }
+    setIsSnapping(false);
+  }, []);
 
   return { handleSeatDrag, isSnapping, clearSnap };
 }
