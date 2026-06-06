@@ -1092,7 +1092,7 @@ const byId = useEntitiesById({
     handleSpeakerDragUpdate(speakerId, newCanvasPos);
   }, [handleSpeakerDragUpdate]);
 
-  const { handleSeatDrag } = useSeatDragHandler({
+  const { handleSeatDrag, isSnapping: isSeatSnapping, clearSnap: clearSeatSnap } = useSeatDragHandler({
     onSetSeatingPositions,
     canvasToRoom,
     lengthM,
@@ -1286,10 +1286,10 @@ const byId = useEntitiesById({
   // Window-level drag cleanup — fires for ALL drag types when mouse is released outside the SVG
   useEffect(() => {
     const onWindowMouseUp = (e) => {
-      if (isAnyDraggingRef.current) handleMouseUp(e);
+      if (isAnyDraggingRef.current) { handleMouseUp(e); clearSeatSnap(); }
     };
     const onWindowBlur = () => {
-      if (isAnyDraggingRef.current) handleMouseUp({});
+      if (isAnyDraggingRef.current) { handleMouseUp({}); clearSeatSnap(); }
     };
     window.addEventListener('mouseup', onWindowMouseUp);
     window.addEventListener('blur', onWindowBlur);
@@ -1297,7 +1297,7 @@ const byId = useEntitiesById({
       window.removeEventListener('mouseup', onWindowMouseUp);
       window.removeEventListener('blur', onWindowBlur);
     };
-  }, [handleMouseUp]);
+  }, [handleMouseUp, clearSeatSnap]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
@@ -1993,6 +1993,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         dragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: !!dragging }}
         roomElementDragInfo={roomElementDragInfo}
         dragType={dragType}
+        isSeatSnapping={isSeatSnapping}
       />
   );
 });

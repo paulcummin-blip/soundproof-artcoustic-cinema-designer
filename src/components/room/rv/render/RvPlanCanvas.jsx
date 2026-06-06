@@ -146,6 +146,7 @@ export default function RvPlanCanvas({
   dragImpact,
   roomElementDragInfo,
   dragType,
+  isSeatSnapping = false,
 }) {
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
@@ -505,6 +506,34 @@ export default function RvPlanCanvas({
 
             {/* Layer 9: Draggable Seating Positions */}
             <RvSeatLayer seatingPositions={seatingPositions} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
+
+            {/* Seat snap-to-zero indicator */}
+            {isSeatSnapping && mlpPoint && (() => {
+              const [sx, sy] = toPx(mlpPoint.x, mlpPoint.y);
+              return (
+                <g data-testid="rsp-snap-label" style={{ pointerEvents: 'none' }}>
+                  <rect
+                    x={sx - 44}
+                    y={sy - 28}
+                    width={88}
+                    height={18}
+                    rx={4}
+                    fill="#22c55e"
+                    opacity={0.85}
+                  />
+                  <text
+                    x={sx}
+                    y={sy - 15}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fontWeight={600}
+                    fill="#ffffff"
+                  >
+                    RSP aligned
+                  </text>
+                </g>
+              );
+            })()}
 
             {/* NEW: Render overhead icons */}
             {overheadIconElements}

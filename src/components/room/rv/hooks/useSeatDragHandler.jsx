@@ -1,6 +1,7 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 
 const SEAT_MARGIN_M = 0.3;
+const SNAP_THRESHOLD_M = 0.03; // ±3 cm snap-to-zero zone
 
 /**
  * useSeatDragHandler
@@ -10,6 +11,7 @@ const SEAT_MARGIN_M = 0.3;
  *   - Accumulates the drag deltaY into seatingBlockOffset (rounded to 0.01 m).
  *   - The seating rebuild hook will reposition seats from the updated offset.
  *   - Seats are NOT written directly, preventing drift.
+ *   - Snaps to exactly 0.00 when within ±SNAP_THRESHOLD_M of zero.
  *
  * Fallback behaviour (when setSeatingBlockOffset is not available):
  *   - Directly applies deltaY to every seat Y (legacy behaviour preserved).
@@ -21,6 +23,8 @@ export function useSeatDragHandler({
   currentSeatingBlockOffset,
   setSeatingBlockOffset,
 }) {
+  const [isSnapping, setIsSnapping] = useState(false);
+
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions && !setSeatingBlockOffset) return;
 
@@ -55,11 +59,19 @@ export function useSeatDragHandler({
       // ── Preferred path: update seatingBlockOffset, let rebuild move the seats ──
       if (typeof setSeatingBlockOffset === 'function') {
         const base = Number(currentSeatingBlockOffset) || 0;
-        const nextOffset = Math.round((base + deltaY) * 100) / 100;
+        const raw = base + deltaY;
+
+        // Magnetic snap-to-zero within ±SNAP_THRESHOLD_M
+        const snapping = Math.abs(raw) <= SNAP_THRESHOLD_M;
+        setIsSnapping(snapping);
+        const nextOffset = snapping ? 0 : Math.round(raw * 100) / 100;
+
         setSeatingBlockOffset(nextOffset);
         // Return prev unchanged — the rebuild hook will recompute seat positions
         return prev;
       }
+
+      setIsSnapping(false);
 
       // ── Fallback: directly move every seat Y (legacy) ──
       return prev.map(seat => ({
@@ -69,5 +81,7 @@ export function useSeatDragHandler({
     });
   }, [onSetSeatingPositions, canvasToRoom, lengthM, currentSeatingBlockOffset, setSeatingBlockOffset]);
 
-  return { handleSeatDrag };
+  const clearSnap = useCallback(() => setIsSnapping(false), []);
+
+  return { handleSeatDrag, isSnapping, clearSnap };
 }
