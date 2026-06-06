@@ -74,7 +74,13 @@ export function useSeatDragHandler({
 
         // Magnetic snap-to-zero within ±SNAP_THRESHOLD_M
         const snapping = Math.abs(raw) <= SNAP_THRESHOLD_M;
-        if (snapping) triggerSnap();
+        if (snapping) {
+          triggerSnap();
+        } else {
+          // Dragged away from alignment — hide label immediately
+          if (snapTimerRef.current) { clearTimeout(snapTimerRef.current); snapTimerRef.current = null; }
+          setIsSnapping(false);
+        }
         const nextOffset = snapping ? 0 : Math.round(raw * 100) / 100;
 
         setSeatingBlockOffset(nextOffset);
