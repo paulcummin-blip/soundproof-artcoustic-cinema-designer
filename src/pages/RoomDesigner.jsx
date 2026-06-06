@@ -568,9 +568,22 @@ function RoomDesignerWithState() {
     return null;
   }, [appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions]);
 
-  // ── RSP: effectiveRspY_m from useEffectiveRsp (Phase 1: auto_from_screen only) ──
+  // ── RSP: effectiveRspY_m from useEffectiveRsp ────────────────────────────────
   // screenWidthM is derived the same way the existing MLP effect derives it.
   const _rspScreenWidthM = Number(screenVisibleWidthInchesEffective) * 0.0254;
+
+  // Phase 3C: derive rowDerivedRspYByMode from the existing computeMLPAndPrimary result.
+  // computeMLPAndPrimary already groups seats by row internally — no new calculation needed.
+  const _rowDerivedRspYByMode = useMemo(() => {
+    const result = computeMLPAndPrimary(
+      Array.isArray(_seatingPositions) ? _seatingPositions : [],
+      stableDimensions.width,
+      stableDimensions.length,
+      "front", // mlpBasis is irrelevant here; we only need rowDerivedRspYByMode
+    );
+    return result?.rowDerivedRspYByMode ?? {};
+  }, [_seatingPositions, stableDimensions.width, stableDimensions.length]);
+
   const { effectiveRspY_m, rspSourceLabel } = useEffectiveRsp({
     rspMode: appState?.rspMode || "auto_from_screen",
     manualRspY_m: appState?.manualRspY_m ?? null,
@@ -579,6 +592,7 @@ function RoomDesignerWithState() {
     rowCentersM: appState?.rowCentersM || [],
     seatingPositions: appState?.seatingPositions || [],
     currentMlpY_m: appState?.mlpY_m ?? null,
+    rowDerivedRspYByMode: _rowDerivedRspYByMode,
   });
 
   // Write effectiveRspY_m → appState.mlpY_m for auto_from_screen and manual_position.
