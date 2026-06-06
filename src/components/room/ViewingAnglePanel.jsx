@@ -166,27 +166,6 @@ export default function ViewingAnglePanel({
         Viewing Angle Analysis
       </h3>
 
-      {/* TEMP VIEW DEBUG */}
-      {(() => {
-        const row1 = perRowData[0];
-        const fmt = (v) => Number.isFinite(Number(v)) ? Number(v).toFixed(3) : String(v);
-        return (
-          <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#c00', background: '#fff8f8', border: '1px solid #fcc', borderRadius: 4, padding: '4px 8px', marginBottom: 8, lineHeight: '1.6' }}>
-            <strong>TEMP VIEW DEBUG</strong><br />
-            centreY (R1): {row1 ? fmt((() => {
-              const seats = seatingPositions?.filter(s => (s.rowNumber ?? 1) === 1) || [];
-              if (!seats.length) return 'n/a';
-              return seats.reduce((sum, s) => sum + (Number(s.y) || 0), 0) / seats.length;
-            })()) : 'n/a'} |
-            screenFrontPlaneM: {fmt(screenFrontPlaneM)} |
-            distToScreen (R1): {row1 ? fmt(row1.distToScreen) : 'n/a'}<br />
-            appScreenFrontPlaneM: {fmt(appScreenFrontPlaneM)} |
-            screen.screenPlaneY_m: {fmt(screen?.screenPlaneY_m)} |
-            screen.floatDepthM: {fmt(screen?.floatDepthM)}
-          </div>
-        );
-      })()}
-
       {/* Row table — always shown (1 row = single row, 2+ rows = all rows) */}
       {perRowData.length >= 1 && (
         <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, overflow: 'hidden' }}>
