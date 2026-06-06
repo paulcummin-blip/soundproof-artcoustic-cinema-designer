@@ -65,6 +65,8 @@ export function useSeatingRebuild({
 }) {
   // Tracks the last MLP Y seen by this hook so we can detect screen-plane shifts
   const prevMlpYRef = useRef(null);
+  // Tracks the last resolved visible screen width (metres) to detect screen-size-driven MLP changes
+  const prevVisibleWidthMRef = useRef(null);
 
   // Helper: get ear height for a 1-based row index, falling back to step pattern
   const getRowZ = (rowIndex) => {
@@ -245,6 +247,76 @@ export function useSeatingRebuild({
       prevMlpYRef.current = currentMlpY;
     }
     // ── END SCREEN-PLANE DELTA SHIFT ──────────────────────────────────────────
+
+    // ── SCREEN-WIDTH ABSOLUTE Y CORRECTION ───────────────────────────────────
+    // When the resolved visible screen width changes after hydration (screen size
+    // picker), regenerate row centres absolutely from appState.mlpY_m and update
+    // only seat.y — preserving IDs, X positions, row numbers, and all per-seat data.
+    // Runs BEFORE the loaded-project guard so it fires even for protected projects.
+    const currentVisibleWidthM = resolveVisibleWidthInches(appState?.screen) * 0.0254;
+    const prevWidthM = prevVisibleWidthMRef.current;
+    const widthChangedAfterHydration =
+      prevWidthM !== null &&
+      Math.abs(currentVisibleWidthM - prevWidthM) > 0.001 &&
+      currentSeats.length > 0 &&
+      !didUserRequestResetRef.current &&
+      !(appState?.roomResetEpoch > 0) &&
+      Number.isFinite(appState?.mlpY_m);
+
+    if (widthChangedAfterHydration) {
+      const list = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
+        ? _seatsPerRowByRow
+        : Array.from(
+            { length: Math.max(1, Number(_seatingRows) || 1) },
+            () => Math.max(1, Number(_seatsPerRow) || 1)
+          );
+
+      const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
+      const MIN_Y = 0.40;
+      const MAX_Y = len - 0.40;
+      const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
+
+      let newCenters = [];
+      try {
+        newCenters = buildRowCenters(
+          appState.mlpY_m,
+          list.length,
+          Number(_rowSpacingM) || 1.8,
+          seatingArrangementBasis || _mlpBasis
+        ) || [];
+      } catch (e) {
+        newCenters = [];
+      }
+
+      if (newCenters.length === list.length) {
+        const clampedCenters = newCenters.map(y => clampY(Number(y)));
+
+        if (typeof appState?.setRowCentersM === 'function' && !arraysEqualWithin1mm(appState?.rowCentersM || [], clampedCenters)) {
+          appState.setRowCentersM(clampedCenters);
+        }
+
+        // Update only seat.y using the new centre for each seat's rowNumber; preserve everything else
+        const updatedSeats = currentSeats.map(s => {
+          const rowIdx = (s.rowNumber ?? 1) - 1;
+          const newY = clampedCenters[rowIdx] !== undefined ? clampedCenters[rowIdx] : Number(s.y);
+          return { ...s, y: newY };
+        });
+
+        if (typeof appState?.setSeatingPositions === 'function') {
+          appState.setSeatingPositions(prev => seatsEqualWithin1mm(prev, updatedSeats) ? prev : updatedSeats);
+        }
+
+        prevVisibleWidthMRef.current = currentVisibleWidthM;
+        prevMlpYRef.current = appState.mlpY_m;
+        return;
+      }
+    }
+
+    // Always keep prevVisibleWidthMRef in sync after hydration
+    if (prevWidthM === null) {
+      prevVisibleWidthMRef.current = currentVisibleWidthM;
+    }
+    // ── END SCREEN-WIDTH ABSOLUTE Y CORRECTION ────────────────────────────────
 
     if (
       isLoadedProject &&
