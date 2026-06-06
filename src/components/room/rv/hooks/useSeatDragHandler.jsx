@@ -5,19 +5,33 @@ const SEAT_MARGIN_M = 0.3;
 /**
  * useSeatDragHandler
  * Drags ALL seats as one rigid block, forward/backward only (Y-axis).
- * X values are never changed. Clamped so no seat exits the room.
+ *
+ * Preferred behaviour (when setSeatingBlockOffset is provided):
+ *   - Accumulates the drag deltaY into seatingBlockOffset (rounded to 0.01 m).
+ *   - The seating rebuild hook will reposition seats from the updated offset.
+ *   - Seats are NOT written directly, preventing drift.
+ *
+ * Fallback behaviour (when setSeatingBlockOffset is not available):
+ *   - Directly applies deltaY to every seat Y (legacy behaviour preserved).
  */
-export function useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, lengthM }) {
+export function useSeatDragHandler({
+  onSetSeatingPositions,
+  canvasToRoom,
+  lengthM,
+  currentSeatingBlockOffset,
+  setSeatingBlockOffset,
+}) {
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
-    if (!onSetSeatingPositions) return;
+    if (!onSetSeatingPositions && !setSeatingBlockOffset) return;
 
     const { y: targetY } = canvasToRoom(newCanvasPos);
     const roomLen = Number(lengthM) || 6.0;
 
+    // We need the current seat array to compute deltaY and clamping.
+    // Use a functional update on seatingPositions to read current state.
     onSetSeatingPositions(prev => {
       if (!Array.isArray(prev) || prev.length === 0) return prev;
 
-      // Find the clicked seat to compute the per-frame deltaY
       const clickedSeat = prev.find(s => s.id === seatId);
       if (!clickedSeat) return prev;
 
@@ -26,28 +40,34 @@ export function useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, length
 
       if (Math.abs(deltaY) < 0.0001) return prev;
 
-      // Find the extremes of the current seating block
+      // Clamp so the whole block stays within room bounds
       const minSeatY = Math.min(...prev.map(s => Number(s.y ?? s.position?.y ?? 0)));
       const maxSeatY = Math.max(...prev.map(s => Number(s.y ?? s.position?.y ?? 0)));
 
-      // Clamp the delta so the whole block stays within room bounds
       if (deltaY < 0) {
-        // Moving toward screen wall
         deltaY = Math.max(deltaY, SEAT_MARGIN_M - minSeatY);
       } else {
-        // Moving toward back wall
         deltaY = Math.min(deltaY, (roomLen - SEAT_MARGIN_M) - maxSeatY);
       }
 
       if (Math.abs(deltaY) < 0.0001) return prev;
 
-      // Apply deltaY to every seat's Y; never touch X
+      // ── Preferred path: update seatingBlockOffset, let rebuild move the seats ──
+      if (typeof setSeatingBlockOffset === 'function') {
+        const base = Number(currentSeatingBlockOffset) || 0;
+        const nextOffset = Math.round((base + deltaY) * 100) / 100;
+        setSeatingBlockOffset(nextOffset);
+        // Return prev unchanged — the rebuild hook will recompute seat positions
+        return prev;
+      }
+
+      // ── Fallback: directly move every seat Y (legacy) ──
       return prev.map(seat => ({
         ...seat,
         y: Number(seat.y ?? seat.position?.y ?? 0) + deltaY,
       }));
     });
-  }, [onSetSeatingPositions, canvasToRoom, lengthM]);
+  }, [onSetSeatingPositions, canvasToRoom, lengthM, currentSeatingBlockOffset, setSeatingBlockOffset]);
 
   return { handleSeatDrag };
 }

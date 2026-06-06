@@ -1092,7 +1092,13 @@ const byId = useEntitiesById({
     handleSpeakerDragUpdate(speakerId, newCanvasPos);
   }, [handleSpeakerDragUpdate]);
 
-  const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom, lengthM });
+  const { handleSeatDrag } = useSeatDragHandler({
+    onSetSeatingPositions,
+    canvasToRoom,
+    lengthM,
+    currentSeatingBlockOffset: viewingDistanceOffsetM,
+    setSeatingBlockOffset: props.setSeatingBlockOffsetGuarded,
+  });
 
   // Room element drag info (structured, only visible during roomElement drag)
   const [roomElementDragInfo, setRoomElementDragInfo] = useState(null);
