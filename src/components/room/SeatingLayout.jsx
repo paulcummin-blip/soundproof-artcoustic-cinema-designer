@@ -775,7 +775,7 @@ export default function SeatingLayout({
           disabled={disabled}
           modal={false}>
           <SelectTrigger style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}>
-            <SelectValue placeholder="Auto from Screen Size">
+            <SelectValue>
               {{
                 auto_from_screen: 'Auto from Screen Size',
                 manual_position: 'Manual Position',
