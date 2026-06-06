@@ -60,6 +60,7 @@ import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore"
 import { useSpeakerReconciliation } from "@/components/hooks/useSpeakerReconciliation";
 import { useSeatingRebuild } from "@/components/hooks/useSeatingRebuild";
 import { useSubwooferSync } from "@/components/hooks/useSubwooferSync";
+import { useInRoomDepths } from "@/components/hooks/useInRoomDepths";
 import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
 import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
@@ -580,14 +581,12 @@ function RoomDesignerWithState() {
     currentMlpY_m: appState?.mlpY_m ?? null,
   });
 
-  // Write effectiveRspY_m → appState.mlpY_m only for auto_from_screen (Phase 1).
+  // Write effectiveRspY_m → appState.mlpY_m for auto_from_screen and manual_position.
   // Uses the identical rounding/tolerance pattern as the existing MLP useEffect so
   // React never sees a spurious state update and no loop is introduced.
-  // NOTE: The existing MLP useEffect still runs and produces the same value, so
-  // both writes resolve to an identical rounded result — no behaviour change.
   const _rspModeForEffect = appState?.rspMode || "auto_from_screen";
   useEffect(() => {
-    if (_rspModeForEffect !== "auto_from_screen") return;
+    if (_rspModeForEffect !== "auto_from_screen" && _rspModeForEffect !== "manual_position") return;
     if (!Number.isFinite(effectiveRspY_m)) return;
     if (typeof appState?.setMlpY_m !== "function") return;
 
@@ -598,6 +597,27 @@ function RoomDesignerWithState() {
       return prevRounded === newRounded ? prev : mlpRounded;
     });
   }, [_rspModeForEffect, effectiveRspY_m, appState?.setMlpY_m]);
+
+  // One-time initialisation: when rspMode first becomes "manual_position" and
+  // manualRspY_m is not yet set, seed it from the current mlpY_m.
+  // A ref prevents this from firing more than once per mode entry.
+  const _didInitManualRspRef = useRef(false);
+  useEffect(() => {
+    if (_rspModeForEffect !== "manual_position") {
+      // Reset the guard when leaving manual_position so it re-fires if mode is re-entered.
+      _didInitManualRspRef.current = false;
+      return;
+    }
+    if (_didInitManualRspRef.current) return;
+    if (appState?.manualRspY_m != null && Number.isFinite(Number(appState.manualRspY_m))) return;
+
+    const currentMlp = appState?.mlpY_m;
+    if (!Number.isFinite(currentMlp)) return;
+    if (typeof appState?.setManualRspY_m !== "function") return;
+
+    _didInitManualRspRef.current = true;
+    appState.setManualRspY_m(currentMlp);
+  }, [_rspModeForEffect, appState?.manualRspY_m, appState?.mlpY_m, appState?.setManualRspY_m]);
   // ── END RSP ───────────────────────────────────────────────────────────────
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
@@ -669,55 +689,18 @@ function RoomDesignerWithState() {
       .join("|");
   }, [placedSpeakersForAim]);
 
-  // In-room depth calculation (compacted)
-  const inRoomDepthsCm = React.useMemo(() => {
-    if (!Array.isArray(placedSpeakersForAim) || placedSpeakersForAim.length === 0) return { frontWides: null, surrounds: null, sideSurrounds: null, rearSurrounds: null };
-    const widthM = stableDimensions.width; const lengthM = stableDimensions.length;
-    if (!_isNum(widthM) || !_isNum(lengthM) || widthM <= 0 || lengthM <= 0) return { frontWides: null, surrounds: null, sideSurrounds: null, rearSurrounds: null };
-    const aimFW = appState?.aimFrontWidesAtMLP || false; const aimSide = appState?.aimSideSurroundsAtMLP || false; const aimRear = appState?.aimRearSurroundsAtMLP || false;
-    const isFrontWideRole = (role) => role === "LW" || role === "RW";
-    const isSurroundRole = (role) => /^SL\d*$/.test(role) || /^SR\d*$/.test(role);
-    const isRearSurroundRole = (role) => role === "SBL" || role === "SBR";
-    const _wallNormalYawDeg = (wall) => wall === "LEFT" ? 90 : wall === "RIGHT" ? -90 : 0;
-    const _hingeAngleDegFromWall = (wall, yawDeg) => { const normal = _wallNormalYawDeg(wall); const delta = _wrap180((Number(yawDeg) || 0) - normal); const abs = Math.abs(delta); return Math.min(90, Math.min(abs, 180 - abs)); };
-    const _hingeIntrusionM = (wM, dM, hDeg) => { const a = _degToRad(hDeg); return dM * Math.abs(Math.cos(a)) + wM * Math.abs(Math.sin(a)); };
-    const getModelMeta = (sp) => { const meta = getSpeakerModelMeta(sp?.model); return meta && !meta.notFound ? meta : null; };
-    const getYawDegForRole = (sp) => {
-      const r = safeCanon(sp?.role);
-      const aimToMLP = () => { if (!sp?.position || !mlpAnchorEffective) return 0; return _wrap180(-Math.atan2(mlpAnchorEffective.x - sp.position.x, mlpAnchorEffective.y - sp.position.y) * (180 / Math.PI)); };
-      if (isFrontWideRole(r) && aimFW) return aimToMLP();
-      if (isSurroundRole(r) && aimSide) return aimToMLP();
-      if (isRearSurroundRole(r) && aimRear) return aimToMLP();
-      if (r === "LW" || /^SL\d*$/.test(r)) return 90;
-      if (r === "RW" || /^SR\d*$/.test(r)) return -90;
-      return 0;
-    };
-    const computeGroupDepthCm = ({ matchRole, speakersToProcess }) => {
-      if (!Array.isArray(speakersToProcess) || speakersToProcess.length === 0) return null;
-      let maxDepthM = null;
-      for (const sp of speakersToProcess) {
-        const role = safeCanon(sp?.role); if (!role || !matchRole(role)) continue;
-        const pos = sp?.position || {}; if (!_isNum(pos.x) || !_isNum(pos.y)) continue;
-        const meta = getModelMeta(sp);
-        const wM = _isNum(meta?.widthM) ? meta.widthM : 0.27;
-        const dM = _isNum(meta?.depthM) ? meta.depthM : 0.082;
-        const wall = (role === "LW" || /^SL\d*$/.test(role)) ? "LEFT" : (role === "RW" || /^SR\d*$/.test(role)) ? "RIGHT" : isRearSurroundRole(role) ? "BACK" : null;
-        if (!wall) continue;
-        const d = _hingeIntrusionM(wM, dM, _hingeAngleDegFromWall(wall, getYawDegForRole(sp)));
-        if (_isNum(d) && (maxDepthM === null || d > maxDepthM)) maxDepthM = d;
-      }
-      return maxDepthM === null ? null : Math.round(maxDepthM * 100);
-    };
-    const frontWides = computeGroupDepthCm({ matchRole: isFrontWideRole, speakersToProcess: placedSpeakersForAim });
-    const surrounds = computeGroupDepthCm({ matchRole: isSurroundRole, speakersToProcess: placedSpeakersForAim });
-    const rearSurrounds = computeGroupDepthCm({ matchRole: isRearSurroundRole, speakersToProcess: placedSpeakersForAim });
-    return {
-      frontWides,
-      surrounds,
-      sideSurrounds: surrounds,
-      rearSurrounds,
-    };
-  }, [placedSpeakersForAim, _posSig, _yawSig, stableDimensions.width, stableDimensions.length, mlpAnchorEffective, appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP]);
+  // In-room depth calculation (extracted to useInRoomDepths hook)
+  const inRoomDepthsCm = useInRoomDepths({
+    placedSpeakersForAim,
+    posSig: _posSig,
+    yawSig: _yawSig,
+    widthM: stableDimensions.width,
+    lengthM: stableDimensions.length,
+    mlpAnchorEffective,
+    aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
+  });
 
   // NEW: Compute centralized SPL data for all seats (powers sidebar SPL cards AND HUD)
   const allSeatSplMetrics = useAllSeatSplMetrics({
