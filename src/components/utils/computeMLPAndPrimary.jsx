@@ -24,6 +24,12 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front", ml
       mlp: fallbackMlp,
       frontRow: [],
       seatsWithFlags: [],
+      rowDerivedRspYByMode: {
+        front_row_center:  null,
+        middle_row_center: null,
+        back_row_center:   null,
+        all_rows_average:  null,
+      },
     };
   }
 
@@ -46,8 +52,46 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front", ml
   });
 
   if (rowCenters.length === 0) {
-    return { mlp: fallbackMlp, frontRow: [], seatsWithFlags: valid };
+    return {
+      mlp: fallbackMlp,
+      frontRow: [],
+      seatsWithFlags: valid,
+      rowDerivedRspYByMode: {
+        front_row_center:  null,
+        middle_row_center: null,
+        back_row_center:   null,
+        all_rows_average:  null,
+      },
+    };
   }
+
+  // ── Row-derived RSP Y values ─────────────────────────────────────────────
+  // Calculated from rowCenters, independently of mlpBasis / mlpOverride.
+  const n = rowCenters.length;
+
+  const frontY  = rowCenters[0].y;
+  const backY   = rowCenters[n - 1].y;
+  const avgY    = rowCenters.reduce((sum, rc) => sum + rc.y, 0) / n;
+
+  let middleY;
+  if (n === 1) {
+    middleY = rowCenters[0].y;
+  } else if (n === 2) {
+    middleY = rowCenters[0].y;
+  } else if (n % 2 !== 0) {
+    middleY = rowCenters[Math.floor(n / 2)].y;
+  } else {
+    const m1 = rowCenters[n / 2 - 1];
+    const m2 = rowCenters[n / 2];
+    middleY = (m1.y + m2.y) / 2;
+  }
+
+  const rowDerivedRspYByMode = {
+    front_row_center:  Number.isFinite(frontY)  ? frontY  : null,
+    middle_row_center: Number.isFinite(middleY) ? middleY : null,
+    back_row_center:   Number.isFinite(backY)   ? backY   : null,
+    all_rows_average:  Number.isFinite(avgY)    ? avgY    : null,
+  };
 
   // Calculate MLP based on selected basis
   let mlp = fallbackMlp;
@@ -178,5 +222,5 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front", ml
 
   const frontRow = seatsByRow[rowNumbers[0]] || [];
 
-  return { mlp, frontRow, seatsWithFlags };
+  return { mlp, frontRow, seatsWithFlags, rowDerivedRspYByMode };
 }
