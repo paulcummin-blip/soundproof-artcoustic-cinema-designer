@@ -93,6 +93,11 @@ export default function SeatingLayout({
   onShowMlpRulerChange,
   rowEarHeights = [],
   onRowEarHeightsChange,
+  // RSP mode
+  rspMode = "auto_from_screen",
+  onRspModeChange,
+  manualRspY_m = null,
+  onManualRspY_mChange,
 }) {
   // Build rowsArray purely from props (parent is the source of truth)
   const rowsArray = React.useMemo(() => {
@@ -759,44 +764,72 @@ export default function SeatingLayout({
 
 
 
-      {/* RSP Reference */}
-      <div className="space-y-2">
-        <Label
-              className="text-sm font-medium"
-              style={{ color: '#3E4349' }}>
-
-          RSP Reference
+      {/* RSP Mode */}
+      <div className="space-y-2 col-span-2">
+        <Label className="text-sm font-medium" style={{ color: '#3E4349' }}>
+          RSP Mode
         </Label>
         <Select
-              value={validMlpBasis}
-              onValueChange={handleMlpBasisChange}
-              disabled={disabled || rowCount <= 1}
-              modal={false}>
-
-          <SelectTrigger
-                style={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #C1B6AD',
-                  color: '#1B1A1A'
-                }}>
-
+          value={rspMode}
+          onValueChange={(val) => onRspModeChange?.(val)}
+          disabled={disabled}
+          modal={false}>
+          <SelectTrigger style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}>
             <SelectValue />
           </SelectTrigger>
-          <SelectContent
-                position="popper"
-                sideOffset={6}
-                className="z-[70]">
-
-            {mlpOptions.map((option) =>
-                <SelectItem
-                  key={option.value}
-                  value={option.value}>
-
-                {option.label}
-              </SelectItem>
-                )}
+          <SelectContent position="popper" sideOffset={6} className="z-[70]">
+            <SelectItem value="auto_from_screen">Auto from Screen</SelectItem>
+            <SelectItem value="manual_position">Manual Position</SelectItem>
           </SelectContent>
         </Select>
+
+        {rspMode === "manual_position" && (
+          <div className="space-y-1 pt-1">
+            <Label className="text-xs" style={{ color: '#625143' }}>RSP Position (m)</Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={disabled}
+                onClick={() => {
+                  const base = Number.isFinite(manualRspY_m) ? manualRspY_m : 2.0;
+                  onManualRspY_mChange?.(Math.round((base - 0.01) * 1000) / 1000);
+                }}
+                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
+                –
+              </Button>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.1"
+                max="20"
+                value={Number.isFinite(manualRspY_m) ? manualRspY_m : ''}
+                disabled={disabled}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  if (Number.isFinite(val) && val > 0) {
+                    onManualRspY_mChange?.(Math.round(val * 1000) / 1000);
+                  }
+                }}
+                className="h-10 flex-1 text-center"
+                style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={disabled}
+                onClick={() => {
+                  const base = Number.isFinite(manualRspY_m) ? manualRspY_m : 2.0;
+                  onManualRspY_mChange?.(Math.round((base + 0.01) * 1000) / 1000);
+                }}
+                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
+                +
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   </div>

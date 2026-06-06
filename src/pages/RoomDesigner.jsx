@@ -1941,6 +1941,10 @@ function RoomDesignerWithState() {
             priceData={priceData}
             _frontSubsCfg={_frontSubsCfg}
             _rearSubsCfg={_rearSubsCfg}
+            rspMode={appState?.rspMode || "auto_from_screen"}
+            onRspModeChange={appState?.setRspMode}
+            manualRspY_m={appState?.manualRspY_m ?? null}
+            onManualRspY_mChange={appState?.setManualRspY_m}
           />
         )}
       />

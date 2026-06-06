@@ -108,6 +108,11 @@ export default function RoomDesignerControlsPanel({
   priceData,
   _frontSubsCfg,
   _rearSubsCfg,
+  // RSP mode
+  rspMode,
+  onRspModeChange,
+  manualRspY_m,
+  onManualRspY_mChange,
 }) {
   const [rightPanelView, setRightPanelView] = useState('controls');
 
@@ -245,7 +250,11 @@ export default function RoomDesignerControlsPanel({
               showMlpRuler={showMlpRuler}
               onShowMlpRulerChange={setShowMlpRuler}
               rowEarHeights={appState?.rowEarHeights || []}
-              onRowEarHeightsChange={appState?.setRowEarHeights} />
+              onRowEarHeightsChange={appState?.setRowEarHeights}
+              rspMode={rspMode}
+              onRspModeChange={onRspModeChange}
+              manualRspY_m={manualRspY_m}
+              onManualRspY_mChange={onManualRspY_mChange} />
           </Suspense>
         </CollapsiblePanel>
 
