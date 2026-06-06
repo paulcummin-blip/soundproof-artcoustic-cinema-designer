@@ -77,7 +77,7 @@ export default function RvSeatLayer({
               ry={RY_M * scale}
               fill="rgba(0,0,0,0)"
               pointerEvents="none"
-              stroke="#213428"
+              stroke="#4A230F"
               strokeWidth={isPinned ? 2 : 1}
               strokeDasharray={isPinned ? '4 2' : 'none'}
               aria-label="Seat — hover for RP23 and P1 analysis"
