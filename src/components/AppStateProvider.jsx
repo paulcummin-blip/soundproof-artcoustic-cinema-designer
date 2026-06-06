@@ -7,6 +7,7 @@ import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getA
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
+import { useRspState } from "@/components/state/useRspState";
 
 // --- SINGLE-PRIMARY ENFORCER ---
 // After normalising, re-run computeMLPAndPrimary and collapse to exactly one
@@ -689,6 +690,10 @@ function useDesignerState() {
     _setExtraSurroundCount(clamped);
   }, []);
 
+  // ── RSP STATE (composed from isolated hook) ──────────────────────────────
+  const { rspMode, setRspMode, manualRspY_m, setManualRspY_m, resetRspState } = useRspState(__autosavePayload);
+  // ── END RSP STATE ─────────────────────────────────────────────────────────
+
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
@@ -1041,29 +1046,6 @@ function useDesignerState() {
       }
     }));
   }, []);
-
-  const hasSurroundModelSelected = useMemo(() => {
-    if (!splConfig) return false;
-
-    const surroundRoles = ['SL', 'SR', 'SBL', 'SBR', 'LR', 'RR'];
-
-    return surroundRoles.some((role) => {
-      const cfg =
-        splConfig.perRole?.[role] ||
-        splConfig.byRole?.[role] ||
-        splConfig[role] ||
-        splConfig.surround ||
-        splConfig.surroundModel;
-
-      const model = cfg && (cfg.model || cfg);
-
-      return !!(
-        model &&
-        typeof model === 'string' &&
-        model.toUpperCase() !== 'NONE'
-      );
-    });
-  }, [splConfig]);
 
   // --- CANONICAL VISIBILITY HELPER (used everywhere) ---------------------
   const visibleRoles = useMemo(() => {
@@ -1872,6 +1854,11 @@ function useDesignerState() {
     setP12Mode,
     p12Level,
     setP12Level,
+    rspMode,
+    setRspMode,
+    manualRspY_m,
+    setManualRspY_m,
+    resetRspState,
     };
   }, [
     dimensions, setDimensions,
@@ -1959,6 +1946,11 @@ function useDesignerState() {
     setP12Mode,
     p12Level,
     setP12Level,
+    rspMode,
+    setRspMode,
+    manualRspY_m,
+    setManualRspY_m,
+    resetRspState,
   ]);
 
   // Export p21 setter as convenience (same pattern as p15)
