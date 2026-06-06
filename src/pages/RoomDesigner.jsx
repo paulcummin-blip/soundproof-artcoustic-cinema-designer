@@ -1823,7 +1823,9 @@ function RoomDesignerWithState() {
                   isDraggingRef={isDraggingRef}
                   extraSurroundCount={appState?.extraSurroundCount ?? 0}
                   showRoomModesOverlay={showRoomModesOverlay}
-                  freeMoveLcr={freeMoveLcr} />}
+                  freeMoveLcr={freeMoveLcr}
+                  rspMode={appState?.rspMode || "auto_from_screen"}
+                  onSetManualRspY_m={appState?.setManualRspY_m} />}
 
                 {leftPanelView === 'front' && (
                   <FrontElevation

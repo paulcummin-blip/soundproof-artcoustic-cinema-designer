@@ -58,6 +58,8 @@ import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragU
 import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
 import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
 import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler";
+import { useMlpDragHandler } from "@/components/room/rv/hooks/useMlpDragHandler";
+import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
 import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement";
 import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
 import { useShiftSeatsToAngle } from "@/components/room/rv/hooks/useShiftSeatsToAngle";
@@ -173,6 +175,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     showScreenPlane = false,
     screenPlaneMode = 'autoTight',
     rp22AnglesEnabled = false,
+    rspMode = 'auto_from_screen',
+    onSetManualRspY_m,
     allSeatSplMetrics: allSeatSplMetricsProp = null,
     speakerPositionsView = 'off',
     showMlpRuler = false,
@@ -918,6 +922,7 @@ const byId = useEntitiesById({
     frontSubs, rearSubs, frontSubsCfg, rearSubsCfg,
     isRenderableSpeaker, isDraggable,
     roomElements,
+    rspMode,
   });
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
@@ -1091,6 +1096,12 @@ const byId = useEntitiesById({
   const handleSpeakerDrag = useCallback((speakerId, newCanvasPos) => {
     handleSpeakerDragUpdate(speakerId, newCanvasPos);
   }, [handleSpeakerDragUpdate]);
+
+  const { handleMlpDrag } = useMlpDragHandler({
+    canvasToRoom,
+    lengthM,
+    setManualRspY_m: onSetManualRspY_m,
+  });
 
   const { handleSeatDrag, isSnapping: isSeatSnapping, clearSnap: clearSeatSnap } = useSeatDragHandler({
     onSetSeatingPositions,
@@ -1271,6 +1282,7 @@ const byId = useEntitiesById({
     handleSubDrag,
     handleProjectorDrag,
     handleRoomElementDrag,
+    handleMlpDrag,
   });
 
   const { handleMouseUp } = useMouseUpHandler({
@@ -1801,42 +1813,24 @@ useEffect(() => {
 
 
 
-  // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
-  // never snap horizontally to a specific seat.
-  const MLPMarker = useMemo(() => {
-    if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) {
-      return null;
-    }
+  // MLPMarker is rendered by RvMlpMarker (see JSX below)
+  const handleMlpMarkerMouseDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleMouseDown(e, 'mlp-marker-dot', 'mlpMarker');
+  }, [handleMouseDown]);
 
-    const [x, y] = toPx(mlpDotX_m, mlpDotY_m);
-
-    return (
-      <g data-testid="mlp-marker">
-        <circle
-          cx={x}
-          cy={y}
-          r={4}
-          fill="#22c55e"
-          stroke="#ffffff"
-          strokeWidth={2}
-          opacity={0.9}
-        />
-        {_overlays?.ROOM_DIMS && exportMode !== 'dimensions' && (
-          <text
-            x={x}
-            y={y + 36}
-            textAnchor="middle"
-            fontSize={12}
-            fontWeight={600}
-            fill="#22c55e"
-            pointerEvents="none"
-          >
-            RSP
-          </text>
-        )}
-      </g>
-    );
-  }, [toPx, mlpDotX_m, mlpDotY_m, _overlays?.ROOM_DIMS]);
+  const MLPMarker = (
+    <RvMlpMarker
+      toPx={toPx}
+      mlpDotX_m={mlpDotX_m}
+      mlpDotY_m={mlpDotY_m}
+      _overlays={_overlays}
+      exportMode={exportMode}
+      rspMode={rspMode}
+      onMouseDown={handleMlpMarkerMouseDown}
+    />
+  );
 
   const canvasStyle = {
     margin: '0 auto',

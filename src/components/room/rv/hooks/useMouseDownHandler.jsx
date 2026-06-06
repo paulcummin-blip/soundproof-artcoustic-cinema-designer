@@ -31,6 +31,8 @@ export function useMouseDownHandler({
   isRenderableSpeaker,
   isDraggable,
   roomElements,
+  // RSP marker drag (manual_position mode only)
+  rspMode,
 }) {
   const handleMouseDown = useCallback(
     (e, id, type) => {
@@ -83,6 +85,17 @@ export function useMouseDownHandler({
             _subType: "front",
           };
         }
+      }
+
+      // RSP marker drag — only active in manual_position mode
+      if (type === 'mlpMarker') {
+        if (rspMode !== 'manual_position') return;
+        dragOffsetRoomRef.current = { x: 0, y: 0 };
+        isAnyDraggingRef.current = true;
+        setDragState({ dragging: true, draggedItemId: id, dragType: 'mlpMarker' });
+        setDragWarning({ show: false });
+        rsDragLockRef.current = null;
+        return;
       }
 
       // Projector drag: handled separately (not in byId)

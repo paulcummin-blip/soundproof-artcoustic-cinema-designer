@@ -26,6 +26,8 @@ export function useRoomCanvasMouseMove({
   handleSubDrag,
   handleProjectorDrag,
   handleRoomElementDrag,
+  // RSP marker drag
+  handleMlpDrag,
 }) {
   const handleMouseMove = useCallback((e) => {
     if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
@@ -68,13 +70,15 @@ export function useRoomCanvasMouseMove({
       handleProjectorDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'roomElement') {
       handleRoomElementDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+    } else if (dragType === 'mlpMarker') {
+      handleMlpDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     }
   }, [
     dragging, draggedItemId, dragType, dragState,
     setDragWarning, svgRef, canvasToRoom, roomToCanvas,
     dragOffsetRoomRef, roomRect, placedSpeakers,
     handleSpeakerDrag, handleSeatDrag, handleSubDrag, handleProjectorDrag,
-    handleRoomElementDrag, setDragState,
+    handleRoomElementDrag, handleMlpDrag, setDragState,
   ]);
 
   return { handleMouseMove };
