@@ -252,14 +252,21 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     return Math.max(minY, Math.min(maxY, y));
   };
 
+  // The fixed RSP is always the pure 57.5° position, independent of Viewing Offset.
+  // appState.mlpY_m = screenFront + idealDist + offset, so subtract offset to recover
+  // the invariant RSP that the green dot must always sit on regardless of offset.
+  const _fixedRspY = Number.isFinite(appState?.mlpY_m)
+    ? appState.mlpY_m - (Number(props.viewingDistanceOffsetM) || 0)
+    : undefined;
+
   const mlp = useMlpCalculation({
     mlpPoint,
     seatingPositions,
     mlpBasis,
     roomWidthM: widthM,
     roomLengthM: lengthM,
-    seatingBlockOffset: props.viewingDistanceOffsetM,
-    lockedMlpY: appState?.mlpY_m,
+    seatingBlockOffset: 0, // always treat as 0 so lockedMlpY wins (fixed RSP dot)
+    lockedMlpY: _fixedRspY,
   });
   const mlpDotX_m = mlp.x;
   const mlpDotY_m = mlp.y;
@@ -1825,17 +1832,6 @@ useEffect(() => {
     );
   }, [toPx, mlpDotX_m, mlpDotY_m, _overlays?.ROOM_DIMS]);
 
-  const containerStyle = {
-    position: 'relative',
-    width: '100%',
-    aspectRatio: aspect,
-    maxHeight: 'none',
-    border: '1px solid #DCDBD6',
-    borderRadius: '88px',
-    backgroundColor: '#F8F8F7',
-    overflow: 'hidden',
-  };
-
   const canvasStyle = {
     margin: '0 auto',
     padding: '24px',
@@ -1844,8 +1840,6 @@ useEffect(() => {
     overflow: 'hidden',
     position: 'relative'
   };
-
-  const containerRect = planBoundsRef.current?.getBoundingClientRect();
 
   const svgW = containerW;
   const svgH = containerH;
