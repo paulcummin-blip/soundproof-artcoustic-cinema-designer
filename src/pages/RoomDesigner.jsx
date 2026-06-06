@@ -41,6 +41,7 @@ import { placeSubwoofers } from '@/components/room/placement/placeSubwoofers'; /
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones"; // NEW import
 import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Import SHOW_DEBUG_LOGS
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
+import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
@@ -565,6 +566,39 @@ function RoomDesignerWithState() {
 
     return null;
   }, [appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions]);
+
+  // ── RSP: effectiveRspY_m from useEffectiveRsp (Phase 1: auto_from_screen only) ──
+  // screenWidthM is derived the same way the existing MLP effect derives it.
+  const _rspScreenWidthM = Number(screenVisibleWidthInchesEffective) * 0.0254;
+  const { effectiveRspY_m, rspSourceLabel } = useEffectiveRsp({
+    rspMode: appState?.rspMode || "auto_from_screen",
+    manualRspY_m: appState?.manualRspY_m ?? null,
+    screenFrontPlaneM: appState?.screenFrontPlaneM,
+    screenWidthM: _rspScreenWidthM,
+    rowCentersM: appState?.rowCentersM || [],
+    seatingPositions: appState?.seatingPositions || [],
+    currentMlpY_m: appState?.mlpY_m ?? null,
+  });
+
+  // Write effectiveRspY_m → appState.mlpY_m only for auto_from_screen (Phase 1).
+  // Uses the identical rounding/tolerance pattern as the existing MLP useEffect so
+  // React never sees a spurious state update and no loop is introduced.
+  // NOTE: The existing MLP useEffect still runs and produces the same value, so
+  // both writes resolve to an identical rounded result — no behaviour change.
+  const _rspModeForEffect = appState?.rspMode || "auto_from_screen";
+  useEffect(() => {
+    if (_rspModeForEffect !== "auto_from_screen") return;
+    if (!Number.isFinite(effectiveRspY_m)) return;
+    if (typeof appState?.setMlpY_m !== "function") return;
+
+    const mlpRounded = Math.round(effectiveRspY_m * 1000) / 1000;
+    appState.setMlpY_m((prev) => {
+      const prevRounded = Number.isFinite(prev) ? Math.round(prev * 1000) : null;
+      const newRounded = Math.round(mlpRounded * 1000);
+      return prevRounded === newRounded ? prev : mlpRounded;
+    });
+  }, [_rspModeForEffect, effectiveRspY_m, appState?.setMlpY_m]);
+  // ── END RSP ───────────────────────────────────────────────────────────────
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
   console.log('[ROOM placedSpeakers]', placedSpeakers.map(s => String(s?.role)));
