@@ -67,6 +67,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // Magnetic snap state
   const [activeSnap, setActiveSnap] = useState(null); // { axis: 'x'|'z', value: number } | null
   const setActiveSnapRef = useRef(setActiveSnap);
+
+  // TV vertical-centre guide state — only for FL/FR drag in TV mode
+  const [tvGuide, setTvGuide] = useState(null); // null | { snapped: boolean }
+  const setTvGuideRef = useRef(setTvGuide);
+  const tvCentreRef = useRef(null); // current TV viewable vertical centre in metres
   // Local live drag state for sub dragging — avoids calling onFrontSubMoved on every mousemove
   const [liveDragSubs, setLiveDragSubs] = useState(null); // { [index]: {x, z} } | null
   const liveDragSubsRef = useRef(null); // readable in mouseup without stale closure
@@ -91,6 +96,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     dragRef.current = { role, speakerMX, speakerMZ, startRoomX: start.mX, startRoomZ: start.mZ, axisLocked: null };
     if (isDraggingRef) isDraggingRef.current = true;
     document.body.style.cursor = 'grabbing';
+    // Show TV centre guide immediately when dragging FL/FR in TV mode
+    if ((role === 'FL' || role === 'FR') && tvCentreRef.current !== null) {
+      setTvGuideRef.current?.({ snapped: false });
+    }
   }, [clientToRoom, isDraggingRef]);
 
   const handleSubMouseDown = useCallback((e, subIndex, speakerMX, speakerMZ) => {
@@ -142,6 +151,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         const zTargets = allOtherSpks
           .filter(s => !(isLRPair && (s.role === 'FL' || s.role === 'FR')))
           .map(s => ({ value: s.z, type: 'speaker' }));
+        // Inject TV vertical centre as a snap target for FL/FR in TV mode
+        const tvCentre = tvCentreRef.current;
+        if (isLRPair && tvCentre !== null) {
+          zTargets.push({ value: tvCentre, type: 'tv_centre' });
+        }
         let best = null, bestD = SNAP_M;
         zTargets.forEach(t => { const d = Math.abs(rawZ - t.value); if (d < bestD) { bestD = d; best = t; } });
         if (best) { snappedZ = best.value; snapResult = { axis: 'z', value: best.value }; }
@@ -167,6 +181,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         onMovedRef.current?.({ role: drag.role, newX: snappedX, newZ: snappedZ, axis: drag.axisLocked });
         if (drag.axisLocked === 'z') {
           setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: snappedZ });
+          // Update TV centre snap state for FL/FR
+          const tvCentre = tvCentreRef.current;
+          if ((drag.role === 'FL' || drag.role === 'FR') && tvCentre !== null) {
+            setTvGuideRef.current?.({ snapped: Math.abs(snappedZ - tvCentre) < 0.005 });
+          }
         }
       }
     };
@@ -187,6 +206,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       document.body.style.cursor = '';
       setAlignGuideRef.current?.(null);
       setActiveSnapRef.current?.(null);
+      setTvGuideRef.current?.(null);
     };
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
@@ -203,6 +223,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const borderM = hasBorderData ? Number(screen.borderThicknessM) : 0.05; // 5cm fallback
   const overallW = screenData.w + borderM * 2;
   const overallH = screenData.h + borderM * 2;
+
+  // TV vertical centre — only when displaying a TV (not a projector screen)
+  const isTV = !!(screen?.tvPresetKey || Number(screen?.tvWidthMm) > 0);
+  const tvVerticalCentreM = isTV ? (screenFloorM + borderM + screenData.h / 2) : null;
 
   // LCR speakers — always returns a plain array
   // Pass the TV preset key as `orientation` so tv_linked models (e.g. C4-1) resolve
@@ -242,6 +266,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // Keep snap refs current on every render
   lcrSpeakersRef.current = lcrSpeakers;
   subItemsRef.current = subItems;
+  tvCentreRef.current = tvVerticalCentreM;
 
   // Clash detection — recalculates live (also during drag via lcrSpeakers/subItems reactivity)
   const clashes = useMemo(() => {
@@ -535,6 +560,32 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
               <text x={rx(rX_m + rW_m / 2)} y={ry(rH_m) - 3} textAnchor="middle" fontSize={7} fill={DIM_COLOR} letterSpacing="0.05em">
                 RISER
               </text>
+            </g>
+          );
+        })()}
+
+        {/* TV vertical centre guide — appears only during FL/FR drag in TV mode */}
+        {tvGuide !== null && tvVerticalCentreM !== null && (() => {
+          const guideY = ry(tvVerticalCentreM);
+          const isSnapped = tvGuide.snapped;
+          const guideColor = isSnapped ? '#10B981' : '#9B9890';
+          return (
+            <g key="tv-centre-guide" style={{ pointerEvents: 'none' }}>
+              <line
+                x1={offsetX} y1={guideY} x2={offsetX + drawW} y2={guideY}
+                stroke={guideColor}
+                strokeWidth={isSnapped ? 1.5 : 0.9}
+                strokeDasharray={isSnapped ? '6 3' : '4 3'}
+                opacity={0.9}
+              />
+              {isSnapped && (
+                <g>
+                  <rect x={offsetX + drawW / 2 - 56} y={guideY - 9} width={112} height={14} fill={guideColor} rx={2} />
+                  <text x={offsetX + drawW / 2} y={guideY + 1} textAnchor="middle" fontSize={8} fill="white" fontWeight={700} letterSpacing="0.06em">
+                    Aligned to TV Centre
+                  </text>
+                </g>
+              )}
             </g>
           );
         })()}
