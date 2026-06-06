@@ -31,7 +31,7 @@ export default function RvMlpRuler(props) {
   
   // Ruler styling (match speaker rulers)
   const rulerColor = '#625143';
-  const brandGreen = '#4A230F';
+  const brandGreen = '#213428';
   const rulerStroke = 1.5;
   const dotRadius = 3;
   const fontSize = 11;
