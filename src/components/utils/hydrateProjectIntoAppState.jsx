@@ -71,6 +71,8 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     setFreeMoveLcr,
     setGlobalSurroundModel,
     setExtraSurroundCount,
+    setRspMode,
+    setManualRspY_m,
   } = setters;
 
   // 1) ROOM DIMS
@@ -253,6 +255,15 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   if (typeof appState?.setScreenFrontPlaneM === "function") {
     const sfp = Number(p?.screen_front_plane_m);
     appState.setScreenFrontPlaneM(Number.isFinite(sfp) ? sfp : 0);
+  }
+
+  // 10d) RSP MODE + MANUAL RSP Y
+  if (typeof setRspMode === "function") {
+    setRspMode(p?.rsp_mode || "auto_from_screen");
+  }
+  if (typeof setManualRspY_m === "function") {
+    const y = Number(p?.manual_rsp_y_m);
+    setManualRspY_m(Number.isFinite(y) ? y : null);
   }
 
   // 11) PLACED SPEAKERS

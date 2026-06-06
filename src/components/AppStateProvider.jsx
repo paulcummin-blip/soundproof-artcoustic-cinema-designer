@@ -1363,6 +1363,8 @@ function useDesignerState() {
       if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
       if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
       if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
+      if (typeof p.rsp_mode === "string") setRspMode(p.rsp_mode);
+      if (p.manual_rsp_y_m !== undefined) setManualRspY_m(typeof p.manual_rsp_y_m === "number" ? p.manual_rsp_y_m : null);
 
       setAutosaveMeta(getAutosaveMeta());
       
@@ -1438,6 +1440,8 @@ function useDesignerState() {
       p21EarlyReflectionPreset,
       mlpOverride,
       extraSurroundCount,
+      rsp_mode: rspMode,
+      manual_rsp_y_m: manualRspY_m,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
@@ -1490,6 +1494,8 @@ function useDesignerState() {
     p21EarlyReflectionPreset,
     mlpOverride,
     extraSurroundCount,
+    rspMode,
+    manualRspY_m,
     roomElements
     ]);
 
@@ -1758,6 +1764,9 @@ function useDesignerState() {
 
     // Per-seat metrics
     setPerSeatMetrics({});
+
+    // RSP state
+    resetRspState();
 
     // 3. Increment reset epoch to force rebuild
     setRoomResetEpoch(prev => prev + 1);

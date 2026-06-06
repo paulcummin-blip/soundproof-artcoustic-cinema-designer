@@ -305,6 +305,24 @@
       "type": "number",
       "description": "Screen border thickness in meters",
       "default": 0.08
+    },
+    "rsp_mode": {
+      "type": "string",
+      "enum": [
+        "auto_from_screen",
+        "front_row_center",
+        "middle_row_center",
+        "back_row_center",
+        "all_rows_average",
+        "manual_position"
+      ],
+      "default": "auto_from_screen",
+      "description": "RSP source-of-truth mode. auto_from_screen = 57.5\u00b0 derived; *_row_* = seating-derived; manual_position = user-nominated Y."
+    },
+    "manual_rsp_y_m": {
+      "type": "number",
+      "description": "Explicit RSP Y position in meters when rsp_mode is manual_position. Null = not set.",
+      "nullable": true
     }
   },
   "required": [
