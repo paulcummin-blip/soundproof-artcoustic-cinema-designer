@@ -50,7 +50,7 @@ function pickMLP(seats) {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 /**
- * @param {{ mlpPoint: object|null, seatingPositions: Array|null, mlpBasis: any, roomWidthM: number, roomLengthM: number }} opts
+ * @param {{ mlpPoint: object|null, seatingPositions: Array|null, mlpBasis: any, roomWidthM: number, roomLengthM: number, seatingBlockOffset?: number, lockedMlpY?: number }} opts
  * @returns {{ x: number, y: number, z: number }|null}
  */
 export function useMlpCalculation({
@@ -59,9 +59,19 @@ export function useMlpCalculation({
   mlpBasis,       // kept for dependency-list parity; not used in computation
   roomWidthM,
   roomLengthM,
+  seatingBlockOffset, // NEW: when 0, the 57.5° RSP locks and mlpPoint cannot override it
+  lockedMlpY,        // NEW: the authoritative 57.5° MLP Y from appState.mlpY_m
 }) {
   const mlp = useMemo(() => {
-    // 1) Explicit mlpPoint
+    // ── 57.5° LOCK: when offset is 0 and a locked MLP Y is available,
+    // use it directly — mlpPoint (stale drag override) cannot win.
+    const isLocked = (Number(seatingBlockOffset) === 0) && Number.isFinite(lockedMlpY);
+    if (isLocked) {
+      const cx = Number.isFinite(roomWidthM) ? roomWidthM / 2 : 0;
+      return { x: cx, y: clampMlpY(lockedMlpY, roomLengthM), z: 1.2 };
+    }
+
+    // 1) Explicit mlpPoint — only allowed when a non-zero viewing offset is active
     if (
       mlpPoint &&
       Number.isFinite(mlpPoint.x) &&
@@ -94,6 +104,8 @@ export function useMlpCalculation({
     mlpBasis,
     roomWidthM,
     roomLengthM,
+    seatingBlockOffset,
+    lockedMlpY,
   ]);
 
   return mlp;

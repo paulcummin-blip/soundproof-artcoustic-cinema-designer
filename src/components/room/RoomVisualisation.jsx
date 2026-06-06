@@ -257,7 +257,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     seatingPositions,
     mlpBasis,
     roomWidthM: widthM,
-    roomLengthM: lengthM
+    roomLengthM: lengthM,
+    seatingBlockOffset: props.viewingDistanceOffsetM,
+    lockedMlpY: appState?.mlpY_m,
   });
   const mlpDotX_m = mlp.x;
   const mlpDotY_m = mlp.y;

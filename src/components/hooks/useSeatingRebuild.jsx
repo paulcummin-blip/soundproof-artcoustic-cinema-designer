@@ -201,6 +201,25 @@ export function useSeatingRebuild({
 
     const isLoadedProject = loadState?.phase === "loaded" && !!hasProjectId;
 
+    // ── 57.5° LOCK: calculate live RSP regardless of project mode ─────────────
+    // When seatingBlockOffset is 0, the RSP is always exactly 57.5° from the
+    // live screen front plane and viewable screen width. This must not be
+    // overridden by saved mlpY_m, saved rowCentersM, or mlpPoint.
+    const liveScreenFrontPlaneM = Number.isFinite(Number(appState?.screenFrontPlaneM)) && Number(appState.screenFrontPlaneM) > 0
+      ? Number(appState.screenFrontPlaneM)
+      : (Number.isFinite(Number(appState?.screen?.screenPlaneY_m)) && Number(appState.screen.screenPlaneY_m) > 0
+          ? Number(appState.screen.screenPlaneY_m)
+          : Number(appState?.screen?.floatDepthM) || 0.20);
+    const liveVisibleWidthInches = resolveVisibleWidthInches(appState?.screen);
+    const liveOffsetM = Number(appState?.seatingBlockOffset) || 0;
+    const liveFix57MlpY = liveScreenFrontPlaneM + distanceFor57_5FromWidth(liveVisibleWidthInches * 0.0254) + liveOffsetM;
+
+    // Detect geometry changes that should bypass the loaded-project guard
+    const currentVisibleWidthM57 = liveVisibleWidthInches * 0.0254;
+    const seatingReferenceChanged =
+      (prevVisibleWidthMRef.current !== null && Math.abs(currentVisibleWidthM57 - prevVisibleWidthMRef.current) > 0.001) ||
+      (prevMlpYRef.current !== null && Math.abs(liveFix57MlpY - prevMlpYRef.current) > 0.005);
+
     // ── SCREEN-PLANE DELTA SHIFT ───────────────────────────────────────────────
     // When the MLP moves because the screen plane shifted (e.g. LCR angling),
     // shift the existing seating block by the same delta instead of rebuilding.
@@ -316,6 +335,10 @@ export function useSeatingRebuild({
     if (prevWidthM === null) {
       prevVisibleWidthMRef.current = currentVisibleWidthM;
     }
+    // Also keep prevMlpYRef in sync with the live 57.5° value for seatingReferenceChanged detection
+    if (prevMlpYRef.current === null && Number.isFinite(liveFix57MlpY)) {
+      prevMlpYRef.current = liveFix57MlpY;
+    }
     // ── END SCREEN-WIDTH ABSOLUTE Y CORRECTION ────────────────────────────────
 
     if (
@@ -323,7 +346,9 @@ export function useSeatingRebuild({
       currentSeats.length > 0 &&
       !userHasChangedSeatingSinceLoad &&
       !didUserRequestResetRef.current &&
-      !(appState?.roomResetEpoch > 0)
+      !(appState?.roomResetEpoch > 0) &&
+      // ── 57.5° LOCK: do NOT guard if screen geometry or offset changed ────────
+      !seatingReferenceChanged
     ) {
       return;
     }
@@ -340,9 +365,9 @@ export function useSeatingRebuild({
     );
 
     // 2) Row centre Y positions
-    // When seating controls change, always regenerate from the live offset-derived MLP
-    // instead of preferring existing (potentially stale) rowCentersM.
-    const shouldRegenerateFromMlp = userHasChangedSeatingSinceLoad;
+    // When offset is 0, always regenerate from the live 57.5° MLP — never trust stale rowCentersM.
+    // When seating controls change, also regenerate from live MLP.
+    const shouldRegenerateFromMlp = userHasChangedSeatingSinceLoad || liveOffsetM === 0;
     let centers = (!shouldRegenerateFromMlp && Array.isArray(appState?.rowCentersM))
       ? appState.rowCentersM.slice(0, list.length)
       : [];
