@@ -775,7 +775,7 @@ export default function SeatingLayout({
           disabled={disabled}
           modal={false}>
           <SelectTrigger style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}>
-            <SelectValue>
+            <span>
               {{
                 auto_from_screen: 'Auto from Screen Size',
                 manual_position: 'Manual Position',
@@ -784,7 +784,7 @@ export default function SeatingLayout({
                 back_row_center: 'Back Row Centre',
                 all_rows_average: 'All Rows Average',
               }[rspMode] ?? 'Auto from Screen Size'}
-            </SelectValue>
+            </span>
           </SelectTrigger>
           <SelectContent position="popper" sideOffset={6} className="z-[70]">
             <SelectItem value="auto_from_screen">Auto from Screen Size</SelectItem>
