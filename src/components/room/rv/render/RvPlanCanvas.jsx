@@ -518,7 +518,7 @@ export default function RvPlanCanvas({
                     width={88}
                     height={18}
                     rx={4}
-                    fill="#22c55e"
+                    fill="#4A230F"
                     opacity={0.85}
                   />
                   <text
