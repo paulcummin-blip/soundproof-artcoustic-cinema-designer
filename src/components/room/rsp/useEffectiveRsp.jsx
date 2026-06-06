@@ -54,7 +54,16 @@ export function useEffectiveRsp({
       // Inputs not yet finite — fall through to fallback below
     }
 
-    // ── Fallback / unsupported modes (Phase 1) ──────────────────────────────
+    // ── manual_position ─────────────────────────────────────────────────────
+    if (rspMode === "manual_position") {
+      const manualY = Number(manualRspY_m);
+      if (Number.isFinite(manualY)) {
+        return { effectiveRspY_m: manualY, rspSourceLabel: "Manual RSP" };
+      }
+      // manualRspY_m not yet set — fall through to currentMlpY_m fallback
+    }
+
+    // ── Fallback / unsupported modes ─────────────────────────────────────────
     // Return currentMlpY_m unchanged so wiring this hook has zero behaviour impact
     // for all modes not yet implemented.
     const fallbackY = Number.isFinite(Number(currentMlpY_m))
@@ -67,10 +76,11 @@ export function useEffectiveRsp({
     };
   }, [
     rspMode,
+    manualRspY_m,
     screenFrontPlaneM,
     screenWidthM,
     currentMlpY_m,
-    // manualRspY_m, rowCentersM, seatingPositions intentionally not reactive in Phase 1
-    // — they will be added in later phases when those modes are implemented.
+    // rowCentersM, seatingPositions intentionally not reactive yet
+    // — they will be added when row-derived modes are implemented.
   ]);
 }
