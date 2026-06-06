@@ -780,6 +780,10 @@ export default function SeatingLayout({
           <SelectContent position="popper" sideOffset={6} className="z-[70]">
             <SelectItem value="auto_from_screen">Auto from Screen</SelectItem>
             <SelectItem value="manual_position">Manual Position</SelectItem>
+            <SelectItem value="front_row_center">Front Row Centre</SelectItem>
+            {rowCount >= 3 && <SelectItem value="middle_row_center">Middle Row Centre</SelectItem>}
+            <SelectItem value="back_row_center">Back Row Centre</SelectItem>
+            <SelectItem value="all_rows_average">All Rows Average</SelectItem>
           </SelectContent>
         </Select>
 
