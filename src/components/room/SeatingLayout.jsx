@@ -817,7 +817,7 @@ export default function SeatingLayout({
                 step="0.01"
                 min="0.1"
                 max="20"
-                value={Number.isFinite(manualRspY_m) ? manualRspY_m : ''}
+                value={Number.isFinite(manualRspY_m) ? (Math.round(manualRspY_m * 100) / 100).toFixed(2) : ''}
                 disabled={disabled}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);

@@ -260,7 +260,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // appState.mlpY_m = screenFront + idealDist + offset, so subtract offset to recover
   // the invariant RSP that the green dot must always sit on regardless of offset.
   const _fixedRspY = Number.isFinite(appState?.mlpY_m)
-    ? appState.mlpY_m - (Number(props.viewingDistanceOffsetM) || 0)
+    ? (rspMode === 'manual_position'
+        ? appState.mlpY_m
+        : appState.mlpY_m - (Number(props.viewingDistanceOffsetM) || 0))
     : undefined;
 
   const mlp = useMlpCalculation({
