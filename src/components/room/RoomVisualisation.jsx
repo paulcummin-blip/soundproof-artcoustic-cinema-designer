@@ -176,6 +176,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     screenPlaneMode = 'autoTight',
     rp22AnglesEnabled = false,
     rspMode = 'auto_from_screen',
+    manualRspY_m,
     onSetManualRspY_m,
     allSeatSplMetrics: allSeatSplMetricsProp = null,
     speakerPositionsView = 'off',
@@ -259,11 +260,11 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // The fixed RSP is always the pure 57.5° position, independent of Viewing Offset.
   // appState.mlpY_m = screenFront + idealDist + offset, so subtract offset to recover
   // the invariant RSP that the green dot must always sit on regardless of offset.
-  const _fixedRspY = Number.isFinite(appState?.mlpY_m)
-    ? (rspMode === 'manual_position'
-        ? appState.mlpY_m
-        : appState.mlpY_m - (Number(props.viewingDistanceOffsetM) || 0))
-    : undefined;
+  const _fixedRspY = (rspMode === 'manual_position' && Number.isFinite(Number(props.manualRspY_m)))
+    ? Number(props.manualRspY_m)
+    : (Number.isFinite(appState?.mlpY_m)
+        ? appState.mlpY_m - (Number(props.viewingDistanceOffsetM) || 0)
+        : undefined);
 
   const mlp = useMlpCalculation({
     mlpPoint,
