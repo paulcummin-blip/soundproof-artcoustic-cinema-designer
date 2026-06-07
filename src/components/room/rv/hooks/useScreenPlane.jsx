@@ -37,7 +37,27 @@ export function useScreenPlane({
     const frontObjectsToCalculate = [...(placedSpeakers || []), ...(frontSubs || [])]
       .filter(s => {
         const r = getCanonicalRole(s.role);
-        if (r === 'FL' || r === 'FC' || r === 'FR') return true;
+        if (r === 'FL' || r === 'FC' || r === 'FR') {
+          // Y-extent check: only include if this LCR speaker is physically
+          // behind the screen/baffle clearance zone (i.e. it occupies space
+          // between the front wall and the screen face).
+          // Soundbars below a TV and visible in-room speakers will have a
+          // position.y that puts them at or in front of the screen plane and
+          // should NOT push the screen forward.
+          const lcrY = Number(s?.position?.y);
+          if (!Number.isFinite(lcrY)) return true; // no position — fallback: include (safe)
+
+          const dims = getModelDimsM(s?.model);
+          const lcrDepthM = dims?.depthM;
+          if (!lcrDepthM) return true; // no dims — fallback: include (safe)
+
+          // Speaker back edge is at lcrY (nearest to front wall when y=0 is wall).
+          // Speaker front edge is at lcrY + lcrDepthM.
+          // Only include if the speaker's body starts before the current screen estimate,
+          // i.e. it occupies space that a screen at currentEstimate depth would clash with.
+          const currentEstimate = lastCalcMinScreenDepthRef.current ?? (0.01 + 0.30);
+          return lcrY < currentEstimate;
+        }
         if (isSubRole(r)) {
           const x = Number(s?.position?.x);
           const xOverlaps = Number.isFinite(x) && x >= screenLeftX && x <= screenRightX;
