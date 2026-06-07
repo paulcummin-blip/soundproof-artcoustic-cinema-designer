@@ -646,6 +646,17 @@ export default function SideElevation({
                         fill={LABEL_COLOR} fontWeight={600}>
                         {label}
                       </text>
+                      {/* Front sub dimension labels */}
+                      {Number.isFinite(bottomZ) && (
+                        <text x={frontX - 4} y={(svgTop + svgBot) / 2 - 6} textAnchor="end" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                          B{Math.round(bottomZ * 100)}cm
+                        </text>
+                      )}
+                      {Number.isFinite(subDepthM) && Number.isFinite(subHeightM) && (
+                        <text x={frontX - 4} y={(svgTop + svgBot) / 2 + 13} textAnchor="end" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                          {Math.round(subDepthM * 100)}×{Math.round(subHeightM * 100)}cm
+                        </text>
+                      )}
                       {canDrag && (
                         <rect
                           x={frontX - 7} y={svgTop - 7}
@@ -709,6 +720,17 @@ export default function SideElevation({
                         fill={LABEL_COLOR} fontWeight={600}>
                         {label}
                       </text>
+                      {/* Rear sub dimension labels */}
+                      {Number.isFinite(bottomZ) && (
+                        <text x={frontX - 4} y={(svgTop + svgBot) / 2 - 6} textAnchor="end" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                          B{Math.round(bottomZ * 100)}cm
+                        </text>
+                      )}
+                      {Number.isFinite(subDepthM) && Number.isFinite(subHeightM) && (
+                        <text x={frontX - 4} y={(svgTop + svgBot) / 2 + 13} textAnchor="end" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                          {Math.round(subDepthM * 100)}×{Math.round(subHeightM * 100)}cm
+                        </text>
+                      )}
                       {canDrag && (
                         <rect
                           x={frontX - 7} y={svgTop - 7}
@@ -895,6 +917,11 @@ export default function SideElevation({
             const adjustedIconX = spkX - adjustedIconW / 2;
             const adjustedIconY = rz(effectiveZ) - adjustedIconH / 2;
 
+            const sideSpkHCm = Number.isFinite(effectiveZ) ? Math.round(effectiveZ * 100) : null;
+            const sideSpkWCm = Number.isFinite(spkWidthM) ? Math.round(spkWidthM * 100) : null;
+            const sideSpkDimHCm = Number.isFinite(spkHeightM) ? Math.round(spkHeightM * 100) : null;
+            // Dim labels to the right of the cabinet box
+            const sideDimX = spkX + svgW / 2 + 4;
             return (
               <g key={`spk-${i}`} opacity={0.85}
                 onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, effectiveZ) : undefined}
@@ -933,6 +960,17 @@ export default function SideElevation({
                   fontWeight={600}>
                   {spk.role}
                 </text>
+                {/* Dimension labels */}
+                {sideSpkHCm !== null && (
+                  <text x={sideDimX} y={(svgTop + svgBot) / 2 - 4} textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                    H{sideSpkHCm}cm
+                  </text>
+                )}
+                {sideSpkWCm !== null && sideSpkDimHCm !== null && (
+                  <text x={sideDimX} y={(svgTop + svgBot) / 2 + 5} textAnchor="start" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                    {sideSpkWCm}×{sideSpkDimHCm}cm
+                  </text>
+                )}
                 {isDraggable && (
                   <rect
                     x={cabinetX - 7} y={cabinetY - 7}
@@ -985,6 +1023,17 @@ export default function SideElevation({
                   fill={LABEL_COLOR} fontWeight={600}>
                   {label}
                 </text>
+                {/* Rear group dimension labels */}
+                {Number.isFinite(effectiveGrpZ) && (
+                  <text x={frontX - 4} y={(svgTop + svgBot) / 2 - 6} textAnchor="end" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                    H{Math.round(effectiveGrpZ * 100)}cm
+                  </text>
+                )}
+                {Number.isFinite(spkDepthM) && Number.isFinite(spkHeightM) && (
+                  <text x={frontX - 4} y={(svgTop + svgBot) / 2 + 13} textAnchor="end" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                    {Math.round(spkDepthM * 100)}×{Math.round(spkHeightM * 100)}cm
+                  </text>
+                )}
                 {isDraggableGrp && (
                   <rect
                     x={frontX - 7} y={svgTop - 7}

@@ -595,39 +595,88 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           // C4-1 is a wide flat soundbar — use exact physical dimensions, no height fudge factor
           const isC41Spk = (spk.modelKey || "").includes("c4-1");
           const hMultiplier = isC41Spk ? 1.0 : 1.20;
-          return drawSpeakerFront({
-            key: spk.role,
-            cx: rx(spk.x),
-            cy: ry(spk.z),
-            sw: Math.max(12, (spk.wM / roomW) * drawW),
-            sh: Math.max(12, (spk.hM / roomH) * drawH * hMultiplier),
-            isRound: spk.round === true,
-            fill: SPEAKER_FILL,
-            stroke: SPEAKER_STROKE,
-            label: spk.label,
-            zM: spk.z,
-            modelKey: spk.modelKey ?? "",
-            onMouseDown: onLcrSpeakerMoved ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
-          });
+          const spkCx = rx(spk.x);
+          const spkCy = ry(spk.z);
+          const spkSw = Math.max(12, (spk.wM / roomW) * drawW);
+          const spkSh = Math.max(12, (spk.hM / roomH) * drawH * hMultiplier);
+          // Dimension label: place to the right of FL, left of FR, right of FC (centre)
+          const isLeft = spk.role === 'FL';
+          const dimLabelX = isLeft ? (spkCx - spkSw / 2 - 3) : (spkCx + spkSw / 2 + 3);
+          const dimAnchor = isLeft ? 'end' : 'start';
+          const heightCm = Number.isFinite(spk.z) ? Math.round(spk.z * 100) : null;
+          const wCm = Number.isFinite(spk.wM) ? Math.round(spk.wM * 100) : null;
+          const hCm = Number.isFinite(spk.hM) ? Math.round(spk.hM * 100) : null;
+          return (
+            <g key={spk.role}>
+              {drawSpeakerFront({
+                key: spk.role + '-body',
+                cx: spkCx,
+                cy: spkCy,
+                sw: spkSw,
+                sh: spkSh,
+                isRound: spk.round === true,
+                fill: SPEAKER_FILL,
+                stroke: SPEAKER_STROKE,
+                label: spk.label,
+                zM: spk.z,
+                modelKey: spk.modelKey ?? "",
+                onMouseDown: onLcrSpeakerMoved ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
+              })}
+              {/* Dimension labels — centre height and cabinet size */}
+              {heightCm !== null && (
+                <text x={dimLabelX} y={spkCy - 4} textAnchor={dimAnchor} fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                  H{heightCm}cm
+                </text>
+              )}
+              {wCm !== null && hCm !== null && (
+                <text x={dimLabelX} y={spkCy + 5} textAnchor={dimAnchor} fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                  {wCm}×{hCm}cm
+                </text>
+              )}
+            </g>
+          );
         })}
 
         {/* Front subwoofers — via drawSpeakerFront helper */}
-        {(Array.isArray(subItems) ? subItems : []).map((sub, i) =>
-          drawSpeakerFront({
-            key: `sub-${i}`,
-            cx: rx(sub.x),
-            cy: ry(sub.z),
-            sw: Math.max(12, (sub.wM / roomW) * drawW),
-            sh: Math.max(12, (sub.hM / roomH) * drawH),
-            isRound: false,
-            fill: "#fff",
-            stroke: "#4A4540",
-            label: sub.label,
-            zM: sub.z,
-            labelInsideBox: true,
-            onMouseDown: onFrontSubMoved ? (e) => handleSubMouseDown(e, i, sub.x, sub.z) : undefined,
-          })
-        )}
+        {(Array.isArray(subItems) ? subItems : []).map((sub, i) => {
+          const subCx = rx(sub.x);
+          const subCy = ry(sub.z);
+          const subSw = Math.max(12, (sub.wM / roomW) * drawW);
+          const subSh = Math.max(12, (sub.hM / roomH) * drawH);
+          const subHCm = Number.isFinite(sub.z) ? Math.round(sub.z * 100) : null;
+          const subWCm = Number.isFinite(sub.wM) ? Math.round(sub.wM * 100) : null;
+          const subDimCm = Number.isFinite(sub.hM) ? Math.round(sub.hM * 100) : null;
+          // Place dim label to the right of each sub
+          const subDimX = subCx + subSw / 2 + 3;
+          return (
+            <g key={`sub-${i}`}>
+              {drawSpeakerFront({
+                key: `sub-${i}-body`,
+                cx: subCx,
+                cy: subCy,
+                sw: subSw,
+                sh: subSh,
+                isRound: false,
+                fill: "#fff",
+                stroke: "#4A4540",
+                label: sub.label,
+                zM: sub.z,
+                labelInsideBox: true,
+                onMouseDown: onFrontSubMoved ? (e) => handleSubMouseDown(e, i, sub.x, sub.z) : undefined,
+              })}
+              {subHCm !== null && (
+                <text x={subDimX} y={subCy - 4} textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                  H{subHCm}cm
+                </text>
+              )}
+              {subWCm !== null && subDimCm !== null && (
+                <text x={subDimX} y={subCy + 5} textAnchor="start" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                  {subWCm}×{subDimCm}cm
+                </text>
+              )}
+            </g>
+          );
+        })}
 
         {/* Projector element if present */}
         {projectorEl && (() => {
