@@ -81,6 +81,7 @@ export default function SeatingLayout({
   onSeatSpacingChange,
   rowSpacingM = 1.8,
   onRowSpacingChange,
+  rowCentersM = [],
   seatingBlockOffset = 0,
   onSeatingBlockOffsetChange,
   mlpBasis = "front",
@@ -680,90 +681,102 @@ export default function SeatingLayout({
         </div>
       </div>
 
-      {/* Move Seats Forward / Back (m) */}
-      <div className="space-y-2">
-        <Label
-              className="text-sm font-medium"
-              style={{ color: '#3E4349' }}>
+      {/* Reference Row Distance from Front Wall (m) */}
+      {(() => {
+        // Determine current reference row Y from rowCentersM
+        const centers = Array.isArray(rowCentersM) && rowCentersM.length > 0 ? rowCentersM : null;
+        const offset = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
 
-          Move Seats Forward / Back (m)
-        </Label>
-        <p className="text-xs" style={{ color: '#625143' }}>
-          Positive values move seats backward, away from the screen. Negative values move seats forward, closer to the screen.
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
+        let currentReferenceRowY = null;
+        if (centers) {
+          const n = centers.length;
+          if (n === 1 || validMlpBasis === 'front') {
+            currentReferenceRowY = centers[0];
+          } else if (validMlpBasis === 'back') {
+            currentReferenceRowY = centers[n - 1];
+          } else if (validMlpBasis === 'middle') {
+            currentReferenceRowY = centers[Math.floor((n - 1) / 2)];
+          } else {
+            // 'all': average
+            currentReferenceRowY = centers.reduce((s, v) => s + v, 0) / n;
+          }
+        }
+
+        // referenceRowYAtZeroOffset = where the reference row would be if offset were 0
+        const referenceRowYAtZeroOffset = Number.isFinite(currentReferenceRowY)
+          ? currentReferenceRowY - offset
+          : null;
+
+        const displayValue = Number.isFinite(currentReferenceRowY)
+          ? Math.round(currentReferenceRowY * 100) / 100
+          : null;
+
+        const handleChange = (desiredReferenceRowY) => {
+          if (!Number.isFinite(desiredReferenceRowY) || !Number.isFinite(referenceRowYAtZeroOffset)) return;
+          const newOffset = desiredReferenceRowY - referenceRowYAtZeroOffset;
+          onSeatingBlockOffsetChange?.(clampViewingOffset(Math.round(newOffset * 100) / 100));
+        };
+
+        const rowLabel = rowCentersM.length <= 1
+          ? 'Row'
+          : validMlpBasis === 'front' ? 'Front Row'
+          : validMlpBasis === 'back' ? 'Back Row'
+          : validMlpBasis === 'middle' ? 'Middle Row'
+          : 'Reference Row';
+
+        return (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium" style={{ color: '#3E4349' }}>
+              {rowLabel} Distance from Front Wall (m)
+            </Label>
+            <p className="text-xs" style={{ color: '#625143' }}>
+              Sets the distance from the front wall to the {rowLabel.toLowerCase()}. Other rows follow using the row spacing value.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                disabled={disabled}
+                disabled={disabled || !Number.isFinite(displayValue)}
                 onClick={() => {
-                 if (disabled) return;
-                 const base = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
-                 // Snap to next lower 0.10 m boundary
-                 const next = Math.floor(Math.round(base * 100) / 100 / 0.1 - 1e-9) / 10;
-                 onSeatingBlockOffsetChange?.(clampViewingOffset(Math.round(next * 100) / 100));
+                  if (disabled || !Number.isFinite(displayValue)) return;
+                  handleChange(Math.round((displayValue - 0.1) * 100) / 100);
                 }}
-                style={{
-                  minWidth: 32,
-                  padding: 0,
-                  border: '1px solid #C1B6AD',
-                  backgroundColor: '#ffffff',
-                  color: '#1B1A1A'
-                }}>
-
-            –
-          </Button>
-
-          <Input
+                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
+                –
+              </Button>
+              <Input
                 type="text"
                 inputMode="decimal"
-                min="-2.0"
-                max="2.0"
                 step="0.1"
-                value={seatingBlockOffset}
+                value={displayValue !== null ? displayValue.toFixed(2) : ''}
                 onChange={(e) => {
                   if (disabled) return;
                   const raw = e.target.value;
                   if (raw === '') return;
                   const num = Number(raw);
-                  if (Number.isFinite(num)) {
-                    onSeatingBlockOffsetChange?.(clampViewingOffset(num));
-                  }
+                  if (Number.isFinite(num)) handleChange(num);
                 }}
-                disabled={disabled}
+                disabled={disabled || displayValue === null}
                 className="h-10 flex-1 text-center"
-                style={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #C1B6AD',
-                  color: '#1B1A1A'
-                }} />
-
-
-          <Button
+                style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
+              />
+              <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                disabled={disabled}
+                disabled={disabled || !Number.isFinite(displayValue)}
                 onClick={() => {
-                 if (disabled) return;
-                 const base = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
-                 // Snap to next higher 0.10 m boundary
-                 const next = Math.ceil(Math.round(base * 100) / 100 / 0.1 + 1e-9) / 10;
-                 onSeatingBlockOffsetChange?.(clampViewingOffset(Math.round(next * 100) / 100));
+                  if (disabled || !Number.isFinite(displayValue)) return;
+                  handleChange(Math.round((displayValue + 0.1) * 100) / 100);
                 }}
-                style={{
-                  minWidth: 32,
-                  padding: 0,
-                  border: '1px solid #C1B6AD',
-                  backgroundColor: '#ffffff',
-                  color: '#1B1A1A'
-                }}>
-
-            +
-          </Button>
-        </div>
-      </div>
+                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
+                +
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
 
 
 

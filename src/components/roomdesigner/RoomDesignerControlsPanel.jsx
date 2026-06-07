@@ -231,6 +231,7 @@ export default function RoomDesignerControlsPanel({
               seatSpacing={seatSpacing}
               onSeatSpacingChange={setSeatSpacingGuarded}
               rowSpacingM={_rowSpacingM || 1.8}
+              rowCentersM={appState?.rowCentersM || []}
               onRowSpacingChange={(val) => {
                 const next = Number(val);
                 if (!Number.isFinite(next)) return;
