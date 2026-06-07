@@ -927,6 +927,7 @@ const byId = useEntitiesById({
     roomElements,
     rspMode,
     mlpDotY_m,
+    meterToCanvasY,
   });
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)

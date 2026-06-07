@@ -71,8 +71,11 @@ export function useRoomCanvasMouseMove({
     } else if (dragType === 'roomElement') {
       handleRoomElementDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'mlpMarker') {
-      // Pass room coords directly — avoids unnecessary room→canvas→room round trip
-      handleMlpDrag?.(draggedItemId, targetRoomPos);
+      // Offset is stored in canvas space (coordinateSpace: 'canvas').
+      // Apply offset in canvas space, then convert to room once.
+      const mlpCanvasY = svgPoint.y + dragOffsetRoomRef.current.y;
+      const mlpRoomPos = canvasToRoom({ x: svgPoint.x, y: mlpCanvasY });
+      handleMlpDrag?.(draggedItemId, mlpRoomPos);
     }
   }, [
     dragging, draggedItemId, dragType, dragState,
