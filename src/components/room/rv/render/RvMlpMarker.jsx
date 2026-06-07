@@ -33,7 +33,8 @@ export default function RvMlpMarker({
           stroke="#22c55e"
           strokeWidth={1.5}
           opacity={0.4}
-          pointerEvents="none"
+          style={{ cursor: "grab" }}
+          onMouseDown={onMouseDown}
         />
       )}
 
