@@ -92,14 +92,9 @@ export function useMouseDownHandler({
       // RSP marker drag — only active in manual_position mode
       if (type === 'mlpMarker') {
         if (rspMode !== 'manual_position') return;
-        // Store offset in canvas space to avoid viewOffsetPx discrepancy
-        // meterToCanvasY converts the marker's room Y to the same pixel space as svgPoint.y
-        const markerCanvasY = (Number.isFinite(mlpDotY_m) && typeof meterToCanvasY === 'function')
-          ? meterToCanvasY(mlpDotY_m)
-          : svgPoint.y;
         dragOffsetRoomRef.current = {
           x: 0,
-          y: markerCanvasY - svgPoint.y,
+          y: 0,
           coordinateSpace: 'canvas',
         };
         isAnyDraggingRef.current = true;
