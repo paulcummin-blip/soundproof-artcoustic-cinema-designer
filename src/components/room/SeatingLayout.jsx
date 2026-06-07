@@ -776,32 +776,28 @@ export default function SeatingLayout({
         <Label className="text-sm font-medium" style={{ color: '#3E4349' }}>
           RSP Mode
         </Label>
-        <Select
-          value={rspMode}
-          onValueChange={(val) => onRspModeChange?.(val)}
-          disabled={disabled}
-          modal={false}>
-          <SelectTrigger style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}>
-            <span>
-              {{
-                auto_from_screen: 'Auto from Screen Size',
-                manual_position: 'Manual Position',
-                front_row_center: 'Front Row Centre',
-                middle_row_center: 'Middle Row Centre',
-                back_row_center: 'Back Row Centre',
-                all_rows_average: 'All Rows Average',
-              }[rspMode] ?? 'Auto from Screen Size'}
-            </span>
-          </SelectTrigger>
-          <SelectContent position="popper" sideOffset={6} className="z-[70]">
-            <SelectItem value="auto_from_screen">Auto from Screen Size</SelectItem>
-            <SelectItem value="manual_position">Manual Position</SelectItem>
-            <SelectItem value="front_row_center">Front Row Centre</SelectItem>
-            {rowCount >= 3 && <SelectItem value="middle_row_center">Middle Row Centre</SelectItem>}
-            <SelectItem value="back_row_center">Back Row Centre</SelectItem>
-            <SelectItem value="all_rows_average">All Rows Average</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Normalise legacy row-derived values to auto_from_screen for display */}
+        {(() => {
+          const ROW_DERIVED = ['front_row_center', 'middle_row_center', 'back_row_center', 'all_rows_average'];
+          const displayMode = ROW_DERIVED.includes(rspMode) ? 'auto_from_screen' : (rspMode || 'auto_from_screen');
+          return (
+            <Select
+              value={displayMode}
+              onValueChange={(val) => onRspModeChange?.(val)}
+              disabled={disabled}
+              modal={false}>
+              <SelectTrigger style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}>
+                <span>
+                  {{ auto_from_screen: 'Auto from Screen Size', manual_position: 'Manual Position' }[displayMode] ?? 'Auto from Screen Size'}
+                </span>
+              </SelectTrigger>
+              <SelectContent position="popper" sideOffset={6} className="z-[70]">
+                <SelectItem value="auto_from_screen">Auto from Screen Size</SelectItem>
+                <SelectItem value="manual_position">Manual Position</SelectItem>
+              </SelectContent>
+            </Select>
+          );
+        })()}
 
         {rspMode === "manual_position" && (
           <div className="space-y-1 pt-1">
