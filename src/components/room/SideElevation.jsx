@@ -767,7 +767,7 @@ export default function SideElevation({
                   fill={DOOR_FILL} stroke={DOOR_STROKE} strokeWidth={0.8} strokeDasharray="3 2" />
                 <text x={px + pw / 2} y={rz(elZ + elH) - 3}
                   textAnchor="middle" fontSize={7} fill={DOOR_STROKE} letterSpacing="0.04em">
-                  {el.type === 'door' ? 'DOOR' : 'WIN'}
+                  {el.label || el.name || (el.type === 'door' ? 'Door' : el.type === 'window' ? 'Window' : el.type ? el.type.charAt(0).toUpperCase() + el.type.slice(1) : 'Element')}
                 </text>
               </g>
             );
