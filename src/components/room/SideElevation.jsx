@@ -986,11 +986,18 @@ export default function SideElevation({
                       <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
                       {/* Tick at centre */}
                       <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      {/* Label */}
-                      <text x={dimX + 4} y={centrePx + (floorPx - centrePx) / 2 + 3}
-                        textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                        H{sideSpkHCm}cm
-                      </text>
+                      {/* Label — rotated vertically beside the line */}
+                      {(() => {
+                        const midY = (floorPx + centrePx) / 2;
+                        return (
+                          <text
+                            x={dimX + 4} y={midY}
+                            textAnchor="middle" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em"
+                            transform={`rotate(-90, ${dimX + 4}, ${midY})`}>
+                            H{sideSpkHCm}cm
+                          </text>
+                        );
+                      })()}
                     </g>
                   );
                 })()}
@@ -1061,10 +1068,17 @@ export default function SideElevation({
                       <line x1={dimX} y1={floorPx} x2={dimX} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
                       <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
                       <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      <text x={dimX + 4} y={centrePx + (floorPx - centrePx) / 2 + 3}
-                        textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                        H{Math.round(effectiveGrpZ * 100)}cm
-                      </text>
+                      {(() => {
+                        const midY = (floorPx + centrePx) / 2;
+                        return (
+                          <text
+                            x={dimX + 4} y={midY}
+                            textAnchor="middle" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em"
+                            transform={`rotate(-90, ${dimX + 4}, ${midY})`}>
+                            H{Math.round(effectiveGrpZ * 100)}cm
+                          </text>
+                        );
+                      })()}
                     </g>
                   );
                 })()}
