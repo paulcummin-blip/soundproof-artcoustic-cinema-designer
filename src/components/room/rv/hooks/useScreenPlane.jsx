@@ -31,63 +31,73 @@ export function useScreenPlane({
     const roomWidthM = Number(appState?.roomDims?.widthM) || 4.5;
     const screenCentreX = roomWidthM / 2;
     const screenVisibleWidthM = Math.max(0.1, Number(screen?.visibleWidthInches || 100) * 0.0254);
-    const screenLeftX  = screenCentreX - screenVisibleWidthM / 2 - 0.05;
-    const screenRightX = screenCentreX + screenVisibleWidthM / 2 + 0.05;
 
-    const frontObjectsToCalculate = [...(placedSpeakers || []), ...(frontSubs || [])]
-      .filter(s => {
-        const r = getCanonicalRole(s.role);
-        if (r === 'FL' || r === 'FC' || r === 'FR') {
-          // Y-extent check: only include if this LCR speaker is physically
-          // behind the screen/baffle clearance zone (i.e. it occupies space
-          // between the front wall and the screen face).
-          // Soundbars below a TV and visible in-room speakers will have a
-          // position.y that puts them at or in front of the screen plane and
-          // should NOT push the screen forward.
-          const lcrY = Number(s?.position?.y);
-          if (!Number.isFinite(lcrY)) return true; // no position — fallback: include (safe)
+    // Physical thickness of the screen body in plan view (front-to-back).
+    // Must match RvBaffleAndScreen — do not change without updating that component too.
+    const SCREEN_THICKNESS_M = 0.02;
 
-          const dims = getModelDimsM(s?.model);
-          const lcrDepthM = dims?.depthM;
-          if (!lcrDepthM) return true; // no dims — fallback: include (safe)
+    // ── Stable intended screen plane ──────────────────────────────────────────
+    // Use the locked value if the screen is locked, otherwise the user's float
+    // depth, otherwise treat the screen as flush with the front wall (0 m).
+    // This value is computed ONCE before any object filtering so the filter
+    // cannot become circular (no dependency on previous calculated depth).
+    const intendedScreenY =
+      (isLocked && Number.isFinite(lockedY))
+        ? lockedY
+        : (Number.isFinite(Number(screen?.floatDepthM)) ? Number(screen.floatDepthM) : 0);
 
-          // Speaker back edge is at lcrY (nearest to front wall when y=0 is wall).
-          // Speaker front edge is at lcrY + lcrDepthM.
-          // Only include if the speaker's body starts before the current screen estimate,
-          // i.e. it occupies space that a screen at currentEstimate depth would clash with.
-          const currentEstimate = lastCalcMinScreenDepthRef.current ?? (0.01 + 0.30);
-          return lcrY < currentEstimate;
-        }
-        if (isSubRole(r)) {
-          const x = Number(s?.position?.x);
-          const xOverlaps = Number.isFinite(x) && x >= screenLeftX && x <= screenRightX;
-          if (!xOverlaps) return false;
+    // ── Intended screen rectangle in plan view ────────────────────────────────
+    const screenXMin = screenCentreX - screenVisibleWidthM / 2;
+    const screenXMax = screenCentreX + screenVisibleWidthM / 2;
+    const screenYMin = intendedScreenY;
+    const screenYMax = intendedScreenY + SCREEN_THICKNESS_M;
 
-          // Y-extent check: only include if the sub's physical body reaches
-          // into the screen/baffle clearance zone.
-          const subY = Number(s?.position?.y);
-          if (!Number.isFinite(subY)) return true; // no position data — fallback: include
+    // ── Rectangle-overlap filter ──────────────────────────────────────────────
+    // An object is passed into computeMinimumScreenDepthM only if its
+    // axis-aligned plan rectangle physically overlaps the intended screen
+    // rectangle.  No role is included automatically; no previous depth
+    // estimate is used.
+    const combinedObjects = [...(placedSpeakers || []), ...(frontSubs || [])];
+    const frontObjectsToCalculate = [];
 
-          const dims = getModelDimsM(s?.model);
-          const subDepthM = dims?.depthM;
-          if (!subDepthM) return true; // no dims — fallback: include
+    for (const s of combinedObjects) {
+      const r = getCanonicalRole(s.role);
 
-          // Sub occupies [subY, subY + subDepthM] from the front wall.
-          // The clearance zone starts at the front wall (Y = 0).
-          // A sub needs to push the screen forward only if its body is
-          // close enough to the front wall that the screen face would clash.
-          // We use the current estimated min depth as the zone boundary.
-          const subFrontEdgeY = subY; // nearest face to front wall
-          const currentEstimate = lastCalcMinScreenDepthRef.current ?? (0.01 + 0.30);
-          return subFrontEdgeY < currentEstimate;
-        }
-        return false;
-      })
-      .map(s => ({
-        model: s.model,
-        role: s.role,
-        position: s.position
-      }));
+      // Only consider front-stage roles and recognised sub roles
+      const isFrontLCR = (r === 'FL' || r === 'FC' || r === 'FR');
+      const isSub      = isSubRole(r);
+      if (!isFrontLCR && !isSub) continue;
+
+      const posX = Number(s?.position?.x);
+      const posY = Number(s?.position?.y);
+      const dims = getModelDimsM(s?.model);
+      const widthM = Number(dims?.widthM);
+      const depthM = Number(dims?.depthM);
+
+      // If any key value is missing, fall back to including the object (safe)
+      if (
+        !Number.isFinite(posX) ||
+        !Number.isFinite(posY) ||
+        !Number.isFinite(widthM) ||
+        !Number.isFinite(depthM)
+      ) {
+        frontObjectsToCalculate.push({ model: s.model, role: s.role, position: s.position });
+        continue;
+      }
+
+      // Simple axis-aligned rectangle — no new yaw logic added
+      const objectXMin = posX - widthM / 2;
+      const objectXMax = posX + widthM / 2;
+      const objectYMin = posY;
+      const objectYMax = posY + depthM;
+
+      const xOverlap = objectXMax > screenXMin && objectXMin < screenXMax;
+      const yOverlap = objectYMax > screenYMin && objectYMin < screenYMax;
+
+      if (xOverlap && yOverlap) {
+        frontObjectsToCalculate.push({ model: s.model, role: s.role, position: s.position });
+      }
+    }
 
     const calculatedValue = computeMinimumScreenDepthM({
       frontObjects: frontObjectsToCalculate,
