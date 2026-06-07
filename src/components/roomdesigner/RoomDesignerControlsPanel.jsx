@@ -194,6 +194,19 @@ export default function RoomDesignerControlsPanel({
             <DataRow label="7.x Bed Layout" value={_sevenBedLayoutType ? (_sevenBedLayoutType === 'wides' ? 'Front Wides' : 'Rear Surrounds') : '—'} />
           </DataSection>
 
+          <DataSection title="Selected Speakers">
+            {Array.isArray(placedSpeakers) && placedSpeakers.length > 0 ? placedSpeakers.map((spk, i) => {
+              const role = spk?.role ?? spk?.id ?? '—';
+              const model = spk?.model ?? spk?.spec?.model ?? null;
+              const label = model ? `${role} — ${model}` : role;
+              const x = spk?.x != null ? Number(spk.x).toFixed(2) : null;
+              const y = spk?.y != null ? Number(spk.y).toFixed(2) : null;
+              const z = spk?.z != null ? Number(spk.z).toFixed(2) : null;
+              const pos = (x != null && y != null && z != null) ? `x ${x} · y ${y} · z ${z}` : '—';
+              return <DataRow key={i} label={label} value={pos} />;
+            }) : <DataRow label="No speakers placed" value="—" />}
+          </DataSection>
+
           <DataSection title="Subwoofers">
             <DataRow label="Front Sub Count" value={Array.isArray(frontSubsForRendering) ? frontSubsForRendering.length : '—'} />
             <DataRow label="Front Sub Model" value={frontSubsCfg?.model || '—'} />
@@ -206,16 +219,26 @@ export default function RoomDesignerControlsPanel({
               const primary = analysisResult?.gradedParameters?.primary || {};
               const params = [
                 { num: 1,  label: 'P1 — Nearest Boundary' },
+                { num: 2,  label: 'P2 — Room Volume' },
                 { num: 3,  label: 'P3 — LCR Zone Compliance' },
                 { num: 4,  label: 'P4 — LCR SPL Balance' },
                 { num: 5,  label: 'P5 — Surround Arc Gap' },
                 { num: 6,  label: 'P6 — Surround SPL Consistency' },
                 { num: 7,  label: 'P7 — Front Wide Deviation' },
+                { num: 8,  label: 'P8 — Overhead Zone Compliance' },
                 { num: 9,  label: 'P9 — Overhead Vertical Gap' },
                 { num: 10, label: 'P10 — Overhead SPL Spread' },
+                { num: 11, label: 'P11 — Sub Count' },
                 { num: 12, label: 'P12 — Screen SPL at RSP' },
                 { num: 13, label: 'P13 — Non-Screen SPL at RSP' },
+                { num: 14, label: 'P14 — SPL Consistency' },
                 { num: 15, label: 'P15 — Background Noise Floor' },
+                { num: 16, label: 'P16 — Seat-to-Seat Consistency' },
+                { num: 17, label: 'P17 — Overhead SPL at RSP' },
+                { num: 18, label: 'P18 — Screen Height' },
+                { num: 19, label: 'P19 — Viewing Angle H' },
+                { num: 20, label: 'P20 — Viewing Angle V' },
+                { num: 21, label: 'P21 — Early Reflections' },
               ];
               if (!Object.keys(primary).length) {
                 return <DataRow label="Status" value="No analysis data" />;
@@ -227,6 +250,26 @@ export default function RoomDesignerControlsPanel({
                 const display = level != null ? `${level}${val ? ' · ' + val : ''}` : '—';
                 return <DataRow key={num} label={label} value={display} />;
               });
+            })()}
+          </DataSection>
+
+          <DataSection title="RP23 Viewing">
+            {(() => {
+              const p19 = analysisResult?.gradedParameters?.primary?.[19];
+              const p20 = analysisResult?.gradedParameters?.primary?.[20];
+              const hAngle = p19?.value != null ? `${p19.value}${p19.unit ? ' ' + p19.unit : '°'}` : '—';
+              const hLevel = p19?.level ?? null;
+              const vAngle = p20?.value != null ? `${p20.value}${p20.unit ? ' ' + p20.unit : '°'}` : '—';
+              const vLevel = p20?.level ?? null;
+              const distM = analysisResult?.roomHudSnapshot?.mlpDistanceM ?? analysisResult?.mlpDistanceM ?? null;
+              return (
+                <>
+                  <DataRow label="Horizontal Angle" value={hLevel != null ? `${hLevel} · ${hAngle}` : hAngle} />
+                  <DataRow label="RP23 H Level" value={hLevel ?? '—'} />
+                  <DataRow label="Vertical Angle" value={vLevel != null ? `${vLevel} · ${vAngle}` : vAngle} />
+                  <DataRow label="Distance to Screen" value={distM != null ? `${Number(distM).toFixed(2)} m` : '—'} />
+                </>
+              );
             })()}
           </DataSection>
         </div>
