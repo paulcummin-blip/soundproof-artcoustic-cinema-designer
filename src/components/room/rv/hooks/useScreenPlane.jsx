@@ -40,7 +40,26 @@ export function useScreenPlane({
         if (r === 'FL' || r === 'FC' || r === 'FR') return true;
         if (isSubRole(r)) {
           const x = Number(s?.position?.x);
-          return Number.isFinite(x) && x >= screenLeftX && x <= screenRightX;
+          const xOverlaps = Number.isFinite(x) && x >= screenLeftX && x <= screenRightX;
+          if (!xOverlaps) return false;
+
+          // Y-extent check: only include if the sub's physical body reaches
+          // into the screen/baffle clearance zone.
+          const subY = Number(s?.position?.y);
+          if (!Number.isFinite(subY)) return true; // no position data — fallback: include
+
+          const dims = getModelDimsM(s?.model);
+          const subDepthM = dims?.depthM;
+          if (!subDepthM) return true; // no dims — fallback: include
+
+          // Sub occupies [subY, subY + subDepthM] from the front wall.
+          // The clearance zone starts at the front wall (Y = 0).
+          // A sub needs to push the screen forward only if its body is
+          // close enough to the front wall that the screen face would clash.
+          // We use the current estimated min depth as the zone boundary.
+          const subFrontEdgeY = subY; // nearest face to front wall
+          const currentEstimate = lastCalcMinScreenDepthRef.current ?? (0.01 + 0.30);
+          return subFrontEdgeY < currentEstimate;
         }
         return false;
       })
