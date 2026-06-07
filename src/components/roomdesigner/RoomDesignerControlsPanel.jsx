@@ -1,5 +1,6 @@
 import React, { Suspense, useState } from "react";
 import { Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
+import { calculateViewingAngle, assignRP23Level } from "@/components/utils/viewingAngleUtils";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
@@ -293,6 +294,20 @@ export default function RoomDesignerControlsPanel({
               }
 
               return params.map(({ num, label }) => {
+                // P2: derive from dolby layout string directly
+                if (num === 2) {
+                  const layout = dolbyPreset || appState?.dolbyLayout || '';
+                  const p2 = primary[2];
+                  const level = p2?.level ?? null;
+                  const display = layout
+                    ? (level != null ? `${level} · ${layout}` : layout)
+                    : NOT_CALC;
+                  return <DataRow key={num} label={label} value={display} />;
+                }
+                // P8: upfiring/elevation speakers are never used in this app → always L4
+                if (num === 8) {
+                  return <DataRow key={num} label={label} value="L4 · No upfiring/elevation speakers" />;
+                }
                 const isSeatScope = SEAT_SCOPE.has(num);
                 const p = resolve(num, isSeatScope);
                 const display = fmt(p, num) ?? NOT_CALC;
@@ -303,10 +318,52 @@ export default function RoomDesignerControlsPanel({
 
           <DataSection title="RP23 Viewing">
             {(() => {
-              const rp23 = analysisResult?.perSeatRp23?.['mlp'];
-              const hAngle = rp23?.formatted ?? null;
-              const hLevel = rp23?.level ?? null;
-              const distM = analysisResult?.roomHudSnapshot?.mlpDistanceM ?? analysisResult?.mlpDistanceM ?? null;
+              // Use same source as ViewingAnglePanel: appState.mlpY_m + appState.screenFrontPlaneM
+              const mlpY = appState?.mlpY_m ?? null;
+              const screenFrontPlaneM = Number.isFinite(Number(appState?.screenFrontPlaneM))
+                ? Number(appState.screenFrontPlaneM)
+                : Number(_screen?.floatDepthM ?? 0);
+
+              let hAngle = null;
+              let hLevel = null;
+              let distM = null;
+
+              if (Number.isFinite(mlpY) && Number.isFinite(screenFrontPlaneM)) {
+                const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
+                const tvKey = _screen?.tvPresetKey;
+                const tvMm = Number(_screen?.tvWidthMm);
+                const visibleWidthInches = (tvKey && TV_KEY_TO_INCHES[tvKey])
+                  ? TV_KEY_TO_INCHES[tvKey]
+                  : (Number.isFinite(tvMm) && tvMm > 0 ? tvMm / 25.4 : (Number(_screen?.visibleWidthInches) || 100));
+
+                const angle = calculateViewingAngle(
+                  { y: mlpY },
+                  visibleWidthInches,
+                  _screen?.aspectRatio || '16:9',
+                  { y: screenFrontPlaneM }
+                );
+
+                if (angle != null) {
+                  const rp23Level = assignRP23Level(angle);
+                  hAngle = `${angle.toFixed(1)}°`;
+                  hLevel = rp23Level?.level ?? null;
+                  distM = Math.abs(mlpY - screenFrontPlaneM);
+                }
+              }
+
+              // Fallbacks from analysisResult if live calc unavailable
+              if (!hAngle) {
+                const rp23 = analysisResult?.perSeatRp23?.['mlp'];
+                if (rp23?.formatted && rp23.formatted !== '—') {
+                  hAngle = rp23.formatted;
+                  hLevel = rp23.level ?? null;
+                }
+              }
+              if (!distM) {
+                const d = analysisResult?.roomHudSnapshot?.mlpDistanceM ?? analysisResult?.mlpDistanceM ?? null;
+                if (d != null) distM = d;
+              }
+
               return (
                 <>
                   <DataRow label="Horizontal Viewing Angle" value={
