@@ -37,9 +37,8 @@ export function useMlpDragHandler({
     const roomPos = canvasToRoom(canvasPos);
     const roomLen = Number(lengthM) || 6.0;
 
-    // Apply initial cursor-to-marker offset to prevent jump on drag start
-    const offsetY = Number(dragOffsetRoomRef?.current?.y) || 0;
-    const rawY = roomPos.y + offsetY;
+    // Offset already applied upstream in useRoomCanvasMouseMove — use room Y directly
+    const rawY = roomPos.y;
 
     // Clamp to room bounds with a small margin
     const MARGIN = 0.20;
