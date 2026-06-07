@@ -241,16 +241,16 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
 
   // Build a canonical role → node position map.
   // Handles aliases: FC / C / Centre / Center all resolve to the same key.
-  const canonRole = (r) => {
+  // Used only for the merge lookup — original role values are never mutated.
+  const normalizeSpeakerRole = (r) => {
     if (!r) return "";
     const u = String(r).toUpperCase().trim();
-    // Centre aliases → "C"
-    if (u === "FC" || u === "C" || u === "CENTRE" || u === "CENTER") return "C";
+    if (u === "C" || u === "CENTRE" || u === "CENTER" || u === "FC") return "FC";
     return u;
   };
   const nodePositionByCanonRole = new Map();
   speakerNodes.forEach(node => {
-    const key = canonRole(node?.role ?? node?.channel);
+    const key = normalizeSpeakerRole(node?.role ?? node?.channel);
     if (!key) return;
     const x = Number(node.x), y = Number(node.y), z = Number(node.z);
     if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
@@ -307,7 +307,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     // stale or missing position.z, causing FrontElevation to fall back to 1.2m.
     const mergedSpeakers = Array.isArray(loadedSpeakers)
       ? loadedSpeakers.map(spk => {
-          const nodePos = nodePositionByCanonRole.get(canonRole(spk?.role));
+          const nodePos = nodePositionByCanonRole.get(normalizeSpeakerRole(spk?.role));
           if (!nodePos) return spk;
           return {
             ...spk,
