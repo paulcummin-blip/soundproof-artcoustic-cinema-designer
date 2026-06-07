@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Project } from "@/entities/Project";
+import { useAuth } from "@/lib/AuthContext";
 
 export const dolbyConfigs = [
   { value: "5.1", label: "5.1 Surround — P2 - L1" },
@@ -53,6 +54,7 @@ const EMPTY_FORM = {
 // editProject: if provided, modal is in edit mode
 export default function NewProjectDialog({ open, onOpenChange, onProjectCreated, editProject, onProjectUpdated }) {
   const isEditMode = !!editProject;
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState(EMPTY_FORM);
 
@@ -102,7 +104,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
         onProjectUpdated && onProjectUpdated(updated);
         onOpenChange(false);
       } else {
-        const created = await Project.create(payload);
+        const created = await Project.create({ ...payload, account_id: user?.account_id || null });
         setFormData(EMPTY_FORM);
         onProjectCreated && onProjectCreated(created);
         onOpenChange(false);
