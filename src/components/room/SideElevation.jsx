@@ -523,6 +523,14 @@ export default function SideElevation({
                   fontSize={7} fill={DIM_COLOR} textAnchor="start">
                   {screenTopM.toFixed(2)}m
                 </text>
+                {/* Transparent drag hit area — full vertical extent, wider for easy grabbing */}
+                <rect
+                  x={sxPx - 15} y={frameTopPx}
+                  width={30} height={frameBotPx - frameTopPx}
+                  fill="transparent" pointerEvents="all"
+                  style={{ cursor: 'ns-resize' }}
+                  onMouseDown={handleScreenMouseDown}
+                />
               </g>
             );
           })()}
