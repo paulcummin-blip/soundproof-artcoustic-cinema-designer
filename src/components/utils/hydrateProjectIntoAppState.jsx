@@ -228,10 +228,35 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   if (typeof setSelectedSpeakersByRole === "function") {
     setSelectedSpeakersByRole(parseMaybe(p?.selected_speakers_by_role, {}));
   }
-  if (typeof setSpeakerNodes === "function") {
+
+  // Parse spl_speaker_nodes once — used both for setSpeakerNodes and position merge below.
+  const speakerNodes = (() => {
     const nodes = parseMaybe(p?.spl_speaker_nodes, []);
-    setSpeakerNodes(Array.isArray(nodes) ? nodes : []);
+    return Array.isArray(nodes) ? nodes : [];
+  })();
+
+  if (typeof setSpeakerNodes === "function") {
+    setSpeakerNodes(speakerNodes);
   }
+
+  // Build a canonical role → node position map.
+  // Handles aliases: FC / C / Centre / Center all resolve to the same key.
+  const canonRole = (r) => {
+    if (!r) return "";
+    const u = String(r).toUpperCase().trim();
+    // Centre aliases → "C"
+    if (u === "FC" || u === "C" || u === "CENTRE" || u === "CENTER") return "C";
+    return u;
+  };
+  const nodePositionByCanonRole = new Map();
+  speakerNodes.forEach(node => {
+    const key = canonRole(node?.role ?? node?.channel);
+    if (!key) return;
+    const x = Number(node.x), y = Number(node.y), z = Number(node.z);
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+      nodePositionByCanonRole.set(key, { x, y, z });
+    }
+  });
 
   // 10) SPL CONFIG
   if (typeof appState?.setSplConfig === "function") {
@@ -276,14 +301,34 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   })();
 
   if (typeof setSpeakerSystem === "function") {
+    // Merge spl_speaker_nodes positions into placedSpeakers.
+    // spl_speaker_nodes is the position authority — it contains the live x/y/z
+    // set by the Room Designer (e.g. FC z=0.59m). selected_speakers may have
+    // stale or missing position.z, causing FrontElevation to fall back to 1.2m.
+    const mergedSpeakers = Array.isArray(loadedSpeakers)
+      ? loadedSpeakers.map(spk => {
+          const nodePos = nodePositionByCanonRole.get(canonRole(spk?.role));
+          if (!nodePos) return spk;
+          return {
+            ...spk,
+            position: {
+              ...(spk.position || {}),
+              x: nodePos.x,
+              y: nodePos.y,
+              z: nodePos.z,
+            },
+          };
+        })
+      : [];
+
     console.log('[HYDRATE speakers]', {
       extra_surround_count: p?.extra_surround_count,
       global_surround_model: p?.global_surround_model,
-      roles: Array.isArray(loadedSpeakers) ? loadedSpeakers.map(s => String(s?.role)) : null
+      roles: mergedSpeakers.map(s => `${s?.role} z=${s?.position?.z}`),
     });
     setSpeakerSystem((prev) => ({
       ...(prev || {}),
-      placedSpeakers: Array.isArray(loadedSpeakers) ? loadedSpeakers : [],
+      placedSpeakers: mergedSpeakers,
     }));
   }
 }
