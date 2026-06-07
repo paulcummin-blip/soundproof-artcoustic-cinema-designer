@@ -1051,9 +1051,9 @@ export default function SideElevation({
                   fill={LABEL_COLOR} fontWeight={600}>
                   {label}
                 </text>
-                {/* Vertical dimension line — floor to group centre */}
+                {/* Vertical dimension line — floor to group centre, outside room (right of rear wall) */}
                 {Number.isFinite(effectiveGrpZ) && (() => {
-                  const dimX = frontX - 10;
+                  const dimX = offsetX + drawW + 12;
                   const floorPx = rz(0);
                   const centrePx = rz(effectiveGrpZ);
                   return (
@@ -1061,8 +1061,8 @@ export default function SideElevation({
                       <line x1={dimX} y1={floorPx} x2={dimX} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
                       <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
                       <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      <text x={dimX - 4} y={centrePx + (floorPx - centrePx) / 2 + 3}
-                        textAnchor="end" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                      <text x={dimX + 4} y={centrePx + (floorPx - centrePx) / 2 + 3}
+                        textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
                         H{Math.round(effectiveGrpZ * 100)}cm
                       </text>
                     </g>
