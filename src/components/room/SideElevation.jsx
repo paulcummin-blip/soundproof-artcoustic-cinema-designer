@@ -410,6 +410,11 @@ export default function SideElevation({
         .map(s => ({ role: String(s.role).toUpperCase(), z: s.position.z }))
     : [];
 
+  // Hoisted so the topmost screen drag hit rect (rendered after all speakers) can reference these
+  const sxPx       = rx(screenFrontY);
+  const frameTopPx = rz(frameTopM);
+  const frameBotPx = rz(frameBottomM);
+
   return (
     <div style={{ width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
@@ -523,14 +528,7 @@ export default function SideElevation({
                   fontSize={7} fill={DIM_COLOR} textAnchor="start">
                   {screenTopM.toFixed(2)}m
                 </text>
-                {/* Transparent drag hit area — full vertical extent, wider for easy grabbing */}
-                <rect
-                  x={sxPx - 15} y={frameTopPx}
-                  width={30} height={frameBotPx - frameTopPx}
-                  fill="transparent" pointerEvents="all"
-                  style={{ cursor: 'ns-resize' }}
-                  onMouseDown={handleScreenMouseDown}
-                />
+                {/* Screen drag hit rect moved to end of SVG so it sits above all speaker layers */}
               </g>
             );
           })()}
@@ -1238,6 +1236,17 @@ export default function SideElevation({
             textAnchor="end" fontSize={7} fill={DIM_COLOR} opacity={0.7}>
             REAR
           </text>
+
+          {/* Screen drag hit area — rendered last so it sits above all speaker/sub layers */}
+          {onScreenHeightFromFloorChange && (
+            <rect
+              x={sxPx - 15} y={frameTopPx}
+              width={30} height={frameBotPx - frameTopPx}
+              fill="transparent" pointerEvents="all"
+              style={{ cursor: 'ns-resize' }}
+              onMouseDown={handleScreenMouseDown}
+            />
+          )}
         </svg>
       </div>
     </div>
