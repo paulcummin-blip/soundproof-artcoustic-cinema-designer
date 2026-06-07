@@ -26,6 +26,26 @@ const BassResponse = React.lazy(() =>
 
 const VIEW_BUTTONS = [['controls', 'CONTROLS'], ['isometric', 'ISOMETRIC'], ['data', 'DATA']];
 
+function DataSection({ title, children }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', color: '#9B9890', textTransform: 'uppercase', padding: '6px 8px 4px', borderBottom: '1px solid #DCDBD6', marginBottom: 4 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function DataRow({ label, value }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', fontSize: 12 }}>
+      <span style={{ color: '#625143', flex: '0 0 auto', marginRight: 8 }}>{label}</span>
+      <span style={{ color: '#1B1A1A', fontWeight: 500, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{value ?? '—'}</span>
+    </div>
+  );
+}
+
 export default function RoomDesignerControlsPanel({
   appState,
   isFrozen,
@@ -138,8 +158,77 @@ export default function RoomDesignerControlsPanel({
       )}
 
       {rightPanelView === 'data' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 196px)', color: '#625143', fontSize: 14, fontWeight: 500 }}>
-          Live data dashboard coming next
+        <div style={{ height: 'calc(100vh - 196px)', overflow: 'auto', padding: '12px 12px 24px' }}>
+          <DataSection title="Room">
+            <DataRow label="Width" value={stableDimensions?.widthM != null ? `${Number(stableDimensions.widthM).toFixed(2)} m` : '—'} />
+            <DataRow label="Length" value={stableDimensions?.lengthM != null ? `${Number(stableDimensions.lengthM).toFixed(2)} m` : '—'} />
+            <DataRow label="Height" value={stableDimensions?.heightM != null ? `${Number(stableDimensions.heightM).toFixed(2)} m` : '—'} />
+            <DataRow label="Volume" value={
+              stableDimensions?.widthM && stableDimensions?.lengthM && stableDimensions?.heightM
+                ? `${(stableDimensions.widthM * stableDimensions.lengthM * stableDimensions.heightM).toFixed(1)} m³`
+                : '—'
+            } />
+          </DataSection>
+
+          <DataSection title="Screen">
+            <DataRow label="Size" value={_screen?.visibleWidthInches ? `${Number(_screen.visibleWidthInches).toFixed(0)}"` : '—'} />
+            <DataRow label="Aspect Ratio" value={_screen?.aspectRatio ?? '—'} />
+            <DataRow label="Mount Mode" value={_screen?.mountMode ? (_screen.mountMode === 'baffle' ? 'Baffle Wall' : 'Floating') : '—'} />
+            <DataRow label="Height from Floor" value={_screen?.heightFromFloorM != null ? `${Number(_screen.heightFromFloorM).toFixed(2)} m` : '—'} />
+            <DataRow label="Screen Plane Depth" value={_screen?.floatDepthM != null ? `${Number(_screen.floatDepthM).toFixed(3)} m` : '—'} />
+          </DataSection>
+
+          <DataSection title="Seating">
+            <DataRow label="Total Seats" value={Array.isArray(seatingPositions) ? seatingPositions.length : '—'} />
+            <DataRow label="Rows" value={seatingRows ?? '—'} />
+            <DataRow label="Row Spacing" value={_rowSpacingM != null ? `${Number(_rowSpacingM).toFixed(2)} m` : '—'} />
+            <DataRow label="Seat Spacing" value={seatSpacing != null ? `${Number(seatSpacing).toFixed(2)} m` : '—'} />
+            <DataRow label="Viewing Offset" value={_seatingBlockOffset != null ? `${Number(_seatingBlockOffset).toFixed(3)} m` : '—'} />
+            <DataRow label="Dolby Layout" value={dolbyPreset ?? '—'} />
+          </DataSection>
+
+          <DataSection title="Speakers">
+            <DataRow label="Speaker Count" value={Array.isArray(placedSpeakers) ? placedSpeakers.length : '—'} />
+            <DataRow label="LCR Aim Mode" value={lcrAimMode ? (lcrAimMode === 'angled' ? 'Angled' : 'Flat') : '—'} />
+            <DataRow label="LCR Angle" value={lcrAngleDeg != null ? `${Number(lcrAngleDeg).toFixed(1)}°` : '—'} />
+            <DataRow label="7.x Bed Layout" value={_sevenBedLayoutType ? (_sevenBedLayoutType === 'wides' ? 'Front Wides' : 'Rear Surrounds') : '—'} />
+          </DataSection>
+
+          <DataSection title="Subwoofers">
+            <DataRow label="Front Sub Count" value={Array.isArray(frontSubsForRendering) ? frontSubsForRendering.length : '—'} />
+            <DataRow label="Front Sub Model" value={frontSubsCfg?.model || '—'} />
+            <DataRow label="Rear Sub Count" value={Array.isArray(rearSubsForRendering) ? rearSubsForRendering.length : '—'} />
+            <DataRow label="Rear Sub Model" value={rearSubsCfg?.model || '—'} />
+          </DataSection>
+
+          <DataSection title="RP22 Summary">
+            {(() => {
+              const primary = analysisResult?.gradedParameters?.primary || {};
+              const params = [
+                { num: 1,  label: 'P1 — Nearest Boundary' },
+                { num: 3,  label: 'P3 — LCR Zone Compliance' },
+                { num: 4,  label: 'P4 — LCR SPL Balance' },
+                { num: 5,  label: 'P5 — Surround Arc Gap' },
+                { num: 6,  label: 'P6 — Surround SPL Consistency' },
+                { num: 7,  label: 'P7 — Front Wide Deviation' },
+                { num: 9,  label: 'P9 — Overhead Vertical Gap' },
+                { num: 10, label: 'P10 — Overhead SPL Spread' },
+                { num: 12, label: 'P12 — Screen SPL at RSP' },
+                { num: 13, label: 'P13 — Non-Screen SPL at RSP' },
+                { num: 15, label: 'P15 — Background Noise Floor' },
+              ];
+              if (!Object.keys(primary).length) {
+                return <DataRow label="Status" value="No analysis data" />;
+              }
+              return params.map(({ num, label }) => {
+                const p = primary[num];
+                const level = p?.level ?? null;
+                const val = p?.value != null ? `${p.value}${p.unit ? ' ' + p.unit : ''}` : null;
+                const display = level != null ? `${level}${val ? ' · ' + val : ''}` : '—';
+                return <DataRow key={num} label={label} value={display} />;
+              });
+            })()}
+          </DataSection>
         </div>
       )}
 
