@@ -323,6 +323,10 @@
       "type": "number",
       "description": "Explicit RSP Y position in meters when rsp_mode is manual_position. Null = not set.",
       "nullable": true
+    },
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Account this project belongs to"
     }
   },
   "required": [

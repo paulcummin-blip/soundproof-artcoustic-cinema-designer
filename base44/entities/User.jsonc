@@ -1,0 +1,27 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "ID of the Account this user belongs to"
+    },
+    "account_role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "account_user"
+      ],
+      "default": "account_user",
+      "description": "Role within the account"
+    }
+  }
+}

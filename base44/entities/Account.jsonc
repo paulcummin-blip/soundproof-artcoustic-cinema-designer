@@ -1,0 +1,53 @@
+{
+  "name": "Account",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Account name"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "trial",
+        "suspended"
+      ],
+      "default": "active",
+      "description": "Account status"
+    },
+    "contact_email": {
+      "type": "string",
+      "description": "Primary contact email"
+    },
+    "account_type": {
+      "type": "string",
+      "enum": [
+        "dealer",
+        "client",
+        "admin",
+        "demo"
+      ],
+      "default": "dealer",
+      "description": "Account type"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Internal admin notes"
+    },
+    "last_access_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last access timestamp"
+    },
+    "project_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of projects linked to this account"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

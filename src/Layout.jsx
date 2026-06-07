@@ -26,6 +26,7 @@ import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
 import PriceSummary from "@/components/pricing/PriceSummary";
+import { useAuth } from "@/lib/AuthContext";
 
 const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3 },
@@ -36,6 +37,8 @@ const menuItems = [
 export default function Layout({ children, currentPageName }) {
   const projectActions = useProjectActions();
   const activeProjectId = useActiveProjectId();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   
   // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)
   const [priceSummary, setPriceSummary] = React.useState({
@@ -180,6 +183,34 @@ export default function Layout({ children, currentPageName }) {
                   })()}
                 </div>
               </div>
+
+              {/* Admin section — only visible to admin users */}
+              {isAdmin && (() => {
+                const currentPath = typeof window !== "undefined" ? (window.location?.pathname || "") : "";
+                const isActive = currentPath === "/admin/accounts" || currentPath.startsWith("/admin/");
+                return (
+                  <div className="mb-4 mt-2">
+                    <div className="text-xs font-medium text-brand-text-label mb-1 px-3" style={{ fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#625143' }}>
+                      Admin
+                    </div>
+                    <a
+                      href="/admin/accounts"
+                      className={`
+                        group flex items-center gap-3 px-3 py-2 rounded-md text-sm
+                        border transition-all duration-200 ease-out cursor-pointer select-none
+                        ${isActive
+                          ? 'bg-brand-menu-active text-brand-primary border-brand-primary shadow-md'
+                          : 'text-brand-text-muted border-transparent bg-transparent'}
+                        hover:bg-white hover:border-[#D9D5CE] hover:text-brand-text-label
+                        hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm
+                      `}
+                    >
+                      <Database className={`w-4 h-4 transition-all duration-200 ${isActive ? 'text-brand-primary' : 'text-brand-text-muted group-hover:text-brand-text-label'} group-hover:-translate-y-[1px]`} />
+                      <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>Accounts</span>
+                    </a>
+                  </div>
+                );
+              })()}
 
               <div className="mb-4" style={{ borderLeft: '4px solid #213428', paddingLeft: '12px', paddingTop: '6px', paddingBottom: '6px' }}>
                 <div className="text-xs font-medium text-brand-text-label mb-2 px-3" style={{ fontSize: 12, letterSpacing: '0.4px' }}>
