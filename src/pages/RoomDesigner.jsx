@@ -1874,7 +1874,17 @@ function RoomDesignerWithState() {
                       rearSubsCfg={rearSubsCfg}
                       wall={sideElevationWall}
                       onScreenHeightFromFloorChange={(h) => setScreenGuarded(prev => ({ ...prev, heightFromFloorM: h }))}
-                      onSideSpeakerMoved={({ role, newZ }) => setSpeakers(prev => prev.map(s => String(s.role).toUpperCase() === role ? { ...s, position: { ...s.position, z: newZ } } : s))}
+                      onSideSpeakerMoved={({ role, newZ }) => {
+                        const PAIRS = { LW: 'RW', RW: 'LW', SL: 'SR', SR: 'SL', SBL: 'SBR', SBR: 'SBL' };
+                        const paired = PAIRS[role] || null;
+                        setSpeakers(prev => prev.map(s => {
+                          const r = String(s.role).toUpperCase();
+                          if (r === role || (paired && r === paired)) {
+                            return { ...s, position: { ...s.position, z: newZ } };
+                          }
+                          return s;
+                        }));
+                      }}
                       onFrontSubHeightChange={(bottomHeightM) => setFrontSubsCfg(prev => ({ ...prev, bottomHeightM }))}
                       onRearSubHeightChange={(bottomHeightM) => setRearSubsCfg(prev => ({ ...prev, bottomHeightM }))}
                     />
