@@ -56,11 +56,33 @@ function formatDate(val) {
   }
 }
 
+function DiagField({ label, value, highlight, ok, warn }) {
+  let color = BRAND.subtext;
+  if (highlight) color = "#2C5AA0";
+  if (ok) color = "#213428";
+  if (warn && value > 0) color = "#B23A3A";
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 600, color, fontFamily: typeof value === "string" && value.length > 20 ? "monospace" : "inherit" }}>
+        {value !== null && value !== undefined ? String(value) : <span style={{ color: "#B23A3A" }}>null</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAccountsPage() {
   const { user, isLoadingAuth } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+
+  // Diagnostics state
+  const [diagProjects, setDiagProjects] = useState([]);
+  const [diagTotalAccounts, setDiagTotalAccounts] = useState(null);
+  const [diagLoading, setDiagLoading] = useState(true);
 
   const isAdmin = user?.role === "admin";
 
@@ -72,12 +94,22 @@ export default function AdminAccountsPage() {
       try {
         setLoading(true);
         setLoadError(null);
-        const data = await base44.entities.Account.list("-created_date", 200);
-        if (mounted) setAccounts(data || []);
+        const [accountData, projectData] = await Promise.all([
+          base44.entities.Account.list("-created_date", 200),
+          base44.entities.Project.list("-created_date", 500),
+        ]);
+        if (mounted) {
+          setAccounts(accountData || []);
+          setDiagTotalAccounts((accountData || []).length);
+          setDiagProjects(projectData || []);
+        }
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Failed to load accounts");
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          setDiagLoading(false);
+        }
       }
     }
 
@@ -131,6 +163,94 @@ export default function AdminAccountsPage() {
           fontSize: 12, fontWeight: 700, letterSpacing: "0.04em",
         }}>
           ADMIN
+        </div>
+      </div>
+
+      {/* ── Account Ownership Diagnostics ── */}
+      <div style={{
+        marginBottom: 24, padding: 20,
+        background: "#fffbe6", border: "1px solid #e6d88a",
+        borderRadius: 12,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#625143", marginBottom: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          🔍 Account Ownership Diagnostics (temporary)
+        </div>
+
+        {/* Current User */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Current User</div>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+            <DiagField label="Email" value={user?.email} />
+            <DiagField label="Role" value={user?.role} />
+            <DiagField label="account_id" value={user?.account_id} highlight />
+          </div>
+        </div>
+
+        <div style={{ height: 1, background: "#e6d88a", marginBottom: 14 }} />
+
+        {/* Counts */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Totals</div>
+          {diagLoading ? (
+            <span style={{ fontSize: 13, color: BRAND.subtext }}>Loading…</span>
+          ) : (
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+              <DiagField label="Total Accounts" value={diagTotalAccounts} />
+              <DiagField label="Total Projects" value={diagProjects.length} />
+              <DiagField label="Projects WITH account_id" value={diagProjects.filter(p => p.account_id).length} ok />
+              <DiagField label="Projects WITHOUT account_id" value={diagProjects.filter(p => !p.account_id).length} warn />
+            </div>
+          )}
+        </div>
+
+        <div style={{ height: 1, background: "#e6d88a", marginBottom: 14 }} />
+
+        {/* Recent Projects */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Most Recent 5 Projects</div>
+          {diagLoading ? (
+            <span style={{ fontSize: 13, color: BRAND.subtext }}>Loading…</span>
+          ) : (
+            <div style={{
+              background: BRAND.card, border: `1px solid ${BRAND.border}`, borderRadius: 8, overflow: "hidden",
+            }}>
+              <div style={{
+                display: "grid", gridTemplateColumns: "2fr 2fr 2fr 1.5fr",
+                padding: "8px 12px",
+                background: "rgb(244 243 241)",
+                borderBottom: `1px solid ${BRAND.border}`,
+                fontSize: 10, fontWeight: 700, color: BRAND.subtext,
+                letterSpacing: "0.06em", textTransform: "uppercase",
+              }}>
+                <div>Project Name</div>
+                <div>created_by_id</div>
+                <div>account_id</div>
+                <div>Created</div>
+              </div>
+              {diagProjects.slice(0, 5).map((p, i) => (
+                <div key={p.id} style={{
+                  display: "grid", gridTemplateColumns: "2fr 2fr 2fr 1.5fr",
+                  padding: "10px 12px",
+                  borderBottom: i < 4 ? `1px solid ${BRAND.border}` : "none",
+                  fontSize: 12,
+                }}>
+                  <div style={{ fontWeight: 600, color: BRAND.text }}>{p.name || "—"}</div>
+                  <div style={{ color: BRAND.subtext, fontFamily: "monospace", fontSize: 11 }}>{p.created_by_id || "—"}</div>
+                  <div style={{
+                    fontFamily: "monospace", fontSize: 11,
+                    color: p.account_id ? "#213428" : BRAND.red,
+                    fontWeight: p.account_id ? 600 : 400,
+                  }}>
+                    {p.account_id || "null"}
+                  </div>
+                  <div style={{ color: BRAND.subtext }}>{formatDate(p.created_date)}</div>
+                </div>
+              ))}
+              {diagProjects.length === 0 && (
+                <div style={{ padding: "16px 12px", color: BRAND.subtext, fontSize: 13 }}>No projects found.</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
