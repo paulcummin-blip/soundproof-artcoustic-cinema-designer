@@ -680,14 +680,17 @@ export default function SeatingLayout({
         </div>
       </div>
 
-      {/* Viewing Offset (m) */}
+      {/* Move Seats Forward / Back (m) */}
       <div className="space-y-2">
         <Label
               className="text-sm font-medium"
               style={{ color: '#3E4349' }}>
 
-          Viewing Offset (m)
+          Move Seats Forward / Back (m)
         </Label>
+        <p className="text-xs" style={{ color: '#625143' }}>
+          Positive values move seats backward, away from the screen. Negative values move seats forward, closer to the screen.
+        </p>
         <div className="flex items-center gap-2">
           <Button
                 type="button"
