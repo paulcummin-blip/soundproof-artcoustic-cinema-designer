@@ -73,21 +73,31 @@ export default function RvRoomElementsLayer({
 
     const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
 
-    const posFrontRear =
-      n(el?.pos_m) ??
-      n(el?.x_m) ??
-      n(el?.x_position) ??
-      n(el?.y_m) ??
-      n(el?.y_position) ??
-      0;
+    const isNorm = (v) => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 1;
 
-    const posLeftRight =
-      n(el?.pos_m) ??
-      n(el?.y_m) ??
-      n(el?.y_position) ??
-      n(el?.x_m) ??
-      n(el?.x_position) ??
-      0;
+    let posFrontRear;
+    if (Number.isFinite(n(el?.pos_m))) {
+      posFrontRear = n(el.pos_m);
+    } else if (Number.isFinite(n(el?.x_m))) {
+      posFrontRear = n(el.x_m);
+    } else if (isNorm(el?.x_position)) {
+      posFrontRear = Number(el.x_position) * widthM;
+    } else {
+      posFrontRear = 0;
+    }
+
+    let posLeftRight;
+    if (Number.isFinite(n(el?.pos_m))) {
+      posLeftRight = n(el.pos_m);
+    } else if (Number.isFinite(n(el?.y_m))) {
+      posLeftRight = n(el.y_m);
+    } else if (isNorm(el?.y_position)) {
+      posLeftRight = Number(el.y_position) * lengthM;
+    } else if (isNorm(el?.x_position)) {
+      posLeftRight = Number(el.x_position) * lengthM;
+    } else {
+      posLeftRight = 0;
+    }
 
     const posM = (wall === 'left' || wall === 'right') ? posLeftRight : posFrontRear;
     const label = String(el?.label || '').trim();
