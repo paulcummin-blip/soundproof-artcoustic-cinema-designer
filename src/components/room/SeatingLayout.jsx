@@ -681,56 +681,29 @@ export default function SeatingLayout({
         </div>
       </div>
 
-      {/* Reference Row Distance from Front Wall (m) */}
+      {/* Front Row Distance from Front Wall (m) — always anchored to Row 1 */}
       {(() => {
-        // Determine current reference row Y from rowCentersM
         const centers = Array.isArray(rowCentersM) && rowCentersM.length > 0 ? rowCentersM : null;
         const offset = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
 
-        let currentReferenceRowY = null;
-        if (centers) {
-          const n = centers.length;
-          if (n === 1 || validMlpBasis === 'front') {
-            currentReferenceRowY = centers[0];
-          } else if (validMlpBasis === 'back') {
-            currentReferenceRowY = centers[n - 1];
-          } else if (validMlpBasis === 'middle') {
-            currentReferenceRowY = centers[Math.floor((n - 1) / 2)];
-          } else {
-            // 'all': average
-            currentReferenceRowY = centers.reduce((s, v) => s + v, 0) / n;
-          }
-        }
+        // Always use Row 1 (index 0) as the editable anchor
+        const frontRowY = centers ? centers[0] : null;
+        const frontRowYAtZeroOffset = Number.isFinite(frontRowY) ? frontRowY - offset : null;
+        const displayValue = Number.isFinite(frontRowY) ? Math.round(frontRowY * 100) / 100 : null;
 
-        // referenceRowYAtZeroOffset = where the reference row would be if offset were 0
-        const referenceRowYAtZeroOffset = Number.isFinite(currentReferenceRowY)
-          ? currentReferenceRowY - offset
-          : null;
-
-        const displayValue = Number.isFinite(currentReferenceRowY)
-          ? Math.round(currentReferenceRowY * 100) / 100
-          : null;
-
-        const handleChange = (desiredReferenceRowY) => {
-          if (!Number.isFinite(desiredReferenceRowY) || !Number.isFinite(referenceRowYAtZeroOffset)) return;
-          const newOffset = desiredReferenceRowY - referenceRowYAtZeroOffset;
+        const handleChange = (desiredFrontRowY) => {
+          if (!Number.isFinite(desiredFrontRowY) || !Number.isFinite(frontRowYAtZeroOffset)) return;
+          const newOffset = desiredFrontRowY - frontRowYAtZeroOffset;
           onSeatingBlockOffsetChange?.(clampViewingOffset(Math.round(newOffset * 100) / 100));
         };
 
-        const rowLabel = rowCentersM.length <= 1
-          ? 'Row'
-          : validMlpBasis === 'front' ? 'Front Row'
-          : validMlpBasis === 'back' ? 'Back Row'
-          : validMlpBasis === 'middle' ? 'Middle Row'
-          : 'Reference Row';
-
         return (
-          <div className="space-y-2">
+          <div className="space-y-2 col-span-2">
             <Label className="text-sm font-medium" style={{ color: '#3E4349' }}>
-              {rowLabel} Distance from Front Wall (m)
+              Front Row Distance from Front Wall (m)
             </Label>
             <p className="text-xs" style={{ color: '#625143' }}>
-              Sets the distance from the front wall to the {rowLabel.toLowerCase()}. Other rows follow using the row spacing value.
+              Sets the distance from the front wall to Row 1. Other rows are derived from row spacing.
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -774,6 +747,24 @@ export default function SeatingLayout({
                 +
               </Button>
             </div>
+
+            {/* Read-only row distance readouts */}
+            {centers && centers.length > 0 && (
+              <div className="pt-1 space-y-1">
+                {centers.slice(0, 4).map((y, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between px-3 py-1 rounded"
+                    style={{ backgroundColor: '#F8F8F7', border: '1px solid #C1B6AD' }}
+                  >
+                    <span className="text-xs" style={{ color: '#625143' }}>Row {i + 1}</span>
+                    <span className="text-xs font-medium" style={{ color: '#1B1A1A' }}>
+                      {Number.isFinite(y) ? y.toFixed(2) : '—'} m
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })()}
