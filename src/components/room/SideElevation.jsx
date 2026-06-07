@@ -973,14 +973,29 @@ export default function SideElevation({
                   fontWeight={600}>
                   {spk.role}
                 </text>
-                {/* Dimension labels */}
-                {sideSpkHCm !== null && (
-                  <text x={sideDimX} y={(svgTop + svgBot) / 2 - 4} textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                    H{sideSpkHCm}cm
-                  </text>
-                )}
+                {/* Vertical dimension line — floor to speaker centre */}
+                {sideSpkHCm !== null && (() => {
+                  const dimX = spkX + svgW / 2 + 7;
+                  const floorPx = rz(0);
+                  const centrePx = rz(effectiveZ);
+                  return (
+                    <g opacity={0.75}>
+                      {/* Vertical line */}
+                      <line x1={dimX} y1={floorPx} x2={dimX} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      {/* Tick at floor */}
+                      <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      {/* Tick at centre */}
+                      <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      {/* Label */}
+                      <text x={dimX + 4} y={centrePx + (floorPx - centrePx) / 2 + 3}
+                        textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                        H{sideSpkHCm}cm
+                      </text>
+                    </g>
+                  );
+                })()}
                 {sideSpkWCm !== null && sideSpkDimHCm !== null && (
-                  <text x={sideDimX} y={(svgTop + svgBot) / 2 + 5} textAnchor="start" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                  <text x={spkX + svgW / 2 + 7} y={svgBot + 8} textAnchor="start" fontSize={6} fill={DIM_COLOR} opacity={0.75}>
                     {sideSpkWCm}×{sideSpkDimHCm}cm
                   </text>
                 )}
@@ -1036,14 +1051,25 @@ export default function SideElevation({
                   fill={LABEL_COLOR} fontWeight={600}>
                   {label}
                 </text>
-                {/* Rear group dimension labels */}
-                {Number.isFinite(effectiveGrpZ) && (
-                  <text x={frontX - 4} y={(svgTop + svgBot) / 2 - 6} textAnchor="end" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                    H{Math.round(effectiveGrpZ * 100)}cm
-                  </text>
-                )}
+                {/* Vertical dimension line — floor to group centre */}
+                {Number.isFinite(effectiveGrpZ) && (() => {
+                  const dimX = frontX - 10;
+                  const floorPx = rz(0);
+                  const centrePx = rz(effectiveGrpZ);
+                  return (
+                    <g opacity={0.75}>
+                      <line x1={dimX} y1={floorPx} x2={dimX} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      <text x={dimX - 4} y={centrePx + (floorPx - centrePx) / 2 + 3}
+                        textAnchor="end" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
+                        H{Math.round(effectiveGrpZ * 100)}cm
+                      </text>
+                    </g>
+                  );
+                })()}
                 {Number.isFinite(spkDepthM) && Number.isFinite(spkHeightM) && (
-                  <text x={frontX - 4} y={(svgTop + svgBot) / 2 + 13} textAnchor="end" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
+                  <text x={frontX - 4} y={svgBot + 8} textAnchor="end" fontSize={6} fill={DIM_COLOR} opacity={0.75}>
                     {Math.round(spkDepthM * 100)}×{Math.round(spkHeightM * 100)}cm
                   </text>
                 )}
