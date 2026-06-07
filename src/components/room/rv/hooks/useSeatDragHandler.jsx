@@ -22,6 +22,8 @@ export function useSeatDragHandler({
   lengthM,
   currentSeatingBlockOffset,
   setSeatingBlockOffset,
+  rspMode,
+  targetRspY_m,
 }) {
   const [isSnapping, setIsSnapping] = useState(false);
   const snapTimerRef = useRef(null);
@@ -72,16 +74,32 @@ export function useSeatDragHandler({
         const base = Number(currentSeatingBlockOffset) || 0;
         const raw = base + deltaY;
 
-        // Magnetic snap-to-zero within ±SNAP_THRESHOLD_M
-        const snapping = Math.abs(raw) <= SNAP_THRESHOLD_M;
+        // Magnetic snap: in manual_position mode snap to targetRspY_m; otherwise snap-to-zero
+        let snapping = false;
+        let nextOffset = Math.round(raw * 100) / 100;
+
+        if (rspMode === 'manual_position' && Number.isFinite(targetRspY_m)) {
+          const candidateSeatY = currentY + deltaY;
+          if (Math.abs(candidateSeatY - targetRspY_m) <= SNAP_THRESHOLD_M) {
+            snapping = true;
+            // Place the dragged seat exactly on the manual RSP dot
+            nextOffset = base + (targetRspY_m - currentY);
+            nextOffset = Math.round(nextOffset * 100) / 100;
+          }
+        } else {
+          // Auto mode: snap when offset crosses zero
+          if (Math.abs(raw) <= SNAP_THRESHOLD_M) {
+            snapping = true;
+            nextOffset = 0;
+          }
+        }
+
         if (snapping) {
           triggerSnap();
         } else {
-          // Dragged away from alignment — hide label immediately
           if (snapTimerRef.current) { clearTimeout(snapTimerRef.current); snapTimerRef.current = null; }
           setIsSnapping(false);
         }
-        const nextOffset = snapping ? 0 : Math.round(raw * 100) / 100;
 
         setSeatingBlockOffset(nextOffset);
         // Return prev unchanged — the rebuild hook will recompute seat positions

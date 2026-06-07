@@ -1115,6 +1115,8 @@ const byId = useEntitiesById({
     lengthM,
     currentSeatingBlockOffset: viewingDistanceOffsetM,
     setSeatingBlockOffset: props.setSeatingBlockOffsetGuarded,
+    rspMode,
+    targetRspY_m: mlpDotY_m,
   });
 
   // Room element drag info (structured, only visible during roomElement drag)
@@ -1814,10 +1816,6 @@ useEffect(() => {
     appState,
     getCanonicalRole,
   });
-
-  // Removed: renderSpeakers function (now RvSpeakerLayer component)
-
-
 
   // MLPMarker is rendered by RvMlpMarker (see JSX below)
   const handleMlpMarkerMouseDown = useCallback((e) => {
