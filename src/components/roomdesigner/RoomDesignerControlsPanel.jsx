@@ -1,6 +1,7 @@
 import React, { Suspense, useState } from "react";
 import { Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
@@ -25,6 +26,15 @@ const BassResponse = React.lazy(() =>
 );
 
 const VIEW_BUTTONS = [['controls', 'CONTROLS'], ['isometric', 'ISOMETRIC'], ['data', 'DATA']];
+
+function resolveProductLabel(rawModel) {
+  if (!rawModel) return '—';
+  const raw = String(rawModel);
+  const meta = getSpeakerModelMeta(normaliseModelKey(raw)) || getSpeakerModelMeta(raw);
+  if (meta?.label) return meta.label;
+  // Fallback: strip _s suffix, replace dashes/underscores with spaces, title-case
+  return raw.replace(/_s$/, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 
 function DataSection({ title, children }) {
   return (
@@ -197,8 +207,9 @@ export default function RoomDesignerControlsPanel({
           <DataSection title="Selected Speakers">
             {Array.isArray(placedSpeakers) && placedSpeakers.length > 0 ? placedSpeakers.map((spk, i) => {
               const role = spk?.role ?? spk?.id ?? '—';
-              const model = spk?.model ?? spk?.spec?.model ?? null;
-              const label = model ? `${role} — ${model}` : role;
+              const rawModel = spk?.model ?? spk?.spec?.model ?? null;
+              const modelDisplay = rawModel ? resolveProductLabel(rawModel) : null;
+              const label = modelDisplay ? `${role} — ${modelDisplay}` : role;
               const x = spk?.x != null ? Number(spk.x).toFixed(2) : null;
               const y = spk?.y != null ? Number(spk.y).toFixed(2) : null;
               const z = spk?.z != null ? Number(spk.z).toFixed(2) : null;
@@ -209,9 +220,9 @@ export default function RoomDesignerControlsPanel({
 
           <DataSection title="Subwoofers">
             <DataRow label="Front Sub Count" value={Array.isArray(frontSubsForRendering) ? frontSubsForRendering.length : '—'} />
-            <DataRow label="Front Sub Model" value={frontSubsCfg?.model || '—'} />
+            <DataRow label="Front Sub Model" value={resolveProductLabel(frontSubsCfg?.model)} />
             <DataRow label="Rear Sub Count" value={Array.isArray(rearSubsForRendering) ? rearSubsForRendering.length : '—'} />
-            <DataRow label="Rear Sub Model" value={rearSubsCfg?.model || '—'} />
+            <DataRow label="Rear Sub Model" value={resolveProductLabel(rearSubsCfg?.model)} />
           </DataSection>
 
           <DataSection title="RP22 Summary">
