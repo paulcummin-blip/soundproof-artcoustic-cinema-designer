@@ -17,10 +17,8 @@
 import { useCallback } from "react";
 
 export function useMlpDragHandler({
-  canvasToRoom,
   lengthM,
   setManualRspY_m,
-  dragOffsetRoomRef,
 }) {
   /**
    * Called on every mousemove when dragType === 'mlpMarker'.
@@ -30,14 +28,12 @@ export function useMlpDragHandler({
    * @param {string} _draggedItemId  - ignored (always 'mlp-marker-dot')
    * @param {{ x: number, y: number }} canvasPos - clamped canvas position
    */
-  const handleMlpDrag = useCallback((_draggedItemId, canvasPos) => {
+  const handleMlpDrag = useCallback((_draggedItemId, roomPos) => {
     if (typeof setManualRspY_m !== "function") return;
-    if (!canvasToRoom) return;
 
-    const roomPos = canvasToRoom(canvasPos);
     const roomLen = Number(lengthM) || 6.0;
 
-    // Offset already applied upstream in useRoomCanvasMouseMove — use room Y directly
+    // roomPos is already in room coordinates — no conversion needed
     const rawY = roomPos.y;
 
     // Clamp to room bounds with a small margin
@@ -48,7 +44,7 @@ export function useMlpDragHandler({
     const rounded = Math.round(clampedY * 100) / 100;
 
     setManualRspY_m(rounded);
-  }, [canvasToRoom, lengthM, setManualRspY_m]);
+  }, [lengthM, setManualRspY_m]);
 
   return { handleMlpDrag };
 }

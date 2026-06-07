@@ -71,7 +71,8 @@ export function useRoomCanvasMouseMove({
     } else if (dragType === 'roomElement') {
       handleRoomElementDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'mlpMarker') {
-      handleMlpDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+      // Pass room coords directly — avoids unnecessary room→canvas→room round trip
+      handleMlpDrag?.(draggedItemId, targetRoomPos);
     }
   }, [
     dragging, draggedItemId, dragType, dragState,
