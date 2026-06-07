@@ -228,37 +228,74 @@ export default function RoomDesignerControlsPanel({
           <DataSection title="RP22 Summary">
             {(() => {
               const primary = analysisResult?.gradedParameters?.primary || {};
+              // Per-seat data for the synthetic RSP/MLP seat
+              const mlpSeat = analysisResult?.perSeatRp22?.['mlp']?.rp22 || {};
+
+              // Helper: resolve value from primary (room-scope) first, then per-seat MLP
+              const resolve = (num, seatFallback = false) => {
+                const roomP = primary[num];
+                // Room-scope params: use primary directly
+                if (!seatFallback) {
+                  if (!roomP || roomP.status === 'no_data') return null;
+                  return roomP;
+                }
+                // Seat-scope: prefer mlpSeat, fallback to primary
+                const seatP = mlpSeat[num];
+                if (seatP) return seatP;
+                if (roomP && roomP.status !== 'no_data') return roomP;
+                return null;
+              };
+
+              const fmt = (p, num) => {
+                if (!p) return null;
+                const level = p.level ?? null;
+                // Use formatted string if present
+                if (p.formatted && p.formatted !== '—') {
+                  return level != null ? `${level} · ${p.formatted}` : p.formatted;
+                }
+                // Fallback: build from value + unit
+                const val = p.value != null ? `${p.value}${p.unit ? ' ' + p.unit : ''}` : null;
+                if (level != null) return val ? `${level} · ${val}` : String(level);
+                return val;
+              };
+
+              const NOT_CALC = 'Not Yet Calculated';
+
+              // Seat-scope parameter numbers
+              const SEAT_SCOPE = new Set([1, 4, 5, 6, 9, 10, 16, 17]);
+
               const params = [
-                { num: 1,  label: 'P1 — Nearest Boundary' },
-                { num: 2,  label: 'P2 — Room Volume' },
-                { num: 3,  label: 'P3 — LCR Zone Compliance' },
-                { num: 4,  label: 'P4 — LCR SPL Balance' },
-                { num: 5,  label: 'P5 — Surround Arc Gap' },
-                { num: 6,  label: 'P6 — Surround SPL Consistency' },
-                { num: 7,  label: 'P7 — Front Wide Deviation' },
-                { num: 8,  label: 'P8 — Overhead Zone Compliance' },
-                { num: 9,  label: 'P9 — Overhead Vertical Gap' },
-                { num: 10, label: 'P10 — Overhead SPL Spread' },
-                { num: 11, label: 'P11 — Sub Count' },
-                { num: 12, label: 'P12 — Screen SPL at RSP' },
-                { num: 13, label: 'P13 — Non-Screen SPL at RSP' },
-                { num: 14, label: 'P14 — SPL Consistency' },
+                { num: 1,  label: 'P1 — Min. Distance, Listening Area to Walls' },
+                { num: 2,  label: 'P2 — Decoder/Renderer & Speaker Config' },
+                { num: 3,  label: 'P3 — Screen Wall Speakers Outside Zones' },
+                { num: 4,  label: 'P4 — Max SPL Difference, Screen Speakers' },
+                { num: 5,  label: 'P5 — Max Horizontal Angle, Adjacent Surrounds' },
+                { num: 6,  label: 'P6 — Max SPL Difference, Surround Speakers' },
+                { num: 7,  label: 'P7 — Front Wide Horizontal Deviation' },
+                { num: 8,  label: 'P8 — Upfiring/Elevation Speakers Allowed' },
+                { num: 9,  label: 'P9 — Max Vertical Angle, Adjacent Upper Speakers' },
+                { num: 10, label: 'P10 — Max SPL Difference, Upper Speakers' },
+                { num: 11, label: 'P11 — Surround/Wide/Upper Speakers Outside Zones' },
+                { num: 12, label: 'P12 — Screen Speakers SPL Capability at RSP' },
+                { num: 13, label: 'P13 — Non-Screen Speakers SPL Capability at RSP' },
+                { num: 14, label: 'P14 — LFE Total SPL Capability at RSP' },
                 { num: 15, label: 'P15 — Background Noise Floor' },
-                { num: 16, label: 'P16 — Seat-to-Seat Consistency' },
-                { num: 17, label: 'P17 — Overhead SPL at RSP' },
-                { num: 18, label: 'P18 — Screen Height' },
-                { num: 19, label: 'P19 — Viewing Angle H' },
-                { num: 20, label: 'P20 — Viewing Angle V' },
-                { num: 21, label: 'P21 — Early Reflections' },
+                { num: 16, label: 'P16 — LCR Seat-to-Seat FR Variance (500Hz–16kHz)' },
+                { num: 17, label: 'P17 — Surround/Wide/Upper Seat-to-Seat FR Variance' },
+                { num: 18, label: 'P18 — In-Room Bass Extension −3 dB Cutoff' },
+                { num: 19, label: 'P19 — FR Below Transition Frequency at RSP' },
+                { num: 20, label: 'P20 — Seat-to-Seat FR Below Transition Frequency' },
+                { num: 21, label: 'P21 — Early Reflections Level (0–15 ms, 1–8 kHz)' },
               ];
-              if (!Object.keys(primary).length) {
+
+              if (!Object.keys(primary).length && !Object.keys(mlpSeat).length) {
                 return <DataRow label="Status" value="No analysis data" />;
               }
+
               return params.map(({ num, label }) => {
-                const p = primary[num];
-                const level = p?.level ?? null;
-                const val = p?.value != null ? `${p.value}${p.unit ? ' ' + p.unit : ''}` : null;
-                const display = level != null ? `${level}${val ? ' · ' + val : ''}` : '—';
+                const isSeatScope = SEAT_SCOPE.has(num);
+                const p = resolve(num, isSeatScope);
+                const display = fmt(p, num) ?? NOT_CALC;
                 return <DataRow key={num} label={label} value={display} />;
               });
             })()}
@@ -266,18 +303,19 @@ export default function RoomDesignerControlsPanel({
 
           <DataSection title="RP23 Viewing">
             {(() => {
-              const p19 = analysisResult?.gradedParameters?.primary?.[19];
-              const p20 = analysisResult?.gradedParameters?.primary?.[20];
-              const hAngle = p19?.value != null ? `${p19.value}${p19.unit ? ' ' + p19.unit : '°'}` : '—';
-              const hLevel = p19?.level ?? null;
-              const vAngle = p20?.value != null ? `${p20.value}${p20.unit ? ' ' + p20.unit : '°'}` : '—';
-              const vLevel = p20?.level ?? null;
+              const rp23 = analysisResult?.perSeatRp23?.['mlp'];
+              const hAngle = rp23?.formatted ?? null;
+              const hLevel = rp23?.level ?? null;
               const distM = analysisResult?.roomHudSnapshot?.mlpDistanceM ?? analysisResult?.mlpDistanceM ?? null;
               return (
                 <>
-                  <DataRow label="Horizontal Angle" value={hLevel != null ? `${hLevel} · ${hAngle}` : hAngle} />
-                  <DataRow label="RP23 H Level" value={hLevel ?? '—'} />
-                  <DataRow label="Vertical Angle" value={vLevel != null ? `${vLevel} · ${vAngle}` : vAngle} />
+                  <DataRow label="Horizontal Viewing Angle" value={
+                    hAngle != null
+                      ? (hLevel != null ? `${hLevel} · ${hAngle}` : hAngle)
+                      : 'Not Yet Calculated'
+                  } />
+                  <DataRow label="RP23 H Level" value={hLevel ?? 'Not Yet Calculated'} />
+                  <DataRow label="Vertical Viewing Angle" value="Not Available" />
                   <DataRow label="Distance to Screen" value={distM != null ? `${Number(distM).toFixed(2)} m` : '—'} />
                 </>
               );
