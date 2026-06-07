@@ -193,6 +193,13 @@ export default function SpeakerPositionsOverlay({
   const rowMid12 = (rowYs.length >= 2) ? ((rowYs[0] + rowYs[1]) / 2) : null;
   const rowMid23 = (rowYs.length >= 3) ? ((rowYs[1] + rowYs[2]) / 2) : null;
 
+  // Returns height in cm: prefers speaker's actual position.z, falls back to bed-layer defaults
+  const speakerHeightCm = (s) => {
+    const z = Number(s?.position?.z);
+    if (Number.isFinite(z) && z > 0) return Math.round(z * 100);
+    return mToCm(bedHeightM(s?.role, s?.position?.y));
+  };
+
   const bedHeightM = (role, speakerY) => {
     const r = String(role || "").toUpperCase();
 
@@ -409,8 +416,8 @@ export default function SpeakerPositionsOverlay({
       const xPx = meterToCanvasX(s.position.x);
       const leftCm = mToCm(s.position.x);
       const rightCm = mToCm(W - s.position.x);
-      const hCm = mToCm(bedHeightM(s.role, s.position.y));
-      
+      const hCm = speakerHeightCm(s);
+
       distanceLabels.push(
         { x: xPx - 14, y: yLine - 8, text: `${leftCm}cm`, textAnchor: 'end' },
         { x: xPx + 14, y: yLine - 8, text: `${rightCm}cm`, textAnchor: 'start' }
@@ -447,7 +454,7 @@ export default function SpeakerPositionsOverlay({
           const xPx = meterToCanvasX(xM);
           const leftCm = mToCm(xM);
           const rightCm = mToCm(W - xM);
-          const hCm = mToCm(bedHeightM(s.role, s.position.y));
+          const hCm = speakerHeightCm(s);
 
           // Check for close neighbors to adjust text offset
           let leftOffset = 14;
@@ -553,8 +560,8 @@ export default function SpeakerPositionsOverlay({
       const xPx = meterToCanvasX(s.xM);
       const leftDistCm = mToCm(s.xM);
       const rightDistCm = mToCm(W - s.xM);
-      const hCm = mToCm(bedHeightM(s.role, s.yM));
-      
+      const hCm = speakerHeightCm(s);
+
       distanceLabels.push(
         { x: xPx - 14, y: distTextY, text: `${leftDistCm}cm`, textAnchor: 'end' },
         { x: xPx + 14, y: distTextY, text: `${rightDistCm}cm`, textAnchor: 'start' }
@@ -587,7 +594,7 @@ export default function SpeakerPositionsOverlay({
         {/* Dots and labels for each speaker */}
         {backGroup.map((s, idx) => {
           const xPx = meterToCanvasX(s.xM);
-          const hCm = mToCm(bedHeightM(s.role, s.yM));
+          const hCm = speakerHeightCm(s);
 
           return (
             <g key={`back-dim-${s.role}-${idx}`}>
@@ -683,7 +690,7 @@ export default function SpeakerPositionsOverlay({
         {/* Dots and labels for each speaker */}
         {rightGroup.map((s, idx) => {
           const yPx = meterToCanvasY(s.yM);
-          const hCm = mToCm(bedHeightM(s.role, s.yM));
+          const hCm = speakerHeightCm(s);
 
           const dotX = rulerXpx;
           const dotY = yPx;
@@ -1077,7 +1084,7 @@ export default function SpeakerPositionsOverlay({
       // Skip left wall speakers entirely
       if (wall === "left") return null;
       
-      const hCm = mToCm(bedHeightM(yM));
+      const hCm = speakerHeightCm(s);
 
       const xPx = meterToCanvasX(xM);
       const yPx = meterToCanvasY(yM);
