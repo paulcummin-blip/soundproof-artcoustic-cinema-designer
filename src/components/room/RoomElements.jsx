@@ -63,8 +63,10 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
       x_m: 1.0,
       y_m: 1.0,
 
-      // Vertical placement (kept for later – you already had z_position)
+      // Vertical placement
       z_m: 0,
+      z_position: 0,
+      height: 2.1,
 
       // UI
       label: `Element ${elementCount + 1}`,
@@ -116,7 +118,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
   };
 
   const updateElement = (id, field, value) => {
-    const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m', 'x_lens_m', 'y_lens_m', 'z_lens_m', 'body_width_m', 'body_height_m', 'body_depth_m']);
+    const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'height', 'z_position', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m', 'x_lens_m', 'y_lens_m', 'z_lens_m', 'body_width_m', 'body_height_m', 'body_depth_m']);
     let parsed = numberFields.has(field) ? parseFloat(value) : value;
 
     const next = (elements || []).map(el => {
@@ -425,6 +427,41 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                       placeholder="e.g. Entrance door"
                     />
                   </div>
+
+                  {/* VERTICAL DIMENSIONS */}
+                  {(() => {
+                    const roomH = Number(roomDims?.heightM ?? roomDims?.height ?? 2.8) || 2.8;
+                    const elH = Number(element?.height) || 2.1;
+                    const elZ = Number(element?.z_position) || 0;
+                    const maxZ = Math.max(0, roomH - elH);
+                    const maxH = Math.max(0.05, roomH - elZ);
+                    return (
+                      <>
+                        <div>
+                          <Label className="text-[#3E4349]">Height from Floor (m)</Label>
+                          <StepperInput
+                            value={elZ}
+                            step={0.01}
+                            min={0}
+                            max={maxZ}
+                            onChange={(val) => updateElement(element.id, 'z_position', Math.max(0, Math.min(val, maxZ)))}
+                          />
+                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>Bottom of element AFF</div>
+                        </div>
+                        <div>
+                          <Label className="text-[#3E4349]">Element Height (m)</Label>
+                          <StepperInput
+                            value={elH}
+                            step={0.01}
+                            min={0.05}
+                            max={maxH}
+                            onChange={(val) => updateElement(element.id, 'height', Math.max(0.05, Math.min(val, maxH)))}
+                          />
+                          <div className="text-[10px] mt-1" style={{ color: '#625143' }}>Opening height</div>
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {/* DUAL DISTANCE — editable steppers */}
                   {(() => {

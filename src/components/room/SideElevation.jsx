@@ -753,10 +753,11 @@ export default function SideElevation({
               : Number.isFinite(el?.pos_m) ? el.pos_m
               : null;
             if (elY === null) return null;
-            const elH = Number.isFinite(el?.height_m) ? el.height_m
+            const elH = Number.isFinite(Number(el?.height)) ? Number(el.height)
+              : Number.isFinite(el?.height_m) ? el.height_m
               : el.type === 'door' ? 2.1 : 1.0;
             const elW = Number.isFinite(el?.length_m) ? el.length_m : 0.9;
-            const elZ = 0;
+            const elZ = Number.isFinite(Number(el?.z_position)) ? Number(el.z_position) : 0;
             const px  = rx(elY);
             const pw  = (elW / roomL) * drawW;
             return (
@@ -769,6 +770,18 @@ export default function SideElevation({
                   textAnchor="middle" fontSize={7} fill={DOOR_STROKE} letterSpacing="0.04em">
                   {el.label || el.name || (el.type === 'door' ? 'Door' : el.type === 'window' ? 'Window' : el.type ? el.type.charAt(0).toUpperCase() + el.type.slice(1) : 'Element')}
                 </text>
+                {/* Dimension: element height */}
+                <text x={px + pw + 3} y={(rz(elZ + elH) + rz(elZ)) / 2 - 3}
+                  textAnchor="start" fontSize={6} fill={DIM_COLOR} letterSpacing="0.02em">
+                  h{Math.round(elH * 100)}cm
+                </text>
+                {/* Dimension: bottom from floor (only shown when above floor) */}
+                {elZ > 0.001 && (
+                  <text x={px + pw + 3} y={(rz(elZ + elH) + rz(elZ)) / 2 + 6}
+                    textAnchor="start" fontSize={6} fill={DIM_COLOR} letterSpacing="0.02em">
+                    +{Math.round(elZ * 100)}cm
+                  </text>
+                )}
               </g>
             );
           })}
