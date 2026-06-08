@@ -74,7 +74,7 @@ function DiagField({ label, value, highlight, ok, warn }) {
 }
 
 export default function AdminAccountsPage() {
-  const { user, isLoadingAuth } = useAuth();
+  const { user, isLoadingAuth, checkAppState } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -149,7 +149,10 @@ export default function AdminAccountsPage() {
         account_role: "admin",
       });
 
-      // 3. Refresh diagnostics
+      // 3. Refresh global AuthContext so useAuth().user gets account_id
+      await checkAppState?.();
+
+      // 4. Refresh diagnostics
       const [accountData, projectData] = await Promise.all([
         base44.entities.Account.list("-created_date", 200),
         base44.entities.Project.list("-created_date", 500),
