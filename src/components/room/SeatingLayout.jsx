@@ -683,7 +683,25 @@ export default function SeatingLayout({
 
       {/* Front Row Distance from Front Wall (m) — always anchored to Row 1 */}
       {(() => {
-        const centers = Array.isArray(rowCentersM) && rowCentersM.length > 0 ? rowCentersM : null;
+        // Derive row centres from seatingPositions (same logic as ViewingAnglePanel).
+        // Falls back to rowCentersM only when seatingPositions is empty.
+        const liveCenters = (() => {
+          if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
+            const byRow = {};
+            for (const seat of seatingPositions) {
+              const rn = seat.rowNumber ?? 1;
+              if (!byRow[rn]) byRow[rn] = [];
+              byRow[rn].push(Number(seat.y) || 0);
+            }
+            const sorted = Object.keys(byRow).map(Number).sort((a, b) => a - b);
+            return sorted.map(rn => {
+              const ys = byRow[rn];
+              return Math.round((ys.reduce((s, v) => s + v, 0) / ys.length) * 100) / 100;
+            });
+          }
+          return null;
+        })();
+        const centers = liveCenters ?? (Array.isArray(rowCentersM) && rowCentersM.length > 0 ? rowCentersM : null);
         const offset = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
 
         // Always use Row 1 (index 0) as the editable anchor
