@@ -63,6 +63,7 @@ import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
 import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement";
 import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
 import { useShiftSeatsToAngle } from "@/components/room/rv/hooks/useShiftSeatsToAngle";
+import { useApplyLcrFromDetail } from "@/components/room/rv/hooks/useApplyLcrFromDetail";
 import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver";
 import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation";
 import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic";
@@ -1217,20 +1218,47 @@ const byId = useEntitiesById({
   const [baselineRp22, setBaselineRp22] = useState(null);
   const [baselineMlp, setBaselineMlp] = useState(null);
   const baselineCapturedRef = useRef(false);
+  const rollingBaselineTimerRef = useRef(null);
+  const latestLiveRp22Ref = useRef(null);
+
+  // Keep ref current so the interval callback always sees the latest value without a dep
+  useEffect(() => {
+    latestLiveRp22Ref.current = liveRp22;
+  }, [liveRp22]);
 
   useEffect(() => {
     if (dragging) {
+      // Capture initial baseline immediately on drag start
       if (!baselineCapturedRef.current) {
         baselineCapturedRef.current = true;
-        setBaselineRp22(liveRp22);
+        setBaselineRp22(latestLiveRp22Ref.current || liveRp22);
         setBaselineMlp(mlp ? { ...mlp } : null);
       }
+      // Start rolling 10-second reset timer only if not already running
+      if (!rollingBaselineTimerRef.current) {
+        rollingBaselineTimerRef.current = setInterval(() => {
+          if (latestLiveRp22Ref.current) {
+            setBaselineRp22(latestLiveRp22Ref.current);
+          }
+        }, 10000);
+      }
     } else {
+      // Drag ended — clear baseline and timer
       baselineCapturedRef.current = false;
       setBaselineRp22(null);
       setBaselineMlp(null);
+      if (rollingBaselineTimerRef.current) {
+        clearInterval(rollingBaselineTimerRef.current);
+        rollingBaselineTimerRef.current = null;
+      }
     }
-  // liveRp22 intentionally excluded — captures the pre-drag snapshot only
+    return () => {
+      if (rollingBaselineTimerRef.current) {
+        clearInterval(rollingBaselineTimerRef.current);
+        rollingBaselineTimerRef.current = null;
+      }
+    };
+  // liveRp22 excluded — rolling reset uses the ref, not the dep array, to avoid baseline thrash
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging]);
 
@@ -1728,81 +1756,8 @@ useEffect(() => {
     resetSideSurrounds: resetSideSurroundsToDefault
   }), [shiftSeatsToMaintainAngle, resetSideSurroundsToDefault]);
 
-  const applyLcrFromDetail = useCallback((detail) => {
-    if (!detail || !onSetSpeakers) return;
-
-    const W = widthM || 4.5; // Use new widthM
-    const L = lengthM || 6.0; // Use new lengthM
-
-    const coords = detail.coords || {};
-    const speakers = detail.speakers || {};
-
-    // coords are normalized [0..1]; convert to room metres
-    const toRoom = (p) => (!p ? { x: W * 0.5, y: 0.03 * L } : { x: (p.x || 0.5) * W, y: (p.y || 0.03) * L });
-
-    const Lpos = toRoom(coords.L);
-    const Cpos = toRoom(coords.C);
-    const Rpos = toRoom(coords.R);
-
-    const Lmodel = speakers.L || "";
-    const Cmodel = speakers.C || "";
-    const Rmodel = speakers.R || "";
-
-    // SAFE SEEDER: never overwrite existing LCR speakers.
-    // Only fills in missing roles or missing models on existing speakers.
-    onSetSpeakers((prev = []) => {
-      const seedMap = {
-        FL: { id: "auto-fl", role: "FL", model: Lmodel, position: { x: Lpos.x, y: Lpos.y } },
-        FC: { id: "auto-fc", role: "FC", model: Cmodel, position: { x: Cpos.x, y: Cpos.y } },
-        FR: { id: "auto-fr", role: "FR", model: Rmodel, position: { x: Rpos.x, y: Rpos.y } },
-      };
-
-      let changed = false;
-      const next = prev.map(s => {
-        const role = getCanonicalRole(s.role);
-        if (!seedMap[role]) return s;
-        // Role already exists — only backfill a missing model, never touch position/id/yaw/positionSource
-        const seed = seedMap[role];
-        delete seedMap[role]; // mark as handled
-        if (!s.model && seed.model) {
-          changed = true;
-          return { ...s, model: seed.model };
-        }
-        return s;
-      });
-
-      // Seed roles that did not exist at all
-      const missing = Object.values(seedMap);
-      if (missing.length > 0) changed = true;
-
-      return changed ? [...next, ...missing] : prev;
-    });
-  }, [onSetSpeakers, widthM, lengthM, getCanonicalRole]); // Use new widthM, lengthM
-
-  // Listen for LCR events and expose a direct hook
-  useEffect(() => {
-    const handler = (e) => applyLcrFromDetail(e?.detail);
-    window.addEventListener("b44:overlay:setLCR", handler);
-
-    // Optional direct hook: window.Base44Overlay.setLCR = applyLcrFromDetail
-    try {
-      window.Base44Overlay = window.Base44Overlay || {};
-      window.Base44Overlay.setLCR = applyLcrFromDetail;
-    } catch (e) {
-      if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Failed to attach Base44Overlay.setLCR:", e);
-    }
-
-    return () => {
-      window.removeEventListener("b44:overlay:setLCR", handler);
-      try {
-        if (window.Base44Overlay && window.Base44Overlay.setLCR === applyLcrFromDetail) {
-          delete window.Base44Overlay.setLCR;
-        }
-      } catch (e) {
-        if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Failed to detach Base44Overlay.setLCR:", e);
-      }
-    };
-  }, [applyLcrFromDetail]);
+  // LCR overlay event listener — extracted to hook
+  useApplyLcrFromDetail({ onSetSpeakers, widthM, lengthM, getCanonicalRole });
 
   // Derived state: seat label sets
   const {
