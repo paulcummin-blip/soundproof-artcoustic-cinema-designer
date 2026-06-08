@@ -67,7 +67,7 @@ function buildChangeSummary(baseLevels, liveLevels) {
     upCount > 0 && downCount === 0 ? 'up' :
     downCount > 0 && upCount === 0 ? 'down' : 'mixed';
 
-  return { changed, total: baseLevels.length, maxDelta, direction };
+  return { changed, total: baseLevels.length, maxDelta, direction, upCount, downCount };
 }
 
 // ─── Auto-discover all changed parameters ────────────────────────────────────
@@ -274,10 +274,43 @@ function ParamRow({ paramNum, baseLevels, liveLevels, scope, isLast }) {
 function SummaryParamRow({ paramNum, summary, scope, isLast }) {
   if (summary.changed === 0) return null;
   const { maxDelta, direction, changed, total } = summary;
-  const color = direction === 'up' ? '#16A34A' : direction === 'down' ? '#DC2626' : '#D97706';
-  const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '↕';
-  const sign = maxDelta > 0 ? '+' : '';
   const seatsLabel = scope === 'room' ? 'Room' : changed === total ? `${total} seat${total !== 1 ? 's' : ''}` : `${changed}/${total} seats`;
+
+  // Count ups and downs from the summary
+  const upCount = direction === 'up' ? changed : direction === 'mixed' ? summary.upCount ?? 0 : 0;
+  const downCount = direction === 'down' ? changed : direction === 'mixed' ? summary.downCount ?? 0 : 0;
+
+  let indicator;
+  if (direction === 'up') {
+    indicator = (
+      <div style={{ textAlign: 'center', minWidth: 36 }}>
+        <div style={{ fontSize: 14, lineHeight: 1, color: '#16A34A', fontWeight: 700 }}>↑</div>
+        <div style={{ fontSize: 10, color: '#16A34A', fontWeight: 600, marginTop: 1 }}>+{changed}</div>
+      </div>
+    );
+  } else if (direction === 'down') {
+    indicator = (
+      <div style={{ textAlign: 'center', minWidth: 36 }}>
+        <div style={{ fontSize: 14, lineHeight: 1, color: '#DC2626', fontWeight: 700 }}>↓</div>
+        <div style={{ fontSize: 10, color: '#DC2626', fontWeight: 600, marginTop: 1 }}>-{changed}</div>
+      </div>
+    );
+  } else {
+    // mixed: show green up + red down side-by-side
+    indicator = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 14, lineHeight: 1, color: '#16A34A', fontWeight: 700 }}>↑</div>
+          <div style={{ fontSize: 10, color: '#16A34A', fontWeight: 600, marginTop: 1 }}>+{upCount}</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 14, lineHeight: 1, color: '#DC2626', fontWeight: 700 }}>↓</div>
+          <div style={{ fontSize: 10, color: '#DC2626', fontWeight: 600, marginTop: 1 }}>-{downCount}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: isLast ? 0 : 8, marginBottom: isLast ? 0 : 8, borderBottom: isLast ? 'none' : '1px solid #F3F4F6' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -286,10 +319,7 @@ function SummaryParamRow({ paramNum, summary, scope, isLast }) {
         </span>
         <span style={{ fontSize: 9, color: '#9CA3AF', marginLeft: 6 }}>{seatsLabel}</span>
       </div>
-      <div style={{ textAlign: 'center', minWidth: 36 }}>
-        <div style={{ fontSize: 14, lineHeight: 1, color, fontWeight: 700 }}>{arrow}</div>
-        <div style={{ fontSize: 10, color, fontWeight: 600, marginTop: 1 }}>{sign}{maxDelta}</div>
-      </div>
+      {indicator}
     </div>
   );
 }
