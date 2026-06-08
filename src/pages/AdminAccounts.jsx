@@ -84,6 +84,11 @@ export default function AdminAccountsPage() {
   const [diagTotalAccounts, setDiagTotalAccounts] = useState(null);
   const [diagLoading, setDiagLoading] = useState(true);
 
+  // Setup action state
+  const [setupRunning, setSetupRunning] = useState(false);
+  const [setupMessage, setSetupMessage] = useState(null); // { type: "success"|"error", text }
+  const [localUser, setLocalUser] = useState(null); // updated user after setup
+
   const isAdmin = user?.role === "admin";
 
   useEffect(() => {
@@ -116,6 +121,53 @@ export default function AdminAccountsPage() {
     load();
     return () => { mounted = false; };
   }, [isAdmin]);
+
+  // Derived: use localUser (post-setup) if available, else auth user
+  const effectiveUser = localUser || user;
+
+  const showSetupButton = isAdmin
+    && !diagLoading
+    && !effectiveUser?.account_id
+    && diagTotalAccounts === 0;
+
+  async function handleCreateAdminAccount() {
+    setSetupRunning(true);
+    setSetupMessage(null);
+    try {
+      // 1. Create Account record
+      const newAccount = await base44.entities.Account.create({
+        name: "Sound Proof Admin",
+        status: "active",
+        account_type: "admin",
+        contact_email: effectiveUser?.email || "",
+        notes: "Initial admin account",
+      });
+
+      // 2. Update current User record
+      await base44.auth.updateMe({
+        account_id: newAccount.id,
+        account_role: "admin",
+      });
+
+      // 3. Refresh diagnostics
+      const [accountData, projectData] = await Promise.all([
+        base44.entities.Account.list("-created_date", 200),
+        base44.entities.Project.list("-created_date", 500),
+      ]);
+      setAccounts(accountData || []);
+      setDiagTotalAccounts((accountData || []).length);
+      setDiagProjects(projectData || []);
+
+      // Update local user snapshot so UI reflects new account_id immediately
+      setLocalUser({ ...effectiveUser, account_id: newAccount.id, account_role: "admin" });
+
+      setSetupMessage({ type: "success", text: `Account created (id: ${newAccount.id}). User account_id updated. Diagnostics refreshed.` });
+    } catch (err) {
+      setSetupMessage({ type: "error", text: err?.message || "Setup failed." });
+    } finally {
+      setSetupRunning(false);
+    }
+  }
 
   // Loading auth state
   if (isLoadingAuth) {
@@ -180,9 +232,9 @@ export default function AdminAccountsPage() {
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Current User</div>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            <DiagField label="Email" value={user?.email} />
-            <DiagField label="Role" value={user?.role} />
-            <DiagField label="account_id" value={user?.account_id} highlight />
+            <DiagField label="Email" value={effectiveUser?.email} />
+            <DiagField label="Role" value={effectiveUser?.role} />
+            <DiagField label="account_id" value={effectiveUser?.account_id} highlight />
           </div>
         </div>
 
@@ -203,7 +255,40 @@ export default function AdminAccountsPage() {
           )}
         </div>
 
-        <div style={{ height: 1, background: "#e6d88a", marginBottom: 14 }} />
+        {/* Setup action */}
+        {showSetupButton && (
+          <div style={{ marginTop: 16, marginBottom: 4 }}>
+            <div style={{ height: 1, background: "#e6d88a", marginBottom: 14 }} />
+            <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+              Initial Setup
+            </div>
+            <button
+              onClick={handleCreateAdminAccount}
+              disabled={setupRunning}
+              style={{
+                padding: "10px 20px", borderRadius: 10,
+                background: setupRunning ? "#888" : "#213428",
+                color: "#fff", border: "none",
+                fontSize: 14, fontWeight: 700, cursor: setupRunning ? "not-allowed" : "pointer",
+              }}
+            >
+              {setupRunning ? "Setting up…" : "Create Sound Proof Admin Account"}
+            </button>
+          </div>
+        )}
+        {setupMessage && (
+          <div style={{
+            marginTop: 10, padding: "10px 14px", borderRadius: 8,
+            background: setupMessage.type === "success" ? "#eafaf1" : "#fdecea",
+            border: `1px solid ${setupMessage.type === "success" ? "#a3d9b1" : "#f5c6cb"}`,
+            color: setupMessage.type === "success" ? "#213428" : BRAND.red,
+            fontSize: 13, fontWeight: 500,
+          }}>
+            {setupMessage.type === "success" ? "✅ " : "❌ "}{setupMessage.text}
+          </div>
+        )}
+
+        <div style={{ height: 1, background: "#e6d88a", marginBottom: 14, marginTop: setupMessage || showSetupButton ? 14 : 0 }} />
 
         {/* Recent Projects */}
         <div>
