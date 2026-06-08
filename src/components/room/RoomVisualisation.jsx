@@ -1114,6 +1114,8 @@ const byId = useEntitiesById({
     canvasToRoom,
     lengthM,
     seatDragStartRef,
+    setSeatingBlockOffset: appState?.setSeatingBlockOffset,
+    setRowCentersM: appState?.setRowCentersM,
   });
 
   // Room element drag info (structured, only visible during roomElement drag)

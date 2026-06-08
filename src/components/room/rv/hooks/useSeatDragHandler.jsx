@@ -19,6 +19,8 @@ export function useSeatDragHandler({
   canvasToRoom,
   lengthM,
   seatDragStartRef,
+  setSeatingBlockOffset,
+  setRowCentersM,
 }) {
   const [isSnapping, setIsSnapping] = useState(false);
   const snapTimerRef = useRef(null);
@@ -54,11 +56,47 @@ export function useSeatDragHandler({
       onSetSeatingPositions(prev => {
         if (!Array.isArray(prev) || prev.length === 0) return prev;
 
-        return prev.map(seat => {
+        const updated = prev.map(seat => {
           const baseY = baseline.baselineYById[seat.id];
           if (!Number.isFinite(baseY)) return seat;
           return { ...seat, y: baseY + clampedDelta };
         });
+
+        // Sync seatingBlockOffset to the new Row 1 Y so the Front Row Distance display stays live.
+        // Row 1 seats are identified by rowNumber === 1; fall back to lowest-y seat if none tagged.
+        if (setSeatingBlockOffset || setRowCentersM) {
+          const row1Seats = updated.filter(s => s.rowNumber === 1);
+          const refSeats = row1Seats.length > 0 ? row1Seats : [updated[0]];
+          const newRow1Y = Math.round(
+            (refSeats.reduce((sum, s) => sum + (Number(s.y) || 0), 0) / refSeats.length) * 100
+          ) / 100;
+
+          if (setSeatingBlockOffset && Number.isFinite(newRow1Y)) {
+            setSeatingBlockOffset(newRow1Y);
+          }
+
+          // Rebuild rowCentersM from the updated seats so the row summary readouts stay in sync.
+          if (setRowCentersM) {
+            const rowMap = new Map();
+            updated.forEach(s => {
+              const rn = s.rowNumber;
+              if (!Number.isInteger(rn)) return;
+              if (!rowMap.has(rn)) rowMap.set(rn, []);
+              rowMap.get(rn).push(Number(s.y) || 0);
+            });
+            if (rowMap.size > 0) {
+              const sortedRows = Array.from(rowMap.keys()).sort((a, b) => a - b);
+              const centers = sortedRows.map(rn => {
+                const ys = rowMap.get(rn);
+                const avg = ys.reduce((a, b) => a + b, 0) / ys.length;
+                return Math.round(avg * 100) / 100;
+              });
+              setRowCentersM(centers);
+            }
+          }
+        }
+
+        return updated;
       });
 
       return;
