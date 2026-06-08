@@ -67,6 +67,8 @@ export function useSeatingRebuild({
   const prevMlpYRef = useRef(null);
   // Tracks the last resolved visible screen width (metres) to detect screen-size-driven MLP changes
   const prevVisibleWidthMRef = useRef(null);
+  // Tracks the last seatingBlockOffset to detect Front Row Distance changes independently
+  const prevSeatingBlockOffsetRef = useRef(null);
 
   // Helper: get ear height for a 1-based row index, falling back to step pattern
   const getRowZ = (rowIndex) => {
@@ -233,8 +235,8 @@ export function useSeatingRebuild({
     const seatingReferenceChanged =
       (prevVisibleWidthMRef.current !== null && Math.abs(currentVisibleWidthM57 - prevVisibleWidthMRef.current) > 0.001) ||
       (prevMlpYRef.current !== null && Math.abs(liveFix57MlpY - prevMlpYRef.current) > 0.005) ||
-      // Treat absolute Row 1 Y changes as a seat-layout reference change (not RSP)
-      (liveRow1IsSet && prevMlpYRef.current !== null && Math.abs(liveRow1AbsoluteY - (appState?.rowCentersM?.[0] ?? -1)) > 0.005);
+      // Direct seatingBlockOffset change detection — independent of RSP/MLP
+      (prevSeatingBlockOffsetRef.current !== null && Math.abs(liveRow1AbsoluteY - prevSeatingBlockOffsetRef.current) > 0.005);
 
     // ── SCREEN-PLANE DELTA SHIFT ───────────────────────────────────────────────
     // When the MLP moves because the screen plane shifted (e.g. LCR angling),
@@ -354,6 +356,10 @@ export function useSeatingRebuild({
     // Also keep prevMlpYRef in sync with the live 57.5° value for seatingReferenceChanged detection
     if (prevMlpYRef.current === null && Number.isFinite(liveFix57MlpY)) {
       prevMlpYRef.current = liveFix57MlpY;
+    }
+    // Seed prevSeatingBlockOffsetRef on first pass so subsequent changes are detectable
+    if (prevSeatingBlockOffsetRef.current === null) {
+      prevSeatingBlockOffsetRef.current = liveRow1AbsoluteY;
     }
     // ── END SCREEN-WIDTH ABSOLUTE Y CORRECTION ────────────────────────────────
 
@@ -477,6 +483,9 @@ export function useSeatingRebuild({
 
     // 5) Commit to app state
     setSeats((prev) => (seatsEqualWithin1mm(prev, seats) ? prev : seats));
+
+    // Update seatingBlockOffset ref so next render can detect further changes
+    prevSeatingBlockOffsetRef.current = liveRow1AbsoluteY;
 
     if (globalThis.__B44_LOGS) console.log(
       '[RD] seating rebuilt: rows=',
