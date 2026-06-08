@@ -388,7 +388,7 @@ export default function AdminAccountsPage() {
           {/* Table header */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr 2fr 1fr 80px",
+            gridTemplateColumns: "2fr 1fr 1fr 2fr 1fr 80px 70px",
             gap: 0,
             padding: "10px 16px",
             background: "rgb(244 243 241)",
@@ -402,6 +402,7 @@ export default function AdminAccountsPage() {
             <div>Contact Email</div>
             <div>Last Access</div>
             <div style={{ textAlign: "right" }}>Projects</div>
+            <div></div>
           </div>
 
           {/* Table rows */}
@@ -410,7 +411,7 @@ export default function AdminAccountsPage() {
               key={acc.id}
               style={{
                 display: "grid",
-                gridTemplateColumns: "2fr 1fr 1fr 2fr 1fr 80px",
+                gridTemplateColumns: "2fr 1fr 1fr 2fr 1fr 80px 70px",
                 gap: 0,
                 padding: "14px 16px",
                 borderBottom: i < accounts.length - 1 ? `1px solid ${BRAND.border}` : "none",
@@ -447,6 +448,21 @@ export default function AdminAccountsPage() {
               </div>
               <div style={{ textAlign: "right", fontSize: 14, fontWeight: 700, color: BRAND.text }}>
                 {diagProjects.filter(p => p.account_id === acc.id).length}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <a
+                  href={`/admin/accounts/${acc.id}`}
+                  style={{
+                    display: "inline-block",
+                    padding: "5px 10px", borderRadius: 8,
+                    border: `1px solid ${BRAND.border}`,
+                    background: BRAND.card, color: BRAND.text,
+                    fontSize: 12, fontWeight: 600, textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  View →
+                </a>
               </div>
             </div>
           ))}
