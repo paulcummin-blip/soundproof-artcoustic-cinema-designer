@@ -1218,47 +1218,22 @@ const byId = useEntitiesById({
   const [baselineRp22, setBaselineRp22] = useState(null);
   const [baselineMlp, setBaselineMlp] = useState(null);
   const baselineCapturedRef = useRef(false);
-  const rollingBaselineTimerRef = useRef(null);
-  const latestLiveRp22Ref = useRef(null);
-
-  // Keep ref current so the interval callback always sees the latest value without a dep
-  useEffect(() => {
-    latestLiveRp22Ref.current = liveRp22;
-  }, [liveRp22]);
 
   useEffect(() => {
     if (dragging) {
-      // Capture initial baseline immediately on drag start
+      // Capture baseline once at drag start
       if (!baselineCapturedRef.current) {
         baselineCapturedRef.current = true;
-        setBaselineRp22(latestLiveRp22Ref.current || liveRp22);
+        setBaselineRp22(liveRp22);
         setBaselineMlp(mlp ? { ...mlp } : null);
       }
-      // Start rolling 10-second reset timer only if not already running
-      if (!rollingBaselineTimerRef.current) {
-        rollingBaselineTimerRef.current = setInterval(() => {
-          if (latestLiveRp22Ref.current) {
-            setBaselineRp22(latestLiveRp22Ref.current);
-          }
-        }, 10000);
-      }
     } else {
-      // Drag ended — clear baseline and timer
+      // Drag ended — clear baseline
       baselineCapturedRef.current = false;
       setBaselineRp22(null);
       setBaselineMlp(null);
-      if (rollingBaselineTimerRef.current) {
-        clearInterval(rollingBaselineTimerRef.current);
-        rollingBaselineTimerRef.current = null;
-      }
     }
-    return () => {
-      if (rollingBaselineTimerRef.current) {
-        clearInterval(rollingBaselineTimerRef.current);
-        rollingBaselineTimerRef.current = null;
-      }
-    };
-  // liveRp22 excluded — rolling reset uses the ref, not the dep array, to avoid baseline thrash
+  // liveRp22 intentionally excluded — baseline is a snapshot, not a live value
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging]);
 
@@ -1750,11 +1725,13 @@ useEffect(() => {
     };
   }, [resetSideSurroundsToDefault]);
 
-  // Expose the shift function so parent components can call it
+  // Expose functions so parent components can call them
   useImperativeHandle(ref, () => ({
     shiftSeatsToMaintainAngle,
-    resetSideSurrounds: resetSideSurroundsToDefault
-  }), [shiftSeatsToMaintainAngle, resetSideSurroundsToDefault]);
+    resetSideSurrounds: resetSideSurroundsToDefault,
+    rebaseline: () => { setBaselineRp22(liveRp22); },
+    hasBaseline: () => baselineRp22 !== null,
+  }), [shiftSeatsToMaintainAngle, resetSideSurroundsToDefault, liveRp22, baselineRp22]);
 
   // LCR overlay event listener — extracted to hook
   useApplyLcrFromDetail({ onSetSpeakers, widthM, lengthM, getCanonicalRole });

@@ -289,6 +289,7 @@ function RoomDesignerWithState() {
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("summary");
+  const [hasLiveBaseline, setHasLiveBaseline] = React.useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
   const [leftPanelView, setLeftPanelView] = useState('plan'); // 'plan' | 'front' | 'side'
@@ -1558,6 +1559,19 @@ function RoomDesignerWithState() {
     return base;
   }, [_overlays, frontWideZones, _enableFrontWides]);
 
+  const handleRebaseline = React.useCallback(() => {
+    visualisationRef.current?.rebaseline?.();
+  }, []);
+
+  // Poll hasBaseline from the RV ref while a drag is in progress
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      const next = !!visualisationRef.current?.hasBaseline?.();
+      setHasLiveBaseline((prev) => prev !== next ? next : prev);
+    }, 200);
+    return () => clearInterval(interval);
+  }, []);
+
   // Subwoofer sync extracted to useSubwooferSync hook (must be before any conditional return)
   useSubwooferSync({ appState, stableDimensions, frontSubsCfg: _frontSubsCfg, rearSubsCfg: _rearSubsCfg });
 
@@ -1705,6 +1719,8 @@ function RoomDesignerWithState() {
             setFreeMoveLcr={setFreeMoveLcr}
             liveImpactMode={safeLiveImpactMode}
             setLiveImpactMode={safeSetLiveImpactMode}
+            onRebaseline={handleRebaseline}
+            hasBaseline={hasLiveBaseline}
             zoomMode={zoomMode}
             setZoomMode={setZoomMode}
           />}
