@@ -707,7 +707,8 @@ const byId = useEntitiesById({
     mlpDotY_m,
     appState,
     onScreenPlaneChange,
-    onScreenPlaneYChange: props.onScreenPlaneYChange
+    onScreenPlaneYChange: props.onScreenPlaneYChange,
+    isDraggingRef: isDraggingSpeakerRef,
   });
 
   // Alias for backward compatibility with rest of component

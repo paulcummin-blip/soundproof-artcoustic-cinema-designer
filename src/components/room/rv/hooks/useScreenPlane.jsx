@@ -15,7 +15,8 @@ export function useScreenPlane({
   mlpDotY_m,
   appState,
   onScreenPlaneChange,
-  onScreenPlaneYChange
+  onScreenPlaneYChange,
+  isDraggingRef,
 }) {
   // LOCK: if screen plane is locked, return the locked value immediately
   const isLocked = appState?.screenPlaneLocked === true;
@@ -212,11 +213,17 @@ export function useScreenPlane({
   }, [resolvedScreenPlaneY, onScreenPlaneChange]);
 
   // NEW: Publish live screen plane Y to screen object for Live Metrics (immediate, no debounce)
+  // Guard: suppress write-back while any speaker drag is active to prevent
+  // oscillation between speakerClearanceM/floatDepthM and screenPlaneY_m.
   const lastSentScreenPlaneYRef = useRef(null);
 
   useEffect(() => {
     if (typeof onScreenPlaneYChange !== 'function') return;
     if (!Number.isFinite(resolvedScreenPlaneY)) return;
+
+    // Do not write screenPlaneY_m back to _screen while a speaker drag is active.
+    // RoomDesigner's LCR clearance effect handles screen updates during drag.
+    if (isDraggingRef?.current) return;
 
     // Round to mm to prevent jitter
     const rounded = Math.round(resolvedScreenPlaneY * 1000) / 1000;
@@ -226,7 +233,7 @@ export function useScreenPlane({
     lastSentScreenPlaneYRef.current = rounded;
 
     onScreenPlaneYChange(rounded);
-  }, [resolvedScreenPlaneY, onScreenPlaneYChange]);
+  }, [resolvedScreenPlaneY, onScreenPlaneYChange, isDraggingRef]);
 
   // resolvedScreenPlaneY is computed early (before publish effects) — reuse it here.
   const resolvedZoneDepthM = (isLocked && Number.isFinite(lockedY))
