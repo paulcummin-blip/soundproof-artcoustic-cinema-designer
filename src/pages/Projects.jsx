@@ -142,8 +142,9 @@ export default function ProjectsPage() {
         const projectList = await base44.entities.Project.list('-created_date', 100);
         
         if (mounted) {
-          // Map to the format expected by the UI
-          const mapped = (projectList || []).map(p => {
+          // Filter out legacy projects with no account_id, then map to UI format
+          const filtered = (projectList || []).filter(p => p.account_id);
+          const mapped = filtered.map(p => {
             try {
               return {
                 id: p.id,
