@@ -70,6 +70,7 @@ import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerCon
 import FrontElevation from "@/components/room/FrontElevation";
 import SideElevation from "@/components/room/SideElevation";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
+import { useElevationDragHandlers } from "@/components/roomdesigner/hooks/useElevationDragHandlers";
 
 // Safe lazy imports that work with both named and default exports
 const RoomDimensions = React.lazy(() =>
@@ -1113,12 +1114,30 @@ function RoomDesignerWithState() {
     if (anyOutOfBounds) setSpeakers((prev) => preserveSurroundModels(prev, rescued, appState));
   }, [stableDimensions.width, stableDimensions.length, placedSpeakers, _isFrozen, setSpeakers]);
 
+  // Ref to hold the latest required screen clearance computed during a speaker drag.
+  // Written on every mouse move, committed once when drag ends to avoid per-pixel jitter.
+  const pendingScreenReqRef = useRef(null);
+
+  // Commit pending screen clearance once when drag ends (placedSpeakers is the trigger proxy).
+  useEffect(() => {
+    if (isDraggingRef?.current) return;
+    const pending = pendingScreenReqRef.current;
+    if (!pending || !_setScreen) return;
+    pendingScreenReqRef.current = null;
+    const { req, mountMode } = pending;
+    if (mountMode === 'floating') {
+      if ((Number(_screen?.floatDepthM) || 0) < req) _setScreen(prev => ({ ...prev, floatDepthM: req }));
+    } else {
+      if ((Number(_screen?.speakerClearanceM) || 0) < req) _setScreen(prev => ({ ...prev, speakerClearanceM: req }));
+    }
+  }, [placedSpeakers, _screen, _setScreen]);
+
   // Effect to lock LCR to front wall + z=1.2, and drive screen clearance
   useEffect(() => {
-    if (isDraggingRef?.current) return; // Skip entirely while drag is active
     if (_isFrozen && _isFrozen('speakers')) return;
     if (!placedSpeakers || !placedSpeakers.length) return;
     if (!mlpAnchorEffective) return;
+    const isDragging = isDraggingRef?.current;
     const gapM = 0.01;
     let needsUpdate = false;
     let maxFrontExtentY = 0;
@@ -1142,6 +1161,7 @@ function RoomDesignerWithState() {
       const willStayAtActual = spk.positionSource === 'user' && actualCentreY >= wallY - 0.001;
       const finalCentreY = willStayAtActual ? actualCentreY : wallY;
       if (finalCentreY + halfExtentM > maxFrontExtentY) maxFrontExtentY = finalCentreY + halfExtentM;
+      if (isDragging) return spk; // skip speaker position corrections during drag
       if (willStayAtActual) return spk;
       const lcrTargetZ = Number.isFinite(appState?.splConfig?.lcrHeightM) ? appState.splConfig.lcrHeightM : 1.2;
       if (Math.abs((spk.position?.y ?? 0) - wallY) > 0.001 || Math.abs((spk.position?.z ?? lcrTargetZ) - lcrTargetZ) > 0.001) {
@@ -1153,10 +1173,16 @@ function RoomDesignerWithState() {
     if (needsUpdate) setSpeakers((prev) => mergePreserveOverheads(prev, updated, dolbyPreset));
     // Push screen front plane out to maintain >= 1cm clearance from the farthest LCR extent.
     // Works for ALL mount modes: floating drives floatDepthM; baffle/recessed drives speakerClearanceM
-    // (in AppStateProvider, screenFrontPlaneY = speakerClearanceM for baffle mode).
     if (maxFrontExtentY > 0 && _setScreen) {
       const req = Math.round((maxFrontExtentY + gapM) * 1000) / 1000;
       const mountMode = _screen?.mountMode || 'baffle';
+      if (isDragging) {
+        // During drag: store latest required value without writing state (prevents jitter).
+        // The commit effect above will flush it on drag end.
+        pendingScreenReqRef.current = { req, mountMode };
+        return;
+      }
+      pendingScreenReqRef.current = null;
       if (mountMode === 'floating') {
         if ((Number(_screen?.floatDepthM) || 0) < req) _setScreen(prev => ({ ...prev, floatDepthM: req }));
       } else {
@@ -1456,119 +1482,15 @@ function RoomDesignerWithState() {
     } catch (e) { if (globalThis.__B44_LOGS) console.error("[OptimiseAll] failed:", e); }
   }, [placedSpeakers, stableDimensions, _seatingPositions, seatingArrangementBasis, _isFrozen, setSpeakers, mlpAnchorEffective]);
 
-  // Front Elevation LCR drag callback
-  const handleLcrSpeakerMoved = useCallback(({ role, newX, newZ, axis }) => {
-    const rW = stableDimensions.widthM || stableDimensions.width || 4.5;
-
-    // Determine if all three LCR speakers share the same model (locked-together mode)
-    const getModel = (r) => {
-      const spk = placedSpeakers.find(s => safeCanon(s.role) === r);
-      return spk?.model || null;
-    };
-    const flModel = getModel('FL');
-    const fcModel = getModel('FC');
-    const frModel = getModel('FR');
-    const allSameModel = flModel && fcModel && frModel && flModel === fcModel && fcModel === frModel;
-
-    setSpeakers(prev => prev.map(spk => {
-      const canon = safeCanon(spk.role);
-      const isLcrRole = canon === 'FL' || canon === 'FC' || canon === 'FR';
-
-      if (canon === role) {
-        return {
-          ...spk,
-          position: {
-            ...spk.position,
-            ...(axis === 'x' ? { x: newX } : {}),
-            ...(axis === 'z' ? { z: newZ } : {}),
-          },
-        };
-      }
-      // FL <-> FR horizontal symmetry
-      if (axis === 'x' && role === 'FL' && canon === 'FR') {
-        return { ...spk, position: { ...spk.position, x: rW - newX } };
-      }
-      if (axis === 'x' && role === 'FR' && canon === 'FL') {
-        return { ...spk, position: { ...spk.position, x: rW - newX } };
-      }
-      // Vertical: if all same model, lock all three LCR together
-      if (axis === 'z' && isLcrRole) {
-        if (allSameModel) {
-          return { ...spk, position: { ...spk.position, z: newZ } };
-        }
-        // Different models: only keep FL/FR paired
-        if ((role === 'FL' || role === 'FR') && (canon === 'FL' || canon === 'FR')) {
-          return { ...spk, position: { ...spk.position, z: newZ } };
-        }
-      }
-      return spk;
-    }));
-
-    // When dragging vertically, update the shared lcrHeightM so the field
-    // and Acoustic Centre Guidance stay in sync with the drag
-    if (axis === 'z') {
-      appState?.updateGlobalSpl?.({ lcrHeightM: newZ });
-    }
-  }, [setSpeakers, stableDimensions.widthM, stableDimensions.width, placedSpeakers, appState?.updateGlobalSpl]);
-
-  // Front Elevation subwoofer drag callback
-  const handleFrontSubMoved = useCallback(({ index, newX, newZ, axis }) => {
-    const roomW = stableDimensions.widthM || stableDimensions.width || 4.5;
-
-    // 1. Immediate visual update
-    setSubwoofers(prev => {
-      if (!Array.isArray(prev)) return prev;
-      const frontSubs = prev.filter(s => s?.group === 'front');
-      const isPaired = frontSubs.length === 2;
-      let frontCount = -1;
-      return prev.map(sub => {
-        if (sub?.group !== 'front') return sub;
-        frontCount++;
-        if (axis === 'x' && isPaired) {
-          // Paired x: dragged sub gets newX, other gets mirror
-          const mirrorX = roomW - newX;
-          const thisX = frontCount === index ? newX : mirrorX;
-          return { ...sub, position: { ...(sub.position || {}), x: thisX } };
-        }
-        if (axis === 'z' && isPaired) {
-          // Paired z: both get same height
-          return { ...sub, position: { ...(sub.position || {}), z: newZ } };
-        }
-        // Independent: only update the dragged sub
-        if (frontCount !== index) return sub;
-        return { ...sub, position: { ...(sub.position || {}), ...(axis === 'x' ? { x: newX } : {}), ...(axis === 'z' ? { z: newZ } : {}) } };
-      });
-    });
-
-    // 2. Persist to config source-of-truth
-    if (axis === 'x' && typeof appState?.setFrontSubsCfg === 'function') {
-      appState.setFrontSubsCfg(prev => {
-        const frontCount = (appState?.subwoofers || []).filter(s => s?.group === 'front').length;
-        const isPaired = frontCount === 2;
-        const positions = Array.isArray(prev?.positions) ? [...prev.positions] : [];
-        if (isPaired) {
-          while (positions.length < 2) positions.push({});
-          const mirrorX = roomW - newX;
-          positions[index] = { ...(positions[index] || {}), x: newX };
-          positions[1 - index] = { ...(positions[1 - index] || {}), x: mirrorX };
-        } else {
-          while (positions.length <= index) positions.push({});
-          positions[index] = { ...(positions[index] || {}), x: newX };
-        }
-        return { ...prev, positions, isManual: true };
-      });
-    }
-
-    if (axis === 'z' && typeof appState?.setFrontSubsCfg === 'function') {
-      const model = _frontSubsCfg?.model || '';
-      const orientation = _frontSubsCfg?.orientation;
-      const meta = getSpeakerModelMeta(model, orientation) || {};
-      const subH = Number(meta.heightM);
-      const resolvedH = Number.isFinite(subH) && subH > 0 ? subH : 0.50;
-      const bottomHeightM = Math.max(0, newZ - resolvedH / 2);
-      appState.setFrontSubsCfg(prev => ({ ...prev, bottomHeightM }));
-    }
-  }, [setSubwoofers, appState?.setFrontSubsCfg, _frontSubsCfg, _frontSubsCfg?.orientation, stableDimensions.widthM, stableDimensions.width, appState?.subwoofers]);
+  // Elevation drag callbacks — extracted to keep this file under the line limit
+  const { handleLcrSpeakerMoved, handleFrontSubMoved } = useElevationDragHandlers({
+    setSpeakers,
+    setSubwoofers,
+    stableDimensions,
+    placedSpeakers,
+    appState,
+    _frontSubsCfg,
+  });
 
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
