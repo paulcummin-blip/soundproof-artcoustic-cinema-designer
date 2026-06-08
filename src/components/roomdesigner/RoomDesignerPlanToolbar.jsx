@@ -112,9 +112,19 @@ export default function RoomDesignerPlanToolbar({
           <option value="summary">Summary</option>
           <option value="detailed">Detailed</option>
         </select>
-      </div>
+        <span
+          style={{
+            fontSize: 11,
+            color: '#3E4349',
+            marginLeft: 6,
+            fontWeight: 600
+          }}
+        >
+          LI: {liveImpactMode || "undefined"}
+        </span>
+        </div>
 
-      {/* 3-state zoom toggle */}
+        {/* 3-state zoom toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
         <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Zoom</span>
         <div style={{ display: 'flex', gap: 4 }}>
