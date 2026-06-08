@@ -349,6 +349,7 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const isDraggingSpeakerRef = useRef(false);
   const isAnyDraggingRef = React.useRef(false);
   const dragOffsetRoomRef = useRef({ x: 0, y: 0 });
+  const seatDragStartRef = useRef(null);
   const draggedSubWallRef = useRef(null);
   const draggedSubTypeRef = useRef(null);
   const lastSentRef = useRef(null);
@@ -928,6 +929,8 @@ const byId = useEntitiesById({
     rspMode,
     mlpDotY_m,
     meterToCanvasY,
+    seatDragStartRef,
+    seatingPositions,
   });
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
@@ -1109,14 +1112,11 @@ const byId = useEntitiesById({
     dragOffsetRoomRef,
   });
 
-  const { handleSeatDrag, isSnapping: isSeatSnapping, clearSnap: clearSeatSnap } = useSeatDragHandler({
+  const { handleSeatDrag, isSnapping: isSeatSnapping, clearSnap: clearSeatSnap, clearSeatDragBaseline } = useSeatDragHandler({
     onSetSeatingPositions,
     canvasToRoom,
     lengthM,
-    currentSeatingBlockOffset: viewingDistanceOffsetM,
-    setSeatingBlockOffset: props.setSeatingBlockOffsetGuarded,
-    rspMode,
-    targetRspY_m: mlpDotY_m,
+    seatDragStartRef,
   });
 
   // Room element drag info (structured, only visible during roomElement drag)
@@ -1306,10 +1306,10 @@ const byId = useEntitiesById({
   // Window-level drag cleanup — fires for ALL drag types when mouse is released outside the SVG
   useEffect(() => {
     const onWindowMouseUp = (e) => {
-      if (isAnyDraggingRef.current) { handleMouseUp(e); clearSeatSnap(); }
+      if (isAnyDraggingRef.current) { handleMouseUp(e); clearSeatSnap(); clearSeatDragBaseline(); }
     };
     const onWindowBlur = () => {
-      if (isAnyDraggingRef.current) { handleMouseUp({}); clearSeatSnap(); }
+      if (isAnyDraggingRef.current) { handleMouseUp({}); clearSeatSnap(); clearSeatDragBaseline(); }
     };
     window.addEventListener('mouseup', onWindowMouseUp);
     window.addEventListener('blur', onWindowBlur);
@@ -1317,7 +1317,7 @@ const byId = useEntitiesById({
       window.removeEventListener('mouseup', onWindowMouseUp);
       window.removeEventListener('blur', onWindowBlur);
     };
-  }, [handleMouseUp, clearSeatSnap]);
+  }, [handleMouseUp, clearSeatSnap, clearSeatDragBaseline]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
