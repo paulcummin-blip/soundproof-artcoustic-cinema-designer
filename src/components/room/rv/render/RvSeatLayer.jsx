@@ -13,7 +13,6 @@ export default function RvSeatLayer({
   hudPinnedSeatId,
   handleMouseDown,
   handleSeatClick,
-  clampMlpY,
   MLPMarker,
 }) {
   if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
@@ -38,15 +37,11 @@ export default function RvSeatLayer({
           seat.position?.x ??
           0
         );
-        const yM_raw = Number(
+        const yM = Number(
           seat.y ??
           seat.position?.y ??
           0
         );
-
-        // IMPORTANT: match the MLP clamping so the green dot and seat oval
-        // cannot diverge on first load / legacy autosave data.
-        const yM = clampMlpY(yM_raw);
 
         const [seatX, seatY] = toPx(xM, yM);
         const isPinned = hudPinnedSeatId === seat.id;
