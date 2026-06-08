@@ -152,8 +152,8 @@ export function useSeatingRebuild({
           );
 
       const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
-      const MIN_Y = 0.40;
-      const MAX_Y = len - 0.40;
+      const MIN_Y = 0;
+      const MAX_Y = len;
       const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
       const rawCenters = buildRowCenters(stableBaseY, list.length, Number(_rowSpacingM) || 1.8, seatingArrangementBasis || _mlpBasis) || [];
@@ -255,8 +255,8 @@ export function useSeatingRebuild({
       const deltaY = currentMlpY - prevMlpYRef.current;
       if (Math.abs(deltaY) > EQ_EPS) {
         const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
-        const MIN_Y = 0.40;
-        const MAX_Y = len - 0.40;
+        const MIN_Y = 0;
+        const MAX_Y = len;
         const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
         const shiftedSeats = currentSeats.map(s => ({
@@ -309,8 +309,8 @@ export function useSeatingRebuild({
           );
 
       const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
-      const MIN_Y = 0.40;
-      const MAX_Y = len - 0.40;
+      const MIN_Y = 0;
+      const MAX_Y = len;
       const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
       let newCenters = [];
@@ -419,8 +419,8 @@ export function useSeatingRebuild({
         }
 
         const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
-        const MIN_Y = 0.40;
-        const MAX_Y = len - 0.40;
+        const MIN_Y = 0;
+        const MAX_Y = len;
         const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
         if (Array.isArray(generated) && generated.length === rowsNeeded) {
