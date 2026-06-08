@@ -287,6 +287,7 @@ function RoomDesignerWithState() {
   const [speakerPositionsView, setSpeakerPositionsView] = React.useState('off'); // 'off' | 'plan' | 'table' | 'both'
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
+  const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("summary");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
   const [leftPanelView, setLeftPanelView] = useState('plan'); // 'plan' | 'front' | 'side'
@@ -1674,6 +1675,13 @@ function RoomDesignerWithState() {
     appState?.updateGlobalSpl?.(patch);
   };
 
+  const safeLiveImpactMode = ["off", "summary", "detailed"].includes(appState?.liveImpactMode)
+    ? appState.liveImpactMode
+    : localLiveImpactMode;
+  const safeSetLiveImpactMode = typeof appState?.setLiveImpactMode === "function"
+    ? appState.setLiveImpactMode
+    : setLocalLiveImpactMode;
+
   return (
     <>
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
@@ -1760,32 +1768,24 @@ function RoomDesignerWithState() {
           </div>
 
           {/* Plan toolbar — only shown in plan view */}
-          {leftPanelView === 'plan' && (() => {
-            const safeLiveImpactMode = ["off", "summary", "detailed"].includes(appState?.liveImpactMode)
-              ? appState.liveImpactMode
-              : "summary";
-            const safeSetLiveImpactMode = typeof appState?.setLiveImpactMode === "function"
-              ? appState.setLiveImpactMode
-              : () => {};
-            return <RoomDesignerPlanToolbar
-              allowExtraSurrounds={allowExtraSurrounds}
-              extraSurroundCount={appState?.extraSurroundCount}
-              dolbyPreset={dolbyPreset}
-              frontSubsCfg={_frontSubsCfg}
-              rearSubsCfg={_rearSubsCfg}
-              overlayRelevance={overlayRelevance}
-              overlays={_overlays}
-              setOverlays={_setOverlays}
-              enableFrontWides={_enableFrontWides}
-              setEnableFrontWides={_setEnableFrontWides}
-              freeMoveLcr={freeMoveLcr}
-              setFreeMoveLcr={setFreeMoveLcr}
-              liveImpactMode={safeLiveImpactMode}
-              setLiveImpactMode={safeSetLiveImpactMode}
-              zoomMode={zoomMode}
-              setZoomMode={setZoomMode}
-            />;
-          })()}
+          {leftPanelView === 'plan' && <RoomDesignerPlanToolbar
+            allowExtraSurrounds={allowExtraSurrounds}
+            extraSurroundCount={appState?.extraSurroundCount}
+            dolbyPreset={dolbyPreset}
+            frontSubsCfg={_frontSubsCfg}
+            rearSubsCfg={_rearSubsCfg}
+            overlayRelevance={overlayRelevance}
+            overlays={_overlays}
+            setOverlays={_setOverlays}
+            enableFrontWides={_enableFrontWides}
+            setEnableFrontWides={_setEnableFrontWides}
+            freeMoveLcr={freeMoveLcr}
+            setFreeMoveLcr={setFreeMoveLcr}
+            liveImpactMode={safeLiveImpactMode}
+            setLiveImpactMode={safeSetLiveImpactMode}
+            zoomMode={zoomMode}
+            setZoomMode={setZoomMode}
+          />}
 
           {/* Content area */}
           <div style={{ height: leftPanelView === 'plan' ? 'calc(100% - 76px)' : 'calc(100% - 44px)', overflow: 'auto' }}>
@@ -1838,7 +1838,7 @@ function RoomDesignerWithState() {
                   freeMoveLcr={freeMoveLcr}
                   rspMode={appState?.rspMode || "auto_from_screen"}
                   onSetManualRspY_m={appState?.setManualRspY_m}
-                  liveImpactMode={appState?.liveImpactMode ?? "summary"} />}
+                  liveImpactMode={safeLiveImpactMode} />}
 
                 {leftPanelView === 'front' && (
                   <FrontElevation
