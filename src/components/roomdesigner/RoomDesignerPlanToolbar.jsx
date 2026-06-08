@@ -12,6 +12,8 @@ export default function RoomDesignerPlanToolbar({
   setOverlays,
   enableFrontWides,
   setEnableFrontWides,
+  liveImpactMode,
+  setLiveImpactMode,
   zoomMode,
   setZoomMode,
 }) {
@@ -98,7 +100,21 @@ export default function RoomDesignerPlanToolbar({
         }
       </div>
       
-      {/* NEW: 3-state zoom toggle */}
+      {/* Live Impact dropdown */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
+        <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Live Impact</span>
+        <select
+          value={liveImpactMode || 'summary'}
+          onChange={(e) => setLiveImpactMode?.(e.target.value)}
+          style={{ fontSize: 11, padding: '4px 6px', borderRadius: 4, border: '1px solid #DCDBD6', background: '#FFFFFF', color: '#3E4349', cursor: 'pointer', fontWeight: 500 }}
+        >
+          <option value="off">Off</option>
+          <option value="summary">Summary</option>
+          <option value="detailed">Detailed</option>
+        </select>
+      </div>
+
+      {/* 3-state zoom toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
         <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Zoom</span>
         <div style={{ display: 'flex', gap: 4 }}>

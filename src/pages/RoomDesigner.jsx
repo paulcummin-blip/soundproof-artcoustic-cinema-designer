@@ -1773,6 +1773,8 @@ function RoomDesignerWithState() {
             setEnableFrontWides={_setEnableFrontWides}
             freeMoveLcr={freeMoveLcr}
             setFreeMoveLcr={setFreeMoveLcr}
+            liveImpactMode={appState?.liveImpactMode}
+            setLiveImpactMode={appState?.setLiveImpactMode}
             zoomMode={zoomMode}
             setZoomMode={setZoomMode}
           />}
@@ -1827,7 +1829,8 @@ function RoomDesignerWithState() {
                   showRoomModesOverlay={showRoomModesOverlay}
                   freeMoveLcr={freeMoveLcr}
                   rspMode={appState?.rspMode || "auto_from_screen"}
-                  onSetManualRspY_m={appState?.setManualRspY_m} />}
+                  onSetManualRspY_m={appState?.setManualRspY_m}
+                  liveImpactMode={appState?.liveImpactMode ?? "summary"} />}
 
                 {leftPanelView === 'front' && (
                   <FrontElevation

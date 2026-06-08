@@ -189,6 +189,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     freeMoveLcr = false,
     showRoomModesOverlay = false,
     showThrowDistance = false,
+    liveImpactMode = "summary",
   } = props;
 
   const appState = useAppState();
@@ -1988,6 +1989,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
         dragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: !!dragging }}
+        liveImpactMode={liveImpactMode}
         roomElementDragInfo={roomElementDragInfo}
         dragType={dragType}
         isSeatSnapping={isSeatSnapping}

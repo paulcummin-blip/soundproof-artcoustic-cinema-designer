@@ -628,6 +628,8 @@ function useDesignerState() {
       : "flat"
   ));
 
+  const [liveImpactMode, setLiveImpactMode] = useState(() => ((__autosavePayload && typeof __autosavePayload.liveImpactMode === "string") ? __autosavePayload.liveImpactMode : "summary"));
+
   const setLcrAimMode = useCallback((mode) => {
     const m = (mode === "angled") ? "angled" : "flat";
     _setLcrAimMode(m);
@@ -1426,6 +1428,7 @@ function useDesignerState() {
       aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP,
       lcrAimMode,
+      liveImpactMode,
       globalSurroundModel,
       sevenBedLayoutType,
       overheadGlobalModel,
@@ -1919,6 +1922,8 @@ function useDesignerState() {
     aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP,
     lcrAimMode,
     setLcrAimMode,
+    liveImpactMode,
+    setLiveImpactMode,
     splConfig,
     getEffectiveSplInputs,
     updateGlobalSpl,

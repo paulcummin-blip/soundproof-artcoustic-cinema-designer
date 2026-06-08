@@ -147,6 +147,7 @@ export default function RvPlanCanvas({
   roomElementDragInfo,
   dragType,
   isSeatSnapping = false,
+  liveImpactMode = "summary",
 }) {
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
@@ -627,10 +628,11 @@ export default function RvPlanCanvas({
         <RvSpeakerTooltip speakerTooltip={speakerTooltip} />
 
         {/* UNIVERSAL DRAG RP22/RP23 IMPACT CARD */}
-        {dragImpact?.isActive && (
+        {dragImpact?.isActive && liveImpactMode !== "off" && (
           <SeatingDragImpactCard
             baseline={dragImpact.baseline}
             live={dragImpact.live}
+            mode={liveImpactMode === "summary" ? "summary" : "detailed"}
           />
         )}
 

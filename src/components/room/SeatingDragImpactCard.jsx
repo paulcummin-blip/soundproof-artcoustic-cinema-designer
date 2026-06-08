@@ -269,9 +269,34 @@ function ParamRow({ paramNum, baseLevels, liveLevels, scope, isLast }) {
   );
 }
 
+// ─── Summary row (compact — no before/after pills) ───────────────────────────
+
+function SummaryParamRow({ paramNum, summary, scope, isLast }) {
+  if (summary.changed === 0) return null;
+  const { maxDelta, direction, changed, total } = summary;
+  const color = direction === 'up' ? '#16A34A' : direction === 'down' ? '#DC2626' : '#D97706';
+  const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '↕';
+  const sign = maxDelta > 0 ? '+' : '';
+  const seatsLabel = scope === 'room' ? 'Room' : changed === total ? `${total} seat${total !== 1 ? 's' : ''}` : `${changed}/${total} seats`;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: isLast ? 0 : 8, marginBottom: isLast ? 0 : 8, borderBottom: isLast ? 'none' : '1px solid #F3F4F6' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#374151', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+          {PARAM_LABELS[paramNum] || `Param ${paramNum}`}
+        </span>
+        <span style={{ fontSize: 9, color: '#9CA3AF', marginLeft: 6 }}>{seatsLabel}</span>
+      </div>
+      <div style={{ textAlign: 'center', minWidth: 36 }}>
+        <div style={{ fontSize: 14, lineHeight: 1, color, fontWeight: 700 }}>{arrow}</div>
+        <div style={{ fontSize: 10, color, fontWeight: 600, marginTop: 1 }}>{sign}{maxDelta}</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function SeatingDragImpactCard({ baseline, live, cardTitle }) {
+export default function SeatingDragImpactCard({ baseline, live, cardTitle, mode = "detailed" }) {
   if (!baseline || !live) return null;
 
   const paramData = buildAllParamData(baseline, live);
@@ -308,16 +333,11 @@ export default function SeatingDragImpactCard({ baseline, live, cardTitle }) {
         </div>
       </div>
 
-      {/* Parameter rows (level changes only) */}
+      {/* Parameter rows */}
       {visibleParams.map((d, idx) => (
-        <ParamRow
-          key={d.paramNum}
-          paramNum={d.paramNum}
-          baseLevels={d.baseLevels}
-          liveLevels={d.liveLevels}
-          scope={d.scope}
-          isLast={idx === visibleParams.length - 1 && hiddenCount === 0}
-        />
+        mode === "summary"
+          ? <SummaryParamRow key={d.paramNum} paramNum={d.paramNum} summary={d.summary} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
+          : <ParamRow key={d.paramNum} paramNum={d.paramNum} baseLevels={d.baseLevels} liveLevels={d.liveLevels} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
       ))}
 
       {/* Overflow indicator */}
