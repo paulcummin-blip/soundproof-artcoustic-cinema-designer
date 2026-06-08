@@ -59,19 +59,18 @@ export function useMlpCalculation({
   mlpBasis,       // kept for dependency-list parity; not used in computation
   roomWidthM,
   roomLengthM,
-  seatingBlockOffset, // NEW: when 0, the 57.5° RSP locks and mlpPoint cannot override it
-  lockedMlpY,        // NEW: the authoritative 57.5° MLP Y from appState.mlpY_m
+  seatingBlockOffset, // retained in signature for caller compatibility; no longer affects RSP lock
+  lockedMlpY,        // authoritative RSP Y (screen-derived or manual); always wins when finite
 }) {
   const mlp = useMemo(() => {
-    // ── 57.5° LOCK: when offset is 0 and a locked MLP Y is available,
-    // use it directly — mlpPoint (stale drag override) cannot win.
-    const isLocked = (Number(seatingBlockOffset) === 0) && Number.isFinite(lockedMlpY);
-    if (isLocked) {
+    // ── RSP LOCK: if lockedMlpY is finite, always use it.
+    // seatingBlockOffset (Front Row Distance) does NOT affect this lock.
+    if (Number.isFinite(lockedMlpY)) {
       const cx = Number.isFinite(roomWidthM) ? roomWidthM / 2 : 0;
       return { x: cx, y: clampMlpY(lockedMlpY, roomLengthM), z: 1.2 };
     }
 
-    // 1) Explicit mlpPoint — only allowed when a non-zero viewing offset is active
+    // 1) Explicit mlpPoint — only used when lockedMlpY is not available
     if (
       mlpPoint &&
       Number.isFinite(mlpPoint.x) &&
@@ -104,7 +103,6 @@ export function useMlpCalculation({
     mlpBasis,
     roomWidthM,
     roomLengthM,
-    seatingBlockOffset,
     lockedMlpY,
   ]);
 
