@@ -1760,24 +1760,32 @@ function RoomDesignerWithState() {
           </div>
 
           {/* Plan toolbar — only shown in plan view */}
-          {leftPanelView === 'plan' && <RoomDesignerPlanToolbar
-            allowExtraSurrounds={allowExtraSurrounds}
-            extraSurroundCount={appState?.extraSurroundCount}
-            dolbyPreset={dolbyPreset}
-            frontSubsCfg={_frontSubsCfg}
-            rearSubsCfg={_rearSubsCfg}
-            overlayRelevance={overlayRelevance}
-            overlays={_overlays}
-            setOverlays={_setOverlays}
-            enableFrontWides={_enableFrontWides}
-            setEnableFrontWides={_setEnableFrontWides}
-            freeMoveLcr={freeMoveLcr}
-            setFreeMoveLcr={setFreeMoveLcr}
-            liveImpactMode={appState?.liveImpactMode}
-            setLiveImpactMode={appState?.setLiveImpactMode}
-            zoomMode={zoomMode}
-            setZoomMode={setZoomMode}
-          />}
+          {leftPanelView === 'plan' && (() => {
+            const safeLiveImpactMode = ["off", "summary", "detailed"].includes(appState?.liveImpactMode)
+              ? appState.liveImpactMode
+              : "summary";
+            const safeSetLiveImpactMode = typeof appState?.setLiveImpactMode === "function"
+              ? appState.setLiveImpactMode
+              : () => {};
+            return <RoomDesignerPlanToolbar
+              allowExtraSurrounds={allowExtraSurrounds}
+              extraSurroundCount={appState?.extraSurroundCount}
+              dolbyPreset={dolbyPreset}
+              frontSubsCfg={_frontSubsCfg}
+              rearSubsCfg={_rearSubsCfg}
+              overlayRelevance={overlayRelevance}
+              overlays={_overlays}
+              setOverlays={_setOverlays}
+              enableFrontWides={_enableFrontWides}
+              setEnableFrontWides={_setEnableFrontWides}
+              freeMoveLcr={freeMoveLcr}
+              setFreeMoveLcr={setFreeMoveLcr}
+              liveImpactMode={safeLiveImpactMode}
+              setLiveImpactMode={safeSetLiveImpactMode}
+              zoomMode={zoomMode}
+              setZoomMode={setZoomMode}
+            />;
+          })()}
 
           {/* Content area */}
           <div style={{ height: leftPanelView === 'plan' ? 'calc(100% - 76px)' : 'calc(100% - 44px)', overflow: 'auto' }}>
