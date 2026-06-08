@@ -632,7 +632,7 @@ export default function RvPlanCanvas({
           <SeatingDragImpactCard
             baseline={dragImpact.baseline}
             live={dragImpact.live}
-            mode={liveImpactMode === "summary" ? "summary" : "detailed"}
+            mode={liveImpactMode}
           />
         )}
 
