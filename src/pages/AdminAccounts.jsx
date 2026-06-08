@@ -136,11 +136,11 @@ export default function AdminAccountsPage() {
     try {
       // 1. Create Account record
       const newAccount = await base44.entities.Account.create({
-        name: "Sound Proof Admin",
+        name: "Sound Proof Admin Account",
         status: "active",
         account_type: "admin",
         contact_email: effectiveUser?.email || "",
-        notes: "Initial admin account",
+        notes: `Auto-created admin account for ${effectiveUser?.email || "unknown"} during initial system setup.`,
       });
 
       // 2. Update current User record
