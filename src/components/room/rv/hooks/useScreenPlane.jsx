@@ -162,12 +162,32 @@ export function useScreenPlane({
     return Math.max(0.10, Math.min(0.60, raw));
   }, [screenPlaneY]);
 
+  // Freeze the rendered screen plane during speaker drag to prevent visible jumping.
+  // The live value continues to be calculated internally; it is just not used for rendering.
+  const frozenScreenPlaneYRef = useRef(null);
+
+  const isDragging = isDraggingRef?.current;
+
+  if (isDragging) {
+    // Capture once at the very first frame of a drag
+    if (frozenScreenPlaneYRef.current === null && Number.isFinite(screenPlaneY)) {
+      frozenScreenPlaneYRef.current = screenPlaneY;
+    }
+  } else {
+    // Release the freeze when drag ends so the final value renders immediately
+    frozenScreenPlaneYRef.current = null;
+  }
+
+  const renderedScreenPlaneY = (isDragging && Number.isFinite(frozenScreenPlaneYRef.current))
+    ? frozenScreenPlaneYRef.current
+    : screenPlaneY;
+
   // Resolve final screen plane: locked value wins over live calculation.
   // This must be computed BEFORE all publish effects so that upstream consumers
   // (appState.screenFrontPlaneM, onScreenPlaneChange, onScreenPlaneYChange) always
   // receive the locked value when the screen is locked, regardless of what the
   // live geometry recalculates (e.g. due to lcrAngleInfo / speaker aiming changes).
-  const resolvedScreenPlaneY = (isLocked && Number.isFinite(lockedY)) ? lockedY : screenPlaneY;
+  const resolvedScreenPlaneY = (isLocked && Number.isFinite(lockedY)) ? lockedY : renderedScreenPlaneY;
 
   // Publish screen front plane to AppState with guards (rounded to mm + change detection)
   const lastScreenFrontPlaneRef = useRef(null);
