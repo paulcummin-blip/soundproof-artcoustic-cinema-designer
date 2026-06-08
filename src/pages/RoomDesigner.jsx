@@ -420,8 +420,6 @@ function RoomDesignerWithState() {
     const screenVisibleWidthM =
       Number(screenVisibleWidthInchesEffective) * 0.0254;
 
-    /* Y-only viewing offset (lock X to centre) */
-    const viewingOffsetM = Number(_seatingBlockOffset) || 0;
     const rows = Number(_seatingRows) || 1;
     const rowSpacing = Number(_rowSpacingM) || 1.8; // default 1.8m
     // SEPARATION: use seatingArrangementBasis (not _mlpBasis / true RSP basis)
@@ -457,11 +455,10 @@ function RoomDesignerWithState() {
 
     // 1. Compute ideal distance for 57.5° FOV (base position)
     const idealDistM = distanceFor57_5FromWidth(screenVisibleWidthM);
-    const mlpY_base = screenFrontPlaneM + idealDistM;
 
-    // 2. Apply viewing offset to get FIXED MLP position (green dot)
-    // Hard rule: zero offset always snaps to exact 57.5° from the live screen plane
-    const fixedMlpY = Number(_seatingBlockOffset) === 0 ? (screenFrontPlaneM + idealDistM) : (mlpY_base + viewingOffsetM);
+    // AUTO RSP: always pure screen geometry, never offset by seatingBlockOffset.
+    // seatingBlockOffset shifts seats only — it must NOT move the RSP green dot.
+    const fixedMlpY = screenFrontPlaneM + idealDistM;
 
     if (
       loadState?.phase === "scratch" &&
@@ -520,7 +517,6 @@ function RoomDesignerWithState() {
       if (globalThis.__B44_LOGS) console.log('[MLP]', {
         frontY: screenFrontPlaneM.toFixed(3),
         idealM: idealDistM.toFixed(3),
-        offset: viewingOffsetM.toFixed(3),
         fixedMlpY: mlpRounded.toFixed(3)
       });
       if (globalThis.__B44_LOGS) console.log('[ROWS]', {

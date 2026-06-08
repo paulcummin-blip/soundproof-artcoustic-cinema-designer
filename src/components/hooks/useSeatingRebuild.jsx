@@ -130,13 +130,16 @@ export function useSeatingRebuild({
             : Number(appState?.screen?.floatDepthM) || 0.20);
 
       const visibleWidthInches = resolveVisibleWidthInches(appState?.screen);
-      const viewingOffsetM = Number(appState?.seatingBlockOffset) || 0;
       const idealDistM = distanceFor57_5FromWidth(visibleWidthInches * 0.0254);
-      const _screenDerivedBaseY = screenFrontPlaneM + idealDistM + viewingOffsetM;
-      const stableBaseY =
+      // RSP anchor: pure screen geometry — seatingBlockOffset is NOT part of the RSP.
+      const _screenDerivedBaseY = screenFrontPlaneM + idealDistM;
+      const rspAnchorY =
         appState?.rspMode === "auto_from_screen" && Number.isFinite(appState?.mlpY_m)
           ? appState.mlpY_m
           : _screenDerivedBaseY;
+      // Apply seatingBlockOffset to shift Row 1 from the RSP (seats only, not RSP).
+      const seatOffsetM = Number(appState?.seatingBlockOffset) || 0;
+      const stableBaseY = rspAnchorY + seatOffsetM;
 
       const list = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
         ? _seatsPerRowByRow
@@ -369,9 +372,9 @@ export function useSeatingRebuild({
     );
 
     // 2) Row centre Y positions
-    // When offset is 0, always regenerate from the live 57.5° MLP — never trust stale rowCentersM.
-    // When seating controls change, also regenerate from live MLP.
-    const shouldRegenerateFromMlp = userHasChangedSeatingSinceLoad || liveOffsetM === 0;
+    // Always regenerate from the live RSP (mlpY_m) when seating changes or offset changes.
+    // seatingBlockOffset shifts Row 1 Y from the RSP anchor — it does NOT move the RSP itself.
+    const shouldRegenerateFromMlp = userHasChangedSeatingSinceLoad || liveOffsetM !== 0 || liveOffsetM === 0;
     let centers = (!shouldRegenerateFromMlp && Array.isArray(appState?.rowCentersM))
       ? appState.rowCentersM.slice(0, list.length)
       : [];
@@ -386,8 +389,9 @@ export function useSeatingRebuild({
             ? Number(appState.screen.screenPlaneY_m)
             : Number(appState?.screen?.floatDepthM) || 0.20);
       const visibleWidthInches = resolveVisibleWidthInches(appState?.screen);
-      const liveOffsetM = Number(appState?.seatingBlockOffset) || 0;
-      const liveMlpY = screenFrontPlaneM + distanceFor57_5FromWidth(visibleWidthInches * 0.0254) + liveOffsetM;
+      // RSP anchor: pure 57.5° from screen — never includes seatingBlockOffset.
+      // seatingBlockOffset is applied BELOW to shift Row 1 away from the RSP.
+      const liveMlpY = screenFrontPlaneM + distanceFor57_5FromWidth(visibleWidthInches * 0.0254);
       const mlpY =
         appState?.rspMode === "auto_from_screen" && Number.isFinite(appState?.mlpY_m)
           ? appState.mlpY_m
@@ -410,7 +414,10 @@ export function useSeatingRebuild({
         const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
         if (Array.isArray(generated) && generated.length === rowsNeeded) {
-          const clamped = generated.map((y) => clampY(Number(y)));
+          // Apply seatingBlockOffset to SEATS only (not the RSP).
+          // Shift all row centers by the offset so Row 1 moves forward/back from the auto RSP.
+          const offsetM = Number(appState?.seatingBlockOffset) || 0;
+          const clamped = generated.map((y) => clampY(Number(y) + offsetM));
           if (!arraysEqualWithin1mm(appState?.rowCentersM || [], clamped)) {
             appState.setRowCentersM(clamped);
           }

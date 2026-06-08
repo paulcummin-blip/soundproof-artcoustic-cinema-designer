@@ -257,14 +257,11 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     return Math.max(minY, Math.min(maxY, y));
   };
 
-  // The fixed RSP is always the pure 57.5° position, independent of Viewing Offset.
-  // appState.mlpY_m = screenFront + idealDist + offset, so subtract offset to recover
-  // the invariant RSP that the green dot must always sit on regardless of offset.
+  // The fixed RSP is always the pure 57.5° position from screen, independent of seat offset.
+  // appState.mlpY_m is now the true RSP (never includes seatingBlockOffset).
   const _fixedRspY = rspMode === 'manual_position'
     ? (Number.isFinite(Number(props.manualRspY_m)) ? Number(props.manualRspY_m) : undefined)
-    : (Number.isFinite(appState?.mlpY_m)
-        ? appState.mlpY_m - (Number(props.viewingDistanceOffsetM) || 0)
-        : undefined);
+    : (Number.isFinite(appState?.mlpY_m) ? appState.mlpY_m : undefined);
 
   const mlp = useMlpCalculation({
     mlpPoint,
