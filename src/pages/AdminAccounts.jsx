@@ -446,7 +446,7 @@ export default function AdminAccountsPage() {
                 {formatDate(acc.last_access_at)}
               </div>
               <div style={{ textAlign: "right", fontSize: 14, fontWeight: 700, color: BRAND.text }}>
-                {acc.project_count ?? 0}
+                {diagProjects.filter(p => p.account_id === acc.id).length}
               </div>
             </div>
           ))}
