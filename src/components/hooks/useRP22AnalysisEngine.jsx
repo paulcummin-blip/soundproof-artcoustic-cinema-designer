@@ -1017,7 +1017,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       // Correct formula: max(abs((SPL_i_seat - SPL_i_rsp) - (SPL_j_seat - SPL_j_rsp)))
       if (seatSplMetrics) {
         const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
-        const rspSpl  = getSeatSplMetrics(seatSplMetrics, "mlp");
+        const rspSpl = getSeatSplMetrics(seatSplMetrics, "mlp") || (
+          primarySeats.length > 0
+            ? getSeatSplMetrics(
+                seatSplMetrics,
+                primarySeats[0].id || `seat-${primarySeats[0].x}-${primarySeats[0].y}`
+              )
+            : null
+        );
 
         if (seatSpl?.surrounds && rspSpl?.surrounds) {
           const P6_ROLES = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'];
