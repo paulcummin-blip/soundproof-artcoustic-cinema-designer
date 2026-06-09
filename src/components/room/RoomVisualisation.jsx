@@ -1215,27 +1215,59 @@ const byId = useEntitiesById({
   });
 
   // ── Universal drag impact baseline — captured at ANY Plan View drag start ─
+  // baselineRp22/baselineMlp: comparison reference only — NOT used for card visibility.
+  // showLiveImpactCard: controls card visibility independently.
   const [baselineRp22, setBaselineRp22] = useState(null);
   const [baselineMlp, setBaselineMlp] = useState(null);
+  const [showLiveImpactCard, setShowLiveImpactCard] = useState(false);
   const baselineCapturedRef = useRef(false);
+  const postDragTimerRef = useRef(null);
+
+  // Accept current liveRp22 as the new comparison baseline. Card hides.
+  const acceptBaseline = useCallback(() => {
+    setBaselineRp22(liveRp22);
+    setBaselineMlp(mlp ? { ...mlp } : null);
+    setShowLiveImpactCard(false);
+    if (postDragTimerRef.current) { clearTimeout(postDragTimerRef.current); postDragTimerRef.current = null; }
+  // liveRp22/mlp intentionally in deps — we want the snapshot at call time
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveRp22, mlp]);
+
+  // Dismiss: hide card only. Baseline is preserved.
+  const dismissCard = useCallback(() => {
+    setShowLiveImpactCard(false);
+    if (postDragTimerRef.current) { clearTimeout(postDragTimerRef.current); postDragTimerRef.current = null; }
+  }, []);
 
   useEffect(() => {
     if (dragging) {
-      // Capture baseline once at drag start
+      // Capture baseline once at drag start — only if no baseline exists yet.
       if (!baselineCapturedRef.current) {
         baselineCapturedRef.current = true;
-        setBaselineRp22(liveRp22);
-        setBaselineMlp(mlp ? { ...mlp } : null);
+        if (!baselineRp22) {
+          setBaselineRp22(liveRp22);
+          setBaselineMlp(mlp ? { ...mlp } : null);
+        }
+        setShowLiveImpactCard(true);
       }
     } else {
-      // Drag ended — clear baseline
+      // Drag ended — reset capture flag but DO NOT clear baselineRp22/baselineMlp.
       baselineCapturedRef.current = false;
-      setBaselineRp22(null);
-      setBaselineMlp(null);
+      // Keep card visible for 10 seconds post-drag, then auto-dismiss.
+      if (postDragTimerRef.current) clearTimeout(postDragTimerRef.current);
+      postDragTimerRef.current = setTimeout(() => {
+        setShowLiveImpactCard(false);
+        postDragTimerRef.current = null;
+      }, 10000);
     }
-  // liveRp22 intentionally excluded — baseline is a snapshot, not a live value
+  // liveRp22/mlp intentionally excluded — baseline is a snapshot, not a live value
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => { if (postDragTimerRef.current) clearTimeout(postDragTimerRef.current); };
+  }, []);
 
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
@@ -1729,7 +1761,7 @@ useEffect(() => {
   useImperativeHandle(ref, () => ({
     shiftSeatsToMaintainAngle,
     resetSideSurrounds: resetSideSurroundsToDefault,
-    rebaseline: () => { setBaselineRp22(liveRp22); },
+    rebaseline: () => { setBaselineRp22(liveRp22); setShowLiveImpactCard(true); },
     hasBaseline: () => baselineRp22 !== null,
   }), [shiftSeatsToMaintainAngle, resetSideSurroundsToDefault, liveRp22, baselineRp22]);
 
@@ -1921,7 +1953,10 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         subDragTick={subDragTick}
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
-        dragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: !!dragging }}
+        dragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: !!dragging, cardVisible: showLiveImpactCard && liveImpactMode !== 'off' }}
+        onAcceptBaseline={acceptBaseline}
+        onDismissCard={dismissCard}
+        isPostDrag={!dragging && showLiveImpactCard}
         liveImpactMode={liveImpactMode}
         roomElementDragInfo={roomElementDragInfo}
         dragType={dragType}

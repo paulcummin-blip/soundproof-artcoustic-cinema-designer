@@ -144,6 +144,9 @@ export default function RvPlanCanvas({
   handleIconMove,
   handleIconLeave,
   dragImpact,
+  onAcceptBaseline,
+  onDismissCard,
+  isPostDrag = false,
   roomElementDragInfo,
   dragType,
   isSeatSnapping = false,
@@ -628,11 +631,14 @@ export default function RvPlanCanvas({
         <RvSpeakerTooltip speakerTooltip={speakerTooltip} />
 
         {/* UNIVERSAL DRAG RP22/RP23 IMPACT CARD */}
-        {dragImpact?.isActive && liveImpactMode !== "off" && (
+        {dragImpact?.cardVisible && (
           <SeatingDragImpactCard
             baseline={dragImpact.baseline}
             live={dragImpact.live}
             mode={liveImpactMode}
+            isPostDrag={isPostDrag}
+            onAccept={onAcceptBaseline}
+            onDismiss={onDismissCard}
           />
         )}
 

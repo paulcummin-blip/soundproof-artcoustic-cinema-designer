@@ -326,7 +326,7 @@ function SummaryParamRow({ paramNum, summary, scope, isLast }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function SeatingDragImpactCard({ baseline, live, cardTitle, mode = "detailed" }) {
+export default function SeatingDragImpactCard({ baseline, live, cardTitle, mode = "detailed", isPostDrag = false, onAccept, onDismiss }) {
   if (!baseline || !live) return null;
 
   const paramData = buildAllParamData(baseline, live);
@@ -348,7 +348,7 @@ export default function SeatingDragImpactCard({ baseline, live, cardTitle, mode 
       border: '1px solid #E5E7EB',
       padding: '12px 14px',
       zIndex: 40,
-      pointerEvents: 'none',
+      pointerEvents: isPostDrag ? 'all' : 'none',
     }}>
       {/* Header */}
       <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #F3F4F6' }}>
@@ -359,7 +359,7 @@ export default function SeatingDragImpactCard({ baseline, live, cardTitle, mode 
           {cardTitle || 'Live Impact'}
         </div>
         <div style={{ fontSize: 10, color: '#6B7280', fontWeight: 400 }}>
-          Parameters affected by current movement
+          {isPostDrag ? 'Comparison vs. previous baseline' : 'Parameters affected by current movement'}
         </div>
       </div>
 
@@ -383,6 +383,52 @@ export default function SeatingDragImpactCard({ baseline, live, cardTitle, mode 
           textTransform: 'uppercase',
         }}>
           + {hiddenCount} more affected
+        </div>
+      )}
+
+      {/* Post-drag action buttons */}
+      {isPostDrag && (
+        <div style={{
+          marginTop: 10,
+          paddingTop: 8,
+          borderTop: '1px solid #F3F4F6',
+          display: 'flex',
+          gap: 6,
+        }}>
+          <button
+            onClick={onAccept}
+            style={{
+              flex: 1,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              padding: '5px 8px',
+              borderRadius: 5,
+              border: '1px solid #213428',
+              backgroundColor: '#213428',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            Accept as Baseline
+          </button>
+          <button
+            onClick={onDismiss}
+            style={{
+              flex: 1,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              padding: '5px 8px',
+              borderRadius: 5,
+              border: '1px solid #D1D5DB',
+              backgroundColor: '#F9FAFB',
+              color: '#374151',
+              cursor: 'pointer',
+            }}
+          >
+            Dismiss
+          </button>
         </div>
       )}
     </div>
