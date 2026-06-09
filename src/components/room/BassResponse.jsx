@@ -199,7 +199,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
 
-      const subId = s?.id ?? `${group}-sub-${idx}`;
+      const POSITION_LABELS = ['left', 'right'];
+      const subId = s?.id ?? `${group}-sub-${POSITION_LABELS[idx] ?? idx}`;
       const tuning = getTuning(subId, cfg);
 
       return {
