@@ -485,6 +485,22 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
         rewPeakFreqHz:    T.hz68.peakFrequencyHz,
         rewProminenceDb:  T.hz68.peakProminenceDb,
       },
+      // 68 Hz peak detection diagnostic — raw bin + neighbours for screenshot audit
+      hz68Diag: (() => {
+        if (!hz68PeakBin) return null;
+        const idx = rawSorted.findIndex(p => p === hz68PeakBin);
+        const prev = idx > 0 ? rawSorted[idx - 1] : null;
+        const next = idx >= 0 && idx < rawSorted.length - 1 ? rawSorted[idx + 1] : null;
+        const refinedHz = hz68Peak?.frequency ?? null;
+        const shiftHz = (Number.isFinite(refinedHz) && Number.isFinite(hz68PeakBin.frequency))
+          ? refinedHz - hz68PeakBin.frequency : null;
+        // Top 10 points in 60–80 Hz sorted by SPL descending
+        const band6080 = [...b44Series]
+          .filter(p => p.frequency >= 60 && p.frequency <= 80 && Number.isFinite(p.spl))
+          .sort((a, b) => b.spl - a.spl)
+          .slice(0, 10);
+        return { rawBin: hz68PeakBin, prev, next, refinedHz, shiftHz, band6080 };
+      })(),
       // Vector
       vector: {
         b44PhaseShiftDeg: b44PhaseShift,
@@ -689,6 +705,124 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
         </tbody>
       </table>
       </SafeTableWrap>
+
+      {/* 68 Hz Peak Detection Diagnostic — diagnostic display only, no scoring */}
+      {r.hz68Diag && (() => {
+        const d = r.hz68Diag;
+        const rawHz    = d.rawBin?.frequency;
+        const rawSpl   = d.rawBin?.spl;
+        const refined  = d.refinedHz;
+        const shift    = d.shiftHz;
+        const rewTarget = T.hz68.peakFrequencyHz;
+        const deltaVsRew = (Number.isFinite(refined) && Number.isFinite(rewTarget)) ? refined - rewTarget : null;
+        const summaryRaw     = Number.isFinite(rawHz)   ? rawHz.toFixed(3)   : '—';
+        const summaryRefined = Number.isFinite(refined) ? refined.toFixed(3) : '—';
+        const summaryShift   = Number.isFinite(shift)   ? (shift >= 0 ? '+' : '') + shift.toFixed(3) : '—';
+        return (
+          <details style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#ecfdf5', border: '1px solid #6ee7b7' }}>
+            <summary style={{ fontSize: 10, fontWeight: 700, color: '#065f46', cursor: 'pointer' }}>
+              68 Hz Peak Detection Diagnostic —{' '}
+              raw: {summaryRaw} Hz, refined: {summaryRefined} Hz, shift: {summaryShift} Hz
+              <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#94a3b8', marginLeft: 8 }}>(diagnostic only)</span>
+            </summary>
+            <div style={{ marginTop: 8 }}>
+              {/* Key values table */}
+              <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: 10 }}>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px', width: '40%' }}>Raw peak bin frequency</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
+                      {Number.isFinite(rawHz) ? rawHz.toFixed(4) + ' Hz' : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>findMaxInWindow result before refinement</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Raw peak bin SPL</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
+                      {Number.isFinite(rawSpl) ? rawSpl.toFixed(4) + ' dB' : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>raw b44Series SPL at peak bin</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Previous point</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>
+                      {d.prev ? `${d.prev.frequency.toFixed(4)} Hz / ${d.prev.spl.toFixed(4)} dB` : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>rawSorted[idx − 1]</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Next point</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>
+                      {d.next ? `${d.next.frequency.toFixed(4)} Hz / ${d.next.spl.toFixed(4)} dB` : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>rawSorted[idx + 1]</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Refined frequency (parabolicRefineFrequency)</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700, color: '#065f46' }}>
+                      {Number.isFinite(refined) ? refined.toFixed(4) + ' Hz' : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>used in benchmark scoring</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Refinement shift</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700, color: Number.isFinite(shift) && Math.abs(shift) > 0.5 ? '#b45309' : '#065f46' }}>
+                      {Number.isFinite(shift) ? (shift >= 0 ? '+' : '') + shift.toFixed(4) + ' Hz' : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>refined − raw bin</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>REW target frequency</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>
+                      {Number.isFinite(rewTarget) ? rewTarget.toFixed(2) + ' Hz' : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>T.hz68.peakFrequencyHz</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Delta vs REW target</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700, color: Number.isFinite(deltaVsRew) && Math.abs(deltaVsRew) <= TOL_.featureFrequencyHz ? '#065f46' : '#dc2626' }}>
+                      {Number.isFinite(deltaVsRew) ? (deltaVsRew >= 0 ? '+' : '') + deltaVsRew.toFixed(4) + ' Hz' : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>refined − REW target (tol ±{TOL_.featureFrequencyHz} Hz)</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Top 10 points in 60–80 Hz */}
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#065f46', marginBottom: 4 }}>
+                Top 10 response points — 60–80 Hz range, sorted by SPL descending
+              </div>
+              <SafeTableWrap minWidth={480}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left',  padding: '3px 6px', fontSize: 10, fontWeight: 700, background: '#d1fae5', borderBottom: '2px solid #6ee7b7', width: '8%' }}>Rank</th>
+                      <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontWeight: 700, background: '#d1fae5', borderBottom: '2px solid #6ee7b7' }}>Frequency</th>
+                      <th style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontWeight: 700, background: '#d1fae5', borderBottom: '2px solid #6ee7b7' }}>SPL</th>
+                      <th style={{ textAlign: 'left',  padding: '3px 6px', fontSize: 10, fontWeight: 700, background: '#d1fae5', borderBottom: '2px solid #6ee7b7' }}>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.band6080.map((pt, i) => {
+                      const isRawPeak = d.rawBin && Math.abs(pt.frequency - d.rawBin.frequency) < 0.001;
+                      return (
+                        <tr key={i} style={{ borderBottom: '1px solid #a7f3d0', background: isRawPeak ? '#bbf7d0' : undefined }}>
+                          <td style={{ padding: '2px 6px', fontSize: 10, fontFamily: 'monospace' }}>{i + 1}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: isRawPeak ? 700 : 400 }}>{pt.frequency.toFixed(4)} Hz</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: isRawPeak ? 700 : 400 }}>{pt.spl.toFixed(4)} dB</td>
+                          <td style={{ padding: '2px 6px', fontSize: 10, color: isRawPeak ? '#065f46' : '#9ca3af', fontWeight: isRawPeak ? 700 : 400 }}>
+                            {isRawPeak ? '← selected raw peak bin' : ''}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </SafeTableWrap>
+            </div>
+          </details>
+        );
+      })()}
 
       <NullCentreActiveModalVectorBreakdown
         id="diagnostic-null-centre"
