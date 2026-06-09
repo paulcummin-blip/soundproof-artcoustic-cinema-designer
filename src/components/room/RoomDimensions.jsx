@@ -100,8 +100,12 @@ export default function RoomDimensions({ disabled }) {
         <Label htmlFor="room-length" className="block mb-2">Length (m)</Label>
         <Input
           id="room-length"
+          name="room-length-m"
           type="text"
           inputMode="decimal"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={draftDims.length}
           onChange={(e) => handleDimensionChange('length', e.target.value)}
           onBlur={() => handleDimensionBlur('length')}
@@ -114,8 +118,12 @@ export default function RoomDimensions({ disabled }) {
         <Label htmlFor="room-width" className="block mb-2">Width (m)</Label>
         <Input
           id="room-width"
+          name="room-width-m"
           type="text"
           inputMode="decimal"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={draftDims.width}
           onChange={(e) => handleDimensionChange('width', e.target.value)}
           onBlur={() => handleDimensionBlur('width')}
@@ -128,8 +136,12 @@ export default function RoomDimensions({ disabled }) {
         <Label htmlFor="room-height" className="block mb-2">Height (m)</Label>
         <Input
           id="room-height"
+          name="room-height-m"
           type="text"
           inputMode="decimal"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={draftDims.height}
           onChange={(e) => handleDimensionChange('height', e.target.value)}
           onBlur={() => handleDimensionBlur('height')}
