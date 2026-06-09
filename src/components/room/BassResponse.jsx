@@ -473,93 +473,100 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return distances;
   }, [seatingPositions, frontSubsCfg, rearSubsCfg, roomDims]);
 
-  // Auto-align function
-  const autoAlignSubs = React.useCallback((groupLabel) => {
+  // Auto-align function — operates across ALL active subs (front + rear) globally
+  const autoAlignSubs = React.useCallback(() => {
     if (!autoAlignEnabled) return;
 
     const seatingPositionsNow = seatingRef.current;
     const roomDimsNow = roomDimsRef.current;
+    const frontCfg = frontCfgRef.current;
+    const rearCfg = rearCfgRef.current;
     const mlpSeat = seatingPositionsNow?.find(s => s.isPrimary) || seatingPositionsNow?.[0];
     if (!mlpSeat) return;
 
     const mlpPoint = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
     const SPEED_OF_SOUND = 343;
-    const isRear = groupLabel === "Rear";
-    const cfg = isRear ? rearCfgRef.current : frontCfgRef.current;
-    const count = cfg?.count || 0;
-    if (count === 0) return;
-
-    const positions = Array.isArray(cfg?.positions) ? cfg.positions : [];
-    const settingsById = cfg?.settingsById || {};
-    const prefix = groupLabel.toLowerCase();
-    const subIds = count === 1 ? [`${prefix}-sub-left`] : [`${prefix}-sub-left`, `${prefix}-sub-right`];
-
     const roomWidth = Number(roomDimsNow?.widthM) || 4.5;
     const roomLength = Number(roomDimsNow?.lengthM) || 6.0;
 
-    const defaultPositions = isRear
-      ? [{ x: roomWidth * 0.33, y: roomLength - 0.15 }, { x: roomWidth * 0.67, y: roomLength - 0.15 }]
-      : [{ x: roomWidth * 0.33, y: 0.15 }, { x: roomWidth * 0.67, y: 0.15 }];
+    // Build combined list of all active subs across both groups
+    const allSubData = [];
 
-    const subData = subIds.map((subId, i) => {
-      const pos = positions[i] || defaultPositions[i] || { x: roomWidth / 2, y: isRear ? roomLength - 0.15 : 0.15 };
-      const dx = pos.x - mlpPoint.x;
-      const dy = pos.y - mlpPoint.y;
-      const dz = 0.35 - mlpPoint.z;
-      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const arrivalTime = distance / SPEED_OF_SOUND;
-      return { subId, arrivalTime, pos };
+    const processGroup = (cfg, group) => {
+      const count = cfg?.count || 0;
+      if (count === 0) return;
+      const positions = Array.isArray(cfg?.positions) ? cfg.positions : [];
+      const POSITION_LABELS = ['left', 'right'];
+      const isRear = group === 'rear';
+      const defaultPositions = isRear
+        ? [{ x: roomWidth * 0.33, y: roomLength - 0.15 }, { x: roomWidth * 0.67, y: roomLength - 0.15 }]
+        : [{ x: roomWidth * 0.33, y: 0.15 }, { x: roomWidth * 0.67, y: 0.15 }];
+      for (let i = 0; i < count; i++) {
+        const subId = `${group}-sub-${POSITION_LABELS[i] ?? i}`;
+        const pos = positions[i] || defaultPositions[i] || { x: roomWidth / 2, y: isRear ? roomLength - 0.15 : 0.15 };
+        const dx = pos.x - mlpPoint.x;
+        const dy = pos.y - mlpPoint.y;
+        const dz = 0.35 - mlpPoint.z;
+        const distanceM = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const arrivalTime = distanceM / SPEED_OF_SOUND;
+        allSubData.push({ subId, group, arrivalTime, distanceM });
+      }
+    };
+
+    processGroup(frontCfg, 'front');
+    processGroup(rearCfg, 'rear');
+
+    if (allSubData.length === 0) return;
+
+    // Single global maxArrival across all subs
+    const maxArrival = Math.max(...allSubData.map(s => s.arrivalTime));
+
+    // Diagnostic log
+    allSubData.forEach(({ subId, distanceM, arrivalTime }) => {
+      const delayMs = Math.max(0, (maxArrival - arrivalTime) * 1000);
+      console.log(`[AutoAlign] ${subId}: ${distanceM.toFixed(3)}m → ${(arrivalTime * 1000).toFixed(2)}ms arrival → ${delayMs.toFixed(2)}ms applied delay`);
     });
 
-    const maxArrival = Math.max(...subData.map(s => s.arrivalTime));
-    const newSettings = { ...settingsById };
-    subData.forEach(({ subId, arrivalTime }) => {
+    // Build new settings per group
+    const newFrontSettings = { ...(frontCfg?.settingsById || {}) };
+    const newRearSettings = { ...(rearCfg?.settingsById || {}) };
+
+    allSubData.forEach(({ subId, group, arrivalTime }) => {
       const delayMs = Math.max(0, Math.min(30, (maxArrival - arrivalTime) * 1000));
-      newSettings[subId] = {
-        ...newSettings[subId],
-        gainDb: newSettings[subId]?.gainDb ?? 0,
-        polarity: newSettings[subId]?.polarity ?? "normal",
-        delayMs
+      const target = group === 'front' ? newFrontSettings : newRearSettings;
+      target[subId] = {
+        ...target[subId],
+        gainDb: target[subId]?.gainDb ?? 0,
+        polarity: target[subId]?.polarity ?? "normal",
+        delayMs,
       };
     });
 
-    const prevSig = lastAutoAlignApplySigRef.current?.[groupLabel] || null;
-    const nextSig = __b44SettingsSig(newSettings, subIds);
+    // Deduplicate writes using signature guard
+    const frontSubIds = allSubData.filter(s => s.group === 'front').map(s => s.subId);
+    const rearSubIds  = allSubData.filter(s => s.group === 'rear').map(s => s.subId);
+    const nextSig = __b44SettingsSig({ ...newFrontSettings, ...newRearSettings }, [...frontSubIds, ...rearSubIds]);
+    const prevSig = lastAutoAlignApplySigRef.current?.all || null;
     if (prevSig === nextSig) return;
-    lastAutoAlignApplySigRef.current = {
-      ...(lastAutoAlignApplySigRef.current || {}),
-      [groupLabel]: nextSig
-    };
+    lastAutoAlignApplySigRef.current = { all: nextSig };
 
-    if (isRear) {
-      setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
-    } else {
-      setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
+    if (frontSubIds.length > 0) {
+      setFrontSubsCfg(prev => ({ ...prev, settingsById: newFrontSettings }));
     }
-  }, [autoAlignEnabled, tryPolarity, setFrontSubsCfg, setRearSubsCfg]);
+    if (rearSubIds.length > 0) {
+      setRearSubsCfg(prev => ({ ...prev, settingsById: newRearSettings }));
+    }
+  }, [autoAlignEnabled, setFrontSubsCfg, setRearSubsCfg]);
 
-  // Auto-align effects — re-run whenever MLP seat, room dims, or sub positions change
+  // Auto-align effects — re-run whenever MLP seat, room dims, or any sub positions change
   useEffect(() => {
-    if (!autoAlignEnabled) return;
     const frontCount = frontSubsCfg?.count || 0;
-    if (frontCount > 0) {
-      autoAlignSubs('Front');
-      setHasAutoAlignedFront(true);
-    } else {
-      setHasAutoAlignedFront(false);
-    }
-  }, [autoAlignEnabled, frontSubsCfg?.count, frontSubsCfg?.positions, seatingPositions, roomDims?.widthM, roomDims?.lengthM, autoAlignSubs]);
-
-  useEffect(() => {
+    const rearCount  = rearSubsCfg?.count  || 0;
     if (!autoAlignEnabled) return;
-    const rearCount = rearSubsCfg?.count || 0;
-    if (rearCount > 0) {
-      autoAlignSubs('Rear');
-      setHasAutoAlignedRear(true);
-    } else {
-      setHasAutoAlignedRear(false);
-    }
-  }, [autoAlignEnabled, rearSubsCfg?.count, rearSubsCfg?.positions, seatingPositions, roomDims?.widthM, roomDims?.lengthM, autoAlignSubs]);
+    if (frontCount > 0) setHasAutoAlignedFront(true); else setHasAutoAlignedFront(false);
+    if (rearCount  > 0) setHasAutoAlignedRear(true);  else setHasAutoAlignedRear(false);
+    autoAlignSubs();
+  }, [autoAlignEnabled, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, seatingPositions, roomDims?.widthM, roomDims?.lengthM, autoAlignSubs]);
 
   // Expose drag state
   useEffect(() => {
