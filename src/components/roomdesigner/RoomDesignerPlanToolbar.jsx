@@ -14,8 +14,6 @@ export default function RoomDesignerPlanToolbar({
   setEnableFrontWides,
   liveImpactMode,
   setLiveImpactMode,
-  onRebaseline,
-  hasBaseline,
   zoomMode,
   setZoomMode,
 }) {
@@ -102,7 +100,7 @@ export default function RoomDesignerPlanToolbar({
         }
       </div>
       
-      {/* Live Impact dropdown + Re-baseline button */}
+      {/* Live Impact dropdown */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
         <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Live Impact</span>
         <select
@@ -114,25 +112,6 @@ export default function RoomDesignerPlanToolbar({
           <option value="summary">Summary</option>
           <option value="detailed">Detailed</option>
         </select>
-        {liveImpactMode !== 'off' && hasBaseline && (
-          <button
-            type="button"
-            onClick={onRebaseline}
-            style={{
-              fontSize: 11,
-              padding: '4px 10px',
-              borderRadius: 4,
-              border: '1px solid #213428',
-              background: '#213428',
-              color: '#FFFFFF',
-              cursor: 'pointer',
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Re-baseline
-          </button>
-        )}
       </div>
 
         {/* 3-state zoom toggle */}
