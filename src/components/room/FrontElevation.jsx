@@ -289,7 +289,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         const a = items[i], b = items[j];
         const gapX = Math.max(0, Math.max(a.xMin, b.xMin) - Math.min(a.xMax, b.xMax));
         const gapZ = Math.max(0, Math.max(a.zMin, b.zMin) - Math.min(a.zMax, b.zMax));
-        if (gapX < T && gapZ < T) pairs.push(`${a.label} and ${b.label}`);
+        if (gapX === 0 && gapZ === 0) pairs.push(`${a.label} and ${b.label}`);
       }
     }
     return pairs;
