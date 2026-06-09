@@ -824,6 +824,150 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
         );
       })()}
 
+      {/* 69 Hz Peak Contributor Diagnostic — diagnostic visibility only, no scoring */}
+      {(() => {
+        const rawHz68 = r.hz68Diag?.rawBin?.frequency ?? null;
+        const refinedHz68 = r.hz68Diag?.refinedHz ?? null;
+
+        // Find stepDebug row nearest to the raw peak frequency
+        const row68 = Array.isArray(stepDebug) && stepDebug.length > 0 && Number.isFinite(rawHz68)
+          ? stepDebug.reduce((best, row) => {
+              const d = Math.abs(row.frequencyHz - rawHz68);
+              return best === null || d < Math.abs(best.frequencyHz - rawHz68) ? row : best;
+            }, null)
+          : null;
+        const sm68 = row68?.strongestMode ?? null;
+
+        // Find the modalContributorDebugRows group nearest to 68 Hz
+        const group68 = modalContributorDebugRows.length > 0
+          ? modalContributorDebugRows.reduce((best, g) => {
+              const d = Math.abs(g.targetHz - 68);
+              return best === null || d < Math.abs(best.targetHz - 68) ? g : best;
+            }, null)
+          : null;
+        const contributors68 = (group68?.contributors || []).slice(0, 10);
+
+        const smLabel = sm68 ? `[${sm68.nx},${sm68.ny},${sm68.nz}] @ ${Number.isFinite(sm68.freq) ? sm68.freq.toFixed(2) : '—'} Hz` : 'no data';
+        const rawLabel = Number.isFinite(rawHz68) ? rawHz68.toFixed(3) : '—';
+
+        return (
+          <details style={{ marginTop: 6, padding: '8px 10px', borderRadius: 6, background: '#fafaf5', border: '1px solid #bef264' }}>
+            <summary style={{ fontSize: 10, fontWeight: 700, color: '#3f6212', cursor: 'pointer' }}>
+              69 Hz contributors — strongest {smLabel}, peak raw {rawLabel} Hz
+              <span style={{ fontWeight: 400, fontStyle: 'italic', color: '#94a3b8', marginLeft: 8 }}>(diagnostic only)</span>
+            </summary>
+            <div style={{ marginTop: 8 }}>
+
+              {/* Key frequencies */}
+              <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: 10 }}>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #d9f99d' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px', width: '40%' }}>Detected raw peak frequency</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
+                      {Number.isFinite(rawHz68) ? rawHz68.toFixed(4) + ' Hz' : '—'}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #d9f99d' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Refined peak frequency</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
+                      {Number.isFinite(refinedHz68) ? refinedHz68.toFixed(4) + ' Hz' : '—'}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #d9f99d' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>REW target frequency</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>
+                      {T.hz68.peakFrequencyHz.toFixed(2)} Hz
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Strongest mode at raw peak */}
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#3f6212', marginBottom: 4 }}>
+                Strongest active mode at raw peak {Number.isFinite(rawHz68) ? rawHz68.toFixed(3) + ' Hz' : '—'}
+                {row68 ? <span style={{ fontWeight: 400, color: '#6b7280' }}> (nearest debug row: {row68.frequencyHz.toFixed(3)} Hz)</span> : null}
+              </div>
+              {sm68 ? (
+                <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: 10 }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #d9f99d' }}>
+                      <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px', width: '30%' }}>Mode indices [nx, ny, nz]</td>
+                      <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>[{sm68.nx},{sm68.ny},{sm68.nz}]</td>
+                      <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Type</td>
+                      <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '2px 6px' }}>{sm68.type || '—'}</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #d9f99d' }}>
+                      <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Modal frequency</td>
+                      <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
+                        {Number.isFinite(sm68.freq) ? sm68.freq.toFixed(4) + ' Hz' : '—'}
+                      </td>
+                      <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Q value</td>
+                      <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '2px 6px' }}>{Number.isFinite(sm68.qValue) ? sm68.qValue.toFixed(2) : '—'}</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #d9f99d' }}>
+                      <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Source coupling</td>
+                      <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>{Number.isFinite(sm68.sourceCoupling) ? sm68.sourceCoupling.toFixed(4) : '—'}</td>
+                      <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Receiver coupling</td>
+                      <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '2px 6px' }}>{Number.isFinite(sm68.receiverCoupling) ? sm68.receiverCoupling.toFixed(4) : '—'}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Combined coupling</td>
+                      <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>{Number.isFinite(sm68.combinedCoupling) ? sm68.combinedCoupling.toFixed(4) : '—'}</td>
+                      <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Contribution mag</td>
+                      <td style={{ fontSize: 10, fontFamily: 'monospace', padding: '2px 6px' }}>{Number.isFinite(sm68.magnitude) ? sm68.magnitude.toFixed(4) : '—'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 10 }}>No strongestMode data — run simulation with modes enabled.</div>
+              )}
+
+              {/* Top 10 active contributors at 68 Hz from modalContributorDebugRows */}
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#3f6212', marginBottom: 4 }}>
+                Top 10 active modal contributors
+                {group68 ? <span style={{ fontWeight: 400, color: '#6b7280' }}> (group target: {fmtDiagnostic(group68.targetHz, 0, ' Hz')} · evaluated: {fmtDiagnostic(group68.frequencyHz, 3, ' Hz')})</span> : null}
+              </div>
+              {contributors68.length > 0 ? (
+                <SafeTableWrap minWidth={860}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...tableHeaderStyle, background: '#ecfccb', borderBottom: '2px solid #bef264' }}>Mode [nx,ny,nz]</th>
+                        <th style={{ ...tableHeaderStyle, textAlign: 'right', background: '#ecfccb', borderBottom: '2px solid #bef264' }}>Type</th>
+                        <th style={{ ...tableHeaderStyle, textAlign: 'right', background: '#ecfccb', borderBottom: '2px solid #bef264' }}>Modal freq</th>
+                        <th style={{ ...tableHeaderStyle, textAlign: 'right', background: '#ecfccb', borderBottom: '2px solid #bef264' }}>Active mag</th>
+                        <th style={{ ...tableHeaderStyle, textAlign: 'right', background: '#ecfccb', borderBottom: '2px solid #bef264' }}>Phase °</th>
+                        <th style={{ ...tableHeaderStyle, textAlign: 'right', background: '#ecfccb', borderBottom: '2px solid #bef264' }}>Src coupling</th>
+                        <th style={{ ...tableHeaderStyle, textAlign: 'right', background: '#ecfccb', borderBottom: '2px solid #bef264' }}>Rcv coupling</th>
+                        <th style={{ ...tableHeaderStyle, textAlign: 'right', background: '#ecfccb', borderBottom: '2px solid #bef264' }}>Combined</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contributors68.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #d9f99d', background: i === 0 ? '#f7fee7' : undefined }}>
+                          <td style={{ padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: i === 0 ? 700 : 400 }}>{formatModeIndices(row)}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10 }}>{row.modeType || '—'}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.modeFrequencyHz, 4, ' Hz')}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: i === 0 ? 700 : 400 }}>{fmtDiagnostic(row.contributionMagnitude, 4)}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.contributionPhaseAngleDeg, 1, '°')}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.sourceCoupling, 4)}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace' }}>{fmtDiagnostic(row.receiverCoupling, 4)}</td>
+                          <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: i === 0 ? 700 : 400 }}>{fmtDiagnostic(row.combinedCoupling, 4)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </SafeTableWrap>
+              ) : (
+                <div style={{ fontSize: 10, color: '#9ca3af' }}>
+                  No modalContributorDebugRows data near 68 Hz — run simulation with modal contributor tracking enabled.
+                </div>
+              )}
+            </div>
+          </details>
+        );
+      })()}
+
       <NullCentreActiveModalVectorBreakdown
         id="diagnostic-null-centre"
         contributorSeries={wholeCurveDebugRows?.activeModalContributorDebugSeries}
