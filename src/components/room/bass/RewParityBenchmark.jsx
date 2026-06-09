@@ -838,14 +838,29 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
           : null;
         const sm68 = row68?.strongestMode ?? null;
 
-        // Find the modalContributorDebugRows group nearest to 68 Hz
-        const group68 = modalContributorDebugRows.length > 0
+        // Find the modalContributorDebugRows group nearest to the actual raw peak frequency.
+        // Each group may expose its evaluated frequency as frequencyHz, evaluatedHz, or targetHz —
+        // check all three and take the closest to rawHz68. No fixed constant fallback.
+        const group68 = (modalContributorDebugRows.length > 0 && Number.isFinite(rawHz68))
           ? modalContributorDebugRows.reduce((best, g) => {
-              const d = Math.abs(g.targetHz - 68);
-              return best === null || d < Math.abs(best.targetHz - 68) ? g : best;
+              const gHz = Number.isFinite(g.frequencyHz) ? g.frequencyHz
+                        : Number.isFinite(g.evaluatedHz) ? g.evaluatedHz
+                        : Number.isFinite(g.targetHz)    ? g.targetHz
+                        : null;
+              if (!Number.isFinite(gHz)) return best;
+              const d = Math.abs(gHz - rawHz68);
+              const bestHz = best ? (Number.isFinite(best.frequencyHz) ? best.frequencyHz
+                                   : Number.isFinite(best.evaluatedHz) ? best.evaluatedHz
+                                   : best.targetHz) : null;
+              return best === null || d < Math.abs(bestHz - rawHz68) ? g : best;
             }, null)
           : null;
-        const contributors68 = (group68?.contributors || []).slice(0, 10);
+        // Reject if the closest group is more than 10 Hz away — prevents 54 Hz fallback
+        const group68Hz = group68 ? (Number.isFinite(group68.frequencyHz) ? group68.frequencyHz
+                                   : Number.isFinite(group68.evaluatedHz) ? group68.evaluatedHz
+                                   : group68.targetHz) : null;
+        const group68Valid = group68 && Number.isFinite(group68Hz) && Math.abs(group68Hz - rawHz68) <= 10;
+        const contributors68 = group68Valid ? (group68.contributors || []).slice(0, 10) : [];
 
         const smLabel = sm68 ? `[${sm68.nx},${sm68.ny},${sm68.nz}] @ ${Number.isFinite(sm68.freq) ? sm68.freq.toFixed(2) : '—'} Hz` : 'no data';
         const rawLabel = Number.isFinite(rawHz68) ? rawHz68.toFixed(3) : '—';
@@ -922,10 +937,12 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                 <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 10 }}>No strongestMode data — run simulation with modes enabled.</div>
               )}
 
-              {/* Top 10 active contributors at 68 Hz from modalContributorDebugRows */}
+              {/* Top 10 active contributors nearest to raw peak from modalContributorDebugRows */}
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3f6212', marginBottom: 4 }}>
-                Top 10 active modal contributors
-                {group68 ? <span style={{ fontWeight: 400, color: '#6b7280' }}> (group target: {fmtDiagnostic(group68.targetHz, 0, ' Hz')} · evaluated: {fmtDiagnostic(group68.frequencyHz, 3, ' Hz')})</span> : null}
+                Top 10 active modal contributors at raw peak {Number.isFinite(rawHz68) ? rawHz68.toFixed(3) + ' Hz' : '—'}
+                {group68Valid
+                  ? <span style={{ fontWeight: 400, color: '#6b7280' }}> (selected group: target {fmtDiagnostic(group68.targetHz, 0, ' Hz')} · evaluated {fmtDiagnostic(group68Hz, 3, ' Hz')} · Δ {fmtDiagnostic(Math.abs(group68Hz - rawHz68), 3, ' Hz')} from raw peak)</span>
+                  : null}
               </div>
               {contributors68.length > 0 ? (
                 <SafeTableWrap minWidth={860}>
@@ -959,8 +976,11 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                   </table>
                 </SafeTableWrap>
               ) : (
-                <div style={{ fontSize: 10, color: '#9ca3af' }}>
-                  No modalContributorDebugRows data near 68 Hz — run simulation with modal contributor tracking enabled.
+                <div style={{ fontSize: 10, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 4, padding: '4px 8px' }}>
+                  No modal contributor group available near the {Number.isFinite(rawHz68) ? rawHz68.toFixed(1) : '69'} Hz raw peak
+                  {modalContributorDebugRows.length > 0
+                    ? ` — available groups: ${modalContributorDebugRows.map(g => fmtDiagnostic(g.targetHz ?? g.frequencyHz ?? g.evaluatedHz, 0, ' Hz')).join(', ')}`
+                    : ' — run simulation with modal contributor tracking enabled'}.
                 </div>
               )}
             </div>
