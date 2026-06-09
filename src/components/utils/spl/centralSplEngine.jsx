@@ -400,6 +400,28 @@ export function computeAllSeatSplMetrics({
     (s) => hasPos(s) && hasRealModel(s) && isOverheadRole(s.role)
   );
 
+  // Integrated LCR soundbars are stored as one physical FC speaker.
+  // For SPL/RP22 reporting only, expose virtual FL/FC/FR screen-channel entries.
+  const isIntegratedLcr = (() => {
+    if (placedLCR.length !== 1) return false;
+    const fc = placedLCR[0];
+    if (getCanonicalRole(fc.role) !== 'FC') return false;
+    const meta = getModelDimsM(fc.model);
+    return meta?.frontStageType === 'integrated_lcr';
+  })();
+
+  const screenSpeakersForSpl = isIntegratedLcr
+    ? (() => {
+        const fc = placedLCR[0];
+        const baseId = fc.id || 'FC';
+        return [
+          { ...fc, role: 'FL', id: `${baseId}__virtual_FL`, virtualFromIntegratedLcr: true },
+          { ...fc, role: 'FC', id: `${baseId}__virtual_FC`, virtualFromIntegratedLcr: true },
+          { ...fc, role: 'FR', id: `${baseId}__virtual_FR`, virtualFromIntegratedLcr: true },
+        ];
+      })()
+    : placedLCR;
+
   // Process each seat (including synthetic MLP)
   for (const seat of seatsToProcess) {
     const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
@@ -486,7 +508,7 @@ export function computeAllSeatSplMetrics({
     };
 
     // Process all speaker categories with unified logic
-    processSpeakers(placedLCR, 'screen');
+    processSpeakers(screenSpeakersForSpl, 'screen');
     processSpeakers(placedSur, 'surrounds');
     processSpeakers(placedOH, 'uppers');
 
