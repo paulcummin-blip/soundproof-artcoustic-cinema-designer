@@ -510,10 +510,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return { subId, arrivalTime, pos };
     });
 
-    const minArrival = Math.min(...subData.map(s => s.arrivalTime));
+    const maxArrival = Math.max(...subData.map(s => s.arrivalTime));
     const newSettings = { ...settingsById };
     subData.forEach(({ subId, arrivalTime }) => {
-      const delayMs = Math.max(0, Math.min(30, (arrivalTime - minArrival) * 1000));
+      const delayMs = Math.max(0, Math.min(30, (maxArrival - arrivalTime) * 1000));
       newSettings[subId] = {
         ...newSettings[subId],
         gainDb: newSettings[subId]?.gainDb ?? 0,
@@ -537,28 +537,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [autoAlignEnabled, tryPolarity, setFrontSubsCfg, setRearSubsCfg]);
 
-  // Auto-align effects
+  // Auto-align effects — re-run whenever MLP seat, room dims, or sub positions change
   useEffect(() => {
     if (!autoAlignEnabled) return;
     const frontCount = frontSubsCfg?.count || 0;
-    if (frontCount > 0 && !hasAutoAlignedFront) {
+    if (frontCount > 0) {
       autoAlignSubs('Front');
       setHasAutoAlignedFront(true);
-    } else if (frontCount === 0) {
+    } else {
       setHasAutoAlignedFront(false);
     }
-  }, [autoAlignEnabled, frontSubsCfg?.count, hasAutoAlignedFront, autoAlignSubs]);
+  }, [autoAlignEnabled, frontSubsCfg?.count, frontSubsCfg?.positions, seatingPositions, roomDims?.widthM, roomDims?.lengthM, autoAlignSubs]);
 
   useEffect(() => {
     if (!autoAlignEnabled) return;
     const rearCount = rearSubsCfg?.count || 0;
-    if (rearCount > 0 && !hasAutoAlignedRear) {
+    if (rearCount > 0) {
       autoAlignSubs('Rear');
       setHasAutoAlignedRear(true);
-    } else if (rearCount === 0) {
+    } else {
       setHasAutoAlignedRear(false);
     }
-  }, [autoAlignEnabled, rearSubsCfg?.count, hasAutoAlignedRear, autoAlignSubs]);
+  }, [autoAlignEnabled, rearSubsCfg?.count, rearSubsCfg?.positions, seatingPositions, roomDims?.widthM, roomDims?.lengthM, autoAlignSubs]);
 
   // Expose drag state
   useEffect(() => {
