@@ -33,8 +33,11 @@ export const REW_TARGETS_CURRENT_ROOM = {
   },
 
   // 68 Hz region — moderate peak (REW cursor: 67.9 Hz @ 92.4 dB, trend ~88-89 dB)
+  // rewCursorPeakFrequencyHz: REW cursor reading — display reference only, NOT used for scoring.
+  // physicsExpectedPeakFrequencyHz: theoretical [2,0,0]/[0,2,0] axial modes for this room — used for scoring.
   hz68: {
-    peakFrequencyHz:   67.9,  // Hz — REW cursor confirmed 67.9 Hz
+    rewCursorPeakFrequencyHz:      67.9,  // Hz — REW cursor confirmed 67.9 Hz (reference only)
+    physicsExpectedPeakFrequencyHz: 68.6, // Hz — theoretical [2,0,0]/[0,2,0] axial mode for 5.0 m room
     peakProminenceDb:  4.0,   // dB — peak above surrounding trend
   },
 
@@ -392,7 +395,8 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
 
     // ── 68 Hz region — detect peak, measure vs local baseline ────────────────
     // Local baseline: ±10 Hz window, excluding ±3 Hz around the peak.
-    const hz68PeakBin = findMaxInWindow(b44Series, T.hz68.peakFrequencyHz, 3);
+    // Peak detection centres on physicsExpectedPeakFrequencyHz (68.6 Hz — the theoretical axial mode).
+    const hz68PeakBin = findMaxInWindow(b44Series, T.hz68.physicsExpectedPeakFrequencyHz, 3);
     const hz68Peak = hz68PeakBin
       ? { ...hz68PeakBin, frequency: parabolicRefineFrequency(rawSorted, hz68PeakBin) }
       : null;
@@ -480,10 +484,11 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
       },
       // 68 Hz peak
       hz68: {
-        b44PeakFreqHz:    hz68Peak?.frequency ?? null,
-        b44ProminenceDb:  hz68Prominence,       // raw peak minus local baseline
-        rewPeakFreqHz:    T.hz68.peakFrequencyHz,
-        rewProminenceDb:  T.hz68.peakProminenceDb,
+        b44PeakFreqHz:              hz68Peak?.frequency ?? null,
+        b44ProminenceDb:            hz68Prominence,       // raw peak minus local baseline
+        rewCursorPeakFreqHz:        T.hz68.rewCursorPeakFrequencyHz,      // display reference only
+        physicsExpectedPeakFreqHz:  T.hz68.physicsExpectedPeakFrequencyHz, // used for scoring
+        rewProminenceDb:            T.hz68.peakProminenceDb,
       },
       // 68 Hz peak detection diagnostic — raw bin + neighbours for screenshot audit
       hz68Diag: (() => {
@@ -499,7 +504,11 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
           .filter(p => p.frequency >= 60 && p.frequency <= 80 && Number.isFinite(p.spl))
           .sort((a, b) => b.spl - a.spl)
           .slice(0, 10);
-        return { rawBin: hz68PeakBin, prev, next, refinedHz, shiftHz, band6080 };
+        return {
+          rawBin: hz68PeakBin, prev, next, refinedHz, shiftHz, band6080,
+          rewCursorHz: T.hz68.rewCursorPeakFrequencyHz,
+          physicsExpectedHz: T.hz68.physicsExpectedPeakFrequencyHz,
+        };
       })(),
       // Vector
       vector: {
@@ -542,8 +551,8 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
     hz40Centre: check(r.hz40.b44NullCentreHz,    r.hz40.rewNullCentreHz,   TOL_.featureFrequencyHz),
     hz40Depth:  check(r.hz40.b44NullDepthDb,     r.hz40.rewNullDepthDb,    TOL_.nullDepthDb),
     hz40Width:  check(r.hz40.b44NullWidthHz,     r.hz40.rewNullWidthHz,    TOL_.nullWidthHz),
-    hz68Freq:   check(r.hz68.b44PeakFreqHz,      r.hz68.rewPeakFreqHz,     TOL_.featureFrequencyHz),
-    hz68Prom:   check(r.hz68.b44ProminenceDb,    r.hz68.rewProminenceDb,   TOL_.featureMagnitudeDb),
+    hz68Freq:   check(r.hz68.b44PeakFreqHz,      r.hz68.physicsExpectedPeakFreqHz, TOL_.featureFrequencyHz),
+    hz68Prom:   check(r.hz68.b44ProminenceDb,    r.hz68.rewProminenceDb,          TOL_.featureMagnitudeDb),
     // Phase excluded from count when no REW target is stored
     ...(r.vector.rewPhaseShiftDeg !== null && {
       vector: check(r.vector.b44PhaseShiftDeg, r.vector.rewPhaseShiftDeg, TOL_.phaseShiftDeg),
@@ -662,11 +671,22 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
 
           {/* 68 Hz region */}
           <tr><td colSpan={6} style={{ padding: '4px 6px', fontSize: 10, fontWeight: 700, color: '#065f46', background: '#ecfdf5' }}>68 Hz region</td></tr>
-          <ResultRow label="Peak frequency"   b44={r.hz68.b44PeakFreqHz}   rew={r.hz68.rewPeakFreqHz}   tol={TOL_.featureFrequencyHz} unit=" Hz" />
+          {/* REW cursor reference row — display only, not scored */}
+          <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+            <td style={{ padding: '3px 6px', fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>REW cursor peak (reference)</td>
+            <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', color: '#6b7280' }}>—</td>
+            <td style={{ textAlign: 'right', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', color: '#6b7280' }}>
+              {Number.isFinite(r.hz68.rewCursorPeakFreqHz) ? r.hz68.rewCursorPeakFreqHz.toFixed(2) : '—'} Hz
+            </td>
+            <td colSpan={3} style={{ padding: '3px 6px', fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>
+              display only · not scored
+            </td>
+          </tr>
+          <ResultRow label="Peak frequency vs expected mode" b44={r.hz68.b44PeakFreqHz} rew={r.hz68.physicsExpectedPeakFreqHz} tol={TOL_.featureFrequencyHz} unit=" Hz" />
           <ResultRow label="Peak prominence (local)" b44={r.hz68.b44ProminenceDb} rew={r.hz68.rewProminenceDb} tol={TOL_.featureMagnitudeDb} unit=" dB" />
           {(() => {
             if (!Array.isArray(stepDebug) || stepDebug.length === 0) return null;
-            const row68 = stepDebug.reduce((best, row) => !best || Math.abs(row.frequencyHz - T.hz68.peakFrequencyHz) < Math.abs(best.frequencyHz - T.hz68.peakFrequencyHz) ? row : best, null);
+            const row68 = stepDebug.reduce((best, row) => !best || Math.abs(row.frequencyHz - T.hz68.physicsExpectedPeakFrequencyHz) < Math.abs(best.frequencyHz - T.hz68.physicsExpectedPeakFrequencyHz) ? row : best, null);
             const sm68 = row68?.strongestMode;
             if (!sm68 || !Number.isFinite(sm68.combinedCoupling)) return null;
             if (Math.abs(sm68.combinedCoupling) > 0.8) {
@@ -713,7 +733,8 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
         const rawSpl   = d.rawBin?.spl;
         const refined  = d.refinedHz;
         const shift    = d.shiftHz;
-        const rewTarget = T.hz68.peakFrequencyHz;
+        const rewCursorTarget = d.rewCursorHz ?? T.hz68.rewCursorPeakFrequencyHz;
+        const rewTarget = d.physicsExpectedHz ?? T.hz68.physicsExpectedPeakFrequencyHz;
         const deltaVsRew = (Number.isFinite(refined) && Number.isFinite(rewTarget)) ? refined - rewTarget : null;
         const summaryRaw     = Number.isFinite(rawHz)   ? rawHz.toFixed(3)   : '—';
         const summaryRefined = Number.isFinite(refined) ? refined.toFixed(3) : '—';
@@ -772,11 +793,18 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                     <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>refined − raw bin</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
-                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>REW target frequency</td>
-                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>REW cursor peak (reference)</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', color: '#6b7280' }}>
+                      {Number.isFinite(rewCursorTarget) ? rewCursorTarget.toFixed(2) + ' Hz' : '—'}
+                    </td>
+                    <td style={{ fontSize: 10, color: '#9ca3af', fontStyle: 'italic', padding: '2px 6px' }}>display reference only · not scored</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #a7f3d0' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Physics expected mode (scored)</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
                       {Number.isFinite(rewTarget) ? rewTarget.toFixed(2) + ' Hz' : '—'}
                     </td>
-                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>T.hz68.peakFrequencyHz</td>
+                    <td style={{ fontSize: 10, color: '#6b7280', padding: '2px 6px' }}>T.hz68.physicsExpectedPeakFrequencyHz — [2,0,0]/[0,2,0] axial</td>
                   </tr>
                   <tr>
                     <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Delta vs REW target</td>
@@ -889,9 +917,15 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
                     </td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #d9f99d' }}>
-                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>REW target frequency</td>
-                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px' }}>
-                      {T.hz68.peakFrequencyHz.toFixed(2)} Hz
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>REW cursor peak (reference)</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', color: '#6b7280' }}>
+                      {T.hz68.rewCursorPeakFrequencyHz.toFixed(2)} Hz
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #d9f99d' }}>
+                    <td style={{ fontSize: 10, color: '#374151', padding: '2px 6px' }}>Physics expected mode (scored)</td>
+                    <td style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'right', padding: '2px 6px', fontWeight: 700 }}>
+                      {T.hz68.physicsExpectedPeakFrequencyHz.toFixed(2)} Hz
                     </td>
                   </tr>
                 </tbody>
@@ -1186,7 +1220,7 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
         const TARGET_HZ = [
           { label: '34 Hz', targetHz: T.hz34.featureFrequencyHz, bg: '#eff6ff', color: '#1e40af' },
           { label: '40 Hz', targetHz: T.hz40.nullCentreHz, bg: '#f5f3ff', color: '#7c3aed' },
-          { label: '68 Hz', targetHz: T.hz68.peakFrequencyHz, bg: '#ecfdf5', color: '#065f46' },
+          { label: '68 Hz', targetHz: T.hz68.physicsExpectedPeakFrequencyHz, bg: '#ecfdf5', color: '#065f46' },
         ];
         return (
           <details style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: '#f9fafb', border: '1px solid #e5e7eb' }}>
