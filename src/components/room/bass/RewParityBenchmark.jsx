@@ -323,9 +323,12 @@ function ResultRow({ label, b44, rew, tol, unit = '', higherIsBetter = false }) 
 export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDebugRows, modalSourceReferenceMode = 'existing' }) {
   const T = REW_TARGETS_CURRENT_ROOM;
   const TOL = T.tolerances;
-  const [pureDeterministicModalSum, setPureDeterministicModalSum] = React.useState(() => (
-    typeof window !== 'undefined' && window.localStorage?.getItem('rewCorePureDeterministicModalSum') === 'true'
-  ));
+  const [pureDeterministicModalSum, setPureDeterministicModalSum] = React.useState(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = window.localStorage?.getItem('rewCorePureDeterministicModalSum');
+    // Default ON — modalPhasePerturbationRad is labelled "Temporary REW parity diagnostic only"
+    return stored === null ? true : stored === 'true';
+  });
 
   const handlePureDeterministicToggle = (checked) => {
     setPureDeterministicModalSum(checked);
@@ -577,9 +580,9 @@ export default function RewParityBenchmark({ b44Series, stepDebug, wholeCurveDeb
             checked={pureDeterministicModalSum}
             onChange={(event) => handlePureDeterministicToggle(event.target.checked)}
           />
-          Pure deterministic modal sum
+          Use deterministic modal sum
         </label>
-        <span>Active modal perturbation: <strong>{activeModalPerturbationEnabled ? 'ON' : 'OFF'}</strong></span>
+        <span>Temporary modal perturbation: <strong>{activeModalPerturbationEnabled ? 'ON' : 'OFF'}</strong></span>
       </div>
 
       {/* Normalisation info */}
