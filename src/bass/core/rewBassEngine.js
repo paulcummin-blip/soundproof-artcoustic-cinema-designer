@@ -277,7 +277,7 @@ const LOW_MODE_KEYS = [
 
 const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6];
 const WHOLE_CURVE_DEBUG_TARGETS = [20, 30, 34.3, 40, 50, 60, 68.6, 70, 80, 90, 100];
-const MODAL_CONTRIBUTOR_DEBUG_TARGETS = [40, 45, 50, 54];
+const MODAL_CONTRIBUTOR_DEBUG_TARGETS = [34.3, 40.6, 45, 50, 54, 68.6, 69.24];
 const PER_MODE_SPLIT_COHERENT_FRACTION = 0.70;
 
 // Temporary REW parity diagnostic only, not final physics: deterministic per-mode phase decorrelation.
