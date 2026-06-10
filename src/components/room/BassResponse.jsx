@@ -119,8 +119,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [tryPolarity, setTryPolarity] = useState(false);
   const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
   const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
-  const [absorptionPct, setAbsorptionPct] = useState(30);
   const [roomDamping, setRoomDamping] = useState(20);
+  const [surfaceAbsorptionInputs, setSurfaceAbsorptionInputs] = useState({
+    front: 0.30,
+    back: 0.30,
+    left: 0.30,
+    right: 0.30,
+    ceiling: 0.30,
+    floor: 0.30,
+  });
   const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(true);
   const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(true);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
@@ -180,15 +187,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return `F[${buildSig(frontSubsCfg?.settingsById)}]R[${buildSig(rearSubsCfg?.settingsById)}]`;
   }, [frontSubsCfg?.settingsById, rearSubsCfg?.settingsById]);
 
-  // Convert absorption % to coefficient
-  const absorptionCoeff = Math.max(0, Math.min(1, absorptionPct / 100));
+  // Six-surface absorption object fed directly to the REW Core engine
   const surfaceAbsorption = {
-    front: absorptionCoeff,
-    back: absorptionCoeff,
-    left: absorptionCoeff,
-    right: absorptionCoeff,
-    ceiling: absorptionCoeff,
-    floor: absorptionCoeff
+    front:   Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.front)   || 0.30)),
+    back:    Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.back)    || 0.30)),
+    left:    Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.left)    || 0.30)),
+    right:   Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.right)   || 0.30)),
+    ceiling: Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.ceiling) || 0.30)),
+    floor:   Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.floor)   || 0.30)),
   };
 
   // Keep refs current
@@ -436,7 +442,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, absorptionPct, selectedSeatIds, debugDisableModalContribution, subTuningSignature]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1223,61 +1229,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
       )}
 
-      {/* Absorption Control */}
+      {/* Surface Absorption Panel */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Acoustics</div>
-        <div className="space-y-3">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs text-[#3E4349]">Absorption</Label>
-              <span className="text-xs font-mono text-[#1B1A1A]">{fmtFixed(absorptionPct, 0)}%</span>
+        <div className="text-sm font-medium text-[#1B1A1A] mb-1">Room Acoustics</div>
+        <div className="text-xs text-[#3E4349] mb-3">Surface absorption coefficients (0.00 – 1.00). Default 0.30 = typical cinema.</div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+          {[
+            { key: 'front',   label: 'Front wall' },
+            { key: 'back',    label: 'Back wall' },
+            { key: 'left',    label: 'Left wall' },
+            { key: 'right',   label: 'Right wall' },
+            { key: 'ceiling', label: 'Ceiling' },
+            { key: 'floor',   label: 'Floor' },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between gap-2">
+              <Label className="text-xs text-[#3E4349] w-20 flex-shrink-0">{label}</Label>
+              <input
+                type="number"
+                min="0.00"
+                max="1.00"
+                step="0.05"
+                value={surfaceAbsorptionInputs[key]}
+                onChange={(e) => {
+                  const val = Math.max(0, Math.min(1, parseFloat(e.target.value) || 0));
+                  setSurfaceAbsorptionInputs(prev => ({ ...prev, [key]: val }));
+                }}
+                autoComplete="off"
+                inputMode="decimal"
+                className="w-16 rounded border border-[#DCDBD6] bg-white px-2 py-1 text-xs font-mono text-right text-[#1B1A1A] focus:outline-none focus:ring-1 focus:ring-[#213428]"
+              />
             </div>
-            <input
-              type="range"
-              value={absorptionPct}
-              onChange={(e) => setAbsorptionPct(Number(e.target.value))}
-              min="0"
-              max="100"
-              step="5"
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-[#3E4349] mt-1">
-              <span>Reflective (0%)</span>
-              <span>Absorptive (100%)</span>
-            </div>
-          </div>
-          <div className="text-xs text-[#3E4349]">
-            Applies to all room surfaces. Default: 30% (typical cinema).
-          </div>
-        </div>
-      </div>
-
-      {/* Room Damping Control */}
-      <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Acoustics</div>
-        <div className="space-y-3">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs text-[#3E4349]">Room Damping</Label>
-              <span className="text-xs font-mono text-[#1B1A1A]">{fmtFixed(roomDamping, 0)}</span>
-            </div>
-            <input
-              type="range"
-              value={roomDamping}
-              onChange={(e) => setRoomDamping(Number(e.target.value))}
-              min="8"
-              max="35"
-              step="1"
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-[#3E4349] mt-1">
-              <span>Dead (8)</span>
-              <span>Lively (35)</span>
-            </div>
-          </div>
-          <div className="text-xs text-[#3E4349]">
-            Modal + SBIR simulation (REW parity, always on)
-          </div>
+          ))}
         </div>
       </div>
 
