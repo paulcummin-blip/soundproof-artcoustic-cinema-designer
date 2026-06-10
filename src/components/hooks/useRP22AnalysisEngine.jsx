@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { degreesBetweenVectors } from '../utils/geometryUtils';
 import { pickMLP } from '../utils/seatingUtils';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
-import { computeBackArc, param5LevelFromGap } from "@/components/utils/RP22Geometry";
+import { computeBackSweepGaps, levelFromGap } from "@/components/utils/RP22Geometry";
 import { computeSurroundRingGaps, rp22LevelForP5, isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
 import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
@@ -469,8 +469,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     let surroundGaps = null;
 
     if (mlp && Number.isFinite(mlp.x) && Number.isFinite(mlp.y) && surrounds.length >= 2) { // Added check for mlp coordinates
-      const { backArcAngles, backArcPairs } = computeBackArc(surrounds, mlp);
-      const inner = Array.isArray(backArcAngles) ? backArcAngles : [];
+      const result = computeBackSweepGaps(surrounds, mlp);
+      const inner = Array.isArray(result.gaps) ? result.gaps : [];
+      const backArcPairs = Array.isArray(result.pairs) ? result.pairs : [];
 
       const maxGap = inner.length ? Math.max(...inner) : 0;
       const mean = inner.length ? inner.reduce((a, g) => a + g, 0) / inner.length : 0;
@@ -480,7 +481,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         gaps: inner.map(g => Number((+g).toFixed(1))),
         maxGap: Number((+maxGap).toFixed(1)),
         std: Number((+std).toFixed(2)),
-        level: param5LevelFromGap(maxGap),
+        level: levelFromGap(maxGap),
         target: 80,
         label: "Back-arc gaps (MLP)"
       };
