@@ -268,12 +268,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       const subId = s?.id ?? `${group}-sub-${POSITION_LABELS[idx] ?? idx}`;
       const tuning = getTuning(subId, cfg);
 
+      // __TEMP_DIAGNOSTIC__ — hard-coded tuning override to verify engine reads sub.tuning.
+      // Remove immediately after diagnosis. Do not ship.
+      const diagnosticTuning = { gainDb: 20, delayMs: 0, polarity: 0 };
+
       return {
         id: subId,
         modelKey: s?.model ?? "SUB2-12",
         x, y,
         z: Number.isFinite(Number(z)) ? Number(z) : 0.35,
-        tuning,
+        tuning: diagnosticTuning,
       };
     };
 
