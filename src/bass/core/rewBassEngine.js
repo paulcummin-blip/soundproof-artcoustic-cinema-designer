@@ -674,10 +674,18 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         heightM,
         fMax: freqMaxHz,
         c: SPEED_OF_SOUND_MPS,
-      }).map((mode) => ({
-        ...mode,
-        qValue: estimateModeQByType(mode, axialQ),
-      }))
+      }).map((mode) => {
+        const baseQ = estimateModeQByType(mode, axialQ);
+        const absorptionQ = estimateModeQLocal({
+          roomDims: { widthM, lengthM, heightM },
+          surfaceAbsorption,
+          f0: mode.freq,
+        });
+        return {
+          ...mode,
+          qValue: Math.max(1, Math.min(baseQ, absorptionQ)),
+        };
+      })
     : [];
 
   const stepDebugRows = [];
