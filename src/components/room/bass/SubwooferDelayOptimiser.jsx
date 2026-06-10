@@ -67,10 +67,16 @@ export default function SubwooferDelayOptimiser({
     // Diagnostic: capture modified sub objects at sentinel delays
     const sentinelSubDiagnostics = {};
 
+    // Helper to detect front subs by ID pattern (supports both naming conventions)
+    const isFrontSub = (sub) => {
+      const id = String(sub?.id || sub?.subId || "").toLowerCase();
+      return id.startsWith("front-") || id.startsWith("sub-front");
+    };
+
     for (let delayMs = 0; delayMs <= MAX_DELAY; delayMs = Math.round((delayMs + STEP) * 100) / 100) {
       // Build modified subs: override front sub delay to delayMs, keep others as-is
       const modifiedSubs = subsForSimulation.map((sub) => {
-        if (sub.id?.startsWith("front")) {
+        if (isFrontSub(sub)) {
           return { ...sub, tuning: { ...sub.tuning, delayMs } };
         }
         // rear subs: zero delay for this scan
