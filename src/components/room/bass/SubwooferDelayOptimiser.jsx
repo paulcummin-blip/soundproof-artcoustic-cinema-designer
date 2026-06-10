@@ -125,14 +125,41 @@ export default function SubwooferDelayOptimiser({
 
       if (!freqsHz || !sumRe || !sumIm) continue;
 
-      // Convert to SPL and filter to 20–120Hz
-      const splValues = freqsHz
-        .map((hz, i) => {
-          if (hz < FREQ_MIN || hz > FREQ_MAX) return null;
-          const mag = Math.sqrt(sumRe[i] ** 2 + sumIm[i] ** 2);
-          return 20 * Math.log10(Math.max(mag, 1e-10));
-        })
-        .filter((v) => v !== null && Number.isFinite(v));
+      // --- Build cleaned response identical to the live graph pipeline ---
+      // Step 1: Convert to {frequency, spl} — spl=null for non-finite values
+      const rawPoints = freqsHz.map((hz, i) => {
+        const mag = Math.sqrt(sumRe[i] ** 2 + sumIm[i] ** 2);
+        const calculatedSpl = 20 * Math.log10(Math.max(mag, 1e-10));
+        return {
+          frequency: hz,
+          spl: Number.isFinite(calculatedSpl) ? calculatedSpl : null,
+        };
+      });
+
+      // Step 2: Filter — keep only valid positive frequencies with a finite spl
+      const validPoints = rawPoints.filter(
+        (p) => p.frequency > 0 && Number.isFinite(p.frequency) && p.spl !== null
+      );
+
+      // Step 3: Sort by frequency ascending
+      validPoints.sort((a, b) => a.frequency - b.frequency);
+
+      // Step 4: Dedupe — keep first occurrence within 1e-9 Hz tolerance
+      const cleanedPoints = [];
+      for (let k = 0; k < validPoints.length; k++) {
+        if (
+          k === 0 ||
+          Math.abs(validPoints[k].frequency - validPoints[k - 1].frequency) > 1e-9
+        ) {
+          cleanedPoints.push(validPoints[k]);
+        }
+      }
+      // --- End cleaned pipeline ---
+
+      // Score over 20–120Hz from cleaned array
+      const splValues = cleanedPoints
+        .filter((p) => p.frequency >= FREQ_MIN && p.frequency <= FREQ_MAX)
+        .map((p) => p.spl);
 
       if (splValues.length === 0) continue;
 
@@ -147,14 +174,10 @@ export default function SubwooferDelayOptimiser({
         bestMax = maxSpl;
       }
 
-      // Narrow band score: 60–100Hz
-      const narrowSplValues = freqsHz
-        .map((hz, i) => {
-          if (hz < NARROW_MIN || hz > NARROW_MAX) return null;
-          const mag = Math.sqrt(sumRe[i] ** 2 + sumIm[i] ** 2);
-          return 20 * Math.log10(Math.max(mag, 1e-10));
-        })
-        .filter((v) => v !== null && Number.isFinite(v));
+      // Narrow band score: 60–100Hz from cleaned array
+      const narrowSplValues = cleanedPoints
+        .filter((p) => p.frequency >= NARROW_MIN && p.frequency <= NARROW_MAX)
+        .map((p) => p.spl);
 
       if (narrowSplValues.length > 0) {
         const narrowScore = Math.max(...narrowSplValues) - Math.min(...narrowSplValues);
