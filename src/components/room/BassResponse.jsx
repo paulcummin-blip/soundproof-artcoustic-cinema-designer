@@ -1274,12 +1274,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
             {autoAlignEnabled && (
               <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
-                Subs are automatically aligned by distance to MLP for coherent summation.
+                Auto alignment active.
               </div>
             )}
             {!autoAlignEnabled && (
               <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
-                Manual mode: adjust delays below.
+                Manual delay controls are currently hidden.
               </div>
             )}
           </div>
@@ -1294,6 +1294,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <SubTuningControls
               subsCfg={frontSubsCfg}
               groupLabel="Front"
+              autoAlignDelays={autoAlignDelays}
               onSettingsChange={(newSettings) => {
                 setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
@@ -1307,6 +1308,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <SubTuningControls
               subsCfg={rearSubsCfg}
               groupLabel="Rear"
+              autoAlignDelays={autoAlignDelays}
               onSettingsChange={(newSettings) => {
                 setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}

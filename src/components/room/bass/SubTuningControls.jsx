@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 
-export default function SubTuningControls({ subsCfg, onSettingsChange, groupLabel = "Front" }) {
+export default function SubTuningControls({ subsCfg, onSettingsChange, groupLabel = "Front", autoAlignDelays = {} }) {
   const count = subsCfg?.count || 0;
   const settingsById = subsCfg?.settingsById || {};
 
@@ -74,6 +74,16 @@ export default function SubTuningControls({ subsCfg, onSettingsChange, groupLabe
                 />
               </div>
             </div>
+
+            {/* Auto-align delay readout — read-only */}
+            {(() => {
+              const autoDelayMs = autoAlignDelays[subId] ?? 0;
+              return (
+                <div className="text-[11px] text-[#3E4349] bg-[#F8F8F7] rounded px-2 py-1">
+                  Auto delay applied: {autoDelayMs.toFixed(2)} ms
+                </div>
+              );
+            })()}
 
             {/* __TEMP_DIAGNOSTIC__ engine tuning readout — remove after gain/polarity test */}
             <div className="text-[10px] font-mono text-[#625143] bg-[#F8F8F7] rounded px-2 py-1">
