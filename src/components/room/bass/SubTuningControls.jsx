@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 
-export default function SubTuningControls({ subsCfg, onSettingsChange, groupLabel = "Front", autoAlignDelays = {} }) {
+export default function SubTuningControls({ subsCfg, onSettingsChange, groupLabel = "Front", autoAlignDelays = {}, showManualDelay = false }) {
   const count = subsCfg?.count || 0;
   const settingsById = subsCfg?.settingsById || {};
 
@@ -32,6 +32,7 @@ export default function SubTuningControls({ subsCfg, onSettingsChange, groupLabe
       {subIds.map((subId, i) => {
         const settings = settingsById[subId] || { gainDb: 0, delayMs: 0, polarity: 'normal' };
         const gainDb = Number.isFinite(settings.gainDb) ? settings.gainDb : 0;
+        const delayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
         const polarity = settings.polarity === 'invert' ? 'invert' : 'normal';
         const enginePolarity = polarity === 'invert' ? 180 : 0;
 
@@ -58,6 +59,24 @@ export default function SubTuningControls({ subsCfg, onSettingsChange, groupLabe
                 className="w-full"
               />
             </div>
+
+            {/* Manual Delay — development mode only */}
+            {showManualDelay && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs text-[#3E4349]">Manual Delay</Label>
+                  <span className="text-xs font-mono text-[#1B1A1A]">{delayMs.toFixed(1)} ms</span>
+                </div>
+                <Slider
+                  value={[delayMs]}
+                  onValueChange={([v]) => updateSettings(subId, 'delayMs', v)}
+                  min={0}
+                  max={20}
+                  step={0.1}
+                  className="w-full"
+                />
+              </div>
+            )}
 
             {/* Polarity */}
             <div className="flex items-center justify-between">
