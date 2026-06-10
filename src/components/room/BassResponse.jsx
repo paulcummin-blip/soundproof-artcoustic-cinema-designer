@@ -15,6 +15,10 @@ import RewParityBenchmark from "@/components/room/bass/RewParityBenchmark";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
+// Development flag — set to true to re-enable all diagnostic UI panels.
+// Do not delete diagnostic code; just flip this flag.
+const IS_DEVELOPMENT_MODE = false;
+
 const REW_SOURCE_CURVES = {
   product: null,
   flat90: [
@@ -117,7 +121,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
   const [absorptionPct, setAbsorptionPct] = useState(30);
   const [roomDamping, setRoomDamping] = useState(20);
-  const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(false);
+  const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(true);
   const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(true);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
   const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState("existing");
@@ -678,9 +682,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
-        <Badge className={useRewCoreTestMode ? "bg-[#213428] text-white border-[#213428]" : "bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]"}>
-          Engine: {useRewCoreTestMode ? "REW Core Test" : "Live Engine"}
-        </Badge>
+        {IS_DEVELOPMENT_MODE && (
+          <Badge className={useRewCoreTestMode ? "bg-[#213428] text-white border-[#213428]" : "bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]"}>
+            Engine: {useRewCoreTestMode ? "REW Core Test" : "Live Engine"}
+          </Badge>
+        )}
       </div>
       
       {(subWarnings?.front?.length > 0 || subWarnings?.rear?.length > 0) && (
@@ -693,7 +699,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
 
       {/* Advanced REW debug — visibility only, no data changes */}
-      {useRewCoreTestMode && (
+      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
         <details style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginBottom: 4 }}>
           <summary style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
             Runtime geometry and seat mapping
@@ -838,9 +844,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>
-              <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
-              {useRewCoreTestMode && (
+              {IS_DEVELOPMENT_MODE && <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>}
+              {IS_DEVELOPMENT_MODE && <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />}
+              {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
                 <>
                   <select
                     value={rewSourceCurveMode}
@@ -908,7 +914,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </>
               )}
             </div>
-            {useRewCoreTestMode && (
+            {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
               <>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
@@ -1052,27 +1058,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-        {/* __TEMP_DIAGNOSTIC__ tuning signature readout — remove after reactivity is confirmed */}
-        <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 2, wordBreak: 'break-all' }}>
-          Tuning sig: {subTuningSignature}
-        </div>
-        {/* __TEMP_DIAGNOSTIC__ getTuning lookup audit — remove after ID mismatch diagnosis */}
-        <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 6, wordBreak: 'break-all' }}>
-          {(() => {
-            const frontKeys = Object.keys(frontSubsCfg?.settingsById || {});
-            const rearKeys = Object.keys(rearSubsCfg?.settingsById || {});
-            const lookup = subsForSimulation.map(sub => {
-              const cfg = sub.id?.startsWith('front') ? frontSubsCfg : rearSubsCfg;
-              const settingsById = cfg?.settingsById || {};
-              const exactHit = !!settingsById[sub.id];
-              const fallbackKey = !exactHit && Object.keys(settingsById).length === 1 ? Object.keys(settingsById)[0] : null;
-              const keyUsed = exactHit ? sub.id : (fallbackKey ?? 'MISS');
-              const resolvedSettings = settingsById[keyUsed] || {};
-              return `[${sub.id}] key=${keyUsed} gain=${Number.isFinite(resolvedSettings.gainDb) ? resolvedSettings.gainDb.toFixed(1) : '0.0'}`;
-            });
-            return <>getTuning lookups: {lookup.length === 0 ? 'no subs' : lookup.join(' | ')} | frontKeys=[{frontKeys.join(',')}] rearKeys=[{rearKeys.join(',')}]</>;
-          })()}
-        </div>
+        {IS_DEVELOPMENT_MODE && (<>
+          {/* __TEMP_DIAGNOSTIC__ tuning signature readout */}
+          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 2, wordBreak: 'break-all' }}>
+            Tuning sig: {subTuningSignature}
+          </div>
+          {/* __TEMP_DIAGNOSTIC__ getTuning lookup audit */}
+          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 6, wordBreak: 'break-all' }}>
+            {(() => {
+              const frontKeys = Object.keys(frontSubsCfg?.settingsById || {});
+              const rearKeys = Object.keys(rearSubsCfg?.settingsById || {});
+              const lookup = subsForSimulation.map(sub => {
+                const cfg = sub.id?.startsWith('front') ? frontSubsCfg : rearSubsCfg;
+                const settingsById = cfg?.settingsById || {};
+                const exactHit = !!settingsById[sub.id];
+                const fallbackKey = !exactHit && Object.keys(settingsById).length === 1 ? Object.keys(settingsById)[0] : null;
+                const keyUsed = exactHit ? sub.id : (fallbackKey ?? 'MISS');
+                const resolvedSettings = settingsById[keyUsed] || {};
+                return `[${sub.id}] key=${keyUsed} gain=${Number.isFinite(resolvedSettings.gainDb) ? resolvedSettings.gainDb.toFixed(1) : '0.0'}`;
+              });
+              return <>getTuning lookups: {lookup.length === 0 ? 'no subs' : lookup.join(' | ')} | frontKeys=[{frontKeys.join(',')}] rearKeys=[{rearKeys.join(',')}]</>;
+            })()}
+          </div>
+        </>)}
 
         <div className="mt-4">
           {multiSeries.length > 0 ? (
@@ -1103,7 +1111,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       </div>
 
       {/* __B44_ALIGNMENT_AUDIT__ Two-sub alignment geometry audit */}
-      {useRewCoreTestMode && (() => {
+      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (() => {
         const auditMlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
         const auditMlpPoint = auditMlpSeat
           ? { x: auditMlpSeat.x, y: auditMlpSeat.y, z: Number.isFinite(Number(auditMlpSeat.z)) ? Number(auditMlpSeat.z) : 1.2 }
@@ -1192,7 +1200,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* __B44_ALIGNMENT_AUDIT__ end */}
 
       {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
-      {useRewCoreTestMode && (
+      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
         <RewDebugPanel
           stepDebug={simulationResults.stepDebug}
           selectedSeatIds={selectedSeatIds}
@@ -1203,7 +1211,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* __B44_STEP_DEBUG__ end */}
 
       {/* REW Parity Benchmark — measurement layer, no physics changes */}
-      {useRewCoreTestMode && (
+      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
         <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginTop: 8 }}>
           <div style={{ fontWeight: 700, fontSize: 12, color: '#213428', marginBottom: 8 }}>REW Parity Benchmark</div>
           <RewParityBenchmark
