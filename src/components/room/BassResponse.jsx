@@ -713,94 +713,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       })()}
       {/* __B44_SEAT_MAP_DEBUG__ end */}
 
-      {/* __B44_ALIGNMENT_AUDIT__ Two-sub alignment geometry audit */}
-      {(() => {
-        const auditMlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-        const auditMlpPoint = auditMlpSeat
-          ? { x: auditMlpSeat.x, y: auditMlpSeat.y, z: Number.isFinite(Number(auditMlpSeat.z)) ? Number(auditMlpSeat.z) : 1.2 }
-          : null;
-        const auditSeatId = auditMlpSeat ? (auditMlpSeat.id || `${auditMlpSeat.x}-${auditMlpSeat.y}`) : '—';
-        const SPEED_OF_SOUND = 343;
-        const auditRoomW = Number(roomDims?.widthM) || 4.5;
-        const auditRoomL = Number(roomDims?.lengthM) || 6.0;
-
-        const auditRows = [];
-
-        const buildRows = (cfg, group) => {
-          const count = cfg?.count || 0;
-          if (count === 0) return;
-          const cfgPositions = Array.isArray(cfg?.positions) ? cfg.positions : [];
-          const LABELS = ['left', 'right'];
-          const isRear = group === 'rear';
-          const defaultPositions = isRear
-            ? [{ x: auditRoomW * 0.33, y: auditRoomL - 0.15 }, { x: auditRoomW * 0.67, y: auditRoomL - 0.15 }]
-            : [{ x: auditRoomW * 0.33, y: 0.15 }, { x: auditRoomW * 0.67, y: 0.15 }];
-
-          for (let i = 0; i < count; i++) {
-            const subId = `${group}-sub-${LABELS[i] ?? i}`;
-            const fromCfg = cfgPositions[i];
-            const pos = fromCfg || defaultPositions[i];
-            const posSource = fromCfg ? `${group}SubsCfg.positions[${i}]` : 'default';
-            const subX = pos?.x ?? null;
-            const subY = pos?.y ?? null;
-            const subZ = 0.35;
-            const settings = cfg?.settingsById?.[subId] || {};
-            const appliedDelayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
-
-            let dx = null, dy = null, dz = null, distM = null, arrMs = null;
-            if (auditMlpPoint && subX !== null && subY !== null) {
-              dx = subX - auditMlpPoint.x;
-              dy = subY - auditMlpPoint.y;
-              dz = subZ - auditMlpPoint.z;
-              distM = Math.sqrt(dx*dx + dy*dy + dz*dz);
-              arrMs = (distM / SPEED_OF_SOUND) * 1000;
-            }
-
-            const uiLabel = count === 1
-              ? `${group.charAt(0).toUpperCase() + group.slice(1)} Sub Single`
-              : `${group.charAt(0).toUpperCase() + group.slice(1)} Sub ${LABELS[i]?.charAt(0).toUpperCase() + LABELS[i]?.slice(1)}`;
-
-            auditRows.push({ uiLabel, subId, group, subX, subY, subZ, dx, dy, dz, distM, arrMs, appliedDelayMs, posSource });
-          }
-        };
-
-        buildRows(frontSubsCfg, 'front');
-        buildRows(rearSubsCfg, 'rear');
-
-        const fmt = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : '—');
-
-        return (
-          <div style={{ border: '1px solid #dc2626', borderRadius: 6, background: '#fef2f2', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
-            <div style={{ fontWeight: 700, color: '#991b1b', marginBottom: 6 }}>Two-sub alignment geometry audit</div>
-            <div style={{ marginBottom: 6, color: '#7f1d1d' }}>
-              <strong>MLP seat id:</strong> {auditSeatId} &nbsp;|&nbsp;
-              <strong>seat x:</strong> {auditMlpPoint ? fmt(auditMlpPoint.x) : '—'} &nbsp;
-              <strong>seat y:</strong> {auditMlpPoint ? fmt(auditMlpPoint.y) : '—'} &nbsp;
-              <strong>seat z:</strong> {auditMlpPoint ? fmt(auditMlpPoint.z) : '—'}
-            </div>
-            {auditRows.length === 0 && <div style={{ color: '#7f1d1d' }}>No active subs found.</div>}
-            {auditRows.map((r, idx) => (
-              <div key={r.subId} style={{ border: '1px solid #fca5a5', borderRadius: 4, background: idx % 2 === 0 ? '#fff5f5' : '#fff', padding: '5px 8px', marginBottom: 4 }}>
-                <div style={{ fontWeight: 700, color: '#b91c1c', marginBottom: 3 }}>{r.uiLabel} — <span style={{ color: '#6b7280' }}>{r.subId}</span> ({r.group})</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px 12px', color: '#1c1917' }}>
-                  <div><strong>sub x:</strong> {fmt(r.subX)}</div>
-                  <div><strong>sub y:</strong> {fmt(r.subY)}</div>
-                  <div><strong>sub z:</strong> {fmt(r.subZ)}</div>
-                  <div><strong>dx:</strong> {fmt(r.dx)}</div>
-                  <div><strong>dy:</strong> {fmt(r.dy)}</div>
-                  <div><strong>dz:</strong> {fmt(r.dz)}</div>
-                  <div><strong>distance:</strong> {fmt(r.distM, 4)} m</div>
-                  <div><strong>arrival:</strong> {fmt(r.arrMs, 3)} ms</div>
-                  <div><strong>applied delay:</strong> {fmt(r.appliedDelayMs, 3)} ms</div>
-                  <div style={{ gridColumn: '1 / -1' }}><strong>pos source:</strong> {r.posSource}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-      {/* __B44_ALIGNMENT_AUDIT__ end */}
-
       {/* __B44_GEOMETRY_DEBUG__ temporary — runtime geometry parity check */}
       {(() => {
         const firstSelectedId = selectedSeatIds[0] || null;
@@ -1099,6 +1011,94 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           )}
         </div>
       </div>
+
+      {/* __B44_ALIGNMENT_AUDIT__ Two-sub alignment geometry audit */}
+      {useRewCoreTestMode && (() => {
+        const auditMlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+        const auditMlpPoint = auditMlpSeat
+          ? { x: auditMlpSeat.x, y: auditMlpSeat.y, z: Number.isFinite(Number(auditMlpSeat.z)) ? Number(auditMlpSeat.z) : 1.2 }
+          : null;
+        const auditSeatId = auditMlpSeat ? (auditMlpSeat.id || `${auditMlpSeat.x}-${auditMlpSeat.y}`) : '—';
+        const SPEED_OF_SOUND = 343;
+        const auditRoomW = Number(roomDims?.widthM) || 4.5;
+        const auditRoomL = Number(roomDims?.lengthM) || 6.0;
+
+        const auditRows = [];
+
+        const buildRows = (cfg, group) => {
+          const count = cfg?.count || 0;
+          if (count === 0) return;
+          const cfgPositions = Array.isArray(cfg?.positions) ? cfg.positions : [];
+          const LABELS = ['left', 'right'];
+          const isRear = group === 'rear';
+          const defaultPositions = isRear
+            ? [{ x: auditRoomW * 0.33, y: auditRoomL - 0.15 }, { x: auditRoomW * 0.67, y: auditRoomL - 0.15 }]
+            : [{ x: auditRoomW * 0.33, y: 0.15 }, { x: auditRoomW * 0.67, y: 0.15 }];
+
+          for (let i = 0; i < count; i++) {
+            const subId = `${group}-sub-${LABELS[i] ?? i}`;
+            const fromCfg = cfgPositions[i];
+            const pos = fromCfg || defaultPositions[i];
+            const posSource = fromCfg ? `${group}SubsCfg.positions[${i}]` : 'default';
+            const subX = pos?.x ?? null;
+            const subY = pos?.y ?? null;
+            const subZ = 0.35;
+            const settings = cfg?.settingsById?.[subId] || {};
+            const appliedDelayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
+
+            let dx = null, dy = null, dz = null, distM = null, arrMs = null;
+            if (auditMlpPoint && subX !== null && subY !== null) {
+              dx = subX - auditMlpPoint.x;
+              dy = subY - auditMlpPoint.y;
+              dz = subZ - auditMlpPoint.z;
+              distM = Math.sqrt(dx*dx + dy*dy + dz*dz);
+              arrMs = (distM / SPEED_OF_SOUND) * 1000;
+            }
+
+            const uiLabel = count === 1
+              ? `${group.charAt(0).toUpperCase() + group.slice(1)} Sub Single`
+              : `${group.charAt(0).toUpperCase() + group.slice(1)} Sub ${LABELS[i]?.charAt(0).toUpperCase() + LABELS[i]?.slice(1)}`;
+
+            auditRows.push({ uiLabel, subId, group, subX, subY, subZ, dx, dy, dz, distM, arrMs, appliedDelayMs, posSource });
+          }
+        };
+
+        buildRows(frontSubsCfg, 'front');
+        buildRows(rearSubsCfg, 'rear');
+
+        const fmt = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : '—');
+
+        return (
+          <div style={{ border: '1px solid #dc2626', borderRadius: 6, background: '#fef2f2', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, color: '#991b1b', marginBottom: 6 }}>Two-sub alignment geometry audit</div>
+            <div style={{ marginBottom: 6, color: '#7f1d1d' }}>
+              <strong>MLP seat id:</strong> {auditSeatId} &nbsp;|&nbsp;
+              <strong>seat x:</strong> {auditMlpPoint ? fmt(auditMlpPoint.x) : '—'} &nbsp;
+              <strong>seat y:</strong> {auditMlpPoint ? fmt(auditMlpPoint.y) : '—'} &nbsp;
+              <strong>seat z:</strong> {auditMlpPoint ? fmt(auditMlpPoint.z) : '—'}
+            </div>
+            {auditRows.length === 0 && <div style={{ color: '#7f1d1d' }}>No active subs found.</div>}
+            {auditRows.map((r, idx) => (
+              <div key={r.subId} style={{ border: '1px solid #fca5a5', borderRadius: 4, background: idx % 2 === 0 ? '#fff5f5' : '#fff', padding: '5px 8px', marginBottom: 4 }}>
+                <div style={{ fontWeight: 700, color: '#b91c1c', marginBottom: 3 }}>{r.uiLabel} — <span style={{ color: '#6b7280' }}>{r.subId}</span> ({r.group})</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px 12px', color: '#1c1917' }}>
+                  <div><strong>sub x:</strong> {fmt(r.subX)}</div>
+                  <div><strong>sub y:</strong> {fmt(r.subY)}</div>
+                  <div><strong>sub z:</strong> {fmt(r.subZ)}</div>
+                  <div><strong>dx:</strong> {fmt(r.dx)}</div>
+                  <div><strong>dy:</strong> {fmt(r.dy)}</div>
+                  <div><strong>dz:</strong> {fmt(r.dz)}</div>
+                  <div><strong>distance:</strong> {fmt(r.distM, 4)} m</div>
+                  <div><strong>arrival:</strong> {fmt(r.arrMs, 3)} ms</div>
+                  <div><strong>applied delay:</strong> {fmt(r.appliedDelayMs, 3)} ms</div>
+                  <div style={{ gridColumn: '1 / -1' }}><strong>pos source:</strong> {r.posSource}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+      {/* __B44_ALIGNMENT_AUDIT__ end */}
 
       {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
       {useRewCoreTestMode && (
