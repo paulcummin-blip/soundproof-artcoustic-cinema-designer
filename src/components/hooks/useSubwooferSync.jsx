@@ -122,10 +122,14 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
         const xFromCfg = Number(cfgPos?.[i]?.x);
         const xFromPrev = Number(prev?.position?.x);
         const xFromDefault = Number(defaultsX?.[i]);
-        const pickedX = isManual && Number.isFinite(xFromCfg)
+        // Priority: saved cfg position > live prev position > computed default.
+        // A saved cfg position is always honoured when finite, regardless of placementMode,
+        // so that positions persisted to the project record survive reload without being
+        // overwritten by pattern-based defaults.
+        const pickedX = Number.isFinite(xFromCfg)
           ? xFromCfg
-          : (placementMode === 'default' && !countChanged)
-            ? (Number.isFinite(xFromCfg) ? xFromCfg : (Number.isFinite(xFromPrev) ? xFromPrev : xFromDefault))
+          : (Number.isFinite(xFromPrev) && !countChanged)
+            ? xFromPrev
             : xFromDefault;
         const finalX = clamp(pickedX, minX, maxX);
         return {
