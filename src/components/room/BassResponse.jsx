@@ -211,32 +211,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     const mlpPoint = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
     const SPEED_OF_SOUND = 343;
-    const roomWidth = Number(roomDims?.widthM) || 4.5;
-    const roomLength = Number(roomDims?.lengthM) || 6.0;
-
+    const POSITION_LABELS = ['left', 'right'];
     const allSubData = [];
 
     const processGroup = (cfg, liveSubs, group) => {
-      const POSITION_LABELS = ['left', 'right'];
-      const isRear = group === 'rear';
-      const livePositions = Array.isArray(liveSubs) ? liveSubs : [];
+      // Primary source: live sub positions from the visualiser (same as subsForSimulation uses)
+      const live = Array.isArray(liveSubs) ? liveSubs : [];
+      // Fallback: cfg positions if live array is empty
       const cfgPositions = Array.isArray(cfg?.positions) ? cfg.positions : [];
-      const count = cfg?.count || livePositions.length || cfgPositions.length || 0;
+      const count = live.length > 0 ? live.length : (cfg?.count || cfgPositions.length || 0);
       if (count === 0) return;
 
-      const defaultPositions = isRear
-        ? [{ x: roomWidth * 0.33, y: roomLength - 0.15 }, { x: roomWidth * 0.67, y: roomLength - 0.15 }]
-        : [{ x: roomWidth * 0.33, y: 0.15 }, { x: roomWidth * 0.67, y: 0.15 }];
-
       for (let i = 0; i < count; i++) {
-        const source = livePositions[i] || cfgPositions[i] || defaultPositions[i] || { x: roomWidth / 2, y: isRear ? roomLength - 0.15 : 0.15 };
-        const pos = source?.position ?? source;
-        const x = Number(pos?.x);
-        const y = Number(pos?.y);
+        // Use the canonical sub ID — matching exactly what subsForSimulation produces
+        const subId = `${group}-sub-${POSITION_LABELS[i] ?? i}`;
+
+        // Position: live first, then cfg fallback
+        const liveEntry = live[i];
+        const livePos = liveEntry?.position ?? liveEntry;
+        const cfgPos = cfgPositions[i];
+        const pos = (liveEntry && Number.isFinite(Number(livePos?.x))) ? livePos : cfgPos;
+        if (!pos) continue;
+
+        const x = Number(pos.x);
+        const y = Number(pos.y);
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
-        const subId = source?.id ?? `${group}-sub-${POSITION_LABELS[i] ?? i}`;
-        const z = Number.isFinite(Number(pos?.z)) ? Number(pos.z) : 0.35;
+        const z = Number.isFinite(Number(pos.z)) ? Number(pos.z) : 0.35;
         const dx = x - mlpPoint.x;
         const dy = y - mlpPoint.y;
         const dz = z - mlpPoint.z;
