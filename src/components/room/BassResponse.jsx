@@ -579,36 +579,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       console.log(`[AutoAlign] ${subId}: ${distanceM.toFixed(3)}m → ${(arrivalTime * 1000).toFixed(2)}ms arrival → ${delayMs.toFixed(2)}ms applied delay`);
     });
 
-    // Build new settings per group
-    const newFrontSettings = { ...(frontCfg?.settingsById || {}) };
-    const newRearSettings = { ...(rearCfg?.settingsById || {}) };
-
-    allSubData.forEach(({ subId, group, arrivalTime }) => {
-      const delayMs = Math.max(0, Math.min(30, (maxArrival - arrivalTime) * 1000));
-      const target = group === 'front' ? newFrontSettings : newRearSettings;
-      target[subId] = {
-        ...target[subId],
-        gainDb: target[subId]?.gainDb ?? 0,
-        polarity: target[subId]?.polarity ?? "normal",
-        delayMs,
-      };
-    });
-
-    // Deduplicate writes using signature guard
-    const frontSubIds = allSubData.filter(s => s.group === 'front').map(s => s.subId);
-    const rearSubIds  = allSubData.filter(s => s.group === 'rear').map(s => s.subId);
-    const nextSig = __b44SettingsSig({ ...newFrontSettings, ...newRearSettings }, [...frontSubIds, ...rearSubIds]);
-    const prevSig = lastAutoAlignApplySigRef.current?.all || null;
-    if (prevSig === nextSig) return;
-    lastAutoAlignApplySigRef.current = { all: nextSig };
-
-    if (frontSubIds.length > 0) {
-      setFrontSubsCfg(prev => ({ ...prev, settingsById: newFrontSettings }));
-    }
-    if (rearSubIds.length > 0) {
-      setRearSubsCfg(prev => ({ ...prev, settingsById: newRearSettings }));
-    }
-  }, [autoAlignEnabled, setFrontSubsCfg, setRearSubsCfg]);
+    // Auto-align is now runtime-only — no writes to settingsById.
+    // Delays are derived in autoAlignDelays useMemo and injected into subsForSimulation at engine call time.
+  }, [autoAlignEnabled]);
 
   // Auto-align effects — re-run whenever MLP seat, room dims, or any sub positions change
   useEffect(() => {
@@ -1281,6 +1254,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               groupLabel="Front"
               subDistances={subDistances}
               autoAlignEnabled={autoAlignEnabled}
+              autoAlignDelays={autoAlignDelays}
               onSettingsChange={(newSettings) => {
                 setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
@@ -1296,6 +1270,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               groupLabel="Rear"
               subDistances={subDistances}
               autoAlignEnabled={autoAlignEnabled}
+              autoAlignDelays={autoAlignDelays}
               onSettingsChange={(newSettings) => {
                 setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}

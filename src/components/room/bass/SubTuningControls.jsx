@@ -8,7 +8,8 @@ export default function SubTuningControls({
   onSettingsChange, 
   groupLabel = "Front",
   subDistances = {},
-  autoAlignEnabled = false
+  autoAlignEnabled = false,
+  autoAlignDelays = {}
 }) {
   const count = subsCfg?.count || 0;
   const settingsById = subsCfg?.settingsById || {};
@@ -81,7 +82,7 @@ export default function SubTuningControls({
             {/* Delay */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs text-[#3E4349]">Delay</Label>
+                <Label className="text-xs text-[#3E4349]">Manual delay</Label>
                 <span className="text-xs font-mono text-[#1B1A1A]">
                   {settings.delayMs.toFixed(1)} ms
                 </span>
@@ -94,6 +95,18 @@ export default function SubTuningControls({
                 step={0.1}
                 className="w-full"
               />
+              {autoAlignEnabled && (
+                <div className="mt-2 text-xs text-[#3E4349] space-y-0.5">
+                  <div className="flex justify-between">
+                    <span>Auto-alignment offset</span>
+                    <span className="font-mono text-[#625143]">{(autoAlignDelays[subId] ?? 0).toFixed(2)} ms</span>
+                  </div>
+                  <div className="flex justify-between font-medium text-[#1B1A1A]">
+                    <span>Effective engine delay</span>
+                    <span className="font-mono">{(settings.delayMs + (autoAlignDelays[subId] ?? 0)).toFixed(2)} ms</span>
+                  </div>
+                </div>
+              )}
             </div>
             
             {/* Polarity */}
