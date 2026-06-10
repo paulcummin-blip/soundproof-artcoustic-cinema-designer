@@ -132,6 +132,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [disableLateField, setDisableLateField] = useState(false);
   const [disableModalPropagationPhase, setDisableModalPropagationPhase] = useState(false);
   const [mute68HzAxialMode, setMute68HzAxialMode] = useState(false);
+  // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
+  const [debugDisableModalContribution, setDebugDisableModalContribution] = useState(false);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -296,6 +298,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             disableLateField,
             disableModalPropagationPhase,
             mute68HzAxialMode,
+            debugDisableModalContribution, // __TEMP_DIAGNOSTIC__ — remove after polarity masking diagnosis
           }
         );
 
@@ -350,7 +353,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, absorptionPct, selectedSeatIds]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, absorptionPct, selectedSeatIds, debugDisableModalContribution]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -904,6 +907,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     />
                     Mute 68.6 Hz mode
                   </label>
+                  {/* __TEMP_DIAGNOSTIC__ debugDisableModalContribution toggle — remove after polarity masking diagnosis */}
+                  <label className="flex h-8 items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 text-xs text-red-700 font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={debugDisableModalContribution}
+                      onChange={(event) => setDebugDisableModalContribution(event.target.checked)}
+                    />
+                    Debug: disable modal contribution
+                  </label>
                 </div>
                 <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
                   <div className="font-bold text-[#1E293B]">Active model:</div>
@@ -919,6 +931,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <div>Late field: {disableLateField ? 'OFF' : 'ON'}</div>
                   <div>Modal propagation phase disabled: {disableModalPropagationPhase ? 'YES' : 'NO'}</div>
                   <div>Mute 68.6 Hz mode: {mute68HzAxialMode ? 'ON' : 'OFF'}</div>
+                  {/* __TEMP_DIAGNOSTIC__ */}
+                  <div style={{ color: debugDisableModalContribution ? '#dc2626' : undefined }}>
+                    Debug modal OFF: {debugDisableModalContribution ? 'YES ⚠️' : 'NO'}
+                  </div>
                 </div>
               </>
             )}

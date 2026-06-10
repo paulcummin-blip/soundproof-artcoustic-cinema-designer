@@ -846,6 +846,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     let modalSumMagnitudeBeforeCap = null;
     let modalSumMagnitudeAfterCap = null;
 
+    // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
     if (enableModes) {
       let {
         modalSumRe,
@@ -936,6 +937,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         distributedCoherenceFinalMag,
         distributedCoherenceFinalDb: 20 * Math.log10(Math.max(distributedCoherenceFinalMag, 1e-10)),
       };
+
+      // __TEMP_DIAGNOSTIC__: Zero modal contribution when debugDisableModalContribution is true.
+      // This proves whether the modal layer is masking polarity/delay. Do not remove modal code.
+      if (options?.debugDisableModalContribution === true) {
+        modalSumRe = 0;
+        modalSumIm = 0;
+      }
 
       // True acoustic pressure superposition:
       // modalSumRe/modalSumIm are already scaled pressure contributions,
