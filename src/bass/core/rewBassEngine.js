@@ -78,7 +78,7 @@ function normalizeSurfaceAbsorption(surfaceAbsorption) {
     if (!Number.isFinite(numericValue)) {
       return defaultCoefficient;
     }
-    return Math.max(0, Math.min(0.95, numericValue));
+    return Math.max(0, Math.min(1.0, numericValue));
   };
 
   return {
