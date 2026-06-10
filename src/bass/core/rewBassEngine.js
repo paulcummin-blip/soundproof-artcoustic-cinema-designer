@@ -343,7 +343,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -412,9 +412,22 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       modalContrib.real * modalContrib.real + modalContrib.imag * modalContrib.imag
     );
 
+    // Apply sub tuning phase (delay + polarity) to each modal contribution.
+    // This ensures polarity inversion and time alignment affect the modal pressure field,
+    // not just the direct/reflection path.
+    const tuningPhase =
+      (-2 * Math.PI * frequencyHz * (delayMs / 1000)) +
+      (polarity === 180 ? Math.PI : 0);
+    const tuningCos = Math.cos(tuningPhase);
+    const tuningSin = Math.sin(tuningPhase);
+    const tunedModalContrib = {
+      real: (modalContrib.real * tuningCos) - (modalContrib.imag * tuningSin),
+      imag: (modalContrib.real * tuningSin) + (modalContrib.imag * tuningCos),
+    };
+
     const storedModalContrib = {
-      real: modalContrib.real * storageFactor,
-      imag: modalContrib.imag * storageFactor,
+      real: tunedModalContrib.real * storageFactor,
+      imag: tunedModalContrib.imag * storageFactor,
     };
 
     // Temporary REW parity diagnostic only: rotate stored modal vector without changing magnitude.
@@ -870,7 +883,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         _debugModalContributors,
         _debugActiveModalVectorBreakdown,
       } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity
       );
 
       if (_debugActiveModalVectorBreakdown) {
