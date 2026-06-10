@@ -12,6 +12,7 @@ import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import RewDebugPanel from "@/components/room/bass/RewDebugPanel";
 import RewParityBenchmark from "@/components/room/bass/RewParityBenchmark";
+import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1279,6 +1280,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         />
       )}
       {/* __B44_STEP_DEBUG__ end */}
+
+      {/* Development delay optimiser — read-only, no state changes */}
+      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (() => {
+        const optimiserSeat = seatingPositions?.find(s => s.id === selectedSeatIds[0] || `${s.x}-${s.y}` === selectedSeatIds[0]) || seatingPositions?.[0];
+        return (
+          <SubwooferDelayOptimiser
+            mlpSeat={optimiserSeat}
+            roomDims={roomDims}
+            subsForSimulation={subsForSimulation}
+            rewSourceCurveMode={rewSourceCurveMode}
+            REW_SOURCE_CURVES={REW_SOURCE_CURVES}
+            enableRewCoreReflections={enableRewCoreReflections}
+            surfaceAbsorption={surfaceAbsorption}
+            modalSourceReferenceMode={modalSourceReferenceMode}
+            modalGainScalar={modalGainScalar}
+            axialQ={axialQ}
+            modalStorageMode={modalStorageMode}
+            propagationPhaseScale={propagationPhaseScale}
+            disableReflectionPhaseJitter={disableReflectionPhaseJitter}
+            disableReflectionCoherenceWeight={disableReflectionCoherenceWeight}
+            disableLateField={disableLateField}
+            disableModalPropagationPhase={disableModalPropagationPhase}
+            mute68HzAxialMode={mute68HzAxialMode}
+            debugDisableModalContribution={debugDisableModalContribution}
+          />
+        );
+      })()}
 
       {/* REW Parity Benchmark — measurement layer, no physics changes */}
       {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (

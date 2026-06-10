@@ -1,0 +1,246 @@
+import React, { useState, useCallback } from "react";
+import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
+import { getSubwooferCurve } from "@/components/models/speakers/registry";
+import { Button } from "@/components/ui/button";
+
+/**
+ * SubwooferDelayOptimiser
+ * Development-only read-only tool.
+ * Scans front sub delay from 0–20ms in 0.5ms steps, scores each by
+ * peak-to-peak SPL variation across 20–120Hz.
+ */
+export default function SubwooferDelayOptimiser({
+  // Seat to evaluate
+  mlpSeat,
+  // Room
+  roomDims,
+  // All subs for simulation (from subsForSimulation in BassResponse)
+  subsForSimulation,
+  // Source curve mode
+  rewSourceCurveMode,
+  REW_SOURCE_CURVES,
+  // Modal / reflection settings passed through
+  enableRewCoreReflections,
+  surfaceAbsorption,
+  modalSourceReferenceMode,
+  modalGainScalar,
+  axialQ,
+  modalStorageMode,
+  propagationPhaseScale,
+  disableReflectionPhaseJitter,
+  disableReflectionCoherenceWeight,
+  disableLateField,
+  disableModalPropagationPhase,
+  mute68HzAxialMode,
+  debugDisableModalContribution,
+}) {
+  const [result, setResult] = useState(null);
+  const [scanning, setScanning] = useState(false);
+
+  const runScan = useCallback(() => {
+    if (!mlpSeat || !roomDims || !subsForSimulation?.length) return;
+
+    setScanning(true);
+    setResult(null);
+
+    const seatPoint = {
+      x: mlpSeat.x,
+      y: mlpSeat.y,
+      z: Number.isFinite(Number(mlpSeat.z)) ? Number(mlpSeat.z) : 1.2,
+    };
+
+    const STEP = 0.5;
+    const MAX_DELAY = 20.0;
+    const FREQ_MIN = 20;
+    const FREQ_MAX = 120;
+
+    let bestDelay = 0;
+    let bestScore = Infinity;
+    let bestMin = null;
+    let bestMax = null;
+
+    for (let delayMs = 0; delayMs <= MAX_DELAY; delayMs = Math.round((delayMs + STEP) * 100) / 100) {
+      // Build modified subs: override front sub delay to delayMs, keep others as-is
+      const modifiedSubs = subsForSimulation.map((sub) => {
+        if (sub.id?.startsWith("front")) {
+          return { ...sub, tuning: { ...sub.tuning, delayMs } };
+        }
+        // rear subs: zero delay for this scan
+        return { ...sub, tuning: { ...sub.tuning, delayMs: 0 } };
+      });
+
+      // Accumulate complex pressure across all subs for this seat
+      let sumRe = null;
+      let sumIm = null;
+      let freqsHz = null;
+
+      for (const sub of modifiedSubs) {
+        const subCurve = getSubwooferCurve(sub.modelKey);
+        if (!subCurve || subCurve.length === 0) continue;
+        const diagnosticSourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
+
+        const rewResult = simulateBassResponseRewCore(
+          { widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM },
+          seatPoint,
+          sub,
+          diagnosticSourceCurve,
+          {
+            enableReflections: enableRewCoreReflections,
+            enableModes: true,
+            surfaceAbsorption,
+            freqMinHz: 20,
+            freqMaxHz: 200,
+            smoothing: "none",
+            modalSourceReferenceMode,
+            modalGainScalar,
+            axialQ,
+            modalStorageMode,
+            propagationPhaseScale,
+            disableReflectionPhaseJitter,
+            disableReflectionCoherenceWeight,
+            disableLateField,
+            disableModalPropagationPhase,
+            mute68HzAxialMode,
+            debugDisableModalContribution,
+          }
+        );
+
+        if (!freqsHz) {
+          freqsHz = rewResult.freqsHz;
+          sumRe = rewResult.complexPressure.map((cp) => cp.re);
+          sumIm = rewResult.complexPressure.map((cp) => cp.im);
+        } else {
+          rewResult.complexPressure.forEach((cp, i) => {
+            if (Number.isFinite(cp.re) && Number.isFinite(cp.im)) {
+              sumRe[i] += cp.re;
+              sumIm[i] += cp.im;
+            }
+          });
+        }
+      }
+
+      if (!freqsHz || !sumRe || !sumIm) continue;
+
+      // Convert to SPL and filter to 20–120Hz
+      const splValues = freqsHz
+        .map((hz, i) => {
+          if (hz < FREQ_MIN || hz > FREQ_MAX) return null;
+          const mag = Math.sqrt(sumRe[i] ** 2 + sumIm[i] ** 2);
+          return 20 * Math.log10(Math.max(mag, 1e-10));
+        })
+        .filter((v) => v !== null && Number.isFinite(v));
+
+      if (splValues.length === 0) continue;
+
+      const minSpl = Math.min(...splValues);
+      const maxSpl = Math.max(...splValues);
+      const score = maxSpl - minSpl; // peak-to-peak variation — lower is better
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestDelay = delayMs;
+        bestMin = minSpl;
+        bestMax = maxSpl;
+      }
+    }
+
+    setResult({
+      bestDelay,
+      score: bestScore,
+      minSpl: bestMin,
+      maxSpl: bestMax,
+    });
+    setScanning(false);
+  }, [
+    mlpSeat,
+    roomDims,
+    subsForSimulation,
+    rewSourceCurveMode,
+    REW_SOURCE_CURVES,
+    enableRewCoreReflections,
+    surfaceAbsorption,
+    modalSourceReferenceMode,
+    modalGainScalar,
+    axialQ,
+    modalStorageMode,
+    propagationPhaseScale,
+    disableReflectionPhaseJitter,
+    disableReflectionCoherenceWeight,
+    disableLateField,
+    disableModalPropagationPhase,
+    mute68HzAxialMode,
+    debugDisableModalContribution,
+  ]);
+
+  const fmt = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "—");
+
+  return (
+    <div
+      style={{
+        border: "2px dashed #7c3aed",
+        borderRadius: 8,
+        background: "#faf5ff",
+        padding: "10px 14px",
+        fontSize: 11,
+        fontFamily: "monospace",
+        marginBottom: 8,
+      }}
+    >
+      <div style={{ fontWeight: 700, color: "#6d28d9", marginBottom: 6, fontSize: 12 }}>
+        Development only — response-based delay scan
+      </div>
+      <div style={{ color: "#4c1d95", marginBottom: 8, lineHeight: 1.5 }}>
+        Scans front sub delay 0–20ms in 0.5ms steps. Rear sub delay held at 0ms.
+        <br />
+        Seat: {mlpSeat ? (mlpSeat.id || `${mlpSeat.x?.toFixed(2)}, ${mlpSeat.y?.toFixed(2)}`) : "—"}
+        &nbsp;|&nbsp;Freq range: 20–120Hz&nbsp;|&nbsp;Metric: peak-to-peak SPL variation (lower = flatter)
+      </div>
+
+      <Button
+        onClick={runScan}
+        disabled={scanning || !mlpSeat || !subsForSimulation?.length}
+        size="sm"
+        style={{
+          background: scanning ? "#a78bfa" : "#7c3aed",
+          color: "#fff",
+          border: "none",
+          borderRadius: 4,
+          padding: "4px 14px",
+          cursor: scanning ? "not-allowed" : "pointer",
+          fontSize: 11,
+          marginBottom: 8,
+        }}
+      >
+        {scanning ? "Scanning…" : "Run Delay Scan"}
+      </Button>
+
+      {result && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "3px 16px",
+            color: "#3b0764",
+            marginTop: 4,
+          }}
+        >
+          <div>
+            <strong>Best delay:</strong> {fmt(result.bestDelay, 1)} ms
+          </div>
+          <div>
+            <strong>Score (P-P):</strong> {fmt(result.score, 2)} dB
+          </div>
+          <div>
+            <strong>Min SPL:</strong> {fmt(result.minSpl, 1)} dB
+          </div>
+          <div>
+            <strong>Max SPL:</strong> {fmt(result.maxSpl, 1)} dB
+          </div>
+          <div style={{ gridColumn: "1 / -1", marginTop: 4, color: "#6d28d9", fontStyle: "italic" }}>
+            Read-only. Apply manually via the Manual Delay slider if desired.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
