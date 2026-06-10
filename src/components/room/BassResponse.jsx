@@ -1284,6 +1284,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* Development delay optimiser — read-only, no state changes */}
       {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (() => {
         const optimiserSeat = seatingPositions?.find(s => s.id === selectedSeatIds[0] || `${s.x}-${s.y}` === selectedSeatIds[0]) || seatingPositions?.[0];
+        
+        // Extract current manual delay from the first active front sub's settings (same source as Manual Delay slider)
+        const frontSettingsById = frontSubsCfg?.settingsById || {};
+        const firstFrontSubId = subsForSimulation.find(s => s.id?.startsWith('front-'))?.id;
+        const currentManualDelay = firstFrontSubId && Number.isFinite(frontSettingsById[firstFrontSubId]?.delayMs) 
+          ? frontSettingsById[firstFrontSubId].delayMs 
+          : 0;
+        
         return (
           <SubwooferDelayOptimiser
             mlpSeat={optimiserSeat}
@@ -1304,6 +1312,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             disableModalPropagationPhase={disableModalPropagationPhase}
             mute68HzAxialMode={mute68HzAxialMode}
             debugDisableModalContribution={debugDisableModalContribution}
+            currentManualDelay={currentManualDelay}
           />
         );
       })()}
