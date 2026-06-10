@@ -216,29 +216,38 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     const allSubData = [];
 
-    const processGroup = (cfg, group) => {
-      const count = cfg?.count || 0;
-      if (count === 0) return;
-      const positions = Array.isArray(cfg?.positions) ? cfg.positions : [];
+    const processGroup = (cfg, liveSubs, group) => {
       const POSITION_LABELS = ['left', 'right'];
       const isRear = group === 'rear';
+      const livePositions = Array.isArray(liveSubs) ? liveSubs : [];
+      const cfgPositions = Array.isArray(cfg?.positions) ? cfg.positions : [];
+      const count = cfg?.count || livePositions.length || cfgPositions.length || 0;
+      if (count === 0) return;
+
       const defaultPositions = isRear
         ? [{ x: roomWidth * 0.33, y: roomLength - 0.15 }, { x: roomWidth * 0.67, y: roomLength - 0.15 }]
         : [{ x: roomWidth * 0.33, y: 0.15 }, { x: roomWidth * 0.67, y: 0.15 }];
+
       for (let i = 0; i < count; i++) {
-        const subId = `${group}-sub-${POSITION_LABELS[i] ?? i}`;
-        const pos = positions[i] || defaultPositions[i] || { x: roomWidth / 2, y: isRear ? roomLength - 0.15 : 0.15 };
-        const dx = pos.x - mlpPoint.x;
-        const dy = pos.y - mlpPoint.y;
-        const dz = 0.35 - mlpPoint.z;
+        const source = livePositions[i] || cfgPositions[i] || defaultPositions[i] || { x: roomWidth / 2, y: isRear ? roomLength - 0.15 : 0.15 };
+        const pos = source?.position ?? source;
+        const x = Number(pos?.x);
+        const y = Number(pos?.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+        const subId = source?.id ?? `${group}-sub-${POSITION_LABELS[i] ?? i}`;
+        const z = Number.isFinite(Number(pos?.z)) ? Number(pos.z) : 0.35;
+        const dx = x - mlpPoint.x;
+        const dy = y - mlpPoint.y;
+        const dz = z - mlpPoint.z;
         const distanceM = Math.sqrt(dx * dx + dy * dy + dz * dz);
         const arrivalMs = (distanceM / SPEED_OF_SOUND) * 1000;
         allSubData.push({ subId, arrivalMs });
       }
     };
 
-    processGroup(frontSubsCfg, 'front');
-    processGroup(rearSubsCfg, 'rear');
+    processGroup(frontSubsCfg, frontSubsLive, 'front');
+    processGroup(rearSubsCfg, rearSubsLive, 'rear');
 
     if (allSubData.length === 0) return {};
 
@@ -248,7 +257,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       delays[subId] = Math.max(0, maxArrivalMs - arrivalMs);
     });
     return delays;
-  }, [autoAlignEnabled, seatingPositions, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, roomDims?.widthM, roomDims?.lengthM]);
+  }, [autoAlignEnabled, seatingPositions, frontSubsLive, rearSubsLive, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, roomDims?.widthM, roomDims?.lengthM]);
 
   // Build subs array for simulation
   const subsForSimulation = useMemo(() => {
