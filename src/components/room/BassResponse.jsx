@@ -162,6 +162,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return __b44SafeSig(obj);
   };
 
+  // __TEMP_DIAGNOSTIC__ tuning signature — force memo invalidation on any gain/polarity/delay change
+  const subTuningSignature = useMemo(() => {
+    const buildSig = (settingsById) => {
+      if (!settingsById) return '{}';
+      return JSON.stringify(
+        Object.keys(settingsById).sort().map(id => {
+          const s = settingsById[id];
+          return `${id}:g${Number.isFinite(s.gainDb) ? s.gainDb.toFixed(1) : 0}:p${s.polarity || 'normal'}:d${Number.isFinite(s.delayMs) ? s.delayMs.toFixed(3) : 0}`;
+        })
+      );
+    };
+    return `F[${buildSig(frontSubsCfg?.settingsById)}]R[${buildSig(rearSubsCfg?.settingsById)}]`;
+  }, [frontSubsCfg?.settingsById, rearSubsCfg?.settingsById]);
+
   // Convert absorption % to coefficient
   const absorptionCoeff = Math.max(0, Math.min(1, absorptionPct / 100));
   const surfaceAbsorption = {
@@ -269,7 +283,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     ].filter(Boolean);
 
     return sources;
-  }, [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById, autoAlignDelays]);
+  }, [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById, autoAlignDelays, subTuningSignature]);
 
   // Run bass simulation engine
   const simulationResults = useMemo(() => {
@@ -402,7 +416,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, absorptionPct, selectedSeatIds, debugDisableModalContribution]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, absorptionPct, selectedSeatIds, debugDisableModalContribution, subTuningSignature]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1021,6 +1035,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
           );
         })()}
+
+        {/* __TEMP_DIAGNOSTIC__ tuning signature readout — remove after reactivity is confirmed */}
+        <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 6, wordBreak: 'break-all' }}>
+          Tuning sig: {subTuningSignature}
+        </div>
 
         <div className="mt-4">
           {multiSeries.length > 0 ? (
