@@ -33,6 +33,8 @@ export default function SubwooferDelayOptimiser({
   disableModalPropagationPhase,
   mute68HzAxialMode,
   debugDisableModalContribution,
+  // Current manual delay for parity check
+  currentManualDelay,
 }) {
   const [result, setResult] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -218,6 +220,110 @@ export default function SubwooferDelayOptimiser({
       return { delayMs: d, narrowScore: match ? match.narrowScore : null };
     });
 
+    // Helper to compute parity metrics for a specific delay value
+    const computeParityMetrics = (testDelayMs) => {
+      const modifiedSubsForTest = subsForSimulation.map((sub) => {
+        if (isFrontSub(sub)) {
+          return { ...sub, tuning: { ...sub.tuning, delayMs: testDelayMs } };
+        }
+        return { ...sub, tuning: { ...sub.tuning, delayMs: 0 } };
+      });
+
+      let sumRe = null;
+      let sumIm = null;
+      let freqsHz = null;
+
+      for (const sub of modifiedSubsForTest) {
+        const subCurve = getSubwooferCurve(sub.modelKey);
+        if (!subCurve || subCurve.length === 0) continue;
+        const diagnosticSourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
+
+        const rewResult = simulateBassResponseRewCore(
+          { widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM },
+          seatPoint,
+          sub,
+          diagnosticSourceCurve,
+          {
+            enableReflections: enableRewCoreReflections,
+            enableModes: true,
+            surfaceAbsorption,
+            freqMinHz: 20,
+            freqMaxHz: 200,
+            smoothing: "none",
+            modalSourceReferenceMode,
+            modalGainScalar,
+            axialQ,
+            modalStorageMode,
+            propagationPhaseScale,
+            disableReflectionPhaseJitter,
+            disableReflectionCoherenceWeight,
+            disableLateField,
+            disableModalPropagationPhase,
+            mute68HzAxialMode,
+            debugDisableModalContribution,
+          }
+        );
+
+        if (!freqsHz) {
+          freqsHz = rewResult.freqsHz;
+          sumRe = rewResult.complexPressure.map((cp) => cp.re);
+          sumIm = rewResult.complexPressure.map((cp) => cp.im);
+        } else {
+          rewResult.complexPressure.forEach((cp, i) => {
+            if (Number.isFinite(cp.re) && Number.isFinite(cp.im)) {
+              sumRe[i] += cp.re;
+              sumIm[i] += cp.im;
+            }
+          });
+        }
+      }
+
+      if (!freqsHz || !sumRe || !sumIm) return null;
+
+      // Build cleaned response (same pipeline as optimiser scoring)
+      const rawPoints = freqsHz.map((hz, i) => {
+        const mag = Math.sqrt(sumRe[i] ** 2 + sumIm[i] ** 2);
+        const calculatedSpl = 20 * Math.log10(Math.max(mag, 1e-10));
+        return { frequency: hz, spl: Number.isFinite(calculatedSpl) ? calculatedSpl : null };
+      });
+
+      const validPoints = rawPoints.filter(
+        (p) => p.frequency > 0 && Number.isFinite(p.frequency) && p.spl !== null
+      );
+      validPoints.sort((a, b) => a.frequency - b.frequency);
+
+      const cleanedPoints = [];
+      for (let k = 0; k < validPoints.length; k++) {
+        if (k === 0 || Math.abs(validPoints[k].frequency - validPoints[k - 1].frequency) > 1e-9) {
+          cleanedPoints.push(validPoints[k]);
+        }
+      }
+
+      const splValues = cleanedPoints
+        .filter((p) => p.frequency >= FREQ_MIN && p.frequency <= FREQ_MAX)
+        .map((p) => p.spl);
+
+      if (splValues.length === 0) return null;
+
+      const minSpl = Math.min(...splValues);
+      const maxSpl = Math.max(...splValues);
+      const score = maxSpl - minSpl;
+
+      return {
+        delayMs: testDelayMs,
+        minSpl,
+        maxSpl,
+        score,
+        binCount: splValues.length,
+        firstFreq: cleanedPoints[0]?.frequency ?? null,
+        lastFreq: cleanedPoints[cleanedPoints.length - 1]?.frequency ?? null,
+      };
+    };
+
+    // Compute parity metrics for current manual delay and recommended delay
+    const currentDelayMetrics = typeof currentManualDelay === "number" ? computeParityMetrics(currentManualDelay) : null;
+    const recommendedDelayMetrics = computeParityMetrics(bestDelay);
+
     setResult({
       bestDelay,
       score: bestScore,
@@ -226,6 +332,8 @@ export default function SubwooferDelayOptimiser({
       top5Narrow,
       sentinelRows,
       sentinelSubDiagnostics,
+      currentDelayMetrics,
+      recommendedDelayMetrics,
     });
     setScanning(false);
   }, [
@@ -247,6 +355,7 @@ export default function SubwooferDelayOptimiser({
     disableModalPropagationPhase,
     mute68HzAxialMode,
     debugDisableModalContribution,
+    currentManualDelay,
   ]);
 
   const fmt = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "—");
@@ -389,6 +498,50 @@ export default function SubwooferDelayOptimiser({
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Graph Parity Check */}
+          {(result.currentDelayMetrics || result.recommendedDelayMetrics) && (
+            <div style={{ gridColumn: "1 / -1", marginTop: 10, background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 4, padding: "8px 10px" }}>
+              <div style={{ fontWeight: 700, color: "#1e40af", marginBottom: 6, fontSize: 12 }}>
+                Graph Parity Check
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px", fontSize: 10 }}>
+                {/* Current Delay */}
+                {result.currentDelayMetrics && (
+                  <div style={{ background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 4, padding: "6px 8px" }}>
+                    <div style={{ fontWeight: 600, color: "#92400e", marginBottom: 4, fontSize: 11 }}>
+                      Current delay: {fmt(result.currentDelayMetrics.delayMs, 1)} ms
+                    </div>
+                    <div style={{ color: "#78350f", lineHeight: 1.6 }}>
+                      <div>Min: {fmt(result.currentDelayMetrics.minSpl, 1)} dB</div>
+                      <div>Max: {fmt(result.currentDelayMetrics.maxSpl, 1)} dB</div>
+                      <div>P-P: {fmt(result.currentDelayMetrics.score, 2)} dB</div>
+                      <div>Bins: {result.currentDelayMetrics.binCount}</div>
+                      <div>Range: {fmt(result.currentDelayMetrics.firstFreq, 0)}–{fmt(result.currentDelayMetrics.lastFreq, 0)} Hz</div>
+                    </div>
+                  </div>
+                )}
+                {/* Recommended Delay */}
+                {result.recommendedDelayMetrics && (
+                  <div style={{ background: "#dcfce7", border: "1px solid #22c55e", borderRadius: 4, padding: "6px 8px" }}>
+                    <div style={{ fontWeight: 600, color: "#166534", marginBottom: 4, fontSize: 11 }}>
+                      Recommended delay: {fmt(result.recommendedDelayMetrics.delayMs, 1)} ms
+                    </div>
+                    <div style={{ color: "#14532d", lineHeight: 1.6 }}>
+                      <div>Min: {fmt(result.recommendedDelayMetrics.minSpl, 1)} dB</div>
+                      <div>Max: {fmt(result.recommendedDelayMetrics.maxSpl, 1)} dB</div>
+                      <div>P-P: {fmt(result.recommendedDelayMetrics.score, 2)} dB</div>
+                      <div>Bins: {result.recommendedDelayMetrics.binCount}</div>
+                      <div>Range: {fmt(result.recommendedDelayMetrics.firstFreq, 0)}–{fmt(result.recommendedDelayMetrics.lastFreq, 0)} Hz</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ marginTop: 6, color: "#1e40af", fontStyle: "italic", fontSize: 10 }}>
+                Both evaluations use the same cleaned, sorted, deduped SPL pipeline as the optimiser scoring.
+              </div>
             </div>
           )}
         </div>
