@@ -69,6 +69,8 @@ export function useSeatingRebuild({
   const prevVisibleWidthMRef = useRef(null);
   // Tracks the last seatingBlockOffset to detect Front Row Distance changes independently
   const prevSeatingBlockOffsetRef = useRef(null);
+  // Guard: fires exactly once on the first loaded-project render to protect restored seating
+  const didProtectInitialLoadedProjectRef = useRef(false);
 
   // Helper: get ear height for a 1-based row index, falling back to step pattern
   const getRowZ = (rowIndex) => {
@@ -210,6 +212,30 @@ export function useSeatingRebuild({
     }
 
     const isLoadedProject = loadState?.phase === "loaded" && !!hasProjectId;
+
+    // ── LOADED-PROJECT INITIAL PROTECTION ────────────────────────────────────
+    // On the very first render after hydration for a loaded project, preserve
+    // the restored seating exactly. Seed all tracking refs so that subsequent
+    // genuine user changes (screen size, offset, etc.) are still detected.
+    if (
+      isLoadedProject &&
+      !didProtectInitialLoadedProjectRef.current &&
+      currentSeats.length > 0 &&
+      !userHasChangedSeatingSinceLoad &&
+      !didUserRequestResetRef.current &&
+      !(appState?.roomResetEpoch > 0)
+    ) {
+      didProtectInitialLoadedProjectRef.current = true;
+      // Seed tracking refs from current live values so deltas are measured correctly going forward
+      const _seedVisibleWidthM = resolveVisibleWidthInches(appState?.screen) * 0.0254;
+      if (prevVisibleWidthMRef.current === null) prevVisibleWidthMRef.current = _seedVisibleWidthM;
+      const _seedMlpY = Number.isFinite(appState?.mlpY_m) ? appState.mlpY_m : null;
+      if (prevMlpYRef.current === null && _seedMlpY !== null) prevMlpYRef.current = _seedMlpY;
+      const _seedOffset = Number(appState?.seatingBlockOffset);
+      if (prevSeatingBlockOffsetRef.current === null) prevSeatingBlockOffsetRef.current = _seedOffset;
+      return;
+    }
+    // ── END LOADED-PROJECT INITIAL PROTECTION ─────────────────────────────────
 
     // ── 57.5° LOCK: calculate live RSP regardless of project mode ─────────────
     // When seatingBlockOffset is 0, the RSP is always exactly 57.5° from the
