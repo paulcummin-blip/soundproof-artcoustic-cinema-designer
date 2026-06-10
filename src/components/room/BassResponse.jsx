@@ -179,6 +179,53 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   React.useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
   React.useEffect(() => { seatingRef.current = seatingPositions; }, [seatingPositions]);
 
+  // Derive auto-alignment delays from geometry — runtime only, never written to config
+  const autoAlignDelays = useMemo(() => {
+    if (!autoAlignEnabled) return {};
+    const mlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    if (!mlpSeat) return {};
+
+    const mlpPoint = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
+    const SPEED_OF_SOUND = 343;
+    const roomWidth = Number(roomDims?.widthM) || 4.5;
+    const roomLength = Number(roomDims?.lengthM) || 6.0;
+
+    const allSubData = [];
+
+    const processGroup = (cfg, group) => {
+      const count = cfg?.count || 0;
+      if (count === 0) return;
+      const positions = Array.isArray(cfg?.positions) ? cfg.positions : [];
+      const POSITION_LABELS = ['left', 'right'];
+      const isRear = group === 'rear';
+      const defaultPositions = isRear
+        ? [{ x: roomWidth * 0.33, y: roomLength - 0.15 }, { x: roomWidth * 0.67, y: roomLength - 0.15 }]
+        : [{ x: roomWidth * 0.33, y: 0.15 }, { x: roomWidth * 0.67, y: 0.15 }];
+      for (let i = 0; i < count; i++) {
+        const subId = `${group}-sub-${POSITION_LABELS[i] ?? i}`;
+        const pos = positions[i] || defaultPositions[i] || { x: roomWidth / 2, y: isRear ? roomLength - 0.15 : 0.15 };
+        const dx = pos.x - mlpPoint.x;
+        const dy = pos.y - mlpPoint.y;
+        const dz = 0.35 - mlpPoint.z;
+        const distanceM = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const arrivalMs = (distanceM / SPEED_OF_SOUND) * 1000;
+        allSubData.push({ subId, arrivalMs });
+      }
+    };
+
+    processGroup(frontSubsCfg, 'front');
+    processGroup(rearSubsCfg, 'rear');
+
+    if (allSubData.length === 0) return {};
+
+    const maxArrivalMs = Math.max(...allSubData.map(s => s.arrivalMs));
+    const delays = {};
+    allSubData.forEach(({ subId, arrivalMs }) => {
+      delays[subId] = Math.max(0, maxArrivalMs - arrivalMs);
+    });
+    return delays;
+  }, [autoAlignEnabled, seatingPositions, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, roomDims?.widthM, roomDims?.lengthM]);
+
   // Build subs array for simulation
   const subsForSimulation = useMemo(() => {
     const liveFront = Array.isArray(frontSubsLive) ? frontSubsLive : [];
@@ -186,9 +233,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     const getTuning = (subId, cfg) => {
       const settings = cfg?.settingsById?.[subId] || {};
+      const manualDelayMs = settings.delayMs || 0;
+      const autoDelayMs = autoAlignDelays[subId] ?? 0;
       return {
         gainDb: settings.gainDb || 0,
-        delayMs: settings.delayMs || 0,
+        delayMs: manualDelayMs + autoDelayMs,
         polarity: settings.polarity === 'invert' ? 180 : 0
       };
     };
@@ -220,7 +269,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     ].filter(Boolean);
 
     return sources;
-  }, [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById]);
+  }, [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById, autoAlignDelays]);
 
   // Run bass simulation engine
   const simulationResults = useMemo(() => {
@@ -1060,7 +1109,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             const subY = pos?.y ?? null;
             const subZ = 0.35;
             const settings = cfg?.settingsById?.[subId] || {};
-            const appliedDelayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
+            const manualDelayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
+            const appliedDelayMs = manualDelayMs + (autoAlignDelays[subId] ?? 0);
 
             let dx = null, dy = null, dz = null, distM = null, arrMs = null;
             if (auditMlpPoint && subX !== null && subY !== null) {
