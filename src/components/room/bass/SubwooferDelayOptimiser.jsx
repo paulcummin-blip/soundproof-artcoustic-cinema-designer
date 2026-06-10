@@ -542,6 +542,12 @@ export default function SubwooferDelayOptimiser({
               <div style={{ marginTop: 6, color: "#1e40af", fontStyle: "italic", fontSize: 10 }}>
                 Both evaluations use the same cleaned, sorted, deduped SPL pipeline as the optimiser scoring.
               </div>
+              {/* Parity Status */}
+              {result.currentDelayMetrics && result.recommendedDelayMetrics && (
+                <div style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: result.currentDelayMetrics.binCount === result.recommendedDelayMetrics.binCount && result.currentDelayMetrics.firstFreq === result.recommendedDelayMetrics.firstFreq && result.currentDelayMetrics.lastFreq === result.recommendedDelayMetrics.lastFreq ? "#166534" : "#92400e" }}>
+                  {result.currentDelayMetrics.binCount === result.recommendedDelayMetrics.binCount && result.currentDelayMetrics.firstFreq === result.recommendedDelayMetrics.firstFreq && result.currentDelayMetrics.lastFreq === result.recommendedDelayMetrics.lastFreq ? "✓ Parity PASS" : "⚠ Parity WARNING: bin count or frequency range differs"}
+                </div>
+              )}
             </div>
           )}
         </div>
