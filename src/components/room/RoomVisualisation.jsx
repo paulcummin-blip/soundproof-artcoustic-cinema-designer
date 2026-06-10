@@ -1271,8 +1271,16 @@ const byId = useEntitiesById({
 
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
+    const labels = ['left', 'right'];
+    const toPositions = (draft, group) => draft.map((s, i) => ({
+      id: `${group}-sub-${labels[i] ?? i}`,
+      x: s.position.x,
+      y: s.position.y,
+      z: s.position.z ?? 0,
+    }));
+
     if (draftFrontSubsRef.current && onSetFrontSubs) {
-      const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
+      const positions = toPositions(draftFrontSubsRef.current, 'front');
       onSetFrontSubs(prev => ({
         ...prev,
         positions,
@@ -1282,7 +1290,7 @@ const byId = useEntitiesById({
       }));
     }
     if (draftRearSubsRef.current && onSetRearSubs) {
-      const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
+      const positions = toPositions(draftRearSubsRef.current, 'rear');
       onSetRearSubs(prev => ({
         ...prev,
         positions,
