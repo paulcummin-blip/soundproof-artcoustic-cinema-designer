@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 
 // Development flag — set to true to re-enable all diagnostic UI panels.
 // Do not delete diagnostic code; just flip this flag.
-const IS_DEVELOPMENT_MODE = false;
+const IS_DEVELOPMENT_MODE = true;
 
 const REW_SOURCE_CURVES = {
   product: null,
