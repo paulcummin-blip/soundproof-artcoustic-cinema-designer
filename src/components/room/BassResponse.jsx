@@ -1359,7 +1359,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               subsCfg={frontSubsCfg}
               groupLabel="Front"
               autoAlignDelays={autoAlignDelays}
-              showManualDelay={IS_DEVELOPMENT_MODE}
+              showManualDelay={true}
               onSettingsChange={(newSettings) => {
                 setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
@@ -1374,7 +1374,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               subsCfg={rearSubsCfg}
               groupLabel="Rear"
               autoAlignDelays={autoAlignDelays}
-              showManualDelay={IS_DEVELOPMENT_MODE}
+              showManualDelay={true}
               onSettingsChange={(newSettings) => {
                 setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
