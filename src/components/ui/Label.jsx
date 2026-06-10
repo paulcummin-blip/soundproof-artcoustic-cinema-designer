@@ -1,14 +1,11 @@
 import React from "react";
 
-export function Label({ children, className = "", htmlFor, ...props }) {
+export function Label({ className = "", ...props }) {
   return (
-    <label 
-      htmlFor={htmlFor}
-      className={`text-sm text-[#3E4349] font-body ${className}`}
+    <span
+      className={className}
       {...props}
-    >
-      {children}
-    </label>
+    />
   );
 }
 
