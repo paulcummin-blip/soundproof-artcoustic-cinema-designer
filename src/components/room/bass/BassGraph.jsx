@@ -327,6 +327,12 @@ export default function BassGraph({
       finalYTicks = yTicks;
     }
 
+    // __TEMP_DIAGNOSTIC__ chartRenderKey — force LineChart remount when plotted data changes.
+    // Remove after confirming whether Recharts holds stale rendered output.
+    const activeData = isMulti ? multiChartData : chartData;
+    const firstRow = activeData?.[0];
+    const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${activeData?.length ?? 0}_${firstRow ? JSON.stringify(firstRow) : 'empty'}`;
+
     // Render mode markers with hover tooltips (REW parity overlay)
     const renderModeMarkers = () => {
         if (!showModeMarkers) return null;
@@ -418,7 +424,7 @@ export default function BassGraph({
                 </>
             )}
             <ResponsiveContainer>
-                <LineChart data={isMulti ? multiChartData : chartData} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
+                <LineChart key={chartRenderKey} data={isMulti ? multiChartData : chartData} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#DCDBD6" />
                     <XAxis
                         dataKey="frequency"
