@@ -451,7 +451,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
 
     return series;
-  }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub]);
+  }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub, subTuningSignature]);
 
   // Keep a single-seat "selectedSeat" reference for the graph title + per-seat detail cards
   const primarySelectedSeat = useMemo(() => {
