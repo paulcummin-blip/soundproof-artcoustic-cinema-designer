@@ -246,15 +246,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const liveRear = Array.isArray(rearSubsLive) ? rearSubsLive : [];
 
     const getTuning = (subId, cfg) => {
-      const settings = cfg?.settingsById?.[subId] || {};
-      const manualDelayMs = settings.delayMs || 0;
+      // __TEMP_DIAGNOSTIC__ fallback: if exact subId key not found, use the only key present
+      const settingsById = cfg?.settingsById || {};
+      let settings = settingsById[subId];
+      let lookupKeyUsed = subId;
+      if (!settings) {
+        const keys = Object.keys(settingsById);
+        if (keys.length === 1) {
+          settings = settingsById[keys[0]];
+          lookupKeyUsed = keys[0];
+        }
+      }
+      settings = settings || {};
+      // Expose lookup key for debug readout
+      getTuning.__lastLookup = getTuning.__lastLookup || {};
+      getTuning.__lastLookup[subId] = { keyUsed: lookupKeyUsed, gainDb: settings.gainDb ?? 0 };
+
+      const manualDelayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
       const autoDelayMs = autoAlignDelays[subId] ?? 0;
       return {
-        gainDb: settings.gainDb || 0,
+        gainDb: Number.isFinite(settings.gainDb) ? settings.gainDb : 0,
         delayMs: manualDelayMs + autoDelayMs,
-        polarity: settings.polarity === 'invert' ? 180 : 0
+        polarity: settings.polarity === 'invert' ? 180 : 0,
       };
     };
+    getTuning.__lastLookup = {};
 
     const toSource = (s, group, idx, cfg) => {
       const p = s?.position ?? s;
@@ -268,16 +284,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       const subId = s?.id ?? `${group}-sub-${POSITION_LABELS[idx] ?? idx}`;
       const tuning = getTuning(subId, cfg);
 
-      // __TEMP_DIAGNOSTIC__ — hard-coded tuning override to verify engine reads sub.tuning.
-      // Remove immediately after diagnosis. Do not ship.
-      const diagnosticTuning = { gainDb: 20, delayMs: 0, polarity: 0 };
-
       return {
         id: subId,
         modelKey: s?.model ?? "SUB2-12",
         x, y,
         z: Number.isFinite(Number(z)) ? Number(z) : 0.35,
-        tuning: diagnosticTuning,
+        tuning,
       };
     };
 
@@ -1041,8 +1053,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         })()}
 
         {/* __TEMP_DIAGNOSTIC__ tuning signature readout — remove after reactivity is confirmed */}
-        <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 6, wordBreak: 'break-all' }}>
+        <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 2, wordBreak: 'break-all' }}>
           Tuning sig: {subTuningSignature}
+        </div>
+        {/* __TEMP_DIAGNOSTIC__ getTuning lookup audit — remove after ID mismatch diagnosis */}
+        <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 6, wordBreak: 'break-all' }}>
+          {(() => {
+            const frontKeys = Object.keys(frontSubsCfg?.settingsById || {});
+            const rearKeys = Object.keys(rearSubsCfg?.settingsById || {});
+            const lookup = subsForSimulation.map(sub => {
+              const cfg = sub.id?.startsWith('front') ? frontSubsCfg : rearSubsCfg;
+              const settingsById = cfg?.settingsById || {};
+              const exactHit = !!settingsById[sub.id];
+              const fallbackKey = !exactHit && Object.keys(settingsById).length === 1 ? Object.keys(settingsById)[0] : null;
+              const keyUsed = exactHit ? sub.id : (fallbackKey ?? 'MISS');
+              const resolvedSettings = settingsById[keyUsed] || {};
+              return `[${sub.id}] key=${keyUsed} gain=${Number.isFinite(resolvedSettings.gainDb) ? resolvedSettings.gainDb.toFixed(1) : '0.0'}`;
+            });
+            return <>getTuning lookups: {lookup.length === 0 ? 'no subs' : lookup.join(' | ')} | frontKeys=[{frontKeys.join(',')}] rearKeys=[{rearKeys.join(',')}]</>;
+          })()}
         </div>
 
         <div className="mt-4">
