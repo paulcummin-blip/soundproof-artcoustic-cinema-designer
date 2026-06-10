@@ -1252,9 +1252,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <SubTuningControls
               subsCfg={frontSubsCfg}
               groupLabel="Front"
-              subDistances={subDistances}
-              autoAlignEnabled={autoAlignEnabled}
-              autoAlignDelays={autoAlignDelays}
               onSettingsChange={(newSettings) => {
                 setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
@@ -1268,9 +1265,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <SubTuningControls
               subsCfg={rearSubsCfg}
               groupLabel="Rear"
-              subDistances={subDistances}
-              autoAlignEnabled={autoAlignEnabled}
-              autoAlignDelays={autoAlignDelays}
               onSettingsChange={(newSettings) => {
                 setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
