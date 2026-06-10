@@ -166,12 +166,20 @@ export default function SubwooferDelayOptimiser({
     narrowCandidates.sort((a, b) => a.narrowScore - b.narrowScore);
     const top5Narrow = narrowCandidates.slice(0, 5);
 
+    // Diagnostic: raw narrow scores at sentinel delays
+    const SENTINEL_DELAYS = [0.0, 5.0, 10.0, 15.0, 20.0];
+    const sentinelRows = SENTINEL_DELAYS.map((d) => {
+      const match = narrowCandidates.find((c) => c.delayMs === d);
+      return { delayMs: d, narrowScore: match ? match.narrowScore : null };
+    });
+
     setResult({
       bestDelay,
       score: bestScore,
       minSpl: bestMin,
       maxSpl: bestMax,
       top5Narrow,
+      sentinelRows,
     });
     setScanning(false);
   }, [
@@ -262,6 +270,23 @@ export default function SubwooferDelayOptimiser({
           <div style={{ gridColumn: "1 / -1", marginTop: 4, color: "#6d28d9", fontStyle: "italic" }}>
             Read-only. Apply manually via the Manual Delay slider if desired.
           </div>
+
+          {/* Sentinel delay diagnostic */}
+          {result.sentinelRows?.length > 0 && (
+            <div style={{ gridColumn: "1 / -1", marginTop: 10, background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 4, padding: "6px 8px" }}>
+              <div style={{ fontWeight: 700, color: "#166534", marginBottom: 4 }}>
+                Diagnostic — raw 60–100Hz scores at sentinel delays
+              </div>
+              {result.sentinelRows.map((row) => (
+                <div key={row.delayMs} style={{ color: "#14532d" }}>
+                  Trial {fmt(row.delayMs, 1)} ms → score {row.narrowScore !== null ? fmt(row.narrowScore, 2) : "—"}
+                </div>
+              ))}
+              <div style={{ marginTop: 4, color: "#166534", fontStyle: "italic", fontSize: 10 }}>
+                If all scores are identical the engine is not consuming sub.tuning.delayMs.
+              </div>
+            </div>
+          )}
 
           {/* Narrow band 60–100Hz top-5 table */}
           {result.top5Narrow?.length > 0 && (
