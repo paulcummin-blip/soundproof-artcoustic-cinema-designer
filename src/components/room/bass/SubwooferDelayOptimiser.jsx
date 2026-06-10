@@ -61,7 +61,11 @@ export default function SubwooferDelayOptimiser({
 
     const NARROW_MIN = 60;
     const NARROW_MAX = 100;
+    const SENTINEL_DELAYS = [0.0, 5.0, 10.0, 15.0, 20.0];
     const narrowCandidates = [];
+
+    // Diagnostic: capture modified sub objects at sentinel delays
+    const sentinelSubDiagnostics = {};
 
     for (let delayMs = 0; delayMs <= MAX_DELAY; delayMs = Math.round((delayMs + STEP) * 100) / 100) {
       // Build modified subs: override front sub delay to delayMs, keep others as-is
@@ -72,6 +76,19 @@ export default function SubwooferDelayOptimiser({
         // rear subs: zero delay for this scan
         return { ...sub, tuning: { ...sub.tuning, delayMs: 0 } };
       });
+
+      // Capture diagnostic for sentinel delays
+      if (SENTINEL_DELAYS.includes(delayMs)) {
+        sentinelSubDiagnostics[delayMs] = modifiedSubs.map((sub) => ({
+          id: sub.id ?? null,
+          subId: sub.subId ?? null,
+          modelKey: sub.modelKey ?? null,
+          delayMs: sub.tuning?.delayMs ?? null,
+          x: sub.x,
+          y: sub.y,
+          z: sub.z,
+        }));
+      }
 
       // Accumulate complex pressure across all subs for this seat
       let sumRe = null;
@@ -190,7 +207,6 @@ export default function SubwooferDelayOptimiser({
     const top5Narrow = narrowCandidates.slice(0, 5);
 
     // Diagnostic: raw narrow scores at sentinel delays
-    const SENTINEL_DELAYS = [0.0, 5.0, 10.0, 15.0, 20.0];
     const sentinelRows = SENTINEL_DELAYS.map((d) => {
       const match = narrowCandidates.find((c) => c.delayMs === d);
       return { delayMs: d, narrowScore: match ? match.narrowScore : null };
@@ -203,6 +219,7 @@ export default function SubwooferDelayOptimiser({
       maxSpl: bestMax,
       top5Narrow,
       sentinelRows,
+      sentinelSubDiagnostics,
     });
     setScanning(false);
   }, [
@@ -308,6 +325,27 @@ export default function SubwooferDelayOptimiser({
               <div style={{ marginTop: 4, color: "#166534", fontStyle: "italic", fontSize: 10 }}>
                 If all scores are identical the engine is not consuming sub.tuning.delayMs.
               </div>
+            </div>
+          )}
+
+          {/* Sub object diagnostic at sentinel delays */}
+          {result.sentinelSubDiagnostics && Object.keys(result.sentinelSubDiagnostics).length > 0 && (
+            <div style={{ gridColumn: "1 / -1", marginTop: 10, background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 4, padding: "6px 8px" }}>
+              <div style={{ fontWeight: 700, color: "#9a3412", marginBottom: 4 }}>
+                Diagnostic — modified sub objects sent to engine
+              </div>
+              {Object.entries(result.sentinelSubDiagnostics).map(([delayMs, subs]) => (
+                <div key={delayMs} style={{ marginTop: 6 }}>
+                  <div style={{ fontWeight: 600, color: "#c2410c", marginBottom: 2 }}>
+                    Trial {fmt(delayMs, 1)} ms:
+                  </div>
+                  {subs.map((s, idx) => (
+                    <div key={idx} style={{ marginLeft: 8, color: "#7c2d12", fontSize: 10 }}>
+                      [{idx}] id={s.id ?? "null"} | subId={s.subId ?? "null"} | modelKey={s.modelKey ?? "null"} | delayMs={fmt(s.delayMs, 1)} | xyz=({fmt(s.x, 2)}, {fmt(s.y, 2)}, {fmt(s.z, 2)})
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           )}
 
