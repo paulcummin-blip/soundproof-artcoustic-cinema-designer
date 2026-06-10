@@ -59,6 +59,10 @@ export default function SubwooferDelayOptimiser({
     let bestMin = null;
     let bestMax = null;
 
+    const NARROW_MIN = 60;
+    const NARROW_MAX = 100;
+    const narrowCandidates = [];
+
     for (let delayMs = 0; delayMs <= MAX_DELAY; delayMs = Math.round((delayMs + STEP) * 100) / 100) {
       // Build modified subs: override front sub delay to delayMs, keep others as-is
       const modifiedSubs = subsForSimulation.map((sub) => {
@@ -142,13 +146,32 @@ export default function SubwooferDelayOptimiser({
         bestMin = minSpl;
         bestMax = maxSpl;
       }
+
+      // Narrow band score: 60–100Hz
+      const narrowSplValues = freqsHz
+        .map((hz, i) => {
+          if (hz < NARROW_MIN || hz > NARROW_MAX) return null;
+          const mag = Math.sqrt(sumRe[i] ** 2 + sumIm[i] ** 2);
+          return 20 * Math.log10(Math.max(mag, 1e-10));
+        })
+        .filter((v) => v !== null && Number.isFinite(v));
+
+      if (narrowSplValues.length > 0) {
+        const narrowScore = Math.max(...narrowSplValues) - Math.min(...narrowSplValues);
+        narrowCandidates.push({ delayMs, narrowScore });
+      }
     }
+
+    // Sort narrow candidates and keep top 5
+    narrowCandidates.sort((a, b) => a.narrowScore - b.narrowScore);
+    const top5Narrow = narrowCandidates.slice(0, 5);
 
     setResult({
       bestDelay,
       score: bestScore,
       minSpl: bestMin,
       maxSpl: bestMax,
+      top5Narrow,
     });
     setScanning(false);
   }, [
@@ -239,6 +262,43 @@ export default function SubwooferDelayOptimiser({
           <div style={{ gridColumn: "1 / -1", marginTop: 4, color: "#6d28d9", fontStyle: "italic" }}>
             Read-only. Apply manually via the Manual Delay slider if desired.
           </div>
+
+          {/* Narrow band 60–100Hz top-5 table */}
+          {result.top5Narrow?.length > 0 && (
+            <div style={{ gridColumn: "1 / -1", marginTop: 10 }}>
+              <div style={{ fontWeight: 700, color: "#6d28d9", marginBottom: 4 }}>
+                Top 5 delay candidates (60–100Hz metric)
+              </div>
+              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #c4b5fd", color: "#4c1d95" }}>
+                    <th style={{ textAlign: "left", padding: "2px 8px" }}>Delay (ms)</th>
+                    <th style={{ textAlign: "right", padding: "2px 8px" }}>Score P-P (dB)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.top5Narrow.map((row, idx) => (
+                    <tr
+                      key={row.delayMs}
+                      style={{
+                        background: idx === 0 ? "#ede9fe" : "transparent",
+                        fontWeight: idx === 0 ? 700 : 400,
+                        borderBottom: "1px solid #ede9fe",
+                        color: idx === 0 ? "#3b0764" : "#4c1d95",
+                      }}
+                    >
+                      <td style={{ padding: "2px 8px" }}>
+                        {idx === 0 ? "★ " : ""}{fmt(row.delayMs, 1)}
+                      </td>
+                      <td style={{ textAlign: "right", padding: "2px 8px" }}>
+                        {fmt(row.narrowScore, 2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
