@@ -67,16 +67,14 @@ export default function BassGraph({
 
     const multiChartData = React.useMemo(() => {
       if (!isMulti) return null;
-      // Collect all unique frequencies across all series
-      const freqSet = new Set();
-      multiSeries.forEach(s => s.data.forEach(p => freqSet.add(p.frequency)));
-      const freqs = Array.from(freqSet).sort((a, b) => a - b);
-      // Build one row per frequency, with a key per series id
-      return freqs.map(frequency => {
-        const row = { frequency };
+      // All series share the same frequency axis — use the first series as the frequency spine.
+      // Index-based mapping avoids floating-point epsilon mismatches in find().
+      const spine = multiSeries[0].data; // already sorted + deduped in BassResponse
+      return spine.map((point, i) => {
+        const row = { frequency: point.frequency };
         multiSeries.forEach(s => {
-          const point = s.data.find(p => Math.abs(p.frequency - frequency) < 1e-9);
-          row[`spl_${s.id}`] = point ? point.spl : null;
+          const p = s.data[i];
+          row[`spl_${s.id}`] = (p && Number.isFinite(p.spl)) ? p.spl : null;
         });
         return row;
       });
