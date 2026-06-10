@@ -851,6 +851,60 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </details>
       )}
 
+      {/* __B44_RUNTIME_AUDIT__ Temporary live state audit panel */}
+      {IS_DEVELOPMENT_MODE && (() => {
+        const auditFirstSeatId = selectedSeatIds[0] || null;
+        const auditFirstSeat = auditFirstSeatId
+          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === auditFirstSeatId)
+          : null;
+        return (
+          <div style={{ border: '2px solid #0ea5e9', borderRadius: 8, background: '#f0f9ff', padding: '10px 12px', fontSize: 10, fontFamily: 'monospace', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: '#0369a1', marginBottom: 8, fontSize: 12 }}>⚡ Bass Runtime Audit Panel</div>
+
+            <div style={{ marginBottom: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px', color: '#0c4a6e' }}>
+              <div><strong>frontSubsCfg.count:</strong> {frontSubsCfg?.count ?? 'undefined'}</div>
+              <div><strong>rearSubsCfg.count:</strong> {rearSubsCfg?.count ?? 'undefined'}</div>
+              <div><strong>frontSubsLive.length:</strong> {Array.isArray(frontSubsLive) ? frontSubsLive.length : 'not array'}</div>
+              <div><strong>rearSubsLive.length:</strong> {Array.isArray(rearSubsLive) ? rearSubsLive.length : 'not array'}</div>
+              <div><strong>autoAlignEnabled:</strong> {String(autoAlignEnabled)}</div>
+              <div><strong>selectedSeatIds:</strong> [{selectedSeatIds.join(', ')}]</div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #bae6fd', paddingTop: 6, marginBottom: 6, color: '#0c4a6e' }}>
+              <strong>First selected seat:</strong>{' '}
+              {auditFirstSeat
+                ? `id=${auditFirstSeat.id ?? `${auditFirstSeat.x}-${auditFirstSeat.y}`}  x=${auditFirstSeat.x}  y=${auditFirstSeat.y}  z=${Number.isFinite(Number(auditFirstSeat.z)) ? Number(auditFirstSeat.z) : 1.2}`
+                : '—'}
+            </div>
+
+            <div style={{ borderTop: '1px solid #bae6fd', paddingTop: 6, marginBottom: 6, color: '#0c4a6e' }}>
+              <strong>autoAlignDelays:</strong>{' '}
+              {Object.keys(autoAlignDelays).length === 0
+                ? '{}'
+                : Object.entries(autoAlignDelays).map(([k, v]) => `${k}: ${Number.isFinite(v) ? v.toFixed(3) : v}ms`).join('  |  ')}
+            </div>
+
+            <div style={{ borderTop: '1px solid #bae6fd', paddingTop: 6, color: '#0c4a6e' }}>
+              <strong>subsForSimulation ({subsForSimulation.length}):</strong>
+              {subsForSimulation.length === 0 && <span style={{ marginLeft: 8 }}>none</span>}
+              {subsForSimulation.map((sub, i) => (
+                <div key={sub.id || i} style={{ border: '1px solid #bae6fd', borderRadius: 4, background: '#fff', padding: '4px 8px', marginTop: 4 }}>
+                  <span style={{ fontWeight: 700, color: '#0369a1' }}>[{i}] {sub.id ?? '—'}</span>
+                  {'  '}model: {sub.modelKey ?? '—'}
+                  {'  '}x: {Number.isFinite(sub.x) ? sub.x.toFixed(4) : '—'}
+                  {'  '}y: {Number.isFinite(sub.y) ? sub.y.toFixed(4) : '—'}
+                  {'  '}z: {Number.isFinite(sub.z) ? sub.z.toFixed(4) : '—'}
+                  {'  '}gainDb: {sub.tuning?.gainDb ?? 0}
+                  {'  '}delayMs: {Number.isFinite(sub.tuning?.delayMs) ? sub.tuning.delayMs.toFixed(3) : 0}
+                  {'  '}polarity: {sub.tuning?.polarity ?? 0}°
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+      {/* __B44_RUNTIME_AUDIT__ end */}
+
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
