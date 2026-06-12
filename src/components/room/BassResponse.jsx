@@ -261,6 +261,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return delays;
   }, [autoAlignEnabled, seatingPositions, frontSubsLive, rearSubsLive, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, roomDims?.widthM, roomDims?.lengthM]);
 
+  // Helper: resolve auto-align delay for a sub regardless of ID naming convention.
+  // autoAlignDelays is keyed by canonical IDs (front-sub-left, rear-sub-left, etc.)
+  // but live sub objects may carry alternate IDs (sub-front-1, sub-rear-1, etc.).
+  const resolveAutoDelayForSub = (subId, group, index) => {
+    const POSITION_LABELS = ['left', 'right'];
+    // 1. Direct lookup
+    if (autoAlignDelays[subId] != null) return autoAlignDelays[subId];
+    // 2. Canonical form: front-sub-left / rear-sub-right
+    const canonicalId = `${group}-sub-${POSITION_LABELS[index] ?? index}`;
+    if (autoAlignDelays[canonicalId] != null) return autoAlignDelays[canonicalId];
+    // 3. Alternate live naming: sub-front-1 / sub-rear-2
+    const altId = `sub-${group}-${index + 1}`;
+    if (autoAlignDelays[altId] != null) return autoAlignDelays[altId];
+    return 0;
+  };
+
   // Build subs array for simulation
   const subsForSimulation = useMemo(() => {
     const liveFront = Array.isArray(frontSubsLive) ? frontSubsLive : [];
@@ -284,7 +300,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       getTuning.__lastLookup[subId] = { keyUsed: lookupKeyUsed, gainDb: settings.gainDb ?? 0 };
 
       const manualDelayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
-      const autoDelayMs = autoAlignDelays[subId] ?? 0;
+      // Use helper to resolve auto delay across both canonical and alternate ID formats
+      const group = subId?.includes('front') || subId?.includes('sub-front') ? 'front' : 'rear';
+      const index = subId?.includes('-right') || subId?.includes('-2') ? 1 : 0;
+      const autoDelayMs = resolveAutoDelayForSub(subId, group, index);
       return {
         gainDb: Number.isFinite(settings.gainDb) ? settings.gainDb : 0,
         delayMs: manualDelayMs + autoDelayMs,
@@ -1238,7 +1257,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 const isFront = subId?.includes('front-sub') || subId?.includes('sub-front');
                 const cfgForSub = isFront ? frontSubsCfg : rearSubsCfg;
                 const manualDelay = Number.isFinite(cfgForSub?.settingsById?.[subId]?.delayMs) ? cfgForSub.settingsById[subId].delayMs : 0;
-                const autoDelay = autoAlignDelays[subId] ?? 0;
+                const autoDelay = resolveAutoDelayForSub(subId, 'front', i);
                 const totalDelay = manualDelay + autoDelay;
                 return (
                   <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
@@ -1254,10 +1273,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Rear Subs ({rearSubs.length})</div>
               {rearSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : rearSubs.map((sub, i) => {
                 const subId = sub.id;
-                const isFront = subId?.includes('front-sub') || subId?.includes('sub-front');
-                const cfgForSub = isFront ? frontSubsCfg : rearSubsCfg;
+                const cfgForSub = rearSubsCfg;
                 const manualDelay = Number.isFinite(cfgForSub?.settingsById?.[subId]?.delayMs) ? cfgForSub.settingsById[subId].delayMs : 0;
-                const autoDelay = autoAlignDelays[subId] ?? 0;
+                const autoDelay = resolveAutoDelayForSub(subId, 'rear', i);
                 const totalDelay = manualDelay + autoDelay;
                 return (
                   <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
