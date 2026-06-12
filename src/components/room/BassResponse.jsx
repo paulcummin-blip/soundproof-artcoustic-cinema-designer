@@ -407,13 +407,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         const diagnosticSourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
 
         // __TEMP_REW_PARITY_ISOLATION__ resolve per-field-mode overrides
-        const _fieldReflections = rewParityFieldMode === 'modes_only' ? false
+        const _fieldReflections = rewParityFieldMode === 'modes_only' || rewParityFieldMode === 'direct_plus_modes' ? false
           : rewParityFieldMode === 'reflections_only' ? true
           : enableRewCoreReflections;
         const _fieldModes = rewParityFieldMode === 'reflections_only' ? false
-          : rewParityFieldMode === 'modes_only' ? true
+          : rewParityFieldMode === 'modes_only' || rewParityFieldMode === 'direct_plus_modes' ? true
           : true;
-        const _fieldLateField = (rewParityFieldMode === 'reflections_only' || rewParityFieldMode === 'modes_only')
+        const _fieldLateField = (rewParityFieldMode === 'reflections_only' || rewParityFieldMode === 'modes_only' || rewParityFieldMode === 'direct_plus_modes')
           ? true  // force disableLateField=true for isolation modes
           : disableLateField;
 
@@ -1101,9 +1101,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <span className="text-xs text-[#3E4349] font-mono">Parity isolation:</span>
                   {[
-                    { value: 'reflections_only', label: 'Reflections only' },
-                    { value: 'modes_only',        label: 'Modes only' },
-                    { value: 'full_field',         label: 'Full field' },
+                    { value: 'reflections_only',    label: 'Reflections only' },
+                    { value: 'modes_only',          label: 'Modes only' },
+                    { value: 'direct_plus_modes',   label: 'Direct + Modes' },
+                    { value: 'full_field',          label: 'Full field' },
                   ].map(({ value, label }) => (
                     <button
                       key={value}
