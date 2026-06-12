@@ -167,6 +167,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [rewParityFieldMode, setRewParityFieldMode] = useState('full_field'); // 'reflections_only' | 'modes_only' | 'full_field'
   // __TEMP_REW_PARITY__ adjustable modal distance blend: 0.00 = existing 1m ref, 1.00 = full distance_normalized
   const [modalDistanceBlend, setModalDistanceBlend] = useState(0.00);
+  // __TEMP_REW_PARITY_Q__ Modal Q model selector: 'existing' | 'constant_axial_q'
+  const [modalQModel, setModalQModel] = useState('existing');
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -477,6 +479,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             modalSourceReferenceMode: _engineModalRefMode,
             modalGainScalar: _engineModalGainScalar,
             axialQ,
+            overrideConstantAxialQ: modalQModel === 'constant_axial_q', // __TEMP_REW_PARITY_Q__
             modalStorageMode,
             propagationPhaseScale: 1.0, // __TEMP_REW_PARITY_TEST__ forced to 1.0
             pureDeterministicModalSum: true, // __TEMP_REW_PARITY_TEST__ forced to true
@@ -540,7 +543,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalQModel, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1063,6 +1066,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <option value={7.0}>Axial Q: 7.0</option>
                     <option value={6.5}>Axial Q: 6.5</option>
                   </select>
+                  {/* __TEMP_REW_PARITY_Q__ Modal Q model selector */}
+                  <select
+                    value={modalQModel}
+                    onChange={(event) => setModalQModel(event.target.value)}
+                    className="h-8 rounded-md border border-amber-400 bg-amber-50 px-2 text-xs text-amber-900 font-mono"
+                    aria-label="Modal Q model"
+                  >
+                    <option value="existing">Modal Q model: existing</option>
+                    <option value="constant_axial_q">Modal Q model: constant axial Q parity test ⚠️</option>
+                  </select>
                   <select
                     value={modalStorageMode}
                     onChange={(event) => setModalStorageMode(event.target.value)}
@@ -1181,6 +1194,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   )}
                   <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
                   <div>Axial Q: {axialQ.toFixed(1)}</div>
+                  <div style={{ color: modalQModel === 'constant_axial_q' ? '#b45309' : undefined, fontWeight: modalQModel === 'constant_axial_q' ? 700 : undefined }}>
+                    Modal Q model: {modalQModel === 'constant_axial_q' ? `constant axial Q parity test ⚠️ (Q=${axialQ.toFixed(1)} for all axial modes)` : 'existing (Sabine-bounded)'}
+                  </div>
                   <div>Storage: {modalStorageMode}</div>
                   <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
                   <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
