@@ -1182,6 +1182,92 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
       </div>
 
+      {/* __REW_GEOMETRY_MATCH__ Development-only REW parity coordinate readout */}
+      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (() => {
+        const rewSeatId = selectedSeatIds[0] || null;
+        const rewSeat = rewSeatId
+          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === rewSeatId)
+          : null;
+        const rewSeatZ = rewSeat && Number.isFinite(Number(rewSeat.z)) ? Number(rewSeat.z) : 1.2;
+        const fmt = (v, d = 4) => Number.isFinite(v) ? Number(v).toFixed(d) : '—';
+        const frontSubs = subsForSimulation.filter(s => s.id?.startsWith('front'));
+        const rearSubs = subsForSimulation.filter(s => s.id?.startsWith('rear'));
+        return (
+          <div style={{ border: '2px solid #0891b2', borderRadius: 6, background: '#ecfeff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, color: '#0e7490', marginBottom: 6, fontSize: 11 }}>REW Geometry Match Values</div>
+
+            {/* Room */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Room</div>
+              <div style={{ color: '#164e63' }}>widthM: {fmt(roomDims?.widthM)} &nbsp; lengthM: {fmt(roomDims?.lengthM)} &nbsp; heightM: {fmt(roomDims?.heightM)}</div>
+            </div>
+
+            {/* Selected seat */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Selected Seat</div>
+              {rewSeat ? (
+                <div style={{ color: '#164e63' }}>
+                  id: {rewSeat.id || `${rewSeat.x}-${rewSeat.y}`} &nbsp; x: {fmt(rewSeat.x)} &nbsp; y: {fmt(rewSeat.y)} &nbsp; z: {fmt(rewSeatZ)}
+                </div>
+              ) : <div style={{ color: '#6b7280' }}>— none selected —</div>}
+            </div>
+
+            {/* All seats */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>All Seats ({(seatingPositions || []).length})</div>
+              {(seatingPositions || []).map((seat, i) => {
+                const sid = seat.id || `${seat.x}-${seat.y}`;
+                const sz = Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2;
+                const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
+                const rowSeats = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
+                const posInRow = rowSeats.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
+                const label = `R${rowNum}S${posInRow}`;
+                return (
+                  <div key={sid} style={{ color: '#164e63', paddingLeft: 8 }}>
+                    [{label}] id: {sid} &nbsp; x: {fmt(seat.x)} &nbsp; y: {fmt(seat.y)} &nbsp; z: {fmt(sz)} {seat.isPrimary ? '(MLP)' : ''}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Front subs */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Front Subs ({frontSubs.length})</div>
+              {frontSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : frontSubs.map((sub, i) => {
+                const manualDelay = frontSubsCfg?.settingsById?.[sub.id]?.delayMs ?? 0;
+                const autoDelay = autoAlignDelays[sub.id] ?? 0;
+                return (
+                  <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
+                    id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>
+                    &nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(sub.tuning?.delayMs, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Rear subs */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Rear Subs ({rearSubs.length})</div>
+              {rearSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : rearSubs.map((sub, i) => {
+                const manualDelay = rearSubsCfg?.settingsById?.[sub.id]?.delayMs ?? 0;
+                const autoDelay = autoAlignDelays[sub.id] ?? 0;
+                return (
+                  <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
+                    id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>
+                    &nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(sub.tuning?.delayMs, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ color: '#0e7490', fontStyle: 'italic', fontSize: 9, borderTop: '1px solid #a5f3fc', paddingTop: 4 }}>
+              Coordinates are engine source points. Use these exact values in REW for parity testing.
+            </div>
+          </div>
+        );
+      })()}
+      {/* __REW_GEOMETRY_MATCH__ end */}
+
       {/* __B44_ALIGNMENT_AUDIT__ Two-sub alignment geometry audit */}
       {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (() => {
         const auditMlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
