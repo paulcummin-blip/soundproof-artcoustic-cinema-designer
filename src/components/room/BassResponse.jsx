@@ -392,7 +392,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             modalGainScalar,
             axialQ,
             modalStorageMode,
-            propagationPhaseScale,
+            propagationPhaseScale: 1.0, // __TEMP_REW_PARITY_TEST__ forced to 1.0
+            pureDeterministicModalSum: true, // __TEMP_REW_PARITY_TEST__ forced to true
             disableReflectionPhaseJitter,
             disableReflectionCoherenceWeight,
             disableLateField,
