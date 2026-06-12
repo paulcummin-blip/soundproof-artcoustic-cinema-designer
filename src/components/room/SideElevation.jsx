@@ -66,6 +66,9 @@ const getRoleSide = (role) => {
   // Explicit wide-speaker overrides (LW/RW end in W, not L/R)
   if (r === 'LW') return 'left';
   if (r === 'RW') return 'right';
+  // Extra surround roles: SL2, SL3, SR2, SR3, etc.
+  if (/^SL\d+$/.test(r)) return 'left';
+  if (/^SR\d+$/.test(r)) return 'right';
   if (r.endsWith('R')) return 'right';
   if (r.endsWith('L')) return 'left';
   return null; // centre / ambiguous
@@ -403,10 +406,13 @@ export default function SideElevation({
   }, [onScreenHeightFromFloorChange, liveFloorM, roomH, screenData.h, drawH, SVG_H]);
 
   // Populate snap targets — draggable side/rear surround speakers, updated every render
-  const DRAGGABLE_SIDE_ROLES = new Set(['LW','RW','SL','SR','SBL','SBR']);
+  const isDraggableSideRole = (r) => {
+    const u = String(r || '').toUpperCase();
+    return ['LW','RW','SL','SR','SBL','SBR'].includes(u) || /^(SL|SR)\d+$/.test(u);
+  };
   speakersForSnapRef.current = Array.isArray(placedSpeakers)
     ? placedSpeakers
-        .filter(s => DRAGGABLE_SIDE_ROLES.has(String(s?.role || '').toUpperCase()) && Number.isFinite(s?.position?.z))
+        .filter(s => isDraggableSideRole(s?.role) && Number.isFinite(s?.position?.z))
         .map(s => ({ role: String(s.role).toUpperCase(), z: s.position.z }))
     : [];
 
@@ -909,7 +915,7 @@ export default function SideElevation({
             const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
 
             const roleUp = String(spk.role || '').toUpperCase();
-            const isDraggable = !!onSideSpeakerMoved && ['LW','RW','SL','SR'].includes(roleUp);
+            const isDraggable = !!onSideSpeakerMoved && (['LW','RW','SL','SR'].includes(roleUp) || /^(SL|SR)\d+$/.test(roleUp));
             const effectiveZ = (liveSpeakerDrag && liveSpeakerDrag.role === roleUp) ? liveSpeakerDrag.z : spk.z;
             const spkX   = rx(spk.y);
             const svgTop = rz(effectiveZ + spkHeightM / 2);
