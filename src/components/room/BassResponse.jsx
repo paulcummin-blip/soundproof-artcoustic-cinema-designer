@@ -1190,8 +1190,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           : null;
         const rewSeatZ = rewSeat && Number.isFinite(Number(rewSeat.z)) ? Number(rewSeat.z) : 1.2;
         const fmt = (v, d = 4) => Number.isFinite(v) ? Number(v).toFixed(d) : '—';
-        const frontSubs = subsForSimulation.filter(s => s.id?.startsWith('front'));
-        const rearSubs = subsForSimulation.filter(s => s.id?.startsWith('rear'));
+        const frontSubs = subsForSimulation.filter(s => s.id?.includes('front-sub') || s.id?.includes('sub-front'));
+        const rearSubs = subsForSimulation.filter(s => s.id?.includes('rear-sub') || s.id?.includes('sub-rear'));
         return (
           <div style={{ border: '2px solid #0891b2', borderRadius: 6, background: '#ecfeff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
             <div style={{ fontWeight: 700, color: '#0e7490', marginBottom: 6, fontSize: 11 }}>REW Geometry Match Values</div>
@@ -1234,7 +1234,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Front Subs ({frontSubs.length})</div>
               {frontSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : frontSubs.map((sub, i) => {
-                const manualDelay = frontSubsCfg?.settingsById?.[sub.id]?.delayMs ?? 0;
+                const fSettings = frontSubsCfg?.settingsById || {};
+                const manualDelay = fSettings[sub.id]?.delayMs ?? Object.values(fSettings)[0]?.delayMs ?? 0;
                 const autoDelay = autoAlignDelays[sub.id] ?? 0;
                 return (
                   <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
@@ -1249,7 +1250,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Rear Subs ({rearSubs.length})</div>
               {rearSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : rearSubs.map((sub, i) => {
-                const manualDelay = rearSubsCfg?.settingsById?.[sub.id]?.delayMs ?? 0;
+                const rSettings = rearSubsCfg?.settingsById || {};
+                const manualDelay = rSettings[sub.id]?.delayMs ?? Object.values(rSettings)[0]?.delayMs ?? 0;
                 const autoDelay = autoAlignDelays[sub.id] ?? 0;
                 return (
                   <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
