@@ -163,6 +163,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [mute68HzAxialMode, setMute68HzAxialMode] = useState(false);
   // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
   const [debugDisableModalContribution, setDebugDisableModalContribution] = useState(false);
+  // __TEMP_REW_PARITY_ISOLATION__ field mode for layered comparison
+  const [rewParityFieldMode, setRewParityFieldMode] = useState('full_field'); // 'reflections_only' | 'modes_only' | 'full_field'
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -404,6 +406,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         if (!subCurve || subCurve.length === 0) return;
         const diagnosticSourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
 
+        // __TEMP_REW_PARITY_ISOLATION__ resolve per-field-mode overrides
+        const _fieldReflections = rewParityFieldMode === 'modes_only' ? false
+          : rewParityFieldMode === 'reflections_only' ? true
+          : enableRewCoreReflections;
+        const _fieldModes = rewParityFieldMode === 'reflections_only' ? false
+          : rewParityFieldMode === 'modes_only' ? true
+          : true;
+        const _fieldLateField = (rewParityFieldMode === 'reflections_only' || rewParityFieldMode === 'modes_only')
+          ? true  // force disableLateField=true for isolation modes
+          : disableLateField;
+
         const rewResult = simulateBassResponseRewCore(
           {
             widthM: roomDims.widthM,
@@ -418,8 +431,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           sub,
           diagnosticSourceCurve,
           {
-            enableReflections: enableRewCoreReflections,
-            enableModes: true,
+            enableReflections: _fieldReflections,
+            enableModes: _fieldModes,
             surfaceAbsorption,
             freqMinHz: 20,
             freqMaxHz: 200,
@@ -432,7 +445,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             pureDeterministicModalSum: true, // __TEMP_REW_PARITY_TEST__ forced to true
             disableReflectionPhaseJitter,
             disableReflectionCoherenceWeight,
-            disableLateField,
+            disableLateField: _fieldLateField,
             disableModalPropagationPhase,
             mute68HzAxialMode,
             debugDisableModalContribution, // __TEMP_DIAGNOSTIC__ — remove after polarity masking diagnosis
@@ -490,7 +503,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1084,6 +1097,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     Debug: disable modal contribution
                   </label>
                 </div>
+                {/* __TEMP_REW_PARITY_ISOLATION__ field isolation selector */}
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <span className="text-xs text-[#3E4349] font-mono">Parity isolation:</span>
+                  {[
+                    { value: 'reflections_only', label: 'Reflections only' },
+                    { value: 'modes_only',        label: 'Modes only' },
+                    { value: 'full_field',         label: 'Full field' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => setRewParityFieldMode(value)}
+                      className={`h-8 px-3 rounded-md border text-xs font-mono transition-colors ${
+                        rewParityFieldMode === value
+                          ? 'bg-[#213428] text-white border-[#213428]'
+                          : 'bg-white text-[#1B1A1A] border-[#DCDBD6] hover:border-[#213428]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <span className="text-[9px] font-mono text-[#6b7280]">__TEMP_REW_PARITY_ISOLATION__</span>
+                </div>
                 <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
                   <div className="font-bold text-[#1E293B]">Active model:</div>
                   <div>Source: {rewSourceCurveMode}</div>
@@ -1101,6 +1136,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   {/* __TEMP_DIAGNOSTIC__ */}
                   <div style={{ color: debugDisableModalContribution ? '#dc2626' : undefined }}>
                     Debug modal OFF: {debugDisableModalContribution ? 'YES ⚠️' : 'NO'}
+                  </div>
+                  {/* __TEMP_REW_PARITY_ISOLATION__ */}
+                  <div style={{ color: rewParityFieldMode !== 'full_field' ? '#b45309' : undefined, fontWeight: rewParityFieldMode !== 'full_field' ? 700 : undefined }}>
+                    Parity isolation: {rewParityFieldMode}
                   </div>
                 </div>
               </>
