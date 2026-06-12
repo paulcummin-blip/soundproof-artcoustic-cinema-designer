@@ -1234,9 +1234,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Front Subs ({frontSubs.length})</div>
               {frontSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : frontSubs.map((sub, i) => {
-                const totalDelay = sub.tuning?.delayMs ?? 0;
-                const autoDelay = autoAlignDelays[sub.id] ?? 0;
-                const manualDelay = totalDelay - autoDelay;
+                const subId = sub.id;
+                const isFront = subId?.includes('front-sub') || subId?.includes('sub-front');
+                const cfgForSub = isFront ? frontSubsCfg : rearSubsCfg;
+                const manualDelay = Number.isFinite(cfgForSub?.settingsById?.[subId]?.delayMs) ? cfgForSub.settingsById[subId].delayMs : 0;
+                const autoDelay = autoAlignDelays[subId] ?? 0;
+                const totalDelay = manualDelay + autoDelay;
                 return (
                   <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
                     id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>
@@ -1250,9 +1253,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Rear Subs ({rearSubs.length})</div>
               {rearSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : rearSubs.map((sub, i) => {
-                const totalDelay = sub.tuning?.delayMs ?? 0;
-                const autoDelay = autoAlignDelays[sub.id] ?? 0;
-                const manualDelay = totalDelay - autoDelay;
+                const subId = sub.id;
+                const isFront = subId?.includes('front-sub') || subId?.includes('sub-front');
+                const cfgForSub = isFront ? frontSubsCfg : rearSubsCfg;
+                const manualDelay = Number.isFinite(cfgForSub?.settingsById?.[subId]?.delayMs) ? cfgForSub.settingsById[subId].delayMs : 0;
+                const autoDelay = autoAlignDelays[subId] ?? 0;
+                const totalDelay = manualDelay + autoDelay;
                 return (
                   <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
                     id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>
