@@ -1234,13 +1234,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Front Subs ({frontSubs.length})</div>
               {frontSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : frontSubs.map((sub, i) => {
-                const fSettings = frontSubsCfg?.settingsById || {};
-                const manualDelay = fSettings[sub.id]?.delayMs ?? Object.values(fSettings)[0]?.delayMs ?? 0;
+                const totalDelay = sub.tuning?.delayMs ?? 0;
                 const autoDelay = autoAlignDelays[sub.id] ?? 0;
+                const manualDelay = totalDelay - autoDelay;
                 return (
                   <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
                     id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>
-                    &nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(sub.tuning?.delayMs, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°
+                    &nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(totalDelay, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°
                   </div>
                 );
               })}
@@ -1250,13 +1250,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Rear Subs ({rearSubs.length})</div>
               {rearSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : rearSubs.map((sub, i) => {
-                const rSettings = rearSubsCfg?.settingsById || {};
-                const manualDelay = rSettings[sub.id]?.delayMs ?? Object.values(rSettings)[0]?.delayMs ?? 0;
+                const totalDelay = sub.tuning?.delayMs ?? 0;
                 const autoDelay = autoAlignDelays[sub.id] ?? 0;
+                const manualDelay = totalDelay - autoDelay;
                 return (
                   <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
                     id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>
-                    &nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(sub.tuning?.delayMs, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°
+                    &nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(totalDelay, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°
                   </div>
                 );
               })}
