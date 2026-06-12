@@ -694,12 +694,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           surfaceAbsorption,
           f0: mode.freq,
         });
-        // __TEMP_REW_PARITY_Q__ When overrideConstantAxialQ is true, axial modes bypass Sabine cap.
-        const isAxialMode = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0) === 1;
-        const useConstantAxialQ = options?.overrideConstantAxialQ === true && isAxialMode;
         return {
           ...mode,
-          qValue: useConstantAxialQ ? Math.max(1, baseQ) : Math.max(1, Math.min(baseQ, absorptionQ)),
+          qValue: Math.max(1, Math.min(baseQ, absorptionQ)),
         };
       })
     : [];
