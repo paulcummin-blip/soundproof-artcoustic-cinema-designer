@@ -165,6 +165,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [debugDisableModalContribution, setDebugDisableModalContribution] = useState(false);
   // __TEMP_REW_PARITY_ISOLATION__ field mode for layered comparison
   const [rewParityFieldMode, setRewParityFieldMode] = useState('full_field'); // 'reflections_only' | 'modes_only' | 'full_field'
+  // __TEMP_REW_PARITY__ adjustable modal distance blend: 0.00 = existing 1m ref, 1.00 = full distance_normalized
+  const [modalDistanceBlend, setModalDistanceBlend] = useState(0.00);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -423,21 +425,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           ? true  // force disableLateField=true for isolation modes
           : disableLateField;
 
-        // __TEMP_REW_PARITY__ hybrid_distance_50: apply half the listener distance attenuation
-        // to the modal source amplitude without touching the engine. Intercept here, pass
-        // 'existing' referenceMode + adjusted gainScalar to the engine.
+        // __TEMP_REW_PARITY__ adjustable modal distance blend
+        // blend=0.00 → existing 1m reference (no attenuation applied)
+        // blend=1.00 → full distance-normalized (pass through to engine as distance_normalized)
+        // blend=0.xx → fractional dB attenuation applied in BassResponse, engine receives 'existing'
         const _seatZ = Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2;
         let _engineModalRefMode = modalSourceReferenceMode;
         let _engineModalGainScalar = modalGainScalar;
-        if (modalSourceReferenceMode === 'hybrid_distance_50') {
-          const _dx = sub.x - seat.x;
-          const _dy = sub.y - seat.y;
-          const _dz = sub.z - _seatZ;
-          const _distM = Math.max(0.01, Math.sqrt(_dx * _dx + _dy * _dy + _dz * _dz));
-          // Full distance loss in dB: -20*log10(d/1). Half = -10*log10(d/1).
-          const _halfDistanceLossDb = -10 * Math.log10(_distM / 1);
-          _engineModalGainScalar = modalGainScalar * Math.pow(10, _halfDistanceLossDb / 20);
-          _engineModalRefMode = 'existing';
+        if (modalSourceReferenceMode === 'distance_blend') {
+          const _blend = Math.max(0, Math.min(1, modalDistanceBlend));
+          if (_blend >= 1.0) {
+            // Full distance_normalized — let the engine handle it
+            _engineModalRefMode = 'distance_normalized';
+          } else if (_blend <= 0.0) {
+            // No attenuation — existing 1m reference
+            _engineModalRefMode = 'existing';
+          } else {
+            // Partial: apply blend fraction of the full distance dB loss as a gain scalar
+            const _dx = sub.x - seat.x;
+            const _dy = sub.y - seat.y;
+            const _dz = sub.z - _seatZ;
+            const _distM = Math.max(0.01, Math.sqrt(_dx * _dx + _dy * _dy + _dz * _dz));
+            // Full distance loss in dB: -20*log10(d/1m). Apply blend fraction.
+            const _fullDistanceLossDb = -20 * Math.log10(_distM / 1);
+            const _blendedLossDb = _fullDistanceLossDb * _blend;
+            _engineModalGainScalar = modalGainScalar * Math.pow(10, _blendedLossDb / 20);
+            _engineModalRefMode = 'existing';
+          }
         }
 
         const rewResult = simulateBassResponseRewCore(
@@ -526,7 +540,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1011,9 +1025,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   >
                     <option value="existing">Modal source: existing 1 m reference</option>
                     <option value="distance_normalized">Modal source: distance matched to listener ⚠️ parity test</option>
-                    <option value="hybrid_distance_50">Modal source: hybrid 50% distance match ⚠️ parity test</option>
+                    <option value="distance_blend">Modal source: distance blend ⚠️ parity test</option>
                     <option value="room_normalized">Modal source: room-normalised</option>
                   </select>
+                  {modalSourceReferenceMode === 'distance_blend' && (
+                    <label className="flex h-8 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-mono">
+                      Modal distance blend:
+                      <input
+                        type="number"
+                        min="0.00"
+                        max="1.00"
+                        step="0.05"
+                        value={modalDistanceBlend}
+                        onChange={(e) => setModalDistanceBlend(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))}
+                        className="w-16 rounded border border-amber-300 bg-white px-1 py-0.5 text-xs font-mono text-right focus:outline-none"
+                      />
+                    </label>
+                  )}
                   <select
                     value={modalGainScalar}
                     onChange={(event) => setModalGainScalar(Number(event.target.value))}
@@ -1147,7 +1175,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
                   <div className="font-bold text-[#1E293B]">Active model:</div>
                   <div>Source: {rewSourceCurveMode}</div>
-                  <div>Modal source: {modalSourceReferenceMode === 'hybrid_distance_50' ? 'hybrid_distance_50 ⚠️ (50% distance match)' : modalSourceReferenceMode}</div>
+                  <div>Modal source: {modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</div>
+                  {modalSourceReferenceMode === 'distance_blend' && (
+                    <div style={{ color: '#b45309', fontWeight: 700 }}>Modal distance blend: {modalDistanceBlend.toFixed(2)}</div>
+                  )}
                   <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
                   <div>Axial Q: {axialQ.toFixed(1)}</div>
                   <div>Storage: {modalStorageMode}</div>
