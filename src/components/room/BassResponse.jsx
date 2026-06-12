@@ -423,6 +423,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           ? true  // force disableLateField=true for isolation modes
           : disableLateField;
 
+        // __TEMP_REW_PARITY__ hybrid_distance_50: apply half the listener distance attenuation
+        // to the modal source amplitude without touching the engine. Intercept here, pass
+        // 'existing' referenceMode + adjusted gainScalar to the engine.
+        const _seatZ = Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2;
+        let _engineModalRefMode = modalSourceReferenceMode;
+        let _engineModalGainScalar = modalGainScalar;
+        if (modalSourceReferenceMode === 'hybrid_distance_50') {
+          const _dx = sub.x - seat.x;
+          const _dy = sub.y - seat.y;
+          const _dz = sub.z - _seatZ;
+          const _distM = Math.max(0.01, Math.sqrt(_dx * _dx + _dy * _dy + _dz * _dz));
+          // Full distance loss in dB: -20*log10(d/1). Half = -10*log10(d/1).
+          const _halfDistanceLossDb = -10 * Math.log10(_distM / 1);
+          _engineModalGainScalar = modalGainScalar * Math.pow(10, _halfDistanceLossDb / 20);
+          _engineModalRefMode = 'existing';
+        }
+
         const rewResult = simulateBassResponseRewCore(
           {
             widthM: roomDims.widthM,
@@ -432,7 +449,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {
             x: seat.x,
             y: seat.y,
-            z: Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2,
+            z: _seatZ,
           },
           sub,
           diagnosticSourceCurve,
@@ -443,8 +460,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             freqMinHz: 20,
             freqMaxHz: 200,
             smoothing: 'none',
-            modalSourceReferenceMode,
-            modalGainScalar,
+            modalSourceReferenceMode: _engineModalRefMode,
+            modalGainScalar: _engineModalGainScalar,
             axialQ,
             modalStorageMode,
             propagationPhaseScale: 1.0, // __TEMP_REW_PARITY_TEST__ forced to 1.0
@@ -994,6 +1011,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   >
                     <option value="existing">Modal source: existing 1 m reference</option>
                     <option value="distance_normalized">Modal source: distance matched to listener ⚠️ parity test</option>
+                    <option value="hybrid_distance_50">Modal source: hybrid 50% distance match ⚠️ parity test</option>
                     <option value="room_normalized">Modal source: room-normalised</option>
                   </select>
                   <select
@@ -1129,7 +1147,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
                   <div className="font-bold text-[#1E293B]">Active model:</div>
                   <div>Source: {rewSourceCurveMode}</div>
-                  <div>Modal source: {modalSourceReferenceMode}</div>
+                  <div>Modal source: {modalSourceReferenceMode === 'hybrid_distance_50' ? 'hybrid_distance_50 ⚠️ (50% distance match)' : modalSourceReferenceMode}</div>
                   <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
                   <div>Axial Q: {axialQ.toFixed(1)}</div>
                   <div>Storage: {modalStorageMode}</div>
