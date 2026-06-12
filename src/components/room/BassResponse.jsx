@@ -407,13 +407,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         const diagnosticSourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
 
         // __TEMP_REW_PARITY_ISOLATION__ resolve per-field-mode overrides
-        const _fieldReflections = rewParityFieldMode === 'modes_only' || rewParityFieldMode === 'direct_plus_modes' ? false
-          : rewParityFieldMode === 'reflections_only' ? true
+        // When full_field is selected with the flat_0_500hz_rew_parity source curve, route it as
+        // direct + modes only (no image-source reflections) to match REW Room Simulator, which does
+        // not stack a separate image-source layer on top of its modal solver.
+        const _isParityFullField = rewParityFieldMode === 'full_field' && rewSourceCurveMode === 'flat_0_500hz_rew_parity';
+        const _effectiveFieldMode = _isParityFullField ? 'direct_plus_modes' : rewParityFieldMode;
+
+        const _fieldReflections = _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes' ? false
+          : _effectiveFieldMode === 'reflections_only' ? true
           : enableRewCoreReflections;
-        const _fieldModes = rewParityFieldMode === 'reflections_only' ? false
-          : rewParityFieldMode === 'modes_only' || rewParityFieldMode === 'direct_plus_modes' ? true
+        const _fieldModes = _effectiveFieldMode === 'reflections_only' ? false
+          : _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes' ? true
           : true;
-        const _fieldLateField = (rewParityFieldMode === 'reflections_only' || rewParityFieldMode === 'modes_only' || rewParityFieldMode === 'direct_plus_modes')
+        const _fieldLateField = (_effectiveFieldMode === 'reflections_only' || _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes')
           ? true  // force disableLateField=true for isolation modes
           : disableLateField;
 
@@ -1139,9 +1145,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     Debug modal OFF: {debugDisableModalContribution ? 'YES ⚠️' : 'NO'}
                   </div>
                   {/* __TEMP_REW_PARITY_ISOLATION__ */}
-                  <div style={{ color: rewParityFieldMode !== 'full_field' ? '#b45309' : undefined, fontWeight: rewParityFieldMode !== 'full_field' ? 700 : undefined }}>
-                    Parity isolation: {rewParityFieldMode}
-                  </div>
+                  {(() => {
+                    const isParityRerouted = rewParityFieldMode === 'full_field' && rewSourceCurveMode === 'flat_0_500hz_rew_parity';
+                    const label = isParityRerouted
+                      ? 'REW parity full field = direct + modes only ⚠️'
+                      : `Parity isolation: ${rewParityFieldMode}`;
+                    const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
+                    return (
+                      <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>
+                        {label}
+                      </div>
+                    );
+                  })()}
                 </div>
               </>
             )}
