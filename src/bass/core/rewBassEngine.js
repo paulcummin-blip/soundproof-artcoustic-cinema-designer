@@ -698,9 +698,16 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         // When overrideConstantAxialQ is true, axial modes bypass the Sabine absorptionQ clamp
         // and use the user baseQ directly. Tangential and oblique modes are unaffected.
         const isAxialOverride = options?.overrideConstantAxialQ === true && mode.type === 'axial';
+        // __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__
+        // When overrideAbsorptionAxialQ is true, axial modes use absorptionQ directly,
+        // bypassing the Math.min(baseQ, absorptionQ) clamp entirely.
+        // Tangential and oblique modes are unaffected.
+        const isAbsorptionAxialOverride = options?.overrideAbsorptionAxialQ === true && mode.type === 'axial';
         return {
           ...mode,
-          qValue: isAxialOverride ? baseQ : Math.max(1, Math.min(baseQ, absorptionQ)),
+          qValue: isAxialOverride ? baseQ
+            : isAbsorptionAxialOverride ? absorptionQ
+            : Math.max(1, Math.min(baseQ, absorptionQ)),
         };
       })
     : [];
