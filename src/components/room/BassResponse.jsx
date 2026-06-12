@@ -36,6 +36,21 @@ const REW_SOURCE_CURVES = {
     { hz: 100, db: 89 },
     { hz: 200, db: 89 },
   ],
+  // __TEMP_REW_PARITY__ flat ported reference matching REW Room Simulator ideal source (-3dB @ 20Hz)
+  flat_20hz_rew_reference: [
+    { hz: 15, db: 91 },
+    { hz: 20, db: 94 },
+    { hz: 25, db: 94 },
+    { hz: 30, db: 94 },
+    { hz: 40, db: 94 },
+    { hz: 50, db: 94 },
+    { hz: 63, db: 94 },
+    { hz: 80, db: 94 },
+    { hz: 100, db: 94 },
+    { hz: 120, db: 94 },
+    { hz: 160, db: 94 },
+    { hz: 200, db: 94 },
+  ],
 };
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
@@ -948,6 +963,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <option value="product">Source curve: current product</option>
                     <option value="flat90">Source curve: flat 90 dB</option>
                     <option value="rew20HzPorted">Source curve: REW-style 20 Hz ported</option>
+                    <option value="flat_20hz_rew_reference">Flat 20Hz REW reference</option>
                   </select>
                   <select
                     value={modalSourceReferenceMode}
