@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useActiveProjectId } from '@/components/state/project-session';
 import { ArrowLeft, FileText, Download } from 'lucide-react';
 import { generateSVG, generateDXF, downloadTextFile } from '../utils/cadExport';
 
@@ -41,7 +42,8 @@ export default function ReportHeader({
     const urlProjectId = typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('projectId')
         : null;
-    const activeProjectId = urlProjectId || null;
+    const sessionProjectId = useActiveProjectId();
+    const activeProjectId = urlProjectId || sessionProjectId || null;
 
     const handleBackToProject = () => {
         if (!activeProjectId) return;
