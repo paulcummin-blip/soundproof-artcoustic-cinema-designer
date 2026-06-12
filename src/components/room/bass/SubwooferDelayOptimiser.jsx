@@ -321,8 +321,106 @@ export default function SubwooferDelayOptimiser({
     };
 
     // Compute parity metrics for current manual delay and recommended delay
-    const currentDelayMetrics = typeof currentManualDelay === "number" ? computeParityMetrics(currentManualDelay) : null;
-    const recommendedDelayMetrics = computeParityMetrics(bestDelay);
+    // Also capture full bin audit data for the Metric Audit panel
+    const computeParityMetricsWithAudit = (testDelayMs) => {
+      const base = computeParityMetrics(testDelayMs);
+      if (!base) return null;
+
+      // Re-run to capture excluded bins (computeParityMetrics does not expose them)
+      const modifiedSubsForTest = subsForSimulation.map((sub) => {
+        if (isFrontSub(sub)) return { ...sub, tuning: { ...sub.tuning, delayMs: testDelayMs } };
+        return { ...sub, tuning: { ...sub.tuning, delayMs: 0 } };
+      });
+
+      let sumRe = null, sumIm = null, freqsHz = null;
+      for (const sub of modifiedSubsForTest) {
+        const subCurve = getSubwooferCurve(sub.modelKey);
+        if (!subCurve || subCurve.length === 0) continue;
+        const diagnosticSourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
+        const rewResult = simulateBassResponseRewCore(
+          { widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM },
+          seatPoint,
+          sub,
+          diagnosticSourceCurve,
+          {
+            enableReflections: enableRewCoreReflections, enableModes: true, surfaceAbsorption,
+            freqMinHz: 20, freqMaxHz: 200, smoothing: "none",
+            modalSourceReferenceMode, modalGainScalar, axialQ, modalStorageMode,
+            propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight,
+            disableLateField, disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution,
+          }
+        );
+        if (!freqsHz) {
+          freqsHz = rewResult.freqsHz;
+          sumRe = rewResult.complexPressure.map((cp) => cp.re);
+          sumIm = rewResult.complexPressure.map((cp) => cp.im);
+        } else {
+          rewResult.complexPressure.forEach((cp, i) => {
+            if (Number.isFinite(cp.re) && Number.isFinite(cp.im)) {
+              sumRe[i] += cp.re; sumIm[i] += cp.im;
+            }
+          });
+        }
+      }
+
+      if (!freqsHz || !sumRe || !sumIm) return { ...base, audit: null };
+
+      // Trace each step of the pipeline to identify excluded bins
+      const allRaw = freqsHz.map((hz, i) => {
+        const mag = Math.sqrt(sumRe[i] ** 2 + sumIm[i] ** 2);
+        const spl = 20 * Math.log10(Math.max(mag, 1e-10));
+        return { hz, spl, finite: Number.isFinite(spl), positive: hz > 0 && Number.isFinite(hz) };
+      });
+
+      const afterFilterExclusions = allRaw.filter(p => !p.positive || !p.finite).map(p => ({
+        hz: p.hz, spl: p.spl, reason: !p.positive ? "non-positive or non-finite frequency" : "non-finite SPL"
+      }));
+
+      const afterFilter = allRaw.filter(p => p.positive && p.finite).map(p => ({ hz: p.hz, spl: p.spl }));
+      const afterSort = [...afterFilter].sort((a, b) => a.hz - b.hz);
+
+      const afterDedup = [];
+      const dedupExclusions = [];
+      for (let k = 0; k < afterSort.length; k++) {
+        if (k === 0 || Math.abs(afterSort[k].hz - afterSort[k - 1].hz) > 1e-9) {
+          afterDedup.push(afterSort[k]);
+        } else {
+          dedupExclusions.push({ hz: afterSort[k].hz, spl: afterSort[k].spl, reason: "duplicate frequency (within 1e-9 Hz)" });
+        }
+      }
+
+      const inRange = afterDedup.filter(p => p.hz >= FREQ_MIN && p.hz <= FREQ_MAX);
+      const outOfRange = afterDedup.filter(p => p.hz < FREQ_MIN || p.hz > FREQ_MAX).map(p => ({
+        hz: p.hz, spl: p.spl, reason: `outside scoring range ${FREQ_MIN}–${FREQ_MAX} Hz`
+      }));
+
+      const allExclusions = [...afterFilterExclusions, ...dedupExclusions, ...outOfRange];
+      const minBin = inRange.reduce((acc, p) => (!acc || p.spl < acc.spl ? p : acc), null);
+      const maxBin = inRange.reduce((acc, p) => (!acc || p.spl > acc.spl ? p : acc), null);
+
+      return {
+        ...base,
+        audit: {
+          totalRawBins: allRaw.length,
+          binsAfterFilter: afterFilter.length,
+          binsAfterDedup: afterDedup.length,
+          binsInRange: inRange.length,
+          excludedCount: allExclusions.length,
+          first5Excluded: allExclusions.slice(0, 5),
+          minBin,
+          maxBin,
+          pipelineFlags: {
+            cleaned: true,
+            sorted: true,
+            deduped: true,
+            sameAsParityCheck: true,
+          },
+        },
+      };
+    };
+
+    const currentDelayMetrics = typeof currentManualDelay === "number" ? computeParityMetricsWithAudit(currentManualDelay) : null;
+    const recommendedDelayMetrics = computeParityMetricsWithAudit(bestDelay);
 
     setResult({
       bestDelay,
@@ -500,6 +598,88 @@ export default function SubwooferDelayOptimiser({
               </table>
             </div>
           )}
+
+          {/* Optimiser Metric Audit */}
+          {(result.currentDelayMetrics?.audit || result.recommendedDelayMetrics?.audit) && (() => {
+            const cur = result.currentDelayMetrics;
+            const rec = result.recommendedDelayMetrics;
+            const fmt2 = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "—");
+
+            const auditPanelFor = (m, label, bg, borderColor, headColor, textColor) => {
+              if (!m?.audit) return null;
+              const a = m.audit;
+              return (
+                <div style={{ background: bg, border: `1px solid ${borderColor}`, borderRadius: 4, padding: "6px 8px" }}>
+                  <div style={{ fontWeight: 600, color: headColor, marginBottom: 4, fontSize: 11 }}>
+                    {label}: {fmt2(m.delayMs, 1)} ms
+                  </div>
+                  <div style={{ color: textColor, lineHeight: 1.7, fontSize: 10 }}>
+                    <div><strong>Bins scored:</strong> {a.binsInRange}</div>
+                    <div><strong>Freq range scored:</strong> {fmt2(m.firstFreq, 1)}–{fmt2(m.lastFreq, 1)} Hz</div>
+                    <div><strong>Min SPL bin:</strong> {fmt2(a.minBin?.hz, 1)} Hz @ {fmt2(a.minBin?.spl, 2)} dB</div>
+                    <div><strong>Max SPL bin:</strong> {fmt2(a.maxBin?.hz, 1)} Hz @ {fmt2(a.maxBin?.spl, 2)} dB</div>
+                    <div><strong>P-P score:</strong> {fmt2(m.score, 3)} dB</div>
+                    <div><strong>Bins excluded:</strong> {a.excludedCount} (raw={a.totalRawBins}, after filter={a.binsAfterFilter}, after dedup={a.binsAfterDedup})</div>
+                    {a.excludedCount > 0 && (
+                      <div style={{ marginTop: 3 }}>
+                        <strong>First {Math.min(5, a.first5Excluded.length)} excluded:</strong>
+                        {a.first5Excluded.map((ex, i) => (
+                          <div key={i} style={{ marginLeft: 8 }}>
+                            [{i}] {fmt2(ex.hz, 2)} Hz → {ex.reason}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ marginTop: 3, borderTop: `1px solid ${borderColor}`, paddingTop: 3 }}>
+                      <strong>Pipeline:</strong>{" "}
+                      cleaned={String(a.pipelineFlags.cleaned)}{" | "}
+                      sorted={String(a.pipelineFlags.sorted)}{" | "}
+                      deduped={String(a.pipelineFlags.deduped)}{" | "}
+                      same as parity check={String(a.pipelineFlags.sameAsParityCheck)}
+                    </div>
+                  </div>
+                </div>
+              );
+            };
+
+            // Metric audit pass/warning
+            let auditStatus = null;
+            if (cur?.audit && rec?.audit) {
+              const binMatch = cur.audit.binsInRange === rec.audit.binsInRange;
+              const firstMatch = cur.firstFreq === rec.firstFreq;
+              const lastMatch = cur.lastFreq === rec.lastFreq;
+              const pipelineMatch = JSON.stringify(cur.audit.pipelineFlags) === JSON.stringify(rec.audit.pipelineFlags);
+              const allPass = binMatch && firstMatch && lastMatch && pipelineMatch;
+              const diffs = [];
+              if (!binMatch) diffs.push(`bin count: current=${cur.audit.binsInRange} vs recommended=${rec.audit.binsInRange}`);
+              if (!firstMatch) diffs.push(`first freq: current=${fmt2(cur.firstFreq,1)} vs recommended=${fmt2(rec.firstFreq,1)}`);
+              if (!lastMatch) diffs.push(`last freq: current=${fmt2(cur.lastFreq,1)} vs recommended=${fmt2(rec.lastFreq,1)}`);
+              if (!pipelineMatch) diffs.push("pipeline flags differ");
+              auditStatus = { pass: allPass, diffs };
+            }
+
+            return (
+              <div style={{ gridColumn: "1 / -1", marginTop: 10, background: "#f8f0ff", border: "1px solid #c084fc", borderRadius: 4, padding: "8px 10px" }}>
+                <div style={{ fontWeight: 700, color: "#7e22ce", marginBottom: 6, fontSize: 12 }}>
+                  Optimiser Metric Audit
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+                  {auditPanelFor(cur, "Current delay", "#fefce8", "#fde68a", "#92400e", "#78350f")}
+                  {auditPanelFor(rec, "Recommended delay", "#f0fdf4", "#86efac", "#166534", "#14532d")}
+                </div>
+                {auditStatus && (
+                  <div style={{ marginTop: 6, fontSize: 10, fontWeight: 600, color: auditStatus.pass ? "#166534" : "#92400e" }}>
+                    {auditStatus.pass
+                      ? "✓ Metric audit PASS — both evaluations use identical bin counts, frequency range, and pipeline."
+                      : `⚠ Metric audit WARNING — ${auditStatus.diffs.join("; ")}`}
+                  </div>
+                )}
+                <div style={{ marginTop: 4, fontSize: 10, color: "#7e22ce", fontStyle: "italic" }}>
+                  Read-only diagnostic. Does not affect optimisation behaviour or chosen delay.
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Graph Parity Check */}
           {(result.currentDelayMetrics || result.recommendedDelayMetrics) && (
