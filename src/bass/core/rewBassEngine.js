@@ -775,11 +775,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const phaseJitter = disableReflectionPhaseJitter ? 0 : 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
       const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + phaseJitter;
 
-      // Temporary REW parity testing only, not final physics:
-      // reduce coherent reflection contribution more strongly below Schroeder/modal region.
-      const reflectionCoherenceWeight = disableReflectionCoherenceWeight
-        ? 1
-        : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
+      // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__
+      // Temporarily forcing full coherence (1.0) to test whether the existing
+      // frequency-dependent weighting is the cause of one-sub REW parity error.
+      // Original formula (preserved, commented out):
+      // const reflectionCoherenceWeight = disableReflectionCoherenceWeight
+      //   ? 1
+      //   : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
+      const reflectionCoherenceWeight = 1.0; // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__
       const imageRe = reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
       const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       reflectionRe += imageRe;
@@ -815,9 +818,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
         const debugPhaseJitter = disableReflectionPhaseJitter ? 0 : 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
         const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + debugPhaseJitter;
-        const debugCoherenceWeight = disableReflectionCoherenceWeight
-          ? 1
-          : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
+        // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__ (debug copy — kept in sync with main path)
+        const debugCoherenceWeight = 1.0;
         _refSumRe += debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
         _refSumIm += debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       });
