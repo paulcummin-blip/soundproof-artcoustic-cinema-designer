@@ -993,7 +993,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     aria-label="Modal source reference comparison"
                   >
                     <option value="existing">Modal source: existing 1 m reference</option>
-                    <option value="distance_normalized">Modal source: distance-normalised</option>
+                    <option value="distance_normalized">Modal source: distance matched to listener ⚠️ parity test</option>
                     <option value="room_normalized">Modal source: room-normalised</option>
                   </select>
                   <select
