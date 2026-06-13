@@ -343,7 +343,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -482,8 +482,14 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     // True pressure accumulation: direct sum of all modal pressure contributions.
     // Temporary REW parity diagnostic: optionally mute only the 68.6 Hz axial mode from active modal sum.
     if (!isMuted68HzAxialMode) {
-      modalSumRe += activeStoredModalContrib.real;
-      modalSumIm += activeStoredModalContrib.imag;
+      // __TEMP_REW_PARITY_MODE_200_SCALE__
+      // Scale only the (2,0,0) modal contribution before accumulation.
+      // All other modes, Q, coupling, storage, phase, and direct/reflection path are completely unchanged.
+      const _mode200Scale = (mode.nx === 2 && mode.ny === 0 && mode.nz === 0 && debugMode200Multiplier !== 1.0)
+        ? debugMode200Multiplier
+        : 1.0;
+      modalSumRe += activeStoredModalContrib.real * _mode200Scale;
+      modalSumIm += activeStoredModalContrib.imag * _mode200Scale;
     }
 
     const isInDebugRange = frequencyHz >= 30 && frequencyHz <= 72;
@@ -896,7 +902,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         _debugModalContributors,
         _debugActiveModalVectorBreakdown,
       } = legacyModalTransferLocal(
-        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity
+        frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity,
+        Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0 // __TEMP_REW_PARITY_MODE_200_SCALE__
       );
 
       if (_debugActiveModalVectorBreakdown) {

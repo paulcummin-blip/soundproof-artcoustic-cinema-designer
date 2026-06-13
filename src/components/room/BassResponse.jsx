@@ -169,6 +169,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [modalDistanceBlend, setModalDistanceBlend] = useState(0.00);
   const [overrideConstantAxialQ, setOverrideConstantAxialQ] = useState(false);
   const [overrideAbsorptionAxialQ, setOverrideAbsorptionAxialQ] = useState(false);
+  // __TEMP_REW_PARITY_MODE_200_SCALE__
+  const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(1.0);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
 
@@ -490,6 +492,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             debugDisableModalContribution, // __TEMP_DIAGNOSTIC__ — remove after polarity masking diagnosis
             overrideConstantAxialQ, // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
             overrideAbsorptionAxialQ, // __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__
+            debugMode200Multiplier, // __TEMP_REW_PARITY_MODE_200_SCALE__
             }
         );
 
@@ -544,7 +547,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1172,6 +1175,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     />
                     Absorption axial Q parity test
                   </label>
+                  {/* __TEMP_REW_PARITY_MODE_200_SCALE__ */}
+                  <select
+                    value={debugMode200Multiplier}
+                    onChange={(event) => setDebugMode200Multiplier(Number(event.target.value))}
+                    className="h-8 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold"
+                    aria-label="(2,0,0) mode scale"
+                  >
+                    <option value={1.00}>(2,0,0) mode scale: 1.00</option>
+                    <option value={0.75}>(2,0,0) mode scale: 0.75</option>
+                    <option value={0.50}>(2,0,0) mode scale: 0.50</option>
+                    <option value={0.25}>(2,0,0) mode scale: 0.25</option>
+                  </select>
                   </div>
                 {/* __TEMP_REW_PARITY_ISOLATION__ field isolation selector */}
                 <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -1224,6 +1239,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   {/* __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__ */}
                   <div style={{ color: overrideAbsorptionAxialQ ? '#b45309' : undefined, fontWeight: overrideAbsorptionAxialQ ? 700 : undefined }}>
                     Absorption axial Q: {overrideAbsorptionAxialQ ? 'ON ⚠️' : 'OFF'}
+                  </div>
+                  {/* __TEMP_REW_PARITY_MODE_200_SCALE__ */}
+                  <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
+                    (2,0,0) mode scale: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
                   </div>
                   {/* __TEMP_REW_PARITY_ISOLATION__ */}
                   {(() => {
