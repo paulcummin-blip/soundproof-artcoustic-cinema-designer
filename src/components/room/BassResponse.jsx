@@ -20,6 +20,19 @@ import { Switch } from "@/components/ui/switch";
 // Do not delete diagnostic code; just flip this flag.
 const IS_DEVELOPMENT_MODE = true;
 
+// Agreed REW parity comparison state — do not change without a new sweep.
+// propagationPhaseScale 0.10 was chosen by sweep on 2026-06-13 (null centre 40.4 Hz vs REW 40.6 Hz).
+const REW_PARITY_PRESET = {
+  rewSourceCurveMode: 'product',
+  modalSourceReferenceMode: 'existing',
+  modalGainScalar: 1.0,
+  axialQ: 8.0,
+  propagationPhaseScale: 0.10,
+  debugMode200Multiplier: 1.00,
+  enableRewCoreReflections: true,
+  rewParityFieldMode: 'full_field',
+};
+
 const REW_SOURCE_CURVES = {
   product: null,
   flat90: [
@@ -174,6 +187,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(1.0);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
+
+  // REW parity preset helpers — no engine changes
+  const resetToParityPreset = () => {
+    setRewSourceCurveMode(REW_PARITY_PRESET.rewSourceCurveMode);
+    setModalSourceReferenceMode(REW_PARITY_PRESET.modalSourceReferenceMode);
+    setModalGainScalar(REW_PARITY_PRESET.modalGainScalar);
+    setAxialQ(REW_PARITY_PRESET.axialQ);
+    setPropagationPhaseScale(REW_PARITY_PRESET.propagationPhaseScale);
+    setDebugMode200Multiplier(REW_PARITY_PRESET.debugMode200Multiplier);
+    setEnableRewCoreReflections(REW_PARITY_PRESET.enableRewCoreReflections);
+    setRewParityFieldMode(REW_PARITY_PRESET.rewParityFieldMode);
+  };
+  const isParityPresetActive =
+    rewSourceCurveMode === REW_PARITY_PRESET.rewSourceCurveMode &&
+    modalSourceReferenceMode === REW_PARITY_PRESET.modalSourceReferenceMode &&
+    modalGainScalar === REW_PARITY_PRESET.modalGainScalar &&
+    axialQ === REW_PARITY_PRESET.axialQ &&
+    propagationPhaseScale === REW_PARITY_PRESET.propagationPhaseScale &&
+    debugMode200Multiplier === REW_PARITY_PRESET.debugMode200Multiplier &&
+    enableRewCoreReflections === REW_PARITY_PRESET.enableRewCoreReflections &&
+    rewParityFieldMode === REW_PARITY_PRESET.rewParityFieldMode;
 
   // Auto-align loop guards
   const frontCfgRef = React.useRef(null);
@@ -819,6 +853,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           return (
             <div className="flex flex-col gap-2 mb-4">
               <div className="text-xs text-[#6b7280] font-mono mb-1">Engine: REW Core (production — fixed)</div>
+
+              {/* REW parity preset control */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <button
+                  onClick={resetToParityPreset}
+                  style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid #213428', background: '#213428', color: '#fff', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Reset to REW parity preset
+                </button>
+                <span style={{
+                  fontSize: 10, fontFamily: 'monospace', fontWeight: 700, padding: '2px 7px', borderRadius: 4,
+                  background: isParityPresetActive ? '#dcfce7' : '#fef9c3',
+                  color: isParityPresetActive ? '#166534' : '#92400e',
+                  border: `1px solid ${isParityPresetActive ? '#86efac' : '#fde68a'}`,
+                }}>
+                  {isParityPresetActive ? '✓ REW parity preset active' : '⚠ modified'}
+                </span>
+              </div>
+
               {true && (<>
                 <div className="flex flex-wrap gap-2">
                   <select value={rewSourceCurveMode} onChange={(e) => setRewSourceCurveMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Source curve">
