@@ -156,7 +156,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [modalStorageMode, setModalStorageMode] = useState("none");
   // Temporary REW parity experiment: default changed to 1.0 to test full acoustic propagation phase.
   // Revert to 0.5 after experiment is concluded.
-  const [propagationPhaseScale, setPropagationPhaseScale] = useState(1.0);
+  const [propagationPhaseScale, setPropagationPhaseScale] = useState(0.10);
   const [disableReflectionPhaseJitter, setDisableReflectionPhaseJitter] = useState(false);
   const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(false);
   const [disableLateField, setDisableLateField] = useState(false);
@@ -483,7 +483,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             modalGainScalar: _engineModalGainScalar,
             axialQ,
             modalStorageMode,
-            propagationPhaseScale: 1.0, // __TEMP_REW_PARITY_TEST__ forced to 1.0
+            propagationPhaseScale, // Uses state value (default 0.10 for REW parity)
             pureDeterministicModalSum: true, // __TEMP_REW_PARITY_TEST__ forced to true
             disableReflectionPhaseJitter,
             disableReflectionCoherenceWeight,
