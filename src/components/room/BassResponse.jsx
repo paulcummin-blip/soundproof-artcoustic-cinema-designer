@@ -806,11 +806,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </Alert>
       )}
 
-      {/* Advanced REW debug — collapsed by default */}
+      {/* Deep REW diagnostics — collapsed by default */}
       {IS_DEVELOPMENT_MODE && (
         <details style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginBottom: 4 }}>
           <summary style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
-            Advanced REW debug
+            Deep REW diagnostics (open only if requested)
           </summary>
           <div style={{ marginTop: 8 }}>
 
@@ -1036,12 +1036,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
       {/* __B44_GEOMETRY_DEBUG__ end */}
-          </div>
-        </details>
-      )}
 
       {/* __B44_RUNTIME_AUDIT__ Temporary live state audit panel */}
-      {IS_DEVELOPMENT_MODE && (() => {
+      {(() => {
         const auditFirstSeatId = selectedSeatIds[0] || null;
         const auditFirstSeat = auditFirstSeatId
           ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === auditFirstSeatId)
@@ -1093,6 +1090,69 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
       {/* __B44_RUNTIME_AUDIT__ end */}
+
+      {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
+      {(
+        <RewDebugPanel
+          stepDebug={simulationResults.stepDebug}
+          selectedSeatIds={selectedSeatIds}
+          disableModalPropagationPhase={disableModalPropagationPhase}
+          propagationPhaseScale={propagationPhaseScale}
+        />
+      )}
+      {/* __B44_STEP_DEBUG__ end */}
+
+      {/* Development delay optimiser — read-only, no state changes */}
+      {(() => {
+        const optimiserSeat = seatingPositions?.find(s => s.id === selectedSeatIds[0] || `${s.x}-${s.y}` === selectedSeatIds[0]) || seatingPositions?.[0];
+
+        // Extract current manual delay from the first active front sub's settings (same source as Manual Delay slider)
+        const frontSettingsById = frontSubsCfg?.settingsById || {};
+        const firstFrontSubId = subsForSimulation.find(s => s.id?.startsWith('front-'))?.id;
+        const currentManualDelay = firstFrontSubId && Number.isFinite(frontSettingsById[firstFrontSubId]?.delayMs) 
+          ? frontSettingsById[firstFrontSubId].delayMs 
+          : 0;
+
+        return (
+          <SubwooferDelayOptimiser
+            mlpSeat={optimiserSeat}
+            roomDims={roomDims}
+            subsForSimulation={subsForSimulation}
+            rewSourceCurveMode={rewSourceCurveMode}
+            REW_SOURCE_CURVES={REW_SOURCE_CURVES}
+            enableRewCoreReflections={enableRewCoreReflections}
+            surfaceAbsorption={surfaceAbsorption}
+            modalSourceReferenceMode={modalSourceReferenceMode}
+            modalGainScalar={modalGainScalar}
+            axialQ={axialQ}
+            modalStorageMode={modalStorageMode}
+            propagationPhaseScale={propagationPhaseScale}
+            disableReflectionPhaseJitter={disableReflectionPhaseJitter}
+            disableReflectionCoherenceWeight={disableReflectionCoherenceWeight}
+            disableLateField={disableLateField}
+            disableModalPropagationPhase={disableModalPropagationPhase}
+            mute68HzAxialMode={mute68HzAxialMode}
+            debugDisableModalContribution={debugDisableModalContribution}
+            currentManualDelay={currentManualDelay}
+          />
+        );
+      })()}
+
+      {/* REW Parity Benchmark — measurement layer, no physics changes */}
+      {(
+        <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginTop: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#213428', marginBottom: 8 }}>REW Parity Benchmark</div>
+          <RewParityBenchmark
+            b44Series={multiSeries[0]?.data ?? []}
+            stepDebug={simulationResults.stepDebug}
+            wholeCurveDebugRows={simulationResults.wholeCurveDebugRows}
+            modalSourceReferenceMode={modalSourceReferenceMode}
+          />
+        </div>
+      )}
+       </div>
+      </details>
+      )}
 
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
@@ -1372,66 +1432,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
       {/* __B44_ALIGNMENT_AUDIT__ end */}
-
-      {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
-      {IS_DEVELOPMENT_MODE && (
-        <RewDebugPanel
-          stepDebug={simulationResults.stepDebug}
-          selectedSeatIds={selectedSeatIds}
-          disableModalPropagationPhase={disableModalPropagationPhase}
-          propagationPhaseScale={propagationPhaseScale}
-        />
-      )}
-      {/* __B44_STEP_DEBUG__ end */}
-
-      {/* Development delay optimiser — read-only, no state changes */}
-      {IS_DEVELOPMENT_MODE && (() => {
-        const optimiserSeat = seatingPositions?.find(s => s.id === selectedSeatIds[0] || `${s.x}-${s.y}` === selectedSeatIds[0]) || seatingPositions?.[0];
-        
-        // Extract current manual delay from the first active front sub's settings (same source as Manual Delay slider)
-        const frontSettingsById = frontSubsCfg?.settingsById || {};
-        const firstFrontSubId = subsForSimulation.find(s => s.id?.startsWith('front-'))?.id;
-        const currentManualDelay = firstFrontSubId && Number.isFinite(frontSettingsById[firstFrontSubId]?.delayMs) 
-          ? frontSettingsById[firstFrontSubId].delayMs 
-          : 0;
-        
-        return (
-          <SubwooferDelayOptimiser
-            mlpSeat={optimiserSeat}
-            roomDims={roomDims}
-            subsForSimulation={subsForSimulation}
-            rewSourceCurveMode={rewSourceCurveMode}
-            REW_SOURCE_CURVES={REW_SOURCE_CURVES}
-            enableRewCoreReflections={enableRewCoreReflections}
-            surfaceAbsorption={surfaceAbsorption}
-            modalSourceReferenceMode={modalSourceReferenceMode}
-            modalGainScalar={modalGainScalar}
-            axialQ={axialQ}
-            modalStorageMode={modalStorageMode}
-            propagationPhaseScale={propagationPhaseScale}
-            disableReflectionPhaseJitter={disableReflectionPhaseJitter}
-            disableReflectionCoherenceWeight={disableReflectionCoherenceWeight}
-            disableLateField={disableLateField}
-            disableModalPropagationPhase={disableModalPropagationPhase}
-            mute68HzAxialMode={mute68HzAxialMode}
-            debugDisableModalContribution={debugDisableModalContribution}
-            currentManualDelay={currentManualDelay}
-          />
-        );
-      })()}
-
-      {/* REW Parity Benchmark — measurement layer, no physics changes */}
-      {IS_DEVELOPMENT_MODE && (
-        <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginTop: 8 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#213428', marginBottom: 8 }}>REW Parity Benchmark</div>
-          <RewParityBenchmark
-            b44Series={multiSeries[0]?.data ?? []}
-            stepDebug={simulationResults.stepDebug}
-            wholeCurveDebugRows={simulationResults.wholeCurveDebugRows}
-            modalSourceReferenceMode={modalSourceReferenceMode}
-          />
-        </div>
-      )}
 
       {/* Surface Absorption Panel */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
