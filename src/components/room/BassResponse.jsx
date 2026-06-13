@@ -528,6 +528,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             overrideConstantAxialQ, // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
             overrideAbsorptionAxialQ, // __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__
             debugMode200Multiplier, // __TEMP_REW_PARITY_MODE_200_SCALE__
+            debugReflectionOrder: 3, // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__ order-3 test — remove or set to 1 after experiment
             }
         );
 
@@ -582,7 +583,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier]); // debugReflectionOrder: 3 hardcoded above
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
