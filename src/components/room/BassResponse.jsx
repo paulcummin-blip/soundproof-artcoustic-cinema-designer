@@ -146,7 +146,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     ceiling: 0.30,
     floor: 0.30,
   });
-  const [useRewCoreTestMode, setUseRewCoreTestMode] = useState(true);
+  // REW Core is the production engine — not user-controllable.
+  const useRewCoreTestMode = true;
   const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(true);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
   const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState("existing");
@@ -813,15 +814,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </summary>
           <div style={{ marginTop: 8 }}>
 
-        {/* Engine toggle + all "Hide" controls */}
+        {/* Advanced debug controls — engine is always REW Core */}
         {(() => {
           return (
             <div className="flex flex-col gap-2 mb-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Label htmlFor="rew-core-test-toggle-adv" className="text-xs text-[#3E4349]">REW Core Test engine</Label>
-                <Switch id="rew-core-test-toggle-adv" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
-              </div>
-              {useRewCoreTestMode && (<>
+              <div className="text-xs text-[#6b7280] font-mono mb-1">Engine: REW Core (production — fixed)</div>
+              {true && (<>
                 <div className="flex flex-wrap gap-2">
                   <select value={rewSourceCurveMode} onChange={(e) => setRewSourceCurveMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Source curve">
                     <option value="product">Source curve: current product</option>
@@ -1194,7 +1192,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       </div>
 
       {/* __REW_GEOMETRY_MATCH__ Development-only REW parity coordinate readout */}
-      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (() => {
+      {IS_DEVELOPMENT_MODE && (() => {
         const rewSeatId = selectedSeatIds[0] || null;
         const rewSeat = rewSeatId
           ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === rewSeatId)
@@ -1287,7 +1285,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* __REW_GEOMETRY_MATCH__ end */}
 
       {/* __B44_ALIGNMENT_AUDIT__ Two-sub alignment geometry audit */}
-      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (() => {
+      {IS_DEVELOPMENT_MODE && (() => {
         const auditMlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
         const auditMlpPoint = auditMlpSeat
           ? { x: auditMlpSeat.x, y: auditMlpSeat.y, z: Number.isFinite(Number(auditMlpSeat.z)) ? Number(auditMlpSeat.z) : 1.2 }
@@ -1376,7 +1374,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* __B44_ALIGNMENT_AUDIT__ end */}
 
       {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
-      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
+      {IS_DEVELOPMENT_MODE && (
         <RewDebugPanel
           stepDebug={simulationResults.stepDebug}
           selectedSeatIds={selectedSeatIds}
@@ -1387,7 +1385,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* __B44_STEP_DEBUG__ end */}
 
       {/* Development delay optimiser — read-only, no state changes */}
-      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (() => {
+      {IS_DEVELOPMENT_MODE && (() => {
         const optimiserSeat = seatingPositions?.find(s => s.id === selectedSeatIds[0] || `${s.x}-${s.y}` === selectedSeatIds[0]) || seatingPositions?.[0];
         
         // Extract current manual delay from the first active front sub's settings (same source as Manual Delay slider)
@@ -1423,7 +1421,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       })()}
 
       {/* REW Parity Benchmark — measurement layer, no physics changes */}
-      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
+      {IS_DEVELOPMENT_MODE && (
         <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginTop: 8 }}>
           <div style={{ fontWeight: 700, fontSize: 12, color: '#213428', marginBottom: 8 }}>REW Parity Benchmark</div>
           <RewParityBenchmark
