@@ -840,7 +840,113 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </Alert>
       )}
 
-      {/* Deep REW diagnostics — collapsed by default */}
+      {/* REW Parity Controls — visible above graph for screenshot workflow */}
+      {IS_DEVELOPMENT_MODE && (
+        <div style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '10px 12px', marginBottom: 4 }}>
+          <div style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', marginBottom: 8 }}>REW Parity Controls</div>
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-[#6b7280] font-mono">Engine: REW Core (production — fixed)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={resetToParityPreset} style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid #213428', background: '#213428', color: '#fff', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer', fontWeight: 600 }}>
+                Reset to REW parity preset
+              </button>
+              <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: isParityPresetActive ? '#dcfce7' : '#fef9c3', color: isParityPresetActive ? '#166534' : '#92400e', border: `1px solid ${isParityPresetActive ? '#86efac' : '#fde68a'}` }}>
+                {isParityPresetActive ? '✓ REW parity preset active' : '⚠ modified'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <select value={rewSourceCurveMode} onChange={(e) => setRewSourceCurveMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Source curve">
+                <option value="product">Source curve: current product</option>
+                <option value="flat90">Source curve: flat 90 dB</option>
+                <option value="rew20HzPorted">Source curve: REW-style 20 Hz ported</option>
+                <option value="flat_0_500hz_rew_parity">Flat 0–500Hz REW parity</option>
+              </select>
+              <select value={modalSourceReferenceMode} onChange={(e) => setModalSourceReferenceMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Modal source reference">
+                <option value="existing">Modal source: existing 1 m reference</option>
+                <option value="distance_normalized">Modal source: distance matched to listener ⚠️</option>
+                <option value="distance_blend">Modal source: distance blend ⚠️</option>
+                <option value="room_normalized">Modal source: room-normalised</option>
+              </select>
+              {modalSourceReferenceMode === 'distance_blend' && (
+                <label className="flex h-8 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-mono">
+                  Modal distance blend:
+                  <input type="number" min="0.00" max="1.00" step="0.05" value={modalDistanceBlend} onChange={(e) => setModalDistanceBlend(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))} className="w-16 rounded border border-amber-300 bg-white px-1 py-0.5 text-xs font-mono text-right focus:outline-none" />
+                </label>
+              )}
+              <select value={modalGainScalar} onChange={(e) => setModalGainScalar(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Modal gain">
+                <option value={1.0}>Modal gain: 1.0</option>
+                <option value={1.2}>Modal gain: 1.2</option>
+                <option value={1.4}>Modal gain: 1.4</option>
+                <option value={1.6}>Modal gain: 1.6</option>
+              </select>
+              <select value={axialQ} onChange={(e) => setAxialQ(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Axial Q">
+                <option value={8.0}>Axial Q: 8.0</option>
+                <option value={7.0}>Axial Q: 7.0</option>
+                <option value={6.5}>Axial Q: 6.5</option>
+                <option value={6.0}>Axial Q: 6.0</option>
+                <option value={5.0}>Axial Q: 5.0</option>
+              </select>
+              <select value={propagationPhaseScale} onChange={(e) => setPropagationPhaseScale(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Propagation phase scale">
+                <option value={0.00}>Propagation phase scale: 0.00</option>
+                <option value={0.10}>Propagation phase scale: 0.10</option>
+                <option value={0.20}>Propagation phase scale: 0.20</option>
+                <option value={0.30}>Propagation phase scale: 0.30</option>
+                <option value={0.40}>Propagation phase scale: 0.40</option>
+                <option value={0.50}>Propagation phase scale: 0.50</option>
+                <option value={0.60}>Propagation phase scale: 0.60</option>
+                <option value={0.70}>Propagation phase scale: 0.70</option>
+                <option value={1.00}>Propagation phase scale: 1.00</option>
+              </select>
+              <select value={debugMode200Multiplier} onChange={(e) => setDebugMode200Multiplier(Number(e.target.value))} className="h-8 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold" aria-label="(2,0,0) axial overlay">
+                <option value={1.00}>(2,0,0) axial overlay: 1.00</option>
+                <option value={0.75}>(2,0,0) axial overlay: 0.75</option>
+                <option value={0.50}>(2,0,0) axial overlay: 0.50</option>
+                <option value={0.25}>(2,0,0) axial overlay: 0.25</option>
+              </select>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                <input type="checkbox" checked={enableRewCoreReflections} onChange={(e) => setEnableRewCoreReflections(e.target.checked)} />
+                Reflections
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'reflections_only', label: 'Reflections only' },
+                { value: 'modes_only', label: 'Modes only' },
+                { value: 'direct_plus_modes', label: 'Direct + Modes' },
+                { value: 'full_field', label: 'Full field' },
+              ].map(({ value, label }) => (
+                <button key={value} onClick={() => setRewParityFieldMode(value)} className={`h-8 px-3 rounded-md border text-xs font-mono transition-colors ${rewParityFieldMode === value ? 'bg-[#213428] text-white border-[#213428]' : 'bg-white text-[#1B1A1A] border-[#DCDBD6] hover:border-[#213428]'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
+              <div className="font-bold text-[#1E293B]">Active model:</div>
+              <div>Source: {rewSourceCurveMode}</div>
+              <div>Modal source: {modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</div>
+              {modalSourceReferenceMode === 'distance_blend' && <div style={{ color: '#b45309', fontWeight: 700 }}>Modal distance blend: {modalDistanceBlend.toFixed(2)}</div>}
+              <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
+              <div>Axial Q: {axialQ.toFixed(1)}</div>
+              <div>Storage: {modalStorageMode}</div>
+              <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
+              <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
+              <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
+                (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
+              </div>
+              {(() => {
+                const isParityRerouted = rewParityFieldMode === 'full_field' && rewSourceCurveMode === 'flat_0_500hz_rew_parity';
+                const label = isParityRerouted ? 'REW parity full field = direct + modes only ⚠️' : `Parity isolation: ${rewParityFieldMode}`;
+                const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
+                return <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>{label}</div>;
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deep REW diagnostics — all verbose debug panels collapsed here */}
       {IS_DEVELOPMENT_MODE && (
         <details style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginBottom: 4 }}>
           <summary style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
@@ -848,128 +954,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </summary>
           <div style={{ marginTop: 8 }}>
 
-        {/* Advanced debug controls — engine is always REW Core */}
-        {(() => {
-          return (
-            <div className="flex flex-col gap-2 mb-4">
-              <div className="text-xs text-[#6b7280] font-mono mb-1">Engine: REW Core (production — fixed)</div>
-
-              {/* REW parity preset control */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <button
-                  onClick={resetToParityPreset}
-                  style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid #213428', background: '#213428', color: '#fff', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  Reset to REW parity preset
-                </button>
-                <span style={{
-                  fontSize: 10, fontFamily: 'monospace', fontWeight: 700, padding: '2px 7px', borderRadius: 4,
-                  background: isParityPresetActive ? '#dcfce7' : '#fef9c3',
-                  color: isParityPresetActive ? '#166534' : '#92400e',
-                  border: `1px solid ${isParityPresetActive ? '#86efac' : '#fde68a'}`,
-                }}>
-                  {isParityPresetActive ? '✓ REW parity preset active' : '⚠ modified'}
-                </span>
-              </div>
-
-              {true && (<>
-                <div className="flex flex-wrap gap-2">
-                  <select value={rewSourceCurveMode} onChange={(e) => setRewSourceCurveMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Source curve">
-                    <option value="product">Source curve: current product</option>
-                    <option value="flat90">Source curve: flat 90 dB</option>
-                    <option value="rew20HzPorted">Source curve: REW-style 20 Hz ported</option>
-                    <option value="flat_0_500hz_rew_parity">Flat 0–500Hz REW parity</option>
-                  </select>
-                  <select value={modalSourceReferenceMode} onChange={(e) => setModalSourceReferenceMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Modal source reference">
-                    <option value="existing">Modal source: existing 1 m reference</option>
-                    <option value="distance_normalized">Modal source: distance matched to listener ⚠️</option>
-                    <option value="distance_blend">Modal source: distance blend ⚠️</option>
-                    <option value="room_normalized">Modal source: room-normalised</option>
-                  </select>
-                  {modalSourceReferenceMode === 'distance_blend' && (
-                    <label className="flex h-8 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-mono">
-                      Modal distance blend:
-                      <input type="number" min="0.00" max="1.00" step="0.05" value={modalDistanceBlend} onChange={(e) => setModalDistanceBlend(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))} className="w-16 rounded border border-amber-300 bg-white px-1 py-0.5 text-xs font-mono text-right focus:outline-none" />
-                    </label>
-                  )}
-                  <select value={modalGainScalar} onChange={(e) => setModalGainScalar(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Modal gain">
-                    <option value={1.0}>Modal gain: 1.0</option>
-                    <option value={1.2}>Modal gain: 1.2</option>
-                    <option value={1.4}>Modal gain: 1.4</option>
-                    <option value={1.6}>Modal gain: 1.6</option>
-                  </select>
-                  <select value={axialQ} onChange={(e) => setAxialQ(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Axial Q">
-                    <option value={8.0}>Axial Q: 8.0</option>
-                    <option value={7.0}>Axial Q: 7.0</option>
-                    <option value={6.5}>Axial Q: 6.5</option>
-                    <option value={6.0}>Axial Q: 6.0</option>
-                    <option value={5.0}>Axial Q: 5.0</option>
-                  </select>
-                  <select value={propagationPhaseScale} onChange={(e) => setPropagationPhaseScale(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Propagation phase scale">
-                    <option value={0.00}>Propagation phase scale: 0.00</option>
-                    <option value={0.10}>Propagation phase scale: 0.10</option>
-                    <option value={0.20}>Propagation phase scale: 0.20</option>
-                    <option value={0.30}>Propagation phase scale: 0.30</option>
-                    <option value={0.40}>Propagation phase scale: 0.40</option>
-                    <option value={0.50}>Propagation phase scale: 0.50</option>
-                    <option value={0.60}>Propagation phase scale: 0.60</option>
-                    <option value={0.70}>Propagation phase scale: 0.70</option>
-                    <option value={1.00}>Propagation phase scale: 1.00</option>
-                  </select>
-                  <select value={debugMode200Multiplier} onChange={(e) => setDebugMode200Multiplier(Number(e.target.value))} className="h-8 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold" aria-label="(2,0,0) axial overlay">
-                    <option value={1.00}>(2,0,0) axial overlay: 1.00</option>
-                    <option value={0.75}>(2,0,0) axial overlay: 0.75</option>
-                    <option value={0.50}>(2,0,0) axial overlay: 0.50</option>
-                    <option value={0.25}>(2,0,0) axial overlay: 0.25</option>
-                  </select>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                    <input type="checkbox" checked={enableRewCoreReflections} onChange={(e) => setEnableRewCoreReflections(e.target.checked)} />
-                    Reflections
-                  </label>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: 'reflections_only', label: 'Reflections only' },
-                    { value: 'modes_only', label: 'Modes only' },
-                    { value: 'direct_plus_modes', label: 'Direct + Modes' },
-                    { value: 'full_field', label: 'Full field' },
-                  ].map(({ value, label }) => (
-                    <button key={value} onClick={() => setRewParityFieldMode(value)} className={`h-8 px-3 rounded-md border text-xs font-mono transition-colors ${rewParityFieldMode === value ? 'bg-[#213428] text-white border-[#213428]' : 'bg-white text-[#1B1A1A] border-[#DCDBD6] hover:border-[#213428]'}`}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
-                  <div className="font-bold text-[#1E293B]">Active model:</div>
-                  <div>Source: {rewSourceCurveMode}</div>
-                  <div>Modal source: {modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</div>
-                  {modalSourceReferenceMode === 'distance_blend' && <div style={{ color: '#b45309', fontWeight: 700 }}>Modal distance blend: {modalDistanceBlend.toFixed(2)}</div>}
-                  <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
-                  <div>Axial Q: {axialQ.toFixed(1)}</div>
-                  <div>Storage: {modalStorageMode}</div>
-                  <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
-                  <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
-                  <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
-                    (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
-                  </div>
-                  {(() => {
-                    const isParityRerouted = rewParityFieldMode === 'full_field' && rewSourceCurveMode === 'flat_0_500hz_rew_parity';
-                    const label = isParityRerouted ? 'REW parity full field = direct + modes only ⚠️' : `Parity isolation: ${rewParityFieldMode}`;
-                    const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
-                    return <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>{label}</div>;
-                  })()}
-                </div>
-              </>)}
-            </div>
-          );
-        })()}
-
-      {/* __B44_SEAT_MAP_DEBUG__ temporary — remove after verification */}
+      {/* __B44_SEAT_MAP_DEBUG__ */}
       {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
-        // Compute per-seat debug rows using same logic as pill renderer
-        const debugRows = orderedSeats.map((seat, globalIdx) => {
+        const debugRows = orderedSeats.map((seat) => {
           const sid = seat.id || `${seat.x}-${seat.y}`;
           const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
           const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
@@ -985,18 +972,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         return (
           <div style={{ border: '1px solid #f97316', borderRadius: 6, background: '#fff7ed', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
             <div style={{ fontWeight: 700, color: '#9a3412', marginBottom: 6 }}>Bass seat mapping debug</div>
-            <div style={{ marginBottom: 4, color: '#7c2d12' }}>
-              <strong>orderedSeats sequence:</strong> {orderedSeats.map(s => s.id || `${s.x}-${s.y}`).join(' → ')}
-            </div>
-            <div style={{ marginBottom: 4, color: '#7c2d12' }}>
-              <strong>selectedSeatIds:</strong> [{selectedSeatIds.join(', ')}]
-            </div>
-            <div style={{ marginBottom: 4, color: '#7c2d12' }}>
-              <strong>multiSeries first id:</strong> {firstSeriesId}
-            </div>
-            <div style={{ marginBottom: 6, color: '#7c2d12' }}>
-              <strong>multiSeries all ids:</strong> [{allSeriesIds}]
-            </div>
+            <div style={{ marginBottom: 4, color: '#7c2d12' }}><strong>orderedSeats sequence:</strong> {orderedSeats.map(s => s.id || `${s.x}-${s.y}`).join(' → ')}</div>
+            <div style={{ marginBottom: 4, color: '#7c2d12' }}><strong>selectedSeatIds:</strong> [{selectedSeatIds.join(', ')}]</div>
+            <div style={{ marginBottom: 4, color: '#7c2d12' }}><strong>multiSeries first id:</strong> {firstSeriesId}</div>
+            <div style={{ marginBottom: 6, color: '#7c2d12' }}><strong>multiSeries all ids:</strong> [{allSeriesIds}]</div>
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #fed7aa', color: '#9a3412' }}>
@@ -1021,10 +1000,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <td style={{ textAlign: 'right', padding: '1px 4px' }}>{r.indexInRow ?? '—'}</td>
                     <td style={{ textAlign: 'center', padding: '1px 4px' }}>{r.isPrimary ? '✓' : ''}</td>
                     <td style={{ textAlign: 'center', padding: '1px 4px', fontWeight: r.isSelected ? 700 : 400 }}>{r.isSelected ? '●' : '○'}</td>
-                    <td style={{ padding: '1px 4px' }}>
-                      <span style={{ display: 'inline-block', width: 10, height: 10, background: r.color, borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }} />
-                      {r.color}
-                    </td>
+                    <td style={{ padding: '1px 4px' }}><span style={{ display: 'inline-block', width: 10, height: 10, background: r.color, borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }} />{r.color}</td>
                     <td style={{ textAlign: 'center', padding: '1px 4px' }}>{r.hasResponse ? '✓' : '✗'}</td>
                   </tr>
                 ))}
@@ -1033,77 +1009,57 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         );
       })()}
-      {/* __B44_SEAT_MAP_DEBUG__ end */}
 
-      {/* __B44_GEOMETRY_DEBUG__ temporary — runtime geometry parity check */}
+      {/* __B44_GEOMETRY_DEBUG__ */}
       {(() => {
         const firstSelectedId = selectedSeatIds[0] || null;
-        const firstSeat = firstSelectedId
-          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === firstSelectedId)
-          : null;
+        const firstSeat = firstSelectedId ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === firstSelectedId) : null;
         const firstSeriesSeatId = multiSeries[0]?.id ?? null;
-
         return (
           <div style={{ border: '1px solid #6366f1', borderRadius: 6, background: '#eef2ff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
             <div style={{ fontWeight: 700, color: '#4338ca', marginBottom: 6 }}>Bass runtime geometry debug</div>
-
-            <div style={{ marginBottom: 4 }}>
-              <strong>selectedSeatIds:</strong> [{selectedSeatIds.join(', ')}]
-            </div>
-            <div style={{ marginBottom: 4 }}>
-              <strong>first graph series seat:</strong> {firstSeriesSeatId ?? '—'}
-            </div>
-
+            <div style={{ marginBottom: 4 }}><strong>selectedSeatIds:</strong> [{selectedSeatIds.join(', ')}]</div>
+            <div style={{ marginBottom: 4 }}><strong>first graph series seat:</strong> {firstSeriesSeatId ?? '—'}</div>
             <div style={{ marginBottom: 4, borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
               <strong>seat id:</strong> {firstSeat ? (firstSeat.id || `${firstSeat.x}-${firstSeat.y}`) : '—'}<br/>
               <strong>seat x:</strong> {firstSeat ? firstSeat.x : '—'}<br/>
               <strong>seat y:</strong> {firstSeat ? firstSeat.y : '—'}<br/>
               <strong>seat z:</strong> {firstSeat ? (Number.isFinite(Number(firstSeat.z)) ? Number(firstSeat.z) : 1.2) : '—'}
             </div>
-
             <div style={{ marginBottom: 4, borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
               <strong>room width:</strong> {roomDims?.widthM ?? '—'}<br/>
               <strong>room length:</strong> {roomDims?.lengthM ?? '—'}<br/>
               <strong>room height:</strong> {roomDims?.heightM ?? '—'}
             </div>
-
             <div style={{ marginBottom: 4, borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
               <strong>subs ({subsForSimulation.length}):</strong>
               {subsForSimulation.length === 0 && <span> none</span>}
               {subsForSimulation.map((sub, i) => (
-                <div key={sub.id || i} style={{ marginLeft: 8 }}>
-                  [{i}] id: {sub.id ?? '—'}, model: {sub.modelKey ?? '—'}, x: {sub.x}, y: {sub.y}, z: {sub.z ?? '—'}, gain: {sub.tuning?.gainDb ?? 0} dB, delay: {sub.tuning?.delayMs ?? 0} ms, polarity: {sub.tuning?.polarity ?? 0}°
-                </div>
+                <div key={sub.id || i} style={{ marginLeft: 8 }}>[{i}] id: {sub.id ?? '—'}, model: {sub.modelKey ?? '—'}, x: {sub.x}, y: {sub.y}, z: {sub.z ?? '—'}, gain: {sub.tuning?.gainDb ?? 0} dB, delay: {sub.tuning?.delayMs ?? 0} ms, polarity: {sub.tuning?.polarity ?? 0}°</div>
               ))}
             </div>
-
             <div style={{ marginBottom: 4, borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
               <strong>surface absorption:</strong><br/>
               <span style={{ marginLeft: 8 }}>front: {surfaceAbsorption.front}, back: {surfaceAbsorption.back}, left: {surfaceAbsorption.left}, right: {surfaceAbsorption.right}, ceiling: {surfaceAbsorption.ceiling}, floor: {surfaceAbsorption.floor}</span>
             </div>
-
             <div style={{ borderTop: '1px solid #c7d2fe', paddingTop: 4 }}>
-              <strong>reflections:</strong> {useRewCoreTestMode ? String(enableRewCoreReflections) : String(splConfig?.modesEnabled !== false)}<br/>
-              <strong>modes:</strong> {useRewCoreTestMode ? 'true' : String(splConfig?.modesEnabled !== false)}<br/>
-              <strong>smoothing:</strong> {useRewCoreTestMode ? 'none' : 'n/a (live engine)'}<br/>
+              <strong>reflections:</strong> {String(enableRewCoreReflections)}<br/>
+              <strong>modes:</strong> true<br/>
+              <strong>smoothing:</strong> none<br/>
               <strong>freq min:</strong> 20 Hz<br/>
               <strong>freq max:</strong> 200 Hz
             </div>
           </div>
         );
       })()}
-      {/* __B44_GEOMETRY_DEBUG__ end */}
 
-      {/* __B44_RUNTIME_AUDIT__ Temporary live state audit panel */}
+      {/* __B44_RUNTIME_AUDIT__ */}
       {(() => {
         const auditFirstSeatId = selectedSeatIds[0] || null;
-        const auditFirstSeat = auditFirstSeatId
-          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === auditFirstSeatId)
-          : null;
+        const auditFirstSeat = auditFirstSeatId ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === auditFirstSeatId) : null;
         return (
           <div style={{ border: '2px solid #0ea5e9', borderRadius: 8, background: '#f0f9ff', padding: '10px 12px', fontSize: 10, fontFamily: 'monospace', marginBottom: 8 }}>
             <div style={{ fontWeight: 700, color: '#0369a1', marginBottom: 8, fontSize: 12 }}>⚡ Bass Runtime Audit Panel</div>
-
             <div style={{ marginBottom: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px', color: '#0c4a6e' }}>
               <div><strong>frontSubsCfg.count:</strong> {frontSubsCfg?.count ?? 'undefined'}</div>
               <div><strong>rearSubsCfg.count:</strong> {rearSubsCfg?.count ?? 'undefined'}</div>
@@ -1112,21 +1068,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div><strong>autoAlignEnabled:</strong> {String(autoAlignEnabled)}</div>
               <div><strong>selectedSeatIds:</strong> [{selectedSeatIds.join(', ')}]</div>
             </div>
-
             <div style={{ borderTop: '1px solid #bae6fd', paddingTop: 6, marginBottom: 6, color: '#0c4a6e' }}>
               <strong>First selected seat:</strong>{' '}
-              {auditFirstSeat
-                ? `id=${auditFirstSeat.id ?? `${auditFirstSeat.x}-${auditFirstSeat.y}`}  x=${auditFirstSeat.x}  y=${auditFirstSeat.y}  z=${Number.isFinite(Number(auditFirstSeat.z)) ? Number(auditFirstSeat.z) : 1.2}`
-                : '—'}
+              {auditFirstSeat ? `id=${auditFirstSeat.id ?? `${auditFirstSeat.x}-${auditFirstSeat.y}`}  x=${auditFirstSeat.x}  y=${auditFirstSeat.y}  z=${Number.isFinite(Number(auditFirstSeat.z)) ? Number(auditFirstSeat.z) : 1.2}` : '—'}
             </div>
-
             <div style={{ borderTop: '1px solid #bae6fd', paddingTop: 6, marginBottom: 6, color: '#0c4a6e' }}>
               <strong>autoAlignDelays:</strong>{' '}
-              {Object.keys(autoAlignDelays).length === 0
-                ? '{}'
-                : Object.entries(autoAlignDelays).map(([k, v]) => `${k}: ${Number.isFinite(v) ? v.toFixed(3) : v}ms`).join('  |  ')}
+              {Object.keys(autoAlignDelays).length === 0 ? '{}' : Object.entries(autoAlignDelays).map(([k, v]) => `${k}: ${Number.isFinite(v) ? v.toFixed(3) : v}ms`).join('  |  ')}
             </div>
-
             <div style={{ borderTop: '1px solid #bae6fd', paddingTop: 6, color: '#0c4a6e' }}>
               <strong>subsForSimulation ({subsForSimulation.length}):</strong>
               {subsForSimulation.length === 0 && <span style={{ marginLeft: 8 }}>none</span>}
@@ -1146,30 +1095,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         );
       })()}
-      {/* __B44_RUNTIME_AUDIT__ end */}
 
-      {/* __B44_STEP_DEBUG__ temporary debug card — remove after diagnosis */}
-      {(
-        <RewDebugPanel
-          stepDebug={simulationResults.stepDebug}
-          selectedSeatIds={selectedSeatIds}
-          disableModalPropagationPhase={disableModalPropagationPhase}
-          propagationPhaseScale={propagationPhaseScale}
-        />
-      )}
-      {/* __B44_STEP_DEBUG__ end */}
+      {/* __B44_STEP_DEBUG__ */}
+      <RewDebugPanel
+        stepDebug={simulationResults.stepDebug}
+        selectedSeatIds={selectedSeatIds}
+        disableModalPropagationPhase={disableModalPropagationPhase}
+        propagationPhaseScale={propagationPhaseScale}
+      />
 
-      {/* Development delay optimiser — read-only, no state changes */}
+      {/* Development delay optimiser */}
       {(() => {
         const optimiserSeat = seatingPositions?.find(s => s.id === selectedSeatIds[0] || `${s.x}-${s.y}` === selectedSeatIds[0]) || seatingPositions?.[0];
-
-        // Extract current manual delay from the first active front sub's settings (same source as Manual Delay slider)
         const frontSettingsById = frontSubsCfg?.settingsById || {};
         const firstFrontSubId = subsForSimulation.find(s => s.id?.startsWith('front-'))?.id;
-        const currentManualDelay = firstFrontSubId && Number.isFinite(frontSettingsById[firstFrontSubId]?.delayMs) 
-          ? frontSettingsById[firstFrontSubId].delayMs 
-          : 0;
-
+        const currentManualDelay = firstFrontSubId && Number.isFinite(frontSettingsById[firstFrontSubId]?.delayMs) ? frontSettingsById[firstFrontSubId].delayMs : 0;
         return (
           <SubwooferDelayOptimiser
             mlpSeat={optimiserSeat}
@@ -1195,125 +1135,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
 
-      {/* REW Parity Benchmark — measurement layer, no physics changes */}
-      {(
-        <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginTop: 8 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#213428', marginBottom: 8 }}>REW Parity Benchmark</div>
-          <RewParityBenchmark
-            b44Series={multiSeries[0]?.data ?? []}
-            stepDebug={simulationResults.stepDebug}
-            wholeCurveDebugRows={simulationResults.wholeCurveDebugRows}
-            modalSourceReferenceMode={modalSourceReferenceMode}
-          />
-        </div>
-      )}
-       </div>
-      </details>
-      )}
-
-      {/* Bass Response Graph */}
-      <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
-            Bass Response
-          </div>
-          </div>
-
-        {/* Seat selector pills — stacked rows, multi-select toggles */}
-        {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
-          const rowMap = new Map();
-          orderedSeats.forEach(seat => {
-            const r = Number(seat?.row || seat?.rowNumber) || 1;
-            if (!rowMap.has(r)) rowMap.set(r, []);
-            rowMap.get(r).push(seat);
-          });
-          const rowNums = Array.from(rowMap.keys()).sort((a, b) => a - b);
-
-          return (
-            <div style={{ display: "grid", gap: 5, marginBottom: 12 }}>
-              {rowNums.map(r => {
-                const rowSeats = rowMap.get(r) || [];
-                return (
-                  <div key={r} style={{ display: "flex", gap: 5 }}>
-                    {rowSeats.map(seat => {
-                      const sid = seat.id || `${seat.x}-${seat.y}`;
-                      const isOn = selectedSeatIds.includes(sid);
-                      const isPrimary = !!seat.isPrimary;
-                      const color = getSeatColor(sid);
-                      const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
-                      const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
-                      const posInRow = rowSeatsOrdered.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
-                      const label = `R${rowNum}S${posInRow}`;
-                      return (
-                        <button
-                          key={sid}
-                          onClick={() => toggleSeat(sid)}
-                          title={`${label}${isPrimary ? " — MLP" : ""}`}
-                          style={{
-                            width: 52,
-                            height: 26,
-                            border: isOn ? `2px solid ${color}` : isPrimary ? "1px solid #A09386" : "1px solid #DCDBD6",
-                            borderRadius: 9999,
-                            fontSize: 11,
-                            fontWeight: isOn ? 700 : 500,
-                            background: isOn ? color : "#F6F3EE",
-                            color: isOn ? "#fff" : isPrimary ? "#3E4349" : "#625143",
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            outline: "none",
-                            flexShrink: 0,
-                            transition: "background 0.12s, border-color 0.12s",
-                          }}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-
-
-
-        <div className="mt-4">
-          {multiSeries.length > 0 ? (
-            <BassGraph
-              multiSeries={multiSeries}
-              responseData={multiSeries[0]?.data ?? []}
-              schroederFrequency={schroederFrequency}
-              rp22Levels={rp22Levels}
-              toggles={{}}
-              crossoverFrequency={80}
-              modeFrequencies={[]}
-              showModeMarkers={false}
-              modeMarkers={{ axial: [], tangential: [], oblique: [] }}
-              linearHzAxis={false}
-              rewStyleMode={true}
-              yDomain={undefined}
-              xDomain={[20, 200]}
-              showAxialOnly={false}
-              refDb={85}
-              disableHighlight={false}
-            />
-          ) : (
-            <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
-              No bass data yet. Add at least one subwoofer and one seat.
-            </div>
-          )}
-        </div>
+      {/* REW Parity Benchmark */}
+      <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginTop: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 12, color: '#213428', marginBottom: 8 }}>REW Parity Benchmark</div>
+        <RewParityBenchmark
+          b44Series={multiSeries[0]?.data ?? []}
+          stepDebug={simulationResults.stepDebug}
+          wholeCurveDebugRows={simulationResults.wholeCurveDebugRows}
+          modalSourceReferenceMode={modalSourceReferenceMode}
+        />
       </div>
 
-      {/* __REW_GEOMETRY_MATCH__ Development-only REW parity coordinate readout */}
-      {IS_DEVELOPMENT_MODE && (() => {
+      {/* __REW_GEOMETRY_MATCH__ */}
+      {(() => {
         const rewSeatId = selectedSeatIds[0] || null;
-        const rewSeat = rewSeatId
-          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === rewSeatId)
-          : null;
+        const rewSeat = rewSeatId ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === rewSeatId) : null;
         const rewSeatZ = rewSeat && Number.isFinite(Number(rewSeat.z)) ? Number(rewSeat.z) : 1.2;
         const fmt = (v, d = 4) => Number.isFinite(v) ? Number(v).toFixed(d) : '—';
         const frontSubs = subsForSimulation.filter(s => s.id?.includes('front-sub') || s.id?.includes('sub-front'));
@@ -1321,42 +1157,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         return (
           <div style={{ border: '2px solid #0891b2', borderRadius: 6, background: '#ecfeff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
             <div style={{ fontWeight: 700, color: '#0e7490', marginBottom: 6, fontSize: 11 }}>REW Geometry Match Values</div>
-
-            {/* Room */}
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Room</div>
               <div style={{ color: '#164e63' }}>widthM: {fmt(roomDims?.widthM)} &nbsp; lengthM: {fmt(roomDims?.lengthM)} &nbsp; heightM: {fmt(roomDims?.heightM)}</div>
             </div>
-
-            {/* Selected seat */}
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Selected Seat</div>
-              {rewSeat ? (
-                <div style={{ color: '#164e63' }}>
-                  id: {rewSeat.id || `${rewSeat.x}-${rewSeat.y}`} &nbsp; x: {fmt(rewSeat.x)} &nbsp; y: {fmt(rewSeat.y)} &nbsp; z: {fmt(rewSeatZ)}
-                </div>
-              ) : <div style={{ color: '#6b7280' }}>— none selected —</div>}
+              {rewSeat ? <div style={{ color: '#164e63' }}>id: {rewSeat.id || `${rewSeat.x}-${rewSeat.y}`} &nbsp; x: {fmt(rewSeat.x)} &nbsp; y: {fmt(rewSeat.y)} &nbsp; z: {fmt(rewSeatZ)}</div> : <div style={{ color: '#6b7280' }}>— none selected —</div>}
             </div>
-
-            {/* All seats */}
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>All Seats ({(seatingPositions || []).length})</div>
-              {(seatingPositions || []).map((seat, i) => {
+              {(seatingPositions || []).map((seat) => {
                 const sid = seat.id || `${seat.x}-${seat.y}`;
                 const sz = Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2;
                 const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
                 const rowSeats = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
                 const posInRow = rowSeats.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
                 const label = `R${rowNum}S${posInRow}`;
-                return (
-                  <div key={sid} style={{ color: '#164e63', paddingLeft: 8 }}>
-                    [{label}] id: {sid} &nbsp; x: {fmt(seat.x)} &nbsp; y: {fmt(seat.y)} &nbsp; z: {fmt(sz)} {seat.isPrimary ? '(MLP)' : ''}
-                  </div>
-                );
+                return <div key={sid} style={{ color: '#164e63', paddingLeft: 8 }}>[{label}] id: {sid} &nbsp; x: {fmt(seat.x)} &nbsp; y: {fmt(seat.y)} &nbsp; z: {fmt(sz)} {seat.isPrimary ? '(MLP)' : ''}</div>;
               })}
             </div>
-
-            {/* Front subs */}
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Front Subs ({frontSubs.length})</div>
               {frontSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : frontSubs.map((sub, i) => {
@@ -1365,55 +1185,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 const cfgForSub = isFront ? frontSubsCfg : rearSubsCfg;
                 const manualDelay = Number.isFinite(cfgForSub?.settingsById?.[subId]?.delayMs) ? cfgForSub.settingsById[subId].delayMs : 0;
                 const autoDelay = resolveAutoDelayForSub(subId, 'front', i);
-                const totalDelay = manualDelay + autoDelay;
-                return (
-                  <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
-                    id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>
-                    &nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(totalDelay, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°
-                  </div>
-                );
+                return <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>&nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(manualDelay + autoDelay, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°</div>;
               })}
             </div>
-
-            {/* Rear subs */}
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontWeight: 600, color: '#155e75', marginBottom: 2 }}>Rear Subs ({rearSubs.length})</div>
               {rearSubs.length === 0 ? <div style={{ color: '#6b7280', paddingLeft: 8 }}>none</div> : rearSubs.map((sub, i) => {
                 const subId = sub.id;
-                const cfgForSub = rearSubsCfg;
-                const manualDelay = Number.isFinite(cfgForSub?.settingsById?.[subId]?.delayMs) ? cfgForSub.settingsById[subId].delayMs : 0;
+                const manualDelay = Number.isFinite(rearSubsCfg?.settingsById?.[subId]?.delayMs) ? rearSubsCfg.settingsById[subId].delayMs : 0;
                 const autoDelay = resolveAutoDelayForSub(subId, 'rear', i);
-                const totalDelay = manualDelay + autoDelay;
-                return (
-                  <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>
-                    id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>
-                    &nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(totalDelay, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°
-                  </div>
-                );
+                return <div key={sub.id || i} style={{ color: '#164e63', paddingLeft: 8, marginBottom: 2 }}>id: {sub.id} &nbsp; x: {fmt(sub.x)} &nbsp; y: {fmt(sub.y)} &nbsp; z: {fmt(sub.z)} &nbsp; model: {sub.modelKey}<br/>&nbsp;&nbsp;manual delay: {fmt(manualDelay, 3)}ms &nbsp; auto delay: {fmt(autoDelay, 3)}ms &nbsp; total: {fmt(manualDelay + autoDelay, 3)}ms &nbsp; polarity: {sub.tuning?.polarity ?? 0}°</div>;
               })}
             </div>
-
             <div style={{ color: '#0e7490', fontStyle: 'italic', fontSize: 9, borderTop: '1px solid #a5f3fc', paddingTop: 4 }}>
               Coordinates are engine source points. Use these exact values in REW for parity testing.
             </div>
           </div>
         );
       })()}
-      {/* __REW_GEOMETRY_MATCH__ end */}
 
-      {/* __B44_ALIGNMENT_AUDIT__ Two-sub alignment geometry audit */}
-      {IS_DEVELOPMENT_MODE && (() => {
+      {/* __B44_ALIGNMENT_AUDIT__ */}
+      {(() => {
         const auditMlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-        const auditMlpPoint = auditMlpSeat
-          ? { x: auditMlpSeat.x, y: auditMlpSeat.y, z: Number.isFinite(Number(auditMlpSeat.z)) ? Number(auditMlpSeat.z) : 1.2 }
-          : null;
+        const auditMlpPoint = auditMlpSeat ? { x: auditMlpSeat.x, y: auditMlpSeat.y, z: Number.isFinite(Number(auditMlpSeat.z)) ? Number(auditMlpSeat.z) : 1.2 } : null;
         const auditSeatId = auditMlpSeat ? (auditMlpSeat.id || `${auditMlpSeat.x}-${auditMlpSeat.y}`) : '—';
         const SPEED_OF_SOUND = 343;
         const auditRoomW = Number(roomDims?.widthM) || 4.5;
         const auditRoomL = Number(roomDims?.lengthM) || 6.0;
-
         const auditRows = [];
-
         const buildRows = (cfg, group) => {
           const count = cfg?.count || 0;
           if (count === 0) return;
@@ -1423,7 +1222,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           const defaultPositions = isRear
             ? [{ x: auditRoomW * 0.33, y: auditRoomL - 0.15 }, { x: auditRoomW * 0.67, y: auditRoomL - 0.15 }]
             : [{ x: auditRoomW * 0.33, y: 0.15 }, { x: auditRoomW * 0.67, y: 0.15 }];
-
           for (let i = 0; i < count; i++) {
             const subId = `${group}-sub-${LABELS[i] ?? i}`;
             const fromCfg = cfgPositions[i];
@@ -1435,29 +1233,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             const settings = cfg?.settingsById?.[subId] || {};
             const manualDelayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
             const appliedDelayMs = manualDelayMs + (autoAlignDelays[subId] ?? 0);
-
             let dx = null, dy = null, dz = null, distM = null, arrMs = null;
             if (auditMlpPoint && subX !== null && subY !== null) {
-              dx = subX - auditMlpPoint.x;
-              dy = subY - auditMlpPoint.y;
-              dz = subZ - auditMlpPoint.z;
-              distM = Math.sqrt(dx*dx + dy*dy + dz*dz);
-              arrMs = (distM / SPEED_OF_SOUND) * 1000;
+              dx = subX - auditMlpPoint.x; dy = subY - auditMlpPoint.y; dz = subZ - auditMlpPoint.z;
+              distM = Math.sqrt(dx*dx + dy*dy + dz*dz); arrMs = (distM / SPEED_OF_SOUND) * 1000;
             }
-
-            const uiLabel = count === 1
-              ? `${group.charAt(0).toUpperCase() + group.slice(1)} Sub Single`
-              : `${group.charAt(0).toUpperCase() + group.slice(1)} Sub ${LABELS[i]?.charAt(0).toUpperCase() + LABELS[i]?.slice(1)}`;
-
+            const uiLabel = count === 1 ? `${group.charAt(0).toUpperCase() + group.slice(1)} Sub Single` : `${group.charAt(0).toUpperCase() + group.slice(1)} Sub ${LABELS[i]?.charAt(0).toUpperCase() + LABELS[i]?.slice(1)}`;
             auditRows.push({ uiLabel, subId, group, subX, subY, subZ, dx, dy, dz, distM, arrMs, appliedDelayMs, posSource });
           }
         };
-
         buildRows(frontSubsCfg, 'front');
         buildRows(rearSubsCfg, 'rear');
-
         const fmt = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : '—');
-
         return (
           <div style={{ border: '1px solid #dc2626', borderRadius: 6, background: '#fef2f2', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
             <div style={{ fontWeight: 700, color: '#991b1b', marginBottom: 6 }}>Two-sub alignment geometry audit</div>
@@ -1488,7 +1275,97 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         );
       })()}
-      {/* __B44_ALIGNMENT_AUDIT__ end */}
+
+          </div>
+        </details>
+      )}
+      {/* Deep REW diagnostics end */}
+
+      {/* Bass Response Graph */}
+      <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
+            Bass Response
+          </div>
+        </div>
+
+        {/* Seat selector pills */}
+        {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
+          const rowMap = new Map();
+          orderedSeats.forEach(seat => {
+            const r = Number(seat?.row || seat?.rowNumber) || 1;
+            if (!rowMap.has(r)) rowMap.set(r, []);
+            rowMap.get(r).push(seat);
+          });
+          const rowNums = Array.from(rowMap.keys()).sort((a, b) => a - b);
+          return (
+            <div style={{ display: "grid", gap: 5, marginBottom: 12 }}>
+              {rowNums.map(r => {
+                const rowSeats = rowMap.get(r) || [];
+                return (
+                  <div key={r} style={{ display: "flex", gap: 5 }}>
+                    {rowSeats.map(seat => {
+                      const sid = seat.id || `${seat.x}-${seat.y}`;
+                      const isOn = selectedSeatIds.includes(sid);
+                      const isPrimary = !!seat.isPrimary;
+                      const color = getSeatColor(sid);
+                      const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
+                      const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
+                      const posInRow = rowSeatsOrdered.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
+                      const label = `R${rowNum}S${posInRow}`;
+                      return (
+                        <button
+                          key={sid}
+                          onClick={() => toggleSeat(sid)}
+                          title={`${label}${isPrimary ? " — MLP" : ""}`}
+                          style={{
+                            width: 52, height: 26,
+                            border: isOn ? `2px solid ${color}` : isPrimary ? "1px solid #A09386" : "1px solid #DCDBD6",
+                            borderRadius: 9999, fontSize: 11, fontWeight: isOn ? 700 : 500,
+                            background: isOn ? color : "#F6F3EE",
+                            color: isOn ? "#fff" : isPrimary ? "#3E4349" : "#625143",
+                            cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            outline: "none", flexShrink: 0, transition: "background 0.12s, border-color 0.12s",
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        <div className="mt-4">
+          {multiSeries.length > 0 ? (
+            <BassGraph
+              multiSeries={multiSeries}
+              responseData={multiSeries[0]?.data ?? []}
+              schroederFrequency={schroederFrequency}
+              rp22Levels={rp22Levels}
+              toggles={{}}
+              crossoverFrequency={80}
+              modeFrequencies={[]}
+              showModeMarkers={false}
+              modeMarkers={{ axial: [], tangential: [], oblique: [] }}
+              linearHzAxis={false}
+              rewStyleMode={true}
+              yDomain={undefined}
+              xDomain={[20, 200]}
+              showAxialOnly={false}
+              refDb={85}
+              disableHighlight={false}
+            />
+          ) : (
+            <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
+              No bass data yet. Add at least one subwoofer and one seat.
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Surface Absorption Panel */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
