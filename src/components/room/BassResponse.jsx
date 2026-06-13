@@ -1182,10 +1182,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     className="h-8 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold"
                     aria-label="(2,0,0) mode scale"
                   >
-                    <option value={1.00}>(2,0,0) mode scale: 1.00</option>
-                    <option value={0.75}>(2,0,0) mode scale: 0.75</option>
-                    <option value={0.50}>(2,0,0) mode scale: 0.50</option>
-                    <option value={0.25}>(2,0,0) mode scale: 0.25</option>
+                    <option value={1.00}>(2,0,0) axial overlay: 1.00</option>
+                      <option value={0.75}>(2,0,0) axial overlay: 0.75</option>
+                      <option value={0.50}>(2,0,0) axial overlay: 0.50</option>
+                      <option value={0.25}>(2,0,0) axial overlay: 0.25</option>
                   </select>
                   </div>
                 {/* __TEMP_REW_PARITY_ISOLATION__ field isolation selector */}
@@ -1242,7 +1242,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                   {/* __TEMP_REW_PARITY_MODE_200_SCALE__ */}
                   <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
-                    (2,0,0) mode scale: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
+                    (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
                   </div>
                   {/* __TEMP_REW_PARITY_ISOLATION__ */}
                   {(() => {
