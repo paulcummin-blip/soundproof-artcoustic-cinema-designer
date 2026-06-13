@@ -793,11 +793,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
-        {IS_DEVELOPMENT_MODE && (
-          <Badge className={useRewCoreTestMode ? "bg-[#213428] text-white border-[#213428]" : "bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]"}>
-            Engine: {useRewCoreTestMode ? "REW Core Test" : "Live Engine"}
-          </Badge>
-        )}
+
       </div>
       
       {(subWarnings?.front?.length > 0 || subWarnings?.rear?.length > 0) && (
@@ -809,13 +805,112 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </Alert>
       )}
 
-      {/* Advanced REW debug — visibility only, no data changes */}
-      {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
+      {/* Advanced REW debug — collapsed by default */}
+      {IS_DEVELOPMENT_MODE && (
         <details style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginBottom: 4 }}>
           <summary style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
-            Runtime geometry and seat mapping
+            Advanced REW debug
           </summary>
           <div style={{ marginTop: 8 }}>
+
+        {/* Engine toggle + all "Hide" controls */}
+        {(() => {
+          return (
+            <div className="flex flex-col gap-2 mb-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Label htmlFor="rew-core-test-toggle-adv" className="text-xs text-[#3E4349]">REW Core Test engine</Label>
+                <Switch id="rew-core-test-toggle-adv" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />
+              </div>
+              {useRewCoreTestMode && (<>
+                <div className="flex flex-wrap gap-2">
+                  <select value={rewSourceCurveMode} onChange={(e) => setRewSourceCurveMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Source curve">
+                    <option value="product">Source curve: current product</option>
+                    <option value="flat90">Source curve: flat 90 dB</option>
+                    <option value="rew20HzPorted">Source curve: REW-style 20 Hz ported</option>
+                    <option value="flat_0_500hz_rew_parity">Flat 0–500Hz REW parity</option>
+                  </select>
+                  <select value={modalSourceReferenceMode} onChange={(e) => setModalSourceReferenceMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Modal source reference">
+                    <option value="existing">Modal source: existing 1 m reference</option>
+                    <option value="distance_normalized">Modal source: distance matched to listener ⚠️</option>
+                    <option value="distance_blend">Modal source: distance blend ⚠️</option>
+                    <option value="room_normalized">Modal source: room-normalised</option>
+                  </select>
+                  {modalSourceReferenceMode === 'distance_blend' && (
+                    <label className="flex h-8 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-mono">
+                      Modal distance blend:
+                      <input type="number" min="0.00" max="1.00" step="0.05" value={modalDistanceBlend} onChange={(e) => setModalDistanceBlend(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))} className="w-16 rounded border border-amber-300 bg-white px-1 py-0.5 text-xs font-mono text-right focus:outline-none" />
+                    </label>
+                  )}
+                  <select value={modalGainScalar} onChange={(e) => setModalGainScalar(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Modal gain">
+                    <option value={1.0}>Modal gain: 1.0</option>
+                    <option value={1.2}>Modal gain: 1.2</option>
+                    <option value={1.4}>Modal gain: 1.4</option>
+                    <option value={1.6}>Modal gain: 1.6</option>
+                  </select>
+                  <select value={axialQ} onChange={(e) => setAxialQ(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Axial Q">
+                    <option value={8.0}>Axial Q: 8.0</option>
+                    <option value={7.0}>Axial Q: 7.0</option>
+                    <option value={6.5}>Axial Q: 6.5</option>
+                    <option value={6.0}>Axial Q: 6.0</option>
+                    <option value={5.0}>Axial Q: 5.0</option>
+                  </select>
+                  <select value={propagationPhaseScale} onChange={(e) => setPropagationPhaseScale(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Propagation phase scale">
+                    <option value={0.4}>Propagation phase scale: 0.40</option>
+                    <option value={0.5}>Propagation phase scale: 0.50</option>
+                    <option value={0.6}>Propagation phase scale: 0.60</option>
+                    <option value={0.7}>Propagation phase scale: 0.70</option>
+                    <option value={1.0}>Propagation phase scale: 1.00</option>
+                  </select>
+                  <select value={debugMode200Multiplier} onChange={(e) => setDebugMode200Multiplier(Number(e.target.value))} className="h-8 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold" aria-label="(2,0,0) axial overlay">
+                    <option value={1.00}>(2,0,0) axial overlay: 1.00</option>
+                    <option value={0.75}>(2,0,0) axial overlay: 0.75</option>
+                    <option value={0.50}>(2,0,0) axial overlay: 0.50</option>
+                    <option value={0.25}>(2,0,0) axial overlay: 0.25</option>
+                  </select>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
+                    <input type="checkbox" checked={enableRewCoreReflections} onChange={(e) => setEnableRewCoreReflections(e.target.checked)} />
+                    Reflections
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'reflections_only', label: 'Reflections only' },
+                    { value: 'modes_only', label: 'Modes only' },
+                    { value: 'direct_plus_modes', label: 'Direct + Modes' },
+                    { value: 'full_field', label: 'Full field' },
+                  ].map(({ value, label }) => (
+                    <button key={value} onClick={() => setRewParityFieldMode(value)} className={`h-8 px-3 rounded-md border text-xs font-mono transition-colors ${rewParityFieldMode === value ? 'bg-[#213428] text-white border-[#213428]' : 'bg-white text-[#1B1A1A] border-[#DCDBD6] hover:border-[#213428]'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
+                  <div className="font-bold text-[#1E293B]">Active model:</div>
+                  <div>Source: {rewSourceCurveMode}</div>
+                  <div>Modal source: {modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</div>
+                  {modalSourceReferenceMode === 'distance_blend' && <div style={{ color: '#b45309', fontWeight: 700 }}>Modal distance blend: {modalDistanceBlend.toFixed(2)}</div>}
+                  <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
+                  <div>Axial Q: {axialQ.toFixed(1)}</div>
+                  <div>Storage: {modalStorageMode}</div>
+                  <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
+                  <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
+                  <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
+                    (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
+                  </div>
+                  {(() => {
+                    const isParityRerouted = rewParityFieldMode === 'full_field' && rewSourceCurveMode === 'flat_0_500hz_rew_parity';
+                    const label = isParityRerouted ? 'REW parity full field = direct + modes only ⚠️' : `Parity isolation: ${rewParityFieldMode}`;
+                    const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
+                    return <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>{label}</div>;
+                  })()}
+                </div>
+              </>)}
+            </div>
+          );
+        })()}
+
       {/* __B44_SEAT_MAP_DEBUG__ temporary — remove after verification */}
       {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
         // Compute per-seat debug rows using same logic as pill renderer
@@ -1007,261 +1102,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              {IS_DEVELOPMENT_MODE && <Label htmlFor="rew-core-test-toggle" className="text-xs text-[#3E4349]">Temporary REW core test</Label>}
-              {IS_DEVELOPMENT_MODE && <Switch id="rew-core-test-toggle" checked={useRewCoreTestMode} onCheckedChange={setUseRewCoreTestMode} />}
-              {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
-                <>
-                  <select
-                    value={rewSourceCurveMode}
-                    onChange={(event) => setRewSourceCurveMode(event.target.value)}
-                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                    aria-label="REW source curve comparison"
-                  >
-                    <option value="product">Source curve: current product</option>
-                    <option value="flat90">Source curve: flat 90 dB</option>
-                    <option value="rew20HzPorted">Source curve: REW-style 20 Hz ported</option>
-                    <option value="flat_0_500hz_rew_parity">Flat 0–500Hz REW parity</option>
-                  </select>
-                  <select
-                    value={modalSourceReferenceMode}
-                    onChange={(event) => setModalSourceReferenceMode(event.target.value)}
-                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                    aria-label="Modal source reference comparison"
-                  >
-                    <option value="existing">Modal source: existing 1 m reference</option>
-                    <option value="distance_normalized">Modal source: distance matched to listener ⚠️ parity test</option>
-                    <option value="distance_blend">Modal source: distance blend ⚠️ parity test</option>
-                    <option value="room_normalized">Modal source: room-normalised</option>
-                  </select>
-                  {modalSourceReferenceMode === 'distance_blend' && (
-                    <label className="flex h-8 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-mono">
-                      Modal distance blend:
-                      <input
-                        type="number"
-                        min="0.00"
-                        max="1.00"
-                        step="0.05"
-                        value={modalDistanceBlend}
-                        onChange={(e) => setModalDistanceBlend(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))}
-                        className="w-16 rounded border border-amber-300 bg-white px-1 py-0.5 text-xs font-mono text-right focus:outline-none"
-                      />
-                    </label>
-                  )}
-                  <select
-                    value={modalGainScalar}
-                    onChange={(event) => setModalGainScalar(Number(event.target.value))}
-                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                    aria-label="Modal gain comparison"
-                  >
-                    <option value={1.0}>Modal gain: 1.0</option>
-                    <option value={1.2}>Modal gain: 1.2</option>
-                    <option value={1.4}>Modal gain: 1.4</option>
-                    <option value={1.6}>Modal gain: 1.6</option>
-                  </select>
-                  <select
-                    value={axialQ}
-                    onChange={(event) => setAxialQ(Number(event.target.value))}
-                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                    aria-label="Axial Q comparison"
-                  >
-                    <option value={8.0}>Axial Q: 8.0</option>
-                    <option value={7.0}>Axial Q: 7.0</option>
-                    <option value={6.5}>Axial Q: 6.5</option>
-                    <option value={6.0}>Axial Q: 6.0</option>
-                    <option value={5.0}>Axial Q: 5.0</option>
-                  </select>
-                  <select
-                    value={modalStorageMode}
-                    onChange={(event) => setModalStorageMode(event.target.value)}
-                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                    aria-label="Modal storage comparison"
-                  >
-                    <option value="none">Modal storage: none</option>
-                    <option value="light">Modal storage: light</option>
-                    <option value="orderCompression">Modal storage: order compression</option>
-                  </select>
-                  <select
-                    value={propagationPhaseScale}
-                    onChange={(event) => setPropagationPhaseScale(Number(event.target.value))}
-                    className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]"
-                    aria-label="Modal propagation phase scale comparison"
-                  >
-                    <option value={0.4}>Propagation phase scale: 0.40</option>
-                    <option value={0.5}>Propagation phase scale: 0.50</option>
-                    <option value={0.6}>Propagation phase scale: 0.60</option>
-                    <option value={0.7}>Propagation phase scale: 0.70</option>
-                    <option value={1.0}>Propagation phase scale: 1.00</option>
-                  </select>
-                </>
-              )}
-            </div>
-            {IS_DEVELOPMENT_MODE && useRewCoreTestMode && (
-              <>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                    <input
-                      type="checkbox"
-                      checked={enableRewCoreReflections}
-                      onChange={(event) => setEnableRewCoreReflections(event.target.checked)}
-                    />
-                    Reflections
-                  </label>
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                    <input
-                      type="checkbox"
-                      checked={!disableReflectionPhaseJitter}
-                      onChange={(event) => setDisableReflectionPhaseJitter(!event.target.checked)}
-                    />
-                    Reflection phase jitter
-                  </label>
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                    <input
-                      type="checkbox"
-                      checked={!disableReflectionCoherenceWeight}
-                      onChange={(event) => setDisableReflectionCoherenceWeight(!event.target.checked)}
-                    />
-                    Reflection weighting
-                  </label>
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                    <input
-                      type="checkbox"
-                      checked={!disableLateField}
-                      onChange={(event) => setDisableLateField(!event.target.checked)}
-                    />
-                    Late field
-                  </label>
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                    <input
-                      type="checkbox"
-                      checked={disableModalPropagationPhase}
-                      onChange={(event) => setDisableModalPropagationPhase(event.target.checked)}
-                    />
-                    Disable modal propagation phase
-                  </label>
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
-                    <input
-                      type="checkbox"
-                      checked={mute68HzAxialMode}
-                      onChange={(event) => setMute68HzAxialMode(event.target.checked)}
-                    />
-                    Mute 68.6 Hz mode
-                  </label>
-                  {/* __TEMP_DIAGNOSTIC__ debugDisableModalContribution toggle — remove after polarity masking diagnosis */}
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 text-xs text-red-700 font-semibold">
-                    <input
-                      type="checkbox"
-                      checked={debugDisableModalContribution}
-                      onChange={(event) => setDebugDisableModalContribution(event.target.checked)}
-                    />
-                    Debug: disable modal contribution
-                  </label>
-                  {/* __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__ */}
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold">
-                    <input
-                      type="checkbox"
-                      checked={overrideConstantAxialQ}
-                      onChange={(event) => setOverrideConstantAxialQ(event.target.checked)}
-                    />
-                    Constant axial Q parity test
-                  </label>
-                  {/* __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__ */}
-                  <label className="flex h-8 items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold">
-                    <input
-                      type="checkbox"
-                      checked={overrideAbsorptionAxialQ}
-                      onChange={(event) => setOverrideAbsorptionAxialQ(event.target.checked)}
-                    />
-                    Absorption axial Q parity test
-                  </label>
-                  {/* __TEMP_REW_PARITY_MODE_200_SCALE__ */}
-                  <select
-                    value={debugMode200Multiplier}
-                    onChange={(event) => setDebugMode200Multiplier(Number(event.target.value))}
-                    className="h-8 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold"
-                    aria-label="(2,0,0) mode scale"
-                  >
-                    <option value={1.00}>(2,0,0) axial overlay: 1.00</option>
-                      <option value={0.75}>(2,0,0) axial overlay: 0.75</option>
-                      <option value={0.50}>(2,0,0) axial overlay: 0.50</option>
-                      <option value={0.25}>(2,0,0) axial overlay: 0.25</option>
-                  </select>
-                  </div>
-                {/* __TEMP_REW_PARITY_ISOLATION__ field isolation selector */}
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  <span className="text-xs text-[#3E4349] font-mono">Parity isolation:</span>
-                  {[
-                    { value: 'reflections_only',    label: 'Reflections only' },
-                    { value: 'modes_only',          label: 'Modes only' },
-                    { value: 'direct_plus_modes',   label: 'Direct + Modes' },
-                    { value: 'full_field',          label: 'Full field' },
-                  ].map(({ value, label }) => (
-                    <button
-                      key={value}
-                      onClick={() => setRewParityFieldMode(value)}
-                      className={`h-8 px-3 rounded-md border text-xs font-mono transition-colors ${
-                        rewParityFieldMode === value
-                          ? 'bg-[#213428] text-white border-[#213428]'
-                          : 'bg-white text-[#1B1A1A] border-[#DCDBD6] hover:border-[#213428]'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                  <span className="text-[9px] font-mono text-[#6b7280]">__TEMP_REW_PARITY_ISOLATION__</span>
-                </div>
-                <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
-                  <div className="font-bold text-[#1E293B]">Active model:</div>
-                  <div>Source: {rewSourceCurveMode}</div>
-                  <div>Modal source: {modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</div>
-                  {modalSourceReferenceMode === 'distance_blend' && (
-                    <div style={{ color: '#b45309', fontWeight: 700 }}>Modal distance blend: {modalDistanceBlend.toFixed(2)}</div>
-                  )}
-                  <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
-                  <div>Axial Q: {axialQ.toFixed(1)}</div>
-                  <div>Storage: {modalStorageMode}</div>
-                  <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
-                  <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
-                  <div>Reflection phase jitter: {disableReflectionPhaseJitter ? 'OFF' : 'ON'}</div>
-                  <div>Reflection weighting: {disableReflectionCoherenceWeight ? 'OFF' : 'ON'}</div>
-                  <div>Late field: {disableLateField ? 'OFF' : 'ON'}</div>
-                  <div>Modal propagation phase disabled: {disableModalPropagationPhase ? 'YES' : 'NO'}</div>
-                  <div>Mute 68.6 Hz mode: {mute68HzAxialMode ? 'ON' : 'OFF'}</div>
-                  {/* __TEMP_DIAGNOSTIC__ */}
-                  <div style={{ color: debugDisableModalContribution ? '#dc2626' : undefined }}>
-                    Debug modal OFF: {debugDisableModalContribution ? 'YES ⚠️' : 'NO'}
-                  </div>
-                  {/* __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__ */}
-                  <div style={{ color: overrideConstantAxialQ ? '#b45309' : undefined, fontWeight: overrideConstantAxialQ ? 700 : undefined }}>
-                    Constant axial Q: {overrideConstantAxialQ ? 'ON ⚠️' : 'OFF'}
-                  </div>
-                  {/* __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__ */}
-                  <div style={{ color: overrideAbsorptionAxialQ ? '#b45309' : undefined, fontWeight: overrideAbsorptionAxialQ ? 700 : undefined }}>
-                    Absorption axial Q: {overrideAbsorptionAxialQ ? 'ON ⚠️' : 'OFF'}
-                  </div>
-                  {/* __TEMP_REW_PARITY_MODE_200_SCALE__ */}
-                  <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
-                    (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
-                  </div>
-                  {/* __TEMP_REW_PARITY_ISOLATION__ */}
-                  {(() => {
-                    const isParityRerouted = rewParityFieldMode === 'full_field' && rewSourceCurveMode === 'flat_0_500hz_rew_parity';
-                    const label = isParityRerouted
-                      ? 'REW parity full field = direct + modes only ⚠️'
-                      : `Parity isolation: ${rewParityFieldMode}`;
-                    const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
-                    return (
-                      <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>
-                        {label}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </>
-            )}
           </div>
-        </div>
 
         {/* Seat selector pills — stacked rows, multi-select toggles */}
         {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
@@ -1322,29 +1163,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-        {IS_DEVELOPMENT_MODE && (<>
-          {/* __TEMP_DIAGNOSTIC__ tuning signature readout */}
-          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 2, wordBreak: 'break-all' }}>
-            Tuning sig: {subTuningSignature}
-          </div>
-          {/* __TEMP_DIAGNOSTIC__ getTuning lookup audit */}
-          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b21a8', background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 4, padding: '3px 8px', marginBottom: 6, wordBreak: 'break-all' }}>
-            {(() => {
-              const frontKeys = Object.keys(frontSubsCfg?.settingsById || {});
-              const rearKeys = Object.keys(rearSubsCfg?.settingsById || {});
-              const lookup = subsForSimulation.map(sub => {
-                const cfg = sub.id?.startsWith('front') ? frontSubsCfg : rearSubsCfg;
-                const settingsById = cfg?.settingsById || {};
-                const exactHit = !!settingsById[sub.id];
-                const fallbackKey = !exactHit && Object.keys(settingsById).length === 1 ? Object.keys(settingsById)[0] : null;
-                const keyUsed = exactHit ? sub.id : (fallbackKey ?? 'MISS');
-                const resolvedSettings = settingsById[keyUsed] || {};
-                return `[${sub.id}] key=${keyUsed} gain=${Number.isFinite(resolvedSettings.gainDb) ? resolvedSettings.gainDb.toFixed(1) : '0.0'}`;
-              });
-              return <>getTuning lookups: {lookup.length === 0 ? 'no subs' : lookup.join(' | ')} | frontKeys=[{frontKeys.join(',')}] rearKeys=[{rearKeys.join(',')}]</>;
-            })()}
-          </div>
-        </>)}
+
 
         <div className="mt-4">
           {multiSeries.length > 0 ? (
