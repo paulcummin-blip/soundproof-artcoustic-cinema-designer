@@ -655,6 +655,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
   const enableReflections = options?.enableReflections === true;
   const enableModes = options?.enableModes === true;
+  // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__
+  // Allows testing whether the missing 58–60 Hz null is caused by first-order-only image sources.
+  // 1 = production first-order only (default)
+  // 2 = include second-order image sources
+  // 3 = include second + third-order image sources
+  // DO NOT promote to production without full parity review.
+  const debugReflectionOrder = Number.isFinite(Number(options?.debugReflectionOrder))
+    ? Math.round(Number(options.debugReflectionOrder))
+    : 1;
   const disableReflectionPhaseJitter = options?.disableReflectionPhaseJitter === true;
   const disableReflectionCoherenceWeight = options?.disableReflectionCoherenceWeight === true;
   const disableLateField = options?.disableLateField === true;
@@ -691,14 +700,110 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const freqsHz = buildFrequencyAxis(freqMinHz, freqMaxHz);
   const schroederFrequency = 2000 * Math.sqrt(0.4 / (widthM * lengthM * heightM));
 
-  const imageSources = enableReflections ? [
-    { x: -source.x, y: source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.left) },
-    { x: 2 * widthM - source.x, y: source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.right) },
-    { x: source.x, y: -source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.front) },
-    { x: source.x, y: 2 * lengthM - source.y, z: source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.back) },
-    { x: source.x, y: source.y, z: -source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.floor) },
-    { x: source.x, y: source.y, z: 2 * heightM - source.z, reflectionCoefficient: Math.sqrt(1 - surfaceAbsorption.ceiling) },
-  ] : [];
+  // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__
+  // buildImageSources generates all image sources up to the requested reflection order
+  // using true rectangular-room mirrored-room geometry.
+  // Each image source carries an accumulated pressure reflection coefficient product
+  // (sqrt(1 - alpha) per wall bounce) matching the first-order convention already in use.
+  //
+  // Wall index convention for the six faces:
+  //   0 = left   (x=0),  alpha = surfaceAbsorption.left
+  //   1 = right  (x=W),  alpha = surfaceAbsorption.right
+  //   2 = front  (y=0),  alpha = surfaceAbsorption.front
+  //   3 = back   (y=L),  alpha = surfaceAbsorption.back
+  //   4 = floor  (z=0),  alpha = surfaceAbsorption.floor
+  //   5 = ceiling(z=H),  alpha = surfaceAbsorption.ceiling
+  //
+  // For order N we iterate over all integer reflection index triples (rx, ry, rz)
+  // where |rx|+|ry|+|rz| <= N, excluding (0,0,0) which is the direct path.
+  // Each axis triple maps to a unique image source position and wall-hit count.
+  //
+  // Image source formula (standard rectangular room):
+  //   For axis X with room width W and source position sx:
+  //     If reflection index ix is even:  image_x = ix * W + sx
+  //     If reflection index ix is odd:   image_x = ix * W + (W - sx)  [i.e. mirrored]
+  //   Same for Y (lengthM, sy) and Z (heightM, sz).
+  //
+  // Wall hit counts per axis (to compute absorption product):
+  //   X axis: hits on left = ceil(|ix|/2) if ix positive, or floor((|ix|+1)/2) if negative (etc.)
+  //   Simplified: left hits = number of even-valued reflections crossing x=0,
+  //               right hits = number of odd-valued reflections crossing x=W.
+  //   Standard closed-form: for integer index n (can be negative):
+  //     right_hits = floor((n+1)/2) if n>0, 0 if n<=0
+  //     left_hits  = floor(n/2+0.5) for n>0, floor(-n/2+0.5) for n<0 ... use below helper.
+
+  function buildImageSources(sx, sy, sz, W, L, H, sa, maxOrder) {
+    if (maxOrder < 1) return [];
+    const sources = [];
+    const rMax = maxOrder;
+
+    for (let rx = -rMax; rx <= rMax; rx++) {
+      for (let ry = -rMax; ry <= rMax; ry++) {
+        for (let rz = -rMax; rz <= rMax; rz++) {
+          const totalOrder = Math.abs(rx) + Math.abs(ry) + Math.abs(rz);
+          if (totalOrder === 0 || totalOrder > maxOrder) continue;
+
+          // Image position
+          const imgX = (rx % 2 === 0) ? rx * W + sx : rx * W + (W - sx);
+          const imgY = (ry % 2 === 0) ? ry * L + sy : ry * L + (L - sy);
+          const imgZ = (rz % 2 === 0) ? rz * H + sz : rz * H + (H - sz);
+
+          // Wall hit counts — derived from the reflection index parity pattern.
+          // Each unit step in the reflection index crosses one wall.
+          // For index n > 0: crosses right wall ceil(n/2) times, left wall floor(n/2) times.
+          // For index n < 0: same but mirrored (crosses left ceil(|n|/2), right floor(|n|/2)).
+          const absRx = Math.abs(rx);
+          const absRy = Math.abs(ry);
+          const absRz = Math.abs(rz);
+
+          let rightHits, leftHits, backHits, frontHits, ceilingHits, floorHits;
+
+          if (rx >= 0) {
+            rightHits = Math.ceil(absRx / 2);
+            leftHits  = Math.floor(absRx / 2);
+          } else {
+            leftHits  = Math.ceil(absRx / 2);
+            rightHits = Math.floor(absRx / 2);
+          }
+          if (ry >= 0) {
+            backHits  = Math.ceil(absRy / 2);
+            frontHits = Math.floor(absRy / 2);
+          } else {
+            frontHits = Math.ceil(absRy / 2);
+            backHits  = Math.floor(absRy / 2);
+          }
+          if (rz >= 0) {
+            ceilingHits = Math.ceil(absRz / 2);
+            floorHits   = Math.floor(absRz / 2);
+          } else {
+            floorHits   = Math.ceil(absRz / 2);
+            ceilingHits = Math.floor(absRz / 2);
+          }
+
+          // Pressure reflection coefficient: product of sqrt(1-alpha) per wall hit
+          const rc =
+            Math.pow(Math.sqrt(1 - sa.left),    leftHits) *
+            Math.pow(Math.sqrt(1 - sa.right),   rightHits) *
+            Math.pow(Math.sqrt(1 - sa.front),   frontHits) *
+            Math.pow(Math.sqrt(1 - sa.back),    backHits) *
+            Math.pow(Math.sqrt(1 - sa.floor),   floorHits) *
+            Math.pow(Math.sqrt(1 - sa.ceiling), ceilingHits);
+
+          sources.push({ x: imgX, y: imgY, z: imgZ, reflectionCoefficient: rc, order: totalOrder });
+        }
+      }
+    }
+    return sources;
+  }
+
+  const imageSources = enableReflections
+    ? buildImageSources(
+        source.x, source.y, source.z,
+        widthM, lengthM, heightM,
+        surfaceAbsorption,
+        debugReflectionOrder
+      )
+    : [];
 
   const modes = enableModes
     ? computeRoomModesLocal({
