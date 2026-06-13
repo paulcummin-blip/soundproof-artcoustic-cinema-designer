@@ -802,9 +802,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
       const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
 
-      // Deterministic frequency-dependent phase jitter — reflections only.
-      const phaseJitter = disableReflectionPhaseJitter ? 0 : 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
-      const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + phaseJitter;
+      // Reflection phase is pure propagation/time-of-flight only.
+      // Phase jitter was removed after parity audit showed it shallowed the 40 Hz null and shifted its centre.
+      // disableReflectionPhaseJitter flag is preserved for reference but no longer alters output.
+      const phaseJitter = 0; // eslint-disable-line no-unused-vars
+      const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
 
       // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__
       // Temporarily forcing full coherence (1.0) to test whether the existing
@@ -847,8 +849,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
         const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
         const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
-        const debugPhaseJitter = disableReflectionPhaseJitter ? 0 : 0.002 * (frequencyHz - 20) * (1 + 0.3 * reflectionIndex);
-        const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase + debugPhaseJitter;
+        // Step-debug copy: jitter removed to match production path.
+        const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
         // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__ (debug copy — kept in sync with main path)
         const debugCoherenceWeight = 1.0;
         _refSumRe += debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
