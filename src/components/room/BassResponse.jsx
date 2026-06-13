@@ -906,11 +906,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <option value={5.0}>Axial Q: 5.0</option>
                   </select>
                   <select value={propagationPhaseScale} onChange={(e) => setPropagationPhaseScale(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Propagation phase scale">
-                    <option value={0.4}>Propagation phase scale: 0.40</option>
-                    <option value={0.5}>Propagation phase scale: 0.50</option>
-                    <option value={0.6}>Propagation phase scale: 0.60</option>
-                    <option value={0.7}>Propagation phase scale: 0.70</option>
-                    <option value={1.0}>Propagation phase scale: 1.00</option>
+                    <option value={0.00}>Propagation phase scale: 0.00</option>
+                    <option value={0.10}>Propagation phase scale: 0.10</option>
+                    <option value={0.20}>Propagation phase scale: 0.20</option>
+                    <option value={0.30}>Propagation phase scale: 0.30</option>
+                    <option value={0.40}>Propagation phase scale: 0.40</option>
+                    <option value={0.50}>Propagation phase scale: 0.50</option>
+                    <option value={0.60}>Propagation phase scale: 0.60</option>
+                    <option value={0.70}>Propagation phase scale: 0.70</option>
+                    <option value={1.00}>Propagation phase scale: 1.00</option>
                   </select>
                   <select value={debugMode200Multiplier} onChange={(e) => setDebugMode200Multiplier(Number(e.target.value))} className="h-8 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs text-amber-800 font-semibold" aria-label="(2,0,0) axial overlay">
                     <option value={1.00}>(2,0,0) axial overlay: 1.00</option>
