@@ -458,7 +458,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         // When full_field is selected with the flat_0_500hz_rew_parity source curve, route it as
         // direct + modes only (no image-source reflections) to match REW Room Simulator, which does
         // not stack a separate image-source layer on top of its modal solver.
-        const _isParityFullField = rewParityFieldMode === 'full_field' && rewSourceCurveMode === 'flat_0_500hz_rew_parity';
+        const _isParityFullField = rewParityFieldMode === 'full_field' && (rewSourceCurveMode === 'flat_rew_reference' || rewSourceCurveMode === 'flat_0_500hz_rew_parity');
         const _effectiveFieldMode = _isParityFullField ? 'direct_plus_modes' : rewParityFieldMode;
 
         const _fieldReflections = _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes' ? false
@@ -945,8 +945,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
               </div>
               {(() => {
-                const isParityRerouted = rewParityFieldMode === 'full_field' && rewSourceCurveMode === 'flat_0_500hz_rew_parity';
-                const label = isParityRerouted ? 'REW parity full field = direct + modes only ⚠️' : `Parity isolation: ${rewParityFieldMode}`;
+                const isParityRerouted = rewParityFieldMode === 'full_field' && (rewSourceCurveMode === 'flat_rew_reference' || rewSourceCurveMode === 'flat_0_500hz_rew_parity');
+                const label = isParityRerouted ? 'REW parity full field → direct + modes only (reflections suppressed) ⚠️' : `Parity isolation: ${rewParityFieldMode} (true full field)`;
                 const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
                 return <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>{label}</div>;
               })()}
