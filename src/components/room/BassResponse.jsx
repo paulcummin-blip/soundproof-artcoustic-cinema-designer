@@ -458,8 +458,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         // When full_field is selected with the flat_0_500hz_rew_parity source curve, route it as
         // direct + modes only (no image-source reflections) to match REW Room Simulator, which does
         // not stack a separate image-source layer on top of its modal solver.
-        const _isParityFullField = rewParityFieldMode === 'full_field' && (rewSourceCurveMode === 'flat_rew_reference' || rewSourceCurveMode === 'flat_0_500hz_rew_parity');
-        const _effectiveFieldMode = _isParityFullField ? 'direct_plus_modes' : rewParityFieldMode;
+        const _isParityFullField = false;
+        const _effectiveFieldMode = rewParityFieldMode;
 
         const _fieldReflections = _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes' ? false
           : _effectiveFieldMode === 'reflections_only' ? true
