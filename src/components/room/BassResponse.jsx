@@ -1314,6 +1314,96 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
 
+      {/* __B44_LAYER_BREAKDOWN__ Frequency layer contribution breakdown table */}
+      {(() => {
+        const TARGET_HZ = [30, 34.3, 40, 50, 58, 60, 68.6, 70, 80, 100];
+        const wcd = simulationResults.wholeCurveDebugRows;
+        const preModalSeries  = wcd?.preModalSeries;
+        const modalOnlySeries = wcd?.modalOnlySeries;
+        const postModalSeries = wcd?.postModalSeries;
+
+        const getDbAtHz = (series, targetHz) => {
+          if (!Array.isArray(series) || series.length === 0) return null;
+          let best = null, bestDist = Infinity;
+          for (const pt of series) {
+            const hz = pt.hz ?? pt.frequency;
+            const dist = Math.abs((hz ?? 0) - targetHz);
+            if (dist < bestDist) { bestDist = dist; best = pt; }
+          }
+          if (!best || bestDist > 5) return null;
+          return best.db ?? best.spl ?? best.dB ?? null;
+        };
+
+        const getRowAtHz = (rows, targetHz) => {
+          if (!Array.isArray(rows)) return null;
+          let best = null, bestDist = Infinity;
+          for (const row of rows) {
+            const hz = row.hz ?? row.frequency ?? row.freq;
+            const dist = Math.abs((hz ?? 0) - targetHz);
+            if (dist < bestDist) { bestDist = dist; best = row; }
+          }
+          return best && bestDist <= 5 ? best : null;
+        };
+
+        const fmt = (v) => (v !== null && v !== undefined && Number.isFinite(Number(v))) ? Number(v).toFixed(1) : '—';
+        const hasData = preModalSeries || modalOnlySeries || postModalSeries || (Array.isArray(wcd) && wcd.length > 0);
+
+        return (
+          <div style={{ border: '1px solid #7c3aed', borderRadius: 6, background: '#f5f3ff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, color: '#5b21b6', marginBottom: 4 }}>
+              Layer Contribution Breakdown — seat: {selectedSeatIds[0] || '—'}
+            </div>
+            {!hasData ? (
+              <div style={{ color: '#7c3aed' }}>No wholeCurveDebugRows data available for this seat.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 500 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #c4b5fd', color: '#5b21b6', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 42 }}>Hz</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Direct</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Refl</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 60 }}>Pre-Modal</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Modal</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Final</th>
+                      <th style={{ textAlign: 'left',  padding: '2px 5px', minWidth: 80 }}>Top mode</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {TARGET_HZ.map(hz => {
+                      const row = getRowAtHz(wcd, hz);
+                      const directDb   = row?.directDb ?? row?.direct_db ?? row?.directPressureDb ?? null;
+                      const reflDb     = row?.reflectionsDb ?? row?.reflDb ?? row?.refl_db ?? null;
+                      const preModalDb = row?.preModalDb ?? row?.pre_modal_db ?? getDbAtHz(preModalSeries, hz);
+                      const modalDb    = row?.modalDb ?? row?.modal_db ?? getDbAtHz(modalOnlySeries, hz);
+                      const finalDb    = row?.finalDb ?? row?.final_db ?? row?.splDb ?? row?.spl_db ?? getDbAtHz(postModalSeries, hz);
+                      const sm = row?.strongestMode ?? row?.dominant_mode ?? row?.dominantMode ?? row?.topMode ?? null;
+                      const modeLabel  = sm
+                        ? (typeof sm === 'string' ? sm : (sm.label ?? sm.mode ?? `(${[sm.nx,sm.ny,sm.nz].filter(v=>v!=null).join(',')})`))
+                        : '—';
+                      return (
+                        <tr key={hz} style={{ borderBottom: '1px solid #ede9fe' }}>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#4c1d95' }}>{hz}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#1e3a5f' }}>{fmt(directDb)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#1e3a5f' }}>{fmt(reflDb)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmt(preModalDb)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmt(modalDb)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#1c1917' }}>{fmt(finalDb)}</td>
+                          <td style={{ textAlign: 'left',  padding: '1px 5px', color: '#6b21a8', fontSize: 9 }}>{modeLabel}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 4, color: '#7c3aed', fontSize: 9, fontStyle: 'italic' }}>
+                  Pre-Modal = direct + reflections summed before modal addition. All values dBSPL. Direct/Refl only populated if engine exposes them separately.
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
           </div>
         </details>
       )}
