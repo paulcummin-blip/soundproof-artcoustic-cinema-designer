@@ -505,7 +505,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         // parity preset is fully active (flat_rew_reference source). This bypasses the
         // legacy decomposed superposition path entirely for direct comparison.
         // Production/product mode is unaffected — this only fires for the REW parity preset.
-        const _useParityFieldSolver = rewSourceCurveMode === 'flat_rew_reference';
+        const _useParityFieldSolver = false;
 
         const rewResult = _useParityFieldSolver
           ? simulateBassResponseRewParityField(
