@@ -23,7 +23,7 @@ const IS_DEVELOPMENT_MODE = true;
 // Agreed REW parity comparison state — do not change without a new sweep.
 // propagationPhaseScale 0.10 was chosen by sweep on 2026-06-13 (null centre 40.4 Hz vs REW 40.6 Hz).
 const REW_PARITY_PRESET = {
-  rewSourceCurveMode: 'product',
+  rewSourceCurveMode: 'flat_rew_reference',
   modalSourceReferenceMode: 'existing',
   modalGainScalar: 1.0,
   axialQ: 8.0,
@@ -35,6 +35,13 @@ const REW_PARITY_PRESET = {
 
 const REW_SOURCE_CURVES = {
   product: null,
+  // Flat 94 dB source from 20–200 Hz — matches REW Room Simulator flat reference for like-for-like parity.
+  flat_rew_reference: [
+    { hz: 20,  db: 94 },
+    { hz: 50,  db: 94 },
+    { hz: 100, db: 94 },
+    { hz: 200, db: 94 },
+  ],
   flat90: [
     { hz: 15, db: 90 },
     { hz: 200, db: 90 },
@@ -858,6 +865,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="flex flex-wrap gap-2">
               <select value={rewSourceCurveMode} onChange={(e) => setRewSourceCurveMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Source curve">
                 <option value="product">Source curve: current product</option>
+                <option value="flat_rew_reference">Source curve: Flat REW reference</option>
                 <option value="flat90">Source curve: flat 90 dB</option>
                 <option value="rew20HzPorted">Source curve: REW-style 20 Hz ported</option>
                 <option value="flat_0_500hz_rew_parity">Flat 0–500Hz REW parity</option>
