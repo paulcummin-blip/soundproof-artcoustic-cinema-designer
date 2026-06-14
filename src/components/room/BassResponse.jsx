@@ -978,11 +978,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
                 return <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>{label}</div>;
               })()}
-              {rewSourceCurveMode === 'flat_rew_reference' && (
-                <div style={{ marginTop: 4, padding: '3px 6px', borderRadius: 4, background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', fontWeight: 700, fontSize: 10 }}>
-                  ⚡ Diagnostic REW parity field solver active (modal-only Green&apos;s function — no direct sound, no reflections)
-                </div>
-              )}
+
             </div>
           </div>
         </div>
