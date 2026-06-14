@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useAppState } from "../AppStateProvider";
 import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
-import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
+import { simulateBassResponseRewCore, simulateBassResponseRewParityField } from "@/bass/core/rewBassEngine";
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import RewDebugPanel from "@/components/room/bass/RewDebugPanel";
@@ -500,7 +500,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           }
         }
 
-        const rewResult = simulateBassResponseRewCore(
+        // __TEMP_DIAGNOSTIC_REW_PARITY_FIELD__
+        // Route to the dedicated REW-style modal-only Green's function solver when the
+        // parity preset is fully active (flat_rew_reference source). This bypasses the
+        // legacy decomposed superposition path entirely for direct comparison.
+        // Production/product mode is unaffected — this only fires for the REW parity preset.
+        const _useParityFieldSolver = rewSourceCurveMode === 'flat_rew_reference';
+
+        const rewResult = _useParityFieldSolver
+          ? simulateBassResponseRewParityField(
+              {
+                widthM: roomDims.widthM,
+                lengthM: roomDims.lengthM,
+                heightM: roomDims.heightM,
+              },
+              {
+                x: seat.x,
+                y: seat.y,
+                z: _seatZ,
+              },
+              sub,
+              diagnosticSourceCurve,
+              {
+                surfaceAbsorption,
+                freqMinHz: 20,
+                freqMaxHz: 200,
+                axialQ,
+              }
+            )
+          : simulateBassResponseRewCore(
           {
             widthM: roomDims.widthM,
             lengthM: roomDims.lengthM,
@@ -950,6 +978,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
                 return <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>{label}</div>;
               })()}
+              {rewSourceCurveMode === 'flat_rew_reference' && (
+                <div style={{ marginTop: 4, padding: '3px 6px', borderRadius: 4, background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', fontWeight: 700, fontSize: 10 }}>
+                  ⚡ Diagnostic REW parity field solver active (modal-only Green&apos;s function — no direct sound, no reflections)
+                </div>
+              )}
             </div>
           </div>
         </div>

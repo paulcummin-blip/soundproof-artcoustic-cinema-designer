@@ -1466,4 +1466,155 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DIAGNOSTIC REW-STYLE PARITY FIELD SOLVER
+// Isolated from simulateBassResponseRewCore. Do not merge with production path.
+//
+// Architecture: Modal-only coherent pressure field via rectangular-room Green's function.
+// No direct sound added as an independent vector.
+// No image-source reflections.
+// No late-field energy.
+//
+// Formula per mode (n):
+//   P_n(r_s, r_r, f) = A * Ψ_n(r_s) * Ψ_n(r_r) * H_n(f)
+//   where:
+//     A             = modalSourceAmplitude (source output at reference, no seat-distance attenuation)
+//     Ψ_n(r)        = modeShapeValueLocal — cosine product for source/receiver
+//     H_n(f)        = 1 / (1 - (f/f_n)^2 + j*(f/(f_n*Q_n)))   [standard 2nd-order resonant TF]
+//
+//   P_total = Σ_n P_n(r_s, r_r, f)   (coherent complex sum over all modes up to fMax)
+//
+// Output format: identical to simulateBassResponseRewCore — { freqsHz, splDbRaw, complexPressure }
+// ─────────────────────────────────────────────────────────────────────────────
+export function simulateBassResponseRewParityField(roomDims, seatPos, sub, subProductCurve, options = {}) {
+  const widthM  = Number(roomDims?.widthM);
+  const lengthM = Number(roomDims?.lengthM);
+  const heightM = Number(roomDims?.heightM);
+
+  if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
+    throw new Error('[RewParityField] roomDims must include finite widthM, lengthM, heightM.');
+  }
+
+  const seat = {
+    x: Number(seatPos?.x),
+    y: Number(seatPos?.y),
+    z: Number.isFinite(Number(seatPos?.z)) ? Number(seatPos?.z) : 1.2,
+  };
+
+  const source = {
+    x: Number(sub?.x),
+    y: Number(sub?.y),
+    z: Number.isFinite(Number(sub?.z)) ? Number(sub?.z) : 0.35,
+    tuning: normalizeSubTuning(sub?.tuning),
+  };
+
+  if (!Number.isFinite(seat.x) || !Number.isFinite(seat.y)) {
+    throw new Error('[RewParityField] seatPos must include finite x and y.');
+  }
+  if (!Number.isFinite(source.x) || !Number.isFinite(source.y)) {
+    throw new Error('[RewParityField] sub must include finite x and y.');
+  }
+  if (!Array.isArray(subProductCurve) || subProductCurve.length === 0) {
+    throw new Error('[RewParityField] subProductCurve must be a non-empty array.');
+  }
+
+  const freqMinHz = options?.freqMinHz ?? 20;
+  const freqMaxHz = options?.freqMaxHz ?? 200;
+  const freqsHz   = buildFrequencyAxis(freqMinHz, freqMaxHz);
+
+  const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
+  const axialQ = Number.isFinite(Number(options?.axialQ)) ? Number(options.axialQ) : 8.0;
+
+  // Compute modes — reusing safe infrastructure
+  const modes = computeRoomModesLocal({
+    widthM, lengthM, heightM,
+    fMax: freqMaxHz,
+    c: SPEED_OF_SOUND_MPS,
+  }).map((mode) => {
+    const baseQ       = estimateModeQByType(mode, axialQ);
+    const absorptionQ = estimateModeQLocal({
+      roomDims: { widthM, lengthM, heightM },
+      surfaceAbsorption,
+      f0: mode.freq,
+    });
+    return { ...mode, qValue: Math.max(1, Math.min(baseQ, absorptionQ)) };
+  });
+
+  // Modal source amplitude: source output at reference level + gain, no seat-distance attenuation.
+  // Seat-distance effects are handled by the mode-shape coupling (Ψ_source * Ψ_receiver).
+  const complexPressure = freqsHz.map((frequencyHz) => {
+    const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
+    const modalSourceAmplitude = Math.pow(10, (curveDb + source.tuning.gainDb) / 20);
+
+    let sumRe = 0;
+    let sumIm = 0;
+
+    // Apply sub tuning phase (delay + polarity) once per frequency bin.
+    // This rotates the entire modal field contribution coherently.
+    const tuningPhase =
+      (-2 * Math.PI * frequencyHz * (source.tuning.delayMs / 1000)) +
+      (source.tuning.polarity === 180 ? Math.PI : 0);
+    const tuningCos = Math.cos(tuningPhase);
+    const tuningSin = Math.sin(tuningPhase);
+
+    modes.forEach((mode) => {
+      // Mode-shape coupling: Ψ(source) * Ψ(receiver)
+      const sourceCoupling   = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
+      const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
+      const coupling = sourceCoupling * receiverCoupling;
+
+      // Standard 2nd-order resonant transfer function H(f, f0, Q)
+      const omega  = 2 * Math.PI * frequencyHz;
+      const omega0 = 2 * Math.PI * mode.freq;
+      const ratio  = omega / omega0;
+      const realDen  = 1 - ratio * ratio;
+      const imagDen  = omega / (mode.qValue * omega0);
+      const denomSq  = realDen * realDen + imagDen * imagDen;
+
+      const transferRe = realDen / denomSq;
+      const transferIm = -imagDen / denomSq;
+
+      // Higher-order axial correction (matches production engine scale for comparability)
+      const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
+      const axialScale = (mode.type === 'axial' && modeOrder >= 2) ? 0.50 : 1.0;
+      const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
+
+      const gain = modalSourceAmplitude * coupling * axialScale * orderWeight;
+
+      // Accumulate complex modal pressure
+      sumRe += gain * transferRe;
+      sumIm += gain * transferIm;
+    });
+
+    // Apply sub tuning phase rotation to the total modal sum
+    const tunedRe = sumRe * tuningCos - sumIm * tuningSin;
+    const tunedIm = sumRe * tuningSin + sumIm * tuningCos;
+
+    return { re: tunedRe, im: tunedIm };
+  });
+
+  const splDbRaw = complexPressure.map(({ re, im }) => {
+    const magnitude = Math.sqrt(re * re + im * im);
+    return 20 * Math.log10(Math.max(magnitude, 1e-10));
+  });
+
+  return {
+    freqsHz,
+    splDbRaw,
+    complexPressure,
+    // Stub fields for output-format compatibility with simulateBassResponseRewCore
+    stepDebug:                        [],
+    wholeCurveDebugRows:              [],
+    modalContributorDebugRows:        [],
+    activeModalContributorDebugSeries:[],
+    preModalSeries:                   [],
+    modalOnlySeries:                  [],
+    postModalSeries:                  [],
+    partialCoherenceDiagnosticSeries: [],
+    distributedCoherenceDiagnosticSeries: [],
+    splitCoherenceDiagnosticSeries:   [],
+    _diagnosticSolverLabel:           'REW parity field solver (modal-only Green\'s function)',
+  };
+}
+
 export default simulateBassResponseRewCore;
