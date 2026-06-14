@@ -197,7 +197,7 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const denominatorSq = (realDen * realDen) + (imagDen * imagDen);
 
   const modeOrder = Math.abs(modeIndices.nx) + Math.abs(modeIndices.ny) + Math.abs(modeIndices.nz);
-  const orderWeight = modeOrder >= 2 ? 0.72 : 1.0;
+  const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
 
   const effectiveCoupling = combinedCoupling;
   const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
