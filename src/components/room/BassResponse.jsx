@@ -194,6 +194,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(1.0);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
+  // REW reference overlay — debug only, no engine changes
+  const [rewOverlayText, setRewOverlayText] = useState('');
+  const [showRewOverlay, setShowRewOverlay] = useState(true);
+  const [normalizeRewOverlay, setNormalizeRewOverlay] = useState(false);
 
   // REW parity preset helpers — no engine changes
   const resetToParityPreset = () => {
@@ -654,6 +658,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     return series;
   }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub, subTuningSignature]);
+
+  // Parse pasted REW CSV into a series object
+  const rewOverlaySeries = useMemo(() => {
+    if (!rewOverlayText?.trim()) return null;
+    const lines = rewOverlayText.trim().split(/[\r\n]+/);
+    const pts = [];
+    for (const line of lines) {
+      const parts = line.split(/[,\t ]+/);
+      const hz = parseFloat(parts[0]);
+      const db = parseFloat(parts[1]);
+      if (Number.isFinite(hz) && Number.isFinite(db) && hz > 0) pts.push({ frequency: hz, spl: db });
+    }
+    if (pts.length < 2) return null;
+    const sorted = [...pts].sort((a, b) => a.frequency - b.frequency);
+    if (normalizeRewOverlay) {
+      const ref80 = sorted.reduce((best, pt) => Math.abs(pt.frequency - 80) < Math.abs(best.frequency - 80) ? pt : best, sorted[0]);
+      const b44ref80 = (() => {
+        const s = multiSeries[0]?.data;
+        if (!s) return null;
+        return s.reduce((best, pt) => Math.abs(pt.frequency - 80) < Math.abs(best.frequency - 80) ? pt : best, s[0]);
+      })();
+      const offset = b44ref80 ? (b44ref80.spl - ref80.spl) : 0;
+      return { id: 'rew-overlay', color: '#f97316', label: 'REW', data: sorted.map(pt => ({ ...pt, spl: pt.spl + offset })) };
+    }
+    return { id: 'rew-overlay', color: '#f97316', label: 'REW', data: sorted };
+  }, [rewOverlayText, normalizeRewOverlay, multiSeries]);
+
+  const multiSeriesForGraph = useMemo(() => {
+    if (!showRewOverlay || !rewOverlaySeries) return multiSeries;
+    return [...multiSeries, rewOverlaySeries];
+  }, [multiSeries, rewOverlaySeries, showRewOverlay]);
 
   // Keep a single-seat "selectedSeat" reference for the graph title + per-seat detail cards
   const primarySelectedSeat = useMemo(() => {
@@ -1314,6 +1349,38 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
 
+      {/* __REW_OVERLAY_IMPORT__ */}
+      <div style={{ border: '1px solid #ea580c', borderRadius: 6, background: '#fff7ed', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+        <div style={{ fontWeight: 700, color: '#9a3412', marginBottom: 6, fontSize: 11 }}>REW Reference Overlay</div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#7c2d12' }}>
+            <input type="checkbox" checked={showRewOverlay} onChange={e => setShowRewOverlay(e.target.checked)} />
+            Show REW overlay
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#7c2d12' }}>
+            <input type="checkbox" checked={normalizeRewOverlay} onChange={e => setNormalizeRewOverlay(e.target.checked)} />
+            Normalise at 80 Hz to B44
+          </label>
+          <button onClick={() => setRewOverlayText('')} style={{ padding: '1px 8px', borderRadius: 4, border: '1px solid #ea580c', background: '#fff', color: '#9a3412', cursor: 'pointer', fontSize: 10 }}>Clear</button>
+        </div>
+        <div style={{ color: '#92400e', marginBottom: 4, fontSize: 9 }}>Paste REW export CSV below (frequency,spl — one per line, header row OK):</div>
+        <textarea
+          value={rewOverlayText}
+          onChange={e => setRewOverlayText(e.target.value)}
+          rows={6}
+          placeholder={"frequency,spl\n20,92.1\n25,93.4\n30,94.8\n..."}
+          style={{ width: '100%', fontFamily: 'monospace', fontSize: 10, border: '1px solid #fed7aa', borderRadius: 4, padding: '4px 6px', background: '#fff', color: '#1c1917', resize: 'vertical', boxSizing: 'border-box' }}
+        />
+        {rewOverlaySeries && (
+          <div style={{ marginTop: 4, color: '#059669', fontSize: 9 }}>
+            ✓ {rewOverlaySeries.data.length} points parsed — {rewOverlaySeries.data[0]?.frequency.toFixed(1)}–{rewOverlaySeries.data[rewOverlaySeries.data.length - 1]?.frequency.toFixed(1)} Hz
+          </div>
+        )}
+        {rewOverlayText.trim() && !rewOverlaySeries && (
+          <div style={{ marginTop: 4, color: '#dc2626', fontSize: 9 }}>⚠ Could not parse data — check format (frequency,spl per line)</div>
+        )}
+      </div>
+
       {/* __B44_LAYER_BREAKDOWN__ Frequency layer contribution breakdown table */}
       {(() => {
         const TARGET_HZ = [30, 34.3, 40, 50, 58, 60, 68.6, 70, 80, 100];
@@ -1470,8 +1537,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <div className="mt-4">
           {multiSeries.length > 0 ? (
             <BassGraph
-              multiSeries={multiSeries}
-              responseData={multiSeries[0]?.data ?? []}
+              multiSeries={multiSeriesForGraph}
+              responseData={multiSeriesForGraph[0]?.data ?? []}
               schroederFrequency={schroederFrequency}
               rp22Levels={rp22Levels}
               toggles={{}}
