@@ -989,6 +989,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // legacyModalTransferLocal returns the net modal pressure sum (starts at zero).
     // Modal contributions are added directly to the pre-modal field — true superposition.
     let modalSumMagnitude = null;
+    let _debugStrongestModeForRow = null; // hoisted for wholeCurveDebugCandidates access
     let partialCoherenceDiagnostic = null;
     let partialCoherencePreModalRe = sumRe;
     let partialCoherencePreModalIm = sumIm;
@@ -1026,6 +1027,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity,
         Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0 // __TEMP_REW_PARITY_MODE_200_SCALE__
       );
+
+      _debugStrongestModeForRow = _debugStrongestMode ?? null;
 
       if (_debugActiveModalVectorBreakdown) {
         activeModalContributorDebugSeries.push(_debugActiveModalVectorBreakdown);
@@ -1345,6 +1348,17 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const existing = wholeCurveDebugCandidates.get(targetHz);
       if (existing && existing.distanceFromTarget <= distanceFromTarget) return;
 
+      // Build topMode label from the already-calculated _debugStrongestMode (no new calculations).
+      // _debugStrongestMode is only populated for the 30–72 Hz debug range; null outside that range.
+      const _topModeLabel = (() => {
+        if (!enableModes) return null;
+        const sm = _debugStrongestModeForRow;
+        if (!sm) return null;
+        const indices = `(${sm.nx},${sm.ny},${sm.nz})`;
+        const freqStr = Number.isFinite(sm.freq) ? sm.freq.toFixed(1) : '?';
+        return `${indices} ${sm.type ?? ''} @ ${freqStr} Hz`;
+      })();
+
       wholeCurveDebugCandidates.set(targetHz, {
         distanceFromTarget,
         targetHz,
@@ -1373,6 +1387,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         partialCoherenceDiagnostic,
         distributedCoherenceDiagnostic,
         splitCoherenceDiagnostic,
+        topMode: _topModeLabel,
       });
     });
 
