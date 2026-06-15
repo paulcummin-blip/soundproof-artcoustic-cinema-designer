@@ -1110,13 +1110,33 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSumIm = 0;
       }
 
-      // __TEMP_DIAGNOSTIC_INVERT_MODAL_VECTOR__
-      // When debugInvertModalVector is true, negate the entire modal pressure sum before
-      // adding to the pre-modal field. This tests whether the modal vector is globally
-      // phase-referenced 180° away from REW. Default behaviour is unchanged (false).
+      // __TEMP_DIAGNOSTIC_INVERT_MODAL_VECTOR__ (superseded by debugModalPhaseConvention)
+      // Kept for reference — debugModalPhaseConvention covers this with the 'invert' mode.
       if (options?.debugInvertModalVector === true) {
         modalSumRe *= -1;
         modalSumIm *= -1;
+      }
+
+      // __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__
+      // Tests whether REW parity requires a phase-convention correction on the modal sum.
+      // Applied immediately before the modal vector is added to the pre-modal field.
+      // Modes:
+      //   'normal'            — no change (default)
+      //   'invert'            — negate both Re and Im  (-modalSumRe, -modalSumIm)
+      //   'conjugate'         — negate Im only         ( modalSumRe, -modalSumIm)
+      //   'negative_conjugate'— negate Re only         (-modalSumRe,  modalSumIm)
+      // Does NOT alter modal maths, Q, source curves, or reflection order.
+      {
+        const _conv = options?.debugModalPhaseConvention;
+        if (_conv === 'invert') {
+          modalSumRe *= -1;
+          modalSumIm *= -1;
+        } else if (_conv === 'conjugate') {
+          modalSumIm *= -1;
+        } else if (_conv === 'negative_conjugate') {
+          modalSumRe *= -1;
+        }
+        // 'normal' or undefined: no change
       }
 
       // True acoustic pressure superposition:

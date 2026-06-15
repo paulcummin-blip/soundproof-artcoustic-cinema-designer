@@ -192,6 +192,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [overrideAbsorptionAxialQ, setOverrideAbsorptionAxialQ] = useState(false);
   // __TEMP_REW_PARITY_MODE_200_SCALE__
   const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(1.0);
+  // __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__
+  const [debugModalPhaseConvention, setDebugModalPhaseConvention] = useState('normal');
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
   // REW reference overlay — debug only, no engine changes
@@ -562,7 +564,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             disableReflectionCoherenceWeight,
             disableLateField: _fieldLateField,
             disableModalPropagationPhase: rewSourceCurveMode === 'flat_rew_reference' ? true : disableModalPropagationPhase,
-            debugInvertModalVector: rewSourceCurveMode === 'flat_rew_reference' ? true : false, // __TEMP_DIAGNOSTIC_INVERT_MODAL_VECTOR__
+            debugInvertModalVector: rewSourceCurveMode === 'flat_rew_reference' ? true : false, // __TEMP_DIAGNOSTIC_INVERT_MODAL_VECTOR__ (legacy — use debugModalPhaseConvention)
+            debugModalPhaseConvention: rewSourceCurveMode === 'flat_rew_reference' ? debugModalPhaseConvention : 'normal', // __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__
             mute68HzAxialMode,
             debugDisableModalContribution, // __TEMP_DIAGNOSTIC__ — remove after polarity masking diagnosis
             overrideConstantAxialQ, // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
@@ -623,7 +626,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier]); // debugReflectionOrder: 3 hardcoded above
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention]); // debugReflectionOrder: 3 hardcoded above
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -976,6 +979,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value={0.50}>(2,0,0) axial overlay: 0.50</option>
                 <option value={0.25}>(2,0,0) axial overlay: 0.25</option>
               </select>
+              {/* __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__ — only active when flat_rew_reference is selected */}
+              <select
+                value={debugModalPhaseConvention}
+                onChange={(e) => setDebugModalPhaseConvention(e.target.value)}
+                className="h-8 rounded-md border border-purple-400 bg-purple-50 px-2 text-xs text-purple-900 font-semibold"
+                aria-label="Modal phase convention"
+                title="Diagnostic: applies a phase-convention transform to the modal sum before it is added to the pre-modal field. Active only when source curve = flat_rew_reference."
+              >
+                <option value="normal">Modal convention: normal (Re, Im)</option>
+                <option value="invert">Modal convention: invert (−Re, −Im) = 180°</option>
+                <option value="conjugate">Modal convention: conjugate (Re, −Im)</option>
+                <option value="negative_conjugate">Modal convention: −conjugate (−Re, Im)</option>
+              </select>
             </div>
             <div className="flex flex-wrap gap-2">
               <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
@@ -1012,6 +1028,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 const isNonDefault = rewParityFieldMode !== 'full_field';
                 const label = `Parity isolation: ${rewParityFieldMode}${rewParityFieldMode === 'full_field' ? ' (true full field)' : ''}`;
                 return <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>{label}</div>;
+              })()}
+              {(() => {
+                const isNonDefault = debugModalPhaseConvention !== 'normal';
+                const isActive = rewSourceCurveMode === 'flat_rew_reference';
+                return (
+                  <div style={{ color: isNonDefault && isActive ? '#7e22ce' : isNonDefault ? '#9ca3af' : undefined, fontWeight: isNonDefault && isActive ? 700 : undefined }}>
+                    Modal phase convention: {debugModalPhaseConvention}{!isActive ? ' (inactive — flat_rew_reference not selected)' : isNonDefault ? ' ⚠️' : ''}
+                  </div>
+                );
               })()}
 
             </div>
