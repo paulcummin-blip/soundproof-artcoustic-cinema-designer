@@ -1110,6 +1110,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         modalSumIm = 0;
       }
 
+      // __TEMP_DIAGNOSTIC_INVERT_MODAL_VECTOR__
+      // When debugInvertModalVector is true, negate the entire modal pressure sum before
+      // adding to the pre-modal field. This tests whether the modal vector is globally
+      // phase-referenced 180° away from REW. Default behaviour is unchanged (false).
+      if (options?.debugInvertModalVector === true) {
+        modalSumRe *= -1;
+        modalSumIm *= -1;
+      }
+
       // True acoustic pressure superposition:
       // modalSumRe/modalSumIm are already scaled pressure contributions,
       // so they must be added to the existing complex pressure field.
