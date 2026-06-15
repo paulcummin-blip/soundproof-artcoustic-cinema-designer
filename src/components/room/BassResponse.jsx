@@ -1008,9 +1008,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
               </div>
               {(() => {
-                const isParityRerouted = rewParityFieldMode === 'full_field' && (rewSourceCurveMode === 'flat_rew_reference' || rewSourceCurveMode === 'flat_0_500hz_rew_parity');
-                const label = isParityRerouted ? 'REW parity full field → direct + modes only (reflections suppressed) ⚠️' : `Parity isolation: ${rewParityFieldMode} (true full field)`;
-                const isNonDefault = rewParityFieldMode !== 'full_field' || isParityRerouted;
+                const isNonDefault = rewParityFieldMode !== 'full_field';
+                const label = `Parity isolation: ${rewParityFieldMode}${rewParityFieldMode === 'full_field' ? ' (true full field)' : ''}`;
                 return <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>{label}</div>;
               })()}
 
