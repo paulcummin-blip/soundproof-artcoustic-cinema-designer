@@ -561,7 +561,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             disableReflectionPhaseJitter,
             disableReflectionCoherenceWeight,
             disableLateField: _fieldLateField,
-            disableModalPropagationPhase,
+            disableModalPropagationPhase: rewSourceCurveMode === 'flat_rew_reference' ? true : disableModalPropagationPhase,
             mute68HzAxialMode,
             debugDisableModalContribution, // __TEMP_DIAGNOSTIC__ — remove after polarity masking diagnosis
             overrideConstantAxialQ, // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
