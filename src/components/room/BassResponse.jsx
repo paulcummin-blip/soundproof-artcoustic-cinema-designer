@@ -1389,23 +1389,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         const modalOnlySeries = wcd?.modalOnlySeries;
         const postModalSeries = wcd?.postModalSeries;
 
+        const magToDb = (v) => (Number.isFinite(v) && v != null) ? 20 * Math.log10(Math.max(v, 1e-10)) : null;
+
         const getDbAtHz = (series, targetHz) => {
           if (!Array.isArray(series) || series.length === 0) return null;
           let best = null, bestDist = Infinity;
           for (const pt of series) {
-            const hz = pt.hz ?? pt.frequency;
+            const hz = pt.hz ?? pt.frequency ?? pt.frequencyHz;
             const dist = Math.abs((hz ?? 0) - targetHz);
             if (dist < bestDist) { bestDist = dist; best = pt; }
           }
           if (!best || bestDist > 5) return null;
-          return best.db ?? best.spl ?? best.dB ?? null;
+          return best.db ?? best.spl ?? best.dB ?? best.splDb ?? null;
         };
 
         const getRowAtHz = (rows, targetHz) => {
           if (!Array.isArray(rows)) return null;
           let best = null, bestDist = Infinity;
           for (const row of rows) {
-            const hz = row.hz ?? row.frequency ?? row.freq;
+            const hz = row.hz ?? row.frequency ?? row.freq ?? row.frequencyHz ?? row.targetHz;
             const dist = Math.abs((hz ?? 0) - targetHz);
             if (dist < bestDist) { bestDist = dist; best = row; }
           }
@@ -1439,11 +1441,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <tbody>
                     {TARGET_HZ.map(hz => {
                       const row = getRowAtHz(wcd, hz);
-                      const directDb   = row?.directDb ?? row?.direct_db ?? row?.directPressureDb ?? null;
-                      const reflDb     = row?.reflectionsDb ?? row?.reflDb ?? row?.refl_db ?? null;
-                      const preModalDb = row?.preModalDb ?? row?.pre_modal_db ?? getDbAtHz(preModalSeries, hz);
-                      const modalDb    = row?.modalDb ?? row?.modal_db ?? getDbAtHz(modalOnlySeries, hz);
-                      const finalDb    = row?.finalDb ?? row?.final_db ?? row?.splDb ?? row?.spl_db ?? getDbAtHz(postModalSeries, hz);
+                      const directDb   = row?.directDb ?? row?.direct_db ?? row?.directPressureDb ?? magToDb(row?.directMagnitude) ?? null;
+                      const reflDb     = row?.reflectionsDb ?? row?.reflDb ?? row?.refl_db ?? magToDb(row?.reflectionMagnitude) ?? null;
+                      const preModalDb = row?.preModalDb ?? row?.pre_modal_db ?? magToDb(row?.preModalMagnitude) ?? getDbAtHz(preModalSeries, hz);
+                      const modalDb    = row?.modalDb ?? row?.modal_db ?? magToDb(row?.modalSumMagnitude) ?? getDbAtHz(modalOnlySeries, hz);
+                      const finalDb    = row?.finalSplDb ?? row?.finalDb ?? row?.final_db ?? row?.splDb ?? row?.spl_db ?? getDbAtHz(postModalSeries, hz);
                       const sm = row?.strongestMode ?? row?.dominant_mode ?? row?.dominantMode ?? row?.topMode ?? null;
                       const modeLabel  = sm
                         ? (typeof sm === 'string' ? sm : (sm.label ?? sm.mode ?? `(${[sm.nx,sm.ny,sm.nz].filter(v=>v!=null).join(',')})`))
