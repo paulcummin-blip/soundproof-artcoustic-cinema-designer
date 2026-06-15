@@ -1048,11 +1048,200 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
       )}
 
-      {/* Deep REW diagnostics — all verbose debug panels collapsed here */}
+      {/* ── Core Parity Diagnostics (always visible) ── */}
+      {IS_DEVELOPMENT_MODE && (() => {
+        /* Phase at Null Region */
+        const PHASE_TARGET_HZ = [70, 75, 77, 78, 80, 85];
+        const stepDebugInline = simulationResults.stepDebug;
+        const getStepRowAtHzInline = (rows, targetHz) => {
+          if (!Array.isArray(rows) || rows.length === 0) return null;
+          let best = null, bestDist = Infinity;
+          for (const row of rows) {
+            const hz = row?.frequencyHz ?? row?.hz ?? null;
+            if (hz === null) continue;
+            const dist = Math.abs(hz - targetHz);
+            if (dist < bestDist) { bestDist = dist; best = row; }
+          }
+          return best && bestDist <= 5 ? best : null;
+        };
+        const radToDegInline = (r) => (r * 180) / Math.PI;
+        const magToDbInline = (v) => (Number.isFinite(v) && v > 0) ? 20 * Math.log10(v) : null;
+        const fmt1Inline = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(1) : '—';
+        const fmt0Inline = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(0) : '—';
+        const hasPhaseData = Array.isArray(stepDebugInline) && stepDebugInline.length > 0;
+
+        /* Layer Breakdown */
+        const wcdInline = simulationResults.wholeCurveDebugRows;
+        const preModalSeriesInline = wcdInline?.preModalSeries;
+        const modalOnlySeriesInline = wcdInline?.modalOnlySeries;
+        const postModalSeriesInline = wcdInline?.postModalSeries;
+        const LAYER_TARGET_HZ = [30, 34.3, 40, 50, 58, 60, 68.6, 70, 80, 100];
+        const magToDbL = (v) => (Number.isFinite(v) && v != null) ? 20 * Math.log10(Math.max(v, 1e-10)) : null;
+        const getDbAtHzL = (series, targetHz) => {
+          if (!Array.isArray(series) || series.length === 0) return null;
+          let best = null, bestDist = Infinity;
+          for (const pt of series) {
+            const hz = pt.hz ?? pt.frequency ?? pt.frequencyHz;
+            const dist = Math.abs((hz ?? 0) - targetHz);
+            if (dist < bestDist) { bestDist = dist; best = pt; }
+          }
+          if (!best || bestDist > 5) return null;
+          return best.db ?? best.spl ?? best.dB ?? best.splDb ?? null;
+        };
+        const getRowAtHzL = (rows, targetHz) => {
+          if (!Array.isArray(rows)) return null;
+          let best = null, bestDist = Infinity;
+          for (const row of rows) {
+            const hz = row.hz ?? row.frequency ?? row.freq ?? row.frequencyHz ?? row.targetHz;
+            const dist = Math.abs((hz ?? 0) - targetHz);
+            if (dist < bestDist) { bestDist = dist; best = row; }
+          }
+          return best && bestDist <= 5 ? best : null;
+        };
+        const fmtL = (v) => (v !== null && v !== undefined && Number.isFinite(Number(v))) ? Number(v).toFixed(1) : '—';
+        const hasLayerData = preModalSeriesInline || modalOnlySeriesInline || postModalSeriesInline || (Array.isArray(wcdInline) && wcdInline.length > 0);
+
+        return (
+          <>
+            {/* Phase at Null Region */}
+            <div style={{ border: '1px solid #0891b2', borderRadius: 6, background: '#ecfeff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, color: '#0e7490', marginBottom: 4 }}>
+                Phase at null region — seat: {selectedSeatIds[0] || '—'}
+              </div>
+              <div style={{ color: '#164e63', fontSize: 9, marginBottom: 6, fontStyle: 'italic' }}>
+                Source: <code>targetVectorDebug.applicationComparison</code> — prevRe/Im = pre-modal field. modalSumRe/Im = isolated modal sum. livePostRe/Im = final summed field.
+                Δ phase = modal° − pre-modal°, wrapped [−180°, +180°]. Destructive = |Δ| &gt; 135°.
+              </div>
+              {!hasPhaseData ? (
+                <div style={{ color: '#0e7490' }}>No stepDebug data — stepDebug is only populated for TARGET_DEBUG_FREQUENCIES in the engine.</div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 580 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #a5f3fc', color: '#0e7490', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 38 }}>Hz</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal dB</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal °</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal dB</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal °</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 60 }}>Δ phase °</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Final dB</th>
+                        <th style={{ textAlign: 'left',  padding: '2px 5px', minWidth: 80 }}>Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {PHASE_TARGET_HZ.map(hz => {
+                        const row = getStepRowAtHzInline(stepDebugInline, hz);
+                        const ac = row?.applicationComparison ?? null;
+                        const pmRe = ac?.prevRe ?? null; const pmIm = ac?.prevIm ?? null;
+                        const mRe = ac?.modalSumRe ?? null; const mIm = ac?.modalSumIm ?? null;
+                        const postRe = ac?.livePostRe ?? null; const postIm = ac?.livePostIm ?? null;
+                        const pmMag = (pmRe !== null && pmIm !== null) ? Math.sqrt(pmRe*pmRe + pmIm*pmIm) : null;
+                        const mMag = (mRe !== null && mIm !== null) ? Math.sqrt(mRe*mRe + mIm*mIm) : null;
+                        const postMag = (postRe !== null && postIm !== null) ? Math.sqrt(postRe*postRe + postIm*postIm) : null;
+                        const preModalDb = magToDbInline(pmMag); const modalDb = magToDbInline(mMag); const finalDb = magToDbInline(postMag);
+                        const preModalPhase = (pmRe !== null && pmIm !== null) ? radToDegInline(Math.atan2(pmIm, pmRe)) : null;
+                        const modalPhase = (mRe !== null && mIm !== null) ? radToDegInline(Math.atan2(mIm, mRe)) : null;
+                        let phaseDiff = null;
+                        if (preModalPhase !== null && modalPhase !== null) {
+                          phaseDiff = modalPhase - preModalPhase;
+                          while (phaseDiff > 180) phaseDiff -= 360;
+                          while (phaseDiff < -180) phaseDiff += 360;
+                        }
+                        const noData = ac === null;
+                        const verdict = (() => {
+                          if (noData) return 'no data';
+                          if (phaseDiff === null) return '—';
+                          const absDiff = Math.abs(phaseDiff);
+                          if (absDiff > 135) return '⚠ destructive';
+                          if (absDiff > 90) return '~ partial cancel';
+                          if (absDiff < 45) return '✓ constructive';
+                          return '~ partial add';
+                        })();
+                        const verdictColor = verdict.startsWith('⚠') ? '#b91c1c' : verdict.startsWith('✓') ? '#15803d' : verdict === 'no data' ? '#9ca3af' : '#92400e';
+                        return (
+                          <tr key={hz} style={{ borderBottom: '1px solid #cffafe', background: noData ? '#f0fdfa' : undefined }}>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#0c4a6e' }}>{hz}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmt1Inline(preModalDb)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmt0Inline(preModalPhase)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmt1Inline(modalDb)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmt0Inline(modalPhase)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: phaseDiff !== null && Math.abs(phaseDiff) > 90 ? '#b91c1c' : '#1c1917' }}>{fmt0Inline(phaseDiff)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#1c1917' }}>{fmt1Inline(finalDb)}</td>
+                            <td style={{ textAlign: 'left', padding: '1px 5px', color: verdictColor, fontWeight: 600 }}>{verdict}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{ marginTop: 4, color: '#0891b2', fontSize: 9, fontStyle: 'italic' }}>
+                    Source: applicationComparison.modalSumRe/modalSumIm — isolated modal sum, same as used in graph.
+                    stepDebug only populated for TARGET_DEBUG_FREQUENCIES in the engine (30–72 Hz range by default).
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Layer Contribution Breakdown */}
+            <div style={{ border: '1px solid #7c3aed', borderRadius: 6, background: '#f5f3ff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, color: '#5b21b6', marginBottom: 4 }}>
+                Layer Contribution Breakdown — seat: {selectedSeatIds[0] || '—'}
+              </div>
+              {!hasLayerData ? (
+                <div style={{ color: '#7c3aed' }}>No wholeCurveDebugRows data available for this seat.</div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 500 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #c4b5fd', color: '#5b21b6', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 42 }}>Hz</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Direct</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Refl</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 60 }}>Pre-Modal</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Modal</th>
+                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Final</th>
+                        <th style={{ textAlign: 'left',  padding: '2px 5px', minWidth: 80 }}>Top mode</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {LAYER_TARGET_HZ.map(hz => {
+                        const row = getRowAtHzL(wcdInline, hz);
+                        const directDb = row?.directDb ?? row?.direct_db ?? row?.directPressureDb ?? magToDbL(row?.directMagnitude) ?? null;
+                        const reflDb = row?.reflectionsDb ?? row?.reflDb ?? row?.refl_db ?? magToDbL(row?.reflectionMagnitude) ?? null;
+                        const preModalDb = row?.preModalDb ?? row?.pre_modal_db ?? magToDbL(row?.preModalMagnitude) ?? getDbAtHzL(preModalSeriesInline, hz);
+                        const modalDb = row?.modalDb ?? row?.modal_db ?? magToDbL(row?.modalSumMagnitude) ?? getDbAtHzL(modalOnlySeriesInline, hz);
+                        const finalDb = row?.finalSplDb ?? row?.finalDb ?? row?.final_db ?? row?.splDb ?? row?.spl_db ?? getDbAtHzL(postModalSeriesInline, hz);
+                        const sm = row?.strongestMode ?? row?.dominant_mode ?? row?.dominantMode ?? row?.topMode ?? null;
+                        const modeLabel = sm ? (typeof sm === 'string' ? sm : (sm.label ?? sm.mode ?? `(${[sm.nx,sm.ny,sm.nz].filter(v=>v!=null).join(',')})`)) : '—';
+                        return (
+                          <tr key={hz} style={{ borderBottom: '1px solid #ede9fe' }}>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#4c1d95' }}>{hz}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#1e3a5f' }}>{fmtL(directDb)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#1e3a5f' }}>{fmtL(reflDb)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmtL(preModalDb)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmtL(modalDb)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#1c1917' }}>{fmtL(finalDb)}</td>
+                            <td style={{ textAlign: 'left', padding: '1px 5px', color: '#6b21a8', fontSize: 9 }}>{modeLabel}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{ marginTop: 4, color: '#7c3aed', fontSize: 9, fontStyle: 'italic' }}>
+                    Pre-Modal = direct + reflections summed before modal addition. All values dBSPL.
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ── Deep diagnostics (legacy, collapsed) ── */}
       {IS_DEVELOPMENT_MODE && (
         <details style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginBottom: 4 }}>
           <summary style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
-            Deep REW diagnostics (open only if requested)
+            Deep Engine Diagnostics (open only if requested)
           </summary>
           <div style={{ marginTop: 8 }}>
 
@@ -1248,6 +1437,107 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         />
       </div>
 
+      {/* REW Geometry Match Values + Alignment Audit — moved to Geometry & REW Import section below the graph */}
+
+          </div>
+        </details>
+      )}
+      {/* Deep Engine Diagnostics end */}
+
+      {/* Bass Response Graph */}
+      <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
+            Bass Response
+          </div>
+        </div>
+
+        {/* Seat selector pills */}
+        {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
+          const rowMap = new Map();
+          orderedSeats.forEach(seat => {
+            const r = Number(seat?.row || seat?.rowNumber) || 1;
+            if (!rowMap.has(r)) rowMap.set(r, []);
+            rowMap.get(r).push(seat);
+          });
+          const rowNums = Array.from(rowMap.keys()).sort((a, b) => a - b);
+          return (
+            <div style={{ display: "grid", gap: 5, marginBottom: 12 }}>
+              {rowNums.map(r => {
+                const rowSeats = rowMap.get(r) || [];
+                return (
+                  <div key={r} style={{ display: "flex", gap: 5 }}>
+                    {rowSeats.map(seat => {
+                      const sid = seat.id || `${seat.x}-${seat.y}`;
+                      const isOn = selectedSeatIds.includes(sid);
+                      const isPrimary = !!seat.isPrimary;
+                      const color = getSeatColor(sid);
+                      const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
+                      const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
+                      const posInRow = rowSeatsOrdered.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
+                      const label = `R${rowNum}S${posInRow}`;
+                      return (
+                        <button
+                          key={sid}
+                          onClick={() => toggleSeat(sid)}
+                          title={`${label}${isPrimary ? " — MLP" : ""}`}
+                          style={{
+                            width: 52, height: 26,
+                            border: isOn ? `2px solid ${color}` : isPrimary ? "1px solid #A09386" : "1px solid #DCDBD6",
+                            borderRadius: 9999, fontSize: 11, fontWeight: isOn ? 700 : 500,
+                            background: isOn ? color : "#F6F3EE",
+                            color: isOn ? "#fff" : isPrimary ? "#3E4349" : "#625143",
+                            cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            outline: "none", flexShrink: 0, transition: "background 0.12s, border-color 0.12s",
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        <div className="mt-4">
+          {multiSeries.length > 0 ? (
+            <BassGraph
+              multiSeries={multiSeriesForGraph}
+              responseData={multiSeriesForGraph[0]?.data ?? []}
+              schroederFrequency={schroederFrequency}
+              rp22Levels={rp22Levels}
+              toggles={{}}
+              crossoverFrequency={80}
+              modeFrequencies={[]}
+              showModeMarkers={false}
+              modeMarkers={{ axial: [], tangential: [], oblique: [] }}
+              linearHzAxis={false}
+              rewStyleMode={true}
+              yDomain={undefined}
+              xDomain={[20, 200]}
+              showAxialOnly={false}
+              refDb={85}
+              disableHighlight={false}
+            />
+          ) : (
+            <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
+              No bass data yet. Add at least one subwoofer and one seat.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Geometry & REW Import (collapsed) ── */}
+      {IS_DEVELOPMENT_MODE && (
+        <details style={{ border: '1px solid #0891b2', borderRadius: 8, background: '#f0f9ff', padding: '8px 10px', marginBottom: 4 }}>
+          <summary style={{ fontWeight: 700, color: '#0369a1', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
+            Geometry &amp; REW Import
+          </summary>
+          <div style={{ marginTop: 8 }}>
+
       {/* __REW_GEOMETRY_MATCH__ */}
       {(() => {
         const rewSeatId = selectedSeatIds[0] || null;
@@ -1410,318 +1700,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         )}
       </div>
 
-      {/* __B44_PHASE_NULL_DIAGNOSTIC__ Phase at null region — vectors from applicationComparison (actual graph vectors) */}
-      {(() => {
-        const PHASE_TARGET_HZ = [70, 75, 77, 78, 80, 85];
-        const stepDebug = simulationResults.stepDebug;
-
-        // stepDebug is an array of targetVectorDebug objects, one per target frequency.
-        // Each has: frequencyHz, applicationComparison.{ prevRe, prevIm, modalSumRe, modalSumIm, livePostRe, livePostIm }
-        const getStepRowAtHz = (rows, targetHz) => {
-          if (!Array.isArray(rows) || rows.length === 0) return null;
-          let best = null, bestDist = Infinity;
-          for (const row of rows) {
-            const hz = row?.frequencyHz ?? row?.hz ?? null;
-            if (hz === null) continue;
-            const dist = Math.abs(hz - targetHz);
-            if (dist < bestDist) { bestDist = dist; best = row; }
-          }
-          return best && bestDist <= 5 ? best : null;
-        };
-
-        const radToDeg = (r) => (r * 180) / Math.PI;
-        const magToDb  = (v) => (Number.isFinite(v) && v > 0) ? 20 * Math.log10(v) : null;
-        const fmt1 = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(1) : '—';
-        const fmt0 = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(0) : '—';
-
-        const hasData = Array.isArray(stepDebug) && stepDebug.length > 0;
-
-        return (
-          <div style={{ border: '1px solid #0891b2', borderRadius: 6, background: '#ecfeff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
-            <div style={{ fontWeight: 700, color: '#0e7490', marginBottom: 4 }}>
-              Phase at null region — seat: {selectedSeatIds[0] || '—'}
-            </div>
-            <div style={{ color: '#164e63', fontSize: 9, marginBottom: 6, fontStyle: 'italic' }}>
-              Source: <code>targetVectorDebug.applicationComparison</code> — these are the actual vectors used in the plotted graph.
-              prevRe/Im = pre-modal field. modalSumRe/Im = isolated modal sum added to field. livePostRe/Im = final summed field.
-              Δ phase = modal° − pre-modal°, wrapped [−180°, +180°]. Destructive = |Δ| &gt; 135°.
-            </div>
-            {!hasData ? (
-              <div style={{ color: '#0e7490' }}>
-                No stepDebug data — stepDebug is only populated for frequencies 30–72 Hz in the engine.
-                Frequencies above 72 Hz (70–85 Hz range) will show — if the engine TARGET_DEBUG_FREQUENCIES includes them.
-                Check that targetVectorDebug entries exist for 70–85 Hz.
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 580 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #a5f3fc', color: '#0e7490', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 38 }}>Hz</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal dB</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal °</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal dB</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal °</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 60 }}>Δ phase °</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Final dB</th>
-                      <th style={{ textAlign: 'left',  padding: '2px 5px', minWidth: 80 }}>Verdict</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {PHASE_TARGET_HZ.map(hz => {
-                      const row = getStepRowAtHz(stepDebug, hz);
-                      const ac = row?.applicationComparison ?? null;
-
-                      // Read directly from applicationComparison — actual graph vectors
-                      const pmRe = ac?.prevRe ?? null;
-                      const pmIm = ac?.prevIm ?? null;
-                      const mRe  = ac?.modalSumRe ?? null;
-                      const mIm  = ac?.modalSumIm ?? null;
-                      const postRe = ac?.livePostRe ?? null;
-                      const postIm = ac?.livePostIm ?? null;
-
-                      const pmMag   = (pmRe !== null && pmIm !== null) ? Math.sqrt(pmRe*pmRe + pmIm*pmIm) : null;
-                      const mMag    = (mRe  !== null && mIm  !== null) ? Math.sqrt(mRe*mRe + mIm*mIm)     : null;
-                      const postMag = (postRe !== null && postIm !== null) ? Math.sqrt(postRe*postRe + postIm*postIm) : null;
-
-                      const preModalDb = magToDb(pmMag);
-                      const modalDb    = magToDb(mMag);
-                      const finalDb    = magToDb(postMag);
-
-                      const preModalPhase = (pmRe !== null && pmIm !== null) ? radToDeg(Math.atan2(pmIm, pmRe)) : null;
-                      const modalPhase    = (mRe  !== null && mIm  !== null) ? radToDeg(Math.atan2(mIm,  mRe))  : null;
-
-                      let phaseDiff = null;
-                      if (preModalPhase !== null && modalPhase !== null) {
-                        phaseDiff = modalPhase - preModalPhase;
-                        while (phaseDiff > 180)  phaseDiff -= 360;
-                        while (phaseDiff < -180) phaseDiff += 360;
-                      }
-
-                      const noData = ac === null;
-                      const verdict = (() => {
-                        if (noData) return 'no data';
-                        if (phaseDiff === null) return '—';
-                        const absDiff = Math.abs(phaseDiff);
-                        if (absDiff > 135) return '⚠ destructive';
-                        if (absDiff > 90)  return '~ partial cancel';
-                        if (absDiff < 45)  return '✓ constructive';
-                        return '~ partial add';
-                      })();
-
-                      const verdictColor = verdict.startsWith('⚠') ? '#b91c1c'
-                        : verdict.startsWith('✓') ? '#15803d'
-                        : verdict === 'no data'   ? '#9ca3af'
-                        : '#92400e';
-
-                      return (
-                        <tr key={hz} style={{ borderBottom: '1px solid #cffafe', background: noData ? '#f0fdfa' : undefined }}>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#0c4a6e' }}>{hz}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmt1(preModalDb)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmt0(preModalPhase)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmt1(modalDb)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmt0(modalPhase)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: phaseDiff !== null && Math.abs(phaseDiff) > 90 ? '#b91c1c' : '#1c1917' }}>{fmt0(phaseDiff)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#1c1917' }}>{fmt1(finalDb)}</td>
-                          <td style={{ textAlign: 'left',  padding: '1px 5px', color: verdictColor, fontWeight: 600 }}>{verdict}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div style={{ marginTop: 4, color: '#0891b2', fontSize: 9, fontStyle: 'italic' }}>
-                  Source: applicationComparison.modalSumRe/modalSumIm — isolated modal sum, same as used in graph.
-                  Note: stepDebug is only populated for TARGET_DEBUG_FREQUENCIES in the engine (30–72 Hz range by default).
-                  Rows showing "no data" mean that frequency is outside the engine's step-debug capture range.
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* __B44_LAYER_BREAKDOWN__ Frequency layer contribution breakdown table */}
-      {(() => {
-        const TARGET_HZ = [30, 34.3, 40, 50, 58, 60, 68.6, 70, 80, 100];
-        const wcd = simulationResults.wholeCurveDebugRows;
-        const preModalSeries  = wcd?.preModalSeries;
-        const modalOnlySeries = wcd?.modalOnlySeries;
-        const postModalSeries = wcd?.postModalSeries;
-
-        const magToDb = (v) => (Number.isFinite(v) && v != null) ? 20 * Math.log10(Math.max(v, 1e-10)) : null;
-
-        const getDbAtHz = (series, targetHz) => {
-          if (!Array.isArray(series) || series.length === 0) return null;
-          let best = null, bestDist = Infinity;
-          for (const pt of series) {
-            const hz = pt.hz ?? pt.frequency ?? pt.frequencyHz;
-            const dist = Math.abs((hz ?? 0) - targetHz);
-            if (dist < bestDist) { bestDist = dist; best = pt; }
-          }
-          if (!best || bestDist > 5) return null;
-          return best.db ?? best.spl ?? best.dB ?? best.splDb ?? null;
-        };
-
-        const getRowAtHz = (rows, targetHz) => {
-          if (!Array.isArray(rows)) return null;
-          let best = null, bestDist = Infinity;
-          for (const row of rows) {
-            const hz = row.hz ?? row.frequency ?? row.freq ?? row.frequencyHz ?? row.targetHz;
-            const dist = Math.abs((hz ?? 0) - targetHz);
-            if (dist < bestDist) { bestDist = dist; best = row; }
-          }
-          return best && bestDist <= 5 ? best : null;
-        };
-
-        const fmt = (v) => (v !== null && v !== undefined && Number.isFinite(Number(v))) ? Number(v).toFixed(1) : '—';
-        const hasData = preModalSeries || modalOnlySeries || postModalSeries || (Array.isArray(wcd) && wcd.length > 0);
-
-        return (
-          <div style={{ border: '1px solid #7c3aed', borderRadius: 6, background: '#f5f3ff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
-            <div style={{ fontWeight: 700, color: '#5b21b6', marginBottom: 4 }}>
-              Layer Contribution Breakdown — seat: {selectedSeatIds[0] || '—'}
-            </div>
-            {!hasData ? (
-              <div style={{ color: '#7c3aed' }}>No wholeCurveDebugRows data available for this seat.</div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 500 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #c4b5fd', color: '#5b21b6', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 42 }}>Hz</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Direct</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Refl</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 60 }}>Pre-Modal</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Modal</th>
-                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 50 }}>Final</th>
-                      <th style={{ textAlign: 'left',  padding: '2px 5px', minWidth: 80 }}>Top mode</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {TARGET_HZ.map(hz => {
-                      const row = getRowAtHz(wcd, hz);
-                      const directDb   = row?.directDb ?? row?.direct_db ?? row?.directPressureDb ?? magToDb(row?.directMagnitude) ?? null;
-                      const reflDb     = row?.reflectionsDb ?? row?.reflDb ?? row?.refl_db ?? magToDb(row?.reflectionMagnitude) ?? null;
-                      const preModalDb = row?.preModalDb ?? row?.pre_modal_db ?? magToDb(row?.preModalMagnitude) ?? getDbAtHz(preModalSeries, hz);
-                      const modalDb    = row?.modalDb ?? row?.modal_db ?? magToDb(row?.modalSumMagnitude) ?? getDbAtHz(modalOnlySeries, hz);
-                      const finalDb    = row?.finalSplDb ?? row?.finalDb ?? row?.final_db ?? row?.splDb ?? row?.spl_db ?? getDbAtHz(postModalSeries, hz);
-                      const sm = row?.strongestMode ?? row?.dominant_mode ?? row?.dominantMode ?? row?.topMode ?? null;
-                      const modeLabel  = sm
-                        ? (typeof sm === 'string' ? sm : (sm.label ?? sm.mode ?? `(${[sm.nx,sm.ny,sm.nz].filter(v=>v!=null).join(',')})`))
-                        : '—';
-                      return (
-                        <tr key={hz} style={{ borderBottom: '1px solid #ede9fe' }}>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#4c1d95' }}>{hz}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#1e3a5f' }}>{fmt(directDb)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#1e3a5f' }}>{fmt(reflDb)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmt(preModalDb)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmt(modalDb)}</td>
-                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#1c1917' }}>{fmt(finalDb)}</td>
-                          <td style={{ textAlign: 'left',  padding: '1px 5px', color: '#6b21a8', fontSize: 9 }}>{modeLabel}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div style={{ marginTop: 4, color: '#7c3aed', fontSize: 9, fontStyle: 'italic' }}>
-                  Pre-Modal = direct + reflections summed before modal addition. All values dBSPL. Direct/Refl only populated if engine exposes them separately.
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
           </div>
         </details>
       )}
-      {/* Deep REW diagnostics end */}
-
-      {/* Bass Response Graph */}
-      <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
-            Bass Response
-          </div>
-        </div>
-
-        {/* Seat selector pills */}
-        {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
-          const rowMap = new Map();
-          orderedSeats.forEach(seat => {
-            const r = Number(seat?.row || seat?.rowNumber) || 1;
-            if (!rowMap.has(r)) rowMap.set(r, []);
-            rowMap.get(r).push(seat);
-          });
-          const rowNums = Array.from(rowMap.keys()).sort((a, b) => a - b);
-          return (
-            <div style={{ display: "grid", gap: 5, marginBottom: 12 }}>
-              {rowNums.map(r => {
-                const rowSeats = rowMap.get(r) || [];
-                return (
-                  <div key={r} style={{ display: "flex", gap: 5 }}>
-                    {rowSeats.map(seat => {
-                      const sid = seat.id || `${seat.x}-${seat.y}`;
-                      const isOn = selectedSeatIds.includes(sid);
-                      const isPrimary = !!seat.isPrimary;
-                      const color = getSeatColor(sid);
-                      const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
-                      const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
-                      const posInRow = rowSeatsOrdered.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
-                      const label = `R${rowNum}S${posInRow}`;
-                      return (
-                        <button
-                          key={sid}
-                          onClick={() => toggleSeat(sid)}
-                          title={`${label}${isPrimary ? " — MLP" : ""}`}
-                          style={{
-                            width: 52, height: 26,
-                            border: isOn ? `2px solid ${color}` : isPrimary ? "1px solid #A09386" : "1px solid #DCDBD6",
-                            borderRadius: 9999, fontSize: 11, fontWeight: isOn ? 700 : 500,
-                            background: isOn ? color : "#F6F3EE",
-                            color: isOn ? "#fff" : isPrimary ? "#3E4349" : "#625143",
-                            cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            outline: "none", flexShrink: 0, transition: "background 0.12s, border-color 0.12s",
-                          }}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-
-        <div className="mt-4">
-          {multiSeries.length > 0 ? (
-            <BassGraph
-              multiSeries={multiSeriesForGraph}
-              responseData={multiSeriesForGraph[0]?.data ?? []}
-              schroederFrequency={schroederFrequency}
-              rp22Levels={rp22Levels}
-              toggles={{}}
-              crossoverFrequency={80}
-              modeFrequencies={[]}
-              showModeMarkers={false}
-              modeMarkers={{ axial: [], tangential: [], oblique: [] }}
-              linearHzAxis={false}
-              rewStyleMode={true}
-              yDomain={undefined}
-              xDomain={[20, 200]}
-              showAxialOnly={false}
-              refDb={85}
-              disableHighlight={false}
-            />
-          ) : (
-            <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
-              No bass data yet. Add at least one subwoofer and one seat.
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Geometry & REW Import end */}
 
       {/* Surface Absorption Panel */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
