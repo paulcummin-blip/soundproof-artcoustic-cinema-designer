@@ -1381,6 +1381,136 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         )}
       </div>
 
+      {/* __B44_PHASE_NULL_DIAGNOSTIC__ Phase at null region — vectors from applicationComparison (actual graph vectors) */}
+      {(() => {
+        const PHASE_TARGET_HZ = [70, 75, 77, 78, 80, 85];
+        const stepDebug = simulationResults.stepDebug;
+
+        // stepDebug is an array of targetVectorDebug objects, one per target frequency.
+        // Each has: frequencyHz, applicationComparison.{ prevRe, prevIm, modalSumRe, modalSumIm, livePostRe, livePostIm }
+        const getStepRowAtHz = (rows, targetHz) => {
+          if (!Array.isArray(rows) || rows.length === 0) return null;
+          let best = null, bestDist = Infinity;
+          for (const row of rows) {
+            const hz = row?.frequencyHz ?? row?.hz ?? null;
+            if (hz === null) continue;
+            const dist = Math.abs(hz - targetHz);
+            if (dist < bestDist) { bestDist = dist; best = row; }
+          }
+          return best && bestDist <= 5 ? best : null;
+        };
+
+        const radToDeg = (r) => (r * 180) / Math.PI;
+        const magToDb  = (v) => (Number.isFinite(v) && v > 0) ? 20 * Math.log10(v) : null;
+        const fmt1 = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(1) : '—';
+        const fmt0 = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(0) : '—';
+
+        const hasData = Array.isArray(stepDebug) && stepDebug.length > 0;
+
+        return (
+          <div style={{ border: '1px solid #0891b2', borderRadius: 6, background: '#ecfeff', padding: '8px 10px', fontSize: 10, fontFamily: 'monospace', marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, color: '#0e7490', marginBottom: 4 }}>
+              Phase at null region — seat: {selectedSeatIds[0] || '—'}
+            </div>
+            <div style={{ color: '#164e63', fontSize: 9, marginBottom: 6, fontStyle: 'italic' }}>
+              Source: <code>targetVectorDebug.applicationComparison</code> — these are the actual vectors used in the plotted graph.
+              prevRe/Im = pre-modal field. modalSumRe/Im = isolated modal sum added to field. livePostRe/Im = final summed field.
+              Δ phase = modal° − pre-modal°, wrapped [−180°, +180°]. Destructive = |Δ| &gt; 135°.
+            </div>
+            {!hasData ? (
+              <div style={{ color: '#0e7490' }}>
+                No stepDebug data — stepDebug is only populated for frequencies 30–72 Hz in the engine.
+                Frequencies above 72 Hz (70–85 Hz range) will show — if the engine TARGET_DEBUG_FREQUENCIES includes them.
+                Check that targetVectorDebug entries exist for 70–85 Hz.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 580 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #a5f3fc', color: '#0e7490', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 38 }}>Hz</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal dB</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal °</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal dB</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal °</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 60 }}>Δ phase °</th>
+                      <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Final dB</th>
+                      <th style={{ textAlign: 'left',  padding: '2px 5px', minWidth: 80 }}>Verdict</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {PHASE_TARGET_HZ.map(hz => {
+                      const row = getStepRowAtHz(stepDebug, hz);
+                      const ac = row?.applicationComparison ?? null;
+
+                      // Read directly from applicationComparison — actual graph vectors
+                      const pmRe = ac?.prevRe ?? null;
+                      const pmIm = ac?.prevIm ?? null;
+                      const mRe  = ac?.modalSumRe ?? null;
+                      const mIm  = ac?.modalSumIm ?? null;
+                      const postRe = ac?.livePostRe ?? null;
+                      const postIm = ac?.livePostIm ?? null;
+
+                      const pmMag   = (pmRe !== null && pmIm !== null) ? Math.sqrt(pmRe*pmRe + pmIm*pmIm) : null;
+                      const mMag    = (mRe  !== null && mIm  !== null) ? Math.sqrt(mRe*mRe + mIm*mIm)     : null;
+                      const postMag = (postRe !== null && postIm !== null) ? Math.sqrt(postRe*postRe + postIm*postIm) : null;
+
+                      const preModalDb = magToDb(pmMag);
+                      const modalDb    = magToDb(mMag);
+                      const finalDb    = magToDb(postMag);
+
+                      const preModalPhase = (pmRe !== null && pmIm !== null) ? radToDeg(Math.atan2(pmIm, pmRe)) : null;
+                      const modalPhase    = (mRe  !== null && mIm  !== null) ? radToDeg(Math.atan2(mIm,  mRe))  : null;
+
+                      let phaseDiff = null;
+                      if (preModalPhase !== null && modalPhase !== null) {
+                        phaseDiff = modalPhase - preModalPhase;
+                        while (phaseDiff > 180)  phaseDiff -= 360;
+                        while (phaseDiff < -180) phaseDiff += 360;
+                      }
+
+                      const noData = ac === null;
+                      const verdict = (() => {
+                        if (noData) return 'no data';
+                        if (phaseDiff === null) return '—';
+                        const absDiff = Math.abs(phaseDiff);
+                        if (absDiff > 135) return '⚠ destructive';
+                        if (absDiff > 90)  return '~ partial cancel';
+                        if (absDiff < 45)  return '✓ constructive';
+                        return '~ partial add';
+                      })();
+
+                      const verdictColor = verdict.startsWith('⚠') ? '#b91c1c'
+                        : verdict.startsWith('✓') ? '#15803d'
+                        : verdict === 'no data'   ? '#9ca3af'
+                        : '#92400e';
+
+                      return (
+                        <tr key={hz} style={{ borderBottom: '1px solid #cffafe', background: noData ? '#f0fdfa' : undefined }}>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#0c4a6e' }}>{hz}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmt1(preModalDb)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a' }}>{fmt0(preModalPhase)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmt1(modalDb)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12' }}>{fmt0(modalPhase)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: phaseDiff !== null && Math.abs(phaseDiff) > 90 ? '#b91c1c' : '#1c1917' }}>{fmt0(phaseDiff)}</td>
+                          <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#1c1917' }}>{fmt1(finalDb)}</td>
+                          <td style={{ textAlign: 'left',  padding: '1px 5px', color: verdictColor, fontWeight: 600 }}>{verdict}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 4, color: '#0891b2', fontSize: 9, fontStyle: 'italic' }}>
+                  Source: applicationComparison.modalSumRe/modalSumIm — isolated modal sum, same as used in graph.
+                  Note: stepDebug is only populated for TARGET_DEBUG_FREQUENCIES in the engine (30–72 Hz range by default).
+                  Rows showing "no data" mean that frequency is outside the engine's step-debug capture range.
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* __B44_LAYER_BREAKDOWN__ Frequency layer contribution breakdown table */}
       {(() => {
         const TARGET_HZ = [30, 34.3, 40, 50, 58, 60, 68.6, 70, 80, 100];
