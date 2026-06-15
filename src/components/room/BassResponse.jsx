@@ -513,6 +513,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         // Production/product mode is unaffected — this only fires for the REW parity preset.
         const _useParityFieldSolver = false;
 
+        // __TEMP_REW_PARITY_DISTANCE_NORM__ When flat_rew_reference is active, force distance_normalized
+        // for the modal source reference to test whether the 1m reference mismatch is the parity error.
+        const _finalModalRefMode = rewSourceCurveMode === 'flat_rew_reference'
+          ? 'distance_normalized'
+          : _engineModalRefMode;
+
         const rewResult = _useParityFieldSolver
           ? simulateBassResponseRewParityField(
               {
@@ -554,7 +560,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             freqMinHz: 20,
             freqMaxHz: 200,
             smoothing: 'none',
-            modalSourceReferenceMode: _engineModalRefMode,
+            modalSourceReferenceMode: _finalModalRefMode,
             modalGainScalar: _engineModalGainScalar,
             axialQ,
             modalStorageMode,
@@ -1014,7 +1020,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
               <div className="font-bold text-[#1E293B]">Active model:</div>
               <div>Source: {rewSourceCurveMode}</div>
-              <div>Modal source: {modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</div>
+              <div>Modal source: {rewSourceCurveMode === 'flat_rew_reference' ? <span style={{ color: '#7e22ce', fontWeight: 700 }}>distance_normalized (forced) ⚠️</span> : <>{modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</>}</div>
               {modalSourceReferenceMode === 'distance_blend' && <div style={{ color: '#b45309', fontWeight: 700 }}>Modal distance blend: {modalDistanceBlend.toFixed(2)}</div>}
               <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
               <div>Axial Q: {axialQ.toFixed(1)}</div>
