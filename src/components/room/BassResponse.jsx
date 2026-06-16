@@ -575,7 +575,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             overrideConstantAxialQ, // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
             overrideAbsorptionAxialQ, // __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__
             debugMode200Multiplier, // __TEMP_REW_PARITY_MODE_200_SCALE__
-            debugReflectionOrder: 3, // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__ order-3 test — remove or set to 1 after experiment
+            debugReflectionOrder: rewSourceCurveMode === 'flat_rew_reference' ? 1 : 3, // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__ force order-1 for REW parity preset
             }
         );
 
