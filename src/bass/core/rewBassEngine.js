@@ -920,7 +920,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // const reflectionCoherenceWeight = disableReflectionCoherenceWeight
       //   ? 1
       //   : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
-      const reflectionCoherenceWeight = 1.0; // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__
+      const reflectionCoherenceWeight = disableReflectionCoherenceWeight
+        ? 1
+        : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
       const imageRe = reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
       const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       reflectionRe += imageRe;
@@ -957,7 +959,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         // Step-debug copy: jitter removed to match production path.
         const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
         // __TEMP_REW_PARITY_TEST_REFLECTION_COHERENCE__ (debug copy — kept in sync with main path)
-        const debugCoherenceWeight = 1.0;
+        const debugCoherenceWeight = disableReflectionCoherenceWeight
+          ? 1
+          : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
         _refSumRe += debugCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
         _refSumIm += debugCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       });
