@@ -194,6 +194,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(1.0);
   // __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__
   const [debugModalPhaseConvention, setDebugModalPhaseConvention] = useState('normal');
+  const [reflectionGainScale, setReflectionGainScale] = useState(1.0); // diagnostic: multiply imageAmplitude after reflectionCoefficient
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
   // REW reference overlay — debug only, no engine changes
@@ -576,6 +577,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             overrideAbsorptionAxialQ, // __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__
             debugMode200Multiplier, // __TEMP_REW_PARITY_MODE_200_SCALE__
             debugReflectionOrder: rewSourceCurveMode === 'flat_rew_reference' ? 1 : 3, // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__ force order-1 for REW parity preset
+            reflectionGainScale, // diagnostic: scale imageAmplitude after reflectionCoefficient
             }
         );
 
@@ -630,7 +632,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention]); // debugReflectionOrder: 3 hardcoded above
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1002,6 +1004,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <input type="checkbox" checked={enableRewCoreReflections} onChange={(e) => setEnableRewCoreReflections(e.target.checked)} />
                 Reflections
               </label>
+              <label className="flex h-8 items-center gap-1 rounded-md border border-orange-300 bg-orange-50 px-2 text-xs text-orange-800 font-mono">
+                Refl gain:
+                <input type="number" min="0.00" max="2.00" step="0.05" value={reflectionGainScale} onChange={(e) => setReflectionGainScale(Math.max(0, Math.min(2, parseFloat(e.target.value) || 0)))} className="w-14 rounded border border-orange-300 bg-white px-1 py-0.5 text-xs font-mono text-right focus:outline-none" />
+              </label>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
@@ -1026,6 +1032,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
               <div>pureDeterministicModalSum: {rewSourceCurveMode === 'flat_rew_reference' ? 'true (REW parity)' : 'false'}</div>
               <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
+              <div style={{ color: reflectionGainScale !== 1.0 ? '#b45309' : undefined, fontWeight: reflectionGainScale !== 1.0 ? 700 : undefined }}>
+                Reflection gain scale: {reflectionGainScale.toFixed(2)}{reflectionGainScale !== 1.0 ? ' ⚠️' : ''}
+              </div>
               <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
                 (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
               </div>

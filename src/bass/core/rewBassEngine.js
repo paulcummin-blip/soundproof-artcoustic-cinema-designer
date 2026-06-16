@@ -903,7 +903,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
       const imageDistanceLossDb = -20 * Math.log10(imageDistanceM / 1);
       const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
-      const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
+      let imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
+      // diagnostic: reflectionGainScale applied after reflectionCoefficient
+      const reflectionGainScale = Number.isFinite(Number(options?.reflectionGainScale)) ? Number(options.reflectionGainScale) : 1.0;
+      if (reflectionGainScale !== 1.0) imageAmplitude *= reflectionGainScale;
 
       const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
 
@@ -954,7 +957,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         const imageDistanceM = Math.max(MIN_DISTANCE_M, Math.sqrt(imageDx * imageDx + imageDy * imageDy + imageDz * imageDz));
         const imageDistanceLossDb = -20 * Math.log10(imageDistanceM / 1);
         const imageMagnitudeDb = curveDb + imageDistanceLossDb + source.tuning.gainDb;
-        const imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
+        let imageAmplitude = Math.pow(10, imageMagnitudeDb / 20) * imageSource.reflectionCoefficient;
+        // diagnostic: reflectionGainScale applied after reflectionCoefficient (debug copy)
+        const reflectionGainScale = Number.isFinite(Number(options?.reflectionGainScale)) ? Number(options.reflectionGainScale) : 1.0;
+        if (reflectionGainScale !== 1.0) imageAmplitude *= reflectionGainScale;
         const imageTimeOfFlightPhase = -2 * Math.PI * frequencyHz * (imageDistanceM / SPEED_OF_SOUND_MPS);
         // Step-debug copy: jitter removed to match production path.
         const imageTotalPhase = imageTimeOfFlightPhase + delayPhase + polarityPhase;
