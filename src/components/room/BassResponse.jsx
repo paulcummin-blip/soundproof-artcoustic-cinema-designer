@@ -563,7 +563,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             axialQ,
             modalStorageMode,
             propagationPhaseScale, // Uses state value (default 0.10 for REW parity)
-            pureDeterministicModalSum: true, // __TEMP_REW_PARITY_TEST__ forced to true
+            pureDeterministicModalSum: rewSourceCurveMode === 'flat_rew_reference', // forced true for REW parity preset only
             disableReflectionPhaseJitter,
             disableReflectionCoherenceWeight,
             disableLateField: _fieldLateField,
@@ -1024,6 +1024,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div>Axial Q: {axialQ.toFixed(1)}</div>
               <div>Storage: {modalStorageMode}</div>
               <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
+              <div>pureDeterministicModalSum: {rewSourceCurveMode === 'flat_rew_reference' ? 'true (REW parity)' : 'false'}</div>
               <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
               <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
                 (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
