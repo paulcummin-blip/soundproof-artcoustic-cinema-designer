@@ -490,7 +490,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       // the 68.6 Hz axial harmonic from ~94.8 dB to ~92.6 dB against the REW target of ~92.4 dB
       // without shifting the primary modes at 34.3 Hz or 48.5 Hz.
       // Q values, coupling, storage factor, tangential/oblique modes, and all non-modal paths are unchanged.
-      const HIGH_ORDER_AXIAL_SCALE = 0.50;
+      const HIGH_ORDER_AXIAL_SCALE = 1.00;
       const highOrderAxialCorrectionScale = (mode.type === 'axial' && modeOrder >= 2)
         ? HIGH_ORDER_AXIAL_SCALE
         : 1.0;
