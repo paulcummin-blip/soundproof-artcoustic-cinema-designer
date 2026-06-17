@@ -194,6 +194,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(1.0);
   // __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__
   const [debugModalPhaseConvention, setDebugModalPhaseConvention] = useState('normal');
+  // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+  const [debugModalHSign, setDebugModalHSign] = useState('normal');
   const [reflectionGainScale, setReflectionGainScale] = useState(1.0); // diagnostic: multiply imageAmplitude after reflectionCoefficient
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
@@ -582,6 +584,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             debugMode200Multiplier, // __TEMP_REW_PARITY_MODE_200_SCALE__
             debugReflectionOrder: rewSourceCurveMode === 'flat_rew_reference' ? 1 : 3, // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__ force order-1 for REW parity preset
             reflectionGainScale, // diagnostic: scale imageAmplitude after reflectionCoefficient
+            debugModalHSign: rewSourceCurveMode === 'flat_rew_reference' ? debugModalHSign : 'normal', // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
             }
         );
 
@@ -636,7 +639,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1002,6 +1005,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value="conjugate">Modal convention: conjugate (Re, −Im)</option>
                 <option value="negative_conjugate">Modal convention: −conjugate (−Re, Im)</option>
               </select>
+              {/* __TEMP_DIAGNOSTIC_MODAL_H_SIGN__ — only active when flat_rew_reference is selected */}
+              <select
+                value={debugModalHSign}
+                onChange={(e) => setDebugModalHSign(e.target.value)}
+                className="h-8 rounded-md border border-rose-400 bg-rose-50 px-2 text-xs text-rose-900 font-semibold"
+                aria-label="Modal H sign"
+                title="Diagnostic: switches the imaginary sign of the resonator transfer function. Active only when source curve = flat_rew_reference."
+              >
+                <option value="normal">Modal H sign: Normal (−Im)</option>
+                <option value="rew_test">Modal H sign: REW test (+Im)</option>
+              </select>
             </div>
             <div className="flex flex-wrap gap-2">
               <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
@@ -1057,6 +1071,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 return (
                   <div style={{ color: isNonDefault && isActive ? '#7e22ce' : isNonDefault ? '#9ca3af' : undefined, fontWeight: isNonDefault && isActive ? 700 : undefined }}>
                     Modal phase convention: {debugModalPhaseConvention}{!isActive ? ' (inactive — flat_rew_reference not selected)' : isNonDefault ? ' ⚠️' : ''}
+                  </div>
+                );
+              })()}
+              {(() => {
+                const isNonDefault = debugModalHSign !== 'normal';
+                const isActive = rewSourceCurveMode === 'flat_rew_reference';
+                return (
+                  <div style={{ color: isNonDefault && isActive ? '#be123c' : isNonDefault ? '#9ca3af' : undefined, fontWeight: isNonDefault && isActive ? 700 : undefined }}>
+                    Modal H sign: {debugModalHSign}{!isActive ? ' (inactive — flat_rew_reference not selected)' : isNonDefault ? ' ⚠️' : ''}
                   </div>
                 );
               })()}

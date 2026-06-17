@@ -187,7 +187,7 @@ function modeShapeValueLocal(mode, x, y, z, roomDims) {
 // Modal Green's function: coupling = Ψ_source * Ψ_receiver, resonant transfer H(f, f0, Q).
 // pressureMagnitude = modalSourceAmplitude * combinedCoupling * resonanceMagnitude
 // modalSourceAmplitude brings the modal layer into the same pressure domain as the direct path.
-function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices, sourceX, sourceY, sourceZ, seatX, seatY, seatZ, disableModalPropagationPhase = false, propagationPhaseScale = 0.5) {
+function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices, sourceX, sourceY, sourceZ, seatX, seatY, seatZ, disableModalPropagationPhase = false, propagationPhaseScale = 0.5, debugModalHSign = 'normal') {
   const angularFrequency = 2 * Math.PI * frequencyHz;
   const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
 
@@ -219,7 +219,13 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   // Imaginary part follows imagDen but stays smooth and finite.
   // No arbitrary additive floor terms.
   const transferReal = realDen / denominatorSq;
-  const transferImag = -imagDen / denominatorSq;
+  // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+  // 'normal' = standard convention H = 1/(1 - r² + j·r/Q) → transferImag is negative.
+  // 'rew_test' = flipped imaginary sign H = 1/(1 - r² - j·r/Q) → transferImag is positive.
+  // Do not promote to production without full parity review.
+  const transferImag = debugModalHSign === 'rew_test'
+    ? +imagDen / denominatorSq
+    : -imagDen / denominatorSq;
 
   // Approximate source-to-seat distance for phase alignment
   const dx = sourceX - seatX;
@@ -343,7 +349,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal') {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -392,7 +398,8 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       source.x, source.y, source.z,
       seat.x, seat.y, seat.z,
       disableModalPropagationPhase,
-      propagationPhaseScale
+      propagationPhaseScale,
+      debugModalHSign
     );
 
     const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
@@ -678,6 +685,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const axialQOption = Number(options?.axialQ);
   const axialQ = Number.isFinite(axialQOption) ? axialQOption : 8.0;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
+  // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+  const debugModalHSign = options?.debugModalHSign === 'rew_test' ? 'rew_test' : 'normal';
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
     throw new Error('roomDims must include finite widthM, lengthM, and heightM values.');
@@ -1035,7 +1044,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         _debugActiveModalVectorBreakdown,
       } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity,
-        Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0 // __TEMP_REW_PARITY_MODE_200_SCALE__
+        Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0, // __TEMP_REW_PARITY_MODE_200_SCALE__
+        debugModalHSign // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
       );
 
       _debugStrongestModeForRow = _debugStrongestMode ?? null;
