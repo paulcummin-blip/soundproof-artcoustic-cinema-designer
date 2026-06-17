@@ -197,6 +197,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
   const [debugModalHSign, setDebugModalHSign] = useState('normal');
   const [reflectionGainScale, setReflectionGainScale] = useState(1.0); // diagnostic: multiply imageAmplitude after reflectionCoefficient
+  // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
+  // Tests whether REW parity is a modal magnitude calibration issue rather than a phase issue.
+  // Applied only when rewSourceCurveMode === 'flat_rew_reference'.
+  const [rewParityModalMagnitudeScale, setRewParityModalMagnitudeScale] = useState(1.00);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
   // REW reference overlay — debug only, no engine changes
@@ -585,6 +589,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             debugReflectionOrder: rewSourceCurveMode === 'flat_rew_reference' ? 1 : 3, // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__ force order-1 for REW parity preset
             reflectionGainScale, // diagnostic: scale imageAmplitude after reflectionCoefficient
             debugModalHSign: rewSourceCurveMode === 'flat_rew_reference' ? debugModalHSign : 'normal', // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+            rewParityModalMagnitudeScale: rewSourceCurveMode === 'flat_rew_reference' ? rewParityModalMagnitudeScale : 1.0, // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
             }
         );
 
@@ -639,7 +644,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1016,6 +1021,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value="normal">Modal H sign: Normal (−Im)</option>
                 <option value="rew_test">Modal H sign: REW test (+Im)</option>
               </select>
+              {/* __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__ — only active when flat_rew_reference is selected */}
+              <label className="flex h-8 items-center gap-2 rounded-md border border-teal-400 bg-teal-50 px-2 text-xs text-teal-900 font-mono font-semibold" title="Scales the entire modal sum before adding to direct+reflections. Active only when source = flat_rew_reference. Tests whether parity is a magnitude issue.">
+                Modal mag scale:
+                <input
+                  type="number"
+                  min="0.25"
+                  max="2.00"
+                  step="0.05"
+                  value={rewParityModalMagnitudeScale}
+                  onChange={(e) => setRewParityModalMagnitudeScale(Math.max(0.25, Math.min(2.0, parseFloat(e.target.value) || 1.0)))}
+                  className="w-16 rounded border border-teal-300 bg-white px-1 py-0.5 text-xs font-mono text-right focus:outline-none"
+                />
+              </label>
             </div>
             <div className="flex flex-wrap gap-2">
               <label className="flex h-8 items-center gap-1 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]">
@@ -1080,6 +1098,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 return (
                   <div style={{ color: isNonDefault && isActive ? '#be123c' : isNonDefault ? '#9ca3af' : undefined, fontWeight: isNonDefault && isActive ? 700 : undefined }}>
                     Modal H sign: {debugModalHSign}{!isActive ? ' (inactive — flat_rew_reference not selected)' : isNonDefault ? ' ⚠️' : ''}
+                  </div>
+                );
+              })()}
+              {(() => {
+                const isNonDefault = rewParityModalMagnitudeScale !== 1.0;
+                const isActive = rewSourceCurveMode === 'flat_rew_reference';
+                return (
+                  <div style={{ color: isNonDefault && isActive ? '#0f766e' : isNonDefault ? '#9ca3af' : undefined, fontWeight: isNonDefault && isActive ? 700 : undefined }}>
+                    Modal magnitude scale: {rewParityModalMagnitudeScale.toFixed(2)}{!isActive ? ' (inactive — flat_rew_reference not selected)' : isNonDefault ? ' ⚠️' : ''}
                   </div>
                 );
               })()}

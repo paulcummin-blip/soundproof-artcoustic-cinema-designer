@@ -1159,6 +1159,16 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         // 'normal' or undefined: no change
       }
 
+      // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
+      // Applied immediately before summation to test whether parity is a modal magnitude issue.
+      // Does not affect phase, Q, coupling, order weighting, direct, or reflection paths.
+      // Only active when rewParityModalMagnitudeScale is passed (from flat_rew_reference mode in BassResponse).
+      const _rewParityModalMagnitudeScale = Number.isFinite(Number(options?.rewParityModalMagnitudeScale)) ? Number(options.rewParityModalMagnitudeScale) : 1.0;
+      if (_rewParityModalMagnitudeScale !== 1.0) {
+        modalSumRe *= _rewParityModalMagnitudeScale;
+        modalSumIm *= _rewParityModalMagnitudeScale;
+      }
+
       // True acoustic pressure superposition:
       // modalSumRe/modalSumIm are already scaled pressure contributions,
       // so they must be added to the existing complex pressure field.
