@@ -1136,6 +1136,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         const magToDbInline = (v) => (Number.isFinite(v) && v > 0) ? 20 * Math.log10(v) : null;
         const fmt1Inline = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(1) : '—';
         const fmt0Inline = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(0) : '—';
+        const fmt3Inline = (v) => (v !== null && Number.isFinite(Number(v))) ? Number(v).toFixed(3) : '—';
         const hasPhaseData = Array.isArray(stepDebugInline) && stepDebugInline.length > 0;
 
         /* Layer Breakdown */
@@ -1186,16 +1187,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 580 }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #a5f3fc', color: '#0e7490', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 38 }}>Hz</th>
-                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal dB</th>
-                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal °</th>
-                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal dB</th>
-                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal °</th>
-                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 60 }}>Δ phase °</th>
-                        <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Final dB</th>
-                        <th style={{ textAlign: 'left',  padding: '2px 5px', minWidth: 80 }}>Verdict</th>
-                      </tr>
+                     <tr style={{ borderBottom: '1px solid #a5f3fc', color: '#0e7490', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 38 }}>Hz</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal dB</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Pre-modal °</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal dB</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Modal °</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 60 }}>Δ phase °</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 52 }}>Final dB</th>
+                       <th style={{ textAlign: 'left',  padding: '2px 5px', minWidth: 80 }}>Verdict</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 58, borderLeft: '1px solid #a5f3fc', color: '#0e4f1a' }}>PRE RE</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 58, color: '#0e4f1a' }}>PRE IM</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 58, color: '#7c2d12' }}>MOD RE</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 58, color: '#7c2d12' }}>MOD IM</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 58, color: '#1c1917' }}>FINAL RE</th>
+                       <th style={{ textAlign: 'right', padding: '2px 5px', minWidth: 58, color: '#1c1917' }}>FINAL IM</th>
+                     </tr>
                     </thead>
                     <tbody>
                       {PHASE_TARGET_HZ.map(hz => {
@@ -1237,13 +1244,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                             <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: phaseDiff !== null && Math.abs(phaseDiff) > 90 ? '#b91c1c' : '#1c1917' }}>{fmt0Inline(phaseDiff)}</td>
                             <td style={{ textAlign: 'right', padding: '1px 5px', fontWeight: 700, color: '#1c1917' }}>{fmt1Inline(finalDb)}</td>
                             <td style={{ textAlign: 'left', padding: '1px 5px', color: verdictColor, fontWeight: 600 }}>{verdict}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  <div style={{ marginTop: 4, color: '#0891b2', fontSize: 9, fontStyle: 'italic' }}>
-                    Source: applicationComparison.modalSumRe/modalSumIm — isolated modal sum, same as used in graph.
+                            <td style={{ textAlign: 'right', padding: '1px 5px', borderLeft: '1px solid #cffafe', color: '#0e4f1a', fontFamily: 'monospace', fontSize: 9 }}>{fmt3Inline(ac?.prevRe ?? null)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#0e4f1a', fontFamily: 'monospace', fontSize: 9 }}>{fmt3Inline(ac?.prevIm ?? null)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12', fontFamily: 'monospace', fontSize: 9 }}>{fmt3Inline(ac?.modalSumRe ?? null)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#7c2d12', fontFamily: 'monospace', fontSize: 9 }}>{fmt3Inline(ac?.modalSumIm ?? null)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#1c1917', fontFamily: 'monospace', fontSize: 9 }}>{fmt3Inline(ac?.livePostRe ?? null)}</td>
+                            <td style={{ textAlign: 'right', padding: '1px 5px', color: '#1c1917', fontFamily: 'monospace', fontSize: 9 }}>{fmt3Inline(ac?.livePostIm ?? null)}</td>
+                            </tr>
+                            );
+                            })}
+                            </tbody>
+                            </table>
+                            <div style={{ marginTop: 4, color: '#0891b2', fontSize: 9, fontStyle: 'italic' }}>
+                            Source: applicationComparison.modalSumRe/modalSumIm — isolated modal sum, same as used in graph.
                     stepDebug only populated for TARGET_DEBUG_FREQUENCIES in the engine (30–72 Hz range by default).
                   </div>
                 </div>
