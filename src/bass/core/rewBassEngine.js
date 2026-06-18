@@ -896,7 +896,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const roomVolumeM3 = widthM * lengthM * heightM;
     const modalSourceAmplitude1m = modalSourceReferenceMode === 'distance_normalized'
       ? modalSourceAmplitudeBase * Math.pow(10, distanceLossDb / 20)
-      : modalSourceReferenceMode === 'room_normalized'
+      : (modalSourceReferenceMode === 'room_volume' || modalSourceReferenceMode === 'room_normalized')
         ? modalSourceAmplitudeBase / Math.sqrt(Math.max(roomVolumeM3, 1e-6))
         : modalSourceAmplitudeBase;
 
