@@ -678,10 +678,16 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     typeof window !== 'undefined' &&
     window.localStorage?.getItem('rewCorePureDeterministicModalSum') === 'true'
   );
-  const disableModalPropagationPhase = options?.disableModalPropagationPhase === true;
+  // __REW_PARITY_MODAL_PHASE__
+  // REW parity mode disables distance-based propagation phase on modal contributions.
+  // Modal phase is carried only by the resonant transfer function.
+  // When rewParityModalPhase is true, both propagationPhaseScale and disableModalPropagationPhase
+  // are forced to their zero/true values regardless of caller options.
+  const rewParityModalPhase = options?.rewParityModalPhase === true;
+  const disableModalPropagationPhase = rewParityModalPhase ? true : options?.disableModalPropagationPhase === true;
   const mute68HzAxialMode = options?.mute68HzAxialMode === true;
   const propagationPhaseScaleOption = Number(options?.propagationPhaseScale);
-  const propagationPhaseScale = Number.isFinite(propagationPhaseScaleOption) ? propagationPhaseScaleOption : 0.5;
+  const propagationPhaseScale = rewParityModalPhase ? 0 : (Number.isFinite(propagationPhaseScaleOption) ? propagationPhaseScaleOption : 0.5);
   const axialQOption = Number(options?.axialQ);
   const axialQ = Number.isFinite(axialQOption) ? axialQOption : 8.0;
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
