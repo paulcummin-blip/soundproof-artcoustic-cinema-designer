@@ -945,8 +945,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       reflectionRe += imageRe;
       reflectionIm += imageIm;
-      sumRe += imageRe;
-      sumIm += imageIm;
+      // REW parity mode avoids double-counting by not adding independent geometric reflection or late-field vectors on top of the modal room solution.
+      if (!rewParityModalPhase) {
+        sumRe += imageRe;
+        sumIm += imageIm;
+      }
     });
 
     // Diffuse late-field approximation
@@ -956,8 +959,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
     lateFieldRe = (disableLateField || frequencyHz < schroederFrequency) ? 0 : lateFieldAmplitude * Math.cos(lateFieldPhase);
     lateFieldIm = (disableLateField || frequencyHz < schroederFrequency) ? 0 : lateFieldAmplitude * Math.sin(lateFieldPhase);
-    sumRe += lateFieldRe;
-    sumIm += lateFieldIm;
+    // REW parity mode avoids double-counting by not adding independent geometric reflection or late-field vectors on top of the modal room solution.
+    if (!rewParityModalPhase) {
+      sumRe += lateFieldRe;
+      sumIm += lateFieldIm;
+    }
 
     const preModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
 
