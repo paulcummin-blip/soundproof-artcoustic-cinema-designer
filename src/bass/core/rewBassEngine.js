@@ -894,11 +894,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const modalStorageMode = options?.modalStorageMode || 'none';
     const modalSourceAmplitudeBase = Math.pow(10, (curveDb + source.tuning.gainDb) / 20) * modalGainScalar;
     const roomVolumeM3 = widthM * lengthM * heightM;
+    // 'no_volume' is a diagnostic alias for 'existing' — explicitly bypasses sqrt(V) normalisation.
+    // 'existing' and 'no_volume' both fall through to the final else branch (modalSourceAmplitudeBase unchanged).
     const modalSourceAmplitude1m = modalSourceReferenceMode === 'distance_normalized'
       ? modalSourceAmplitudeBase * Math.pow(10, distanceLossDb / 20)
       : (modalSourceReferenceMode === 'room_volume' || modalSourceReferenceMode === 'room_normalized')
         ? modalSourceAmplitudeBase / Math.sqrt(Math.max(roomVolumeM3, 1e-6))
-        : modalSourceAmplitudeBase;
+        : modalSourceAmplitudeBase; // covers 'existing', 'no_volume', and any unrecognised mode
 
     const timeOfFlightPhase = -2 * Math.PI * frequencyHz * (distanceM / SPEED_OF_SOUND_MPS);
     const delayPhase = -2 * Math.PI * frequencyHz * (source.tuning.delayMs / 1000);

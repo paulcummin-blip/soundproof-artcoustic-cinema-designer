@@ -12,6 +12,7 @@ import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import RewDebugPanel from "@/components/room/bass/RewDebugPanel";
 import RewParityBenchmark from "@/components/room/bass/RewParityBenchmark";
+import RewBenchmarkComparisonTable from "@/components/room/bass/RewBenchmarkComparisonTable";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -957,6 +958,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </select>
               <select value={modalSourceReferenceMode} onChange={(e) => setModalSourceReferenceMode(e.target.value)} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Modal source reference">
                 <option value="existing">Modal source: existing 1 m reference</option>
+                <option value="no_volume">Modal source: no volume attenuation ⚠️ diagnostic</option>
                 <option value="distance_normalized">Modal source: distance matched to listener ⚠️</option>
                 <option value="distance_blend">Modal source: distance blend ⚠️</option>
                 <option value="room_normalized">Modal source: room-normalised</option>
@@ -1111,6 +1113,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 );
               })()}
 
+            </div>
+
+            {/* ── REW Benchmark Comparison Table ── */}
+            <div style={{ marginTop: 10, borderTop: '1px solid #CBD5E1', paddingTop: 8 }}>
+              <div style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', marginBottom: 6 }}>
+                REW Benchmark Comparison — seat: {selectedSeatIds[0] || '—'}
+                {modalSourceReferenceMode === 'no_volume' && (
+                  <span style={{ marginLeft: 8, color: '#b45309', fontSize: 10 }}>⚠️ no_volume mode active</span>
+                )}
+              </div>
+              {multiSeries.length > 0 ? (
+                <RewBenchmarkComparisonTable
+                  b44Data={multiSeries[0]?.data ?? []}
+                  label={`B44 dB (${modalSourceReferenceMode})`}
+                />
+              ) : (
+                <div style={{ color: '#6b7280', fontSize: 10, fontFamily: 'monospace' }}>No simulation data — add a sub and seat.</div>
+              )}
             </div>
           </div>
         </div>
