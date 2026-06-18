@@ -590,7 +590,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             debugMode200Multiplier, // __TEMP_REW_PARITY_MODE_200_SCALE__
             debugReflectionOrder: rewSourceCurveMode === 'flat_rew_reference' ? 1 : 3, // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__ force order-1 for REW parity preset
             reflectionGainScale, // diagnostic: scale imageAmplitude after reflectionCoefficient
-            debugModalHSign: rewSourceCurveMode === 'flat_rew_reference' ? debugModalHSign : 'normal', // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+            debugModalHSign: 'normal', // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
             rewParityModalMagnitudeScale: rewSourceCurveMode === 'flat_rew_reference' ? rewParityModalMagnitudeScale : 1.0, // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
             }
         );

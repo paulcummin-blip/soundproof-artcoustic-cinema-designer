@@ -131,7 +131,7 @@ export default function RewCandidateComparisonPanel({
     disableModalPropagationPhase: true, // forced true for flat_rew_reference
     debugInvertModalVector: false,      // matches current BassResponse REW parity path (debugInvertModalVector set to false)
     debugModalPhaseConvention: debugModalPhaseConvention ?? 'normal',
-    debugModalHSign: debugModalHSign ?? 'normal',
+    debugModalHSign: 'normal',
     disableReflectionPhaseJitter: false,
     disableReflectionCoherenceWeight: false,
     disableLateField: true,             // matches flat_rew_reference + full_field path
