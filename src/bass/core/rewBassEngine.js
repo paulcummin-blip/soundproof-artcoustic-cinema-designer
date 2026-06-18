@@ -1536,10 +1536,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     axialQ,
   };
 
+  const activeModalVectorPath = pureDeterministicModalSum
+    ? 'storedModalContrib clean path'
+    : 'perturbedStoredModalContrib diagnostic path';
+
   return {
     freqsHz,
     splDbRaw,
     complexPressure,
+    activeModalVectorPath,
     stepDebug: stepDebugRows
       .map((row) => row.targetVectorDebug)
       .filter(Boolean),

@@ -1070,6 +1070,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div>Storage: {modalStorageMode}</div>
               <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
               <div>pureDeterministicModalSum: {rewSourceCurveMode === 'flat_rew_reference' ? 'true (REW parity)' : 'false'}</div>
+              <div style={{ color: rewSourceCurveMode === 'flat_rew_reference' ? '#166534' : '#92400e', fontWeight: 600 }}>
+                activeModalVectorPath: {rewSourceCurveMode === 'flat_rew_reference' ? 'storedModalContrib clean path' : 'perturbedStoredModalContrib diagnostic path'}
+              </div>
               <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
               <div style={{ color: reflectionGainScale !== 1.0 ? '#b45309' : undefined, fontWeight: reflectionGainScale !== 1.0 ? 700 : undefined }}>
                 Reflection gain scale: {reflectionGainScale.toFixed(2)}{reflectionGainScale !== 1.0 ? ' ⚠️' : ''}
