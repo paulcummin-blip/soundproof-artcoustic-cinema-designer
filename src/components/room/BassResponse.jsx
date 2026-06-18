@@ -1083,6 +1083,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div style={{ color: debugMode200Multiplier !== 1.0 ? '#b45309' : undefined, fontWeight: debugMode200Multiplier !== 1.0 ? 700 : undefined }}>
                 (2,0,0) overlay after 0.5x axial correction: {debugMode200Multiplier.toFixed(2)}{debugMode200Multiplier !== 1.0 ? ' ⚠️' : ''}
               </div>
+              {debugMode200Multiplier !== 1.0 && (
+                <div style={{ color: '#dc2626', fontWeight: 700, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 4, padding: '2px 6px', marginTop: 2 }}>
+                  ⛔ WARNING: (2,0,0) diagnostic multiplier is active
+                </div>
+              )}
               {(() => {
                 const isNonDefault = rewParityFieldMode !== 'full_field';
                 const isParityIsolated = rewSourceCurveMode === 'flat_rew_reference' && rewParityFieldMode === 'full_field';
