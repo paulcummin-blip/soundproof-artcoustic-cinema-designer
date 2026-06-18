@@ -27,7 +27,7 @@ const REW_PARITY_PRESET = {
   modalSourceReferenceMode: 'room_volume', // REW parity uses room-volume modal source normalisation to avoid over-feeding modal pressure.
   modalGainScalar: 1.0,
   axialQ: 8.0,
-  propagationPhaseScale: 0.10,
+  propagationPhaseScale: 0,
   debugMode200Multiplier: 1.00,
   enableRewCoreReflections: true,
   rewParityFieldMode: 'full_field',
