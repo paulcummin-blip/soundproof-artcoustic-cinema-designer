@@ -129,7 +129,7 @@ export default function RewCandidateComparisonPanel({
     propagationPhaseScale: Number.isFinite(propagationPhaseScale) ? propagationPhaseScale : 0,
     pureDeterministicModalSum: true,    // forced true for flat_rew_reference
     disableModalPropagationPhase: true, // forced true for flat_rew_reference
-    debugInvertModalVector: true,       // matches BassResponse production path for flat_rew_reference
+    debugInvertModalVector: false,      // matches current BassResponse REW parity path (debugInvertModalVector set to false)
     debugModalPhaseConvention: debugModalPhaseConvention ?? 'normal',
     debugModalHSign: debugModalHSign ?? 'normal',
     disableReflectionPhaseJitter: false,
