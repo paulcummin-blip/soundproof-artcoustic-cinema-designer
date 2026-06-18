@@ -455,6 +455,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Use ID-based matching (not reference equality) so it is robust to seat list re-creation.
     let __b44StepDebugCapture = null;
     let __b44WholeCurveDebugCapture = null;
+    let __b44ActiveModalVectorPath = null;
     const debugSeatId = selectedSeatIds[0] || null;
     const debugSubForCapture = subsForSimulation[0] || null;
 
@@ -605,6 +606,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         ) {
           __b44StepDebugCapture = rewResult.stepDebug;
           __b44WholeCurveDebugCapture = rewResult.wholeCurveDebugRows;
+          __b44ActiveModalVectorPath = rewResult.activeModalVectorPath ?? null;
           if (__b44WholeCurveDebugCapture) {
             __b44WholeCurveDebugCapture.preModalSeries = rewResult.preModalSeries;
             __b44WholeCurveDebugCapture.modalOnlySeries = rewResult.modalOnlySeries;
@@ -645,6 +647,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       audit: null,
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
+      activeModalVectorPath: __b44ActiveModalVectorPath,
     };
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale]);
 
@@ -1070,8 +1073,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div>Storage: {modalStorageMode}</div>
               <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
               <div>pureDeterministicModalSum: {rewSourceCurveMode === 'flat_rew_reference' ? 'true (REW parity)' : 'false'}</div>
-              <div style={{ color: rewSourceCurveMode === 'flat_rew_reference' ? '#166534' : '#92400e', fontWeight: 600 }}>
-                activeModalVectorPath: {rewSourceCurveMode === 'flat_rew_reference' ? 'storedModalContrib clean path' : 'perturbedStoredModalContrib diagnostic path'}
+              <div style={{ color: simulationResults?.activeModalVectorPath === 'storedModalContrib clean path' ? '#166534' : '#92400e', fontWeight: 600 }}>
+                activeModalVectorPath: {simulationResults?.activeModalVectorPath || 'not reported'}
               </div>
               <div className="mt-1">Reflections: {enableRewCoreReflections ? 'ON' : 'OFF'}</div>
               <div style={{ color: reflectionGainScale !== 1.0 ? '#b45309' : undefined, fontWeight: reflectionGainScale !== 1.0 ? 700 : undefined }}>
