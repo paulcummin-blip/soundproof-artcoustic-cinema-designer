@@ -26,7 +26,7 @@ const IS_DEVELOPMENT_MODE = true;
 // propagationPhaseScale 0.10 was chosen by sweep on 2026-06-13 (null centre 40.4 Hz vs REW 40.6 Hz).
 const REW_PARITY_PRESET = {
   rewSourceCurveMode: 'flat_rew_reference',
-  modalSourceReferenceMode: 'room_volume', // REW parity uses room-volume modal source normalisation to avoid over-feeding modal pressure.
+  modalSourceReferenceMode: 'existing',
   modalGainScalar: 1.0,
   axialQ: 8.0,
   propagationPhaseScale: 0,
