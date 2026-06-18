@@ -13,6 +13,7 @@ import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import RewDebugPanel from "@/components/room/bass/RewDebugPanel";
 import RewParityBenchmark from "@/components/room/bass/RewParityBenchmark";
 import RewBenchmarkComparisonTable from "@/components/room/bass/RewBenchmarkComparisonTable";
+import RewCandidateComparisonPanel from "@/components/room/bass/RewCandidateComparisonPanel";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1132,6 +1133,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div style={{ color: '#6b7280', fontSize: 10, fontFamily: 'monospace' }}>No simulation data — add a sub and seat.</div>
               )}
             </div>
+
+            {/* ── REW Parity Candidate Comparison (axialQ=4 vs axialQ=8) ── */}
+            {rewSourceCurveMode === 'flat_rew_reference' && (() => {
+              const candidateSeat = selectedSeatIds[0]
+                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+                : null;
+              const candidateSub = subsForSimulation[0] ?? null;
+              const candidateSourceCurve = REW_SOURCE_CURVES['flat_rew_reference'];
+              return (
+                <div style={{ marginTop: 12, borderTop: '1px solid #CBD5E1', paddingTop: 10 }}>
+                  <RewCandidateComparisonPanel
+                    roomDims={roomDims}
+                    seat={candidateSeat}
+                    sub={candidateSub}
+                    sourceCurve={candidateSourceCurve}
+                    modalSourceReferenceMode={modalSourceReferenceMode}
+                    modalGainScalar={modalGainScalar}
+                    propagationPhaseScale={propagationPhaseScale}
+                    surfaceAbsorption={surfaceAbsorption}
+                    enableRewCoreReflections={enableRewCoreReflections}
+                    rewParityModalMagnitudeScale={rewParityModalMagnitudeScale}
+                    debugModalPhaseConvention={debugModalPhaseConvention}
+                    debugModalHSign={debugModalHSign}
+                  />
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
