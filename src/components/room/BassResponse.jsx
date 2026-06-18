@@ -169,14 +169,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // REW Core is the production engine — not user-controllable.
   const useRewCoreTestMode = true;
   const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(true);
-  const [rewSourceCurveMode, setRewSourceCurveMode] = useState("product");
-  const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState("existing");
+  const [rewSourceCurveMode, setRewSourceCurveMode] = useState(REW_PARITY_PRESET.rewSourceCurveMode);
+  const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState(REW_PARITY_PRESET.modalSourceReferenceMode);
   const [modalGainScalar, setModalGainScalar] = useState(1.0);
   const [axialQ, setAxialQ] = useState(8.0);
   const [modalStorageMode, setModalStorageMode] = useState("none");
   // Temporary REW parity experiment: default changed to 1.0 to test full acoustic propagation phase.
   // Revert to 0.5 after experiment is concluded.
-  const [propagationPhaseScale, setPropagationPhaseScale] = useState(0.10);
+  const [propagationPhaseScale, setPropagationPhaseScale] = useState(REW_PARITY_PRESET.propagationPhaseScale);
   const [disableReflectionPhaseJitter, setDisableReflectionPhaseJitter] = useState(false);
   const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(false);
   const [disableLateField, setDisableLateField] = useState(false);
