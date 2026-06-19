@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import RewParityTangentialDominanceAudit from './RewParityTangentialDominanceAudit';
+import RewParityModalSourceAudit from './RewParityModalSourceAudit';
 
 // ── Tiny collapsible section wrapper ──────────────────────────────────────────
 function DebugSection({ title, defaultOpen = false, accentColor = '#92400e', children }) {
@@ -518,6 +519,17 @@ export default function RewDebugPanel({ stepDebug, selectedSeatIds, disableModal
       {/* ⑥ REW Parity Tangential Dominance Audit — closed by default */}
       <DebugSection title="REW Parity Tangential Dominance Audit" defaultOpen={false} accentColor="#be185d">
         <RewParityTangentialDominanceAudit
+          roomDims={roomDims}
+          seat={seat}
+          sub={sub}
+          surfaceAbsorption={surfaceAbsorption}
+          activeSettings={activeSettings}
+        />
+      </DebugSection>
+
+      {/* ⑦ REW Parity Modal Source Audit — closed by default */}
+      <DebugSection title="REW Parity Modal Source Audit" defaultOpen={false} accentColor="#1d4ed8">
+        <RewParityModalSourceAudit
           roomDims={roomDims}
           seat={seat}
           sub={sub}
