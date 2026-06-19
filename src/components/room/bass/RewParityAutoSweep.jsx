@@ -2,39 +2,34 @@
 // Diagnostic-only: auto-sweeps parameter combinations and ranks by MAE against REW_BENCHMARK.
 // Does NOT change the active simulation, graph, defaults, or benchmark values.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { simulateBassResponseRewCore } from '@/bass/core/rewBassEngine';
-import { getSubwooferCurve } from '@/components/models/speakers/registry';
 
-// ── REW benchmark targets (same values as RewBenchmarkComparisonTable) ────────
-// Keep in sync with the canonical benchmark table. Do not modify here.
+// ── REW benchmark targets — MUST match RewBenchmarkComparisonTable.jsx exactly ──
 const REW_BENCHMARK = [
-  { hz: 20,  db: 90.0 },
-  { hz: 25,  db: 91.5 },
-  { hz: 30,  db: 93.0 },
-  { hz: 33.5,db: 93.6 },
-  { hz: 35,  db: 92.5 },
-  { hz: 40,  db: 72.9 },
-  { hz: 45,  db: 87.5 },
-  { hz: 50,  db: 90.5 },
-  { hz: 57,  db: 91.0 },
-  { hz: 60,  db: 91.5 },
-  { hz: 67.9,db: 92.4 },
-  { hz: 70,  db: 91.8 },
-  { hz: 80,  db: 90.5 },
-  { hz: 100, db: 89.5 },
-  { hz: 120, db: 88.5 },
-  { hz: 150, db: 87.5 },
-  { hz: 180, db: 86.5 },
-  { hz: 200, db: 86.0 },
+  { hz: 20,  db: 92.4 },
+  { hz: 25,  db: 93.6 },
+  { hz: 30,  db: 89.2 },
+  { hz: 40,  db: 86.0 },
+  { hz: 50,  db: 91.8 },
+  { hz: 57,  db: 104.1 },
+  { hz: 60,  db: 98.1 },
+  { hz: 70,  db: 86.8 },
+  { hz: 80,  db: 79.7 },
+  { hz: 85,  db: 90.8 },
+  { hz: 100, db: 98.3 },
+  { hz: 120, db: 92.1 },
+  { hz: 150, db: 94.3 },
+  { hz: 180, db: 99.3 },
+  { hz: 200, db: 99.5 },
 ];
 
 // ── Sweep grid ────────────────────────────────────────────────────────────────
 const SWEEP_GRID = {
-  modalDistanceBlend:   [0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65],
-  modalCoherenceMode:   ['coherent', 'distributed'],
-  axialQ:               [6, 7, 8],
-  highOrderAxialScale:  [1.00, 0.85],
+  modalDistanceBlend:           [0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65],
+  modalCoherenceMode:           ['coherent', 'distributed'],
+  axialQ:                       [6, 7, 8],
+  highOrderAxialScale:          [1.00, 0.85],
   rewParityModalMagnitudeScale: [0.85, 0.90, 0.95, 1.00, 1.05],
 };
 
@@ -74,25 +69,43 @@ function computeMAE(series) {
   return { mae: sumAbsErr / count, worst: worstErr };
 }
 
-function runOneCombination(roomDims, seat, sub, sourceCurve, surfaceAbsorption, combo) {
-  const { modalDistanceBlend, modalCoherenceMode, axialQ, highOrderAxialScale, rewParityModalMagnitudeScale } = combo;
-
+// Mirrors the distance-blend logic in BassResponse exactly.
+function resolveEngineModalParams(seat, sub, modalSourceReferenceMode, modalDistanceBlend, modalGainScalar) {
   const seatZ = Number.isFinite(Number(seat?.z)) ? Number(seat.z) : 1.2;
-  const blend = Math.max(0, Math.min(1, modalDistanceBlend));
+  let engineModalRefMode = modalSourceReferenceMode;
+  let engineModalGainScalar = modalGainScalar ?? 1.0;
 
-  // Distance blend → gain scalar (mirrors BassResponse logic)
-  let engineModalRefMode = 'existing';
-  let engineModalGainScalar = 1.0;
-  if (blend >= 1.0) {
-    engineModalRefMode = 'distance_normalized';
-  } else if (blend > 0) {
-    const dx = sub.x - seat.x;
-    const dy = sub.y - seat.y;
-    const dz = sub.z - seatZ;
-    const distM = Math.max(0.01, Math.sqrt(dx * dx + dy * dy + dz * dz));
-    const fullLossDb = -20 * Math.log10(distM / 1);
-    engineModalGainScalar = Math.pow(10, (fullLossDb * blend) / 20);
+  if (modalSourceReferenceMode === 'distance_blend') {
+    const blend = Math.max(0, Math.min(1, modalDistanceBlend));
+    if (blend >= 1.0) {
+      engineModalRefMode = 'distance_normalized';
+    } else if (blend <= 0.0) {
+      engineModalRefMode = 'existing';
+    } else {
+      const dx = sub.x - seat.x;
+      const dy = sub.y - seat.y;
+      const dz = (Number.isFinite(sub.z) ? sub.z : 0.35) - seatZ;
+      const distM = Math.max(0.01, Math.sqrt(dx * dx + dy * dy + dz * dz));
+      const fullLossDb = -20 * Math.log10(distM / 1);
+      engineModalGainScalar = (modalGainScalar ?? 1.0) * Math.pow(10, (fullLossDb * blend) / 20);
+      engineModalRefMode = 'existing';
+    }
   }
+
+  return { engineModalRefMode, engineModalGainScalar, seatZ };
+}
+
+function runOneSim(roomDims, seat, sub, sourceCurve, surfaceAbsorption, params) {
+  const {
+    modalSourceReferenceMode, modalDistanceBlend, modalCoherenceMode,
+    axialQ, highOrderAxialScale, rewParityModalMagnitudeScale,
+    modalGainScalar, enableReflections, disableLateField,
+    propagationPhaseScale, pureDeterministicModalSum, disableModalPropagationPhase,
+    modalStorageMode,
+  } = params;
+
+  const { engineModalRefMode, engineModalGainScalar, seatZ } =
+    resolveEngineModalParams(seat, sub, modalSourceReferenceMode, modalDistanceBlend, modalGainScalar);
 
   let result;
   try {
@@ -102,24 +115,24 @@ function runOneCombination(roomDims, seat, sub, sourceCurve, surfaceAbsorption, 
       sub,
       sourceCurve,
       {
-        enableReflections: false,   // flat_rew_reference parity: no reflections
-        enableModes: true,
+        enableReflections:           enableReflections ?? false,
+        enableModes:                 true,
         surfaceAbsorption,
-        freqMinHz: 20,
-        freqMaxHz: 200,
-        smoothing: 'none',
-        modalSourceReferenceMode: engineModalRefMode,
-        modalGainScalar: engineModalGainScalar,
+        freqMinHz:                   20,
+        freqMaxHz:                   200,
+        smoothing:                   'none',
+        modalSourceReferenceMode:    engineModalRefMode,
+        modalGainScalar:             engineModalGainScalar,
         axialQ,
-        modalStorageMode: 'none',
-        propagationPhaseScale: 0,
-        pureDeterministicModalSum: true,
-        disableModalPropagationPhase: true,
+        modalStorageMode:            modalStorageMode ?? 'none',
+        propagationPhaseScale:       propagationPhaseScale ?? 0,
+        pureDeterministicModalSum:   pureDeterministicModalSum ?? true,
+        disableModalPropagationPhase: disableModalPropagationPhase ?? true,
         modalCoherenceMode,
         highOrderAxialScale,
         rewParityModalMagnitudeScale,
-        debugReflectionOrder: 1,
-        disableLateField: true,
+        debugReflectionOrder:        1,
+        disableLateField:            disableLateField ?? true,
       }
     );
   } catch (e) {
@@ -127,9 +140,7 @@ function runOneCombination(roomDims, seat, sub, sourceCurve, surfaceAbsorption, 
   }
 
   if (!result?.freqsHz || !result?.splDbRaw) return null;
-
-  const series = result.freqsHz.map((hz, i) => ({ frequency: hz, spl: result.splDbRaw[i] }));
-  return computeMAE(series);
+  return result.freqsHz.map((hz, i) => ({ frequency: hz, spl: result.splDbRaw[i] }));
 }
 
 function fmt(v, d = 2) {
@@ -137,12 +148,16 @@ function fmt(v, d = 2) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function RewParityAutoSweep({ roomDims, seat, sub, surfaceAbsorption }) {
-  const [results, setResults] = useState(null);
+export default function RewParityAutoSweep({
+  roomDims, seat, sub, surfaceAbsorption,
+  liveB44Series,   // the same data passed to RewBenchmarkComparisonTable
+  activeSettings,  // all current BassResponse engine settings
+}) {
+  const [results, setResults] = useState(null);         // top-10 sweep rows
+  const [activeRow, setActiveRow] = useState(null);     // current-active computed row
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(0);
-  const [error, setError] = useState(null);
 
   const canRun = !!(
     roomDims?.widthM && roomDims?.lengthM && roomDims?.heightM &&
@@ -150,16 +165,39 @@ export default function RewParityAutoSweep({ roomDims, seat, sub, surfaceAbsorpt
     sub?.x != null && sub?.y != null
   );
 
+  // Compute live MAE from the series already shown in the benchmark table above
+  const liveMae = React.useMemo(() => {
+    if (!Array.isArray(liveB44Series) || liveB44Series.length === 0) return null;
+    return computeMAE(liveB44Series).mae;
+  }, [liveB44Series]);
+
   const runSweep = useCallback(async () => {
     if (!canRun) return;
     setRunning(true);
     setResults(null);
-    setError(null);
+    setActiveRow(null);
 
-    const subCurve = getSubwooferCurve(sub?.modelKey);
-    const sourceCurve = FLAT_SOURCE_CURVE; // always flat REW reference for this sweep
+    const sourceCurve = FLAT_SOURCE_CURVE;
 
-    // Build all combos
+    // ── Step 1: run CURRENT ACTIVE SETTINGS first ──────────────────────────
+    let activeMetrics = null;
+    if (activeSettings && seat && sub) {
+      const activeSeries = runOneSim(roomDims, seat, sub, sourceCurve, surfaceAbsorption, activeSettings);
+      if (activeSeries) {
+        activeMetrics = computeMAE(activeSeries);
+      }
+    }
+    setActiveRow(activeMetrics ? {
+      mae: activeMetrics.mae,
+      worst: activeMetrics.worst,
+      modalDistanceBlend: activeSettings?.modalDistanceBlend,
+      modalCoherenceMode: activeSettings?.modalCoherenceMode,
+      axialQ: activeSettings?.axialQ,
+      highOrderAxialScale: activeSettings?.highOrderAxialScale,
+      rewParityModalMagnitudeScale: activeSettings?.rewParityModalMagnitudeScale,
+    } : null);
+
+    // ── Step 2: sweep grid ─────────────────────────────────────────────────
     const combos = [];
     for (const blend of SWEEP_GRID.modalDistanceBlend)
       for (const coherence of SWEEP_GRID.modalCoherenceMode)
@@ -167,29 +205,37 @@ export default function RewParityAutoSweep({ roomDims, seat, sub, surfaceAbsorpt
           for (const hoScale of SWEEP_GRID.highOrderAxialScale)
             for (const magScale of SWEEP_GRID.rewParityModalMagnitudeScale)
               combos.push({
-                modalDistanceBlend: blend,
-                modalCoherenceMode: coherence,
-                axialQ: q,
-                highOrderAxialScale: hoScale,
+                modalSourceReferenceMode:    'distance_blend',
+                modalDistanceBlend:          blend,
+                modalCoherenceMode:          coherence,
+                axialQ:                      q,
+                highOrderAxialScale:         hoScale,
                 rewParityModalMagnitudeScale: magScale,
+                modalGainScalar:             1.0,
+                enableReflections:           false,
+                disableLateField:            true,
+                propagationPhaseScale:       0,
+                pureDeterministicModalSum:   true,
+                disableModalPropagationPhase: true,
+                modalStorageMode:            'none',
               });
 
     setTotal(combos.length);
     setProgress(0);
 
     const scored = [];
-    const CHUNK = 20; // process in chunks to keep UI responsive
+    const CHUNK = 20;
 
     for (let i = 0; i < combos.length; i += CHUNK) {
       const chunk = combos.slice(i, i + CHUNK);
       for (const combo of chunk) {
-        const metrics = runOneCombination(roomDims, seat, sub, sourceCurve, surfaceAbsorption, combo);
-        if (metrics?.mae !== null) {
-          scored.push({ ...combo, mae: metrics.mae, worst: metrics.worst });
+        const series = runOneSim(roomDims, seat, sub, sourceCurve, surfaceAbsorption, combo);
+        if (series) {
+          const m = computeMAE(series);
+          if (m.mae !== null) scored.push({ ...combo, mae: m.mae, worst: m.worst });
         }
       }
       setProgress(Math.min(i + CHUNK, combos.length));
-      // Yield to browser between chunks
       await new Promise(resolve => setTimeout(resolve, 0));
     }
 
@@ -197,7 +243,14 @@ export default function RewParityAutoSweep({ roomDims, seat, sub, surfaceAbsorpt
     setResults(scored.slice(0, 10));
     setRunning(false);
     setProgress(combos.length);
-  }, [roomDims, seat, sub, surfaceAbsorption, canRun]);
+  }, [roomDims, seat, sub, surfaceAbsorption, activeSettings, canRun]);
+
+  const totalCombos =
+    SWEEP_GRID.modalDistanceBlend.length *
+    SWEEP_GRID.modalCoherenceMode.length *
+    SWEEP_GRID.axialQ.length *
+    SWEEP_GRID.highOrderAxialScale.length *
+    SWEEP_GRID.rewParityModalMagnitudeScale.length;
 
   const thStyle = {
     textAlign: 'right', padding: '3px 6px', fontSize: 10, fontWeight: 700,
@@ -206,9 +259,13 @@ export default function RewParityAutoSweep({ roomDims, seat, sub, surfaceAbsorpt
   };
   const tdStyle = { textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace' };
 
+  // Mismatch check: sweep's active-row MAE vs live benchmark MAE
+  const hasMismatch = activeRow?.mae !== null && liveMae !== null &&
+    Math.abs(activeRow.mae - liveMae) > 0.05;
+
   return (
     <div style={{
-      marginTop: 12, borderTop: '1px solid #CBD5E1', paddingTop: 10,
+      marginTop: 12,
       border: '1px solid #86efac', borderRadius: 8, background: '#f0fdf4', padding: '10px 12px',
     }}>
       <div style={{ fontWeight: 700, color: '#166534', fontSize: 11, fontFamily: 'monospace', marginBottom: 6 }}>
@@ -223,19 +280,7 @@ export default function RewParityAutoSweep({ roomDims, seat, sub, surfaceAbsorpt
       )}
 
       <div style={{ marginBottom: 8, fontSize: 10, fontFamily: 'monospace', color: '#374151' }}>
-        Grid: {SWEEP_GRID.modalDistanceBlend.length} blend ×{' '}
-        {SWEEP_GRID.modalCoherenceMode.length} coherence ×{' '}
-        {SWEEP_GRID.axialQ.length} Q ×{' '}
-        {SWEEP_GRID.highOrderAxialScale.length} hoScale ×{' '}
-        {SWEEP_GRID.rewParityModalMagnitudeScale.length} magScale ={' '}
-        <strong>
-          {SWEEP_GRID.modalDistanceBlend.length *
-            SWEEP_GRID.modalCoherenceMode.length *
-            SWEEP_GRID.axialQ.length *
-            SWEEP_GRID.highOrderAxialScale.length *
-            SWEEP_GRID.rewParityModalMagnitudeScale.length} combinations
-        </strong>
-        . Source: flat 94 dB REW reference. Top 10 shown by lowest MAE.
+        Grid: {SWEEP_GRID.modalDistanceBlend.length} blend × {SWEEP_GRID.modalCoherenceMode.length} coherence × {SWEEP_GRID.axialQ.length} Q × {SWEEP_GRID.highOrderAxialScale.length} hoScale × {SWEEP_GRID.rewParityModalMagnitudeScale.length} magScale = <strong>{totalCombos} combinations</strong>. Source: flat 94 dB REW reference. Top 10 by lowest MAE.
       </div>
 
       <button
@@ -253,37 +298,84 @@ export default function RewParityAutoSweep({ roomDims, seat, sub, surfaceAbsorpt
       </button>
 
       {running && total > 0 && (
-        <div style={{ marginBottom: 8, fontSize: 10, fontFamily: 'monospace', color: '#166534' }}>
+        <div style={{ marginBottom: 8 }}>
           <div style={{ background: '#dcfce7', borderRadius: 4, height: 6, overflow: 'hidden' }}>
             <div style={{ background: '#16a34a', height: '100%', width: `${(progress / total) * 100}%`, transition: 'width 0.1s' }} />
           </div>
-          <span style={{ fontSize: 9, color: '#4ade80' }}>{Math.round((progress / total) * 100)}%</span>
+          <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#4ade80' }}>{Math.round((progress / total) * 100)}%</span>
         </div>
       )}
 
-      {error && (
-        <div style={{ fontSize: 10, color: '#dc2626', fontFamily: 'monospace', marginBottom: 6 }}>
-          ⚠ {error}
+      {/* ── Mismatch warning ── */}
+      {hasMismatch && (
+        <div style={{
+          marginBottom: 8, padding: '6px 10px', borderRadius: 6,
+          background: '#fef2f2', border: '2px solid #fca5a5',
+          fontSize: 10, fontFamily: 'monospace', color: '#dc2626', fontWeight: 700,
+        }}>
+          ⚠ SWEEP MISMATCH — active settings do not match live benchmark
+          <div style={{ fontWeight: 400, marginTop: 2, color: '#991b1b' }}>
+            Sweep "current active" MAE = {fmt(activeRow.mae, 3)} dB &nbsp;|&nbsp;
+            Live benchmark MAE = {fmt(liveMae, 3)} dB &nbsp;|&nbsp;
+            Δ = {fmt(Math.abs(activeRow.mae - liveMae), 3)} dB
+          </div>
+          <div style={{ fontWeight: 400, marginTop: 2, color: '#991b1b', fontSize: 9 }}>
+            The sweep engine path does not reproduce the live graph. Check that activeSettings props match the production BassResponse engine call exactly.
+          </div>
         </div>
       )}
 
-      {results && results.length > 0 && (
+      {/* ── Match confirmation ── */}
+      {activeRow?.mae !== null && liveMae !== null && !hasMismatch && (
+        <div style={{
+          marginBottom: 8, padding: '4px 8px', borderRadius: 6,
+          background: '#dcfce7', border: '1px solid #86efac',
+          fontSize: 10, fontFamily: 'monospace', color: '#166534',
+        }}>
+          ✓ Sweep engine matches live benchmark (Δ = {fmt(Math.abs(activeRow.mae - liveMae), 3)} dB)
+          &nbsp;|&nbsp; sweep MAE = {fmt(activeRow.mae, 3)} dB · live MAE = {fmt(liveMae, 3)} dB
+        </div>
+      )}
+
+      {/* ── Results table ── */}
+      {(activeRow || (results && results.length > 0)) && (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 700 }}>
             <thead>
               <tr>
                 <th style={{ ...thStyle, textAlign: 'left' }}>Rank</th>
                 <th style={thStyle}>MAE (dB)</th>
-                <th style={thStyle}>Worst err (dB)</th>
-                <th style={thStyle}>Distance blend</th>
+                <th style={thStyle}>Worst (dB)</th>
+                <th style={thStyle}>Dist blend</th>
                 <th style={{ ...thStyle, textAlign: 'left' }}>Coherence</th>
                 <th style={thStyle}>Axial Q</th>
-                <th style={thStyle}>HO axial scale</th>
-                <th style={thStyle}>Modal mag scale</th>
+                <th style={thStyle}>HO axial</th>
+                <th style={thStyle}>Mag scale</th>
               </tr>
             </thead>
             <tbody>
-              {results.map((row, i) => (
+              {/* Fixed first row: current active settings */}
+              {activeRow && (
+                <tr style={{ borderBottom: '2px solid #86efac', background: '#fff7ed' }}>
+                  <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700, color: '#b45309', fontSize: 9 }}>
+                    ★ CURRENT
+                  </td>
+                  <td style={{ ...tdStyle, fontWeight: 700, color: hasMismatch ? '#dc2626' : '#b45309' }}>
+                    {fmt(activeRow.mae, 3)}
+                    {hasMismatch && ' ⚠'}
+                  </td>
+                  <td style={{ ...tdStyle, color: activeRow.worst > 5 ? '#dc2626' : activeRow.worst > 3 ? '#b45309' : '#374151' }}>
+                    {fmt(activeRow.worst, 3)}
+                  </td>
+                  <td style={{ ...tdStyle, color: '#78350f' }}>{fmt(activeRow.modalDistanceBlend, 2)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'left', color: '#78350f' }}>{activeRow.modalCoherenceMode ?? '—'}</td>
+                  <td style={{ ...tdStyle, color: '#78350f' }}>{fmt(activeRow.axialQ, 1)}</td>
+                  <td style={{ ...tdStyle, color: '#78350f' }}>{fmt(activeRow.highOrderAxialScale, 2)}</td>
+                  <td style={{ ...tdStyle, color: '#78350f' }}>{fmt(activeRow.rewParityModalMagnitudeScale, 2)}</td>
+                </tr>
+              )}
+              {/* Sweep top-10 */}
+              {results && results.map((row, i) => (
                 <tr
                   key={i}
                   style={{

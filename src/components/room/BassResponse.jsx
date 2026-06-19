@@ -1211,6 +1211,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   seat={sweepSeat}
                   sub={sweepSub}
                   surfaceAbsorption={surfaceAbsorption}
+                  liveB44Series={multiSeries[0]?.data ?? []}
+                  activeSettings={{
+                    modalSourceReferenceMode,
+                    modalDistanceBlend,
+                    modalCoherenceMode,
+                    axialQ,
+                    highOrderAxialScale,
+                    rewParityModalMagnitudeScale,
+                    modalGainScalar,
+                    enableReflections: (() => {
+                      const _isParityFullField = rewSourceCurveMode === 'flat_rew_reference' && rewParityFieldMode === 'full_field';
+                      return _isParityFullField ? false : enableRewCoreReflections;
+                    })(),
+                    disableLateField: (() => {
+                      const _isParityFullField = rewSourceCurveMode === 'flat_rew_reference' && rewParityFieldMode === 'full_field';
+                      return _isParityFullField ? true : disableLateField;
+                    })(),
+                    propagationPhaseScale: 0,
+                    pureDeterministicModalSum: true,
+                    disableModalPropagationPhase: true,
+                    modalStorageMode,
+                  }}
                 />
               );
             })()}
