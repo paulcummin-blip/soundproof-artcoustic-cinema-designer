@@ -281,9 +281,9 @@ const LOW_MODE_KEYS = [
   { nx: 2, ny: 0, nz: 0 },
 ];
 
-const TARGET_DEBUG_FREQUENCIES = [34.3, 40.4, 68.6, 70, 75, 77, 78, 80, 85];
-const WHOLE_CURVE_DEBUG_TARGETS = [20, 30, 34.3, 40, 50, 60, 68.6, 70, 80, 90, 100];
-const MODAL_CONTRIBUTOR_DEBUG_TARGETS = [34.3, 40.6, 45, 50, 54, 68.6, 69.24];
+const TARGET_DEBUG_FREQUENCIES = [20, 25, 30, 40, 50, 57, 60, 70, 80, 85, 100, 120, 150, 180, 200];
+const WHOLE_CURVE_DEBUG_TARGETS = [20, 25, 30, 40, 50, 57, 60, 70, 80, 85, 100, 120, 150, 180, 200];
+const MODAL_CONTRIBUTOR_DEBUG_TARGETS = [20, 25, 30, 40, 50, 57, 60, 70, 80, 85, 100, 120, 150, 180, 200];
 const PER_MODE_SPLIT_COHERENT_FRACTION = 0.70;
 
 // Temporary REW parity diagnostic only, not final physics: deterministic per-mode phase decorrelation.
@@ -515,7 +515,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       modalSumIm += activeStoredModalContrib.imag * highOrderAxialCorrectionScale * _mode200DebugOverride;
     }
 
-    const isInDebugRange = frequencyHz >= 30 && frequencyHz <= 88;
+    const isInDebugRange = frequencyHz >= 18 && frequencyHz <= 205;
 
     if (isInDebugRange) {
       activeModalContributorRows.push({
