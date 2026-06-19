@@ -207,6 +207,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
   // Tests whether the 80–150 Hz over-prediction is caused by fully coherent modal summation.
   const [modalCoherenceMode, setModalCoherenceMode] = useState('coherent');
+  // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
+  // Diagnostic scale applied to axial modes with order >= 2. Default 1.00 = no change.
+  const [highOrderAxialScale, setHighOrderAxialScale] = useState(1.0);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
   // REW reference overlay — debug only, no engine changes
@@ -600,6 +603,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             debugModalHSign: 'normal', // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
             rewParityModalMagnitudeScale: rewSourceCurveMode === 'flat_rew_reference' ? rewParityModalMagnitudeScale : 1.0, // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
             modalCoherenceMode, // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
+            highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
             }
         );
 
@@ -656,7 +660,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
       activeModalVectorPath: __b44ActiveModalVectorPath,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1046,6 +1050,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value="distributed">Modal coherence: distributed diagnostic ⚠️</option>
                 <option value="split">Modal coherence: split diagnostic ⚠️</option>
               </select>
+              {/* __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__ */}
+              <select
+                value={highOrderAxialScale}
+                onChange={(e) => setHighOrderAxialScale(Number(e.target.value))}
+                className="h-8 rounded-md border border-amber-400 bg-amber-50 px-2 text-xs text-amber-900 font-semibold"
+                aria-label="High-order axial scale"
+                title="Diagnostic: scales axial modes with order ≥ 2. Default 1.00 = no change."
+              >
+                <option value={1.00}>High-order axial scale: 1.00</option>
+                <option value={0.85}>High-order axial scale: 0.85</option>
+                <option value={0.70}>High-order axial scale: 0.70</option>
+                <option value={0.60}>High-order axial scale: 0.60</option>
+                <option value={0.50}>High-order axial scale: 0.50</option>
+              </select>
               {/* __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__ — only active when flat_rew_reference is selected */}
               <label className="flex h-8 items-center gap-2 rounded-md border border-teal-400 bg-teal-50 px-2 text-xs text-teal-900 font-mono font-semibold" title="Scales the entire modal sum before adding to direct+reflections. Active only when source = flat_rew_reference. Tests whether parity is a magnitude issue.">
                 Modal mag scale:
@@ -1139,6 +1157,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 return (
                   <div style={{ color: isNonDefault ? '#3730a3' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>
                     Modal coherence: {modalCoherenceMode}{isNonDefault ? ' ⚠️' : ''}
+                  </div>
+                );
+              })()}
+              {(() => {
+                const isNonDefault = highOrderAxialScale !== 1.0;
+                return (
+                  <div style={{ color: isNonDefault ? '#b45309' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>
+                    High-order axial scale: {highOrderAxialScale.toFixed(2)}{isNonDefault ? ' ⚠️ (axial order ≥ 2 only)' : ''}
                   </div>
                 );
               })()}

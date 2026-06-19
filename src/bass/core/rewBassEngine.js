@@ -349,7 +349,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal') {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal', highOrderAxialScale = 1.0) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -499,7 +499,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       // the 68.6 Hz axial harmonic from ~94.8 dB to ~92.6 dB against the REW target of ~92.4 dB
       // without shifting the primary modes at 34.3 Hz or 48.5 Hz.
       // Q values, coupling, storage factor, tangential/oblique modes, and all non-modal paths are unchanged.
-      const HIGH_ORDER_AXIAL_SCALE = 1.00;
+      const HIGH_ORDER_AXIAL_SCALE = Number.isFinite(Number(highOrderAxialScale)) ? Number(highOrderAxialScale) : 1.0;
       const highOrderAxialCorrectionScale = (mode.type === 'axial' && modeOrder >= 2)
         ? HIGH_ORDER_AXIAL_SCALE
         : 1.0;
@@ -695,6 +695,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
   // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
   const debugModalHSign = options?.debugModalHSign === 'rew_test' ? 'rew_test' : 'normal';
+  // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
+  // Diagnostic-only scale applied to axial modes with modeOrder >= 2. Default 1.00 = no change.
+  const highOrderAxialScale = Number.isFinite(Number(options?.highOrderAxialScale)) ? Number(options.highOrderAxialScale) : 1.0;
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
     throw new Error('roomDims must include finite widthM, lengthM, and heightM values.');
@@ -1062,7 +1065,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       } = legacyModalTransferLocal(
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity,
         Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0, // __TEMP_REW_PARITY_MODE_200_SCALE__
-        debugModalHSign // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+        debugModalHSign, // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+        highOrderAxialScale // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
       );
 
       _debugStrongestModeForRow = _debugStrongestMode ?? null;
