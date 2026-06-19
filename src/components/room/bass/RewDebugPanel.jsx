@@ -2,6 +2,7 @@
 // All debug data is preserved. Layout only.
 
 import React, { useState } from "react";
+import RewParityTangentialDominanceAudit from './RewParityTangentialDominanceAudit';
 
 // ── Tiny collapsible section wrapper ──────────────────────────────────────────
 function DebugSection({ title, defaultOpen = false, accentColor = '#92400e', children }) {
@@ -444,7 +445,7 @@ function VectorBreakdown686({ stepDebug }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export default function RewDebugPanel({ stepDebug, selectedSeatIds, disableModalPropagationPhase = false, propagationPhaseScale }) {
+export default function RewDebugPanel({ stepDebug, selectedSeatIds, disableModalPropagationPhase = false, propagationPhaseScale, roomDims, seat, sub, surfaceAbsorption, activeSettings }) {
   if (!stepDebug?.length) return null;
 
   return (
@@ -512,6 +513,17 @@ export default function RewDebugPanel({ stepDebug, selectedSeatIds, disableModal
       {/* ⑤ Application Comparison Raw Row — closed by default */}
       <DebugSection title="Application Comparison Raw Row" defaultOpen={false} accentColor="#7c3aed">
         <AppComparisonRawRow stepDebug={stepDebug} />
+      </DebugSection>
+
+      {/* ⑥ REW Parity Tangential Dominance Audit — closed by default */}
+      <DebugSection title="REW Parity Tangential Dominance Audit" defaultOpen={false} accentColor="#be185d">
+        <RewParityTangentialDominanceAudit
+          roomDims={roomDims}
+          seat={seat}
+          sub={sub}
+          surfaceAbsorption={surfaceAbsorption}
+          activeSettings={activeSettings}
+        />
       </DebugSection>
     </div>
   );

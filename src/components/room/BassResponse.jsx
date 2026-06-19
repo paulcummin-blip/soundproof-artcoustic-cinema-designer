@@ -1621,12 +1621,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       })()}
 
       {/* __B44_STEP_DEBUG__ */}
-      <RewDebugPanel
-        stepDebug={simulationResults.stepDebug}
-        selectedSeatIds={selectedSeatIds}
-        disableModalPropagationPhase={disableModalPropagationPhase}
-        propagationPhaseScale={propagationPhaseScale}
-      />
+      {(() => {
+        const debugSeat = selectedSeatIds[0]
+          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+          : null;
+        const debugSub = subsForSimulation[0] ?? null;
+        return (
+          <RewDebugPanel
+            stepDebug={simulationResults.stepDebug}
+            selectedSeatIds={selectedSeatIds}
+            disableModalPropagationPhase={disableModalPropagationPhase}
+            propagationPhaseScale={propagationPhaseScale}
+            roomDims={roomDims}
+            seat={debugSeat}
+            sub={debugSub}
+            surfaceAbsorption={surfaceAbsorption}
+            activeSettings={{ axialQ, modalSourceReferenceMode, modalDistanceBlend, modalGainScalar }}
+          />
+        );
+      })()}
 
       {/* Development delay optimiser */}
       {(() => {
