@@ -446,14 +446,20 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       imag: (storedModalContrib.real * modalPhaseSin) + (storedModalContrib.imag * modalPhaseCos),
     };
 
+    // Active modal vector source. Coherent, split, and distributed diagnostics all
+    // derive from this same vector before applying their different coherence behaviour.
+    const activeStoredModalContrib = pureDeterministicModalSum
+      ? storedModalContrib
+      : perturbedStoredModalContrib;
+
     // Diagnostic-only per-mode coherent/energetic split. Preserves each modal
     // contribution's energy while moving only the split-off portion out of
     // pressure-domain modal aggregation. Active modalSumRe/modalSumIm are untouched.
     const splitModalMagSq =
-      (perturbedStoredModalContrib.real * perturbedStoredModalContrib.real) +
-      (perturbedStoredModalContrib.imag * perturbedStoredModalContrib.imag);
-    splitCoherenceModalSumRe += perturbedStoredModalContrib.real * PER_MODE_SPLIT_COHERENT_FRACTION;
-    splitCoherenceModalSumIm += perturbedStoredModalContrib.imag * PER_MODE_SPLIT_COHERENT_FRACTION;
+      (activeStoredModalContrib.real * activeStoredModalContrib.real) +
+      (activeStoredModalContrib.imag * activeStoredModalContrib.imag);
+    splitCoherenceModalSumRe += activeStoredModalContrib.real * PER_MODE_SPLIT_COHERENT_FRACTION;
+    splitCoherenceModalSumIm += activeStoredModalContrib.imag * PER_MODE_SPLIT_COHERENT_FRACTION;
     splitCoherenceModalEnergySq += splitModalMagSq * (1 - (PER_MODE_SPLIT_COHERENT_FRACTION * PER_MODE_SPLIT_COHERENT_FRACTION));
 
     // Diagnostic-only distributed modal coherence sum. Uses the already-built
@@ -463,18 +469,14 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
     const distributedPhaseCos = Math.cos(distributedPhaseRad);
     const distributedPhaseSin = Math.sin(distributedPhaseRad);
     distributedCoherenceModalSumRe +=
-      (perturbedStoredModalContrib.real * distributedPhaseCos) -
-      (perturbedStoredModalContrib.imag * distributedPhaseSin);
+      (activeStoredModalContrib.real * distributedPhaseCos) -
+      (activeStoredModalContrib.imag * distributedPhaseSin);
     distributedCoherenceModalSumIm +=
-      (perturbedStoredModalContrib.real * distributedPhaseSin) +
-      (perturbedStoredModalContrib.imag * distributedPhaseCos);
+      (activeStoredModalContrib.real * distributedPhaseSin) +
+      (activeStoredModalContrib.imag * distributedPhaseCos);
 
     diagnosticPerturbedModalSumRe += perturbedStoredModalContrib.real;
     diagnosticPerturbedModalSumIm += perturbedStoredModalContrib.imag;
-
-    const activeStoredModalContrib = pureDeterministicModalSum
-      ? storedModalContrib
-      : perturbedStoredModalContrib;
 
     const activeMagnitude = Math.sqrt(
       activeStoredModalContrib.real * activeStoredModalContrib.real + activeStoredModalContrib.imag * activeStoredModalContrib.imag
