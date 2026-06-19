@@ -8,6 +8,7 @@ import RewParityTiltSweep from './RewParityTiltSweep';
 import RewParityArchitectureSweep from './RewParityArchitectureSweep';
 import RewParityModeContributionAudit from './RewParityModeContributionAudit';
 import RewParityModalFamilySweep from './RewParityModalFamilySweep';
+import RewParityFamilyQSweep from './RewParityFamilyQSweep';
 
 // ── REW benchmark targets — MUST match RewBenchmarkComparisonTable.jsx exactly ──
 const REW_BENCHMARK = [
@@ -717,6 +718,15 @@ export default function RewParityAutoSweep({
 
       {/* ── REW Parity Modal Family Sweep ── */}
       <RewParityModalFamilySweep
+        roomDims={roomDims}
+        seat={seat}
+        sub={sub}
+        surfaceAbsorption={surfaceAbsorption}
+        activeSettings={activeSettings}
+      />
+
+      {/* ── REW Parity Family-Q Sweep ── */}
+      <RewParityFamilyQSweep
         roomDims={roomDims}
         seat={seat}
         sub={sub}
