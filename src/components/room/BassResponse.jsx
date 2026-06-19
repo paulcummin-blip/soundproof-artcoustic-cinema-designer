@@ -30,7 +30,7 @@ const REW_PARITY_PRESET = {
   modalSourceReferenceMode: 'distance_blend',
   modalDistanceBlend: 0.55,
   modalGainScalar: 1.0,
-  axialQ: 8.0,
+  axialQ: 4.0,
   propagationPhaseScale: 0,
   debugMode200Multiplier: 1.00,
   enableRewCoreReflections: true,
@@ -176,7 +176,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState(REW_PARITY_PRESET.rewSourceCurveMode);
   const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState(REW_PARITY_PRESET.modalSourceReferenceMode);
   const [modalGainScalar, setModalGainScalar] = useState(1.0);
-  const [axialQ, setAxialQ] = useState(8.0);
+  const [axialQ, setAxialQ] = useState(4.0);
   const [modalStorageMode, setModalStorageMode] = useState("none");
   // Temporary REW parity experiment: default changed to 1.0 to test full acoustic propagation phase.
   // Revert to 0.5 after experiment is concluded.
@@ -992,11 +992,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value={1.6}>Modal gain: 1.6</option>
               </select>
               <select value={axialQ} onChange={(e) => setAxialQ(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Axial Q">
-                <option value={8.0}>Axial Q: 8.0</option>
-                <option value={7.0}>Axial Q: 7.0</option>
-                <option value={6.5}>Axial Q: 6.5</option>
-                <option value={6.0}>Axial Q: 6.0</option>
+                <option value={4.0}>Axial Q: 4.0 (parity)</option>
                 <option value={5.0}>Axial Q: 5.0</option>
+                <option value={6.0}>Axial Q: 6.0</option>
+                <option value={6.5}>Axial Q: 6.5</option>
+                <option value={7.0}>Axial Q: 7.0</option>
+                <option value={8.0}>Axial Q: 8.0 (legacy)</option>
               </select>
               <select value={propagationPhaseScale} onChange={(e) => setPropagationPhaseScale(Number(e.target.value))} className="h-8 rounded-md border border-[#DCDBD6] bg-white px-2 text-xs text-[#1B1A1A]" aria-label="Propagation phase scale">
                 <option value={0.00}>Propagation phase scale: 0.00</option>

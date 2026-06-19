@@ -153,20 +153,22 @@ function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
   return Math.max(1, Math.min(80, qSabine));
 }
 
-function estimateModeQByType(mode, axialQOverride = 8.0) {
+function estimateModeQByType(mode, axialQOverride = 4.0) {
   const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
-  const axialQ = Number.isFinite(Number(axialQOverride)) ? Number(axialQOverride) : 8.0;
+  const axialQ = Number.isFinite(Number(axialQOverride)) ? Number(axialQOverride) : 4.0;
 
-  // Temporary REW parity diagnostic only: allow axial Q override in REW Core Test path.
+  // Parity-corrected base Q values (updated from Q Source Audit, 2026-06-19).
+  // Previous values: axial 8.0, tangential 6.0, oblique 4.5 — were ~1.8× too high.
+  // These are pre-Sabine-clamp defaults; final Q = Math.max(1, Math.min(baseQ, absorptionQ)).
   if (activeAxes === 1) {
     return axialQ;
   }
 
   if (activeAxes === 2) {
-    return 6.0;
+    return 3.9;
   }
 
-  return 4.5;
+  return 2.5;
 }
 
 function modeShapeValueLocal(mode, x, y, z, roomDims) {
