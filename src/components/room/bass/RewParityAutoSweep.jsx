@@ -69,6 +69,20 @@ function computeMAE(series) {
   return { mae: sumAbsErr / count, worst: worstErr };
 }
 
+// MAE for a specific Hz band using benchmark points within [loHz, hiHz]
+function computeBandMAE(series, loHz, hiHz) {
+  const pts = REW_BENCHMARK.filter(p => p.hz >= loHz && p.hz <= hiHz);
+  if (pts.length === 0) return null;
+  let sum = 0, count = 0;
+  for (const { hz, db } of pts) {
+    const b44 = interpolateSpl(series, hz);
+    if (!Number.isFinite(b44)) continue;
+    sum += Math.abs(b44 - db);
+    count++;
+  }
+  return count > 0 ? sum / count : null;
+}
+
 // Mirrors the distance-blend logic in BassResponse exactly.
 function resolveEngineModalParams(seat, sub, modalSourceReferenceMode, modalDistanceBlend, modalGainScalar) {
   const seatZ = Number.isFinite(Number(seat?.z)) ? Number(seat.z) : 1.2;
@@ -153,11 +167,12 @@ export default function RewParityAutoSweep({
   liveB44Series,   // the same data passed to RewBenchmarkComparisonTable
   activeSettings,  // all current BassResponse engine settings
 }) {
-  const [results, setResults] = useState(null);         // top-10 sweep rows
-  const [allScored, setAllScored] = useState(null);     // full scored list for influence analysis
-  const [activeRow, setActiveRow] = useState(null);     // current-active computed row
-  const [activeSeries, setActiveSeries] = useState(null); // raw series for active settings
-  const [bestSeries, setBestSeries] = useState(null);     // raw series for best sweep result
+  const [results, setResults] = useState(null);            // top-10 sweep rows
+  const [allScored, setAllScored] = useState(null);        // full scored list for influence analysis
+  const [activeRow, setActiveRow] = useState(null);        // current-active computed row
+  const [activeSeries, setActiveSeries] = useState(null);  // raw series for active settings
+  const [bestSeries, setBestSeries] = useState(null);      // raw series for best sweep result
+  const [topSeriesList, setTopSeriesList] = useState(null); // series for top-10 rows (same index)
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(0);
@@ -183,6 +198,7 @@ export default function RewParityAutoSweep({
     setActiveRow(null);
     setActiveSeries(null);
     setBestSeries(null);
+    setTopSeriesList(null);
 
     const sourceCurve = FLAT_SOURCE_CURVE;
 
@@ -250,14 +266,15 @@ export default function RewParityAutoSweep({
 
     scored.sort((a, b) => a.mae - b.mae);
     setAllScored(scored);
-    setResults(scored.slice(0, 10));
+    const top10 = scored.slice(0, 10);
+    setResults(top10);
 
-    // Compute best-sweep series for frequency error report
-    if (scored.length > 0) {
-      const bestCombo = scored[0];
-      const bs = runOneSim(roomDims, seat, sub, sourceCurve, surfaceAbsorption, bestCombo);
-      if (bs) setBestSeries(bs);
-    }
+    // Compute series for top-10 (for band error report + freq error report)
+    const computedTopSeries = top10.map(combo =>
+      runOneSim(roomDims, seat, sub, sourceCurve, surfaceAbsorption, combo)
+    );
+    setTopSeriesList(computedTopSeries);
+    if (computedTopSeries[0]) setBestSeries(computedTopSeries[0]);
 
     setRunning(false);
     setProgress(combos.length);
@@ -357,6 +374,36 @@ export default function RewParityAutoSweep({
     rows.sort((a, b) => Math.abs(b.currentErr ?? 0) - Math.abs(a.currentErr ?? 0));
     return rows;
   }, [activeSeries, bestSeries]);
+
+  // ── Band MAE report (top-10 + active) ────────────────────────────────────────
+  const BANDS = [
+    { label: '20–40', lo: 20,  hi: 40  },
+    { label: '40–80', lo: 40,  hi: 80  },
+    { label: '80–120', lo: 80, hi: 120 },
+    { label: '120–200', lo: 120, hi: 200 },
+  ];
+
+  const bandErrorReport = useMemo(() => {
+    if (!results || !topSeriesList) return null;
+    const rows = results.map((row, i) => {
+      const series = topSeriesList[i];
+      return {
+        rank: i + 1,
+        mae: row.mae,
+        bands: BANDS.map(({ lo, hi }) => series ? computeBandMAE(series, lo, hi) : null),
+        settings: `blend=${fmt(row.modalDistanceBlend,2)} ${row.modalCoherenceMode} Q=${fmt(row.axialQ,1)} ho=${fmt(row.highOrderAxialScale,2)} mag=${fmt(row.rewParityModalMagnitudeScale,2)}`,
+      };
+    });
+
+    const activeEntry = activeSeries ? {
+      rank: null,
+      mae: activeRow?.mae ?? null,
+      bands: BANDS.map(({ lo, hi }) => computeBandMAE(activeSeries, lo, hi)),
+      settings: `blend=${fmt(activeRow?.modalDistanceBlend,2)} ${activeRow?.modalCoherenceMode ?? '—'} Q=${fmt(activeRow?.axialQ,1)} ho=${fmt(activeRow?.highOrderAxialScale,2)} mag=${fmt(activeRow?.rewParityModalMagnitudeScale,2)}`,
+    } : null;
+
+    return { rows, activeEntry };
+  }, [results, topSeriesList, activeSeries, activeRow]);
 
   // Mismatch check: only compare when both values are valid finite numbers
   const activeRowMae = Number.isFinite(activeRow?.mae) ? activeRow.mae : null;
@@ -566,6 +613,82 @@ export default function RewParityAutoSweep({
             {influenceReport[0]?.maeRange > 0 && (
               <span style={{ color: '#6b7280' }}> (spread = {fmt(influenceReport[0].maeRange, 3)} dB)</span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── REW Parity Band Error Report ── */}
+      {bandErrorReport && (
+        <div style={{ marginTop: 14, borderTop: '1px solid #86efac', paddingTop: 10 }}>
+          <div style={{ fontWeight: 700, color: '#166534', fontSize: 11, fontFamily: 'monospace', marginBottom: 4 }}>
+            REW Parity Band Error Report
+            <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 9 }}>
+              top-10 sweep results · MAE per frequency band · diagnostic only
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 720 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...thStyle, textAlign: 'left' }}>Rank</th>
+                  <th style={thStyle}>Overall MAE</th>
+                  {BANDS.map(b => (
+                    <th key={b.label} style={thStyle}>{b.label} MAE</th>
+                  ))}
+                  <th style={{ ...thStyle, textAlign: 'left' }}>Settings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Active settings row */}
+                {bandErrorReport.activeEntry && (() => {
+                  const ae = bandErrorReport.activeEntry;
+                  return (
+                    <tr style={{ borderBottom: '2px solid #86efac', background: '#fff7ed' }}>
+                      <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 700, color: '#b45309', fontSize: 9 }}>★ CURRENT</td>
+                      <td style={{ ...tdStyle, fontWeight: 700, color: '#b45309' }}>{fmt(ae.mae, 3)}</td>
+                      {ae.bands.map((v, bi) => (
+                        <td key={bi} style={{ ...tdStyle, color: (v ?? 0) > 5 ? '#dc2626' : (v ?? 0) > 3 ? '#b45309' : '#374151', fontWeight: 600 }}>
+                          {fmt(v, 2)}
+                        </td>
+                      ))}
+                      <td style={{ ...tdStyle, textAlign: 'left', fontSize: 9, color: '#78350f' }}>{ae.settings}</td>
+                    </tr>
+                  );
+                })()}
+                {/* Top-10 sweep rows */}
+                {bandErrorReport.rows.map((row, i) => {
+                  const isBest = i === 0;
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid #bbf7d0', background: isBest ? '#dcfce7' : i < 3 ? '#f0fdf4' : undefined }}>
+                      <td style={{ ...tdStyle, textAlign: 'left', fontWeight: isBest ? 700 : 400, color: isBest ? '#166534' : '#374151' }}>
+                        {isBest ? '🥇 1' : i === 1 ? '🥈 2' : i === 2 ? '🥉 3' : `#${row.rank}`}
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: isBest ? 700 : 400, color: isBest ? '#166534' : '#374151' }}>
+                        {fmt(row.mae, 3)}
+                      </td>
+                      {row.bands.map((v, bi) => {
+                        const activeBand = bandErrorReport.activeEntry?.bands[bi];
+                        const improved = v !== null && activeBand !== null && v < activeBand;
+                        const worse    = v !== null && activeBand !== null && v > activeBand;
+                        return (
+                          <td key={bi} style={{
+                            ...tdStyle,
+                            fontWeight: isBest ? 700 : 400,
+                            color: improved ? '#15803d' : worse ? '#dc2626' : (v ?? 0) > 5 ? '#dc2626' : (v ?? 0) > 3 ? '#b45309' : '#374151',
+                          }}>
+                            {fmt(v, 2)}{improved ? ' ▼' : worse ? ' ▲' : ''}
+                          </td>
+                        );
+                      })}
+                      <td style={{ ...tdStyle, textAlign: 'left', fontSize: 9, color: '#374151' }}>{row.settings}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop: 6, fontSize: 9, fontFamily: 'monospace', color: '#6b7280' }}>
+            ▼ = better than current · ▲ = worse than current · compared against ★ CURRENT row
           </div>
         </div>
       )}
