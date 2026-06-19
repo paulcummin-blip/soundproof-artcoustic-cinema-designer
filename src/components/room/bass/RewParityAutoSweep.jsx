@@ -166,9 +166,10 @@ export default function RewParityAutoSweep({
   );
 
   // Compute live MAE from the series already shown in the benchmark table above
-  const liveMae = React.useMemo(() => {
+  const liveMae = useMemo(() => {
     if (!Array.isArray(liveB44Series) || liveB44Series.length === 0) return null;
-    return computeMAE(liveB44Series).mae;
+    const result = computeMAE(liveB44Series);
+    return Number.isFinite(result?.mae) ? result.mae : null;
   }, [liveB44Series]);
 
   const runSweep = useCallback(async () => {
@@ -259,9 +260,12 @@ export default function RewParityAutoSweep({
   };
   const tdStyle = { textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace' };
 
-  // Mismatch check: sweep's active-row MAE vs live benchmark MAE
-  const hasMismatch = activeRow?.mae !== null && liveMae !== null &&
-    Math.abs(activeRow.mae - liveMae) > 0.05;
+  // Mismatch check: only compare when both values are valid finite numbers
+  const activeRowMae = Number.isFinite(activeRow?.mae) ? activeRow.mae : null;
+  const maeDelta = activeRowMae !== null && liveMae !== null
+    ? Math.abs(activeRowMae - liveMae)
+    : null;
+  const hasMismatch = maeDelta !== null && maeDelta > 0.05;
 
   return (
     <div style={{
@@ -315,9 +319,9 @@ export default function RewParityAutoSweep({
         }}>
           ⚠ SWEEP MISMATCH — active settings do not match live benchmark
           <div style={{ fontWeight: 400, marginTop: 2, color: '#991b1b' }}>
-            Sweep "current active" MAE = {fmt(activeRow.mae, 3)} dB &nbsp;|&nbsp;
+            Sweep "current active" MAE = {fmt(activeRowMae, 3)} dB &nbsp;|&nbsp;
             Live benchmark MAE = {fmt(liveMae, 3)} dB &nbsp;|&nbsp;
-            Δ = {fmt(Math.abs(activeRow.mae - liveMae), 3)} dB
+            Δ = {maeDelta !== null ? fmt(maeDelta, 3) : '—'} dB
           </div>
           <div style={{ fontWeight: 400, marginTop: 2, color: '#991b1b', fontSize: 9 }}>
             The sweep engine path does not reproduce the live graph. Check that activeSettings props match the production BassResponse engine call exactly.
@@ -326,14 +330,14 @@ export default function RewParityAutoSweep({
       )}
 
       {/* ── Match confirmation ── */}
-      {activeRow?.mae !== null && liveMae !== null && !hasMismatch && (
+      {activeRowMae !== null && liveMae !== null && !hasMismatch && (
         <div style={{
           marginBottom: 8, padding: '4px 8px', borderRadius: 6,
           background: '#dcfce7', border: '1px solid #86efac',
           fontSize: 10, fontFamily: 'monospace', color: '#166534',
         }}>
-          ✓ Sweep engine matches live benchmark (Δ = {fmt(Math.abs(activeRow.mae - liveMae), 3)} dB)
-          &nbsp;|&nbsp; sweep MAE = {fmt(activeRow.mae, 3)} dB · live MAE = {fmt(liveMae, 3)} dB
+          ✓ Sweep engine matches live benchmark (Δ = {maeDelta !== null ? fmt(maeDelta, 3) : '—'} dB)
+          &nbsp;|&nbsp; sweep MAE = {fmt(activeRowMae, 3)} dB · live MAE = {fmt(liveMae, 3)} dB
         </div>
       )}
 
@@ -361,11 +365,11 @@ export default function RewParityAutoSweep({
                     ★ CURRENT
                   </td>
                   <td style={{ ...tdStyle, fontWeight: 700, color: hasMismatch ? '#dc2626' : '#b45309' }}>
-                    {fmt(activeRow.mae, 3)}
+                    {activeRowMae !== null ? fmt(activeRowMae, 3) : 'Calculating…'}
                     {hasMismatch && ' ⚠'}
                   </td>
-                  <td style={{ ...tdStyle, color: activeRow.worst > 5 ? '#dc2626' : activeRow.worst > 3 ? '#b45309' : '#374151' }}>
-                    {fmt(activeRow.worst, 3)}
+                  <td style={{ ...tdStyle, color: Number.isFinite(activeRow?.worst) && activeRow.worst > 5 ? '#dc2626' : Number.isFinite(activeRow?.worst) && activeRow.worst > 3 ? '#b45309' : '#374151' }}>
+                    {fmt(activeRow?.worst, 3)}
                   </td>
                   <td style={{ ...tdStyle, color: '#78350f' }}>{fmt(activeRow.modalDistanceBlend, 2)}</td>
                   <td style={{ ...tdStyle, textAlign: 'left', color: '#78350f' }}>{activeRow.modalCoherenceMode ?? '—'}</td>
