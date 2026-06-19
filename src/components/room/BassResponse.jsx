@@ -26,7 +26,8 @@ const IS_DEVELOPMENT_MODE = true;
 // propagationPhaseScale 0.10 was chosen by sweep on 2026-06-13 (null centre 40.4 Hz vs REW 40.6 Hz).
 const REW_PARITY_PRESET = {
   rewSourceCurveMode: 'flat_rew_reference',
-  modalSourceReferenceMode: 'existing',
+  modalSourceReferenceMode: 'distance_blend',
+  modalDistanceBlend: 0.55,
   modalGainScalar: 1.0,
   axialQ: 8.0,
   propagationPhaseScale: 0,
@@ -189,7 +190,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // __TEMP_REW_PARITY_ISOLATION__ field mode for layered comparison
   const [rewParityFieldMode, setRewParityFieldMode] = useState('full_field'); // 'reflections_only' | 'modes_only' | 'full_field'
   // __TEMP_REW_PARITY__ adjustable modal distance blend: 0.00 = existing 1m ref, 1.00 = full distance_normalized
-  const [modalDistanceBlend, setModalDistanceBlend] = useState(0.00);
+  const [modalDistanceBlend, setModalDistanceBlend] = useState(REW_PARITY_PRESET.modalDistanceBlend);
   const [overrideConstantAxialQ, setOverrideConstantAxialQ] = useState(false);
   const [overrideAbsorptionAxialQ, setOverrideAbsorptionAxialQ] = useState(false);
   // __TEMP_REW_PARITY_MODE_200_SCALE__
@@ -217,6 +218,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const resetToParityPreset = () => {
     setRewSourceCurveMode(REW_PARITY_PRESET.rewSourceCurveMode);
     setModalSourceReferenceMode(REW_PARITY_PRESET.modalSourceReferenceMode);
+    setModalDistanceBlend(REW_PARITY_PRESET.modalDistanceBlend);
     setModalGainScalar(REW_PARITY_PRESET.modalGainScalar);
     setAxialQ(REW_PARITY_PRESET.axialQ);
     setPropagationPhaseScale(REW_PARITY_PRESET.propagationPhaseScale);
@@ -227,6 +229,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const isParityPresetActive =
     rewSourceCurveMode === REW_PARITY_PRESET.rewSourceCurveMode &&
     modalSourceReferenceMode === REW_PARITY_PRESET.modalSourceReferenceMode &&
+    modalDistanceBlend === REW_PARITY_PRESET.modalDistanceBlend &&
     modalGainScalar === REW_PARITY_PRESET.modalGainScalar &&
     axialQ === REW_PARITY_PRESET.axialQ &&
     propagationPhaseScale === REW_PARITY_PRESET.propagationPhaseScale &&
