@@ -156,6 +156,8 @@ export default function RewParityAutoSweep({
   const [results, setResults] = useState(null);         // top-10 sweep rows
   const [allScored, setAllScored] = useState(null);     // full scored list for influence analysis
   const [activeRow, setActiveRow] = useState(null);     // current-active computed row
+  const [activeSeries, setActiveSeries] = useState(null); // raw series for active settings
+  const [bestSeries, setBestSeries] = useState(null);     // raw series for best sweep result
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(0);
@@ -179,15 +181,19 @@ export default function RewParityAutoSweep({
     setResults(null);
     setAllScored(null);
     setActiveRow(null);
+    setActiveSeries(null);
+    setBestSeries(null);
 
     const sourceCurve = FLAT_SOURCE_CURVE;
 
     // ── Step 1: run CURRENT ACTIVE SETTINGS first ──────────────────────────
     let activeMetrics = null;
+    let computedActiveSeries = null;
     if (activeSettings && seat && sub) {
-      const activeSeries = runOneSim(roomDims, seat, sub, sourceCurve, surfaceAbsorption, activeSettings);
-      if (activeSeries) {
-        activeMetrics = computeMAE(activeSeries);
+      computedActiveSeries = runOneSim(roomDims, seat, sub, sourceCurve, surfaceAbsorption, activeSettings);
+      if (computedActiveSeries) {
+        activeMetrics = computeMAE(computedActiveSeries);
+        setActiveSeries(computedActiveSeries);
       }
     }
     setActiveRow(activeMetrics ? {
@@ -245,6 +251,14 @@ export default function RewParityAutoSweep({
     scored.sort((a, b) => a.mae - b.mae);
     setAllScored(scored);
     setResults(scored.slice(0, 10));
+
+    // Compute best-sweep series for frequency error report
+    if (scored.length > 0) {
+      const bestCombo = scored[0];
+      const bs = runOneSim(roomDims, seat, sub, sourceCurve, surfaceAbsorption, bestCombo);
+      if (bs) setBestSeries(bs);
+    }
+
     setRunning(false);
     setProgress(combos.length);
   }, [roomDims, seat, sub, surfaceAbsorption, activeSettings, canRun]);
@@ -325,6 +339,24 @@ export default function RewParityAutoSweep({
     report.sort((a, b) => (b.maeRange ?? 0) - (a.maeRange ?? 0));
     return report;
   }, [allScored]);
+
+  // ── Per-frequency error report ───────────────────────────────────────────────
+  const freqErrorReport = useMemo(() => {
+    if (!activeSeries) return null;
+    const rows = REW_BENCHMARK.map(({ hz, db: rewTarget }) => {
+      const currentB44  = interpolateSpl(activeSeries, hz);
+      const currentErr  = Number.isFinite(currentB44) ? currentB44 - rewTarget : null;
+      const bestB44     = bestSeries ? interpolateSpl(bestSeries, hz) : null;
+      const bestErr     = Number.isFinite(bestB44) ? bestB44 - rewTarget : null;
+      const improvement = (currentErr !== null && bestErr !== null)
+        ? Math.abs(currentErr) - Math.abs(bestErr)
+        : null;
+      return { hz, rewTarget, currentB44, currentErr, bestB44, bestErr, improvement };
+    });
+    // Sort by largest absolute current error first
+    rows.sort((a, b) => Math.abs(b.currentErr ?? 0) - Math.abs(a.currentErr ?? 0));
+    return rows;
+  }, [activeSeries, bestSeries]);
 
   // Mismatch check: only compare when both values are valid finite numbers
   const activeRowMae = Number.isFinite(activeRow?.mae) ? activeRow.mae : null;
@@ -534,6 +566,83 @@ export default function RewParityAutoSweep({
             {influenceReport[0]?.maeRange > 0 && (
               <span style={{ color: '#6b7280' }}> (spread = {fmt(influenceReport[0].maeRange, 3)} dB)</span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── REW Parity Frequency Error Report ── */}
+      {freqErrorReport && (
+        <div style={{ marginTop: 14, borderTop: '1px solid #86efac', paddingTop: 10 }}>
+          <div style={{ fontWeight: 700, color: '#166534', fontSize: 11, fontFamily: 'monospace', marginBottom: 4 }}>
+            REW Parity Frequency Error Report
+            <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 9 }}>
+              sorted by |current error| ↓ · diagnostic only
+              {!bestSeries && <span style={{ color: '#b45309', marginLeft: 6 }}>· run sweep for Best column</span>}
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 620 }}>
+              <thead>
+                <tr>
+                  {[
+                    ['right', 'Hz'],
+                    ['right', 'REW target'],
+                    ['right', 'Current B44'],
+                    ['right', 'Current err'],
+                    ['right', 'Best B44'],
+                    ['right', 'Best err'],
+                    ['right', 'Improvement'],
+                  ].map(([align, label]) => (
+                    <th key={label} style={{
+                      textAlign: align, padding: '3px 6px', fontSize: 10, fontWeight: 700,
+                      background: '#f0fdf4', borderBottom: '2px solid #86efac', color: '#166534',
+                      whiteSpace: 'nowrap',
+                    }}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {freqErrorReport.map((row, i) => {
+                  const absErr   = Math.abs(row.currentErr ?? 0);
+                  const errColor = absErr >= 5 ? '#dc2626' : absErr >= 3 ? '#b45309' : absErr >= 1.5 ? '#854d0e' : '#374151';
+                  const impColor = (row.improvement ?? 0) > 0.1 ? '#15803d'
+                    : (row.improvement ?? 0) < -0.1 ? '#dc2626'
+                    : '#6b7280';
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid #dcfce7', background: i % 2 === 0 ? '#f0fdf4' : undefined }}>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: '#166534' }}>{row.hz}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#374151' }}>{fmt(row.rewTarget, 1)}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#1c1917' }}>{fmt(row.currentB44, 2)}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: errColor }}>
+                        {row.currentErr !== null ? (row.currentErr >= 0 ? '+' : '') + fmt(row.currentErr, 2) : '—'}
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#374151' }}>{row.bestB44 !== null ? fmt(row.bestB44, 2) : '—'}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: row.bestErr !== null ? errColor : '#6b7280' }}>
+                        {row.bestErr !== null ? (row.bestErr >= 0 ? '+' : '') + fmt(row.bestErr, 2) : '—'}
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: impColor }}>
+                        {row.improvement !== null ? (row.improvement >= 0 ? '▼ ' : '▲ ') + fmt(Math.abs(row.improvement), 2) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {/* Top 5 summary */}
+          <div style={{ marginTop: 8, fontSize: 10, fontFamily: 'monospace', color: '#374151' }}>
+            <span style={{ fontWeight: 700, color: '#166534' }}>Top 5 frequencies contributing most to MAE: </span>
+            {freqErrorReport.slice(0, 5).map((row, i) => (
+              <span key={row.hz}>
+                <span style={{ fontWeight: 700, color: Math.abs(row.currentErr ?? 0) >= 5 ? '#dc2626' : '#b45309' }}>
+                  {row.hz} Hz
+                </span>
+                <span style={{ color: '#6b7280' }}>
+                  {' '}({row.currentErr !== null ? (row.currentErr >= 0 ? '+' : '') + fmt(row.currentErr, 2) : '—'} dB)
+                </span>
+                {i < 4 && <span style={{ color: '#86efac' }}> · </span>}
+              </span>
+            ))}
           </div>
         </div>
       )}
