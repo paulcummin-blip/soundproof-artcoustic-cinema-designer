@@ -1187,8 +1187,19 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // True acoustic pressure superposition:
       // modalSumRe/modalSumIm are already scaled pressure contributions,
       // so they must be added to the existing complex pressure field.
-      sumRe = prevRe + modalSumRe;
-      sumIm = prevIm + modalSumIm;
+      //
+      // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
+      // When modalCoherenceMode is 'distributed', use the distributed-phase diagnostic modal sum.
+      // When 'split', the final magnitude is computed after superposition using split-coherence energy.
+      // Default ('coherent') is the existing path — no change.
+      const _modalCoherenceMode = options?.modalCoherenceMode || 'coherent';
+      if (_modalCoherenceMode === 'distributed') {
+        sumRe = prevRe + diagnosticModalSumRe;
+        sumIm = prevIm + diagnosticModalSumIm;
+      } else {
+        sumRe = prevRe + modalSumRe;
+        sumIm = prevIm + modalSumIm;
+      }
 
       const modalTransferRe = null;
       const modalTransferIm = null;
@@ -1325,7 +1336,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       }
     }
 
-    const postModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+    // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__ split path: override final magnitude with split-coherence energy sum.
+    const _coherenceMode = options?.modalCoherenceMode || 'coherent';
+    let postModalMagnitude;
+    if (_coherenceMode === 'split' && splitCoherenceDiagnostic) {
+      postModalMagnitude = splitCoherenceDiagnostic.splitCoherenceFinalMag;
+    } else {
+      postModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+    }
     const finalSplDb = 20 * Math.log10(postModalMagnitude);
     if (enableModes && !partialCoherenceDiagnostic) {
       partialCoherenceDiagnostic = buildPartialCoherenceDiagnostic({

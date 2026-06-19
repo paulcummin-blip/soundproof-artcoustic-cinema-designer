@@ -203,6 +203,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Tests whether REW parity is a modal magnitude calibration issue rather than a phase issue.
   // Applied only when rewSourceCurveMode === 'flat_rew_reference'.
   const [rewParityModalMagnitudeScale, setRewParityModalMagnitudeScale] = useState(1.00);
+  // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
+  // Tests whether the 80–150 Hz over-prediction is caused by fully coherent modal summation.
+  const [modalCoherenceMode, setModalCoherenceMode] = useState('coherent');
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const lastStablePlotRef = useRef(null);
   // REW reference overlay — debug only, no engine changes
@@ -593,6 +596,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             reflectionGainScale, // diagnostic: scale imageAmplitude after reflectionCoefficient
             debugModalHSign: 'normal', // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
             rewParityModalMagnitudeScale: rewSourceCurveMode === 'flat_rew_reference' ? rewParityModalMagnitudeScale : 1.0, // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
+            modalCoherenceMode, // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
             }
         );
 
@@ -649,7 +653,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
       activeModalVectorPath: __b44ActiveModalVectorPath,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1027,6 +1031,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value="normal">Modal H sign: Normal (−Im)</option>
                 <option value="rew_test">Modal H sign: REW test (+Im)</option>
               </select>
+              {/* __TEMP_DIAGNOSTIC_MODAL_COHERENCE__ */}
+              <select
+                value={modalCoherenceMode}
+                onChange={(e) => setModalCoherenceMode(e.target.value)}
+                className="h-8 rounded-md border border-indigo-400 bg-indigo-50 px-2 text-xs text-indigo-900 font-semibold"
+                aria-label="Modal coherence mode"
+                title="Diagnostic: tests whether 80–150 Hz over-prediction is caused by fully coherent modal summation."
+              >
+                <option value="coherent">Modal coherence: coherent</option>
+                <option value="distributed">Modal coherence: distributed diagnostic ⚠️</option>
+                <option value="split">Modal coherence: split diagnostic ⚠️</option>
+              </select>
               {/* __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__ — only active when flat_rew_reference is selected */}
               <label className="flex h-8 items-center gap-2 rounded-md border border-teal-400 bg-teal-50 px-2 text-xs text-teal-900 font-mono font-semibold" title="Scales the entire modal sum before adding to direct+reflections. Active only when source = flat_rew_reference. Tests whether parity is a magnitude issue.">
                 Modal mag scale:
@@ -1112,6 +1128,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 return (
                   <div style={{ color: isNonDefault && isActive ? '#be123c' : isNonDefault ? '#9ca3af' : undefined, fontWeight: isNonDefault && isActive ? 700 : undefined }}>
                     Modal H sign: {debugModalHSign}{!isActive ? ' (inactive — flat_rew_reference not selected)' : isNonDefault ? ' ⚠️' : ''}
+                  </div>
+                );
+              })()}
+              {(() => {
+                const isNonDefault = modalCoherenceMode !== 'coherent';
+                return (
+                  <div style={{ color: isNonDefault ? '#3730a3' : undefined, fontWeight: isNonDefault ? 700 : undefined }}>
+                    Modal coherence: {modalCoherenceMode}{isNonDefault ? ' ⚠️' : ''}
                   </div>
                 );
               })()}
