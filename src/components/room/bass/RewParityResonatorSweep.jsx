@@ -345,12 +345,14 @@ export default function RewParityResonatorSweep({ roomDims, seat, sub, surfaceAb
     setRunning(false);
   }, [roomDims, seat, sub, surfaceAbsorption, activeSettings, canRun]);
 
+  const rankedRows = Array.isArray(results?.ranked) ? results.ranked : [];
   const prodRow = results?.production ?? null;
-  const bestRow = results?.ranked?.filter(r => r.id !== 'production')[0] ?? null;
-  const bestAlt = results?.ranked?.[0]?.id !== 'production' ? results.ranked[0]
-    : results?.ranked?.[1] ?? null;
+  const bestRow = rankedRows.filter(r => r.id !== 'production')[0] ?? null;
+  const bestAlt = rankedRows[0]?.id !== 'production'
+    ? rankedRows[0]
+    : rankedRows[1] ?? null;
   // Best across ALL including production
-  const overallBest = results?.ranked?.[0] ?? null;
+  const overallBest = rankedRows[0] ?? null;
   const maeDelta = (prodRow && overallBest) ? prodRow.mae - overallBest.mae : null;
   const worstDelta = (prodRow && overallBest) ? prodRow.worst - overallBest.worst : null;
 
@@ -406,7 +408,7 @@ export default function RewParityResonatorSweep({ roomDims, seat, sub, surfaceAb
                 </tr>
               </thead>
               <tbody>
-                {results.ranked.map((row, i) => {
+                {rankedRows.map((row, i) => {
                   const isProd = row.id === 'production';
                   const isBest = i === 0 && !isProd || (i === 0 && results.ranked.length === 1);
                   const isOverallBest = overallBest?.id === row.id;
@@ -495,7 +497,7 @@ export default function RewParityResonatorSweep({ roomDims, seat, sub, surfaceAb
                 { label: 'Best resonator',       value: overallBest?.id === 'production' ? 'Production' : (overallBest?.label?.replace(/^\d+\.\s*/, '') ?? '—'),
                   note: overallBest?.id === 'production' ? 'no alternative beats it' : '' },
                 { label: 'Production rank',
-                  value: `#${(results.ranked.findIndex(r => r.id === 'production') + 1)} of ${results.ranked.length}`,
+                  value: `#${(rankedRows.findIndex(r => r.id === 'production') + 1)} of ${rankedRows.length}`,
                   note: '' },
               ].map(({ label, value, note }) => (
                 <div key={label} style={{ background: '#fff', border: '1px solid #fde047', borderRadius: 6, padding: '6px 10px' }}>
