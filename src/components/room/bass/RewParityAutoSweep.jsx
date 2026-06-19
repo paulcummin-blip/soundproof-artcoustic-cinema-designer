@@ -6,6 +6,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { simulateBassResponseRewCore } from '@/bass/core/rewBassEngine';
 import RewParityTiltSweep from './RewParityTiltSweep';
 import RewParityArchitectureSweep from './RewParityArchitectureSweep';
+import RewParityModeContributionAudit from './RewParityModeContributionAudit';
 
 // ── REW benchmark targets — MUST match RewBenchmarkComparisonTable.jsx exactly ──
 const REW_BENCHMARK = [
@@ -706,6 +707,15 @@ export default function RewParityAutoSweep({
 
       {/* ── REW Parity Modal Architecture Sweep ── */}
       <RewParityArchitectureSweep
+        roomDims={roomDims}
+        seat={seat}
+        sub={sub}
+        surfaceAbsorption={surfaceAbsorption}
+        activeSettings={activeSettings}
+      />
+
+      {/* ── REW Parity Mode Contribution Audit ── */}
+      <RewParityModeContributionAudit
         roomDims={roomDims}
         seat={seat}
         sub={sub}
