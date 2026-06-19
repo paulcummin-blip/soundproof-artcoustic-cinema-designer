@@ -154,6 +154,7 @@ export default function RewParityAutoSweep({
   activeSettings,  // all current BassResponse engine settings
 }) {
   const [results, setResults] = useState(null);         // top-10 sweep rows
+  const [allScored, setAllScored] = useState(null);     // full scored list for influence analysis
   const [activeRow, setActiveRow] = useState(null);     // current-active computed row
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -176,6 +177,7 @@ export default function RewParityAutoSweep({
     if (!canRun) return;
     setRunning(true);
     setResults(null);
+    setAllScored(null);
     setActiveRow(null);
 
     const sourceCurve = FLAT_SOURCE_CURVE;
@@ -241,6 +243,7 @@ export default function RewParityAutoSweep({
     }
 
     scored.sort((a, b) => a.mae - b.mae);
+    setAllScored(scored);
     setResults(scored.slice(0, 10));
     setRunning(false);
     setProgress(combos.length);
@@ -259,6 +262,61 @@ export default function RewParityAutoSweep({
     whiteSpace: 'nowrap',
   };
   const tdStyle = { textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace' };
+
+  // ── Parameter influence analysis (computed from full scored set) ──────────
+  const influenceReport = useMemo(() => {
+    if (!allScored || allScored.length === 0) return null;
+
+    const PARAMS = [
+      { key: 'modalDistanceBlend',           label: 'Distance blend',        fmt: v => fmt(v, 2) },
+      { key: 'modalCoherenceMode',           label: 'Coherence mode',        fmt: v => String(v) },
+      { key: 'axialQ',                       label: 'Axial Q',               fmt: v => fmt(v, 1) },
+      { key: 'highOrderAxialScale',          label: 'HO axial scale',        fmt: v => fmt(v, 2) },
+      { key: 'rewParityModalMagnitudeScale', label: 'Modal magnitude scale', fmt: v => fmt(v, 2) },
+    ];
+
+    return PARAMS.map(({ key, label, fmt: fmtVal }) => {
+      // Group all scored rows by this parameter value
+      const byValue = {};
+      for (const row of allScored) {
+        const v = String(row[key]);
+        if (!byValue[v]) byValue[v] = { value: row[key], maes: [] };
+        byValue[v].maes.push(row.mae);
+      }
+
+      // For each value, compute average MAE across all combos with that value
+      const valueSummaries = Object.values(byValue).map(({ value, maes }) => {
+        const avg = maes.reduce((s, m) => s + m, 0) / maes.length;
+        return { value, avg, best: Math.min(...maes), worst: Math.max(...maes) };
+      });
+
+      valueSummaries.sort((a, b) => a.avg - b.avg);
+
+      const bestEntry = valueSummaries[0];
+      const worstEntry = valueSummaries[valueSummaries.length - 1];
+      const maeRange = Number.isFinite(bestEntry?.avg) && Number.isFinite(worstEntry?.avg)
+        ? worstEntry.avg - bestEntry.avg
+        : null;
+
+      // Influence level
+      let influence = 'inert';
+      if (maeRange !== null) {
+        if (maeRange >= 2.0) influence = 'high';
+        else if (maeRange >= 0.5) influence = 'medium';
+        else if (maeRange >= 0.1) influence = 'low';
+      }
+
+      return {
+        label,
+        bestValue: bestEntry ? fmtVal(bestEntry.value) : '—',
+        bestAvgMae: bestEntry?.avg ?? null,
+        worstAvgMae: worstEntry?.avg ?? null,
+        maeRange,
+        influence,
+        valueSummaries: valueSummaries.map(vs => ({ ...vs, label: fmtVal(vs.value) })),
+      };
+    });
+  }, [allScored]);
 
   // Mismatch check: only compare when both values are valid finite numbers
   const activeRowMae = Number.isFinite(activeRow?.mae) ? activeRow.mae : null;
@@ -411,6 +469,87 @@ export default function RewParityAutoSweep({
       {results && results.length === 0 && (
         <div style={{ fontSize: 10, color: '#6b7280', fontFamily: 'monospace' }}>
           No valid results — check room/seat/sub configuration.
+        </div>
+      )}
+
+      {/* ── Parameter Influence Report ── */}
+      {influenceReport && (
+        <div style={{ marginTop: 14, borderTop: '1px solid #86efac', paddingTop: 10 }}>
+          <div style={{ fontWeight: 700, color: '#166534', fontSize: 11, fontFamily: 'monospace', marginBottom: 4 }}>
+            Parameter Influence Report
+            <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 9 }}>
+              averaged over all {allScored.length} combinations
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 560 }}>
+              <thead>
+                <tr>
+                  {[
+                    ['left',  'Parameter'],
+                    ['left',  'Best setting'],
+                    ['right', 'Best avg MAE'],
+                    ['right', 'Worst avg MAE'],
+                    ['right', 'MAE range'],
+                    ['left',  'Influence'],
+                  ].map(([align, label]) => (
+                    <th key={label} style={{
+                      textAlign: align, padding: '3px 6px', fontSize: 10, fontWeight: 700,
+                      background: '#f0fdf4', borderBottom: '2px solid #86efac', color: '#166534',
+                      whiteSpace: 'nowrap',
+                    }}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {influenceReport.map((row, i) => {
+                  const influenceColor = row.influence === 'high' ? '#dc2626'
+                    : row.influence === 'medium' ? '#b45309'
+                    : row.influence === 'low'    ? '#0369a1'
+                    : '#6b7280';
+                  const influenceLabel = row.influence === 'high'   ? '⬆ HIGH'
+                    : row.influence === 'medium' ? '△ medium'
+                    : row.influence === 'low'    ? '▽ low'
+                    : '· inert';
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid #dcfce7', background: i % 2 === 0 ? '#f0fdf4' : undefined }}>
+                      <td style={{ textAlign: 'left',  padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: '#166534' }}>{row.label}</td>
+                      <td style={{ textAlign: 'left',  padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#1c1917' }}>{row.bestValue}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#15803d' }}>{fmt(row.bestAvgMae, 3)}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#b91c1c' }}>{fmt(row.worstAvgMae, 3)}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: influenceColor }}>{fmt(row.maeRange, 3)}</td>
+                      <td style={{ textAlign: 'left',  padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: influenceColor }}>{influenceLabel}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Per-parameter value breakdown */}
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 9, fontFamily: 'monospace', color: '#6b7280', marginBottom: 4 }}>
+              Per-value breakdown (avg MAE across all combos sharing that value):
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {influenceReport.map((param) => (
+                <div key={param.label} style={{
+                  border: '1px solid #bbf7d0', borderRadius: 6, padding: '5px 8px',
+                  background: '#fff', minWidth: 140,
+                }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#166534', fontFamily: 'monospace', marginBottom: 3 }}>
+                    {param.label}
+                  </div>
+                  {param.valueSummaries.map((vs, j) => (
+                    <div key={j} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 9, fontFamily: 'monospace', color: j === 0 ? '#15803d' : '#374151' }}>
+                      <span style={{ fontWeight: j === 0 ? 700 : 400 }}>{vs.label}</span>
+                      <span style={{ fontWeight: j === 0 ? 700 : 400 }}>{fmt(vs.avg, 3)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
