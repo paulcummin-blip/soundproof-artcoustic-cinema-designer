@@ -14,6 +14,7 @@ import RewDebugPanel from "@/components/room/bass/RewDebugPanel";
 import RewParityBenchmark from "@/components/room/bass/RewParityBenchmark";
 import RewBenchmarkComparisonTable from "@/components/room/bass/RewBenchmarkComparisonTable";
 import RewCandidateComparisonPanel from "@/components/room/bass/RewCandidateComparisonPanel";
+import RewParityAutoSweep from "@/components/room/bass/RewParityAutoSweep";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1197,6 +1198,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div style={{ color: '#6b7280', fontSize: 10, fontFamily: 'monospace' }}>No simulation data — add a sub and seat.</div>
               )}
             </div>
+
+            {/* ── REW Parity Auto Sweep ── */}
+            {rewSourceCurveMode === 'flat_rew_reference' && (() => {
+              const sweepSeat = selectedSeatIds[0]
+                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+                : null;
+              const sweepSub = subsForSimulation[0] ?? null;
+              return (
+                <RewParityAutoSweep
+                  roomDims={roomDims}
+                  seat={sweepSeat}
+                  sub={sweepSub}
+                  surfaceAbsorption={surfaceAbsorption}
+                />
+              );
+            })()}
 
             {/* ── REW Parity Candidate Comparison (axialQ=4 vs axialQ=8) ── */}
             {rewSourceCurveMode === 'flat_rew_reference' && (() => {
