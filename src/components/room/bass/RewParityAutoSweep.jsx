@@ -275,7 +275,7 @@ export default function RewParityAutoSweep({
       { key: 'rewParityModalMagnitudeScale', label: 'Modal magnitude scale', fmt: v => fmt(v, 2) },
     ];
 
-    return PARAMS.map(({ key, label, fmt: fmtVal }) => {
+    const report = PARAMS.map(({ key, label, fmt: fmtVal }) => {
       // Group all scored rows by this parameter value
       const byValue = {};
       for (const row of allScored) {
@@ -292,11 +292,15 @@ export default function RewParityAutoSweep({
 
       valueSummaries.sort((a, b) => a.avg - b.avg);
 
-      const bestEntry = valueSummaries[0];
+      const bestEntry  = valueSummaries[0];
       const worstEntry = valueSummaries[valueSummaries.length - 1];
-      const maeRange = Number.isFinite(bestEntry?.avg) && Number.isFinite(worstEntry?.avg)
+      const maeRange   = Number.isFinite(bestEntry?.avg) && Number.isFinite(worstEntry?.avg)
         ? worstEntry.avg - bestEntry.avg
         : null;
+
+      // Overall average MAE across all rows for this parameter (grand mean)
+      const allMaes    = allScored.map(r => r.mae).filter(Number.isFinite);
+      const avgMae     = allMaes.length > 0 ? allMaes.reduce((s, m) => s + m, 0) / allMaes.length : null;
 
       // Influence level
       let influence = 'inert';
@@ -308,14 +312,18 @@ export default function RewParityAutoSweep({
 
       return {
         label,
-        bestValue: bestEntry ? fmtVal(bestEntry.value) : '—',
-        bestAvgMae: bestEntry?.avg ?? null,
-        worstAvgMae: worstEntry?.avg ?? null,
+        bestValue:    bestEntry ? fmtVal(bestEntry.value) : '—',
+        bestAvgMae:   bestEntry?.avg ?? null,
+        worstAvgMae:  worstEntry?.avg ?? null,
+        avgMae,
         maeRange,
         influence,
-        valueSummaries: valueSummaries.map(vs => ({ ...vs, label: fmtVal(vs.value) })),
       };
     });
+
+    // Sort by MAE spread descending
+    report.sort((a, b) => (b.maeRange ?? 0) - (a.maeRange ?? 0));
+    return report;
   }, [allScored]);
 
   // Mismatch check: only compare when both values are valid finite numbers
@@ -472,26 +480,26 @@ export default function RewParityAutoSweep({
         </div>
       )}
 
-      {/* ── Parameter Influence Report ── */}
+      {/* ── REW Parity Sensitivity Report ── */}
       {influenceReport && (
         <div style={{ marginTop: 14, borderTop: '1px solid #86efac', paddingTop: 10 }}>
           <div style={{ fontWeight: 700, color: '#166534', fontSize: 11, fontFamily: 'monospace', marginBottom: 4 }}>
-            Parameter Influence Report
+            REW Parity Sensitivity Report
             <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 9 }}>
-              averaged over all {allScored.length} combinations
+              {allScored.length} combinations · sorted by MAE spread ↓ · diagnostic only
             </span>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 560 }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 580 }}>
               <thead>
                 <tr>
                   {[
                     ['left',  'Parameter'],
                     ['left',  'Best setting'],
-                    ['right', 'Best avg MAE'],
-                    ['right', 'Worst avg MAE'],
-                    ['right', 'MAE range'],
-                    ['left',  'Influence'],
+                    ['right', 'Best MAE'],
+                    ['right', 'Avg MAE'],
+                    ['right', 'Worst MAE'],
+                    ['right', 'MAE spread'],
                   ].map(([align, label]) => (
                     <th key={label} style={{
                       textAlign: align, padding: '3px 6px', fontSize: 10, fontWeight: 700,
@@ -503,52 +511,29 @@ export default function RewParityAutoSweep({
               </thead>
               <tbody>
                 {influenceReport.map((row, i) => {
-                  const influenceColor = row.influence === 'high' ? '#dc2626'
+                  const spreadColor = row.influence === 'high'   ? '#dc2626'
                     : row.influence === 'medium' ? '#b45309'
                     : row.influence === 'low'    ? '#0369a1'
                     : '#6b7280';
-                  const influenceLabel = row.influence === 'high'   ? '⬆ HIGH'
-                    : row.influence === 'medium' ? '△ medium'
-                    : row.influence === 'low'    ? '▽ low'
-                    : '· inert';
                   return (
-                    <tr key={i} style={{ borderBottom: '1px solid #dcfce7', background: i % 2 === 0 ? '#f0fdf4' : undefined }}>
+                    <tr key={i} style={{ borderBottom: '1px solid #dcfce7', background: i === 0 ? '#fef9c3' : i % 2 === 0 ? '#f0fdf4' : undefined }}>
                       <td style={{ textAlign: 'left',  padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: '#166534' }}>{row.label}</td>
                       <td style={{ textAlign: 'left',  padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#1c1917' }}>{row.bestValue}</td>
-                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#15803d' }}>{fmt(row.bestAvgMae, 3)}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#15803d', fontWeight: 700 }}>{fmt(row.bestAvgMae, 3)}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#374151' }}>{fmt(row.avgMae, 3)}</td>
                       <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', color: '#b91c1c' }}>{fmt(row.worstAvgMae, 3)}</td>
-                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: influenceColor }}>{fmt(row.maeRange, 3)}</td>
-                      <td style={{ textAlign: 'left',  padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: influenceColor }}>{influenceLabel}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 6px', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: spreadColor }}>{fmt(row.maeRange, 3)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-
-          {/* Per-parameter value breakdown */}
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 9, fontFamily: 'monospace', color: '#6b7280', marginBottom: 4 }}>
-              Per-value breakdown (avg MAE across all combos sharing that value):
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {influenceReport.map((param) => (
-                <div key={param.label} style={{
-                  border: '1px solid #bbf7d0', borderRadius: 6, padding: '5px 8px',
-                  background: '#fff', minWidth: 140,
-                }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: '#166534', fontFamily: 'monospace', marginBottom: 3 }}>
-                    {param.label}
-                  </div>
-                  {param.valueSummaries.map((vs, j) => (
-                    <div key={j} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 9, fontFamily: 'monospace', color: j === 0 ? '#15803d' : '#374151' }}>
-                      <span style={{ fontWeight: j === 0 ? 700 : 400 }}>{vs.label}</span>
-                      <span style={{ fontWeight: j === 0 ? 700 : 400 }}>{fmt(vs.avg, 3)}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+          <div style={{ marginTop: 6, fontSize: 10, fontFamily: 'monospace', color: '#374151' }}>
+            Most influential parameter: <strong style={{ color: influenceReport[0]?.maeRange > 0 ? '#b45309' : '#6b7280' }}>{influenceReport[0]?.label ?? '—'}</strong>
+            {influenceReport[0]?.maeRange > 0 && (
+              <span style={{ color: '#6b7280' }}> (spread = {fmt(influenceReport[0].maeRange, 3)} dB)</span>
+            )}
           </div>
         </div>
       )}
