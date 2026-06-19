@@ -10,6 +10,7 @@ import RewParityModeContributionAudit from './RewParityModeContributionAudit';
 import RewParityModalFamilySweep from './RewParityModalFamilySweep';
 import RewParityFamilyQSweep from './RewParityFamilyQSweep';
 import RewParityResonatorSweep from './RewParityResonatorSweep';
+import RewParityQSourceAudit from './RewParityQSourceAudit';
 
 // ── REW benchmark targets — MUST match RewBenchmarkComparisonTable.jsx exactly ──
 const REW_BENCHMARK = [
@@ -737,6 +738,15 @@ export default function RewParityAutoSweep({
 
       {/* ── REW Parity Resonator Shape Sweep ── */}
       <RewParityResonatorSweep
+        roomDims={roomDims}
+        seat={seat}
+        sub={sub}
+        surfaceAbsorption={surfaceAbsorption}
+        activeSettings={activeSettings}
+      />
+
+      {/* ── REW Parity Q Source Audit ── */}
+      <RewParityQSourceAudit
         roomDims={roomDims}
         seat={seat}
         sub={sub}
