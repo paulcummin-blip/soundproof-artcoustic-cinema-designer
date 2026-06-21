@@ -279,29 +279,37 @@ function buildClusterReport(top50) {
   ];
 
   const dimResults = dims.map(({ dim, values, key, label }) => {
+    // Compute count AND maeDelta for every value upfront
     const valueCounts = values.map(v => {
-      const c = top50.filter(r => {
+      const matchRuns = top50.filter(r => {
         const val = r.candidate[dim];
         return (val?.[key] ?? val) === (v[key] ?? v);
-      }).length;
-      return { ...v, count: c, pct: Math.round((c / n) * 100) };
+      });
+      const otherRuns = top50.filter(r => {
+        const val = r.candidate[dim];
+        return (val?.[key] ?? val) !== (v[key] ?? v);
+      });
+      const c = matchRuns.length;
+      let delta = null;
+      if (matchRuns.length && otherRuns.length) {
+        const matchAvg = matchRuns.reduce((s, r) => s + r.score.mae, 0) / matchRuns.length;
+        const otherAvg = otherRuns.reduce((s, r) => s + r.score.mae, 0) / otherRuns.length;
+        delta = otherAvg - matchAvg; // positive = this trait is better (lower MAE)
+      }
+      return { ...v, count: c, pct: Math.round((c / n) * 100), delta };
     }).sort((a, b) => b.count - a.count);
+
+    // Most frequent trait (for display / COMMON WINNING TRAITS section)
     const winner = valueCounts[0];
-    const maeDelta = (() => {
-      const winnerRuns = top50.filter(r => {
-        const val = r.candidate[dim];
-        return (val?.[key] ?? val) === (winner[key] ?? winner);
-      });
-      const loserRuns = top50.filter(r => {
-        const val = r.candidate[dim];
-        return (val?.[key] ?? val) !== (winner[key] ?? winner);
-      });
-      if (!loserRuns.length) return null;
-      const winnerAvg = winnerRuns.reduce((s, r) => s + r.score.mae, 0) / winnerRuns.length;
-      const loserAvg  = loserRuns.reduce((s, r) => s + r.score.mae, 0) / loserRuns.length;
-      return loserAvg - winnerAvg; // positive = winner is better
-    })();
-    return { label, dim, valueCounts, winner, maeDelta };
+
+    // maeDelta for the most-frequent winner (for COMMON WINNING TRAITS display)
+    const maeDelta = winner.delta;
+
+    // Safe winner: highest-frequency trait where delta >= 0 (beneficial or neutral).
+    // Falls back to null — buildProductionRecommendation will use best candidate.
+    const safeWinner = valueCounts.find(v => v.delta === null || v.delta >= 0) ?? null;
+
+    return { label, dim, key, valueCounts, winner, safeWinner, maeDelta };
   });
 
   return dimResults;
@@ -311,17 +319,43 @@ function buildProductionRecommendation(top50, clusterReport) {
   if (!top50?.length || !clusterReport) return null;
   const best = top50[0];
 
-  const spec = {
-    participation: clusterReport.find(d => d.dim === 'participation')?.winner?.label ?? best.candidate.participation.label,
-    coupling:      clusterReport.find(d => d.dim === 'coupling')?.winner?.label      ?? best.candidate.coupling.label,
-    qScale:        clusterReport.find(d => d.dim === 'qScale')?.winner?.label        ?? best.candidate.qScale.label,
-    family:        clusterReport.find(d => d.dim === 'family')?.winner?.label        ?? best.candidate.family.label,
-    selection:     clusterReport.find(d => d.dim === 'selection')?.winner?.label     ?? best.candidate.selection.label,
-    predictedMae:  best.score.mae,
+  // Helper: resolve the safe winner for a dimension, falling back to best candidate value
+  const resolve = (dimId, bestVal) => {
+    const dim = clusterReport.find(d => d.dim === dimId);
+    if (!dim) return { label: bestVal, fallback: true };
+    if (dim.safeWinner) return { label: dim.safeWinner.label, fallback: false };
+    return { label: bestVal, fallback: true };
   };
 
-  // Find the actual candidate that matches this combination
-  const matchKey = `${clusterReport.find(d=>d.dim==='participation')?.winner?.id}_${clusterReport.find(d=>d.dim==='coupling')?.winner?.id}_${clusterReport.find(d=>d.dim==='qScale')?.winner?.scale}_${clusterReport.find(d=>d.dim==='family')?.winner?.id}_${clusterReport.find(d=>d.dim==='selection')?.winner?.id}`;
+  const participation = resolve('participation', best.candidate.participation.label);
+  const coupling      = resolve('coupling',      best.candidate.coupling.label);
+  const qScale        = resolve('qScale',        best.candidate.qMult.label);
+  const family        = resolve('family',        best.candidate.family.label);
+  const selection     = resolve('selection',     best.candidate.selection.label);
+
+  const spec = {
+    participation: participation.label,
+    coupling:      coupling.label,
+    qScale:        qScale.label,
+    family:        family.label,
+    selection:     selection.label,
+    fallbacks: {
+      participation: participation.fallback,
+      coupling:      coupling.fallback,
+      qScale:        qScale.fallback,
+      family:        family.fallback,
+      selection:     selection.fallback,
+    },
+    predictedMae: best.score.mae,
+  };
+
+  // Attempt to find the exact candidate matching this combination
+  const pDim = clusterReport.find(d => d.dim === 'participation');
+  const cDim = clusterReport.find(d => d.dim === 'coupling');
+  const qDim = clusterReport.find(d => d.dim === 'qScale');
+  const fDim = clusterReport.find(d => d.dim === 'family');
+  const sDim = clusterReport.find(d => d.dim === 'selection');
+  const matchKey = `${pDim?.safeWinner?.id ?? best.candidate.participation.id}_${cDim?.safeWinner?.id ?? best.candidate.coupling.id}_${qDim?.safeWinner?.scale ?? best.candidate.qMult.scale}_${fDim?.safeWinner?.id ?? best.candidate.family.id}_${sDim?.safeWinner?.id ?? best.candidate.selection.id}`;
   const exact = top50.find(r => r.candidate._key === matchKey);
   if (exact) spec.predictedMae = exact.score.mae;
 
@@ -581,15 +615,23 @@ export default function RewProductionCandidateGenerator({ roomDims, seat, sub, s
                 RECOMMENDED PRODUCTION TEST ENGINE
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px', fontSize: 11, fontFamily: 'monospace', color: '#065f46', marginBottom: 8 }}>
-                <div><span style={{ color: '#6b7280' }}>Participation:</span> <strong>{results.recommendation.participation}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Coupling:</span> <strong>{results.recommendation.coupling}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Q:</span> <strong>{results.recommendation.qScale}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Family weighting:</span> <strong>{results.recommendation.family}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Selection:</span> <strong>{results.recommendation.selection}</strong></div>
+                {[
+                  { label: 'Participation', val: results.recommendation.participation, fb: results.recommendation.fallbacks?.participation },
+                  { label: 'Coupling',      val: results.recommendation.coupling,      fb: results.recommendation.fallbacks?.coupling },
+                  { label: 'Q',             val: results.recommendation.qScale,        fb: results.recommendation.fallbacks?.qScale },
+                  { label: 'Family weighting', val: results.recommendation.family,     fb: results.recommendation.fallbacks?.family },
+                  { label: 'Selection',     val: results.recommendation.selection,     fb: results.recommendation.fallbacks?.selection },
+                ].map(({ label, val, fb }) => (
+                  <div key={label}>
+                    <span style={{ color: '#6b7280' }}>{label}:</span>{' '}
+                    <strong>{val}</strong>
+                    {fb && <span title="No beneficial trait found — using best candidate value" style={{ marginLeft: 5, fontSize: 9, color: '#b45309', background: '#fef3c7', borderRadius: 3, padding: '1px 4px' }}>↑ best fallback</span>}
+                  </div>
+                ))}
                 <div><span style={{ color: '#6b7280' }}>Predicted MAE:</span> <strong style={{ color: '#15803d', fontSize: 14 }}>{fmt(results.recommendation.predictedMae, 3)} dB</strong></div>
               </div>
               <div style={{ fontSize: 9, fontFamily: 'monospace', color: '#059669', background: '#dcfce7', borderRadius: 4, padding: '4px 8px' }}>
-                This specification is assembled from the strongest recurring traits in the Top 50 candidates. It is a starting point for a targeted production test — not a final implementation.
+                Traits are selected from the Top 50 only where their average MAE impact is beneficial (▼). Harmful traits are excluded; where no beneficial trait exists, the best single candidate's value is used (shown as <span style={{ color: '#b45309' }}>↑ best fallback</span>).
               </div>
             </div>
           )}
