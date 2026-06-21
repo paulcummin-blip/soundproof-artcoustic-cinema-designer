@@ -577,6 +577,100 @@ export default function RewProductionCandidateGenerator({ roomDims, seat, sub, s
             </div>
           )}
 
+          {/* ── Q MULTIPLIER AUDIT ── */}
+          {results.clusterReport && (() => {
+            const qDim = results.clusterReport.find(d => d.dim === 'qScale');
+            if (!qDim) return null;
+            const recommendedQLabel = results.recommendation?.qScale;
+            return (
+              <div style={{ border: '2px solid #7c3aed', borderRadius: 8, background: '#faf5ff', padding: '10px 14px', marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, color: '#4c1d95', fontSize: 12, fontFamily: 'monospace', marginBottom: 8, letterSpacing: '0.04em' }}>
+                  Q MULTIPLIER AUDIT
+                  <span style={{ fontWeight: 400, fontSize: 9, color: '#6b7280', marginLeft: 8 }}>computed from Top 50 · no re-sweep</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #c4b5fd', color: '#5b21b6', fontSize: 9, fontFamily: 'monospace' }}>
+                        <th style={{ textAlign: 'left',  padding: '2px 8px' }}>Q Option</th>
+                        <th style={{ textAlign: 'right', padding: '2px 8px' }}>Count (Top 50)</th>
+                        <th style={{ textAlign: 'right', padding: '2px 8px' }}>Avg MAE (with)</th>
+                        <th style={{ textAlign: 'right', padding: '2px 8px' }}>Avg MAE (without)</th>
+                        <th style={{ textAlign: 'right', padding: '2px 8px' }}>Delta</th>
+                        <th style={{ textAlign: 'center', padding: '2px 8px' }}>Beneficial?</th>
+                        <th style={{ textAlign: 'center', padding: '2px 8px' }}>Selected?</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Q_MULTIPLIERS.map(qOpt => {
+                        // Find value entry in valueCounts (matched by scale)
+                        const entry = qDim.valueCounts.find(v => v.scale === qOpt.scale);
+                        if (!entry) return null;
+                        // Avg MAE for candidates WITH this Q
+                        const withRuns  = results.top50.filter(r => r.candidate.qMult.scale === qOpt.scale);
+                        const withoutRuns = results.top50.filter(r => r.candidate.qMult.scale !== qOpt.scale);
+                        const avgWith    = withRuns.length    ? withRuns.reduce((s, r)    => s + r.score.mae, 0) / withRuns.length    : null;
+                        const avgWithout = withoutRuns.length ? withoutRuns.reduce((s, r) => s + r.score.mae, 0) / withoutRuns.length : null;
+                        const delta      = (avgWith != null && avgWithout != null) ? avgWithout - avgWith : null; // positive = beneficial
+                        const beneficial = delta != null && delta > 0;
+                        const selected   = recommendedQLabel === qOpt.label;
+                        return (
+                          <tr key={qOpt.id} style={{
+                            borderBottom: '1px solid #e9d5ff',
+                            background: selected ? '#ede9fe' : undefined,
+                          }}>
+                            <td style={{ padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', fontWeight: selected ? 700 : 400, color: selected ? '#4c1d95' : '#374151' }}>
+                              {qOpt.label} {selected && '◀'}
+                            </td>
+                            <td style={{ padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', color: '#374151' }}>
+                              {withRuns.length} / 50 ({entry.pct}%)
+                            </td>
+                            <td style={{ padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', fontWeight: 600, color: '#1e40af' }}>
+                              {avgWith != null ? avgWith.toFixed(3) : '—'} dB
+                            </td>
+                            <td style={{ padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', color: '#4b5563' }}>
+                              {avgWithout != null ? avgWithout.toFixed(3) : '—'} dB
+                            </td>
+                            <td style={{ padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, color: beneficial ? '#15803d' : delta != null ? '#dc2626' : '#6b7280' }}>
+                              {delta != null ? (delta > 0 ? `▼${delta.toFixed(3)}` : `▲${Math.abs(delta).toFixed(3)}`) : '—'}
+                            </td>
+                            <td style={{ padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', textAlign: 'center', color: beneficial ? '#15803d' : '#dc2626', fontWeight: 700 }}>
+                              {beneficial ? '✓ YES' : '✗ NO'}
+                            </td>
+                            <td style={{ padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', textAlign: 'center', color: selected ? '#7c3aed' : '#6b7280', fontWeight: selected ? 700 : 400 }}>
+                              {selected ? '★ YES' : 'no'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Top 10 Q strip */}
+                <div style={{ marginTop: 10, borderTop: '1px dashed #c4b5fd', paddingTop: 6 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: '#5b21b6', fontWeight: 700, marginBottom: 4 }}>Top 10 Q values (rank order):</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {results.top10.map((row, i) => {
+                      const q = row.candidate.qMult;
+                      const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+                      return (
+                        <div key={row.candidate._key} style={{
+                          padding: '2px 8px', borderRadius: 4, fontSize: 9, fontFamily: 'monospace',
+                          background: i < 3 ? '#ede9fe' : '#f3f4f6',
+                          border: `1px solid ${i < 3 ? '#a78bfa' : '#d1d5db'}`,
+                          color: i < 3 ? '#4c1d95' : '#374151',
+                          fontWeight: i < 3 ? 700 : 400,
+                        }}>
+                          {rankLabel} {q.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── RECOMMENDED PRODUCTION TEST ENGINE ── */}
           {results.recommendation && (
             <div style={{ border: '3px solid #059669', borderRadius: 8, background: '#f0fdf4', padding: '12px 16px', marginBottom: 12 }}>
