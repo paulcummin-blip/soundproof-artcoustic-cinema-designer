@@ -96,6 +96,13 @@ const DIAGNOSTICS = [
     panel: 'REW Parity Mode Contribution Audit',
     hypothesis: 'Individual mode contribution breakdown at each benchmark frequency',
   },
+  {
+    id: 'modal_participation',
+    name: 'REW Parity Modal Participation Audit',
+    button: 'Run Modal Participation Audit',
+    panel: 'REW Parity Modal Participation Audit',
+    hypothesis: 'Whether limiting distant/excess modal contributions (by count, bandwidth, or frequency) improves parity',
+  },
 ];
 
 function interpolateSpl(series, targetHz) {

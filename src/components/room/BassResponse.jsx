@@ -16,6 +16,7 @@ import RewBenchmarkComparisonTable from "@/components/room/bass/RewBenchmarkComp
 import RewCandidateComparisonPanel from "@/components/room/bass/RewCandidateComparisonPanel";
 import RewParityAutoSweep from "@/components/room/bass/RewParityAutoSweep";
 import RewParityInvestigationRunner from "@/components/room/bass/RewParityInvestigationRunner";
+import RewParityModalParticipationAudit from "@/components/room/bass/RewParityModalParticipationAudit";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1202,11 +1203,32 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
 
             {/* ── REW Parity Investigation Runner ── */}
-            {rewSourceCurveMode === 'flat_rew_reference' && (
-              <RewParityInvestigationRunner
-                liveB44Series={multiSeries[0]?.data ?? []}
-              />
-            )}
+            {rewSourceCurveMode === 'flat_rew_reference' && (() => {
+              const participSeat = selectedSeatIds[0]
+                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+                : null;
+              const participSub = subsForSimulation[0] ?? null;
+              return (
+                <>
+                  <RewParityInvestigationRunner
+                    liveB44Series={multiSeries[0]?.data ?? []}
+                  />
+                  {/* ── REW Parity Modal Participation Audit — runs with one button ── */}
+                  <RewParityModalParticipationAudit
+                    roomDims={roomDims}
+                    seat={participSeat}
+                    sub={participSub}
+                    surfaceAbsorption={surfaceAbsorption}
+                    activeSettings={{
+                      axialQ,
+                      modalDistanceBlend,
+                      modalSourceReferenceMode,
+                      modalGainScalar,
+                    }}
+                  />
+                </>
+              );
+            })()}
 
             {/* ── REW Parity Auto Sweep ── */}
             {rewSourceCurveMode === 'flat_rew_reference' && (() => {
