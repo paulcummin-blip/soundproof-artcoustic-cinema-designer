@@ -3,7 +3,7 @@ import {
   estimateModeQLocal,
   modeShapeValueLocal,
   resonantTransfer,
-} from '@/components/room/bass/core/modalCalculations.js';
+} from './modalCalculations.js';
 
 const SPEED_OF_SOUND_MPS = 343;
 const MIN_DISTANCE_M = 0.01;
