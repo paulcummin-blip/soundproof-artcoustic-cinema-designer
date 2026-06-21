@@ -4,6 +4,12 @@
 // No production engine changes. No project state writes. No graph changes.
 
 import React, { useState, useCallback, useRef } from 'react';
+import {
+  computeRoomModesLocal,
+  estimateModeQLocal,
+  modeShapeValueLocal,
+  resonantTransfer,
+} from './core/modalCalculations.js';
 
 // ── REW benchmark ─────────────────────────────────────────────────────────────
 const REW_BENCHMARK = [
@@ -76,6 +82,8 @@ const SELECTION_MODES = [
 // Total: 5 × 4 × 4 × 5 × 4 = 1600 combinations
 
 // ── Acoustic primitives ───────────────────────────────────────────────────────
+// buildModes, sabineQ, cosShape, resonator replaced by shared helpers imported above.
+// typeBaseQ is local-only (not part of the shared helper) and is preserved here.
 
 function buildFreqAxis(minHz = 20, maxHz = 200) {
   const freqs = [];
@@ -90,50 +98,10 @@ function buildFreqAxis(minHz = 20, maxHz = 200) {
   return freqs;
 }
 
-function buildModes(W, L, H, fMax) {
-  const modes = [];
-  const nMax = Math.ceil((fMax / C) * 2 * Math.max(W, L, H)) + 4;
-  for (let nx = 0; nx <= nMax; nx++) {
-    for (let ny = 0; ny <= nMax; ny++) {
-      for (let nz = 0; nz <= nMax; nz++) {
-        if (nx === 0 && ny === 0 && nz === 0) continue;
-        const freq = (C / 2) * Math.sqrt((nx / W) ** 2 + (ny / L) ** 2 + (nz / H) ** 2);
-        if (!Number.isFinite(freq) || freq <= 0 || freq > fMax) continue;
-        const axes = (nx > 0 ? 1 : 0) + (ny > 0 ? 1 : 0) + (nz > 0 ? 1 : 0);
-        const type = axes === 1 ? 'axial' : axes === 2 ? 'tangential' : 'oblique';
-        modes.push({ nx, ny, nz, freq, type });
-      }
-    }
-  }
-  return modes.sort((a, b) => a.freq - b.freq);
-}
-
-function sabineQ(f0, W, L, H, sa) {
-  const V = W * L * H;
-  const A =
-    (L * W) * ((sa?.floor ?? 0.3) + (sa?.ceiling ?? 0.3)) +
-    (W * H) * ((sa?.front ?? 0.3) + (sa?.back ?? 0.3)) +
-    (L * H) * ((sa?.left ?? 0.3) + (sa?.right ?? 0.3));
-  const rt60 = 0.161 * V / Math.max(A, 1e-6);
-  return Math.max(1, Math.min(80, 2 * Math.PI * f0 * rt60 / 13.815));
-}
-
 function typeBaseQ(type, axialQ) {
   if (type === 'axial') return axialQ;
   if (type === 'tangential') return 3.9;
   return 2.5;
-}
-
-function cosShape(n, pos, dim) {
-  return n > 0 ? Math.cos(n * Math.PI * pos / Math.max(dim, 1e-6)) : 1;
-}
-
-function resonator(f, f0, q) {
-  const r = f / Math.max(f0, 1e-6);
-  const rr = 1 - r * r;
-  const ri = r / Math.max(q, 1e-6);
-  const d = rr * rr + ri * ri;
-  return { re: rr / d, im: -ri / d, transferMag: Math.sqrt((rr * rr + ri * ri) / (d * d)) };
 }
 
 // ── Single candidate simulation ───────────────────────────────────────────────
@@ -158,8 +126,8 @@ function simulateCandidate(candidate, W, L, H, modesWithBaseQ, freqsHz, sx, sy, 
 
     // Build per-mode entries
     const entries = modes.map(mode => {
-      const sc = cosShape(mode.nx, sx, W) * cosShape(mode.ny, sy, L) * cosShape(mode.nz, sz, H);
-      const rc = cosShape(mode.nx, rx, W) * cosShape(mode.ny, ry, L) * cosShape(mode.nz, rz, H);
+      const sc = modeShapeValueLocal(mode, sx, sy, sz, { widthM: W, lengthM: L, heightM: H });
+      const rc = modeShapeValueLocal(mode, rx, ry, rz, { widthM: W, lengthM: L, heightM: H });
 
       // Coupling strategy
       let coupVal;
@@ -181,7 +149,7 @@ function simulateCandidate(candidate, W, L, H, modesWithBaseQ, freqsHz, sx, sy, 
       const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
       const hoScale = (mode.type === 'axial' && modeOrder >= 2) ? 0.50 : 1.0;
 
-      const { re: tRe, im: tIm, transferMag } = resonator(f, mode.freq, mode.q);
+      const { re: tRe, im: tIm, transferMag } = resonantTransfer(f, mode.freq, mode.q);
 
       const bw = mode.freq / Math.max(mode.q, 1e-6);
       const energyProxy = transferMag * Math.abs(coupVal) * fw * orderWeight;
@@ -407,11 +375,12 @@ export default function RewProductionCandidateGenerator({ roomDims, seat, sub, s
     const sa = surfaceAbsorption ?? {};
 
     // Build modes with base Q (pre-scale — each Q scale applied per candidate)
+    // Uses shared helpers: computeRoomModesLocal (was buildModes), estimateModeQLocal (was sabineQ).
     await new Promise(r => setTimeout(r, 0));
-    const rawModes = buildModes(W, L, H, 210);
+    const rawModes = computeRoomModesLocal({ widthM: W, lengthM: L, heightM: H, fMax: 210 });
     const modesWithBaseQ = rawModes.map(m => {
       const baseQ = typeBaseQ(m.type, axialQOverride);
-      const absQ  = sabineQ(m.freq, W, L, H, sa);
+      const absQ  = estimateModeQLocal({ roomDims: { widthM: W, lengthM: L, heightM: H }, surfaceAbsorption: sa, f0: m.freq });
       return { ...m, baseQ: Math.max(1, Math.min(baseQ, absQ)) };
     });
 

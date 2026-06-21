@@ -1,3 +1,10 @@
+import {
+  computeRoomModesLocal,
+  estimateModeQLocal,
+  modeShapeValueLocal,
+  resonantTransfer,
+} from '@/components/room/bass/core/modalCalculations.js';
+
 const SPEED_OF_SOUND_MPS = 343;
 const MIN_DISTANCE_M = 0.01;
 
@@ -91,67 +98,9 @@ function normalizeSurfaceAbsorption(surfaceAbsorption) {
   };
 }
 
-function computeRoomModesLocal({ widthM, lengthM, heightM, fMax, c }) {
-  const modes = [];
-  const nMax = Math.ceil((fMax / c) * 2 * Math.max(widthM, lengthM, heightM)) + 5;
+// computeRoomModesLocal — imported from modalCalculations.js
 
-  for (let nx = 0; nx <= nMax; nx += 1) {
-    for (let ny = 0; ny <= nMax; ny += 1) {
-      for (let nz = 0; nz <= nMax; nz += 1) {
-        if (nx === 0 && ny === 0 && nz === 0) continue;
-
-        const freq = (c / 2) * Math.sqrt(
-          Math.pow(nx / widthM, 2) +
-          Math.pow(ny / lengthM, 2) +
-          Math.pow(nz / heightM, 2)
-        );
-
-        if (!Number.isFinite(freq) || freq <= 0 || freq > fMax) continue;
-
-        const activeAxes = (nx > 0 ? 1 : 0) + (ny > 0 ? 1 : 0) + (nz > 0 ? 1 : 0);
-        let type = 'oblique';
-        if (activeAxes === 1) type = 'axial';
-        else if (activeAxes === 2) type = 'tangential';
-
-        modes.push({ nx, ny, nz, freq, type });
-      }
-    }
-  }
-
-  return modes.sort((a, b) => a.freq - b.freq);
-}
-
-// ─── ORIGINAL DAMPING BASELINE ───────────────────────────────────────────────
-// Global Sabine-derived Q. No family weighting. No mode-axis-selective absorption.
-// All six surfaces contribute to absorptionArea for every mode equally.
-// ─────────────────────────────────────────────────────────────────────────────
-function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
-  const widthM = Number(roomDims?.widthM) || 1;
-  const lengthM = Number(roomDims?.lengthM) || 1;
-  const heightM = Number(roomDims?.heightM) || 1;
-  const volume = widthM * lengthM * heightM;
-
-  const surfaceFloor = lengthM * widthM;
-  const surfaceCeiling = lengthM * widthM;
-  const surfaceFront = widthM * heightM;
-  const surfaceBack = widthM * heightM;
-  const surfaceLeft = lengthM * heightM;
-  const surfaceRight = lengthM * heightM;
-
-  const absorptionArea =
-    surfaceFloor * (surfaceAbsorption?.floor ?? 0.3) +
-    surfaceCeiling * (surfaceAbsorption?.ceiling ?? 0.3) +
-    surfaceFront * (surfaceAbsorption?.front ?? 0.3) +
-    surfaceBack * (surfaceAbsorption?.back ?? 0.3) +
-    surfaceLeft * (surfaceAbsorption?.left ?? 0.3) +
-    surfaceRight * (surfaceAbsorption?.right ?? 0.3);
-
-  const rt60 = 0.161 * volume / Math.max(absorptionArea, 1e-6);
-  const tau = rt60 / 13.815;
-  const qSabine = 2 * Math.PI * f0 * tau;
-
-  return Math.max(1, Math.min(80, qSabine));
-}
+// estimateModeQLocal — imported from modalCalculations.js
 
 function estimateModeQByType(mode, axialQOverride = 4.0) {
   const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
@@ -171,63 +120,32 @@ function estimateModeQByType(mode, axialQOverride = 4.0) {
   return 2.5;
 }
 
-function modeShapeValueLocal(mode, x, y, z, roomDims) {
-  const widthM = Math.max(1e-6, Number(roomDims?.widthM) || 0);
-  const lengthM = Math.max(1e-6, Number(roomDims?.lengthM) || 0);
-  const heightM = Math.max(1e-6, Number(roomDims?.heightM) || 0);
-
-  // Returns the signed mode-shape value for a single position.
-  // Caller is responsible for computing source and receiver couplings separately.
-  const shapeX = mode.nx > 0 ? Math.cos(mode.nx * Math.PI * x / widthM) : 1;
-  const shapeY = mode.ny > 0 ? Math.cos(mode.ny * Math.PI * y / lengthM) : 1;
-  const shapeZ = mode.nz > 0 ? Math.cos(mode.nz * Math.PI * z / heightM) : 1;
-
-  return shapeX * shapeY * shapeZ;
-}
+// modeShapeValueLocal — imported from modalCalculations.js
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
 // Modal Green's function: coupling = Ψ_source * Ψ_receiver, resonant transfer H(f, f0, Q).
 // pressureMagnitude = modalSourceAmplitude * combinedCoupling * resonanceMagnitude
 // modalSourceAmplitude brings the modal layer into the same pressure domain as the direct path.
 function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, combinedCoupling, modalSourceAmplitude, modeIndices, sourceX, sourceY, sourceZ, seatX, seatY, seatZ, disableModalPropagationPhase = false, propagationPhaseScale = 0.5, debugModalHSign = 'normal') {
-  const angularFrequency = 2 * Math.PI * frequencyHz;
-  const modalAngularFrequency = 2 * Math.PI * modeFrequencyHz;
+  // resonantTransfer imported from modalCalculations.js — shared canonical implementation.
+  // debugModalHSign 'rew_test' flips the imaginary sign for diagnostic purposes only.
+  const { re: _tfRe, im: _tfIm, realDen, imagDen, denominatorSq } = resonantTransfer(frequencyHz, modeFrequencyHz, qValue);
+  const transferReal = _tfRe;
+  // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
+  // 'normal' = standard convention (negative imaginary — matches resonantTransfer output).
+  // 'rew_test' = flipped imaginary sign for parity testing only.
+  const transferImag = debugModalHSign === 'rew_test'
+    ? +imagDen / denominatorSq
+    : _tfIm;
 
-  const ratio = angularFrequency / modalAngularFrequency;
-  const realDen = 1 - (ratio * ratio);
-  const imagDen = angularFrequency / (qValue * modalAngularFrequency);
-  const denominatorSq = (realDen * realDen) + (imagDen * imagDen);
+  // ratio = ω/ω₀ — retained locally for the beta debug field in the return object.
+  const ratio = (2 * Math.PI * frequencyHz) / (2 * Math.PI * Math.max(modeFrequencyHz, 1e-6));
 
   const modeOrder = Math.abs(modeIndices.nx) + Math.abs(modeIndices.ny) + Math.abs(modeIndices.nz);
   const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
 
   const effectiveCoupling = combinedCoupling;
   const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
-
-  // Standard second-order resonant transfer, derived directly from:
-  // H(jω) = 1 / (1 - (ω/ω0)^2 + j * ω/(ω0 Q))
-  //
-  // Real(H) = realDen / denominatorSq
-  // Imag(H) = -imagDen / denominatorSq
-  //
-  // No heuristic offsets, no hand-tuned real scaling.
-  // Controlled phase-trajectory test transfer.
-  // Goal:
-  // - broadly constructive below the null region
-  // - strong opposition through the null region
-  // - recovery above the null region
-  //
-  // Real part follows realDen so it can change sign naturally across resonance.
-  // Imaginary part follows imagDen but stays smooth and finite.
-  // No arbitrary additive floor terms.
-  const transferReal = realDen / denominatorSq;
-  // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
-  // 'normal' = standard convention H = 1/(1 - r² + j·r/Q) → transferImag is negative.
-  // 'rew_test' = flipped imaginary sign H = 1/(1 - r² - j·r/Q) → transferImag is positive.
-  // Do not promote to production without full parity review.
-  const transferImag = debugModalHSign === 'rew_test'
-    ? +imagDen / denominatorSq
-    : -imagDen / denominatorSq;
 
   // Approximate source-to-seat distance for phase alignment
   const dx = sourceX - seatX;
