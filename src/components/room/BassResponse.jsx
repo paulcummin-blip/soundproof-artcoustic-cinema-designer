@@ -19,6 +19,7 @@ import RewParityInvestigationRunner from "@/components/room/bass/RewParityInvest
 import RewParityModalParticipationAudit from "@/components/room/bass/RewParityModalParticipationAudit";
 import RewParityCombinedRootCauseAudit from "@/components/room/bass/RewParityCombinedRootCauseAudit";
 import RewParityParticipationDecayAudit from "@/components/room/bass/RewParityParticipationDecayAudit";
+import RewProductionCandidateGenerator from "@/components/room/bass/RewProductionCandidateGenerator";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1238,6 +1239,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   />
                   {/* ── REW Parity Participation Decay Audit — hard vs soft suppression ── */}
                   <RewParityParticipationDecayAudit
+                    roomDims={roomDims}
+                    seat={participSeat}
+                    sub={participSub}
+                    surfaceAbsorption={surfaceAbsorption}
+                    activeSettings={{ axialQ }}
+                  />
+                  {/* ── REW Production Candidate Generator — 1600-combo full sweep ── */}
+                  <RewProductionCandidateGenerator
                     roomDims={roomDims}
                     seat={participSeat}
                     sub={participSub}
