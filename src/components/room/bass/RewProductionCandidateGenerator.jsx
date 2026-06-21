@@ -9,7 +9,7 @@ import {
   estimateModeQLocal,
   modeShapeValueLocal,
   resonantTransfer,
-} from './core/modalCalculations.js';
+} from '../../../bass/core/modalCalculations.js';
 
 // ── REW benchmark ─────────────────────────────────────────────────────────────
 const REW_BENCHMARK = [

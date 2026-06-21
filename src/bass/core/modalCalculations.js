@@ -1,10 +1,12 @@
 /**
- * modalCalculations.js
- * Shared stateless acoustic primitives for modal room simulation.
- * Canonical copy co-located with rewBassEngine.js for reliable Vite resolution.
+ * modalCalculations.js — canonical source of truth for modal acoustic primitives.
  *
- * Source of truth: components/room/bass/core/modalCalculations.js
- * Keep both files in sync when modifying.
+ * Consumers:
+ *   - bass/core/rewBassEngine.js          → import './modalCalculations.js'
+ *   - components/room/bass/RewProductionCandidateGenerator.jsx  → import '../../../bass/core/modalCalculations.js'
+ *
+ * DO NOT add UI, state, side-effects, or pressure summation logic here.
+ * Each function is pure and stateless.
  */
 
 const SPEED_OF_SOUND_MPS = 343;
@@ -60,8 +62,8 @@ export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
     surfaceLeft    * (surfaceAbsorption?.left    ?? 0.3) +
     surfaceRight   * (surfaceAbsorption?.right   ?? 0.3);
 
-  const rt60  = 0.161 * volume / Math.max(absorptionArea, 1e-6);
-  const tau   = rt60 / 13.815;
+  const rt60    = 0.161 * volume / Math.max(absorptionArea, 1e-6);
+  const tau     = rt60 / 13.815;
   const qSabine = 2 * Math.PI * f0 * tau;
 
   return Math.max(1, Math.min(80, qSabine));
@@ -84,8 +86,8 @@ export function resonantTransfer(f, f0, q) {
   const omega0 = 2 * Math.PI * Math.max(f0, 1e-6);
   const ratio  = omega / omega0;
 
-  const realDen      = 1 - (ratio * ratio);
-  const imagDen      = omega / (Math.max(q, 1e-6) * omega0);
+  const realDen       = 1 - (ratio * ratio);
+  const imagDen       = omega / (Math.max(q, 1e-6) * omega0);
   const denominatorSq = (realDen * realDen) + (imagDen * imagDen);
 
   const re = realDen  / denominatorSq;
