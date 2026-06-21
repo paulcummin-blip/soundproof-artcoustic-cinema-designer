@@ -103,6 +103,13 @@ const DIAGNOSTICS = [
     panel: 'REW Parity Modal Participation Audit',
     hypothesis: 'Whether limiting distant/excess modal contributions (by count, bandwidth, or frequency) improves parity',
   },
+  {
+    id: 'combined_root_cause',
+    name: 'REW Parity Combined Root Cause Audit',
+    button: 'Run Combined Root Cause Audit',
+    panel: 'REW Parity Combined Root Cause Audit',
+    hypothesis: '900-combo grid: modal participation × source coupling × Q scale × family weighting — ranks most likely root cause',
+  },
 ];
 
 function interpolateSpl(series, targetHz) {

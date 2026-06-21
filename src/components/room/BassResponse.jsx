@@ -17,6 +17,7 @@ import RewCandidateComparisonPanel from "@/components/room/bass/RewCandidateComp
 import RewParityAutoSweep from "@/components/room/bass/RewParityAutoSweep";
 import RewParityInvestigationRunner from "@/components/room/bass/RewParityInvestigationRunner";
 import RewParityModalParticipationAudit from "@/components/room/bass/RewParityModalParticipationAudit";
+import RewParityCombinedRootCauseAudit from "@/components/room/bass/RewParityCombinedRootCauseAudit";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1225,6 +1226,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       modalSourceReferenceMode,
                       modalGainScalar,
                     }}
+                  />
+                  {/* ── REW Parity Combined Root Cause Audit — 900 combos, one button ── */}
+                  <RewParityCombinedRootCauseAudit
+                    roomDims={roomDims}
+                    seat={participSeat}
+                    sub={participSub}
+                    surfaceAbsorption={surfaceAbsorption}
+                    activeSettings={{ axialQ }}
                   />
                 </>
               );
