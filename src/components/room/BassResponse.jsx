@@ -22,6 +22,7 @@ import RewParityParticipationDecayAudit from "@/components/room/bass/RewParityPa
 import RewProductionCandidateGenerator from "@/components/room/bass/RewProductionCandidateGenerator";
 import RewEngineShootout from "@/components/room/bass/RewEngineShootout";
 import RewBestCandidateRefiner from "@/components/room/bass/RewBestCandidateRefiner";
+import RewRefinedEngineShootout from "@/components/room/bass/RewRefinedEngineShootout";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -219,6 +220,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Diagnostic scale applied to axial modes with order >= 2. Default 1.00 = no change.
   const [highOrderAxialScale, setHighOrderAxialScale] = useState(1.0);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
+  // Active test engine — set by RewRefinedEngineShootout promote button via window.__B44_ACTIVE_TEST_ENGINE__
+  const [activeTestEngine, setActiveTestEngine] = useState(null);
   const lastStablePlotRef = useRef(null);
   // REW reference overlay — debug only, no engine changes
   const [rewOverlayText, setRewOverlayText] = useState('');
@@ -1271,6 +1274,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     surfaceAbsorption={surfaceAbsorption}
                     activeSettings={{ axialQ }}
                   />
+                  {/* ── REW Refined Engine Shootout — final 3-way comparison ── */}
+                  <RewRefinedEngineShootout
+                    roomDims={roomDims}
+                    seat={participSeat}
+                    sub={participSub}
+                    surfaceAbsorption={surfaceAbsorption}
+                    activeSettings={{ axialQ }}
+                    onPromoteRefined={(spec) => setActiveTestEngine(spec)}
+                  />
                 </>
               );
             })()}
@@ -1764,6 +1776,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </details>
       )}
       {/* Deep Engine Diagnostics end */}
+
+      {/* ── Active Test Engine Banner ── */}
+      {activeTestEngine && (
+        <div style={{ border: '2px solid #059669', borderRadius: 8, background: '#f0fdf4', padding: '8px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#065f46', fontWeight: 700 }}>
+            🧪 Production Test Engine Active: {activeTestEngine.label}
+            <span style={{ fontWeight: 400, marginLeft: 8, color: '#6b7280' }}>
+              Top 5 · Listener ×1.25 · Q×1.20 · Tang 0.40 · Transfer ranked
+            </span>
+          </div>
+          <button
+            onClick={() => { setActiveTestEngine(null); if (typeof window !== 'undefined') { window.__B44_ACTIVE_TEST_ENGINE__ = null; } }}
+            style={{ height: 24, padding: '0 10px', borderRadius: 4, border: '1px solid #059669', background: '#fff', color: '#065f46', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer' }}
+          >
+            Restore production engine
+          </button>
+        </div>
+      )}
 
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
