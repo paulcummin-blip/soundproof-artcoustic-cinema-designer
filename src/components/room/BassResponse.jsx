@@ -20,6 +20,7 @@ import RewParityModalParticipationAudit from "@/components/room/bass/RewParityMo
 import RewParityCombinedRootCauseAudit from "@/components/room/bass/RewParityCombinedRootCauseAudit";
 import RewParityParticipationDecayAudit from "@/components/room/bass/RewParityParticipationDecayAudit";
 import RewProductionCandidateGenerator from "@/components/room/bass/RewProductionCandidateGenerator";
+import RewEngineShootout from "@/components/room/bass/RewEngineShootout";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1247,6 +1248,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   />
                   {/* ── REW Production Candidate Generator — 1600-combo full sweep ── */}
                   <RewProductionCandidateGenerator
+                    roomDims={roomDims}
+                    seat={participSeat}
+                    sub={participSub}
+                    surfaceAbsorption={surfaceAbsorption}
+                    activeSettings={{ axialQ }}
+                  />
+                  {/* ── REW Engine Shootout — direct head-to-head comparison ── */}
+                  <RewEngineShootout
                     roomDims={roomDims}
                     seat={participSeat}
                     sub={participSub}
