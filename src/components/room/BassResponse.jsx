@@ -1274,16 +1274,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     surfaceAbsorption={surfaceAbsorption}
                     activeSettings={{ axialQ }}
                   />
-                  {/* ── REW Refined Engine Shootout — final 3-way comparison ── */}
-                  <RewRefinedEngineShootout
-                    roomDims={roomDims}
-                    seat={participSeat}
-                    sub={participSub}
-                    surfaceAbsorption={surfaceAbsorption}
-                    activeSettings={{ axialQ }}
-                    onPromoteRefined={(spec) => setActiveTestEngine(spec)}
-                  />
                 </>
+              );
+            })()}
+
+            {/* ── REW Refined Engine Shootout — final 3-way comparison ── */}
+            {rewSourceCurveMode === 'flat_rew_reference' && (() => {
+              const refinedSeat = selectedSeatIds[0]
+                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+                : null;
+              const refinedSub = subsForSimulation[0] ?? null;
+              return (
+                <RewRefinedEngineShootout
+                  roomDims={roomDims}
+                  seat={refinedSeat}
+                  sub={refinedSub}
+                  surfaceAbsorption={surfaceAbsorption}
+                  activeSettings={{ axialQ }}
+                  onPromoteRefined={(spec) => setActiveTestEngine(spec)}
+                />
               );
             })()}
 
