@@ -15,6 +15,7 @@ import RewParityBenchmark from "@/components/room/bass/RewParityBenchmark";
 import RewBenchmarkComparisonTable from "@/components/room/bass/RewBenchmarkComparisonTable";
 import RewCandidateComparisonPanel from "@/components/room/bass/RewCandidateComparisonPanel";
 import RewParityAutoSweep from "@/components/room/bass/RewParityAutoSweep";
+import RewParityInvestigationRunner from "@/components/room/bass/RewParityInvestigationRunner";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1199,6 +1200,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div style={{ color: '#6b7280', fontSize: 10, fontFamily: 'monospace' }}>No simulation data — add a sub and seat.</div>
               )}
             </div>
+
+            {/* ── REW Parity Investigation Runner ── */}
+            {rewSourceCurveMode === 'flat_rew_reference' && (
+              <RewParityInvestigationRunner
+                liveB44Series={multiSeries[0]?.data ?? []}
+              />
+            )}
 
             {/* ── REW Parity Auto Sweep ── */}
             {rewSourceCurveMode === 'flat_rew_reference' && (() => {
