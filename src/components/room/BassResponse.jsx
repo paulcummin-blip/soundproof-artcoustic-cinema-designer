@@ -50,6 +50,7 @@ import ModalOrderLimitAudit from "@/components/room/bass/ModalOrderLimitAudit";
 import ModalContributionHistogram from "@/components/room/bass/ModalContributionHistogram";
 import HighOrderSuppressionSweep from "@/components/room/bass/HighOrderSuppressionSweep";
 import CombinedBestFitAudit from "@/components/room/bass/CombinedBestFitAudit";
+import ParityRootCauseMatrixAudit from "@/components/room/bass/ParityRootCauseMatrixAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1996,6 +1997,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               seat={sweepSeat}
               surfaceAbsorption={surfaceAbsorption}
               axialQ={axialQ}
+            />
+            <ParityRootCauseMatrixAudit
+              roomDims={roomDims}
+              subs={subsForSimulation}
+              seat={sweepSeat}
+              surfaceAbsorption={surfaceAbsorption}
+              axialQ={axialQ}
+              distanceBlend={modalDistanceBlend}
             />
           </>
         );
