@@ -1759,6 +1759,7 @@ function RoomDesignerWithState() {
                   showRoomModesOverlay={showRoomModesOverlay}
                   freeMoveLcr={freeMoveLcr}
                   rspMode={appState?.rspMode || "auto_from_screen"}
+                  manualRspY_m={appState?.manualRspY_m ?? null}
                   onSetManualRspY_m={appState?.setManualRspY_m}
                   liveImpactMode={safeLiveImpactMode} />}
 
