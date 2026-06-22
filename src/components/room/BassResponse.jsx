@@ -30,6 +30,7 @@ import RewParityQSweep from "@/components/room/bass/RewParityQSweep";
 import RewParityQTangentialSweep from "@/components/room/bass/RewParityQTangentialSweep";
 import RewParity80HzAudit from "@/components/room/bass/RewParity80HzAudit";
 import ModalBandwidthDiagnostic from "@/components/room/bass/ModalBandwidthDiagnostic";
+import DominantModeRootCauseAudit from "@/components/room/bass/DominantModeRootCauseAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1846,6 +1847,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               activeSettings={sweepSettings}
             />
             <ModalBandwidthDiagnostic
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+              activeSettings={sweepSettings}
+            />
+            <DominantModeRootCauseAudit
               roomDims={roomDims}
               seat={sweepSeat}
               sub={sweepSub}
