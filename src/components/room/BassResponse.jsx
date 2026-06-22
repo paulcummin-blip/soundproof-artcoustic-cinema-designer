@@ -38,6 +38,7 @@ import DirectModalEnergyAudit from "@/components/room/bass/DirectModalEnergyAudi
 import FinalSplReconstructionAudit from "@/components/room/bass/FinalSplReconstructionAudit";
 import ModalGainSweep from "@/components/room/bass/ModalGainSweep";
 import ModalSourceModelSweep from "@/components/room/bass/ModalSourceModelSweep";
+import OffResonanceTransferAudit from "@/components/room/bass/OffResonanceTransferAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1911,6 +1912,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               roomDims={roomDims}
               seat={sweepSeat}
               sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+            />
+            <OffResonanceTransferAudit
+              roomDims={roomDims}
               surfaceAbsorption={surfaceAbsorption}
             />
           </>
