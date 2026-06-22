@@ -1,6 +1,6 @@
 // BassResponse.jsx - Simplified bass simulation UI
 
-import React, { useMemo, useEffect, useState, useRef } from "react";
+import React, { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import RewParityCombinedRootCauseAudit from "@/components/room/bass/RewParityCom
 import RewParityParticipationDecayAudit from "@/components/room/bass/RewParityParticipationDecayAudit";
 import RewProductionCandidateGenerator from "@/components/room/bass/RewProductionCandidateGenerator";
 import RewEngineShootout from "@/components/room/bass/RewEngineShootout";
+import RewParityErrorBreakdown from "@/components/room/bass/RewParityErrorBreakdown";
 import RewBestCandidateRefiner from "@/components/room/bass/RewBestCandidateRefiner";
 import RewRefinedEngineShootout from "@/components/room/bass/RewRefinedEngineShootout";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
@@ -1260,6 +1261,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   />
                   {/* ── REW Engine Shootout — direct head-to-head comparison ── */}
                   <RewEngineShootout
+                    roomDims={roomDims}
+                    seat={participSeat}
+                    sub={participSub}
+                    surfaceAbsorption={surfaceAbsorption}
+                    activeSettings={{ axialQ }}
+                  />
+                  {/* ── REW Parity Error Breakdown — 10-variant compact diagnostic ── */}
+                  <RewParityErrorBreakdown
                     roomDims={roomDims}
                     seat={participSeat}
                     sub={participSub}
