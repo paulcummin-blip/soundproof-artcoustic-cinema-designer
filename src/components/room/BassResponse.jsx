@@ -46,6 +46,7 @@ import FamilyEnergyBreakdownAudit from "@/components/room/bass/FamilyEnergyBreak
 import TangentialScaleSweepAudit from "@/components/room/bass/TangentialScaleSweepAudit";
 import SourceCoherenceMatrixAudit from "@/components/room/bass/SourceCoherenceMatrixAudit";
 import FamilyCoherenceInterpolationAudit from "@/components/room/bass/FamilyCoherenceInterpolationAudit";
+import ModalOrderLimitAudit from "@/components/room/bass/ModalOrderLimitAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1963,6 +1964,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               surfaceAbsorption={surfaceAbsorption}
             />
             <FamilyCoherenceInterpolationAudit
+              roomDims={roomDims}
+              subs={subsForSimulation}
+              seat={sweepSeat}
+              surfaceAbsorption={surfaceAbsorption}
+            />
+            <ModalOrderLimitAudit
               roomDims={roomDims}
               subs={subsForSimulation}
               seat={sweepSeat}
