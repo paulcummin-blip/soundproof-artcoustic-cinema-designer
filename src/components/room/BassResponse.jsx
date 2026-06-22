@@ -49,6 +49,7 @@ import FamilyCoherenceInterpolationAudit from "@/components/room/bass/FamilyCohe
 import ModalOrderLimitAudit from "@/components/room/bass/ModalOrderLimitAudit";
 import ModalContributionHistogram from "@/components/room/bass/ModalContributionHistogram";
 import HighOrderSuppressionSweep from "@/components/room/bass/HighOrderSuppressionSweep";
+import CombinedBestFitAudit from "@/components/room/bass/CombinedBestFitAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1988,6 +1989,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               subs={subsForSimulation}
               seat={sweepSeat}
               surfaceAbsorption={surfaceAbsorption}
+            />
+            <CombinedBestFitAudit
+              roomDims={roomDims}
+              subs={subsForSimulation}
+              seat={sweepSeat}
+              surfaceAbsorption={surfaceAbsorption}
+              axialQ={axialQ}
             />
           </>
         );
