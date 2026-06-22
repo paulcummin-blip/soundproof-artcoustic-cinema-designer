@@ -25,6 +25,8 @@ import RewParityErrorBreakdown from "@/components/room/bass/RewParityErrorBreakd
 import RewBestCandidateRefiner from "@/components/room/bass/RewBestCandidateRefiner";
 import RewRefinedEngineShootout from "@/components/room/bass/RewRefinedEngineShootout";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
+import RewParityTangentialSweep from "@/components/room/bass/RewParityTangentialSweep";
+import RewParityQSweep from "@/components/room/bass/RewParityQSweep";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1789,6 +1791,46 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       </div>
 
       {/* REW Geometry Match Values + Alignment Audit — moved to Geometry & REW Import section below the graph */}
+
+      {/* ── Tangential Weight Sweep & Modal Q Sweep ── */}
+      {(() => {
+        const sweepSeat = selectedSeatIds[0]
+          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+          : null;
+        const sweepSub = subsForSimulation[0] ?? null;
+        const sweepSettings = {
+          axialQ,
+          modalSourceReferenceMode,
+          modalGainScalar,
+          propagationPhaseScale: 0,
+          pureDeterministicModalSum: true,
+          disableModalPropagationPhase: true,
+          modalStorageMode,
+          highOrderAxialScale,
+          rewParityModalMagnitudeScale,
+          enableReflections: false,
+          disableLateField: true,
+          modalCoherenceMode: 'coherent',
+        };
+        return (
+          <>
+            <RewParityTangentialSweep
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+              activeSettings={sweepSettings}
+            />
+            <RewParityQSweep
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+              activeSettings={sweepSettings}
+            />
+          </>
+        );
+      })()}
 
           </div>
         </details>
