@@ -27,9 +27,6 @@ export default function RvSeatLayer({
 
   return (
     <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
-      {/* MLP marker MUST live in the same layer as seats to prevent transform drift */}
-      {MLPMarker}
-
       {seatingPositions.map((seat) => {
         // accept either { x, y } or { position: { x, y } }
         const xM = Number(
@@ -80,6 +77,9 @@ export default function RvSeatLayer({
           </g>
         );
       })}
+
+      {/* MLP marker renders after all seat hit targets so it sits above them in the SVG stack */}
+      {MLPMarker}
 
       {/* Seat row labels extracted to component */}
       <RvSeatRowLabels
