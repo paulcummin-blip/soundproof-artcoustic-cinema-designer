@@ -37,6 +37,7 @@ import ModalPressureAudit from "@/components/room/bass/ModalPressureAudit";
 import DirectModalEnergyAudit from "@/components/room/bass/DirectModalEnergyAudit";
 import FinalSplReconstructionAudit from "@/components/room/bass/FinalSplReconstructionAudit";
 import ModalGainSweep from "@/components/room/bass/ModalGainSweep";
+import ModalSourceModelSweep from "@/components/room/bass/ModalSourceModelSweep";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1901,6 +1902,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               graphSeries={multiSeries[0]?.data ?? []}
             />
             <ModalGainSweep
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+            />
+            <ModalSourceModelSweep
               roomDims={roomDims}
               seat={sweepSeat}
               sub={sweepSub}
