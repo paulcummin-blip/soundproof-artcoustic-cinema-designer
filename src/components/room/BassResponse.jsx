@@ -1983,6 +1983,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               seat={sweepSeat}
               surfaceAbsorption={surfaceAbsorption}
             />
+            <HighOrderSuppressionSweep
+              roomDims={roomDims}
+              subs={subsForSimulation}
+              seat={sweepSeat}
+              surfaceAbsorption={surfaceAbsorption}
+            />
           </>
         );
       })()}
