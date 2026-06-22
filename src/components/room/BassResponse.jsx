@@ -44,6 +44,7 @@ import SubPositionParitySensitivityAudit from "@/components/room/bass/SubPositio
 import ModalCoherenceSweepAudit from "@/components/room/bass/ModalCoherenceSweepAudit";
 import FamilyEnergyBreakdownAudit from "@/components/room/bass/FamilyEnergyBreakdownAudit";
 import TangentialScaleSweepAudit from "@/components/room/bass/TangentialScaleSweepAudit";
+import SourceCoherenceMatrixAudit from "@/components/room/bass/SourceCoherenceMatrixAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1953,6 +1954,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               seat={sweepSeat}
               surfaceAbsorption={surfaceAbsorption}
               activeSettings={sweepSettings}
+            />
+            <SourceCoherenceMatrixAudit
+              roomDims={roomDims}
+              subs={subsForSimulation}
+              seat={sweepSeat}
+              surfaceAbsorption={surfaceAbsorption}
             />
           </>
         );
