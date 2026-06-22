@@ -34,6 +34,7 @@ import DominantModeRootCauseAudit from "@/components/room/bass/DominantModeRootC
 import DominantModeTransferAudit from "@/components/room/bass/DominantModeTransferAudit";
 import TransferMagnitudeSanityAudit from "@/components/room/bass/TransferMagnitudeSanityAudit";
 import ModalPressureAudit from "@/components/room/bass/ModalPressureAudit";
+import DirectModalEnergyAudit from "@/components/room/bass/DirectModalEnergyAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1883,6 +1884,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               sub={sweepSub}
               surfaceAbsorption={surfaceAbsorption}
               activeSettings={sweepSettings}
+            />
+            <DirectModalEnergyAudit
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+              activeSettings={sweepSettings}
+              graphSeries={multiSeries[0]?.data ?? []}
             />
           </>
         );
