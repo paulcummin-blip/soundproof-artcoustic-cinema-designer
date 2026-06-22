@@ -48,6 +48,7 @@ import SourceCoherenceMatrixAudit from "@/components/room/bass/SourceCoherenceMa
 import FamilyCoherenceInterpolationAudit from "@/components/room/bass/FamilyCoherenceInterpolationAudit";
 import ModalOrderLimitAudit from "@/components/room/bass/ModalOrderLimitAudit";
 import ModalContributionHistogram from "@/components/room/bass/ModalContributionHistogram";
+import HighOrderSuppressionSweep from "@/components/room/bass/HighOrderSuppressionSweep";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
