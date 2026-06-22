@@ -269,7 +269,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal', highOrderAxialScale = 1.0) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal', highOrderAxialScale = 1.0, axialFamilyScale = 1.0, tangentialFamilyScale = 1.0, obliqueFamilyScale = 1.0) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -431,8 +431,16 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
         ? debugMode200Multiplier
         : 1.0;
 
-      modalSumRe += activeStoredModalContrib.real * highOrderAxialCorrectionScale * _mode200DebugOverride;
-      modalSumIm += activeStoredModalContrib.imag * highOrderAxialCorrectionScale * _mode200DebugOverride;
+      // __TEMP_DIAGNOSTIC_FAMILY_SCALES__
+      // Diagnostic-only per-family scalar applied immediately before accumulation.
+      // Does not affect mode data, Q values, coupling, or any non-modal path.
+      const _familyScale = mode.type === 'axial'      ? axialFamilyScale
+                         : mode.type === 'tangential'  ? tangentialFamilyScale
+                         : mode.type === 'oblique'     ? obliqueFamilyScale
+                         : 1.0;
+
+      modalSumRe += activeStoredModalContrib.real * highOrderAxialCorrectionScale * _mode200DebugOverride * _familyScale;
+      modalSumIm += activeStoredModalContrib.imag * highOrderAxialCorrectionScale * _mode200DebugOverride * _familyScale;
     }
 
     const isInDebugRange = frequencyHz >= 18 && frequencyHz <= 205;
@@ -618,6 +626,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
   // Diagnostic-only scale applied to axial modes with modeOrder >= 2. Default 1.00 = no change.
   const highOrderAxialScale = Number.isFinite(Number(options?.highOrderAxialScale)) ? Number(options.highOrderAxialScale) : 1.0;
+
+  // __TEMP_DIAGNOSTIC_FAMILY_SCALES__
+  // Diagnostic-only per-family amplitude scalars. Default 1.0 = no change to production behaviour.
+  // Consumed by legacyModalTransferLocal; do not affect Q, coupling, or direct/reflection paths.
+  const axialFamilyScale = Number.isFinite(Number(options?.axialFamilyScale)) ? Number(options.axialFamilyScale) : 1.0;
+  const tangentialFamilyScale = Number.isFinite(Number(options?.tangentialFamilyScale)) ? Number(options.tangentialFamilyScale) : 1.0;
+  const obliqueFamilyScale = Number.isFinite(Number(options?.obliqueFamilyScale)) ? Number(options.obliqueFamilyScale) : 1.0;
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
     throw new Error('roomDims must include finite widthM, lengthM, and heightM values.');
@@ -986,7 +1001,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         frequencyHz, modes, source, seat, { widthM, lengthM, heightM }, widthM, lengthM, heightM, modalSourceAmplitude1m, modalStorageMode, pureDeterministicModalSum, disableModalPropagationPhase, mute68HzAxialMode, propagationPhaseScale, source.tuning.delayMs, source.tuning.polarity,
         Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0, // __TEMP_REW_PARITY_MODE_200_SCALE__
         debugModalHSign, // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
-        highOrderAxialScale // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
+        highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
+        axialFamilyScale, tangentialFamilyScale, obliqueFamilyScale // __TEMP_DIAGNOSTIC_FAMILY_SCALES__
       );
 
       _debugStrongestModeForRow = _debugStrongestMode ?? null;
