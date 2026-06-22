@@ -168,6 +168,74 @@ export function analyseFrequency(targetHz, bin, freqsHz, splDbRaw) {
   };
 }
 
+// ─── transfer normalisation analysis ─────────────────────────────────────────
+
+/**
+ * For a sorted list of contributors (all modes at a given frequency),
+ * compute transfer normalisation metrics for the top N.
+ *
+ * Expected contribution if transfer = 1.0:
+ *   expected = |combinedCoupling| × 1.0
+ * Actual contribution:
+ *   actual = |combinedCoupling| × transferMag
+ *
+ * Transfer excess %  = ((actual - expected) / expected) × 100   when actual > expected
+ * Transfer deficit % = ((expected - actual) / expected) × 100   when actual < expected
+ */
+export function analyseTransfer(contributors, topN) {
+  if (!Array.isArray(contributors) || contributors.length === 0) return [];
+
+  const sorted = [...contributors]
+    .sort((a, b) => (b.activeMagnitude ?? 0) - (a.activeMagnitude ?? 0))
+    .slice(0, topN);
+
+  return sorted.map((c, i) => {
+    const coupling    = Math.abs(c.combinedCoupling ?? 0);
+    const transferMag = c.activeTransferMagnitudeAtNull ?? 0;
+    const actual      = c.activeMagnitude ?? 0;
+    const expected    = coupling; // transfer = 1.0 baseline
+    const diff        = actual - expected;
+    const excessPct   = expected > 1e-12 ? (diff / expected) * 100 : null;
+
+    return {
+      rank:             i + 1,
+      nx:               c.nx,
+      ny:               c.ny,
+      nz:               c.nz,
+      family:           c.modeType,
+      modeHz:           c.modeFrequencyHz,
+      q:                c.qValue,
+      sourceCoupling:   c.sourceCoupling ?? 0,
+      receiverCoupling: c.receiverCoupling ?? 0,
+      combinedCoupling: coupling,
+      transferMag,
+      actualContrib:    actual,
+      expectedContrib:  expected,
+      excessPct,        // positive = inflated, negative = suppressed
+    };
+  });
+}
+
+/**
+ * Compute summary statistics across top-N transfer rows.
+ * avgExcessPct: mean of excessPct values (excludes nulls).
+ * inflatedCount: modes where excessPct > 0.
+ * deflatedCount: modes where excessPct < 0.
+ */
+export function transferSummary(rows) {
+  if (!rows || rows.length === 0) return { avgExcessPct: null, inflatedCount: 0, deflatedCount: 0, count: 0 };
+  const valid = rows.filter(r => r.excessPct != null);
+  const avgExcessPct = valid.length > 0
+    ? valid.reduce((s, r) => s + r.excessPct, 0) / valid.length
+    : null;
+  return {
+    avgExcessPct,
+    inflatedCount: valid.filter(r => r.excessPct > 0).length,
+    deflatedCount: valid.filter(r => r.excessPct < 0).length,
+    count: valid.length,
+  };
+}
+
 // ─── recommendation engine ────────────────────────────────────────────────────
 
 export function buildRecommendation(freqResults) {
