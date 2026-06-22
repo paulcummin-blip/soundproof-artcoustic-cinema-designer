@@ -27,6 +27,7 @@ import RewRefinedEngineShootout from "@/components/room/bass/RewRefinedEngineSho
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import RewParityTangentialSweep from "@/components/room/bass/RewParityTangentialSweep";
 import RewParityQSweep from "@/components/room/bass/RewParityQSweep";
+import RewParityQTangentialSweep from "@/components/room/bass/RewParityQTangentialSweep";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1822,6 +1823,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               activeSettings={sweepSettings}
             />
             <RewParityQSweep
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+              activeSettings={sweepSettings}
+            />
+            <RewParityQTangentialSweep
               roomDims={roomDims}
               seat={sweepSeat}
               sub={sweepSub}
