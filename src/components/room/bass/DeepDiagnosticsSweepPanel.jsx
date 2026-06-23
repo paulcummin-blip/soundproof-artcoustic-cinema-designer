@@ -43,6 +43,7 @@ import DirectModalRatioValidationAudit from "@/components/room/bass/DirectModalR
 import ModalSourceAmplitudeProvenanceAudit from "@/components/room/bass/ModalSourceAmplitudeProvenanceAudit";
 import TransferFunctionShapeAudit from "@/components/room/bass/TransferFunctionShapeAudit";
 import TransferFunctionFormulaAudit from "@/components/room/bass/TransferFunctionFormulaAudit";
+import ModeCouplingProvenanceAudit from "@/components/room/bass/ModeCouplingProvenanceAudit";
 
 export default function DeepDiagnosticsSweepPanel({
   roomDims,
@@ -105,6 +106,7 @@ export default function DeepDiagnosticsSweepPanel({
       <ModalSourceAmplitudeProvenanceAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
       <TransferFunctionShapeAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
       <TransferFunctionFormulaAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
+      <ModeCouplingProvenanceAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
     </>
   );
 }
