@@ -53,6 +53,7 @@ import CombinedBestFitAudit from "@/components/room/bass/CombinedBestFitAudit";
 import ParityRootCauseMatrixAudit from "@/components/room/bass/ParityRootCauseMatrixAudit";
 import GlobalEnergyCalibrationAudit from "@/components/room/bass/GlobalEnergyCalibrationAudit";
 import DirectFieldDecompositionAudit from "@/components/room/bass/DirectFieldDecompositionAudit";
+import DirectReferenceLevelSweepAudit from "@/components/room/bass/DirectReferenceLevelSweepAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -2017,6 +2018,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               distanceBlend={modalDistanceBlend}
             />
             <DirectFieldDecompositionAudit
+              roomDims={roomDims}
+              subs={subsForSimulation}
+              seat={sweepSeat}
+              surfaceAbsorption={surfaceAbsorption}
+              axialQ={axialQ}
+              distanceBlend={modalDistanceBlend}
+            />
+            <DirectReferenceLevelSweepAudit
               roomDims={roomDims}
               subs={subsForSimulation}
               seat={sweepSeat}
