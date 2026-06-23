@@ -59,6 +59,7 @@ import ModalDensityAudit from "@/components/room/bass/ModalDensityAudit";
 import SourceReferenceProvenanceAudit from "@/components/room/bass/SourceReferenceProvenanceAudit";
 import RemainingSuspectsMatrixAudit from "@/components/room/bass/RemainingSuspectsMatrixAudit";
 import DirectModalEnergyRatioAudit from "@/components/room/bass/DirectModalEnergyRatioAudit";
+import ModalGainProvenanceAudit from "@/components/room/bass/ModalGainProvenanceAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -2066,6 +2067,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               activeSettings={sweepSettings}
             />
             <DirectModalEnergyRatioAudit
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+              activeSettings={sweepSettings}
+            />
+            <ModalGainProvenanceAudit
               roomDims={roomDims}
               seat={sweepSeat}
               sub={sweepSub}
