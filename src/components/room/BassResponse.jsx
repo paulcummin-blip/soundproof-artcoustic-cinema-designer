@@ -55,6 +55,7 @@ import GlobalEnergyCalibrationAudit from "@/components/room/bass/GlobalEnergyCal
 import DirectFieldDecompositionAudit from "@/components/room/bass/DirectFieldDecompositionAudit";
 import DirectReferenceLevelSweepAudit from "@/components/room/bass/DirectReferenceLevelSweepAudit";
 import ReferenceTraceAudit from "@/components/room/bass/ReferenceTraceAudit";
+import ModalDensityAudit from "@/components/room/bass/ModalDensityAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -2039,6 +2040,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               graphSeries={multiSeries[0]?.data ?? []}
               subs={subsForSimulation}
               seat={sweepSeat}
+            />
+            <ModalDensityAudit
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+              activeSettings={sweepSettings}
             />
           </>
         );
