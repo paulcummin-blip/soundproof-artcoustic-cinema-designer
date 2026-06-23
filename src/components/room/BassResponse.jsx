@@ -54,6 +54,7 @@ import ParityRootCauseMatrixAudit from "@/components/room/bass/ParityRootCauseMa
 import GlobalEnergyCalibrationAudit from "@/components/room/bass/GlobalEnergyCalibrationAudit";
 import DirectFieldDecompositionAudit from "@/components/room/bass/DirectFieldDecompositionAudit";
 import DirectReferenceLevelSweepAudit from "@/components/room/bass/DirectReferenceLevelSweepAudit";
+import ReferenceTraceAudit from "@/components/room/bass/ReferenceTraceAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -2032,6 +2033,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               surfaceAbsorption={surfaceAbsorption}
               axialQ={axialQ}
               distanceBlend={modalDistanceBlend}
+            />
+            <ReferenceTraceAudit
+              simulationResults={simulationResults}
+              graphSeries={multiSeries[0]?.data ?? []}
+              subs={subsForSimulation}
+              seat={sweepSeat}
             />
           </>
         );
