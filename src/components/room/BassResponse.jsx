@@ -25,41 +25,7 @@ import RewParityErrorBreakdown from "@/components/room/bass/RewParityErrorBreakd
 import RewBestCandidateRefiner from "@/components/room/bass/RewBestCandidateRefiner";
 import RewRefinedEngineShootout from "@/components/room/bass/RewRefinedEngineShootout";
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
-import RewParityTangentialSweep from "@/components/room/bass/RewParityTangentialSweep";
-import RewParityQSweep from "@/components/room/bass/RewParityQSweep";
-import RewParityQTangentialSweep from "@/components/room/bass/RewParityQTangentialSweep";
-import RewParity80HzAudit from "@/components/room/bass/RewParity80HzAudit";
-import ModalBandwidthDiagnostic from "@/components/room/bass/ModalBandwidthDiagnostic";
-import DominantModeRootCauseAudit from "@/components/room/bass/DominantModeRootCauseAudit";
-import DominantModeTransferAudit from "@/components/room/bass/DominantModeTransferAudit";
-import TransferMagnitudeSanityAudit from "@/components/room/bass/TransferMagnitudeSanityAudit";
-import ModalPressureAudit from "@/components/room/bass/ModalPressureAudit";
-import DirectModalEnergyAudit from "@/components/room/bass/DirectModalEnergyAudit";
-import FinalSplReconstructionAudit from "@/components/room/bass/FinalSplReconstructionAudit";
-import ModalGainSweep from "@/components/room/bass/ModalGainSweep";
-import ModalSourceModelSweep from "@/components/room/bass/ModalSourceModelSweep";
-import OffResonanceTransferAudit from "@/components/room/bass/OffResonanceTransferAudit";
-import ModeShapeAudit from "@/components/room/bass/ModeShapeAudit";
-import SubPositionParitySensitivityAudit from "@/components/room/bass/SubPositionParitySensitivityAudit";
-import ModalCoherenceSweepAudit from "@/components/room/bass/ModalCoherenceSweepAudit";
-import FamilyEnergyBreakdownAudit from "@/components/room/bass/FamilyEnergyBreakdownAudit";
-import TangentialScaleSweepAudit from "@/components/room/bass/TangentialScaleSweepAudit";
-import SourceCoherenceMatrixAudit from "@/components/room/bass/SourceCoherenceMatrixAudit";
-import FamilyCoherenceInterpolationAudit from "@/components/room/bass/FamilyCoherenceInterpolationAudit";
-import ModalOrderLimitAudit from "@/components/room/bass/ModalOrderLimitAudit";
-import ModalContributionHistogram from "@/components/room/bass/ModalContributionHistogram";
-import HighOrderSuppressionSweep from "@/components/room/bass/HighOrderSuppressionSweep";
-import CombinedBestFitAudit from "@/components/room/bass/CombinedBestFitAudit";
-import ParityRootCauseMatrixAudit from "@/components/room/bass/ParityRootCauseMatrixAudit";
-import GlobalEnergyCalibrationAudit from "@/components/room/bass/GlobalEnergyCalibrationAudit";
-import DirectFieldDecompositionAudit from "@/components/room/bass/DirectFieldDecompositionAudit";
-import DirectReferenceLevelSweepAudit from "@/components/room/bass/DirectReferenceLevelSweepAudit";
-import ReferenceTraceAudit from "@/components/room/bass/ReferenceTraceAudit";
-import ModalDensityAudit from "@/components/room/bass/ModalDensityAudit";
-import SourceReferenceProvenanceAudit from "@/components/room/bass/SourceReferenceProvenanceAudit";
-import RemainingSuspectsMatrixAudit from "@/components/room/bass/RemainingSuspectsMatrixAudit";
-import DirectModalEnergyRatioAudit from "@/components/room/bass/DirectModalEnergyRatioAudit";
-import ModalGainProvenanceAudit from "@/components/room/bass/ModalGainProvenanceAudit";
+import DeepDiagnosticsSweepPanel from "@/components/room/bass/DeepDiagnosticsSweepPanel";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1825,7 +1791,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       {/* REW Geometry Match Values + Alignment Audit — moved to Geometry & REW Import section below the graph */}
 
-      {/* ── Tangential Weight Sweep & Modal Q Sweep ── */}
+      {/* ── Deep Diagnostics Sweep (extracted to DeepDiagnosticsSweepPanel) ── */}
       {(() => {
         const sweepSeat = selectedSeatIds[0]
           ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
@@ -1846,241 +1812,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           modalCoherenceMode: 'coherent',
         };
         return (
-          <>
-            <RewParityTangentialSweep
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <RewParityQSweep
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <RewParityQTangentialSweep
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <RewParity80HzAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <ModalBandwidthDiagnostic
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <DominantModeRootCauseAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <DominantModeTransferAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <TransferMagnitudeSanityAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <ModalPressureAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <DirectModalEnergyAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-              graphSeries={multiSeries[0]?.data ?? []}
-            />
-            <FinalSplReconstructionAudit
-              simulationResults={simulationResults}
-              selectedSeatId={selectedSeatIds[0] ?? null}
-              graphSeries={multiSeries[0]?.data ?? []}
-            />
-            <ModalGainSweep
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <ModalSourceModelSweep
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <OffResonanceTransferAudit
-              roomDims={roomDims}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <ModeShapeAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <SubPositionParitySensitivityAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <ModalCoherenceSweepAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <FamilyEnergyBreakdownAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <TangentialScaleSweepAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <SourceCoherenceMatrixAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <FamilyCoherenceInterpolationAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <ModalOrderLimitAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <ModalContributionHistogram
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <HighOrderSuppressionSweep
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-            />
-            <CombinedBestFitAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-              axialQ={axialQ}
-            />
-            <ParityRootCauseMatrixAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-              axialQ={axialQ}
-              distanceBlend={modalDistanceBlend}
-            />
-            <GlobalEnergyCalibrationAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-              axialQ={axialQ}
-              distanceBlend={modalDistanceBlend}
-            />
-            <DirectFieldDecompositionAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-              axialQ={axialQ}
-              distanceBlend={modalDistanceBlend}
-            />
-            <DirectReferenceLevelSweepAudit
-              roomDims={roomDims}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-              surfaceAbsorption={surfaceAbsorption}
-              axialQ={axialQ}
-              distanceBlend={modalDistanceBlend}
-            />
-            <ReferenceTraceAudit
-              simulationResults={simulationResults}
-              graphSeries={multiSeries[0]?.data ?? []}
-              subs={subsForSimulation}
-              seat={sweepSeat}
-            />
-            <ModalDensityAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <SourceReferenceProvenanceAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <RemainingSuspectsMatrixAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <DirectModalEnergyRatioAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-            <ModalGainProvenanceAudit
-              roomDims={roomDims}
-              seat={sweepSeat}
-              sub={sweepSub}
-              surfaceAbsorption={surfaceAbsorption}
-              activeSettings={sweepSettings}
-            />
-          </>
+          <DeepDiagnosticsSweepPanel
+            roomDims={roomDims}
+            sweepSeat={sweepSeat}
+            sweepSub={sweepSub}
+            subs={subsForSimulation}
+            surfaceAbsorption={surfaceAbsorption}
+            sweepSettings={sweepSettings}
+            simulationResults={simulationResults}
+            multiSeries={multiSeries}
+            axialQ={axialQ}
+            modalDistanceBlend={modalDistanceBlend}
+          />
         );
       })()}
 
