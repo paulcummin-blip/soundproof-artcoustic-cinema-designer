@@ -40,6 +40,7 @@ import RemainingSuspectsMatrixAudit from "@/components/room/bass/RemainingSuspec
 import DirectModalEnergyRatioAudit from "@/components/room/bass/DirectModalEnergyRatioAudit";
 import ModalGainProvenanceAudit from "@/components/room/bass/ModalGainProvenanceAudit";
 import DirectModalRatioValidationAudit from "@/components/room/bass/DirectModalRatioValidationAudit";
+import ModalSourceAmplitudeProvenanceAudit from "@/components/room/bass/ModalSourceAmplitudeProvenanceAudit";
 
 export default function DeepDiagnosticsSweepPanel({
   roomDims,
@@ -99,6 +100,7 @@ export default function DeepDiagnosticsSweepPanel({
       <DirectModalEnergyRatioAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
       <ModalGainProvenanceAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
       <DirectModalRatioValidationAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
+      <ModalSourceAmplitudeProvenanceAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
     </>
   );
 }
