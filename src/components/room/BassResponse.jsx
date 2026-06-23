@@ -56,6 +56,7 @@ import DirectFieldDecompositionAudit from "@/components/room/bass/DirectFieldDec
 import DirectReferenceLevelSweepAudit from "@/components/room/bass/DirectReferenceLevelSweepAudit";
 import ReferenceTraceAudit from "@/components/room/bass/ReferenceTraceAudit";
 import ModalDensityAudit from "@/components/room/bass/ModalDensityAudit";
+import SourceReferenceProvenanceAudit from "@/components/room/bass/SourceReferenceProvenanceAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -2042,6 +2043,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               seat={sweepSeat}
             />
             <ModalDensityAudit
+              roomDims={roomDims}
+              seat={sweepSeat}
+              sub={sweepSub}
+              surfaceAbsorption={surfaceAbsorption}
+              activeSettings={sweepSettings}
+            />
+            <SourceReferenceProvenanceAudit
               roomDims={roomDims}
               seat={sweepSeat}
               sub={sweepSub}
