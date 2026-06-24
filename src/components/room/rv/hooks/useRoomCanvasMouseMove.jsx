@@ -33,7 +33,8 @@ export function useRoomCanvasMouseMove({
 }) {
   const handleMouseMove = useCallback((e) => {
     if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
-    if (!dragging || !draggedItemId) return;
+    const isMlpDragging = mlpDragActiveRef?.current === true;
+    if ((!dragging || !draggedItemId) && !isMlpDragging) return;
     setDragWarning({ show: false });
 
     if (!svgRef.current) return;
@@ -63,7 +64,7 @@ export function useRoomCanvasMouseMove({
 
     // mlpMarker: also check ref so the branch fires on the very first mousemove
     // frame before React state has flushed from the synchronous mousedown.
-    if (dragType === 'mlpMarker' || mlpDragActiveRef?.current) {
+    if (dragType === 'mlpMarker' || isMlpDragging) {
       handleMlpDrag?.(draggedItemId || 'mlp-marker-dot', targetRoomPos);
     } else if (dragType === 'speaker') {
       handleSpeakerDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
