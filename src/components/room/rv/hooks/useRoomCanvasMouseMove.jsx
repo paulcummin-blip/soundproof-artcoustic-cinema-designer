@@ -28,6 +28,8 @@ export function useRoomCanvasMouseMove({
   handleRoomElementDrag,
   // RSP marker drag
   handleMlpDrag,
+  // Ref-based RSP drag guard — set synchronously in mousedown, never stale
+  mlpDragActiveRef,
 }) {
   const handleMouseMove = useCallback((e) => {
     if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
@@ -59,7 +61,11 @@ export function useRoomCanvasMouseMove({
     const clampedCanvasX = Math.max(roomRect?.x ?? 0, Math.min((roomRect?.x ?? 0) + (roomRect?.width ?? 0), targetCanvasPos.x));
     const clampedCanvasY = Math.max(roomRect?.y ?? 0, Math.min((roomRect?.y ?? 0) + (roomRect?.height ?? 0), targetCanvasPos.y));
 
-    if (dragType === 'speaker') {
+    // mlpMarker: also check ref so the branch fires on the very first mousemove
+    // frame before React state has flushed from the synchronous mousedown.
+    if (dragType === 'mlpMarker' || mlpDragActiveRef?.current) {
+      handleMlpDrag?.(draggedItemId || 'mlp-marker-dot', targetRoomPos);
+    } else if (dragType === 'speaker') {
       handleSpeakerDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'seat') {
       handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
@@ -70,15 +76,13 @@ export function useRoomCanvasMouseMove({
       handleProjectorDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'roomElement') {
       handleRoomElementDrag?.(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
-    } else if (dragType === 'mlpMarker') {
-      handleMlpDrag?.(draggedItemId, targetRoomPos);
     }
   }, [
     dragging, draggedItemId, dragType, dragState,
     setDragWarning, svgRef, canvasToRoom, roomToCanvas,
     dragOffsetRoomRef, roomRect, placedSpeakers,
     handleSpeakerDrag, handleSeatDrag, handleSubDrag, handleProjectorDrag,
-    handleRoomElementDrag, handleMlpDrag, setDragState,
+    handleRoomElementDrag, handleMlpDrag, setDragState, mlpDragActiveRef,
   ]);
 
   return { handleMouseMove };

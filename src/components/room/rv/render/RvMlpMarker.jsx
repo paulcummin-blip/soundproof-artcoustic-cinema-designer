@@ -22,7 +22,20 @@ export default function RvMlpMarker({
   const isManual = rspMode === "manual_position";
 
   return (
-    <g data-testid="mlp-marker">
+    <g data-testid="mlp-marker" style={{ pointerEvents: isManual ? "all" : "none" }}>
+      {/* Invisible oversized hit target — ensures easy grab even at zoom */}
+      {isManual && (
+        <circle
+          cx={x}
+          cy={y}
+          r={14}
+          fill="transparent"
+          pointerEvents="all"
+          style={{ cursor: "grab" }}
+          onMouseDown={onMouseDown}
+        />
+      )}
+
       {/* Pulse ring — only shown in manual mode as drag affordance */}
       {isManual && (
         <circle
@@ -33,8 +46,7 @@ export default function RvMlpMarker({
           stroke="#22c55e"
           strokeWidth={1.5}
           opacity={0.4}
-          style={{ cursor: "grab" }}
-          onMouseDown={onMouseDown}
+          pointerEvents="none"
         />
       )}
 
@@ -47,8 +59,8 @@ export default function RvMlpMarker({
         stroke="#ffffff"
         strokeWidth={2}
         opacity={0.9}
+        pointerEvents="none"
         style={{ cursor: isManual ? "grab" : "default" }}
-        onMouseDown={isManual ? onMouseDown : undefined}
       />
 
       {/* Label */}

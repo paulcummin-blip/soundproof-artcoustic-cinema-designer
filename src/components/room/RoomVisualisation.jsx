@@ -355,6 +355,7 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const isDraggingSpeakerRef = useRef(false);
   const isAnyDraggingRef = React.useRef(false);
   const dragOffsetRoomRef = useRef({ x: 0, y: 0 });
+  const mlpDragActiveRef = useRef(false); // set synchronously in mousedown, never stale
   const seatDragStartRef = useRef(null);
   const draggedSubWallRef = useRef(null);
   const draggedSubTypeRef = useRef(null);
@@ -1342,9 +1343,10 @@ const byId = useEntitiesById({
     handleProjectorDrag,
     handleRoomElementDrag,
     handleMlpDrag,
+    mlpDragActiveRef,
   });
 
-  const { handleMouseUp } = useMouseUpHandler({
+  const { handleMouseUp: _handleMouseUpRaw } = useMouseUpHandler({
     dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers,
     setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW,
     isDraggingSubRef, isAnyDraggingRef, isDraggingSpeakerRef, dragOffsetRoomRef,
@@ -1353,6 +1355,12 @@ const byId = useEntitiesById({
     widthM, getModelDimsM, commitDraftSubPositions,
     _lastValidDraftFrontSubsRef, _lastValidDraftRearSubsRef,
   });
+
+  // Wrap mouseup so mlpDragActiveRef is always cleared, regardless of drag type
+  const handleMouseUp = useCallback((e) => {
+    mlpDragActiveRef.current = false;
+    _handleMouseUpRaw(e);
+  }, [_handleMouseUpRaw]);
 
   // Window-level drag cleanup — fires for ALL drag types when mouse is released outside the SVG
   useEffect(() => {
@@ -1801,6 +1809,7 @@ useEffect(() => {
   const handleMlpMarkerMouseDown = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
+    mlpDragActiveRef.current = true;
     handleMouseDown(e, 'mlp-marker-dot', 'mlpMarker');
   }, [handleMouseDown]);
 
