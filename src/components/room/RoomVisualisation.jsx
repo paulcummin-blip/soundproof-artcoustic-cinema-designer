@@ -64,6 +64,7 @@ import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWi
 import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
 import { useShiftSeatsToAngle } from "@/components/room/rv/hooks/useShiftSeatsToAngle";
 import { useApplyLcrFromDetail } from "@/components/room/rv/hooks/useApplyLcrFromDetail";
+import { useEffectiveRsp } from "@/components/room/rsp/useEffectiveRsp";
 import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver";
 import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation";
 import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic";
@@ -260,10 +261,16 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   };
 
   // The fixed RSP is always the pure 57.5° position from screen, independent of seat offset.
-  // appState.mlpY_m is now the true RSP (never includes seatingBlockOffset).
-  const _fixedRspY = rspMode === 'manual_position'
-    ? (Number.isFinite(Number(props.manualRspY_m)) ? Number(props.manualRspY_m) : undefined)
-    : (Number.isFinite(appState?.mlpY_m) ? appState.mlpY_m : undefined);
+  // useEffectiveRsp is the single read-path: manual_position wins when manualRspY_m is finite.
+  const { effectiveRspY_m } = useEffectiveRsp({
+    rspMode,
+    manualRspY_m,
+    screenFrontPlaneM: Number.isFinite(Number(appState?.screenFrontPlaneM)) ? Number(appState.screenFrontPlaneM) : 0,
+    screenWidthM: Number(screen?.visibleWidthM ?? (Number(screen?.visibleWidthInches || 100) * 0.0254)),
+    currentMlpY_m: appState?.mlpY_m ?? null,
+    rowDerivedRspYByMode: {},
+  });
+  const _fixedRspY = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : undefined;
 
   const mlp = useMlpCalculation({
     mlpPoint,
