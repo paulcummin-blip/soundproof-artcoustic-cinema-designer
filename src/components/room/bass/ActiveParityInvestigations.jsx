@@ -13,6 +13,7 @@ import ModalParticipationWeightingMatrixAudit from './ModalParticipationWeightin
 import TransferFunctionShapeMatrixAudit from './TransferFunctionShapeMatrixAudit';
 import ModalExcitationAmplitudeAudit from './ModalExcitationAmplitudeAudit';
 import RewParityBenchmark from './RewParityBenchmark';
+import RewBenchmarkProvenancePanel from './RewBenchmarkProvenancePanel';
 import RewBenchmarkComparisonTable from './RewBenchmarkComparisonTable';
 import RewCandidateComparisonPanel from './RewCandidateComparisonPanel';
 import RewParityAutoSweep from './RewParityAutoSweep';
@@ -145,6 +146,21 @@ export default function ActiveParityInvestigations({
 
       {/* ── Investigation Tracker ── */}
       <InvestigationTracker investigations={INVESTIGATIONS} />
+
+      {/* ── 0. REW Benchmark Provenance Panel ── */}
+      <details style={{ border: '1px solid #fca5a5', borderRadius: 8, background: '#fef2f2', padding: '6px 10px', marginBottom: 8 }}>
+        <summary style={{ fontWeight: 700, color: '#991b1b', fontSize: 10, cursor: 'pointer' }}>
+          REW Benchmark Provenance — enter REW setup for like-for-like validation
+        </summary>
+        <div style={{ marginTop: 8 }}>
+          <RewBenchmarkProvenancePanel
+            roomDims={roomDims}
+            subsForSimulation={subsForSimulation}
+            seatingPositions={seatingPositions}
+            multiSeries={multiSeries}
+          />
+        </div>
+      </details>
 
       {/* ── REW Benchmark Comparison (always visible — primary MAE readout) ── */}
       <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginBottom: 8 }}>
