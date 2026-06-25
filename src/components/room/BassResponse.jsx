@@ -27,6 +27,7 @@ import RewRefinedEngineShootout from "@/components/room/bass/RewRefinedEngineSho
 import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimiser";
 import DeepDiagnosticsSweepPanel from "@/components/room/bass/DeepDiagnosticsSweepPanel";
 import ModalSourceNormalisationAudit from "@/components/room/bass/ModalSourceNormalisationAudit";
+import MultiSeatParityValidationAudit from "@/components/room/bass/MultiSeatParityValidationAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1818,6 +1819,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       </div>
 
       {/* REW Geometry Match Values + Alignment Audit — moved to Geometry & REW Import section below the graph */}
+
+      {/* ── Multi-Seat REW Parity Validation Audit ── */}
+      <MultiSeatParityValidationAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+        axialQ={axialQ}
+      />
 
       {/* ── Modal Source Normalisation Matrix Audit ── */}
       {(() => {
