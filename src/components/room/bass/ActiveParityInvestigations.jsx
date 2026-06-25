@@ -11,6 +11,7 @@ import ModalSourceNormalisationAudit from './ModalSourceNormalisationAudit';
 import ModalQDampingParityAudit from './ModalQDampingParityAudit';
 import ModalParticipationWeightingMatrixAudit from './ModalParticipationWeightingMatrixAudit';
 import TransferFunctionShapeMatrixAudit from './TransferFunctionShapeMatrixAudit';
+import ModalExcitationAmplitudeAudit from './ModalExcitationAmplitudeAudit';
 import RewParityBenchmark from './RewParityBenchmark';
 import RewBenchmarkComparisonTable from './RewBenchmarkComparisonTable';
 import RewCandidateComparisonPanel from './RewCandidateComparisonPanel';
@@ -22,7 +23,8 @@ const INVESTIGATIONS = [
   { id: 'multi_seat_parity',    label: 'Multi-Seat Parity Validation',      status: 'Running',  note: 'Active — verifying distance_normalized across all seats' },
   { id: 'modal_q_damping',      label: 'Modal Q / Damping Parity',           status: 'Pending',  note: 'New — compare Q implementation against REW' },
   { id: 'modal_participation',  label: 'Modal Participation Weighting Matrix', status: 'Running',  note: 'New — dominant-mode / family / redistribution vs MAE' },
-  { id: 'tf_shape_matrix',     label: 'Transfer Function Shape Matrix',        status: 'Running',  note: 'New — TF formulation variants vs REW parity' },
+  { id: 'tf_shape_matrix',       label: 'Transfer Function Shape Matrix',          status: 'Running',  note: 'New — TF formulation variants vs REW parity' },
+  { id: 'modal_excitation_amp', label: 'Modal Excitation Amplitude Audit',         status: 'Running',  note: 'New — excitation generation before TF vs REW parity' },
   { id: 'modal_source_norm',    label: 'Modal Source Normalisation Matrix',   status: 'Running',  note: 'Active — distance_normalized vs existing at MLP' },
   { id: 'rew_benchmark',        label: 'REW Benchmark Comparison',            status: 'Running',  note: 'Always active — primary MAE readout' },
   { id: 'candidate_comparison', label: 'Candidate Comparison Panel',          status: 'Running',  note: 'Active — comparing engine variants' },
@@ -198,7 +200,17 @@ export default function ActiveParityInvestigations({
         axialQ={axialQ}
       />
 
-      {/* ── 5. Modal Source Normalisation Matrix ── */}
+      {/* ── 5. Modal Excitation Amplitude Audit ── */}
+      <ModalExcitationAmplitudeAudit
+        roomDims={roomDims}
+        seat={seat}
+        sub={sub}
+        seatingPositions={seatingPositions}
+        surfaceAbsorption={surfaceAbsorption}
+        axialQ={axialQ}
+      />
+
+      {/* ── 6. Modal Source Normalisation Matrix ── */}
       <ModalSourceNormalisationAudit
         roomDims={roomDims}
         seat={seat}
