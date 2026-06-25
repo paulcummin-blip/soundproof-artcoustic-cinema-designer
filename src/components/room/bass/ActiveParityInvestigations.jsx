@@ -14,6 +14,7 @@ import TransferFunctionShapeMatrixAudit from './TransferFunctionShapeMatrixAudit
 import ModalExcitationAmplitudeAudit from './ModalExcitationAmplitudeAudit';
 import GreenFunctionEquationShootoutAudit from './GreenFunctionEquationShootoutAudit';
 import DestructiveNullStoryAudit from './DestructiveNullStoryAudit';
+import PhaseOriginPropagationAudit from './PhaseOriginPropagationAudit';
 import RewParityBenchmark from './RewParityBenchmark';
 import RewBenchmarkProvenancePanel from './RewBenchmarkProvenancePanel';
 import RewBenchmarkComparisonTable from './RewBenchmarkComparisonTable';
@@ -238,7 +239,16 @@ export default function ActiveParityInvestigations({
         axialQ={axialQ}
       />
 
-      {/* ── 7. Green's Function Equation Shootout ── */}
+      {/* ── 7. Phase Origin & Propagation Audit ── */}
+      <PhaseOriginPropagationAudit
+        roomDims={roomDims}
+        seat={seat}
+        sub={sub}
+        surfaceAbsorption={surfaceAbsorption}
+        axialQ={axialQ}
+      />
+
+      {/* ── 8. Green's Function Equation Shootout ── */}
       <GreenFunctionEquationShootoutAudit
         roomDims={roomDims}
         sub={sub}
