@@ -12,6 +12,8 @@ import ModalQDampingParityAudit from './ModalQDampingParityAudit';
 import ModalParticipationWeightingMatrixAudit from './ModalParticipationWeightingMatrixAudit';
 import TransferFunctionShapeMatrixAudit from './TransferFunctionShapeMatrixAudit';
 import ModalExcitationAmplitudeAudit from './ModalExcitationAmplitudeAudit';
+import GreenFunctionEquationShootoutAudit from './GreenFunctionEquationShootoutAudit';
+import DestructiveNullStoryAudit from './DestructiveNullStoryAudit';
 import RewParityBenchmark from './RewParityBenchmark';
 import RewBenchmarkProvenancePanel from './RewBenchmarkProvenancePanel';
 import RewBenchmarkComparisonTable from './RewBenchmarkComparisonTable';
@@ -226,7 +228,26 @@ export default function ActiveParityInvestigations({
         axialQ={axialQ}
       />
 
-      {/* ── 6. Modal Source Normalisation Matrix ── */}
+      {/* ── 6. Destructive Null Story Audit ── */}
+      <DestructiveNullStoryAudit
+        roomDims={roomDims}
+        seat={seat}
+        sub={sub}
+        seatingPositions={seatingPositions}
+        surfaceAbsorption={surfaceAbsorption}
+        axialQ={axialQ}
+      />
+
+      {/* ── 7. Green's Function Equation Shootout ── */}
+      <GreenFunctionEquationShootoutAudit
+        roomDims={roomDims}
+        sub={sub}
+        seatingPositions={seatingPositions}
+        surfaceAbsorption={surfaceAbsorption}
+        axialQ={axialQ}
+      />
+
+      {/* ── 7. Modal Source Normalisation Matrix ── */}
       <ModalSourceNormalisationAudit
         roomDims={roomDims}
         seat={seat}
