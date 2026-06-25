@@ -28,6 +28,8 @@ import SubwooferDelayOptimiser from "@/components/room/bass/SubwooferDelayOptimi
 import DeepDiagnosticsSweepPanel from "@/components/room/bass/DeepDiagnosticsSweepPanel";
 import ModalSourceNormalisationAudit from "@/components/room/bass/ModalSourceNormalisationAudit";
 import MultiSeatParityValidationAudit from "@/components/room/bass/MultiSeatParityValidationAudit";
+import ActiveParityInvestigations from "@/components/room/bass/ActiveParityInvestigations";
+import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1241,164 +1243,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               )}
             </div>
 
-            {/* ── REW Parity Investigation Runner ── */}
-            {rewSourceCurveMode === 'flat_rew_reference' && (() => {
-              const participSeat = selectedSeatIds[0]
-                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
-                : null;
-              const participSub = subsForSimulation[0] ?? null;
-              return (
-                <>
-                  <RewParityInvestigationRunner
-                    liveB44Series={multiSeries[0]?.data ?? []}
-                  />
-                  {/* ── REW Parity Modal Participation Audit — runs with one button ── */}
-                  <RewParityModalParticipationAudit
-                    roomDims={roomDims}
-                    seat={participSeat}
-                    sub={participSub}
-                    surfaceAbsorption={surfaceAbsorption}
-                    activeSettings={{
-                      axialQ,
-                      modalDistanceBlend,
-                      modalSourceReferenceMode,
-                      modalGainScalar,
-                    }}
-                  />
-                  {/* ── REW Parity Combined Root Cause Audit — 900 combos, one button ── */}
-                  <RewParityCombinedRootCauseAudit
-                    roomDims={roomDims}
-                    seat={participSeat}
-                    sub={participSub}
-                    surfaceAbsorption={surfaceAbsorption}
-                    activeSettings={{ axialQ }}
-                  />
-                  {/* ── REW Parity Participation Decay Audit — hard vs soft suppression ── */}
-                  <RewParityParticipationDecayAudit
-                    roomDims={roomDims}
-                    seat={participSeat}
-                    sub={participSub}
-                    surfaceAbsorption={surfaceAbsorption}
-                    activeSettings={{ axialQ }}
-                  />
-                  {/* ── REW Production Candidate Generator — 1600-combo full sweep ── */}
-                  <RewProductionCandidateGenerator
-                    roomDims={roomDims}
-                    seat={participSeat}
-                    sub={participSub}
-                    surfaceAbsorption={surfaceAbsorption}
-                    activeSettings={{ axialQ }}
-                  />
-                  {/* ── REW Engine Shootout — direct head-to-head comparison ── */}
-                  <RewEngineShootout
-                    roomDims={roomDims}
-                    seat={participSeat}
-                    sub={participSub}
-                    surfaceAbsorption={surfaceAbsorption}
-                    activeSettings={{ axialQ }}
-                  />
-                  {/* ── REW Parity Error Breakdown — 10-variant compact diagnostic ── */}
-                  <RewParityErrorBreakdown
-                    roomDims={roomDims}
-                    seat={participSeat}
-                    sub={participSub}
-                    surfaceAbsorption={surfaceAbsorption}
-                    activeSettings={{ axialQ }}
-                  />
-                  {/* ── REW Best Candidate Refiner — fine-sweep around winner ── */}
-                  <RewBestCandidateRefiner
-                    roomDims={roomDims}
-                    seat={participSeat}
-                    sub={participSub}
-                    surfaceAbsorption={surfaceAbsorption}
-                    activeSettings={{ axialQ }}
-                  />
-                </>
-              );
-            })()}
-
-            {/* ── REW Refined Engine Shootout — final 3-way comparison ── */}
-            {rewSourceCurveMode === 'flat_rew_reference' && (() => {
-              const refinedSeat = selectedSeatIds[0]
-                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
-                : null;
-              const refinedSub = subsForSimulation[0] ?? null;
-              return (
-                <RewRefinedEngineShootout
-                  roomDims={roomDims}
-                  seat={refinedSeat}
-                  sub={refinedSub}
-                  surfaceAbsorption={surfaceAbsorption}
-                  activeSettings={{ axialQ }}
-                  onPromoteRefined={(spec) => setActiveTestEngine(spec)}
-                />
-              );
-            })()}
-
-            {/* ── REW Parity Auto Sweep ── */}
-            {rewSourceCurveMode === 'flat_rew_reference' && (() => {
-              const sweepSeat = selectedSeatIds[0]
-                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
-                : null;
-              const sweepSub = subsForSimulation[0] ?? null;
-              return (
-                <RewParityAutoSweep
-                  roomDims={roomDims}
-                  seat={sweepSeat}
-                  sub={sweepSub}
-                  surfaceAbsorption={surfaceAbsorption}
-                  liveB44Series={multiSeries[0]?.data ?? []}
-                  activeSettings={{
-                    modalSourceReferenceMode,
-                    modalDistanceBlend,
-                    modalCoherenceMode,
-                    axialQ,
-                    highOrderAxialScale,
-                    rewParityModalMagnitudeScale,
-                    modalGainScalar,
-                    enableReflections: (() => {
-                      const _isParityFullField = rewSourceCurveMode === 'flat_rew_reference' && rewParityFieldMode === 'full_field';
-                      return _isParityFullField ? false : enableRewCoreReflections;
-                    })(),
-                    disableLateField: (() => {
-                      const _isParityFullField = rewSourceCurveMode === 'flat_rew_reference' && rewParityFieldMode === 'full_field';
-                      return _isParityFullField ? true : disableLateField;
-                    })(),
-                    propagationPhaseScale: 0,
-                    pureDeterministicModalSum: true,
-                    disableModalPropagationPhase: true,
-                    modalStorageMode,
-                  }}
-                />
-              );
-            })()}
-
-            {/* ── REW Parity Candidate Comparison (axialQ=4 vs axialQ=8) ── */}
-            {rewSourceCurveMode === 'flat_rew_reference' && (() => {
-              const candidateSeat = selectedSeatIds[0]
-                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
-                : null;
-              const candidateSub = subsForSimulation[0] ?? null;
-              const candidateSourceCurve = REW_SOURCE_CURVES['flat_rew_reference'];
-              return (
-                <div style={{ marginTop: 12, borderTop: '1px solid #CBD5E1', paddingTop: 10 }}>
-                  <RewCandidateComparisonPanel
-                    roomDims={roomDims}
-                    seat={candidateSeat}
-                    sub={candidateSub}
-                    sourceCurve={candidateSourceCurve}
-                    modalSourceReferenceMode={modalSourceReferenceMode}
-                    modalGainScalar={modalGainScalar}
-                    propagationPhaseScale={propagationPhaseScale}
-                    surfaceAbsorption={surfaceAbsorption}
-                    enableRewCoreReflections={enableRewCoreReflections}
-                    rewParityModalMagnitudeScale={rewParityModalMagnitudeScale}
-                    debugModalPhaseConvention={debugModalPhaseConvention}
-                    debugModalHSign={debugModalHSign}
-                  />
-                </div>
-              );
-            })()}
+            {/* Investigation tools moved to Deep Engine Diagnostics → ActiveParityInvestigations / ArchivedInvestigations */}
           </div>
         </div>
       )}
@@ -1605,14 +1450,98 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
 
-      {/* ── Deep diagnostics (legacy, collapsed) ── */}
+      {/* ── Deep Engine Diagnostics (reorganised) ── */}
       {IS_DEVELOPMENT_MODE && (
         <details style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginBottom: 4 }}>
           <summary style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
-            Deep Engine Diagnostics (open only if requested)
+            Deep Engine Diagnostics
           </summary>
           <div style={{ marginTop: 8 }}>
 
+            {/* ── SECTION 1: Active REW Parity Investigation ── */}
+            <div style={{ fontWeight: 700, color: '#213428', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, paddingBottom: 6, borderBottom: '2px solid #213428' }}>
+              Section 1 — Active REW Parity Investigation
+            </div>
+            {(() => {
+              const activeSeat = selectedSeatIds[0]
+                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+                : null;
+              const activeSub = subsForSimulation[0] ?? null;
+              return (
+                <ActiveParityInvestigations
+                  roomDims={roomDims}
+                  seat={activeSeat}
+                  sub={activeSub}
+                  seatingPositions={seatingPositions}
+                  subsForSimulation={subsForSimulation}
+                  surfaceAbsorption={surfaceAbsorption}
+                  axialQ={axialQ}
+                  multiSeries={multiSeries}
+                  modalSourceReferenceMode={modalSourceReferenceMode}
+                  modalGainScalar={modalGainScalar}
+                  modalDistanceBlend={modalDistanceBlend}
+                  propagationPhaseScale={propagationPhaseScale}
+                  enableRewCoreReflections={enableRewCoreReflections}
+                  rewParityModalMagnitudeScale={rewParityModalMagnitudeScale}
+                  debugModalPhaseConvention={debugModalPhaseConvention}
+                  debugModalHSign={debugModalHSign}
+                  modalCoherenceMode={modalCoherenceMode}
+                  modalStorageMode={modalStorageMode}
+                  disableLateField={disableLateField}
+                  onPromoteRefined={(spec) => setActiveTestEngine(spec)}
+                />
+              );
+            })()}
+
+            {/* ── SECTION 2: Archived Investigations ── */}
+            <div style={{ fontWeight: 700, color: '#4c1d95', fontSize: 11, fontFamily: 'monospace', margin: '16px 0 8px', paddingBottom: 6, borderBottom: '2px solid #c4b5fd' }}>
+              Section 2 — Archived Investigations
+            </div>
+            {(() => {
+              const archiveSeat = selectedSeatIds[0]
+                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+                : null;
+              const archiveSub = subsForSimulation[0] ?? null;
+              const archiveSweepSettings = {
+                axialQ, modalSourceReferenceMode, modalGainScalar,
+                propagationPhaseScale: 0, pureDeterministicModalSum: true,
+                disableModalPropagationPhase: true, modalStorageMode,
+                highOrderAxialScale, rewParityModalMagnitudeScale,
+                enableReflections: false, disableLateField: true, modalCoherenceMode: 'coherent',
+              };
+              return (
+                <ArchivedInvestigations
+                  roomDims={roomDims}
+                  seat={archiveSeat}
+                  sub={archiveSub}
+                  subs={subsForSimulation}
+                  seatingPositions={seatingPositions}
+                  surfaceAbsorption={surfaceAbsorption}
+                  axialQ={axialQ}
+                  multiSeries={multiSeries}
+                  simulationResults={simulationResults}
+                  sweepSettings={archiveSweepSettings}
+                  modalDistanceBlend={modalDistanceBlend}
+                  modalSourceReferenceMode={modalSourceReferenceMode}
+                  modalGainScalar={modalGainScalar}
+                  disableModalPropagationPhase={disableModalPropagationPhase}
+                  propagationPhaseScale={propagationPhaseScale}
+                  rewSourceCurveMode={rewSourceCurveMode}
+                  selectedSeatIds={selectedSeatIds}
+                  subsForSimulation={subsForSimulation}
+                  frontSubsCfg={frontSubsCfg}
+                  enableRewCoreReflections={enableRewCoreReflections}
+                  disableLateField={disableLateField}
+                  modalStorageMode={modalStorageMode}
+                  disableReflectionPhaseJitter={disableReflectionPhaseJitter}
+                  disableReflectionCoherenceWeight={disableReflectionCoherenceWeight}
+                  mute68HzAxialMode={mute68HzAxialMode}
+                  debugDisableModalContribution={debugDisableModalContribution}
+                />
+              );
+            })()}
+
+            {/* ── Inline geometry debug panels (preserved) ── */}
       {/* __B44_SEAT_MAP_DEBUG__ */}
       {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
         const debugRows = orderedSeats.map((seat) => {
@@ -1755,132 +1684,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         );
       })()}
 
-      {/* __B44_STEP_DEBUG__ */}
-      {(() => {
-        const debugSeat = selectedSeatIds[0]
-          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
-          : null;
-        const debugSub = subsForSimulation[0] ?? null;
-        return (
-          <RewDebugPanel
-            stepDebug={simulationResults.stepDebug}
-            selectedSeatIds={selectedSeatIds}
-            disableModalPropagationPhase={disableModalPropagationPhase}
-            propagationPhaseScale={propagationPhaseScale}
-            roomDims={roomDims}
-            seat={debugSeat}
-            sub={debugSub}
-            surfaceAbsorption={surfaceAbsorption}
-            activeSettings={{ axialQ, modalSourceReferenceMode, modalDistanceBlend, modalGainScalar }}
-          />
-        );
-      })()}
+      {/* RewDebugPanel moved to ArchivedInvestigations */}
 
-      {/* Development delay optimiser */}
-      {(() => {
-        const optimiserSeat = seatingPositions?.find(s => s.id === selectedSeatIds[0] || `${s.x}-${s.y}` === selectedSeatIds[0]) || seatingPositions?.[0];
-        const frontSettingsById = frontSubsCfg?.settingsById || {};
-        const firstFrontSubId = subsForSimulation.find(s => s.id?.startsWith('front-'))?.id;
-        const currentManualDelay = firstFrontSubId && Number.isFinite(frontSettingsById[firstFrontSubId]?.delayMs) ? frontSettingsById[firstFrontSubId].delayMs : 0;
-        return (
-          <SubwooferDelayOptimiser
-            mlpSeat={optimiserSeat}
-            roomDims={roomDims}
-            subsForSimulation={subsForSimulation}
-            rewSourceCurveMode={rewSourceCurveMode}
-            REW_SOURCE_CURVES={REW_SOURCE_CURVES}
-            enableRewCoreReflections={enableRewCoreReflections}
-            surfaceAbsorption={surfaceAbsorption}
-            modalSourceReferenceMode={modalSourceReferenceMode}
-            modalGainScalar={modalGainScalar}
-            axialQ={axialQ}
-            modalStorageMode={modalStorageMode}
-            propagationPhaseScale={propagationPhaseScale}
-            disableReflectionPhaseJitter={disableReflectionPhaseJitter}
-            disableReflectionCoherenceWeight={disableReflectionCoherenceWeight}
-            disableLateField={disableLateField}
-            disableModalPropagationPhase={disableModalPropagationPhase}
-            mute68HzAxialMode={mute68HzAxialMode}
-            debugDisableModalContribution={debugDisableModalContribution}
-            currentManualDelay={currentManualDelay}
-          />
-        );
-      })()}
+      {/* Delay optimiser moved to ArchivedInvestigations */}
 
-      {/* REW Parity Benchmark */}
-      <div style={{ border: '1px solid #213428', borderRadius: 8, background: '#f0fdf4', padding: 12, marginTop: 8 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, color: '#213428', marginBottom: 8 }}>REW Parity Benchmark</div>
-        <RewParityBenchmark
-          b44Series={multiSeries[0]?.data ?? []}
-          stepDebug={simulationResults.stepDebug}
-          wholeCurveDebugRows={simulationResults.wholeCurveDebugRows}
-          modalSourceReferenceMode={modalSourceReferenceMode}
-        />
-      </div>
-
-      {/* REW Geometry Match Values + Alignment Audit — moved to Geometry & REW Import section below the graph */}
-
-      {/* ── Multi-Seat REW Parity Validation Audit ── */}
-      <MultiSeatParityValidationAudit
-        roomDims={roomDims}
-        seatingPositions={seatingPositions}
-        subsForSimulation={subsForSimulation}
-        surfaceAbsorption={surfaceAbsorption}
-        axialQ={axialQ}
-      />
-
-      {/* ── Modal Source Normalisation Matrix Audit ── */}
-      {(() => {
-        const normAuditSeat = selectedSeatIds[0]
-          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
-          : null;
-        const normAuditSub = subsForSimulation[0] ?? null;
-        return (
-          <ModalSourceNormalisationAudit
-            roomDims={roomDims}
-            seat={normAuditSeat}
-            sub={normAuditSub}
-            surfaceAbsorption={surfaceAbsorption}
-            axialQ={axialQ}
-          />
-        );
-      })()}
-
-      {/* ── Deep Diagnostics Sweep (extracted to DeepDiagnosticsSweepPanel) ── */}
-      {(() => {
-        const sweepSeat = selectedSeatIds[0]
-          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
-          : null;
-        const sweepSub = subsForSimulation[0] ?? null;
-        const sweepSettings = {
-          axialQ,
-          modalSourceReferenceMode,
-          modalGainScalar,
-          propagationPhaseScale: 0,
-          pureDeterministicModalSum: true,
-          disableModalPropagationPhase: true,
-          modalStorageMode,
-          highOrderAxialScale,
-          rewParityModalMagnitudeScale,
-          enableReflections: false,
-          disableLateField: true,
-          modalCoherenceMode: 'coherent',
-        };
-        return (
-          <DeepDiagnosticsSweepPanel
-            roomDims={roomDims}
-            sweepSeat={sweepSeat}
-            sweepSub={sweepSub}
-            subs={subsForSimulation}
-            surfaceAbsorption={surfaceAbsorption}
-            sweepSettings={sweepSettings}
-            simulationResults={simulationResults}
-            multiSeries={multiSeries}
-            axialQ={axialQ}
-            modalDistanceBlend={modalDistanceBlend}
-          />
-        );
-      })()}
+      {/* REW Geometry Match Values + Alignment Audit — in Geometry & REW Import section below the graph */}
 
           </div>
         </details>
