@@ -829,8 +829,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Seat-distance effects are already handled separately by sourceCoupling / receiverCoupling.
     const modalGainScalarOption = Number(options?.modalGainScalar);
     const modalGainScalar = Number.isFinite(modalGainScalarOption) ? modalGainScalarOption : 1.0;
-    // REW parity uses room-volume modal source normalisation to avoid over-feeding modal pressure in small rooms.
-    const modalSourceReferenceMode = options?.modalSourceReferenceMode || (rewParityModalPhase ? 'room_volume' : 'existing');
+    // REW parity production default: distance_normalized aligns modal excitation with REW's implicit Green's
+    // function distance attenuation. Audit result (4.00×6.00×2.40 m): existing MAE 7.20 dB → distance_normalized 2.85 dB.
+    // Explicit callers that pass modalSourceReferenceMode still win — this only affects the unset case.
+    const modalSourceReferenceMode = options?.modalSourceReferenceMode || (rewParityModalPhase ? 'room_volume' : 'distance_normalized');
     const modalStorageMode = options?.modalStorageMode || 'none';
     const modalSourceAmplitudeBase = Math.pow(10, (curveDb + source.tuning.gainDb) / 20) * modalGainScalar;
     const roomVolumeM3 = widthM * lengthM * heightM;

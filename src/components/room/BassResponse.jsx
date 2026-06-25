@@ -38,7 +38,7 @@ const IS_DEVELOPMENT_MODE = true;
 // propagationPhaseScale 0.10 was chosen by sweep on 2026-06-13 (null centre 40.4 Hz vs REW 40.6 Hz).
 const REW_PARITY_PRESET = {
   rewSourceCurveMode: 'flat_rew_reference',
-  modalSourceReferenceMode: 'distance_blend',
+  modalSourceReferenceMode: 'distance_normalized',
   modalDistanceBlend: 0.55,
   modalGainScalar: 1.0,
   axialQ: 4.0,
@@ -1121,6 +1121,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div>Modal source: {modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</div>
               {modalSourceReferenceMode === 'distance_blend' && <div style={{ color: '#b45309', fontWeight: 700 }}>Modal distance blend: {modalDistanceBlend.toFixed(2)}</div>}
               <div>Modal gain: {modalGainScalar.toFixed(1)}</div>
+              {(() => {
+                // Distance normalisation factor readout — mirrors the engine's distance_normalized path
+                const _dnSeat = selectedSeatIds[0]
+                  ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+                  : null;
+                const _dnSub = subsForSimulation[0] ?? null;
+                if (!_dnSeat || !_dnSub) return null;
+                const _seatZ = Number.isFinite(Number(_dnSeat.z)) ? Number(_dnSeat.z) : 1.2;
+                const _dx = _dnSub.x - _dnSeat.x;
+                const _dy = _dnSub.y - _dnSeat.y;
+                const _dz = (_dnSub.z ?? 0.35) - _seatZ;
+                const _dist = Math.sqrt(_dx*_dx + _dy*_dy + _dz*_dz);
+                const _lossDb = -20 * Math.log10(Math.max(_dist, 0.01));
+                const _factor = Math.pow(10, _lossDb / 20);
+                const activeRefMode = modalSourceReferenceMode === 'distance_blend' ? 'distance_blend→engine:' + (modalDistanceBlend >= 1 ? 'distance_normalized' : 'existing') : modalSourceReferenceMode;
+                const isDistNorm = activeRefMode === 'distance_normalized' || (modalSourceReferenceMode === 'distance_blend' && modalDistanceBlend >= 1);
+                return (
+                  <>
+                    <div style={{ color: isDistNorm ? '#166534' : '#6b7280', fontWeight: isDistNorm ? 700 : undefined }}>
+                      modalSourceReferenceMode: {activeRefMode}{isDistNorm ? '' : ' (not distance_normalized)'}
+                    </div>
+                    <div style={{ color: isDistNorm ? '#166534' : '#6b7280' }}>
+                      distance normalisation factor: {_factor.toFixed(4)} ({_lossDb.toFixed(2)} dB @ {_dist.toFixed(3)} m)
+                    </div>
+                  </>
+                );
+              })()}
               <div>Axial Q: {axialQ.toFixed(1)}</div>
               <div>Storage: {modalStorageMode}</div>
               <div>Propagation phase scale: {propagationPhaseScale.toFixed(2)}</div>
