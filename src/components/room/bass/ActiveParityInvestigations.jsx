@@ -10,6 +10,7 @@ import MultiSeatParityValidationAudit from './MultiSeatParityValidationAudit';
 import ModalSourceNormalisationAudit from './ModalSourceNormalisationAudit';
 import ModalQDampingParityAudit from './ModalQDampingParityAudit';
 import ModalParticipationWeightingMatrixAudit from './ModalParticipationWeightingMatrixAudit';
+import TransferFunctionShapeMatrixAudit from './TransferFunctionShapeMatrixAudit';
 import RewParityBenchmark from './RewParityBenchmark';
 import RewBenchmarkComparisonTable from './RewBenchmarkComparisonTable';
 import RewCandidateComparisonPanel from './RewCandidateComparisonPanel';
@@ -21,6 +22,7 @@ const INVESTIGATIONS = [
   { id: 'multi_seat_parity',    label: 'Multi-Seat Parity Validation',      status: 'Running',  note: 'Active — verifying distance_normalized across all seats' },
   { id: 'modal_q_damping',      label: 'Modal Q / Damping Parity',           status: 'Pending',  note: 'New — compare Q implementation against REW' },
   { id: 'modal_participation',  label: 'Modal Participation Weighting Matrix', status: 'Running',  note: 'New — dominant-mode / family / redistribution vs MAE' },
+  { id: 'tf_shape_matrix',     label: 'Transfer Function Shape Matrix',        status: 'Running',  note: 'New — TF formulation variants vs REW parity' },
   { id: 'modal_source_norm',    label: 'Modal Source Normalisation Matrix',   status: 'Running',  note: 'Active — distance_normalized vs existing at MLP' },
   { id: 'rew_benchmark',        label: 'REW Benchmark Comparison',            status: 'Running',  note: 'Always active — primary MAE readout' },
   { id: 'candidate_comparison', label: 'Candidate Comparison Panel',          status: 'Running',  note: 'Active — comparing engine variants' },
@@ -186,7 +188,17 @@ export default function ActiveParityInvestigations({
         axialQ={axialQ}
       />
 
-      {/* ── 4. Modal Source Normalisation Matrix ── */}
+      {/* ── 4. Transfer Function Shape Matrix ── */}
+      <TransferFunctionShapeMatrixAudit
+        roomDims={roomDims}
+        seat={seat}
+        sub={sub}
+        seatingPositions={seatingPositions}
+        surfaceAbsorption={surfaceAbsorption}
+        axialQ={axialQ}
+      />
+
+      {/* ── 5. Modal Source Normalisation Matrix ── */}
       <ModalSourceNormalisationAudit
         roomDims={roomDims}
         seat={seat}
