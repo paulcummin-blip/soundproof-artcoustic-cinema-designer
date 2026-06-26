@@ -188,7 +188,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   });
   // REW Core is the production engine — not user-controllable.
   const useRewCoreTestMode = true;
-  const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(true);
+  const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(false);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState(REW_PARITY_PRESET.rewSourceCurveMode);
   const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState(REW_PARITY_PRESET.modalSourceReferenceMode);
   const [modalGainScalar, setModalGainScalar] = useState(1.0);
@@ -199,8 +199,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [propagationPhaseScale, setPropagationPhaseScale] = useState(REW_PARITY_PRESET.propagationPhaseScale);
   const [disableReflectionPhaseJitter, setDisableReflectionPhaseJitter] = useState(false);
   const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(false);
-  const [disableLateField, setDisableLateField] = useState(false);
-  const [disableModalPropagationPhase, setDisableModalPropagationPhase] = useState(false);
+  const [disableLateField, setDisableLateField] = useState(true);
+  const [disableModalPropagationPhase, setDisableModalPropagationPhase] = useState(true);
   const [mute68HzAxialMode, setMute68HzAxialMode] = useState(false);
   // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
   const [debugDisableModalContribution, setDebugDisableModalContribution] = useState(false);
