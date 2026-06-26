@@ -132,36 +132,33 @@ function runProductionBaseline(roomDims, seatPos, sub, subProductCurve, surfaceA
     sub,
     flatRewCurve,
     {
-      // ── field structure (matches _isParityFullField = true path) ──
-      enableReflections:    false,   // flat_rew_reference + full_field suppresses reflections
-      enableModes:          true,
-      disableLateField:     true,    // _fieldLateField = true for parity preset
+      // ── field structure — real visible production options ──
+      enableModes:                  true,
+      enableReflections:            true,   // production default: enableRewCoreReflections = true
+      disableLateField:             false,  // production default: disableLateField state = false
 
-      // ── phase options ──
-      rewParityModalPhase:         false,  // NOT used in production call
-      propagationPhaseScale:       0.10,   // REW_PARITY_PRESET.propagationPhaseScale = 0 but
-                                            // comment in code says 0.10 was the sweep winner;
-                                            // production state default is 0 (from preset).
-                                            // We use 0 to match current production preset exactly.
-      disableModalPropagationPhase: true,   // forced true when rewSourceCurveMode === 'flat_rew_reference'
+      // ── phase options — real visible production options ──
+      rewParityModalPhase:          false,  // not passed in production call
+      propagationPhaseScale:        0.10,   // REW_PARITY_PRESET default active in production
+      disableModalPropagationPhase: false,  // production default
 
       // ── modal options ──
-      pureDeterministicModalSum:   true,   // forced true for flat_rew_reference
-      modalSourceReferenceMode:    'distance_normalized',
-      modalGainScalar:             1.0,
+      pureDeterministicModalSum:    true,   // forced true for flat_rew_reference in production
+      modalSourceReferenceMode:     'distance_normalized',
+      modalGainScalar:              1.0,
       axialQ,
-      modalStorageMode:            'none',
+      modalStorageMode:             'none',
 
       // ── diagnostic overrides (match production defaults) ──
-      highOrderAxialScale:         1.0,
+      highOrderAxialScale:          1.0,
       rewParityModalMagnitudeScale: 1.0,
-      debugModalPhaseConvention:   'normal',
-      debugModalHSign:             'normal',
-      modalCoherenceMode:          'coherent',
-      debugMode200Multiplier:      1.0,
-      debugReflectionOrder:        1,
-      overrideConstantAxialQ:      false,
-      overrideAbsorptionAxialQ:    false,
+      debugModalPhaseConvention:    'normal',
+      debugModalHSign:              'normal',
+      modalCoherenceMode:           'coherent',
+      debugMode200Multiplier:       1.0,
+      debugReflectionOrder:         1,
+      overrideConstantAxialQ:       false,
+      overrideAbsorptionAxialQ:     false,
       debugDisableModalContribution: false,
 
       // ── freq range ──
