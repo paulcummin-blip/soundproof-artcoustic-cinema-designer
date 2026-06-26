@@ -30,6 +30,7 @@ import ModalSourceNormalisationAudit from "@/components/room/bass/ModalSourceNor
 import MultiSeatParityValidationAudit from "@/components/room/bass/MultiSeatParityValidationAudit";
 import ActiveParityInvestigations from "@/components/room/bass/ActiveParityInvestigations";
 import AcousticSolverShootoutBatch1 from "@/components/room/bass/AcousticSolverShootoutBatch1";
+import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1820,6 +1821,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           )}
         </div>
       </div>
+
+      {/* ── Null Depth Audit Badge ── */}
+      {multiSeries.length > 0 && multiSeries[0]?.data?.length > 0 && (
+        <NullDepthAuditBadge rawData={multiSeries[0].data} />
+      )}
 
       {/* ── Geometry & REW Import (collapsed) ── */}
       {IS_DEVELOPMENT_MODE && (
