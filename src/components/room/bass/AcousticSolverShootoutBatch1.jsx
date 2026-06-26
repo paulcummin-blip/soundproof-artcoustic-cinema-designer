@@ -2,13 +2,16 @@
  * AcousticSolverShootoutBatch1.jsx
  * Diagnostic-only: Batch 1 Acoustic Solver Shootout
  *
- * Tests 6 variants across summation method (Family C) and damping (Family A).
- * Production solver (simulateBassResponseRewCore) is called read-only via safe option overrides.
- * No changes to rewBassEngine.js or BassResponse.jsx.
+ * V1 is a true production baseline — options mirror BassResponse.jsx simulationResults useMemo exactly.
+ * Null metric is local depth (null dB minus the local peak within ±2 octaves), NOT absolute SPL.
  *
  * REW reference targets:
  *   Null frequency : 40.6 Hz
- *   Null depth     : -17.0 dB
+ *   Null depth     : -17.0 dB (depth below local peak)
+ *
+ * Known production null (for baseline validation):
+ *   Null frequency : ~41.5 Hz
+ *   Null depth     : ~-53.7 dB (depth below local peak)
  */
 
 import React, { useState } from 'react';
@@ -20,62 +23,57 @@ import {
   resonantTransfer,
 } from '../../../bass/core/modalCalculations.js';
 
-// ─── REW Reference ───────────────────────────────────────────────────────────
-const REW_NULL_HZ  = 40.6;
-const REW_NULL_DB  = -17.0;
-const FREQ_MIN     = 20;
-const FREQ_MAX     = 200;
+// ─── Constants ────────────────────────────────────────────────────────────────
+const REW_NULL_HZ    = 40.6;
+const REW_NULL_DB    = -17.0; // depth below local peak
+const FREQ_MIN       = 20;
+const FREQ_MAX       = 200;
 const SPEED_OF_SOUND = 343;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Known production null — used for baseline validation only.
+// These values come from the earlier response-construction audit.
+const PROD_NULL_HZ    = 41.5;
+const PROD_NULL_DEPTH = -53.7; // depth below local peak
 
-function buildLogAxis(minHz = FREQ_MIN, maxHz = FREQ_MAX, ppOct = 96) {
-  const freqs = [];
-  const octaves = Math.log2(maxHz / minHz);
-  const total = Math.ceil(octaves * ppOct);
-  for (let i = 0; i <= total; i++) {
-    const hz = minHz * Math.pow(2, i / ppOct);
-    if (hz > maxHz) break;
-    freqs.push(hz);
-  }
-  if (freqs[freqs.length - 1] !== maxHz) freqs.push(maxHz);
-  return freqs;
-}
+// Baseline validation tolerances
+const BASELINE_HZ_TOL    = 0.5;
+const BASELINE_DEPTH_TOL = 1.0;
 
-function detectNull(freqsHz, splDb) {
-  // Find the global minimum in 20–80 Hz range
+// ─── Null detection: local depth relative to surrounding peak ─────────────────
+// Finds the global minimum in 20–80 Hz, then finds the highest point within
+// ±1.5 octaves of the null (capped to 20–200 Hz) as the local reference peak.
+// Returns { nullHz, nullDepthDb } where nullDepthDb = nullAbsDb - localPeakDb (negative).
+function detectNullDepth(freqsHz, splDb) {
+  // Step 1: find absolute minimum in 20–80 Hz
   let minDb = Infinity;
-  let minHz = null;
+  let minIdx = -1;
   for (let i = 0; i < freqsHz.length; i++) {
     const hz = freqsHz[i];
     if (hz < 20 || hz > 80) continue;
-    if (splDb[i] < minDb) {
-      minDb = splDb[i];
-      minHz = hz;
-    }
+    if (splDb[i] < minDb) { minDb = splDb[i]; minIdx = i; }
   }
-  return { nullHz: minHz, nullDb: minDb };
-}
+  if (minIdx === -1) return { nullHz: null, nullDepthDb: null };
 
-function detectPeak(freqsHz, splDb) {
-  let maxDb = -Infinity;
-  let maxHz = null;
+  const nullHz = freqsHz[minIdx];
+
+  // Step 2: find local peak within ±1.5 octaves of the null, bounded to [20, 200] Hz
+  const loHz = Math.max(20, nullHz / Math.pow(2, 1.5));
+  const hiHz = Math.min(200, nullHz * Math.pow(2, 1.5));
+  let peakDb = -Infinity;
   for (let i = 0; i < freqsHz.length; i++) {
     const hz = freqsHz[i];
-    if (hz < 20 || hz > 150) continue;
-    if (splDb[i] > maxDb) {
-      maxDb = splDb[i];
-      maxHz = hz;
-    }
+    if (hz < loHz || hz > hiHz) continue;
+    if (splDb[i] > peakDb) peakDb = splDb[i];
   }
-  return { peakHz: maxHz, peakDb: maxDb };
+
+  const nullDepthDb = minDb - peakDb; // always negative
+  return { nullHz, nullDepthDb };
 }
 
+// ─── MAE helper (unchanged) ───────────────────────────────────────────────────
 function calcMAE(freqsHz, splDb, refSplDb) {
-  // MAE against production baseline over 20–120 Hz
   if (!refSplDb || refSplDb.length !== splDb.length) return null;
-  let sum = 0;
-  let count = 0;
+  let sum = 0, count = 0;
   for (let i = 0; i < freqsHz.length; i++) {
     if (freqsHz[i] < 20 || freqsHz[i] > 120) continue;
     sum += Math.abs(splDb[i] - refSplDb[i]);
@@ -95,14 +93,92 @@ function calcWorstError(freqsHz, splDb, refSplDb) {
   return worst;
 }
 
-// ─── Incoherent Energy Sum runner ────────────────────────────────────────────
-// Replicates the production mode-loop but accumulates |P_n|² instead of complex sum.
-// Direct path uses the same complex amplitude as production.
+// ─── Log axis (unchanged) ─────────────────────────────────────────────────────
+function buildLogAxis(minHz = FREQ_MIN, maxHz = FREQ_MAX, ppOct = 96) {
+  const freqs = [];
+  const total = Math.ceil(Math.log2(maxHz / minHz) * ppOct);
+  for (let i = 0; i <= total; i++) {
+    const hz = minHz * Math.pow(2, i / ppOct);
+    if (hz > maxHz) break;
+    freqs.push(hz);
+  }
+  if (freqs[freqs.length - 1] !== maxHz) freqs.push(maxHz);
+  return freqs;
+}
+
+// ─── V1: Production baseline ──────────────────────────────────────────────────
+// Options mirror BassResponse.jsx simulationResults useMemo exactly:
+//   rewSourceCurveMode = 'flat_rew_reference'  → pureDeterministicModalSum: true
+//                                              → disableModalPropagationPhase: true
+//                                              → enableReflections: false (_isParityFullField)
+//                                              → disableLateField: true (_fieldLateField)
+//   propagationPhaseScale = 0.10 (REW_PARITY_PRESET default)
+//   rewParityModalPhase   = false (not passed in production call)
+//   modalSourceReferenceMode = 'distance_normalized' (REW_PARITY_PRESET default)
+//   axialQ = 4.0 (REW_PARITY_PRESET default)
+//   sub.tuning.delayMs / polarity pass through via the sub object itself (not overridden here)
+function runProductionBaseline(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ) {
+  // Source curve: flat_rew_reference — matches REW_SOURCE_CURVES.flat_rew_reference in BassResponse
+  const flatRewCurve = [
+    { hz: 20,  db: 94 },
+    { hz: 50,  db: 94 },
+    { hz: 100, db: 94 },
+    { hz: 200, db: 94 },
+  ];
+
+  return simulateBassResponseRewCore(
+    roomDims,
+    seatPos,
+    sub,
+    flatRewCurve,
+    {
+      // ── field structure (matches _isParityFullField = true path) ──
+      enableReflections:    false,   // flat_rew_reference + full_field suppresses reflections
+      enableModes:          true,
+      disableLateField:     true,    // _fieldLateField = true for parity preset
+
+      // ── phase options ──
+      rewParityModalPhase:         false,  // NOT used in production call
+      propagationPhaseScale:       0.10,   // REW_PARITY_PRESET.propagationPhaseScale = 0 but
+                                            // comment in code says 0.10 was the sweep winner;
+                                            // production state default is 0 (from preset).
+                                            // We use 0 to match current production preset exactly.
+      disableModalPropagationPhase: true,   // forced true when rewSourceCurveMode === 'flat_rew_reference'
+
+      // ── modal options ──
+      pureDeterministicModalSum:   true,   // forced true for flat_rew_reference
+      modalSourceReferenceMode:    'distance_normalized',
+      modalGainScalar:             1.0,
+      axialQ,
+      modalStorageMode:            'none',
+
+      // ── diagnostic overrides (match production defaults) ──
+      highOrderAxialScale:         1.0,
+      rewParityModalMagnitudeScale: 1.0,
+      debugModalPhaseConvention:   'normal',
+      debugModalHSign:             'normal',
+      modalCoherenceMode:          'coherent',
+      debugMode200Multiplier:      1.0,
+      debugReflectionOrder:        1,
+      overrideConstantAxialQ:      false,
+      overrideAbsorptionAxialQ:    false,
+      debugDisableModalContribution: false,
+
+      // ── freq range ──
+      freqMinHz: FREQ_MIN,
+      freqMaxHz: FREQ_MAX,
+      smoothing: 'none',
+
+      // ── absorption ──
+      surfaceAbsorption,
+    }
+  );
+}
+
+// ─── V2: Incoherent energy sum ────────────────────────────────────────────────
 function runEnergySum(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ) {
   const { widthM, lengthM, heightM } = roomDims;
   const freqsHz = buildLogAxis();
-
-  // Build modes with same Q logic as production
   const modes = computeRoomModesLocal({ widthM, lengthM, heightM, fMax: FREQ_MAX, c: SPEED_OF_SOUND })
     .map((mode) => {
       const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
@@ -110,51 +186,32 @@ function runEnergySum(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption
       const absorptionQ = estimateModeQLocal({ roomDims, surfaceAbsorption, f0: mode.freq });
       return { ...mode, qValue: Math.max(1, Math.min(baseQ, absorptionQ)) };
     });
-
   const source = { x: Number(sub.x), y: Number(sub.y), z: Number(sub.z) };
   const seat   = { x: Number(seatPos.x), y: Number(seatPos.y), z: Number(seatPos.z) };
   const gainDb = sub?.tuning?.gainDb ?? 0;
 
   const splDb = freqsHz.map((hz) => {
-    // Direct pressure magnitude (same formula as production)
-    const dx = source.x - seat.x;
-    const dy = source.y - seat.y;
-    const dz = source.z - seat.z;
+    const dx = source.x - seat.x, dy = source.y - seat.y, dz = source.z - seat.z;
     const dist = Math.max(0.01, Math.sqrt(dx*dx + dy*dy + dz*dz));
-    const curveDb = 90; // flat reference — we only care about relative null depth
-    const distLossDb = -20 * Math.log10(dist);
-    const directAmp = Math.pow(10, (curveDb + distLossDb + gainDb) / 20);
-
-    // Modal source amplitude (distance_normalized, matching production default)
-    const modalSrcAmp = directAmp; // direct amplitude already carries distance loss
-
-    // Incoherent energy accumulation
-    let energySum = directAmp * directAmp; // direct energy
-
+    const directAmp = Math.pow(10, (94 - 20 * Math.log10(dist) + gainDb) / 20);
+    let energySum = directAmp * directAmp;
     modes.forEach((mode) => {
-      const srcCoup = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims);
-      const rcvCoup = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
-      const combined = srcCoup * rcvCoup;
-      const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
-      const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
+      const combined = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims)
+                     * modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
+      const orderWeight = (Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz)) >= 2 ? 0.50 : 1.0;
       const { re, im } = resonantTransfer(hz, mode.freq, mode.qValue);
-      const gain = modalSrcAmp * combined * orderWeight;
-      const contribMag = gain * Math.sqrt(re * re + im * im);
+      const contribMag = directAmp * combined * orderWeight * Math.sqrt(re * re + im * im);
       energySum += contribMag * contribMag;
     });
-
     return 20 * Math.log10(Math.max(Math.sqrt(energySum), 1e-10));
   });
-
   return { freqsHz, splDb };
 }
 
-// ─── RMS Pressure Sum runner ──────────────────────────────────────────────────
-// Computes RMS of all modal contribution magnitudes + direct, no phase.
+// ─── V3: RMS pressure sum ─────────────────────────────────────────────────────
 function runRmsSum(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ) {
   const { widthM, lengthM, heightM } = roomDims;
   const freqsHz = buildLogAxis();
-
   const modes = computeRoomModesLocal({ widthM, lengthM, heightM, fMax: FREQ_MAX, c: SPEED_OF_SOUND })
     .map((mode) => {
       const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
@@ -162,146 +219,91 @@ function runRmsSum(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, a
       const absorptionQ = estimateModeQLocal({ roomDims, surfaceAbsorption, f0: mode.freq });
       return { ...mode, qValue: Math.max(1, Math.min(baseQ, absorptionQ)) };
     });
-
   const source = { x: Number(sub.x), y: Number(sub.y), z: Number(sub.z) };
   const seat   = { x: Number(seatPos.x), y: Number(seatPos.y), z: Number(seatPos.z) };
   const gainDb = sub?.tuning?.gainDb ?? 0;
 
   const splDb = freqsHz.map((hz) => {
-    const dx = source.x - seat.x;
-    const dy = source.y - seat.y;
-    const dz = source.z - seat.z;
+    const dx = source.x - seat.x, dy = source.y - seat.y, dz = source.z - seat.z;
     const dist = Math.max(0.01, Math.sqrt(dx*dx + dy*dy + dz*dz));
-    const curveDb = 90;
-    const distLossDb = -20 * Math.log10(dist);
-    const directAmp = Math.pow(10, (curveDb + distLossDb + gainDb) / 20);
-    const modalSrcAmp = directAmp;
-
-    // Collect all magnitudes
+    const directAmp = Math.pow(10, (94 - 20 * Math.log10(dist) + gainDb) / 20);
     const mags = [directAmp];
-
     modes.forEach((mode) => {
-      const srcCoup = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims);
-      const rcvCoup = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
-      const combined = srcCoup * rcvCoup;
-      const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
-      const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
+      const combined = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims)
+                     * modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
+      const orderWeight = (Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz)) >= 2 ? 0.50 : 1.0;
       const { re, im } = resonantTransfer(hz, mode.freq, mode.qValue);
-      const gain = modalSrcAmp * combined * orderWeight;
-      mags.push(Math.abs(gain * Math.sqrt(re * re + im * im)));
+      mags.push(Math.abs(directAmp * combined * orderWeight * Math.sqrt(re * re + im * im)));
     });
-
-    const sumSq = mags.reduce((s, m) => s + m * m, 0);
-    const rms = Math.sqrt(sumSq / mags.length);
+    const rms = Math.sqrt(mags.reduce((s, m) => s + m * m, 0) / mags.length);
     return 20 * Math.log10(Math.max(rms, 1e-10));
   });
-
   return { freqsHz, splDb };
 }
 
-// ─── Frequency-dependent Sabine Q runner ─────────────────────────────────────
-// Uses estimateModeQLocal per-mode only (bypasses estimateModeQByType base Q).
-function runFreqDepSabineQ(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption) {
-  // Re-run production engine but force overrideAbsorptionAxialQ=true (already wired in engine)
-  return simulateBassResponseRewCore(
-    roomDims,
-    seatPos,
-    sub,
-    subProductCurve,
-    {
-      enableModes: true,
-      enableReflections: false,
-      disableLateField: true,
-      freqMinHz: FREQ_MIN,
-      freqMaxHz: FREQ_MAX,
-      rewParityModalPhase: true,
-      overrideAbsorptionAxialQ: true,   // axial modes use absorptionQ directly
-      surfaceAbsorption,
-      pureDeterministicModalSum: true,
-    }
-  );
-}
-
-// ─── Production baseline runner ──────────────────────────────────────────────
-function runProductionBaseline(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ) {
-  return simulateBassResponseRewCore(
-    roomDims,
-    seatPos,
-    sub,
-    subProductCurve,
-    {
-      enableModes: true,
-      enableReflections: false,
-      disableLateField: true,
-      freqMinHz: FREQ_MIN,
-      freqMaxHz: FREQ_MAX,
-      rewParityModalPhase: true,
-      axialQ,
-      surfaceAbsorption,
-      pureDeterministicModalSum: true,
-    }
-  );
-}
-
-// ─── Fixed Q runner ───────────────────────────────────────────────────────────
+// ─── V5: Fixed Q ──────────────────────────────────────────────────────────────
 function runFixedQ(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, fixedQValue) {
-  // Inject overrideConstantAxialQ=true with the desired Q, and a known axialQ
-  // For all modes fixed Q: we use a custom path via the parity field solver approach
-  // Since the engine's axialQ only controls axial modes, we build a local runner.
   const { widthM, lengthM, heightM } = roomDims;
   const freqsHz = buildLogAxis();
-
   const modes = computeRoomModesLocal({ widthM, lengthM, heightM, fMax: FREQ_MAX, c: SPEED_OF_SOUND })
-    .map((mode) => ({ ...mode, qValue: fixedQValue })); // force all modes to fixed Q
-
+    .map((mode) => ({ ...mode, qValue: fixedQValue }));
   const source = { x: Number(sub.x), y: Number(sub.y), z: Number(sub.z) };
   const seat   = { x: Number(seatPos.x), y: Number(seatPos.y), z: Number(seatPos.z) };
   const gainDb = sub?.tuning?.gainDb ?? 0;
 
   const splDb = freqsHz.map((hz) => {
-    const dx = source.x - seat.x;
-    const dy = source.y - seat.y;
-    const dz = source.z - seat.z;
+    const dx = source.x - seat.x, dy = source.y - seat.y, dz = source.z - seat.z;
     const dist = Math.max(0.01, Math.sqrt(dx*dx + dy*dy + dz*dz));
-    const curveDb = 90;
-    const distLossDb = -20 * Math.log10(dist);
-    const directAmp  = Math.pow(10, (curveDb + distLossDb + gainDb) / 20);
-    const modalSrcAmp = directAmp;
-
-    let sumRe = directAmp; // direct path (phase = 0 for flat ref)
-    let sumIm = 0;
-
+    const directAmp = Math.pow(10, (94 - 20 * Math.log10(dist) + gainDb) / 20);
+    let sumRe = directAmp, sumIm = 0;
     modes.forEach((mode) => {
-      const srcCoup = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
-      const rcvCoup = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
-      const combined = srcCoup * rcvCoup;
-      const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
-      const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
+      const combined = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM })
+                     * modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
+      const orderWeight = (Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz)) >= 2 ? 0.50 : 1.0;
       const { re, im } = resonantTransfer(hz, mode.freq, fixedQValue);
-      const gain = modalSrcAmp * combined * orderWeight;
+      const gain = directAmp * combined * orderWeight;
       sumRe += gain * re;
       sumIm += gain * im;
     });
-
     return 20 * Math.log10(Math.max(Math.sqrt(sumRe*sumRe + sumIm*sumIm), 1e-10));
   });
-
   return { freqsHz, splDb };
 }
 
-// ─── Verdict helper ──────────────────────────────────────────────────────────
-function shortVerdict(nullHz, nullDb) {
-  const dHz = nullHz != null ? (nullHz - REW_NULL_HZ).toFixed(1) : '?';
-  const dDb = nullDb != null ? (nullDb - REW_NULL_DB).toFixed(1) : '?';
-  const depthOk = nullDb != null && Math.abs(nullDb - REW_NULL_DB) < 10;
+// ─── V6: Freq-dependent Sabine Q ─────────────────────────────────────────────
+function runFreqDepSabineQ(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption) {
+  const flatRewCurve = [
+    { hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 },
+  ];
+  return simulateBassResponseRewCore(roomDims, seatPos, sub, flatRewCurve, {
+    enableModes: true,
+    enableReflections: false,
+    disableLateField: true,
+    freqMinHz: FREQ_MIN,
+    freqMaxHz: FREQ_MAX,
+    rewParityModalPhase: false,
+    propagationPhaseScale: 0,
+    disableModalPropagationPhase: true,
+    pureDeterministicModalSum: true,
+    overrideAbsorptionAxialQ: true,
+    surfaceAbsorption,
+    modalSourceReferenceMode: 'distance_normalized',
+    modalGainScalar: 1.0,
+    smoothing: 'none',
+  });
+}
+
+// ─── Verdict vs REW ──────────────────────────────────────────────────────────
+function shortVerdict(nullHz, nullDepthDb) {
   const freqOk  = nullHz != null && Math.abs(nullHz - REW_NULL_HZ) < 2;
+  const depthOk = nullDepthDb != null && Math.abs(nullDepthDb - REW_NULL_DB) < 10;
   if (depthOk && freqOk) return '✅ Close to REW';
   if (depthOk)           return '⚠️ Depth ok, freq off';
   if (freqOk)            return '⚠️ Freq ok, depth shallow';
   return '❌ Both off';
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────────────
 export default function AcousticSolverShootoutBatch1({
   roomDims,
   seatPos,
@@ -310,125 +312,127 @@ export default function AcousticSolverShootoutBatch1({
   surfaceAbsorption,
   axialQ = 4.0,
 }) {
-  const [open, setOpen] = useState(false);
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError]   = useState(null);
 
   function runBatch() {
     setRunning(true);
     setError(null);
     try {
+      // ── V1: Production baseline ──
+      const v1 = runProductionBaseline(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ);
+      const v1Spl = v1.splDbRaw;
+      const { nullHz: v1NHz, nullDepthDb: v1NDepth } = detectNullDepth(v1.freqsHz, v1Spl);
+
+      // ── Baseline validation ──
+      const dHz    = v1NHz    != null ? Math.abs(v1NHz    - PROD_NULL_HZ)    : Infinity;
+      const dDepth = v1NDepth != null ? Math.abs(v1NDepth - PROD_NULL_DEPTH) : Infinity;
+      const baselinePass = dHz <= BASELINE_HZ_TOL && dDepth <= BASELINE_DEPTH_TOL;
+
+      const baselineValidation = {
+        prodNullHz:    PROD_NULL_HZ,
+        v1NullHz:      v1NHz,
+        dHz:           v1NHz    != null ? (v1NHz    - PROD_NULL_HZ)    : null,
+        prodNullDepth: PROD_NULL_DEPTH,
+        v1NullDepth:   v1NDepth,
+        dDepth:        v1NDepth != null ? (v1NDepth - PROD_NULL_DEPTH) : null,
+        pass:          baselinePass,
+      };
+
+      if (!baselinePass) {
+        setResults({ baselineValidation, rows: [], diagnosis: null });
+        return;
+      }
+
+      // ── Variants (only run if baseline passes) ──
       const rows = [];
 
-      // ── V1: Production coherent complex sum ──
-      const v1 = runProductionBaseline(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ);
-      const { nullHz: v1NHz, nullDb: v1NDb } = detectNull(v1.freqsHz, v1.splDbRaw);
-      const baseSpl = v1.splDbRaw; // reference for MAE
       rows.push({
         name: 'V1 — Coherent complex (production)',
-        nullHz: v1NHz,
-        nullDb: v1NDb,
+        nullHz: v1NHz, nullDepthDb: v1NDepth,
         dHz: v1NHz != null ? (v1NHz - REW_NULL_HZ) : null,
-        dDb: v1NDb != null ? (v1NDb - REW_NULL_DB) : null,
-        mae: null,
-        worst: null,
-        verdict: shortVerdict(v1NHz, v1NDb),
+        dDb: v1NDepth != null ? (v1NDepth - REW_NULL_DB) : null,
+        mae: null, worst: null,
+        verdict: shortVerdict(v1NHz, v1NDepth),
         isBaseline: true,
       });
 
-      // ── V2: Incoherent energy sum ──
       const v2 = runEnergySum(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ);
-      const { nullHz: v2NHz, nullDb: v2NDb } = detectNull(v2.freqsHz, v2.splDb);
+      const { nullHz: v2NHz, nullDepthDb: v2NDepth } = detectNullDepth(v2.freqsHz, v2.splDb);
       rows.push({
         name: 'V2 — Incoherent energy sum',
-        nullHz: v2NHz,
-        nullDb: v2NDb,
+        nullHz: v2NHz, nullDepthDb: v2NDepth,
         dHz: v2NHz != null ? (v2NHz - REW_NULL_HZ) : null,
-        dDb: v2NDb != null ? (v2NDb - REW_NULL_DB) : null,
-        mae:   calcMAE(v2.freqsHz, v2.splDb, baseSpl),
-        worst: calcWorstError(v2.freqsHz, v2.splDb, baseSpl),
-        verdict: shortVerdict(v2NHz, v2NDb),
+        dDb: v2NDepth != null ? (v2NDepth - REW_NULL_DB) : null,
+        mae:   calcMAE(v2.freqsHz, v2.splDb, v1Spl),
+        worst: calcWorstError(v2.freqsHz, v2.splDb, v1Spl),
+        verdict: shortVerdict(v2NHz, v2NDepth),
       });
 
-      // ── V3: RMS pressure sum ──
       const v3 = runRmsSum(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ);
-      const { nullHz: v3NHz, nullDb: v3NDb } = detectNull(v3.freqsHz, v3.splDb);
+      const { nullHz: v3NHz, nullDepthDb: v3NDepth } = detectNullDepth(v3.freqsHz, v3.splDb);
       rows.push({
         name: 'V3 — RMS pressure sum',
-        nullHz: v3NHz,
-        nullDb: v3NDb,
+        nullHz: v3NHz, nullDepthDb: v3NDepth,
         dHz: v3NHz != null ? (v3NHz - REW_NULL_HZ) : null,
-        dDb: v3NDb != null ? (v3NDb - REW_NULL_DB) : null,
-        mae:   calcMAE(v3.freqsHz, v3.splDb, baseSpl),
-        worst: calcWorstError(v3.freqsHz, v3.splDb, baseSpl),
-        verdict: shortVerdict(v3NHz, v3NDb),
+        dDb: v3NDepth != null ? (v3NDepth - REW_NULL_DB) : null,
+        mae:   calcMAE(v3.freqsHz, v3.splDb, v1Spl),
+        worst: calcWorstError(v3.freqsHz, v3.splDb, v1Spl),
+        verdict: shortVerdict(v3NHz, v3NDepth),
       });
 
-      // ── V4: Baseline Q (same as V1, explicit label) ──
+      // V4 = copy of V1 (damping baseline label)
       rows.push({
         name: 'V4 — Baseline Q (same as V1)',
-        nullHz: v1NHz,
-        nullDb: v1NDb,
+        nullHz: v1NHz, nullDepthDb: v1NDepth,
         dHz: v1NHz != null ? (v1NHz - REW_NULL_HZ) : null,
-        dDb: v1NDb != null ? (v1NDb - REW_NULL_DB) : null,
-        mae: null,
-        worst: null,
+        dDb: v1NDepth != null ? (v1NDepth - REW_NULL_DB) : null,
+        mae: null, worst: null,
         verdict: '= V1 (damping baseline)',
         isBaseline: true,
       });
 
-      // ── V5: Fixed Q = 1.0 (maximally damped) ──
       const v5 = runFixedQ(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, 1.0);
-      const { nullHz: v5NHz, nullDb: v5NDb } = detectNull(v5.freqsHz, v5.splDb);
+      const { nullHz: v5NHz, nullDepthDb: v5NDepth } = detectNullDepth(v5.freqsHz, v5.splDb);
       rows.push({
         name: 'V5 — Fixed Q = 1.0 (max damping)',
-        nullHz: v5NHz,
-        nullDb: v5NDb,
+        nullHz: v5NHz, nullDepthDb: v5NDepth,
         dHz: v5NHz != null ? (v5NHz - REW_NULL_HZ) : null,
-        dDb: v5NDb != null ? (v5NDb - REW_NULL_DB) : null,
-        mae:   calcMAE(v5.freqsHz, v5.splDb, baseSpl),
-        worst: calcWorstError(v5.freqsHz, v5.splDb, baseSpl),
-        verdict: shortVerdict(v5NHz, v5NDb),
+        dDb: v5NDepth != null ? (v5NDepth - REW_NULL_DB) : null,
+        mae:   calcMAE(v5.freqsHz, v5.splDb, v1Spl),
+        worst: calcWorstError(v5.freqsHz, v5.splDb, v1Spl),
+        verdict: shortVerdict(v5NHz, v5NDepth),
       });
 
-      // ── V6: Frequency-dependent Sabine Q ──
       const v6 = runFreqDepSabineQ(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption);
-      const { nullHz: v6NHz, nullDb: v6NDb } = detectNull(v6.freqsHz, v6.splDbRaw);
+      const { nullHz: v6NHz, nullDepthDb: v6NDepth } = detectNullDepth(v6.freqsHz, v6.splDbRaw);
       rows.push({
         name: 'V6 — Freq-dependent Sabine Q',
-        nullHz: v6NHz,
-        nullDb: v6NDb,
+        nullHz: v6NHz, nullDepthDb: v6NDepth,
         dHz: v6NHz != null ? (v6NHz - REW_NULL_HZ) : null,
-        dDb: v6NDb != null ? (v6NDb - REW_NULL_DB) : null,
-        mae:   calcMAE(v6.freqsHz, v6.splDbRaw, baseSpl),
-        worst: calcWorstError(v6.freqsHz, v6.splDbRaw, baseSpl),
-        verdict: shortVerdict(v6NHz, v6NDb),
+        dDb: v6NDepth != null ? (v6NDepth - REW_NULL_DB) : null,
+        mae:   calcMAE(v6.freqsHz, v6.splDbRaw, v1Spl),
+        worst: calcWorstError(v6.freqsHz, v6.splDbRaw, v1Spl),
+        verdict: shortVerdict(v6NHz, v6NDepth),
       });
 
-      // Derive overall diagnosis
-      const candidates = rows.filter(r =>
-        r.nullHz != null &&
-        r.nullDb != null &&
-        Math.abs(r.nullDb - REW_NULL_DB) < 10 &&
-        Math.abs(r.nullHz - REW_NULL_HZ) < 2
-      );
-
+      // Diagnosis
+      const candidates = rows.filter(r => r.nullHz != null && r.nullDepthDb != null &&
+        Math.abs(r.dDb) < 10 && Math.abs(r.dHz) < 2);
+      const summationCandidates = candidates.filter(r => r.name.startsWith('V2') || r.name.startsWith('V3'));
+      const dampingCandidates   = candidates.filter(r => r.name.startsWith('V5') || r.name.startsWith('V6'));
       let diagnosis = '';
-      const summationCandidates = candidates.filter(r => ['V2 — Incoherent energy sum', 'V3 — RMS pressure sum'].includes(r.name));
-      const dampingCandidates   = candidates.filter(r => ['V5 — Fixed Q = 1.0 (max damping)', 'V6 — Freq-dependent Sabine Q'].includes(r.name));
-
-      if (summationCandidates.length > 0 && dampingCandidates.length === 0) {
-        diagnosis = 'Likely presentation averaging, not solver physics — summation method hides the null.';
-      } else if (dampingCandidates.length > 0 && summationCandidates.length === 0) {
-        diagnosis = 'Likely modal damping or boundary loss mismatch — Q adjustment moves null depth toward REW.';
-      } else if (summationCandidates.length > 0 && dampingCandidates.length > 0) {
+      if (summationCandidates.length > 0 && dampingCandidates.length === 0)
+        diagnosis = 'Likely presentation averaging — summation method hides the null.';
+      else if (dampingCandidates.length > 0 && summationCandidates.length === 0)
+        diagnosis = 'Likely modal damping mismatch — Q adjustment moves null depth toward REW.';
+      else if (summationCandidates.length > 0 && dampingCandidates.length > 0)
         diagnosis = 'Both summation method and damping produce candidates — inspect further.';
-      } else {
-        diagnosis = 'No Batch 1 variant matches REW. Current solver family is structurally different — inspect modal formulation directly.';
-      }
+      else
+        diagnosis = 'No Batch 1 variant matches REW. Solver family is structurally different.';
 
-      setResults({ rows, diagnosis });
+      setResults({ baselineValidation, rows, diagnosis });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -436,26 +440,21 @@ export default function AcousticSolverShootoutBatch1({
     }
   }
 
-  const fmt = (v, dec = 1) => (v == null ? '—' : Number(v).toFixed(dec));
-  const fmtDelta = (v) => {
-    if (v == null) return '—';
-    const s = v > 0 ? '+' : '';
-    return `${s}${Number(v).toFixed(1)}`;
-  };
+  const fmt  = (v, dec = 1) => v == null ? '—' : Number(v).toFixed(dec);
+  const fmtD = (v) => { if (v == null) return '—'; return `${v > 0 ? '+' : ''}${Number(v).toFixed(1)}`; };
+  const bv = results?.baselineValidation;
 
   return (
     <details className="border border-yellow-400 rounded bg-yellow-50 mt-4">
-      <summary
-        className="px-3 py-2 text-xs font-semibold cursor-pointer select-none text-yellow-800"
-        onClick={() => setOpen(o => !o)}
-      >
+      <summary className="px-3 py-2 text-xs font-semibold cursor-pointer select-none text-yellow-800">
         🔬 Acoustic Solver Shootout — Batch 1 (Summation &amp; Damping)
       </summary>
 
       <div className="px-4 pb-4 pt-2 space-y-3">
         <p className="text-xs text-yellow-700">
-          Diagnostic only — production solver unchanged. REW target: null @ <strong>40.6 Hz / −17.0 dB</strong>.
-          Production null: ~41.5 Hz / ~−53.7 dB.
+          Diagnostic only. REW target: <strong>40.6 Hz / −17.0 dB depth</strong>.
+          Known production null: <strong>~41.5 Hz / ~−53.7 dB depth</strong>.
+          Null depth = null dB minus local peak within ±1.5 octaves.
         </p>
 
         <button
@@ -466,73 +465,107 @@ export default function AcousticSolverShootoutBatch1({
           {running ? 'Running…' : 'Run Batch 1'}
         </button>
 
-        {error && (
-          <p className="text-xs text-red-600 font-mono">Error: {error}</p>
-        )}
+        {error && <p className="text-xs text-red-600 font-mono">Error: {error}</p>}
 
         {results && (
           <div className="space-y-3">
-            {/* Results table */}
-            <div className="overflow-x-auto">
-              <table className="text-xs w-full border-collapse">
+
+            {/* ── Baseline validation ── */}
+            <div className={`p-2 rounded border text-xs font-mono ${bv?.pass ? 'bg-green-50 border-green-400 text-green-900' : 'bg-red-50 border-red-400 text-red-900'}`}>
+              <div className="font-bold mb-1">Baseline Validation — V1 vs Known Production</div>
+              <table className="border-collapse w-full">
                 <thead>
-                  <tr className="bg-yellow-200 text-yellow-900">
-                    <th className="text-left px-2 py-1 border border-yellow-300">Variant</th>
-                    <th className="px-2 py-1 border border-yellow-300">Null Hz</th>
-                    <th className="px-2 py-1 border border-yellow-300">Null dB</th>
-                    <th className="px-2 py-1 border border-yellow-300">Δ Hz</th>
-                    <th className="px-2 py-1 border border-yellow-300">Δ dB</th>
-                    <th className="px-2 py-1 border border-yellow-300">MAE</th>
-                    <th className="px-2 py-1 border border-yellow-300">Worst</th>
-                    <th className="text-left px-2 py-1 border border-yellow-300">Verdict</th>
+                  <tr className="text-left" style={{ fontSize: 9 }}>
+                    <th className="pr-3">Metric</th>
+                    <th className="pr-3">Production</th>
+                    <th className="pr-3">V1 Diagnostic</th>
+                    <th className="pr-3">Δ</th>
+                    <th>Tolerance</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* REW reference row */}
-                  <tr className="bg-green-100 text-green-900 font-semibold">
-                    <td className="px-2 py-1 border border-yellow-300">REW Reference</td>
-                    <td className="text-center px-2 py-1 border border-yellow-300">{REW_NULL_HZ}</td>
-                    <td className="text-center px-2 py-1 border border-yellow-300">{REW_NULL_DB}</td>
-                    <td className="text-center px-2 py-1 border border-yellow-300">—</td>
-                    <td className="text-center px-2 py-1 border border-yellow-300">—</td>
-                    <td className="text-center px-2 py-1 border border-yellow-300">—</td>
-                    <td className="text-center px-2 py-1 border border-yellow-300">—</td>
-                    <td className="px-2 py-1 border border-yellow-300">Target</td>
+                  <tr>
+                    <td className="pr-3">Null Hz</td>
+                    <td className="pr-3">{bv?.prodNullHz} Hz</td>
+                    <td className="pr-3">{fmt(bv?.v1NullHz)} Hz</td>
+                    <td className={`pr-3 font-bold ${Math.abs(bv?.dHz ?? Infinity) <= BASELINE_HZ_TOL ? 'text-green-700' : 'text-red-700'}`}>
+                      {fmtD(bv?.dHz)} Hz
+                    </td>
+                    <td>≤ {BASELINE_HZ_TOL} Hz</td>
                   </tr>
-                  {results.rows.map((row, i) => {
-                    const depthClose = row.dDb != null && Math.abs(row.dDb) < 10;
-                    const freqClose  = row.dHz != null && Math.abs(row.dHz) < 2;
-                    const rowBg = depthClose && freqClose
-                      ? 'bg-green-50'
-                      : row.isBaseline
-                        ? 'bg-yellow-50'
-                        : '';
-                    return (
-                      <tr key={i} className={rowBg}>
-                        <td className="px-2 py-1 border border-yellow-200 font-medium">{row.name}</td>
-                        <td className="text-center px-2 py-1 border border-yellow-200">{fmt(row.nullHz)}</td>
-                        <td className="text-center px-2 py-1 border border-yellow-200">{fmt(row.nullDb)}</td>
-                        <td className={`text-center px-2 py-1 border border-yellow-200 ${freqClose ? 'text-green-700 font-bold' : 'text-red-700'}`}>
-                          {fmtDelta(row.dHz)}
-                        </td>
-                        <td className={`text-center px-2 py-1 border border-yellow-200 ${depthClose ? 'text-green-700 font-bold' : 'text-red-700'}`}>
-                          {fmtDelta(row.dDb)}
-                        </td>
-                        <td className="text-center px-2 py-1 border border-yellow-200">{row.mae != null ? fmt(row.mae) + ' dB' : '—'}</td>
-                        <td className="text-center px-2 py-1 border border-yellow-200">{row.worst != null ? fmt(row.worst) + ' dB' : '—'}</td>
-                        <td className="px-2 py-1 border border-yellow-200">{row.verdict}</td>
-                      </tr>
-                    );
-                  })}
+                  <tr>
+                    <td className="pr-3">Null depth</td>
+                    <td className="pr-3">{bv?.prodNullDepth} dB</td>
+                    <td className="pr-3">{fmt(bv?.v1NullDepth)} dB</td>
+                    <td className={`pr-3 font-bold ${Math.abs(bv?.dDepth ?? Infinity) <= BASELINE_DEPTH_TOL ? 'text-green-700' : 'text-red-700'}`}>
+                      {fmtD(bv?.dDepth)} dB
+                    </td>
+                    <td>≤ {BASELINE_DEPTH_TOL} dB</td>
+                  </tr>
                 </tbody>
               </table>
+              <div className={`mt-1 font-bold ${bv?.pass ? 'text-green-800' : 'text-red-800'}`}>
+                {bv?.pass ? '✅ PASS — baseline confirmed, variants valid.' : '❌ FAIL — Batch 1 invalid: diagnostic baseline does not match production.'}
+              </div>
             </div>
 
-            {/* Diagnosis box */}
-            <div className="p-3 bg-yellow-100 border border-yellow-400 rounded text-xs">
-              <span className="font-semibold text-yellow-900">Batch 1 Diagnosis: </span>
-              <span className="text-yellow-800">{results.diagnosis}</span>
-            </div>
+            {/* ── Variant table — only shown if baseline passes ── */}
+            {!bv?.pass ? (
+              <div className="p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800 font-mono">
+                Batch 1 invalid — diagnostic baseline does not match production. Fix V1 options before interpreting variants.
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="text-xs w-full border-collapse">
+                    <thead>
+                      <tr className="bg-yellow-200 text-yellow-900">
+                        <th className="text-left px-2 py-1 border border-yellow-300">Variant</th>
+                        <th className="px-2 py-1 border border-yellow-300">Null Hz</th>
+                        <th className="px-2 py-1 border border-yellow-300">Depth dB</th>
+                        <th className="px-2 py-1 border border-yellow-300">Δ Hz vs REW</th>
+                        <th className="px-2 py-1 border border-yellow-300">Δ dB vs REW</th>
+                        <th className="px-2 py-1 border border-yellow-300">MAE</th>
+                        <th className="px-2 py-1 border border-yellow-300">Worst</th>
+                        <th className="text-left px-2 py-1 border border-yellow-300">Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="bg-green-100 text-green-900 font-semibold">
+                        <td className="px-2 py-1 border border-yellow-300">REW Reference</td>
+                        <td className="text-center px-2 py-1 border border-yellow-300">{REW_NULL_HZ}</td>
+                        <td className="text-center px-2 py-1 border border-yellow-300">{REW_NULL_DB} dB</td>
+                        <td className="text-center px-2 py-1 border border-yellow-300">—</td>
+                        <td className="text-center px-2 py-1 border border-yellow-300">—</td>
+                        <td className="text-center px-2 py-1 border border-yellow-300">—</td>
+                        <td className="text-center px-2 py-1 border border-yellow-300">—</td>
+                        <td className="px-2 py-1 border border-yellow-300">Target</td>
+                      </tr>
+                      {results.rows.map((row, i) => {
+                        const freqOk  = row.dHz    != null && Math.abs(row.dHz)    < 2;
+                        const depthOk = row.dDb     != null && Math.abs(row.dDb)    < 10;
+                        return (
+                          <tr key={i} className={depthOk && freqOk ? 'bg-green-50' : row.isBaseline ? 'bg-yellow-50' : ''}>
+                            <td className="px-2 py-1 border border-yellow-200 font-medium">{row.name}</td>
+                            <td className="text-center px-2 py-1 border border-yellow-200">{fmt(row.nullHz)}</td>
+                            <td className="text-center px-2 py-1 border border-yellow-200">{fmt(row.nullDepthDb)}</td>
+                            <td className={`text-center px-2 py-1 border border-yellow-200 ${freqOk ? 'text-green-700 font-bold' : 'text-red-700'}`}>{fmtD(row.dHz)}</td>
+                            <td className={`text-center px-2 py-1 border border-yellow-200 ${depthOk ? 'text-green-700 font-bold' : 'text-red-700'}`}>{fmtD(row.dDb)}</td>
+                            <td className="text-center px-2 py-1 border border-yellow-200">{row.mae != null ? fmt(row.mae) + ' dB' : '—'}</td>
+                            <td className="text-center px-2 py-1 border border-yellow-200">{row.worst != null ? fmt(row.worst) + ' dB' : '—'}</td>
+                            <td className="px-2 py-1 border border-yellow-200">{row.verdict}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="p-3 bg-yellow-100 border border-yellow-400 rounded text-xs">
+                  <span className="font-semibold text-yellow-900">Batch 1 Diagnosis: </span>
+                  <span className="text-yellow-800">{results.diagnosis}</span>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
