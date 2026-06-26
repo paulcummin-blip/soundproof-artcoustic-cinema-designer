@@ -1,7 +1,45 @@
 import React, { useMemo } from 'react';
 
-// Apply 1/6 octave fractional-octave smoothing to a {frequency, spl} array.
-// width = fractional octave (e.g. 6 = 1/6 octave).
+// ─── Null depth detection ────────────────────────────────────────────────────
+// Copied from AcousticSolverShootoutBatch1.jsx (identical logic).
+// null depth = null dB minus local peak dB within ±1.5 octaves (always negative).
+// Input: parallel arrays freqsHz[] and splDb[].
+function detectNullDepth(freqsHz, splDb) {
+  // Step 1: find absolute minimum in 20–80 Hz
+  let minDb = Infinity;
+  let minIdx = -1;
+  for (let i = 0; i < freqsHz.length; i++) {
+    const hz = freqsHz[i];
+    if (hz < 20 || hz > 80) continue;
+    if (splDb[i] < minDb) { minDb = splDb[i]; minIdx = i; }
+  }
+  if (minIdx === -1) return { nullHz: null, nullDepthDb: null };
+
+  const nullHz = freqsHz[minIdx];
+
+  // Step 2: find local peak within ±1.5 octaves of the null, bounded to [20, 200] Hz
+  const loHz = Math.max(20, nullHz / Math.pow(2, 1.5));
+  const hiHz = Math.min(200, nullHz * Math.pow(2, 1.5));
+  let peakDb = -Infinity;
+  for (let i = 0; i < freqsHz.length; i++) {
+    const hz = freqsHz[i];
+    if (hz < loHz || hz > hiHz) continue;
+    if (splDb[i] > peakDb) peakDb = splDb[i];
+  }
+
+  const nullDepthDb = minDb - peakDb; // always negative
+  return { nullHz, nullDepthDb };
+}
+
+// Convenience wrapper for { frequency, spl }[] series format
+function detectNullDepthFromSeries(data) {
+  if (!Array.isArray(data) || data.length === 0) return { nullHz: null, nullDepthDb: null };
+  const freqsHz = data.map(p => p.frequency);
+  const splDb   = data.map(p => p.spl);
+  return detectNullDepth(freqsHz, splDb);
+}
+
+// ─── 1/6 octave fractional-octave smoothing ──────────────────────────────────
 function smoothFractionalOctave(data, width = 6) {
   if (!Array.isArray(data) || data.length < 3) return data;
   const sorted = [...data].sort((a, b) => a.frequency - b.frequency);
@@ -15,94 +53,68 @@ function smoothFractionalOctave(data, width = 6) {
   });
 }
 
-// Find the deepest null (minimum SPL) within 20–120 Hz.
-function detectNull(data) {
-  if (!Array.isArray(data) || data.length === 0) return null;
-  let min = Infinity;
-  let minFreq = null;
-  for (const { frequency, spl } of data) {
-    if (!Number.isFinite(frequency) || !Number.isFinite(spl)) continue;
-    if (frequency < 20 || frequency > 120) continue;
-    if (spl < min) { min = spl; minFreq = frequency; }
-  }
-  return minFreq !== null ? { frequency: minFreq, spl: min } : null;
-}
-
-// Find the SPL at the closest frequency point in a series.
-function splAtFreq(data, targetHz) {
-  if (!Array.isArray(data) || data.length === 0) return null;
-  let best = null, bestDist = Infinity;
-  for (const { frequency, spl } of data) {
-    if (!Number.isFinite(frequency) || !Number.isFinite(spl)) continue;
-    const d = Math.abs(frequency - targetHz);
-    if (d < bestDist) { bestDist = d; best = spl; }
-  }
-  return bestDist <= 5 ? best : null;
-}
-
+// ─── Component ───────────────────────────────────────────────────────────────
 /**
  * NullDepthAuditBadge
  *
- * Shows a compact audit card comparing the raw engine response (no smoothing)
- * against a 1/6 octave smoothed version of the same data, so destructive nulls
- * hidden by display smoothing are surfaced.
+ * Compares true null depth (null dB minus local peak within ±1.5 octaves)
+ * on the raw engine output vs the same data after 1/6 octave smoothing,
+ * so destructive nulls hidden by display smoothing are surfaced.
  *
  * Props:
- *   rawData  — array of { frequency, spl } — the pre-display engine output (multiSeries[0].data)
+ *   rawData — array of { frequency, spl } — pre-display engine output (multiSeries[0].data)
  */
 export default function NullDepthAuditBadge({ rawData }) {
   const audit = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length < 3) return null;
 
-    // Raw null: engine output, no smoothing applied
-    const rawNull = detectNull(rawData);
-    if (!rawNull) return null;
+    // Raw null depth — engine output, no smoothing
+    const { nullHz: rawHz, nullDepthDb: rawDepthDb } = detectNullDepthFromSeries(rawData);
+    if (rawHz === null || rawDepthDb === null) return null;
 
-    // Displayed null: 1/6 octave smoothed — matches typical acoustic analysis display
-    const smoothed = smoothFractionalOctave(rawData, 6);
-    const smoothedNullAtSameFreq = splAtFreq(smoothed, rawNull.frequency);
-    const smoothedNull = detectNull(smoothed);
+    // Smoothed null depth — 1/6 octave applied first, then same depth detection
+    const smoothedData = smoothFractionalOctave(rawData, 6)
+      .filter(p => Number.isFinite(p.spl));
+    const { nullHz: smoothedHz, nullDepthDb: smoothedDepthDb } = detectNullDepthFromSeries(smoothedData);
 
-    const fill = (smoothedNullAtSameFreq !== null)
-      ? smoothedNullAtSameFreq - rawNull.spl  // positive = smoothing filled the null
+    // Smoothing fill: how many dB of null depth were hidden by smoothing (positive = smoothing filled the null)
+    const fillDb = (smoothedDepthDb !== null && rawDepthDb !== null)
+      ? smoothedDepthDb - rawDepthDb
       : null;
 
-    return {
-      rawHz: rawNull.frequency,
-      rawDb: rawNull.spl,
-      smoothedHz: smoothedNull?.frequency ?? null,
-      smoothedDb: smoothedNullAtSameFreq ?? smoothedNull?.spl ?? null,
-      fillDb: fill,
-    };
+    return { rawHz, rawDepthDb, smoothedHz, smoothedDepthDb, fillDb };
   }, [rawData]);
 
   if (!audit) return null;
 
-  // Severity thresholds based on raw null depth
-  const { rawDb, rawHz, smoothedDb, smoothedHz, fillDb } = audit;
+  const { rawHz, rawDepthDb, smoothedHz, smoothedDepthDb, fillDb } = audit;
 
-  let severity, borderColor, bgColor, labelColor, dotColor;
-  if (rawDb <= -20) {
-    severity = 'red';
+  // ─── Severity — based on raw null depth ─────────────────────────────────
+  let severity, borderColor, bgColor, labelColor, dotColor, statusLabel;
+  if (rawDepthDb <= -20) {
+    severity    = 'red';
     borderColor = '#dc2626';
-    bgColor = '#fef2f2';
-    labelColor = '#991b1b';
-    dotColor = '#dc2626';
-  } else if (rawDb <= -12) {
-    severity = 'amber';
+    bgColor     = '#fef2f2';
+    labelColor  = '#991b1b';
+    dotColor    = '#dc2626';
+    statusLabel = 'SEVERE NULL';
+  } else if (rawDepthDb <= -12) {
+    severity    = 'amber';
     borderColor = '#d97706';
-    bgColor = '#fffbeb';
-    labelColor = '#92400e';
-    dotColor = '#d97706';
+    bgColor     = '#fffbeb';
+    labelColor  = '#92400e';
+    dotColor    = '#d97706';
+    statusLabel = 'MODERATE NULL';
   } else {
-    severity = 'green';
+    severity    = 'green';
     borderColor = '#16a34a';
-    bgColor = '#f0fdf4';
-    labelColor = '#14532d';
-    dotColor = '#16a34a';
+    bgColor     = '#f0fdf4';
+    labelColor  = '#14532d';
+    dotColor    = '#16a34a';
+    statusLabel = 'ACCEPTABLE';
   }
 
-  const fmt1 = (v) => (Number.isFinite(v) ? v.toFixed(1) : '—');
+  const fmt1    = (v) => (Number.isFinite(v) ? v.toFixed(1) : '—');
   const fmtSign = (v) => (Number.isFinite(v) ? (v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1)) : '—');
 
   return (
@@ -117,7 +129,7 @@ export default function NullDepthAuditBadge({ rawData }) {
       flexDirection: 'column',
       gap: 4,
     }}>
-      {/* Header row */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
         <span style={{
           width: 8, height: 8, borderRadius: '50%',
@@ -129,39 +141,39 @@ export default function NullDepthAuditBadge({ rawData }) {
         <span style={{
           marginLeft: 'auto',
           fontSize: 9,
-          fontWeight: 600,
+          fontWeight: 700,
           color: labelColor,
           background: bgColor,
           border: `1px solid ${borderColor}`,
           borderRadius: 4,
           padding: '1px 5px',
           textTransform: 'uppercase',
-          letterSpacing: '0.04em',
+          letterSpacing: '0.05em',
         }}>
-          {severity === 'red' ? 'Severe' : severity === 'amber' ? 'Moderate' : 'Acceptable'}
+          {statusLabel}
         </span>
       </div>
 
-      {/* Data rows */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px', color: labelColor }}>
+      {/* Metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px', color: labelColor }}>
         <div>
           <span style={{ opacity: 0.7 }}>Raw null: </span>
-          <span style={{ fontWeight: 700 }}>{fmt1(rawHz)} Hz / {fmt1(rawDb)} dB</span>
+          <span style={{ fontWeight: 700 }}>{fmt1(rawHz)} Hz / {fmt1(rawDepthDb)} dB depth</span>
         </div>
         <div>
           <span style={{ opacity: 0.7 }}>Displayed (1/6 oct): </span>
-          <span style={{ fontWeight: 700 }}>{fmt1(rawHz)} Hz / {fmt1(smoothedDb)} dB</span>
+          <span style={{ fontWeight: 700 }}>{fmt1(smoothedHz ?? rawHz)} Hz / {fmt1(smoothedDepthDb)} dB depth</span>
         </div>
         <div>
           <span style={{ opacity: 0.7 }}>Smoothing fill: </span>
           <span style={{ fontWeight: 700 }}>{fmtSign(fillDb)} dB</span>
         </div>
-        <div style={{ opacity: 0.6, fontSize: 9 }}>
-          Source: engine output · no display smoothing
+        <div style={{ opacity: 0.55, fontSize: 9, alignSelf: 'center' }}>
+          depth = null dB − local peak (±1.5 oct)
         </div>
       </div>
 
-      {/* Warning — only shown when severe */}
+      {/* Warning — red only */}
       {severity === 'red' && (
         <div style={{
           marginTop: 4,
