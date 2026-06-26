@@ -142,7 +142,7 @@ function modalPressureContributionLocal(frequencyHz, modeFrequencyHz, qValue, co
   const ratio = (2 * Math.PI * frequencyHz) / (2 * Math.PI * Math.max(modeFrequencyHz, 1e-6));
 
   const modeOrder = Math.abs(modeIndices.nx) + Math.abs(modeIndices.ny) + Math.abs(modeIndices.nz);
-  const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
+  const orderWeight = 1.0; // global attenuation removed — highOrderAxialScale is the sole governor for axial harmonics
 
   const effectiveCoupling = combinedCoupling;
   const modalGain = modalSourceAmplitude * effectiveCoupling * orderWeight;
@@ -1633,7 +1633,7 @@ export function simulateBassResponseRewParityField(roomDims, seatPos, sub, subPr
       // Higher-order axial correction (matches production engine scale for comparability)
       const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
       const axialScale = (mode.type === 'axial' && modeOrder >= 2) ? 0.50 : 1.0;
-      const orderWeight = modeOrder >= 2 ? 0.50 : 1.0;
+      const orderWeight = 1.0; // global attenuation removed — axialScale is the sole governor for axial harmonics
 
       const gain = modalSourceAmplitude * coupling * axialScale * orderWeight;
 
