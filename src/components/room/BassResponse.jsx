@@ -1122,6 +1122,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
             <div className="w-full max-w-xl rounded-md border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-[11px] text-[#334155] font-mono leading-5">
               <div className="font-bold text-[#1E293B]">Active model:</div>
+              {(() => {
+                const _isMOP =
+                  (rewSourceCurveMode === 'flat_rew_reference' && rewParityFieldMode === 'full_field') ||
+                  rewParityFieldMode === 'modes_only';
+                return (
+                  <div style={{ color: _isMOP ? '#166534' : '#991b1b', fontWeight: 700 }}>
+                    isModeOnlyParity: {String(_isMOP)}
+                  </div>
+                );
+              })()}
               <div>Source: {rewSourceCurveMode}</div>
               <div>Modal source: {modalSourceReferenceMode}{modalSourceReferenceMode === 'distance_blend' ? ` ⚠️` : ''}</div>
               {modalSourceReferenceMode === 'distance_blend' && <div style={{ color: '#b45309', fontWeight: 700 }}>Modal distance blend: {modalDistanceBlend.toFixed(2)}</div>}
@@ -1226,6 +1236,71 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               })()}
 
             </div>
+
+            {/* ── Live Modal Table (first 20 modes) ── */}
+            {roomDims?.widthM && roomDims?.lengthM && roomDims?.heightM && (() => {
+              const _W = Number(roomDims.widthM);
+              const _L = Number(roomDims.lengthM);
+              const _H = Number(roomDims.heightM);
+              const _C = 343;
+              const _fMax = 200;
+              const _nMax = Math.ceil((_fMax / _C) * 2 * Math.max(_W, _L, _H)) + 3;
+              const _modes = [];
+              for (let nx = 0; nx <= _nMax && _modes.length < 60; nx++) {
+                for (let ny = 0; ny <= _nMax && _modes.length < 60; ny++) {
+                  for (let nz = 0; nz <= _nMax && _modes.length < 60; nz++) {
+                    if (nx === 0 && ny === 0 && nz === 0) continue;
+                    const freq = (_C / 2) * Math.sqrt((nx / _W) ** 2 + (ny / _L) ** 2 + (nz / _H) ** 2);
+                    if (!Number.isFinite(freq) || freq <= 0 || freq > _fMax) continue;
+                    const axes = (nx > 0 ? 1 : 0) + (ny > 0 ? 1 : 0) + (nz > 0 ? 1 : 0);
+                    const type = axes === 1 ? 'axial' : axes === 2 ? 'tangential' : 'oblique';
+                    const axisLabel = type === 'axial'
+                      ? (nx > 0 ? 'width' : ny > 0 ? 'length' : 'height')
+                      : '';
+                    _modes.push({ nx, ny, nz, freq, type, axisLabel, order: nx + ny + nz });
+                  }
+                }
+              }
+              _modes.sort((a, b) => a.freq - b.freq);
+              const top20 = _modes.slice(0, 20);
+              return (
+                <details style={{ marginTop: 6, borderTop: '1px solid #CBD5E1', paddingTop: 4 }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 700, color: '#334155', fontSize: 10 }}>
+                    Live Modal Table — first 20 modes ({_W}×{_L}×{_H} m)
+                  </summary>
+                  <div style={{ overflowX: 'auto', marginTop: 4 }}>
+                    <table style={{ borderCollapse: 'collapse', fontSize: 9, width: '100%' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #CBD5E1', color: '#6b7280' }}>
+                          <th style={{ padding: '1px 4px', textAlign: 'right' }}>#</th>
+                          <th style={{ padding: '1px 4px', textAlign: 'right' }}>nx</th>
+                          <th style={{ padding: '1px 4px', textAlign: 'right' }}>ny</th>
+                          <th style={{ padding: '1px 4px', textAlign: 'right' }}>nz</th>
+                          <th style={{ padding: '1px 4px' }}>type</th>
+                          <th style={{ padding: '1px 4px' }}>axis</th>
+                          <th style={{ padding: '1px 4px', textAlign: 'right' }}>order</th>
+                          <th style={{ padding: '1px 4px', textAlign: 'right' }}>Hz</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {top20.map((m, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', color: m.type === 'axial' ? '#1d4ed8' : m.type === 'tangential' ? '#7c3aed' : '#374151' }}>
+                            <td style={{ padding: '1px 4px', textAlign: 'right', color: '#9ca3af' }}>{i + 1}</td>
+                            <td style={{ padding: '1px 4px', textAlign: 'right' }}>{m.nx}</td>
+                            <td style={{ padding: '1px 4px', textAlign: 'right' }}>{m.ny}</td>
+                            <td style={{ padding: '1px 4px', textAlign: 'right' }}>{m.nz}</td>
+                            <td style={{ padding: '1px 4px' }}>{m.type}</td>
+                            <td style={{ padding: '1px 4px', color: '#64748b' }}>{m.axisLabel}</td>
+                            <td style={{ padding: '1px 4px', textAlign: 'right' }}>{m.order}</td>
+                            <td style={{ padding: '1px 4px', textAlign: 'right', fontWeight: 600 }}>{m.freq.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              );
+            })()}
 
             {/* ── REW Benchmark Comparison Table ── */}
             <div style={{ marginTop: 10, borderTop: '1px solid #CBD5E1', paddingTop: 8 }}>
