@@ -614,6 +614,12 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   // When rewParityModalPhase is true, both propagationPhaseScale and disableModalPropagationPhase
   // are forced to their zero/true values regardless of caller options.
   const rewParityModalPhase = options?.rewParityModalPhase === true;
+  // Mode-only parity gate: suppresses direct path and image/reflection contributions
+  // when the caller is running a REW modal-only parity comparison.
+  // Does not affect normal product mode (rewSourceCurveMode !== 'flat_rew_reference').
+  const isModeOnlyParity =
+    (options?.rewSourceCurveMode === 'flat_rew_reference' && options?.rewParityFieldMode === 'full_field') ||
+    options?.rewParityFieldMode === 'modes_only';
   const disableModalPropagationPhase = rewParityModalPhase ? true : options?.disableModalPropagationPhase === true;
   const mute68HzAxialMode = options?.mute68HzAxialMode === true;
   const propagationPhaseScaleOption = Number(options?.propagationPhaseScale);
@@ -851,8 +857,12 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
     directRe = amplitude * Math.cos(totalPhase);
     directIm = amplitude * Math.sin(totalPhase);
-    sumRe += directRe;
-    sumIm += directIm;
+    // Suppress direct path in mode-only parity mode (flat_rew_reference + full_field or modes_only).
+    // Normal product mode is unaffected.
+    if (!isModeOnlyParity) {
+      sumRe += directRe;
+      sumIm += directIm;
+    }
 
     // First-order reflections
     imageSources.forEach((imageSource, reflectionIndex) => {
@@ -890,8 +900,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
       reflectionRe += imageRe;
       reflectionIm += imageIm;
-      // REW parity mode avoids double-counting by not adding independent geometric reflection or late-field vectors on top of the modal room solution.
-      if (!rewParityModalPhase) {
+      // Suppress reflection contributions in mode-only parity mode.
+      // rewParityModalPhase legacy path preserved; isModeOnlyParity is the new gate.
+      if (!rewParityModalPhase && !isModeOnlyParity) {
         sumRe += imageRe;
         sumIm += imageIm;
       }
@@ -904,8 +915,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     const lateFieldPhase = 2 * Math.PI * frequencyHz * 0.0071 + 1.3;
     lateFieldRe = (disableLateField || frequencyHz < schroederFrequency) ? 0 : lateFieldAmplitude * Math.cos(lateFieldPhase);
     lateFieldIm = (disableLateField || frequencyHz < schroederFrequency) ? 0 : lateFieldAmplitude * Math.sin(lateFieldPhase);
-    // REW parity mode avoids double-counting by not adding independent geometric reflection or late-field vectors on top of the modal room solution.
-    if (!rewParityModalPhase) {
+    // Suppress late-field in mode-only parity mode.
+    if (!rewParityModalPhase && !isModeOnlyParity) {
       sumRe += lateFieldRe;
       sumIm += lateFieldIm;
     }
