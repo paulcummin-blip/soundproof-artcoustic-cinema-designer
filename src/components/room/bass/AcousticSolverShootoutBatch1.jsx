@@ -30,11 +30,6 @@ const FREQ_MIN       = 20;
 const FREQ_MAX       = 200;
 const SPEED_OF_SOUND = 343;
 
-// Known production null — used for baseline validation only.
-// These values come from the earlier response-construction audit.
-const PROD_NULL_HZ    = 41.5;
-const PROD_NULL_DEPTH = -53.7; // depth below local peak
-
 // Baseline validation tolerances
 const BASELINE_HZ_TOL    = 0.5;
 const BASELINE_DEPTH_TOL = 1.0;
@@ -330,6 +325,14 @@ function shortVerdict(nullHz, nullDepthDb) {
   return '❌ Both off';
 }
 
+// ─── Extract null from live production data ({ frequency, spl }[]) ────────────
+function detectNullDepthFromSeries(data) {
+  if (!Array.isArray(data) || data.length === 0) return { nullHz: null, nullDepthDb: null };
+  const freqsHz = data.map(p => p.frequency);
+  const splDb   = data.map(p => p.spl);
+  return detectNullDepth(freqsHz, splDb);
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function AcousticSolverShootoutBatch1({
   roomDims,
@@ -338,6 +341,7 @@ export default function AcousticSolverShootoutBatch1({
   subProductCurve,
   surfaceAbsorption,
   axialQ = 4.0,
+  liveProductionData = null, // live graph series data: { frequency, spl }[]
 }) {
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
@@ -359,19 +363,31 @@ export default function AcousticSolverShootoutBatch1({
       const v1Spl = v1.splDbRaw;
       const { nullHz: v1NHz, nullDepthDb: v1NDepth } = detectNullDepth(v1.freqsHz, v1Spl);
 
-      // ── Baseline validation ──
-      const dHz    = v1NHz    != null ? Math.abs(v1NHz    - PROD_NULL_HZ)    : Infinity;
-      const dDepth = v1NDepth != null ? Math.abs(v1NDepth - PROD_NULL_DEPTH) : Infinity;
+      // ── Baseline validation against live production response ──
+      if (!liveProductionData || liveProductionData.length === 0) {
+        setResults({
+          baselineValidation: { unavailable: true },
+          rows: [],
+          diagnosis: null,
+        });
+        return;
+      }
+
+      const { nullHz: prodNullHz, nullDepthDb: prodNullDepth } =
+        detectNullDepthFromSeries(liveProductionData);
+
+      const dHz    = (v1NHz    != null && prodNullHz    != null) ? Math.abs(v1NHz    - prodNullHz)    : Infinity;
+      const dDepth = (v1NDepth != null && prodNullDepth != null) ? Math.abs(v1NDepth - prodNullDepth) : Infinity;
       const baselinePass = dHz <= BASELINE_HZ_TOL && dDepth <= BASELINE_DEPTH_TOL;
 
       const baselineValidation = {
-        prodNullHz:    PROD_NULL_HZ,
-        v1NullHz:      v1NHz,
-        dHz:           v1NHz    != null ? (v1NHz    - PROD_NULL_HZ)    : null,
-        prodNullDepth: PROD_NULL_DEPTH,
-        v1NullDepth:   v1NDepth,
-        dDepth:        v1NDepth != null ? (v1NDepth - PROD_NULL_DEPTH) : null,
-        pass:          baselinePass,
+        prodNullHz,
+        v1NullHz:    v1NHz,
+        dHz:         (v1NHz != null && prodNullHz != null) ? (v1NHz - prodNullHz) : null,
+        prodNullDepth,
+        v1NullDepth: v1NDepth,
+        dDepth:      (v1NDepth != null && prodNullDepth != null) ? (v1NDepth - prodNullDepth) : null,
+        pass:        baselinePass,
       };
 
       if (!baselinePass) {
@@ -488,7 +504,7 @@ export default function AcousticSolverShootoutBatch1({
       <div className="px-4 pb-4 pt-2 space-y-3">
         <p className="text-xs text-yellow-700">
           Diagnostic only. REW target: <strong>40.6 Hz / −17.0 dB depth</strong>.
-          Known production null: <strong>~41.5 Hz / ~−53.7 dB depth</strong>.
+          Baseline validation compares V1 against the <strong>live production graph</strong> (selected seat).
           Null depth = null dB minus local peak within ±1.5 octaves.
         </p>
 
@@ -506,50 +522,56 @@ export default function AcousticSolverShootoutBatch1({
           <div className="space-y-3">
 
             {/* ── Baseline validation ── */}
-            <div className={`p-2 rounded border text-xs font-mono ${bv?.pass ? 'bg-green-50 border-green-400 text-green-900' : 'bg-red-50 border-red-400 text-red-900'}`}>
-              <div className="font-bold mb-1">Baseline Validation — V1 vs Known Production</div>
-              <table className="border-collapse w-full">
-                <thead>
-                  <tr className="text-left" style={{ fontSize: 9 }}>
-                    <th className="pr-3">Metric</th>
-                    <th className="pr-3">Production</th>
-                    <th className="pr-3">V1 Diagnostic</th>
-                    <th className="pr-3">Δ</th>
-                    <th>Tolerance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="pr-3">Null Hz</td>
-                    <td className="pr-3">{bv?.prodNullHz} Hz</td>
-                    <td className="pr-3">{fmt(bv?.v1NullHz)} Hz</td>
-                    <td className={`pr-3 font-bold ${Math.abs(bv?.dHz ?? Infinity) <= BASELINE_HZ_TOL ? 'text-green-700' : 'text-red-700'}`}>
-                      {fmtD(bv?.dHz)} Hz
-                    </td>
-                    <td>≤ {BASELINE_HZ_TOL} Hz</td>
-                  </tr>
-                  <tr>
-                    <td className="pr-3">Null depth</td>
-                    <td className="pr-3">{bv?.prodNullDepth} dB</td>
-                    <td className="pr-3">{fmt(bv?.v1NullDepth)} dB</td>
-                    <td className={`pr-3 font-bold ${Math.abs(bv?.dDepth ?? Infinity) <= BASELINE_DEPTH_TOL ? 'text-green-700' : 'text-red-700'}`}>
-                      {fmtD(bv?.dDepth)} dB
-                    </td>
-                    <td>≤ {BASELINE_DEPTH_TOL} dB</td>
-                  </tr>
-                </tbody>
-              </table>
-              <div className={`mt-1 font-bold ${bv?.pass ? 'text-green-800' : 'text-red-800'}`}>
-                {bv?.pass ? '✅ PASS — baseline confirmed, variants valid.' : '❌ FAIL — Batch 1 invalid: diagnostic baseline does not match production.'}
-              </div>
-            </div>
-
-            {/* ── Variant table — only shown if baseline passes ── */}
-            {!bv?.pass ? (
-              <div className="p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800 font-mono">
-                Batch 1 invalid — diagnostic baseline does not match production. Fix V1 options before interpreting variants.
+            {bv?.unavailable ? (
+              <div className="p-2 rounded border bg-gray-50 border-gray-300 text-xs font-mono text-gray-600">
+                Baseline validation unavailable — production response array not provided.
               </div>
             ) : (
+              <div className={`p-2 rounded border text-xs font-mono ${bv?.pass ? 'bg-green-50 border-green-400 text-green-900' : 'bg-red-50 border-red-400 text-red-900'}`}>
+                <div className="font-bold mb-1">Baseline Validation — V1 vs Live Production Graph</div>
+                <table className="border-collapse w-full">
+                  <thead>
+                    <tr className="text-left" style={{ fontSize: 9 }}>
+                      <th className="pr-3">Metric</th>
+                      <th className="pr-3">Live Production</th>
+                      <th className="pr-3">V1 Diagnostic</th>
+                      <th className="pr-3">Δ</th>
+                      <th>Tolerance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="pr-3">Null Hz</td>
+                      <td className="pr-3">{fmt(bv?.prodNullHz)} Hz</td>
+                      <td className="pr-3">{fmt(bv?.v1NullHz)} Hz</td>
+                      <td className={`pr-3 font-bold ${Math.abs(bv?.dHz ?? Infinity) <= BASELINE_HZ_TOL ? 'text-green-700' : 'text-red-700'}`}>
+                        {fmtD(bv?.dHz)} Hz
+                      </td>
+                      <td>≤ {BASELINE_HZ_TOL} Hz</td>
+                    </tr>
+                    <tr>
+                      <td className="pr-3">Null depth</td>
+                      <td className="pr-3">{fmt(bv?.prodNullDepth)} dB</td>
+                      <td className="pr-3">{fmt(bv?.v1NullDepth)} dB</td>
+                      <td className={`pr-3 font-bold ${Math.abs(bv?.dDepth ?? Infinity) <= BASELINE_DEPTH_TOL ? 'text-green-700' : 'text-red-700'}`}>
+                        {fmtD(bv?.dDepth)} dB
+                      </td>
+                      <td>≤ {BASELINE_DEPTH_TOL} dB</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div className={`mt-1 font-bold ${bv?.pass ? 'text-green-800' : 'text-red-800'}`}>
+                  {bv?.pass ? '✅ PASS — baseline confirmed, variants valid.' : '❌ FAIL — V1 does not match live production graph.'}
+                </div>
+              </div>
+            )}
+
+            {/* ── Variant table — only shown if baseline passes (and not unavailable) ── */}
+            {!bv?.unavailable && !bv?.pass ? (
+              <div className="p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800 font-mono">
+                Batch 1 invalid — V1 does not match the live graph. Fix V1 options before interpreting variants.
+              </div>
+            ) : bv?.pass ? (
               <>
                 <div className="overflow-x-auto">
                   <table className="text-xs w-full border-collapse">
@@ -600,7 +622,7 @@ export default function AcousticSolverShootoutBatch1({
                   <span className="text-yellow-800">{results.diagnosis}</span>
                 </div>
               </>
-            )}
+            ) : null}
           </div>
         )}
       </div>

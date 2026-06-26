@@ -1510,6 +1510,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   subProductCurve={shootoutCurve}
                   surfaceAbsorption={surfaceAbsorption}
                   axialQ={axialQ}
+                  liveProductionData={multiSeries[0]?.data ?? null}
                 />
               );
             })()}
