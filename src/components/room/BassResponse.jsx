@@ -1506,7 +1506,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <AcousticSolverShootoutBatch1
                   roomDims={{ widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM }}
                   seatPos={{ x: shootoutSeat.x, y: shootoutSeat.y, z: Number.isFinite(Number(shootoutSeat.z)) ? Number(shootoutSeat.z) : 1.2 }}
-                  sub={shootoutSub}
+                  subsForSimulation={subsForSimulation}
                   subProductCurve={shootoutCurve}
                   surfaceAbsorption={surfaceAbsorption}
                   axialQ={axialQ}

@@ -107,17 +107,22 @@ function buildLogAxis(minHz = FREQ_MIN, maxHz = FREQ_MAX, ppOct = 96) {
 }
 
 // ─── V1: Production baseline ──────────────────────────────────────────────────
-// Options mirror BassResponse.jsx simulationResults useMemo exactly:
-//   rewSourceCurveMode = 'flat_rew_reference'  → pureDeterministicModalSum: true
-//                                              → disableModalPropagationPhase: true
-//                                              → enableReflections: false (_isParityFullField)
-//                                              → disableLateField: true (_fieldLateField)
-//   propagationPhaseScale = 0.10 (REW_PARITY_PRESET default)
-//   rewParityModalPhase   = false (not passed in production call)
-//   modalSourceReferenceMode = 'distance_normalized' (REW_PARITY_PRESET default)
-//   axialQ = 4.0 (REW_PARITY_PRESET default)
-//   sub.tuning.delayMs / polarity pass through via the sub object itself (not overridden here)
-function runProductionBaseline(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ) {
+// Options mirror BassResponse.jsx simulationResults useMemo exactly for
+// rewSourceCurveMode = 'flat_rew_reference':
+//
+//   _isParityFullField = true  (flat_rew_reference + full_field)
+//   → enableReflections: false    (_isParityFullField suppresses reflections)
+//   → disableLateField:  true     (_fieldLateField forced true)
+//   → disableModalPropagationPhase: true  (line 611: forced true when flat_rew_reference)
+//   → pureDeterministicModalSum:  true    (line 607: forced true when flat_rew_reference)
+//   → propagationPhaseScale: REW_PARITY_PRESET.propagationPhaseScale = 0
+//   → debugReflectionOrder: 1     (line 619: forced 1 when flat_rew_reference)
+//   → modalSourceReferenceMode: 'distance_normalized' (REW_PARITY_PRESET default)
+//   → axialQ: 4.0 (REW_PARITY_PRESET default)
+//
+//   Multi-sub: iterates all subs and coherently sums complex pressure Re/Im,
+//   matching the seatingPositions.forEach → subsForSimulation.forEach loop in BassResponse.
+function runProductionBaseline(roomDims, seatPos, subsForSimulation, surfaceAbsorption, axialQ) {
   // Source curve: flat_rew_reference — matches REW_SOURCE_CURVES.flat_rew_reference in BassResponse
   const flatRewCurve = [
     { hz: 20,  db: 94 },
@@ -126,50 +131,75 @@ function runProductionBaseline(roomDims, seatPos, sub, subProductCurve, surfaceA
     { hz: 200, db: 94 },
   ];
 
-  return simulateBassResponseRewCore(
-    roomDims,
-    seatPos,
-    sub,
-    flatRewCurve,
-    {
-      // ── field structure — real visible production options ──
-      enableModes:                  true,
-      enableReflections:            true,   // production default: enableRewCoreReflections = true
-      disableLateField:             false,  // production default: disableLateField state = false
+  // Production engine options for flat_rew_reference + full_field (BassResponse lines 503–625)
+  const prodOptions = {
+    // _isParityFullField = true → reflections suppressed, late field suppressed
+    enableModes:                  true,
+    enableReflections:            false,  // BassResponse line 508: _isParityFullField → false
+    disableLateField:             true,   // BassResponse line 516: _isParityFullField → disableLateField=true
 
-      // ── phase options — real visible production options ──
-      rewParityModalPhase:          false,  // not passed in production call
-      propagationPhaseScale:        0.10,   // REW_PARITY_PRESET default active in production
-      disableModalPropagationPhase: false,  // production default
+    // Phase — flat_rew_reference forces these on line 611
+    rewParityModalPhase:          false,
+    propagationPhaseScale:        0,      // REW_PARITY_PRESET.propagationPhaseScale = 0
+    disableModalPropagationPhase: true,   // BassResponse line 611: forced true for flat_rew_reference
 
-      // ── modal options ──
-      pureDeterministicModalSum:    true,   // forced true for flat_rew_reference in production
-      modalSourceReferenceMode:     'distance_normalized',
-      modalGainScalar:              1.0,
-      axialQ,
-      modalStorageMode:             'none',
+    // Modal options
+    pureDeterministicModalSum:    true,   // BassResponse line 607: forced true for flat_rew_reference
+    modalSourceReferenceMode:     'distance_normalized',
+    modalGainScalar:              1.0,
+    axialQ,
+    modalStorageMode:             'none',
 
-      // ── diagnostic overrides (match production defaults) ──
-      highOrderAxialScale:          1.0,
-      rewParityModalMagnitudeScale: 1.0,
-      debugModalPhaseConvention:    'normal',
-      debugModalHSign:              'normal',
-      modalCoherenceMode:           'coherent',
-      debugMode200Multiplier:       1.0,
-      debugReflectionOrder:         1,
-      overrideConstantAxialQ:       false,
-      overrideAbsorptionAxialQ:     false,
-      debugDisableModalContribution: false,
+    // Diagnostic overrides — match production defaults
+    highOrderAxialScale:          1.0,
+    rewParityModalMagnitudeScale: 1.0,
+    debugModalPhaseConvention:    'normal',
+    debugModalHSign:              'normal',
+    modalCoherenceMode:           'coherent',
+    debugMode200Multiplier:       1.0,
+    debugReflectionOrder:         1,      // BassResponse line 619: forced 1 for flat_rew_reference
+    overrideConstantAxialQ:       false,
+    overrideAbsorptionAxialQ:     false,
+    debugDisableModalContribution: false,
 
-      // ── freq range ──
-      freqMinHz: FREQ_MIN,
-      freqMaxHz: FREQ_MAX,
-      smoothing: 'none',
+    // Freq range
+    freqMinHz: FREQ_MIN,
+    freqMaxHz: FREQ_MAX,
+    smoothing: 'none',
 
-      // ── absorption ──
-      surfaceAbsorption,
+    // Absorption
+    surfaceAbsorption,
+  };
+
+  // Coherent complex pressure sum over all subs — mirrors BassResponse lines 646–657
+  let freqsHz = null;
+  let sumRe = null;
+  let sumIm = null;
+
+  for (const sub of subsForSimulation) {
+    const result = simulateBassResponseRewCore(roomDims, seatPos, sub, flatRewCurve, prodOptions);
+    if (!freqsHz) {
+      freqsHz = result.freqsHz;
+      sumRe = result.complexPressure.map(cp => cp.re);
+      sumIm = result.complexPressure.map(cp => cp.im);
+    } else {
+      result.complexPressure.forEach((cp, i) => {
+        if (Number.isFinite(cp.re) && Number.isFinite(cp.im)) {
+          sumRe[i] += cp.re;
+          sumIm[i] += cp.im;
+        }
+      });
     }
-  );
+  }
+
+  // Convert combined complex pressure to SPL dB — mirrors BassResponse lines 660–669
+  const splDbRaw = sumRe.map((re, i) => {
+    const im = sumIm[i];
+    const mag = Math.sqrt(re * re + im * im);
+    return 20 * Math.log10(Math.max(mag, 1e-10));
+  });
+
+  return { freqsHz, splDbRaw };
 }
 
 // ─── V2: Incoherent energy sum ────────────────────────────────────────────────
@@ -304,7 +334,7 @@ function shortVerdict(nullHz, nullDepthDb) {
 export default function AcousticSolverShootoutBatch1({
   roomDims,
   seatPos,
-  sub,
+  subsForSimulation,  // all active subs — replaces single `sub` prop
   subProductCurve,
   surfaceAbsorption,
   axialQ = 4.0,
@@ -317,8 +347,15 @@ export default function AcousticSolverShootoutBatch1({
     setRunning(true);
     setError(null);
     try {
-      // ── V1: Production baseline ──
-      const v1 = runProductionBaseline(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ);
+      // ── V1: Production baseline — multi-sub coherent complex sum ──
+      const activeSubs = Array.isArray(subsForSimulation) && subsForSimulation.length > 0
+        ? subsForSimulation
+        : [];
+      if (activeSubs.length === 0) {
+        setError('No active subs passed to Batch 1 — subsForSimulation is empty.');
+        return;
+      }
+      const v1 = runProductionBaseline(roomDims, seatPos, activeSubs, surfaceAbsorption, axialQ);
       const v1Spl = v1.splDbRaw;
       const { nullHz: v1NHz, nullDepthDb: v1NDepth } = detectNullDepth(v1.freqsHz, v1Spl);
 
@@ -355,6 +392,7 @@ export default function AcousticSolverShootoutBatch1({
         isBaseline: true,
       });
 
+      const sub = activeSubs[0]; // variants V2–V6 operate on single-sub for isolation testing
       const v2 = runEnergySum(roomDims, seatPos, sub, subProductCurve, surfaceAbsorption, axialQ);
       const { nullHz: v2NHz, nullDepthDb: v2NDepth } = detectNullDepth(v2.freqsHz, v2.splDb);
       rows.push({
