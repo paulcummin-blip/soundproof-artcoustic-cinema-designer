@@ -16,6 +16,7 @@ import GreenFunctionEquationShootoutAudit from './GreenFunctionEquationShootoutA
 import DestructiveNullStoryAudit from './DestructiveNullStoryAudit';
 import PhaseOriginPropagationAudit from './PhaseOriginPropagationAudit';
 import ComplexVectorCoherenceAudit from './ComplexVectorCoherenceAudit';
+import FiniteSourceRadiationAudit from './FiniteSourceRadiationAudit';
 import RewParityBenchmark from './RewParityBenchmark';
 import RewBenchmarkProvenancePanel from './RewBenchmarkProvenancePanel';
 import RewBenchmarkComparisonTable from './RewBenchmarkComparisonTable';
@@ -258,7 +259,16 @@ export default function ActiveParityInvestigations({
         axialQ={axialQ}
       />
 
-      {/* ── 9. Green's Function Equation Shootout ── */}
+      {/* ── 9. Finite Source Radiation Audit ── */}
+      <FiniteSourceRadiationAudit
+        roomDims={roomDims}
+        seat={seat}
+        sub={sub}
+        surfaceAbsorption={surfaceAbsorption}
+        axialQ={axialQ}
+      />
+
+      {/* ── 10. Green's Function Equation Shootout ── */}
       <GreenFunctionEquationShootoutAudit
         roomDims={roomDims}
         sub={sub}
