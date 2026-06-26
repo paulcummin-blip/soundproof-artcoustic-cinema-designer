@@ -29,6 +29,7 @@ import DeepDiagnosticsSweepPanel from "@/components/room/bass/DeepDiagnosticsSwe
 import ModalSourceNormalisationAudit from "@/components/room/bass/ModalSourceNormalisationAudit";
 import MultiSeatParityValidationAudit from "@/components/room/bass/MultiSeatParityValidationAudit";
 import ActiveParityInvestigations from "@/components/room/bass/ActiveParityInvestigations";
+import AcousticSolverShootoutBatch1 from "@/components/room/bass/AcousticSolverShootoutBatch1";
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1489,6 +1490,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   modalStorageMode={modalStorageMode}
                   disableLateField={disableLateField}
                   onPromoteRefined={(spec) => setActiveTestEngine(spec)}
+                />
+              );
+            })()}
+
+            {/* ── Acoustic Solver Shootout — Batch 1 ── */}
+            {(() => {
+              const shootoutSeat = selectedSeatIds[0]
+                ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+                : null;
+              const shootoutSub = subsForSimulation[0] ?? null;
+              const shootoutCurve = shootoutSub ? getSubwooferCurve(shootoutSub.modelKey) : null;
+              if (!shootoutSeat || !shootoutSub || !shootoutCurve || !roomDims?.widthM) return null;
+              return (
+                <AcousticSolverShootoutBatch1
+                  roomDims={{ widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM }}
+                  seatPos={{ x: shootoutSeat.x, y: shootoutSeat.y, z: Number.isFinite(Number(shootoutSeat.z)) ? Number(shootoutSeat.z) : 1.2 }}
+                  sub={shootoutSub}
+                  subProductCurve={shootoutCurve}
+                  surfaceAbsorption={surfaceAbsorption}
+                  axialQ={axialQ}
                 />
               );
             })()}
