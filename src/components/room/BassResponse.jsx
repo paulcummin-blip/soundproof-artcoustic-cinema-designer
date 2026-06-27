@@ -35,6 +35,7 @@ import AcousticSolverShootoutBatch3 from "@/components/room/bass/AcousticSolverS
 import AcousticSolverShootoutBatch4 from "@/components/room/bass/AcousticSolverShootoutBatch4";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
+import ImageSourceParityShootout from "@/components/room/bass/ImageSourceParityShootout";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1459,6 +1460,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               )}
             </div>
           </>
+        );
+      })()}
+
+      {/* ── Image-Source Parity Shootout ── */}
+      {IS_DEVELOPMENT_MODE && (() => {
+        const shootoutSeat = selectedSeatIds[0]
+          ? (seatingPositions || []).find(s => (s.id || `${s.x}-${s.y}`) === selectedSeatIds[0])
+          : null;
+        return (
+          <ImageSourceParityShootout
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
+            subsForSimulation={subsForSimulation}
+            surfaceAbsorption={surfaceAbsorption}
+            rewOverlaySeries={rewOverlaySeries}
+            liveProductionData={multiSeries[0]?.data ?? null}
+          />
         );
       })()}
 
