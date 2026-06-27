@@ -494,8 +494,8 @@ export default function BassGraph({
                     {rewStyleMode && isMulti && multiSeries.map((s) => (
                       <Line
                         key={s.id}
-                        type="monotone"
-                        dataKey={`spl_${s.id}`}
+                        type="linear" 
+                         dataKey={`spl_${s.id}`}
                         stroke={s.color}
                         strokeWidth={2}
                         dot={false}
@@ -506,7 +506,7 @@ export default function BassGraph({
                     ))}
                     {rewStyleMode && !isMulti && (
                       <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="spl"
                           stroke="#213428" 
                           strokeWidth={2} 
