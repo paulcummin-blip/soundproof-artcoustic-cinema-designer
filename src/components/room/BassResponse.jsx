@@ -1900,6 +1900,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <NullDepthAuditBadge rawData={multiSeries[0].data} />
       )}
 
+      {/* ── Image-Source Parity Shootout (temporary production exposure) ── */}
+      <ImageSourceParityShootout
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        rewOverlaySeries={rewOverlaySeries}
+        liveProductionData={multiSeries[0]?.data ?? null}
+      />
+
       {/* ── Geometry & REW Import (collapsed) ── */}
       {IS_DEVELOPMENT_MODE && (
         <details style={{ border: '1px solid #0891b2', borderRadius: 8, background: '#f0f9ff', padding: '8px 10px', marginBottom: 4 }}>
