@@ -31,6 +31,7 @@ import MultiSeatParityValidationAudit from "@/components/room/bass/MultiSeatPari
 import ActiveParityInvestigations from "@/components/room/bass/ActiveParityInvestigations";
 import AcousticSolverShootoutBatch1 from "@/components/room/bass/AcousticSolverShootoutBatch1";
 import AcousticSolverShootoutBatch2 from "@/components/room/bass/AcousticSolverShootoutBatch2";
+import AcousticSolverShootoutBatch3 from "@/components/room/bass/AcousticSolverShootoutBatch3";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import { Label } from "@/components/ui/label";
@@ -1523,6 +1524,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     seatPos={_seatPos}
                     subsForSimulation={subsForSimulation}
                     subProductCurve={shootoutCurve}
+                    surfaceAbsorption={surfaceAbsorption}
+                    axialQ={axialQ}
+                    liveProductionData={_liveData}
+                  />
+                  <AcousticSolverShootoutBatch3
+                    roomDims={_rdims}
+                    seatPos={_seatPos}
+                    subsForSimulation={subsForSimulation}
                     surfaceAbsorption={surfaceAbsorption}
                     axialQ={axialQ}
                     liveProductionData={_liveData}
