@@ -5,6 +5,7 @@ import {
   REW_ESTIMATE, TRACE_CONFIG,
   fmt1, computeMAE, analyseResponse, computeEstimateMetrics, estimateMatchVerdict,
 } from "./shootoutHelpers";
+import ModalQDampingSweep from "./ModalQDampingSweep";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -160,6 +161,7 @@ function ShootoutChart({ rows, rewOverlaySeries, visibleTraces }) {
 
 // --- Main component ---
 export default function ImageSourceParityShootout({ roomDims, seatingPositions, subsForSimulation, rewOverlaySeries, liveProductionData }) {
+  // ModalQDampingSweep is rendered after the shootout results section (see bottom of JSX)
   const [ran, setRan] = useState(false);
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
@@ -405,6 +407,14 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
           </>
         )}
       </div>
+
+      {/* Modal Q / Damping sweep — always visible below shootout */}
+      <ModalQDampingSweep
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        liveProductionData={liveProductionData}
+      />
     </details>
   );
 }
