@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
 
 // Flat 94 dB reference — matches REW Room Simulator
@@ -162,6 +163,139 @@ function VerdictBadge({ text }) {
   );
 }
 
+// --- Trace config ---
+const TRACE_CONFIG = [
+  { id: 'modal_only',    label: 'Current modal-only parity', color: '#213428', strokeWidth: 2, dash: '0' },
+  { id: 'image_only_rigid', label: 'Rigid image-source only (order 4)', color: '#0891b2', strokeWidth: 2, dash: '0' },
+  { id: 'hybrid_rigid', label: 'Rigid hybrid (modal + image, order 4)', color: '#7c3aed', strokeWidth: 2, dash: '0' },
+  { id: 'rew',          label: 'Imported REW overlay', color: '#f97316', strokeWidth: 2, dash: '6 3' },
+];
+
+// --- Comparison chart ---
+function ShootoutChart({ rows, rewOverlaySeries, visibleTraces }) {
+  // Build merged frequency spine from all available data
+  const chartData = useMemo(() => {
+    // Collect all unique frequencies from all sources
+    const freqSet = new Set();
+
+    rows.forEach(r => {
+      if (r._freqsHz) r._freqsHz.forEach(f => freqSet.add(Math.round(f * 100) / 100));
+    });
+    if (rewOverlaySeries?.data) {
+      rewOverlaySeries.data.forEach(p => freqSet.add(Math.round(p.frequency * 100) / 100));
+    }
+
+    const sorted = Array.from(freqSet).sort((a, b) => a - b).filter(f => f >= 20 && f <= 200);
+
+    // For each frequency, look up SPL from each source via nearest-point interpolation
+    const interp = (freqsHz, splDb, targetF) => {
+      if (!freqsHz || !splDb) return null;
+      let best = null, bestDist = Infinity;
+      for (let i = 0; i < freqsHz.length; i++) {
+        const d = Math.abs(freqsHz[i] - targetF);
+        if (d < bestDist) { bestDist = d; best = i; }
+      }
+      if (best === null || bestDist > 1.5) return null;
+      return Number.isFinite(splDb[best]) ? splDb[best] : null;
+    };
+
+    const interpRew = (data, targetF) => {
+      if (!data || data.length < 2) return null;
+      const sorted2 = [...data].sort((a, b) => a.frequency - b.frequency);
+      for (let j = 0; j < sorted2.length - 1; j++) {
+        if (targetF >= sorted2[j].frequency && targetF <= sorted2[j + 1].frequency) {
+          const t = (targetF - sorted2[j].frequency) / (sorted2[j + 1].frequency - sorted2[j].frequency);
+          const v = sorted2[j].spl + t * (sorted2[j + 1].spl - sorted2[j].spl);
+          return Number.isFinite(v) ? v : null;
+        }
+      }
+      return null;
+    };
+
+    const rowById = {};
+    rows.forEach(r => { rowById[r.id] = r; });
+
+    return sorted.map(f => {
+      const point = { frequency: f };
+      TRACE_CONFIG.forEach(tc => {
+        if (tc.id === 'rew') {
+          point['spl_rew'] = interpRew(rewOverlaySeries?.data, f);
+        } else {
+          const row = rowById[tc.id];
+          point[`spl_${tc.id}`] = row ? interp(row._freqsHz, row._splDb, f) : null;
+        }
+      });
+      return point;
+    });
+  }, [rows, rewOverlaySeries]);
+
+  // Y domain: fixed REW-style 60–120 dB
+  const Y_MIN = 60, Y_MAX = 120;
+  const yTicks = [60, 70, 80, 90, 100, 110, 120];
+  const xTicks = [20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 200];
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{ background: 'white', border: '1px solid #DCDBD6', borderRadius: 6, padding: '6px 10px', fontSize: 10, fontFamily: 'monospace' }}>
+        <div style={{ fontWeight: 700, marginBottom: 3 }}>{Number.isFinite(Number(label)) ? `${Number(label).toFixed(1)} Hz` : label}</div>
+        {payload.map(p => (
+          <div key={p.dataKey} style={{ color: p.stroke }}>
+            {TRACE_CONFIG.find(t => `spl_${t.id}` === p.dataKey)?.label ?? p.dataKey}: {Number.isFinite(p.value) ? `${p.value.toFixed(1)} dB` : '—'}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ width: '100%', height: 380 }}>
+      <ResponsiveContainer>
+        <LineChart data={chartData} margin={{ top: 20, right: 60, left: 20, bottom: 30 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#DCDBD6" />
+          <XAxis
+            dataKey="frequency"
+            type="number"
+            scale="log"
+            domain={[20, 200]}
+            ticks={xTicks}
+            tickFormatter={v => Number.isFinite(v) ? String(Math.round(v)) : ''}
+            label={{ value: 'Frequency (Hz)', position: 'insideBottom', offset: -10, fill: '#3E4349', fontSize: 11 }}
+            tick={{ fill: '#3E4349', fontSize: 10 }}
+          />
+          <YAxis
+            domain={[Y_MIN, Y_MAX]}
+            ticks={yTicks}
+            tickFormatter={v => String(v)}
+            label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', fill: '#3E4349', fontSize: 11 }}
+            tick={{ fill: '#3E4349', fontSize: 10 }}
+            allowDecimals={false}
+          />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#DCDBD6', strokeWidth: 1 }} />
+          {TRACE_CONFIG.map(tc => {
+            if (!visibleTraces[tc.id]) return null;
+            if (tc.id === 'rew' && !rewOverlaySeries?.data?.length) return null;
+            return (
+              <Line
+                key={tc.id}
+                type="linear"
+                dataKey={`spl_${tc.id}`}
+                stroke={tc.color}
+                strokeWidth={tc.strokeWidth}
+                strokeDasharray={tc.dash === '0' ? undefined : tc.dash}
+                dot={false}
+                activeDot={{ r: 3, fill: tc.color }}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            );
+          })}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // --- Component ---
 
 export default function ImageSourceParityShootout({
@@ -174,6 +308,11 @@ export default function ImageSourceParityShootout({
   const [ran, setRan] = useState(false);
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
+  const [visibleTraces, setVisibleTraces] = useState(() =>
+    Object.fromEntries(TRACE_CONFIG.map(t => [t.id, true]))
+  );
+
+  const toggleTrace = (id) => setVisibleTraces(prev => ({ ...prev, [id]: !prev[id] }));
 
   const activeSeat = useMemo(() => {
     const primary = (seatingPositions || []).find(s => s.isPrimary);
@@ -386,6 +525,50 @@ export default function ImageSourceParityShootout({
 
             <div style={{ marginTop: 6, fontSize: 9, fontFamily: 'monospace', color: '#6b7280', lineHeight: 1.5 }}>
               Diagnostic only. No production defaults changed. All three variants use flat 94 dB source and live sub positions.
+            </div>
+
+            {/* --- Comparison chart --- */}
+            <div style={{ marginTop: 12, border: '1px solid #d1fae5', borderRadius: 8, background: '#fff', padding: '10px 12px' }}>
+              <div style={{ fontWeight: 700, fontSize: 11, fontFamily: 'monospace', color: '#065f46', marginBottom: 8 }}>
+                Visual Comparison — same axes as production graph (log Hz, 60–120 dB, no smoothing)
+              </div>
+
+              {/* Legend / toggles */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                {TRACE_CONFIG.map(tc => {
+                  const isRew = tc.id === 'rew';
+                  const rewLoaded = rewOverlaySeries?.data?.length > 0;
+                  const disabled = isRew && !rewLoaded;
+                  const active = visibleTraces[tc.id] && !disabled;
+                  return (
+                    <button
+                      key={tc.id}
+                      onClick={() => !disabled && toggleTrace(tc.id)}
+                      disabled={disabled}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        padding: '3px 10px', borderRadius: 99,
+                        border: `2px solid ${active ? tc.color : '#d1d5db'}`,
+                        background: active ? `${tc.color}18` : '#f9fafb',
+                        color: active ? tc.color : '#9ca3af',
+                        fontSize: 10, fontFamily: 'monospace', fontWeight: 600,
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                        opacity: disabled ? 0.4 : 1,
+                        transition: 'all 0.1s',
+                      }}
+                    >
+                      <span style={{ display: 'inline-block', width: 18, height: 2, background: active ? tc.color : '#d1d5db', borderRadius: 1, flexShrink: 0 }} />
+                      {tc.label}{isRew && !rewLoaded ? ' (not loaded)' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <ShootoutChart
+                rows={results.rows}
+                rewOverlaySeries={rewOverlaySeries}
+                visibleTraces={visibleTraces}
+              />
             </div>
           </>
         )}
