@@ -38,9 +38,9 @@ import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigation
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
-// Development flag — set to true to re-enable all diagnostic UI panels.
-// Do not delete diagnostic code; just flip this flag.
-const IS_DEVELOPMENT_MODE = true;
+// Development flag — set to false to hide all diagnostic UI panels in production.
+// Flip to true to re-enable. Do not delete diagnostic code.
+const IS_DEVELOPMENT_MODE = false;
 
 // Agreed REW parity comparison state — do not change without a new sweep.
 // propagationPhaseScale 0.10 was chosen by sweep on 2026-06-13 (null centre 40.4 Hz vs REW 40.6 Hz).
@@ -971,9 +971,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </Alert>
       )}
 
-      {/* REW Parity Controls — visible above graph for screenshot workflow */}
+      {/* ── Developer Bass Diagnostics (collapsed, dev-only) ── */}
       {IS_DEVELOPMENT_MODE && (
-        <div style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '10px 12px', marginBottom: 4 }}>
+        <details style={{ border: '2px solid #7c3aed', borderRadius: 8, background: '#faf5ff', padding: '8px 10px', marginBottom: 8 }}>
+          <summary style={{ fontWeight: 700, color: '#5b21b6', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>
+            🔬 Developer Bass Diagnostics
+          </summary>
+          <div style={{ marginTop: 8 }}>
+      {/* REW Parity Controls — inside developer section */}
+      <div style={{ border: '1px solid #CBD5E1', borderRadius: 8, background: '#f8fafc', padding: '10px 12px', marginBottom: 4 }}>
           <div style={{ fontWeight: 700, color: '#334155', fontSize: 11, fontFamily: 'monospace', marginBottom: 8 }}>REW Parity Controls</div>
           <div className="flex flex-col gap-2">
             <div className="text-xs text-[#6b7280] font-mono">Engine: REW Core (production — fixed)</div>
@@ -1251,9 +1257,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             {/* Investigation tools moved to Deep Engine Diagnostics → ActiveParityInvestigations / ArchivedInvestigations */}
           </div>
         </div>
-      )}
 
-      {/* ── Core Parity Diagnostics (always visible) ── */}
+      {/* ── Core Parity Diagnostics ── */}
       {IS_DEVELOPMENT_MODE && (() => {
         /* Phase at Null Region */
         const PHASE_TARGET_HZ = [70, 75, 77, 78, 80, 85];
@@ -2032,6 +2037,40 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </details>
       )}
       {/* Geometry & REW Import end */}
+
+          </div>{/* /Developer Bass Diagnostics inner */}
+        </details>
+      )}
+      {/* /Developer Bass Diagnostics end */}
+
+      {/* ── Deep null warning — always visible ── */}
+      {multiSeries.length > 0 && (() => {
+        const data = multiSeries[0]?.data;
+        if (!Array.isArray(data) || data.length === 0) return null;
+        // Find raw minimum in 20–120 Hz band
+        const band = data.filter(p => p.frequency >= 20 && p.frequency <= 120 && Number.isFinite(p.spl));
+        if (band.length === 0) return null;
+        const minSpl = Math.min(...band.map(p => p.spl));
+        // Find local peak within ±1.5 octaves of the null
+        const nullPt = band.find(p => p.spl === minSpl);
+        const loHz = nullPt.frequency / Math.pow(2, 1.5);
+        const hiHz = nullPt.frequency * Math.pow(2, 1.5);
+        const peak = Math.max(...data.filter(p => p.frequency >= loHz && p.frequency <= hiHz && Number.isFinite(p.spl)).map(p => p.spl));
+        const depth = minSpl - peak;
+        if (depth > -12) return null;
+        return (
+          <div style={{ border: '2px solid #b45309', borderRadius: 8, background: '#fffbeb', padding: '10px 14px', marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: '#92400e', fontSize: 13, marginBottom: 4 }}>
+              ⚠ Potential bass null detected
+            </div>
+            <div style={{ color: '#78350f', fontSize: 12, lineHeight: 1.5 }}>
+              Raw null depth: <strong>{depth.toFixed(1)} dB</strong> at <strong>{nullPt.frequency.toFixed(1)} Hz</strong>.
+              A null this deep ({depth < -20 ? 'severe' : 'significant'}) is unlikely to be fully resolved by EQ alone.
+              Consider adjusting subwoofer placement before applying EQ correction.
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Surface Absorption Panel */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
