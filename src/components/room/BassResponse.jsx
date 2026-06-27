@@ -32,6 +32,7 @@ import ActiveParityInvestigations from "@/components/room/bass/ActiveParityInves
 import AcousticSolverShootoutBatch1 from "@/components/room/bass/AcousticSolverShootoutBatch1";
 import AcousticSolverShootoutBatch2 from "@/components/room/bass/AcousticSolverShootoutBatch2";
 import AcousticSolverShootoutBatch3 from "@/components/room/bass/AcousticSolverShootoutBatch3";
+import AcousticSolverShootoutBatch4 from "@/components/room/bass/AcousticSolverShootoutBatch4";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import { Label } from "@/components/ui/label";
@@ -1535,6 +1536,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     surfaceAbsorption={surfaceAbsorption}
                     axialQ={axialQ}
                     liveProductionData={_liveData}
+                  />
+                  <AcousticSolverShootoutBatch4
+                    roomDims={_rdims}
+                    seatPos={_seatPos}
+                    subsForSimulation={subsForSimulation}
+                    surfaceAbsorption={surfaceAbsorption}
                   />
                 </>
               );
