@@ -1753,6 +1753,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </details>
       )}
       {/* Deep Engine Diagnostics end */}
+          </div>
+        </details>
+      )}
+      {/* Developer Bass Diagnostics end */}
 
       {/* ── Active Test Engine Banner ── */}
       {activeTestEngine && (
@@ -2038,9 +2042,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
       {/* Geometry & REW Import end */}
 
-          </div>{/* /Developer Bass Diagnostics inner */}
-        </details>
-      )}
       {/* /Developer Bass Diagnostics end */}
 
       {/* ── Deep null warning — always visible ── */}
