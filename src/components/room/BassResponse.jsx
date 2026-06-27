@@ -30,6 +30,7 @@ import ModalSourceNormalisationAudit from "@/components/room/bass/ModalSourceNor
 import MultiSeatParityValidationAudit from "@/components/room/bass/MultiSeatParityValidationAudit";
 import ActiveParityInvestigations from "@/components/room/bass/ActiveParityInvestigations";
 import AcousticSolverShootoutBatch1 from "@/components/room/bass/AcousticSolverShootoutBatch1";
+import AcousticSolverShootoutBatch2 from "@/components/room/bass/AcousticSolverShootoutBatch2";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import { Label } from "@/components/ui/label";
@@ -1503,16 +1504,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               const shootoutSub = subsForSimulation[0] ?? null;
               const shootoutCurve = shootoutSub ? getSubwooferCurve(shootoutSub.modelKey) : null;
               if (!shootoutSeat || !shootoutSub || !shootoutCurve || !roomDims?.widthM) return null;
+              const _rdims = { widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM };
+              const _seatPos = { x: shootoutSeat.x, y: shootoutSeat.y, z: Number.isFinite(Number(shootoutSeat.z)) ? Number(shootoutSeat.z) : 1.2 };
+              const _liveData = multiSeries[0]?.data ?? null;
               return (
-                <AcousticSolverShootoutBatch1
-                  roomDims={{ widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM }}
-                  seatPos={{ x: shootoutSeat.x, y: shootoutSeat.y, z: Number.isFinite(Number(shootoutSeat.z)) ? Number(shootoutSeat.z) : 1.2 }}
-                  subsForSimulation={subsForSimulation}
-                  subProductCurve={shootoutCurve}
-                  surfaceAbsorption={surfaceAbsorption}
-                  axialQ={axialQ}
-                  liveProductionData={multiSeries[0]?.data ?? null}
-                />
+                <>
+                  <AcousticSolverShootoutBatch1
+                    roomDims={_rdims}
+                    seatPos={_seatPos}
+                    subsForSimulation={subsForSimulation}
+                    subProductCurve={shootoutCurve}
+                    surfaceAbsorption={surfaceAbsorption}
+                    axialQ={axialQ}
+                    liveProductionData={_liveData}
+                  />
+                  <AcousticSolverShootoutBatch2
+                    roomDims={_rdims}
+                    seatPos={_seatPos}
+                    subsForSimulation={subsForSimulation}
+                    subProductCurve={shootoutCurve}
+                    surfaceAbsorption={surfaceAbsorption}
+                    axialQ={axialQ}
+                    liveProductionData={_liveData}
+                  />
+                </>
               );
             })()}
 
