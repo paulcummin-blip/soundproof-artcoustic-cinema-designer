@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
-import { getSubwooferCurve } from "@/components/models/speakers/registry";
 
-// Flat 94 dB reference — matches REW Room Simulator flat source
+// Flat 94 dB reference — matches REW Room Simulator
 const FLAT_SOURCE_CURVE = [
   { hz: 20,  db: 94 },
   { hz: 50,  db: 94 },
@@ -10,76 +9,78 @@ const FLAT_SOURCE_CURVE = [
   { hz: 200, db: 94 },
 ];
 
-// Rigid boundaries (near-zero absorption on all surfaces)
-const RIGID_BOUNDARIES = {
-  front: 0.01, back: 0.01, left: 0.01, right: 0.01, ceiling: 0.01, floor: 0.01,
-};
+// Rigid boundaries — absorption ≈ 0 on all surfaces
+const RIGID = { front: 0.0, back: 0.0, left: 0.0, right: 0.0, ceiling: 0.0, floor: 0.0 };
 
-function analyseResponse(freqsHz, splDb) {
-  const band = freqsHz
-    .map((f, i) => ({ f, db: splDb[i] })  )
-    .filter(p => p.f >= 20 && p.f <= 80 && Number.isFinite(p.db));
+// --- Variants ---
+// Exactly the three asked for. surfaceAbsorption resolved at run-time for V1.
+const VARIANTS = [
+  {
+    id: 'modal_only',
+    label: 'Current parity — modal-only',
+    description: 'enableModes: true · enableReflections: false · disableLateField: true',
+    buildOpts: () => ({
+      enableModes: true,
+      enableReflections: false,
+      disableLateField: true,
+      smoothing: 'none',
+      axialQ: 4.0,
+      pureDeterministicModalSum: true,
+      disableModalPropagationPhase: true,
+      propagationPhaseScale: 0,
+    }),
+  },
+  {
+    id: 'image_only_rigid',
+    label: 'Rigid image-source only (order 4)',
+    description: 'enableModes: false · enableReflections: true · order 4 · absorption = 0',
+    buildOpts: () => ({
+      enableModes: false,
+      enableReflections: true,
+      disableLateField: true,
+      debugReflectionOrder: 4,
+      surfaceAbsorption: RIGID,
+      smoothing: 'none',
+      axialQ: 4.0,
+    }),
+  },
+  {
+    id: 'hybrid_rigid',
+    label: 'Rigid hybrid — modal + image-source (order 4)',
+    description: 'enableModes: true · enableReflections: true · order 4 · absorption = 0',
+    buildOpts: () => ({
+      enableModes: true,
+      enableReflections: true,
+      disableLateField: true,
+      debugReflectionOrder: 4,
+      surfaceAbsorption: RIGID,
+      smoothing: 'none',
+      axialQ: 4.0,
+      pureDeterministicModalSum: true,
+      disableModalPropagationPhase: true,
+      propagationPhaseScale: 0,
+    }),
+  },
+];
 
-  if (band.length < 3) return { nullFreq: null, nullDb: null, peakFreq: null, peakDb: null, swing: null };
+// --- Helpers ---
 
-  let nullPt = band[0];
-  let peakPt = band[0];
-
-  for (const pt of band) {
-    if (pt.db < nullPt.db) nullPt = pt;
-    if (pt.db > peakPt.db) peakPt = pt;
-  }
-
-  const swing = peakPt.db - nullPt.db;
-  return {
-    nullFreq: nullPt.f,
-    nullDb: nullPt.db,
-    peakFreq: peakPt.f,
-    peakDb: peakPt.db,
-    swing,
-  };
-}
-
-function computeMAE(freqsHz, splDb, rewData) {
-  if (!rewData || rewData.length < 2) return null;
-  let errSum = 0;
-  let count = 0;
-  for (let i = 0; i < freqsHz.length; i++) {
-    const f = freqsHz[i];
-    if (f < 20 || f > 200) continue;
-    // Interpolate REW value at this frequency
-    const sorted = [...rewData].sort((a, b) => a.frequency - b.frequency);
-    let rewDb = null;
-    for (let j = 0; j < sorted.length - 1; j++) {
-      if (f >= sorted[j].frequency && f <= sorted[j + 1].frequency) {
-        const t = (f - sorted[j].frequency) / (sorted[j + 1].frequency - sorted[j].frequency);
-        rewDb = sorted[j].spl + t * (sorted[j + 1].spl - sorted[j].spl);
-        break;
-      }
-    }
-    if (rewDb !== null && Number.isFinite(splDb[i])) {
-      errSum += Math.abs(splDb[i] - rewDb);
-      count++;
-    }
-  }
-  return count > 0 ? errSum / count : null;
-}
-
-function runVariant(roomDims, seatPos, subsForSimulation, options) {
+function runVariant(roomDims, seatPos, subs, opts) {
   let sumRe = null;
   let sumIm = null;
   let freqsHz = null;
 
-  for (const sub of subsForSimulation) {
-    const result = simulateBassResponseRewCore(
-      roomDims, seatPos, sub, FLAT_SOURCE_CURVE, options
+  for (const sub of subs) {
+    const r = simulateBassResponseRewCore(
+      roomDims, seatPos, sub, FLAT_SOURCE_CURVE,
+      { freqMinHz: 20, freqMaxHz: 200, ...opts }
     );
     if (!freqsHz) {
-      freqsHz = result.freqsHz;
-      sumRe = result.complexPressure.map(cp => cp.re);
-      sumIm = result.complexPressure.map(cp => cp.im);
+      freqsHz = r.freqsHz;
+      sumRe = r.complexPressure.map(cp => cp.re);
+      sumIm = r.complexPressure.map(cp => cp.im);
     } else {
-      result.complexPressure.forEach((cp, i) => {
+      r.complexPressure.forEach((cp, i) => {
         if (Number.isFinite(cp.re)) sumRe[i] += cp.re;
         if (Number.isFinite(cp.im)) sumIm[i] += cp.im;
       });
@@ -90,130 +91,83 @@ function runVariant(roomDims, seatPos, subsForSimulation, options) {
 
   const splDb = sumRe.map((re, i) => {
     const im = sumIm[i];
-    const mag = Math.sqrt(re * re + im * im);
-    return 20 * Math.log10(Math.max(mag, 1e-10));
+    return 20 * Math.log10(Math.max(Math.sqrt(re * re + im * im), 1e-10));
   });
 
   return { freqsHz, splDb };
 }
 
-const VARIANTS = [
-  {
-    id: 'v1_live_production',
-    label: 'V1 — Live production (current)',
-    description: 'Exact active solver state: modes ON, reflections from UI, live absorption',
-  },
-  {
-    id: 'v2_modal_only',
-    label: 'V2 — Modal-only',
-    description: 'enableModes: true, enableReflections: false, disableLateField: true, flat source',
-    options: {
-      enableModes: true,
-      enableReflections: false,
-      disableLateField: true,
-      smoothing: 'none',
-      axialQ: 4.0,
-      pureDeterministicModalSum: true,
-      disableModalPropagationPhase: true,
-      propagationPhaseScale: 0,
-    },
-  },
-  {
-    id: 'v3_image_order1_current_abs',
-    label: 'V3 — Image-source, order 1, current absorption',
-    description: 'enableModes: false, enableReflections: true, order 1, live surface absorption',
-    options: (absorption) => ({
-      enableModes: false,
-      enableReflections: true,
-      disableLateField: true,
-      debugReflectionOrder: 1,
-      surfaceAbsorption: absorption,
-      smoothing: 'none',
-      axialQ: 4.0,
-    }),
-  },
-  {
-    id: 'v4_image_order2_rigid',
-    label: 'V4 — Image-source, order 2, rigid walls',
-    description: 'enableModes: false, enableReflections: true, order 2, absorption ≈ 0',
-    options: {
-      enableModes: false,
-      enableReflections: true,
-      disableLateField: true,
-      debugReflectionOrder: 2,
-      surfaceAbsorption: RIGID_BOUNDARIES,
-      smoothing: 'none',
-      axialQ: 4.0,
-    },
-  },
-  {
-    id: 'v5_image_order3_rigid',
-    label: 'V5 — Image-source, order 3, rigid walls',
-    description: 'enableModes: false, enableReflections: true, order 3, absorption ≈ 0',
-    options: {
-      enableModes: false,
-      enableReflections: true,
-      disableLateField: true,
-      debugReflectionOrder: 3,
-      surfaceAbsorption: RIGID_BOUNDARIES,
-      smoothing: 'none',
-      axialQ: 4.0,
-    },
-  },
-  {
-    id: 'v6_image_order4_rigid',
-    label: 'V6 — Image-source, order 4, rigid walls',
-    description: 'enableModes: false, enableReflections: true, order 4, absorption ≈ 0',
-    options: {
-      enableModes: false,
-      enableReflections: true,
-      disableLateField: true,
-      debugReflectionOrder: 4,
-      surfaceAbsorption: RIGID_BOUNDARIES,
-      smoothing: 'none',
-      axialQ: 4.0,
-    },
-  },
-  {
-    id: 'v7_hybrid_order4_rigid',
-    label: 'V7 — Hybrid modal + image-source, order 4, rigid walls',
-    description: 'enableModes: true, enableReflections: true, order 4, absorption ≈ 0',
-    options: {
-      enableModes: true,
-      enableReflections: true,
-      disableLateField: true,
-      debugReflectionOrder: 4,
-      surfaceAbsorption: RIGID_BOUNDARIES,
-      smoothing: 'none',
-      axialQ: 4.0,
-      pureDeterministicModalSum: true,
-      disableModalPropagationPhase: true,
-      propagationPhaseScale: 0,
-    },
-  },
-];
+function analyseResponse(freqsHz, splDb) {
+  const band = freqsHz
+    .map((f, i) => ({ f, db: splDb[i] }))
+    .filter(p => p.f >= 20 && p.f <= 80 && Number.isFinite(p.db));
+
+  if (band.length < 3) return { nullFreq: null, nullDb: null, peakFreq: null, peakDb: null, swing: null };
+
+  let nullPt = band[0], peakPt = band[0];
+  for (const pt of band) {
+    if (pt.db < nullPt.db) nullPt = pt;
+    if (pt.db > peakPt.db) peakPt = pt;
+  }
+
+  return {
+    nullFreq: nullPt.f,
+    nullDb: nullPt.db,
+    peakFreq: peakPt.f,
+    peakDb: peakPt.db,
+    swing: peakPt.db - nullPt.db,
+  };
+}
+
+function computeMAE(freqsHz, splDb, rewData) {
+  if (!rewData || rewData.length < 2) return null;
+  const sorted = [...rewData].sort((a, b) => a.frequency - b.frequency);
+  let sum = 0, count = 0;
+  for (let i = 0; i < freqsHz.length; i++) {
+    const f = freqsHz[i];
+    if (f < 20 || f > 200) continue;
+    // Linear interpolation into REW data
+    let rewDb = null;
+    for (let j = 0; j < sorted.length - 1; j++) {
+      if (f >= sorted[j].frequency && f <= sorted[j + 1].frequency) {
+        const t = (f - sorted[j].frequency) / (sorted[j + 1].frequency - sorted[j].frequency);
+        rewDb = sorted[j].spl + t * (sorted[j + 1].spl - sorted[j].spl);
+        break;
+      }
+    }
+    if (rewDb !== null && Number.isFinite(splDb[i])) {
+      sum += Math.abs(splDb[i] - rewDb);
+      count++;
+    }
+  }
+  return count > 0 ? sum / count : null;
+}
 
 function fmt1(v) {
   return v !== null && Number.isFinite(v) ? v.toFixed(1) : '—';
 }
 
 function VerdictBadge({ text }) {
-  const isCloser = text?.toLowerCase().includes('closer');
-  const isWorse  = text?.toLowerCase().includes('worse');
-  const bg = isCloser ? '#dcfce7' : isWorse ? '#fee2e2' : '#f3f4f6';
-  const color = isCloser ? '#166534' : isWorse ? '#991b1b' : '#374151';
+  if (!text) return <span style={{ color: '#6b7280', fontSize: 10, fontFamily: 'monospace' }}>—</span>;
+  const lower = text.toLowerCase();
+  const isBaseline = lower.includes('baseline');
+  const isCloser  = lower.includes('closer');
+  const isWorse   = lower.includes('worse');
+  const bg    = isBaseline ? '#e0f2fe' : isCloser ? '#dcfce7' : isWorse ? '#fee2e2' : '#f3f4f6';
+  const color = isBaseline ? '#0369a1' : isCloser ? '#166534' : isWorse ? '#991b1b' : '#374151';
   return (
-    <span style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 4, background: bg, color, fontSize: 10, fontWeight: 700, fontFamily: 'monospace' }}>
-      {text || '—'}
+    <span style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 4, background: bg, color, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+      {text}
     </span>
   );
 }
+
+// --- Component ---
 
 export default function ImageSourceParityShootout({
   roomDims,
   seatingPositions,
   subsForSimulation,
-  surfaceAbsorption,
   rewOverlaySeries,
   liveProductionData,
 }) {
@@ -235,167 +189,145 @@ export default function ImageSourceParityShootout({
     };
   }, [activeSeat]);
 
-  const canRun = roomDims?.widthM && roomDims?.lengthM && roomDims?.heightM &&
-    seatPos && subsForSimulation?.length > 0;
+  const canRun = !!(roomDims?.widthM && roomDims?.lengthM && roomDims?.heightM &&
+    seatPos && subsForSimulation?.length > 0);
 
-  const rewReferenceData = rewOverlaySeries?.data || null;
+  const rewData = rewOverlaySeries?.data || null;
+  const hasRew  = rewData !== null && rewData.length > 1;
 
   function runShootout() {
     if (!canRun) return;
     setRunning(true);
 
     setTimeout(() => {
-      const out = [];
+      const rdims = { widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM };
+      const rows = [];
 
       for (const variant of VARIANTS) {
-        if (variant.id === 'v1_live_production') {
-          // Use live data passed in directly
-          const analysis = liveProductionData
-            ? analyseResponse(
-                liveProductionData.map(p => p.frequency),
-                liveProductionData.map(p => p.spl)
-              )
-            : { nullFreq: null, nullDb: null, peakFreq: null, peakDb: null, swing: null };
-
-          const mae = rewReferenceData && liveProductionData
-            ? computeMAE(
-                liveProductionData.map(p => p.frequency),
-                liveProductionData.map(p => p.spl),
-                rewReferenceData
-              )
-            : null;
-
-          out.push({ id: variant.id, label: variant.label, description: variant.description, ...analysis, mae, error: null });
+        // V1 modal_only — use the live production series directly so we're comparing apples-to-apples
+        if (variant.id === 'modal_only' && liveProductionData?.length > 1) {
+          const freqsHz = liveProductionData.map(p => p.frequency);
+          const splDb   = liveProductionData.map(p => p.spl);
+          const analysis = analyseResponse(freqsHz, splDb);
+          const mae = hasRew ? computeMAE(freqsHz, splDb, rewData) : null;
+          rows.push({ ...variant, ...analysis, mae, verdict: 'baseline', error: null });
           continue;
         }
 
         try {
-          const opts = typeof variant.options === 'function'
-            ? variant.options(surfaceAbsorption)
-            : { ...variant.options, surfaceAbsorption: variant.options?.surfaceAbsorption ?? surfaceAbsorption };
-
-          const res = runVariant(
-            { widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM },
-            seatPos,
-            subsForSimulation,
-            { ...opts, freqMinHz: 20, freqMaxHz: 200 }
-          );
-
+          const opts = variant.buildOpts();
+          const res = runVariant(rdims, seatPos, subsForSimulation, opts);
           if (!res) {
-            out.push({ id: variant.id, label: variant.label, description: variant.description, nullFreq: null, nullDb: null, peakFreq: null, peakDb: null, swing: null, mae: null, error: 'No result' });
+            rows.push({ ...variant, nullFreq: null, nullDb: null, peakFreq: null, peakDb: null, swing: null, mae: null, verdict: '—', error: 'engine returned null' });
             continue;
           }
-
           const analysis = analyseResponse(res.freqsHz, res.splDb);
-          const mae = rewReferenceData
-            ? computeMAE(res.freqsHz, res.splDb, rewReferenceData)
-            : null;
-
-          out.push({ id: variant.id, label: variant.label, description: variant.description, ...analysis, mae, error: null, _freqsHz: res.freqsHz, _splDb: res.splDb });
+          const mae = hasRew ? computeMAE(res.freqsHz, res.splDb, rewData) : null;
+          rows.push({ ...variant, ...analysis, mae, verdict: null, error: null });
         } catch (e) {
-          out.push({ id: variant.id, label: variant.label, description: variant.description, nullFreq: null, nullDb: null, peakFreq: null, peakDb: null, swing: null, mae: null, error: e.message });
+          rows.push({ ...variant, nullFreq: null, nullDb: null, peakFreq: null, peakDb: null, swing: null, mae: null, verdict: '—', error: e.message });
         }
       }
 
-      // Compute verdicts relative to V1 production
-      const v1 = out[0];
-      const v1Swing = v1?.swing;
-      const v1Mae = v1?.mae;
+      // Assign verdicts relative to baseline (row 0)
+      const baseline = rows[0];
+      const baseMae  = baseline?.mae;
 
-      // Determine if REW reference is available for MAE comparison
-      const hasRew = rewReferenceData !== null;
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.error) { row.verdict = 'error'; continue; }
 
-      // For each non-V1 variant, determine verdict
-      for (let i = 1; i < out.length; i++) {
-        const row = out[i];
-        const swingDiff = (row.swing != null && v1Swing != null) ? row.swing - v1Swing : null;
-        const maeDiff = (hasRew && row.mae != null && v1Mae != null) ? row.mae - v1Mae : null;
-
-        let verdict = 'no meaningful change';
-        if (hasRew && maeDiff !== null) {
-          if (maeDiff < -1.0) verdict = 'closer to REW';
-          else if (maeDiff > 1.0) verdict = 'worse than current';
-          else verdict = 'no meaningful change';
-        } else if (swingDiff !== null) {
-          // Without REW data, compare swing as a proxy for shape accuracy
-          if (Math.abs(swingDiff) < 1.0) verdict = 'no meaningful change';
-          else verdict = 'shape change only (no REW ref)';
-        }
-        row.verdict = verdict;
-      }
-      v1.verdict = 'baseline (current production)';
-
-      // Determine final answer
-      const imageCandidates = out.filter(r => r.id.startsWith('v4') || r.id.startsWith('v5') || r.id.startsWith('v6'));
-      let finalVerdict = '';
-      if (hasRew) {
-        const bestImage = imageCandidates.reduce((best, r) => (r.mae != null && (best == null || r.mae < best.mae)) ? r : best, null);
-        if (bestImage && v1Mae != null) {
-          if (bestImage.mae < v1Mae - 1.0) {
-            finalVerdict = `✅ YES — Image-source-only rigid boundaries (${bestImage.label}) gives lower MAE (${fmt1(bestImage.mae)} dB) vs production (${fmt1(v1Mae)} dB). Recommend switching REW-parity mode to image-source.`;
-          } else if (bestImage.mae > v1Mae + 1.0) {
-            finalVerdict = `❌ NO — Modal/hybrid path (${fmt1(v1Mae)} dB MAE) outperforms best rigid image-source (${bestImage.label}: ${fmt1(bestImage.mae)} dB MAE). Continue with modal basis.`;
-          } else {
-            finalVerdict = `⚖️ INCONCLUSIVE — Image-source and modal paths perform similarly (within 1 dB MAE). Need to compare curve shapes directly.`;
-          }
+        if (hasRew && row.mae !== null && baseMae !== null) {
+          const diff = row.mae - baseMae;
+          if (diff < -1.0)      row.verdict = 'closer to REW';
+          else if (diff > 1.0)  row.verdict = 'worse than baseline';
+          else                   row.verdict = 'no meaningful change';
         } else {
-          finalVerdict = 'Could not determine — ensure REW overlay is loaded and subs/seats are configured.';
+          // No REW ref — compare swing shape
+          const swingDiff = (row.swing != null && baseline?.swing != null) ? Math.abs(row.swing - baseline.swing) : null;
+          row.verdict = swingDiff !== null && swingDiff > 2 ? 'shape change (no REW)' : 'no meaningful change';
         }
-      } else {
-        finalVerdict = '⚠️ No REW reference imported — paste REW export CSV in "Geometry & REW Import" → "REW Reference Overlay" to enable MAE comparison. Null/peak metrics shown instead.';
       }
 
-      setResults({ rows: out, finalVerdict, hasRew });
+      // Final verdict
+      const imageRow  = rows.find(r => r.id === 'image_only_rigid');
+      const hybridRow = rows.find(r => r.id === 'hybrid_rigid');
+      let finalVerdict;
+
+      if (!hasRew) {
+        finalVerdict = '⚠️ No REW reference loaded. Paste REW CSV in "REW Reference Overlay" to enable MAE comparison. Null/peak metrics still shown.';
+      } else {
+        const candidates = [imageRow, hybridRow].filter(r => r && r.mae !== null);
+        const best = candidates.reduce((b, r) => (!b || r.mae < b.mae) ? r : b, null);
+        if (!best || baseMae === null) {
+          finalVerdict = '⚠️ Could not compute — ensure subs, seat and REW overlay are all loaded.';
+        } else if (best.mae < baseMae - 1.0) {
+          finalVerdict = `✅ YES — "${best.label}" (MAE ${fmt1(best.mae)} dB) outperforms current modal-only (MAE ${fmt1(baseMae)} dB) by >${fmt1(baseMae - best.mae)} dB. Recommend switching REW-parity basis.`;
+        } else if (best.mae > baseMae + 1.0) {
+          finalVerdict = `❌ NO — Current modal-only (MAE ${fmt1(baseMae)} dB) outperforms best image-source candidate (MAE ${fmt1(best.mae)} dB). Continue with modal basis; investigate Green's function calibration.`;
+        } else {
+          finalVerdict = `⚖️ INCONCLUSIVE — Image-source and modal paths within 1 dB MAE of each other. Compare null centre frequency across rows to determine which better captures REW's modal pattern.`;
+        }
+      }
+
+      setResults({ rows, finalVerdict, hasRew });
       setRan(true);
       setRunning(false);
-    }, 30);
+    }, 20);
   }
 
-  const cellStyle = { padding: '3px 6px', textAlign: 'right', fontSize: 10, fontFamily: 'monospace', borderBottom: '1px solid #e5e7eb' };
-  const cellLeft = { ...cellStyle, textAlign: 'left', maxWidth: 180 };
-  const thStyle = { ...cellStyle, fontWeight: 700, color: '#374151', background: '#f9fafb', borderBottom: '2px solid #d1d5db' };
-  const thLeft = { ...thStyle, textAlign: 'left' };
+  // --- Styles ---
+  const cell = { padding: '3px 7px', textAlign: 'right', fontSize: 10, fontFamily: 'monospace', borderBottom: '1px solid #d1fae5', verticalAlign: 'top' };
+  const cellL = { ...cell, textAlign: 'left' };
+  const th   = { ...cell, fontWeight: 700, color: '#065f46', background: '#ecfdf5', borderBottom: '2px solid #6ee7b7' };
+  const thL  = { ...th, textAlign: 'left' };
 
   return (
     <details style={{ border: '2px solid #0f766e', borderRadius: 8, background: '#f0fdfa', padding: '8px 10px', marginBottom: 8 }}>
       <summary style={{ fontWeight: 700, color: '#0f766e', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
         🔬 Image-Source Parity Shootout — REW Basis Audit
       </summary>
-      <div style={{ marginTop: 8 }}>
 
+      <div style={{ marginTop: 8 }}>
         <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#134e4a', marginBottom: 8, lineHeight: 1.5 }}>
-          Compares 7 engine variants using the flat 94 dB reference source, live room geometry, and selected seat.
-          Rigid boundaries = all absorption ≈ 0.01. Goal: determine if image-source-only matches REW better than modal/hybrid.
-          {!rewReferenceData && (
-            <span style={{ color: '#b45309', fontWeight: 700, marginLeft: 4 }}>
-              ⚠ No REW overlay loaded — MAE column will show "—". Load REW CSV for full comparison.
-            </span>
+          Three engine variants — flat 94 dB source, live geometry.
+          Compares current modal-only parity path against rigid image-source (order 4) and rigid hybrid (order 4).
+          Null/peak analysis: 20–80 Hz band.{' '}
+          {!hasRew && (
+            <strong style={{ color: '#b45309' }}>
+              ⚠ No REW overlay loaded — MAE column unavailable. Load REW CSV in "Geometry &amp; REW Import → REW Reference Overlay" for full comparison.
+            </strong>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
           <button
             onClick={runShootout}
             disabled={!canRun || running}
             style={{
               height: 30, padding: '0 14px', borderRadius: 6,
-              border: '1px solid #0f766e', background: canRun && !running ? '#0f766e' : '#d1d5db',
+              border: `1px solid ${canRun && !running ? '#0f766e' : '#d1d5db'}`,
+              background: canRun && !running ? '#0f766e' : '#f3f4f6',
               color: canRun && !running ? '#fff' : '#9ca3af',
-              fontSize: 11, fontFamily: 'monospace', fontWeight: 700, cursor: canRun && !running ? 'pointer' : 'not-allowed',
+              fontSize: 11, fontFamily: 'monospace', fontWeight: 700,
+              cursor: canRun && !running ? 'pointer' : 'not-allowed',
             }}
           >
-            {running ? 'Running…' : ran ? 'Re-run Shootout' : 'Run Shootout'}
+            {running ? 'Running…' : ran ? 'Re-run' : 'Run Shootout'}
           </button>
+
           {!canRun && (
             <span style={{ fontSize: 10, color: '#b45309', fontFamily: 'monospace' }}>
-              Need room dims + seat + subs to run.
+              Need room dims + seat + at least one sub.
             </span>
           )}
-          {ran && !running && (
+
+          {ran && !running && activeSeat && (
             <span style={{ fontSize: 10, color: '#065f46', fontFamily: 'monospace' }}>
-              Seat: {activeSeat ? (activeSeat.id || `${activeSeat.x?.toFixed(2)},${activeSeat.y?.toFixed(2)}`) : '—'} &nbsp;|&nbsp;
-              Subs: {subsForSimulation?.length ?? 0} &nbsp;|&nbsp;
-              Room: {roomDims?.widthM?.toFixed(1)}×{roomDims?.lengthM?.toFixed(1)}×{roomDims?.heightM?.toFixed(1)} m
+              Seat: {activeSeat.id || `(${Number(activeSeat.x).toFixed(2)}, ${Number(activeSeat.y).toFixed(2)})`}
+              {' '}· Subs: {subsForSimulation?.length ?? 0}
+              {' '}· Room: {roomDims?.widthM?.toFixed(1)}×{roomDims?.lengthM?.toFixed(1)}×{roomDims?.heightM?.toFixed(1)} m
+              {hasRew ? ' · REW overlay ✓' : ' · REW overlay ✗'}
             </span>
           )}
         </div>
@@ -403,55 +335,57 @@ export default function ImageSourceParityShootout({
         {results && (
           <>
             <div style={{ overflowX: 'auto', marginBottom: 10 }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 660 }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 620 }}>
                 <thead>
                   <tr>
-                    <th style={thLeft}>Variant</th>
-                    <th style={thStyle}>Null Hz</th>
-                    <th style={thStyle}>Null dB</th>
-                    <th style={thStyle}>Peak Hz</th>
-                    <th style={thStyle}>Peak dB</th>
-                    <th style={thStyle}>Swing dB</th>
-                    <th style={thStyle}>MAE dB</th>
-                    <th style={{ ...thLeft, minWidth: 130 }}>Verdict</th>
+                    <th style={{ ...thL, minWidth: 180 }}>Variant</th>
+                    <th style={th}>Null Hz</th>
+                    <th style={th}>Null dB</th>
+                    <th style={th}>Peak Hz</th>
+                    <th style={th}>Peak dB</th>
+                    <th style={th}>Swing dB</th>
+                    <th style={{ ...th, color: results.hasRew ? '#065f46' : '#9ca3af' }}>MAE dB</th>
+                    <th style={{ ...thL, minWidth: 120 }}>Verdict</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {results.rows.map((row, idx) => (
-                    <tr key={row.id} style={{ background: idx === 0 ? '#f0fdf4' : undefined }}>
-                      <td style={{ ...cellLeft, maxWidth: 200 }}>
-                        <div style={{ fontWeight: idx === 0 ? 700 : 400, color: '#0f172a', fontSize: 10 }}>{row.label}</div>
-                        <div style={{ color: '#6b7280', fontSize: 9, marginTop: 1 }}>{row.description}</div>
-                        {row.error && <div style={{ color: '#dc2626', fontSize: 9 }}>Error: {row.error}</div>}
-                      </td>
-                      <td style={cellStyle}>{fmt1(row.nullFreq)}</td>
-                      <td style={{ ...cellStyle, color: row.nullDb !== null && row.nullDb < -30 ? '#b91c1c' : undefined, fontWeight: row.nullDb !== null && row.nullDb < -30 ? 700 : undefined }}>{fmt1(row.nullDb)}</td>
-                      <td style={cellStyle}>{fmt1(row.peakFreq)}</td>
-                      <td style={cellStyle}>{fmt1(row.peakDb)}</td>
-                      <td style={{ ...cellStyle, fontWeight: 600 }}>{fmt1(row.swing)}</td>
-                      <td style={{ ...cellStyle, color: results.hasRew ? (row.mae !== null && row.mae < (results.rows[0]?.mae ?? 999) - 1 ? '#065f46' : row.mae !== null && row.mae > (results.rows[0]?.mae ?? 0) + 1 ? '#991b1b' : undefined) : '#9ca3af' }}>
-                        {results.hasRew ? fmt1(row.mae) : '—'}
-                      </td>
-                      <td style={{ ...cellLeft }}>
-                        <VerdictBadge text={row.verdict} />
-                      </td>
-                    </tr>
-                  ))}
+                  {results.rows.map((row, idx) => {
+                    const isBaseline = idx === 0;
+                    const rowBg = isBaseline ? '#f0fdf4' : idx % 2 === 0 ? '#fff' : '#f9fafb';
+                    const maeBetter = results.hasRew && row.mae !== null && results.rows[0]?.mae !== null && row.mae < results.rows[0].mae - 1;
+                    const maeWorse  = results.hasRew && row.mae !== null && results.rows[0]?.mae !== null && row.mae > results.rows[0].mae + 1;
+                    return (
+                      <tr key={row.id} style={{ background: rowBg }}>
+                        <td style={{ ...cellL, minWidth: 180 }}>
+                          <div style={{ fontWeight: isBaseline ? 700 : 500, color: '#0f172a', fontSize: 10 }}>{row.label}</div>
+                          <div style={{ color: '#6b7280', fontSize: 9, marginTop: 1, lineHeight: 1.4 }}>{row.description}</div>
+                          {row.error && <div style={{ color: '#dc2626', fontSize: 9, marginTop: 2 }}>⚠ {row.error}</div>}
+                        </td>
+                        <td style={{ ...cell, color: '#374151' }}>{fmt1(row.nullFreq)}</td>
+                        <td style={{ ...cell, color: row.nullDb !== null && row.nullDb < -20 ? '#b91c1c' : '#374151', fontWeight: row.nullDb !== null && row.nullDb < -20 ? 700 : 400 }}>{fmt1(row.nullDb)}</td>
+                        <td style={cell}>{fmt1(row.peakFreq)}</td>
+                        <td style={cell}>{fmt1(row.peakDb)}</td>
+                        <td style={{ ...cell, fontWeight: 600 }}>{fmt1(row.swing)}</td>
+                        <td style={{ ...cell, color: !results.hasRew ? '#9ca3af' : maeBetter ? '#065f46' : maeWorse ? '#991b1b' : '#374151', fontWeight: maeBetter || maeWorse ? 700 : 400 }}>
+                          {results.hasRew ? fmt1(row.mae) : '—'}
+                        </td>
+                        <td style={cellL}>
+                          <VerdictBadge text={row.verdict} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            {/* Final Verdict */}
-            <div style={{ border: '2px solid #0f766e', borderRadius: 6, background: '#ccfbf1', padding: '8px 12px', fontSize: 11, fontFamily: 'monospace', color: '#0f172a', lineHeight: 1.6 }}>
-              <div style={{ fontWeight: 700, color: '#0f766e', marginBottom: 4, fontSize: 12 }}>Final Verdict</div>
+            <div style={{ border: '2px solid #0f766e', borderRadius: 6, background: '#ccfbf1', padding: '8px 12px', fontSize: 11, fontFamily: 'monospace', color: '#0f172a', lineHeight: 1.7 }}>
+              <div style={{ fontWeight: 700, color: '#0f766e', marginBottom: 3, fontSize: 11 }}>▶ Final Answer</div>
               <div>{results.finalVerdict}</div>
             </div>
 
-            {/* Architecture Decision Note */}
-            <div style={{ marginTop: 8, fontSize: 9, fontFamily: 'monospace', color: '#6b7280', lineHeight: 1.5 }}>
-              If image-source-only wins: switch REW-parity mode to <code>enableModes: false, enableReflections: true, debugReflectionOrder: N, surfaceAbsorption → 0</code>.<br/>
-              If modal wins: continue investigating Green's function calibration (Q, coupling, source amplitude).<br/>
-              This panel is diagnostic only — no production defaults were changed.
+            <div style={{ marginTop: 6, fontSize: 9, fontFamily: 'monospace', color: '#6b7280', lineHeight: 1.5 }}>
+              Diagnostic only. No production defaults changed. All three variants use flat 94 dB source and live sub positions.
             </div>
           </>
         )}
