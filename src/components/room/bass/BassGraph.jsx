@@ -231,15 +231,12 @@ export default function BassGraph({
       finalYMin = d[0];
       finalYMax = d[1];
 
-      // Generate simple ticks based on the provided yDomain
+      // Always use 10 dB steps for fixed external domains (e.g. REW-style 60–120)
       const domainSpan = finalYMax - finalYMin;
-      let step = 10;
-      if (domainSpan <= 30) step = 5;
-      else if (domainSpan <= 60) step = 10;
-      else step = 20;
+      const step = domainSpan <= 30 ? 5 : 10;
 
       const ticks = [];
-      for (let i = Math.floor(finalYMin / step) * step; i <= Math.ceil(finalYMax / step) * step; i += step) {
+      for (let i = finalYMin; i <= finalYMax; i += step) {
         ticks.push(i);
       }
       finalYTicks = ticks;

@@ -231,6 +231,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Diagnostic scale applied to axial modes with order >= 2. Default 1.00 = no change.
   const [highOrderAxialScale, setHighOrderAxialScale] = useState(1.0);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
+  // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
+  const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
   // Active test engine — set by RewRefinedEngineShootout promote button via window.__B44_ACTIVE_TEST_ENGINE__
   const [activeTestEngine, setActiveTestEngine] = useState(null);
   const lastStablePlotRef = useRef(null);
@@ -1782,6 +1784,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Graph scale:</span>
+            <select
+              value={graphScaleMode}
+              onChange={e => setGraphScaleMode(e.target.value)}
+              style={{ height: 26, borderRadius: 6, border: '1px solid #DCDBD6', background: '#F8F8F7', fontSize: 11, padding: '0 6px', color: '#1B1A1A', fontFamily: 'monospace', cursor: 'pointer' }}
+            >
+              <option value="rew_fixed">REW-style fixed</option>
+              <option value="auto">Auto</option>
+            </select>
+          </div>
         </div>
 
         {/* Seat selector pills */}
@@ -1848,8 +1861,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               modeMarkers={{ axial: [], tangential: [], oblique: [] }}
               linearHzAxis={false}
               rewStyleMode={true}
-              yDomain={undefined}
-              xDomain={[20, 200]}
+              yDomain={graphScaleMode === 'rew_fixed' ? [60, 120] : undefined}
+              xDomain={graphScaleMode === 'rew_fixed'
+                ? (multiSeriesForGraph[0]?.data?.some(p => p.frequency > 200) ? [20, 300] : [20, 200])
+                : [20, 200]}
               showAxialOnly={false}
               refDb={85}
               disableHighlight={false}
