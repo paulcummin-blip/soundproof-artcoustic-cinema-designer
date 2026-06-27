@@ -91,14 +91,14 @@ export default function NullDepthAuditBadge({ rawData }) {
 
   // ─── Severity — based on raw null depth ─────────────────────────────────
   let severity, borderColor, bgColor, labelColor, dotColor, statusLabel;
-  if (rawDepthDb <= -20) {
+  if (rawDepthDb <= -18) {
     severity    = 'red';
     borderColor = '#dc2626';
     bgColor     = '#fef2f2';
     labelColor  = '#991b1b';
     dotColor    = '#dc2626';
     statusLabel = 'SEVERE NULL';
-  } else if (rawDepthDb <= -12) {
+  } else if (rawDepthDb <= -9) {
     severity    = 'amber';
     borderColor = '#d97706';
     bgColor     = '#fffbeb';
