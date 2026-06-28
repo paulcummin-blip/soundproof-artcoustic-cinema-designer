@@ -47,6 +47,7 @@ import ModeCouplingProvenanceAudit from "@/components/room/bass/ModeCouplingProv
 import DirectModalAllocationAudit from "@/components/room/bass/DirectModalAllocationAudit";
 import ModalPressureGrowthAudit from "@/components/room/bass/ModalPressureGrowthAudit";
 import SingleModeAbsoluteCalibrationAudit from "@/components/room/bass/SingleModeAbsoluteCalibrationAudit";
+import ModalFamilyExcitationAudit from "@/components/room/bass/ModalFamilyExcitationAudit";
 
 export default function DeepDiagnosticsSweepPanel({
   roomDims,
@@ -113,6 +114,7 @@ export default function DeepDiagnosticsSweepPanel({
       <DirectModalAllocationAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
       <ModalPressureGrowthAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
       <SingleModeAbsoluteCalibrationAudit roomDims={roomDims} seat={sweepSeat} sub={sweepSub} surfaceAbsorption={surfaceAbsorption} activeSettings={sweepSettings} />
+      <ModalFamilyExcitationAudit roomDims={roomDims} seatingPositions={sweepSeat ? [sweepSeat] : []} subsForSimulation={subs} />
     </>
   );
 }
