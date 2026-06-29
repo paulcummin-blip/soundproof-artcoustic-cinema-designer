@@ -17,6 +17,7 @@ import BehaviouralStoryTest from "./BehaviouralStoryTest";
 import AbsorptionSensitivityAudit from "./AbsorptionSensitivityAudit";
 import ZeroAbsorptionQTest from "./ZeroAbsorptionQTest";
 import ContinuousQReplacementAudit from "./ContinuousQReplacementAudit";
+import MultiRoomQRegressionTest from "./MultiRoomQRegressionTest";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -464,6 +465,9 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
       />
+
+      {/* Multi-Room Q Regression Test — collapsed by default */}
+      <MultiRoomQRegressionTest />
 
       {/* Continuous Q Replacement Audit — collapsed by default */}
       <ContinuousQReplacementAudit
