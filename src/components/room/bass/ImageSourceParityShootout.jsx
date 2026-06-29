@@ -26,6 +26,7 @@ import DegenerateModeGroupingAudit from "./DegenerateModeGroupingAudit";
 import RawPressureViolenceAudit from "./RawPressureViolenceAudit";
 import ModalEnergyContributionAudit from "./ModalEnergyContributionAudit";
 import TransferFunctionShapeAudit from "./TransferFunctionShapeAudit";
+import PhysicsSubstitutionShootout from "./PhysicsSubstitutionShootout";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -427,6 +428,15 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
           </>
         )}
       </div>
+
+      {/* Physics Substitution Shootout — collapsed by default */}
+      <PhysicsSubstitutionShootout
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+        rewOverlaySeries={rewOverlaySeries}
+      />
 
       {/* Modal Q / Damping sweep — always visible below shootout */}
       <ModalQDampingSweep
