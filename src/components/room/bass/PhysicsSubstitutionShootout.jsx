@@ -27,6 +27,7 @@ import {
 } from '@/bass/core/modalCalculations';
 import { REW_ESTIMATE, fmt1, computeEstimateMetrics, computeMAE } from './shootoutHelpers';
 import RegionalPhysicsAttributionAudit from './RegionalPhysicsAttributionAudit';
+import SimulationDataExport from './SimulationDataExport';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const C = 343;
@@ -643,6 +644,12 @@ export default function PhysicsSubstitutionShootout({
           </>
         )}
       </div>
+      {/* Simulation Data Export — raw array inspection, export to CSV */}
+      <SimulationDataExport
+        rows={results?.rows || []}
+        rewEstimate={REW_ESTIMATE}
+      />
+
       {/* Regional Physics Attribution Audit — nested below shootout */}
       <RegionalPhysicsAttributionAudit
         roomDims={roomDims}
