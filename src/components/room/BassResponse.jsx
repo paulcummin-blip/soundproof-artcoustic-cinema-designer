@@ -1821,9 +1821,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   fontWeight: qStrategy === 'freq_dependent_cap' ? 700 : 400,
                 }}
               >
-                <option value="production">Production (static ceiling)</option>
-                <option value="freq_dependent_cap">⚡ Freq-dep cap — Variant F</option>
-                <option value="smooth_soft_cap">🔬 Smooth soft cap — candidate</option>
+                <option value="production">Production — smooth Q cap</option>
+                 <option value="freq_dependent_cap">⚡ Freq-dep cap — Variant F (diagnostic)</option>
+                 <option value="smooth_soft_cap">🔬 Smooth soft cap (same as production)</option>
               </select>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1928,7 +1928,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
       {qStrategy === 'smooth_soft_cap' && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#166534', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
-          🔬 Q strategy: Smooth Soft Cap — candidate mode
+          🔬 Q strategy: Smooth Soft Cap — same as production default
         </div>
       )}
 
