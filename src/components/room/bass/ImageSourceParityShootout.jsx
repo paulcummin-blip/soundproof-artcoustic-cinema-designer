@@ -14,6 +14,7 @@ import ModalExcitationChainAudit from "./ModalExcitationChainAudit";
 import ModalParticipationAudit from "./ModalParticipationAudit";
 import RewPipelineDivergenceAudit from "./RewPipelineDivergenceAudit";
 import BehaviouralStoryTest from "./BehaviouralStoryTest";
+import AbsorptionSensitivityAudit from "./AbsorptionSensitivityAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -457,6 +458,13 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
 
       {/* Modal Participation Audit — collapsed by default */}
       <ModalParticipationAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+      />
+
+      {/* Absorption Sensitivity Audit — collapsed by default */}
+      <AbsorptionSensitivityAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
