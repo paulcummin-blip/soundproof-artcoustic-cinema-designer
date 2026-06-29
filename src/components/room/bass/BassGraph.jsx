@@ -411,7 +411,7 @@ export default function BassGraph({
     };
 
     return (
-        <div className="w-full h-[400px]">
+        <div className="w-full h-[500px]">
             {rewStyleMode && (
                 <>
                     <div className="text-[10px] text-gray-500 mb-1">
