@@ -1,572 +1,563 @@
 /**
- * TransferFunctionShapeAudit — Diagnostic only. No production changes.
- *
- * Compares the modal transfer-function shape used by rewBassEngine.js against
- * 4 alternative physically-plausible formulations at ±30 Hz around f₀.
- *
- * Variants:
- *   A) Production H(f,f0,Q) — exactly from resonantTransfer() in modalCalculations.js
- *   B) Magnitude-only Lorentzian  — |1 / (1 - (f/f0)² + j·f/(f0·Q))|
- *   C) Classical 2nd-order resonator — same denominator, magnitude only, no (1-ratio²) sign flip
- *   D) Energy-normalised resonator — scaled so ∫|H|² df = ∫|H_prod|² df
- *   E) Constant-area resonator — scaled so ∫|H| df = ∫|H_prod| df
- *
- * For each variant: peak gain, -3 dB bandwidth, integrated area, modal SPL, MAE vs REW benchmark.
+ * TransferFunctionShapeAudit.jsx
+ * Individual Modal Transfer Function Audit – are individual modes too broad?
+ * Diagnostic only. No production changes.
  */
-
-import React, { useState, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import {
   computeRoomModesLocal,
   estimateModeQLocal,
   modeShapeValueLocal,
+  resonantTransfer,
 } from '@/bass/core/modalCalculations.js';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine, ResponsiveContainer } from 'recharts';
 
-// ── REW benchmark (same data used across all audits) ─────────────────────────
-const REW_BENCHMARK = [
-  { hz: 20, db: 92.5 }, { hz: 25, db: 94.1 }, { hz: 30, db: 95.2 }, { hz: 35, db: 95.8 },
-  { hz: 40, db: 96.2 }, { hz: 45, db: 96.5 }, { hz: 50, db: 96.6 }, { hz: 55, db: 96.4 },
-  { hz: 60, db: 95.8 }, { hz: 65, db: 94.7 }, { hz: 70, db: 93.2 }, { hz: 75, db: 91.8 },
-  { hz: 80, db: 90.5 }, { hz: 85, db: 89.6 }, { hz: 90, db: 89.2 }, { hz: 95, db: 89.4 },
-  { hz: 100, db: 90.1 },
-];
+// ── Constants ─────────────────────────────────────────────────────────────────
+const C = 343;
+const FLAT_SOURCE_DB = 94;
+const MODE_COLORS = ['#2563eb','#16a34a','#d97706','#9333ea','#dc2626'];
+const NULL_COLOR  = '#b91c1c';
+const PEAK_COLOR  = '#166534';
 
-const FREQ_STEP   = 0.5;   // Hz resolution for curves
-const TARGET_HZ   = [40, 57, 70, 80, 85, 90];
-const FLAT_DB     = 94;
-const C           = 343;
-const MONO        = { fontFamily: 'monospace' };
-const REF_P       = 20e-6; // 20 µPa
+const f1  = (v) => Number.isFinite(v) ? v.toFixed(1)  : '—';
+const f2  = (v) => Number.isFinite(v) ? v.toFixed(2)  : '—';
+const f3  = (v) => Number.isFinite(v) ? v.toFixed(3)  : '—';
+const fS  = (v) => Number.isFinite(v) ? v.toExponential(3) : '—';
 
-// ── Transfer-function variants ────────────────────────────────────────────────
-
-/** A) Production — exactly mirrors resonantTransfer() in modalCalculations.js */
-function tfProduction(f, f0, q) {
-  const ratio    = f / Math.max(f0, 1e-6);
-  const realDen  = 1 - ratio * ratio;
-  const imagDen  = ratio / Math.max(q, 1e-6);
-  const den2     = realDen * realDen + imagDen * imagDen;
-  return Math.sqrt(1 / Math.max(den2, 1e-30));  // |H| = 1/√(den²)
-}
-
-/** B) Magnitude-only Lorentzian — classical half-power form |1/(1-(f/f0)²+j·f/(f0·Q))| */
-function tfLorentzian(f, f0, q) {
-  const r    = f / Math.max(f0, 1e-6);
-  const real = 1 - r * r;
-  const imag = r / Math.max(q, 1e-6);
-  return Math.sqrt(1 / Math.max(real * real + imag * imag, 1e-30));
-}
-
-/** C) Classical 2nd-order — no sign on imaginary, uses +j damping term */
-function tfClassical2ndOrder(f, f0, q) {
-  const r    = f / Math.max(f0, 1e-6);
-  const real = 1 - r * r;
-  const imag = r / Math.max(q, 1e-6);
-  // identical to Lorentzian but with numerator = 1/(q·r) — peaks at damping null
-  const num  = 1 / Math.max(q * r, 1e-9);
-  return num / Math.sqrt(Math.max(real * real + imag * imag, 1e-30));
-}
-
-/** D) Energy-normalised — same shape as production, rescaled so ∫|H|² = 1 over range */
-function buildEnergyNorm(freqs, f0, q) {
-  const raw   = freqs.map(f => tfProduction(f, f0, q));
-  const energy = raw.reduce((s, v) => s + v * v * FREQ_STEP, 0);
-  const norm   = Math.sqrt(Math.max(energy, 1e-30));
-  return freqs.map((_, i) => raw[i] / norm);
-}
-
-/** E) Constant-area — same shape as production, rescaled so ∫|H| = 1 over range */
-function buildAreaNorm(freqs, f0, q) {
-  const raw  = freqs.map(f => tfProduction(f, f0, q));
-  const area = raw.reduce((s, v) => s + v * FREQ_STEP, 0);
-  const norm = Math.max(area, 1e-30);
-  return freqs.map((_, i) => raw[i] / norm);
-}
-
-// ── Utility ───────────────────────────────────────────────────────────────────
-function linspace(lo, hi, step) {
-  const out = [];
-  for (let f = lo; f <= hi + 1e-9; f += step) out.push(f);
-  return out;
-}
-
-function peakGain(vals) { return Math.max(...vals); }
-
-function bandwidth3dB(freqs, vals) {
-  const pk = peakGain(vals);
-  const thresh = pk / Math.sqrt(2);
-  let lo = null, hi = null;
-  for (let i = 0; i < freqs.length; i++) {
-    if (vals[i] >= thresh) { if (lo === null) lo = freqs[i]; hi = freqs[i]; }
-  }
-  return lo === null ? null : hi - lo;
-}
-
-function integratedArea(vals) {
-  return vals.reduce((s, v) => s + v * FREQ_STEP, 0);
-}
-
-function modalSplDb(transferMag, coupling, sourceP) {
-  const pressure = Math.abs(coupling) * sourceP * Math.abs(transferMag);
-  return pressure > 0 ? 20 * Math.log10(pressure / REF_P) : null;
-}
-
-function interpolateDb(benchmark, hz) {
-  let lo = null, hi = null;
-  for (const pt of benchmark) {
-    if (pt.hz <= hz) lo = pt;
-    if (pt.hz >= hz && !hi) hi = pt;
-  }
-  if (!lo && hi) return hi.db;
-  if (lo && !hi) return lo.db;
-  if (!lo && !hi) return null;
-  if (lo.hz === hi.hz) return lo.db;
-  const t = (hz - lo.hz) / (hi.hz - lo.hz);
-  return lo.db + t * (hi.db - lo.db);
-}
-
-function computeMAE(splSeries, benchmark) {
-  const errors = [];
-  for (const pt of benchmark) {
-    const s = splSeries.find(d => Math.abs(d.hz - pt.hz) < 1);
-    if (s && s.db != null) errors.push(Math.abs(s.db - pt.db));
-  }
-  return errors.length ? errors.reduce((a, b) => a + b, 0) / errors.length : null;
-}
-
-function normSA(sa) {
-  const c = k => Math.max(0, Math.min(1, Number.isFinite(Number(sa?.[k])) ? Number(sa[k]) : 0.3));
-  return { front: c('front'), back: c('back'), left: c('left'), right: c('right'), floor: c('floor'), ceiling: c('ceiling') };
-}
-
-function qForType(type, axialQ) {
-  if (type === 'axial') return axialQ;
-  if (type === 'tangential') return 3.9;
+// ── Mode Q helpers (mirror ModalEnergyContributionAudit) ─────────────────────
+function modeQByType(mode, axialQ = 4.0) {
+  const axes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
+  if (axes === 1) return axialQ;
+  if (axes === 2) return 3.9;
   return 2.5;
 }
 
-// ── Find dominant mode at a target Hz ─────────────────────────────────────────
-function findDominantMode(targetHz, roomDims, seat, sub, sa, axialQ) {
-  const { widthM, lengthM, heightM } = roomDims;
-  const subZ  = Number.isFinite(Number(sub?.z))  ? Number(sub.z)  : 0.35;
-  const seatZ = Number.isFinite(Number(seat?.z)) ? Number(seat.z) : 1.2;
-  const nSA   = normSA(sa);
-
-  const rawModes = computeRoomModesLocal({ widthM, lengthM, heightM, fMax: 200, c: C });
-  let best = null, bestScore = -1;
-  for (const m of rawModes) {
-    const baseQ = qForType(m.type, axialQ);
-    const absQ  = estimateModeQLocal({ roomDims, surfaceAbsorption: nSA, f0: m.freq });
-    const q     = Math.max(1, Math.min(baseQ, absQ));
-    const ψs    = modeShapeValueLocal(m, Number(sub.x),  Number(sub.y),  subZ,  { widthM, lengthM, heightM });
-    const ψr    = modeShapeValueLocal(m, Number(seat.x), Number(seat.y), seatZ, { widthM, lengthM, heightM });
-    const score = Math.abs(ψs * ψr) * tfProduction(targetHz, m.freq, q);
-    if (score > bestScore) { bestScore = score; best = { ...m, q, ψs, ψr, coupling: ψs * ψr }; }
-  }
-  return best;
+// ── Classical H(f) = 1 / (fn²−f²+ j·fn·f/Q) ─────────────────────────────────
+// Returns { mag, phaseDeg } at frequency f for mode resonating at fn with quality Q.
+function classicalH(f, fn, Q) {
+  const re = fn * fn - f * f;
+  const im = fn * f / Math.max(Q, 1e-6);
+  const mag = 1 / Math.sqrt(re * re + im * im);
+  const phaseDeg = Math.atan2(-im, re) * 180 / Math.PI;
+  return { re, im, mag, phaseDeg };
 }
 
-// ── Build frequency-response series for one variant over 20–200 Hz ───────────
-function buildFullSeries(variantFn, variantVals, roomDims, seat, sub, sa, axialQ, sourceP) {
-  const { widthM, lengthM, heightM } = roomDims;
-  const subZ  = Number.isFinite(Number(sub?.z))  ? Number(sub.z)  : 0.35;
-  const seatZ = Number.isFinite(Number(seat?.z)) ? Number(seat.z) : 1.2;
-  const nSA   = normSA(sa);
-  const freqs = linspace(20, 200, FREQ_STEP);
-  const rawModes = computeRoomModesLocal({ widthM, lengthM, heightM, fMax: 200, c: C });
+// ── Half-power bandwidth from Q ───────────────────────────────────────────────
+function halfPowerBw(fn, Q) { return fn / Math.max(Q, 1e-6); }
 
-  return freqs.map(hz => {
-    let sumP = 0;
-    for (const m of rawModes) {
-      const baseQ = qForType(m.type, axialQ);
-      const absQ  = estimateModeQLocal({ roomDims, surfaceAbsorption: nSA, f0: m.freq });
-      const q     = Math.max(1, Math.min(baseQ, absQ));
-      const ψs    = modeShapeValueLocal(m, Number(sub.x),  Number(sub.y),  subZ,  { widthM, lengthM, heightM });
-      const ψr    = modeShapeValueLocal(m, Number(seat.x), Number(seat.y), seatZ, { widthM, lengthM, heightM });
-      const tf    = variantFn ? variantFn(hz, m.freq, q) : 0;
-      sumP += Math.abs(ψs * ψr) * sourceP * tf;
-    }
-    const db = sumP > 0 ? 20 * Math.log10(sumP / REF_P) : null;
-    return { hz, db };
+// ── Build per-frequency sweep for one mode across ±1 octave ──────────────────
+function buildModeSweep(mode, source, seat, roomDims, modalSourceAmp, nPts = 120) {
+  const fLow  = mode.freq / 2;
+  const fHigh = mode.freq * 2;
+  const freqs = [];
+  for (let i = 0; i < nPts; i++) {
+    freqs.push(fLow * Math.pow(fHigh / fLow, i / (nPts - 1)));
+  }
+
+  const sc = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims);
+  const rc = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
+  const coupling = sc * rc;
+
+  return freqs.map(f => {
+    // B44 resonant transfer (as used in production)
+    const b44 = resonantTransfer(f, mode.freq, mode.qValue);
+    const b44Mag  = Math.sqrt(b44.re * b44.re + b44.im * b44.im);
+    const b44PhDeg = Math.atan2(b44.im, b44.re) * 180 / Math.PI;
+    const b44Contrib = modalSourceAmp * Math.abs(coupling) * b44Mag;
+    const b44Db  = 20 * Math.log10(Math.max(b44Contrib, 1e-12));
+
+    // Classical second-order reference H(f)
+    const cls = classicalH(f, mode.freq, mode.qValue);
+    const clsContrib = modalSourceAmp * Math.abs(coupling) * cls.mag;
+    const clsDb  = 20 * Math.log10(Math.max(clsContrib, 1e-12));
+
+    return {
+      f,
+      b44Db, b44PhDeg, b44Contrib,
+      clsDb, clsPhDeg: cls.phaseDeg, clsContrib,
+      ampDiffDb: b44Db - clsDb,
+      phDiffDeg: b44PhDeg - cls.phaseDeg,
+    };
   });
 }
 
-// ── Main computation ──────────────────────────────────────────────────────────
-function runAudit(targetHz, roomDims, seat, sub, sa, axialQ) {
-  const dom = findDominantMode(targetHz, roomDims, seat, sub, sa, axialQ);
-  if (!dom) return null;
+// ── Analyse a single mode's TF shape ─────────────────────────────────────────
+function analyseModeShape(mode, source, seat, roomDims, modalSourceAmp) {
+  const sweep = buildModeSweep(mode, source, seat, roomDims, modalSourceAmp);
+  const atResonance = sweep.reduce((best, p) => p.b44Db > best.b44Db ? p : best, sweep[0]);
+  const peakDb = atResonance.b44Db;
+  const halfPowerDb = peakDb - 3;
 
-  const f0 = dom.freq;
-  const q  = dom.q;
-  const fLo = Math.max(1, f0 - 30);
-  const fHi = f0 + 30;
-  const freqs = linspace(fLo, fHi, FREQ_STEP);
+  // Measured −3 dB bandwidth (B44)
+  const above = sweep.filter(p => p.b44Db >= halfPowerDb);
+  const measuredBwHz = above.length >= 2
+    ? above[above.length - 1].f - above[0].f
+    : null;
 
-  const sourceP = Math.pow(10, FLAT_DB / 20);
+  // Classical prediction
+  const classicalBwHz = halfPowerBw(mode.freq, mode.qValue);
 
-  // ── Variant curves over ±30 Hz ─────────────────────────────────────────────
-  const curveA = freqs.map(f => tfProduction(f, f0, q));
-  const curveB = freqs.map(f => tfLorentzian(f, f0, q));
-  const curveC = freqs.map(f => tfClassical2ndOrder(f, f0, q));
-  const curveD = buildEnergyNorm(freqs, f0, q);
-  const curveE = buildAreaNorm(freqs, f0, q);
+  // Phase at resonance (should be −90° for classical 2nd-order)
+  const phaseAtRes = atResonance.b44PhDeg;
+  const clsPhaseAtRes = -90; // canonical
 
-  const variants = [
-    { id: 'A', label: 'Production H(f,f0,Q)', color: '#60a5fa', vals: curveA, fn: (f, f0, q) => tfProduction(f, f0, q) },
-    { id: 'B', label: 'Magnitude-only Lorentzian', color: '#4ade80', vals: curveB, fn: (f, f0, q) => tfLorentzian(f, f0, q) },
-    { id: 'C', label: 'Classical 2nd-order', color: '#fb923c', vals: curveC, fn: (f, f0, q) => tfClassical2ndOrder(f, f0, q) },
-    { id: 'D', label: 'Energy-normalised', color: '#a78bfa', vals: curveD, fn: null },
-    { id: 'E', label: 'Constant-area', color: '#f472b6', vals: curveE, fn: null },
-  ];
+  // Bandwidth ratio
+  const bwRatio = (measuredBwHz !== null && classicalBwHz > 0)
+    ? measuredBwHz / classicalBwHz : null;
 
-  // Metrics per variant (over ±30 Hz window)
-  const metrics = variants.map(v => ({
-    ...v,
-    peakGain:  peakGain(v.vals),
-    bw3dB:     bandwidth3dB(freqs, v.vals),
-    area:      integratedArea(v.vals),
-    modalSpl:  modalSplDb(v.vals[Math.round(v.vals.length / 2)], dom.coupling, sourceP),
-  }));
+  // Mean amplitude diff across sweep
+  const meanAmpDiff = sweep.reduce((s, p) => s + p.ampDiffDb, 0) / sweep.length;
+  const meanPhDiff  = sweep.reduce((s, p) => s + p.phDiffDeg, 0) / sweep.length;
 
-  // ── Full-range 20–200 Hz series + MAE (only for variants with a fn) ─────────
-  const maes = {};
-  for (const v of variants) {
-    if (!v.fn) { maes[v.id] = null; continue; }
-    const series = buildFullSeries(v.fn, null, roomDims, seat, sub, sa, axialQ, sourceP);
-    maes[v.id] = computeMAE(series, REW_BENCHMARK);
-  }
+  const sc = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims);
+  const rc = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
+  const coupling = sc * rc;
+  const dampCoeff = mode.freq / Math.max(mode.qValue, 1e-6) / (2 * Math.PI); // ζ·ωn simplified
 
-  return { dom, f0, q, freqs, metrics, maes, sourceP };
+  return {
+    mode, coupling, sc, rc, dampCoeff,
+    sweep, peakDb, measuredBwHz, classicalBwHz, bwRatio,
+    phaseAtRes, meanAmpDiff, meanPhDiff,
+    isBroader: bwRatio !== null && bwRatio > 1.15,
+    isLower: peakDb < (20 * Math.log10(Math.max(modalSourceAmp * Math.abs(coupling), 1e-12)) - 3),
+    phaseTooSlow: Math.abs(phaseAtRes - clsPhaseAtRes) > 20,
+  };
 }
 
-// ── Micro chart (SVG) ─────────────────────────────────────────────────────────
-function OverlayChart({ freqs, metrics }) {
-  const W = 480, H = 140, PL = 40, PR = 10, PT = 10, PB = 28;
-  const cW = W - PL - PR, cH = H - PT - PB;
-
-  const allVals = metrics.flatMap(m => m.vals);
-  const maxV    = Math.max(...allVals.filter(Number.isFinite));
-  const minV    = 0;
-  const rangeV  = Math.max(maxV - minV, 1e-6);
-  const fLo     = freqs[0], fRange = freqs[freqs.length - 1] - fLo;
-
-  const toX = (f) => PL + ((f - fLo) / fRange) * cW;
-  const toY = (v) => PT + (1 - (v - minV) / rangeV) * cH;
-
-  const ticks = [0, 0.25, 0.5, 0.75, 1.0].map(t => ({
-    v: minV + t * rangeV, y: PT + (1 - t) * cH,
-  }));
-  const fTicks = [freqs[0], freqs[Math.round(freqs.length / 2)], freqs[freqs.length - 1]];
-
-  return (
-    <svg width={W} height={H} style={{ display: 'block', overflow: 'visible' }}>
-      {/* Grid */}
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line x1={PL} y1={t.y} x2={PL + cW} y2={t.y} stroke="#292524" strokeWidth={0.5} />
-          <text x={PL - 4} y={t.y + 3} textAnchor="end" fill="#57534e" fontSize={7} fontFamily="monospace">{t.v.toFixed(1)}</text>
-        </g>
-      ))}
-      {fTicks.map((f, i) => (
-        <text key={i} x={toX(f)} y={H - PB + 14} textAnchor="middle" fill="#57534e" fontSize={7} fontFamily="monospace">{f.toFixed(0)} Hz</text>
-      ))}
-
-      {/* Variant curves */}
-      {metrics.map(v => {
-        const pts = freqs.map((f, i) => `${toX(f)},${toY(v.vals[i])}`).join(' ');
-        return <polyline key={v.id} points={pts} fill="none" stroke={v.color} strokeWidth={v.id === 'A' ? 2 : 1.2} strokeDasharray={v.id === 'A' ? undefined : '3,2'} />;
-      })}
-
-      {/* Legend */}
-      {metrics.map((v, i) => (
-        <g key={v.id} transform={`translate(${PL + i * 90}, ${H - 6})`}>
-          <line x1={0} y1={0} x2={12} y2={0} stroke={v.color} strokeWidth={v.id === 'A' ? 2 : 1.2} strokeDasharray={v.id === 'A' ? undefined : '3,2'} />
-          <text x={15} y={3} fill={v.color} fontSize={7} fontFamily="monospace">{v.id}) {v.label.split(' ').slice(0, 2).join(' ')}</text>
-        </g>
-      ))}
-    </svg>
-  );
+// ── Find top-5 modes at a given frequency ────────────────────────────────────
+function topModesAt(freqHz, modes, source, seat, roomDims, modalSourceAmp, n = 5) {
+  return modes
+    .map(mode => {
+      const sc = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims);
+      const rc = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
+      const tf = resonantTransfer(freqHz, mode.freq, mode.qValue);
+      const gain = modalSourceAmp * sc * rc;
+      const re = gain * tf.re, im = gain * tf.im;
+      const mag = Math.sqrt(re * re + im * im);
+      return { mode, mag };
+    })
+    .sort((a, b) => b.mag - a.mag)
+    .slice(0, n)
+    .map(({ mode }) => mode);
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-const TH  = { padding: '3px 7px', fontSize: 9, fontWeight: 700, ...MONO, background: '#1c1917', color: '#a8a29e', borderBottom: '2px solid #292524', textAlign: 'right', whiteSpace: 'nowrap' };
-const THL = { ...TH, textAlign: 'left' };
-const TD  = { padding: '2px 7px', fontSize: 9, ...MONO, textAlign: 'right', borderBottom: '1px solid #1c1917' };
-const TDL = { ...TD, textAlign: 'left' };
+// ── Run the full audit ────────────────────────────────────────────────────────
+function runAudit(roomDims, seat, source, surfaceAbsorption) {
+  const modesRaw = computeRoomModesLocal({ ...roomDims, fMax: 220, c: C });
+  const modes = modesRaw.map(m => {
+    const baseQ = modeQByType(m, 4.0);
+    const absQ  = estimateModeQLocal({ roomDims, surfaceAbsorption, f0: m.freq });
+    return { ...m, qValue: Math.max(1, Math.min(baseQ, absQ)) };
+  });
 
-const VARIANT_COLORS = { A: '#60a5fa', B: '#4ade80', C: '#fb923c', D: '#a78bfa', E: '#f472b6' };
+  const dx = source.x - seat.x, dy = source.y - seat.y, dz = source.z - seat.z;
+  const distM = Math.max(0.01, Math.sqrt(dx*dx + dy*dy + dz*dz));
+  const modalSourceAmp = Math.pow(10, (FLAT_SOURCE_DB - 20 * Math.log10(distM)) / 20);
 
-// ── Component ─────────────────────────────────────────────────────────────────
-export default function TransferFunctionShapeAudit({ roomDims, seat, sub, surfaceAbsorption, activeSettings }) {
-  const [results, setResults]   = useState(null);
-  const [running, setRunning]   = useState(false);
-  const [error, setError]       = useState(null);
-  const [activeHz, setActiveHz] = useState(40);
+  // Full sweep to find null/peak
+  const freqs = [];
+  for (let i = 0; i <= 300; i++) freqs.push(20 * Math.pow(220/20, i/300));
+  const sweep = freqs.map(hz => {
+    let sumRe = 0, sumIm = 0;
+    modes.forEach(mode => {
+      const sc = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims);
+      const rc = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
+      const tf = resonantTransfer(hz, mode.freq, mode.qValue);
+      const g = modalSourceAmp * sc * rc;
+      sumRe += g * tf.re; sumIm += g * tf.im;
+    });
+    const mag = Math.sqrt(sumRe*sumRe + sumIm*sumIm);
+    return { hz, splDb: 20 * Math.log10(Math.max(mag, 1e-10)) };
+  });
 
-  const axialQ = Number.isFinite(activeSettings?.axialQ) ? activeSettings.axialQ : 4.0;
+  const band = sweep.filter(p => p.hz >= 20 && p.hz <= 120);
+  const nullPt = band.reduce((b, p) => !b || p.splDb < b.splDb ? p : b, null);
+  const peakPt = band.reduce((b, p) => !b || p.splDb > b.splDb ? p : b, null);
 
-  const canRun = !!(
-    roomDims?.widthM && roomDims?.lengthM && roomDims?.heightM &&
-    seat?.x != null && seat?.y != null && sub?.x != null && sub?.y != null
-  );
+  const nullModes = nullPt ? topModesAt(nullPt.hz, modes, source, seat, roomDims, modalSourceAmp, 5) : [];
+  const peakModes = peakPt ? topModesAt(peakPt.hz, modes, source, seat, roomDims, modalSourceAmp, 5) : [];
 
-  const run = useCallback(async () => {
-    if (!canRun) return;
-    setRunning(true); setError(null); setResults(null);
-    await new Promise(r => setTimeout(r, 0));
-    try {
-      const byHz = {};
-      for (const hz of TARGET_HZ) {
-        await new Promise(r => setTimeout(r, 0));
-        byHz[hz] = runAudit(hz, roomDims, seat, sub, surfaceAbsorption, axialQ);
-      }
-      setResults(byHz);
-    } catch (e) {
-      setError(e.message || 'Unknown error');
+  const nullAnalysis = nullModes.map(m => analyseModeShape(m, source, seat, roomDims, modalSourceAmp));
+  const peakAnalysis = peakModes.map(m => analyseModeShape(m, source, seat, roomDims, modalSourceAmp));
+
+  // Coherent sum overlay for null modes (at null frequency, across ±1 oct)
+  const buildCoherentSumSweep = (modeSet, centreHz) => {
+    const fLow = centreHz / 2, fHigh = centreHz * 2;
+    const pts = [];
+    for (let i = 0; i < 120; i++) {
+      const f = fLow * Math.pow(fHigh/fLow, i/119);
+      let sumRe = 0, sumIm = 0;
+      modeSet.forEach(mode => {
+        const sc = modeShapeValueLocal(mode, source.x, source.y, source.z, roomDims);
+        const rc = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, roomDims);
+        const tf = resonantTransfer(f, mode.freq, mode.qValue);
+        const g = modalSourceAmp * sc * rc;
+        sumRe += g * tf.re; sumIm += g * tf.im;
+      });
+      const mag = Math.sqrt(sumRe*sumRe + sumIm*sumIm);
+      pts.push({ f, db: 20 * Math.log10(Math.max(mag, 1e-12)) });
     }
-    setRunning(false);
-  }, [roomDims, seat, sub, surfaceAbsorption, axialQ, canRun]);
+    return pts;
+  };
 
-  const active = results?.[activeHz];
-  const prodMAE = active?.maes?.A;
+  const nullCohSum = nullPt ? buildCoherentSumSweep(nullModes, nullPt.hz) : [];
+  const peakCohSum = peakPt ? buildCoherentSumSweep(peakModes, peakPt.hz) : [];
+
+  // --- 6 diagnostic answers ---
+  const allAnalysis = [...nullAnalysis, ...peakAnalysis];
+  const broaderCount = allAnalysis.filter(a => a.isBroader).length;
+  const lowerCount   = allAnalysis.filter(a => a.isLower).length;
+  const slowPhCount  = allAnalysis.filter(a => a.phaseTooSlow).length;
+  const avgBwRatio   = allAnalysis.reduce((s,a,_,arr) => s + (a.bwRatio??1)/arr.length, 0);
+  const avgMeanAmpDiff = allAnalysis.reduce((s,a,_,arr) => s + a.meanAmpDiff/arr.length, 0);
+  const avgPhDiff    = allAnalysis.reduce((s,a,_,arr) => s + Math.abs(a.meanPhDiff)/arr.length, 0);
+
+  const nullDepth = nullPt && peakPt ? peakPt.splDb - nullPt.splDb : null;
+
+  // Discrepancy estimate
+  const bwContrib  = Math.min(40, broaderCount * 7);          // % explained by broad modes
+  const phContrib  = Math.min(30, slowPhCount  * 6);
+  const cplContrib = Math.min(20, allAnalysis.filter(a => Math.abs(a.coupling) < 0.3).length * 5);
+  const ampContrib = Math.min(20, lowerCount   * 5);
+  const total      = Math.min(95, bwContrib + phContrib + cplContrib + ampContrib);
+
+  return {
+    nullPt, peakPt, nullDepth, modes,
+    nullAnalysis, peakAnalysis,
+    nullCohSum, peakCohSum,
+    broaderCount, lowerCount, slowPhCount,
+    avgBwRatio, avgMeanAmpDiff, avgPhDiff,
+    discrepancy: { bwContrib, phContrib, cplContrib, ampContrib, total },
+    questions: {
+      q1_broader: broaderCount > 3,
+      q2_lower: lowerCount > 3,
+      q3_phaseSlow: slowPhCount > 3,
+      q4_dampBroad: avgBwRatio > 1.2,
+      q5_couplingLow: allAnalysis.some(a => Math.abs(a.coupling) < 0.2),
+      q6_tfExplains: total > 50,
+    },
+  };
+}
+
+// ── Chart: individual TF lines + coherent sum ─────────────────────────────────
+function TfOverlayChart({ analysis, cohSum, centreHz, label, color }) {
+  if (!analysis.length) return null;
+
+  const data = analysis[0].sweep.map((pt, i) => {
+    const row = { f: Math.round(pt.f * 10) / 10 };
+    analysis.forEach((a, mi) => {
+      row[`m${mi}_b44`] = Math.round(a.sweep[i].b44Db * 10) / 10;
+      row[`m${mi}_cls`] = Math.round(a.sweep[i].clsDb * 10) / 10;
+    });
+    const cohPt = cohSum[Math.round(i * (cohSum.length - 1) / (analysis[0].sweep.length - 1))] ?? null;
+    row['coherent'] = cohPt ? Math.round(cohPt.db * 10) / 10 : null;
+    return row;
+  });
 
   return (
-    <div style={{ marginTop: 12, border: '1px solid #292524', borderRadius: 8, background: '#0c0a09', padding: '10px 12px' }}>
-
-      {/* Header */}
-      <div style={{ fontWeight: 700, color: '#d6d3d1', fontSize: 11, ...MONO, marginBottom: 3 }}>
-        Transfer Function Shape Audit
-        <span style={{ fontWeight: 400, color: '#44403c', marginLeft: 10, fontSize: 10 }}>
-          diagnostic only · no production changes
-        </span>
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 11, fontFamily: 'monospace', color, marginBottom: 4 }}>
+        {label} — TF overlay (±1 octave around {centreHz?.toFixed(1)} Hz)
       </div>
-      <div style={{ fontSize: 9, color: '#57534e', ...MONO, marginBottom: 8, lineHeight: 1.8 }}>
-        Compares 5 transfer-function shapes over ±30 Hz around the dominant mode f₀.
-        MAE vs REW benchmark computed over 20–200 Hz for variants A–C.
-        Variants D–E are window-only (rescaled globally — MAE not computed).
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={data} margin={{ top: 4, right: 10, left: -10, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis dataKey="f" type="number" scale="log" domain={['auto','auto']}
+            tickFormatter={v => `${v.toFixed(0)}`} tick={{ fontSize: 9, fontFamily: 'monospace' }}
+            label={{ value: 'Hz', position: 'insideRight', fontSize: 9, dx: 6 }} />
+          <YAxis tick={{ fontSize: 9, fontFamily: 'monospace' }}
+            label={{ value: 'dB (contrib.)', angle: -90, position: 'insideLeft', fontSize: 8, dy: 40 }} />
+          <Tooltip formatter={(v, k) => [v?.toFixed(1) + ' dB', k]} labelFormatter={v => `${Number(v).toFixed(1)} Hz`}
+            contentStyle={{ fontSize: 9, fontFamily: 'monospace' }} />
+          <Legend wrapperStyle={{ fontSize: 9, fontFamily: 'monospace' }} />
+          <ReferenceLine x={centreHz} stroke={color} strokeDasharray="6 3" strokeWidth={1} />
+          {analysis.map((a, mi) => (
+            <Line key={`m${mi}_b44`} dataKey={`m${mi}_b44`}
+              name={`(${a.mode.nx},${a.mode.ny},${a.mode.nz}) B44`}
+              stroke={MODE_COLORS[mi % 5]} dot={false} strokeWidth={1.5} />
+          ))}
+          {analysis.map((a, mi) => (
+            <Line key={`m${mi}_cls`} dataKey={`m${mi}_cls`}
+              name={`(${a.mode.nx},${a.mode.ny},${a.mode.nz}) Classical`}
+              stroke={MODE_COLORS[mi % 5]} dot={false} strokeWidth={1} strokeDasharray="4 3" opacity={0.55} />
+          ))}
+          <Line dataKey="coherent" name="Coherent sum" stroke="#0f172a" strokeWidth={2.5} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+      <div style={{ fontSize: 9, fontFamily: 'monospace', color: '#94a3b8' }}>
+        Solid = B44 resonantTransfer · Dashed = classical H(f) = 1/(fn²−f²+jfnf/Q) · Black = coherent sum of top-5
       </div>
+    </div>
+  );
+}
 
-      {!canRun && <div style={{ fontSize: 10, color: '#fbbf24', ...MONO, marginBottom: 6 }}>⚠ Need room, seat, and sub.</div>}
+// ── Mode metrics table ────────────────────────────────────────────────────────
+function ModeMetricsTable({ analysisArr, label, color }) {
+  const th = { padding: '3px 8px', fontSize: 9, fontFamily: 'monospace', fontWeight: 700, background: color + '22', color, textAlign: 'right', borderBottom: `2px solid ${color}` };
+  const thL = { ...th, textAlign: 'left' };
+  const td = { padding: '3px 8px', fontSize: 9, fontFamily: 'monospace', textAlign: 'right', borderBottom: '1px solid #e2e8f0' };
+  const tdL = { ...td, textAlign: 'left' };
 
-      <button
-        onClick={run}
-        disabled={running || !canRun}
-        style={{
-          height: 28, padding: '0 14px', borderRadius: 6,
-          border: '1px solid #57534e', background: running ? '#1c1917' : '#292524',
-          color: running || !canRun ? '#57534e' : '#d6d3d1', fontSize: 11, ...MONO,
-          cursor: running || !canRun ? 'not-allowed' : 'pointer', fontWeight: 700, marginBottom: 10,
-        }}
-      >
-        {running ? 'Computing…' : results ? 'Re-run' : 'Run Transfer Function Shape Audit'}
-      </button>
-
-      {error && <div style={{ fontSize: 10, color: '#f87171', ...MONO, marginBottom: 8 }}>⚠ {error}</div>}
-
-      {results && (
-        <>
-          {/* Frequency tabs */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
-            {TARGET_HZ.map(hz => {
-              const d = results[hz];
-              const bestMAE = d ? Math.min(...Object.values(d.maes).filter(Number.isFinite)) : null;
-              const isActive = hz === activeHz;
+  return (
+    <div style={{ marginBottom: 12, border: `1px solid ${color}44`, borderRadius: 6, background: '#fff', padding: '8px 10px' }}>
+      <div style={{ fontWeight: 700, fontSize: 11, fontFamily: 'monospace', color, marginBottom: 6 }}>{label}</div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 760 }}>
+          <thead>
+            <tr>
+              <th style={{ ...thL, minWidth: 130 }}>Mode</th>
+              <th style={th}>fn (Hz)</th>
+              <th style={th}>Q</th>
+              <th style={th}>Damp coeff</th>
+              <th style={th}>Coupling</th>
+              <th style={th}>Peak (dB)</th>
+              <th style={th}>BW−3dB meas. (Hz)</th>
+              <th style={th}>BW classical (Hz)</th>
+              <th style={th}>BW ratio</th>
+              <th style={th}>Phase@fn (°)</th>
+              <th style={th}>Avg ΔAmp (dB)</th>
+              <th style={th}>Avg ΔPhase (°)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {analysisArr.map((a, i) => {
+              const bwWarn = a.bwRatio !== null && a.bwRatio > 1.15;
+              const phWarn = Math.abs(a.phaseAtRes + 90) > 20;
+              const bg = i % 2 === 0 ? '#fff' : '#f8fafc';
               return (
-                <button key={hz} onClick={() => setActiveHz(hz)} style={{
-                  padding: '3px 10px', borderRadius: 4, fontSize: 9, ...MONO, cursor: 'pointer',
-                  border: isActive ? '1px solid #60a5fa' : '1px solid #292524',
-                  background: isActive ? '#1e3a5f' : '#1c1917',
-                  color: isActive ? '#93c5fd' : '#78716c', fontWeight: isActive ? 700 : 400,
-                }}>
-                  {hz} Hz
-                  {d?.dom && <span style={{ marginLeft: 5, color: '#57534e' }}>f₀={d.f0.toFixed(1)}</span>}
-                </button>
+                <tr key={i} style={{ background: bg }}>
+                  <td style={{ ...tdL, fontWeight: 600, color: MODE_COLORS[i % 5] }}>
+                    ({a.mode.nx},{a.mode.ny},{a.mode.nz}) {a.mode.type}
+                  </td>
+                  <td style={td}>{f1(a.mode.freq)}</td>
+                  <td style={td}>{f2(a.mode.qValue)}</td>
+                  <td style={td}>{f3(a.dampCoeff)}</td>
+                  <td style={{ ...td, color: Math.abs(a.coupling) < 0.2 ? '#b91c1c' : '#166534', fontWeight: 600 }}>
+                    {f3(a.coupling)}
+                  </td>
+                  <td style={td}>{f1(a.peakDb)}</td>
+                  <td style={{ ...td, color: bwWarn ? '#b91c1c' : '#1e293b', fontWeight: bwWarn ? 700 : 400 }}>
+                    {a.measuredBwHz !== null ? f1(a.measuredBwHz) : '—'}
+                  </td>
+                  <td style={td}>{f1(a.classicalBwHz)}</td>
+                  <td style={{ ...td, color: bwWarn ? '#b91c1c' : '#166534', fontWeight: 700 }}>
+                    {a.bwRatio !== null ? f2(a.bwRatio) : '—'}
+                    {bwWarn && ' ⚠'}
+                  </td>
+                  <td style={{ ...td, color: phWarn ? '#b45309' : '#1e293b', fontWeight: phWarn ? 700 : 400 }}>
+                    {f1(a.phaseAtRes)}{phWarn ? ' ⚠' : ''}
+                  </td>
+                  <td style={{ ...td, color: Math.abs(a.meanAmpDiff) > 1 ? '#b45309' : '#1e293b' }}>
+                    {f2(a.meanAmpDiff)}
+                  </td>
+                  <td style={td}>{f1(a.meanPhDiff)}</td>
+                </tr>
               );
             })}
-          </div>
-
-          {active && (() => {
-            const { dom, f0, q, freqs, metrics, maes } = active;
-
-            // Rank by MAE (A/B/C only)
-            const rankedByMAE = metrics
-              .filter(v => maes[v.id] != null)
-              .sort((a, b) => maes[a.id] - maes[b.id]);
-
-            const bestMAE = rankedByMAE[0] ? maes[rankedByMAE[0].id] : null;
-            const prodIsNotBest = rankedByMAE[0]?.id !== 'A';
-            const improvement = (prodMAE != null && bestMAE != null) ? prodMAE - bestMAE : null;
-            const isPrimaryDriver = improvement != null && improvement > 1;
-
-            return (
-              <>
-                {/* Mode info */}
-                <div style={{ padding: '5px 10px', background: '#1c1917', borderLeft: '3px solid #a78bfa', borderRadius: 4, fontSize: 9, ...MONO, color: '#d6d3d1', marginBottom: 10, lineHeight: 1.9 }}>
-                  <span style={{ color: '#a78bfa', fontWeight: 700 }}>Dominant mode @ {activeHz} Hz: </span>
-                  ({dom.nx},{dom.ny},{dom.nz}) {dom.type} · f₀ = {f0.toFixed(2)} Hz · Q = {q.toFixed(2)}
-                  · ψ coupling = {dom.coupling.toFixed(6)} · window: {freqs[0].toFixed(1)}–{freqs[freqs.length - 1].toFixed(1)} Hz
-                </div>
-
-                {/* Overlay chart */}
-                <div style={{ marginBottom: 10, background: '#110f0e', borderRadius: 6, padding: '6px 4px', overflow: 'hidden' }}>
-                  <div style={{ fontSize: 9, color: '#57534e', ...MONO, marginBottom: 4, paddingLeft: 8 }}>
-                    Transfer magnitude |H(f)| — ±30 Hz around f₀ = {f0.toFixed(1)} Hz
-                  </div>
-                  <OverlayChart freqs={freqs} metrics={metrics} />
-                </div>
-
-                {/* MAE table (A/B/C) */}
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', ...MONO, marginBottom: 4 }}>
-                  Ranked MAE vs REW benchmark (20–200 Hz)
-                </div>
-                <div style={{ overflowX: 'auto', marginBottom: 12 }}>
-                  <table style={{ borderCollapse: 'collapse', minWidth: 480 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ ...THL, minWidth: 20 }}>Rank</th>
-                        <th style={{ ...THL, minWidth: 22 }}>ID</th>
-                        <th style={{ ...THL, minWidth: 200 }}>Variant</th>
-                        <th style={{ ...TH, minWidth: 70 }}>MAE (dB)</th>
-                        <th style={{ ...TH, minWidth: 80 }}>ΔvsProd (dB)</th>
-                        <th style={{ ...THL, minWidth: 80 }}>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankedByMAE.map((v, i) => {
-                        const mae = maes[v.id];
-                        const delta = mae != null && prodMAE != null ? prodMAE - mae : null;
-                        const isProd = v.id === 'A';
-                        const isBest = i === 0;
-                        const col = VARIANT_COLORS[v.id];
-                        return (
-                          <tr key={v.id} style={{ background: isBest && !isProd ? '#1a1205' : 'transparent', borderBottom: '1px solid #1c1917' }}>
-                            <td style={{ ...TDL, color: isBest ? '#fbbf24' : '#57534e', fontWeight: isBest ? 700 : 400 }}>{i + 1}</td>
-                            <td style={{ ...TDL, color: col, fontWeight: 700 }}>{v.id}</td>
-                            <td style={{ ...TDL, color: '#d6d3d1' }}>{v.label}</td>
-                            <td style={{ ...TD, color: isBest ? '#4ade80' : '#d6d3d1', fontWeight: isBest ? 700 : 400 }}>
-                              {mae != null ? mae.toFixed(3) : '—'}
-                            </td>
-                            <td style={{ ...TD, color: delta != null && delta > 1 ? '#4ade80' : delta != null && delta < 0 ? '#f87171' : '#78716c' }}>
-                              {delta != null ? (delta > 0 ? '+' : '') + delta.toFixed(3) : '—'}
-                            </td>
-                            <td style={{ ...TDL, color: isProd ? '#60a5fa' : isBest ? '#fbbf24' : '#57534e', fontSize: 8, fontWeight: isBest || isProd ? 700 : 400 }}>
-                              {isProd ? 'production' : isBest ? '★ best' : ''}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {metrics.filter(v => maes[v.id] == null).map(v => (
-                        <tr key={v.id} style={{ borderBottom: '1px solid #1c1917' }}>
-                          <td style={{ ...TDL, color: '#292524' }}>—</td>
-                          <td style={{ ...TDL, color: VARIANT_COLORS[v.id] }}>{v.id}</td>
-                          <td style={{ ...TDL, color: '#44403c' }}>{v.label}</td>
-                          <td colSpan={3} style={{ ...TDL, color: '#44403c', fontSize: 8 }}>MAE not computed — window-rescaled variant</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Bandwidth comparison */}
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', ...MONO, marginBottom: 4 }}>
-                  Bandwidth &amp; Peak comparison
-                </div>
-                <div style={{ overflowX: 'auto', marginBottom: 12 }}>
-                  <table style={{ borderCollapse: 'collapse', minWidth: 480 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ ...THL, minWidth: 22 }}>ID</th>
-                        <th style={{ ...THL, minWidth: 200 }}>Variant</th>
-                        <th style={{ ...TH, minWidth: 80 }}>Peak |H|</th>
-                        <th style={{ ...TH, minWidth: 80 }}>−3 dB BW (Hz)</th>
-                        <th style={{ ...TH, minWidth: 80 }}>BW ratio vs A</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metrics.map(v => {
-                        const bwA = metrics[0].bw3dB;
-                        const bwRatio = (v.bw3dB != null && bwA != null && bwA > 0) ? v.bw3dB / bwA : null;
-                        const col = VARIANT_COLORS[v.id];
-                        return (
-                          <tr key={v.id} style={{ borderBottom: '1px solid #1c1917' }}>
-                            <td style={{ ...TDL, color: col, fontWeight: 700 }}>{v.id}</td>
-                            <td style={{ ...TDL, color: '#d6d3d1' }}>{v.label}</td>
-                            <td style={{ ...TD, color: '#d6d3d1' }}>{Number.isFinite(v.peakGain) ? v.peakGain.toFixed(4) : '—'}</td>
-                            <td style={{ ...TD, color: '#d6d3d1' }}>{v.bw3dB != null ? v.bw3dB.toFixed(2) : '—'}</td>
-                            <td style={{ ...TD, color: bwRatio != null && Math.abs(bwRatio - 1) > 0.05 ? '#fbbf24' : '#57534e' }}>
-                              {bwRatio != null ? bwRatio.toFixed(3) : '—'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Area comparison */}
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', ...MONO, marginBottom: 4 }}>
-                  Integrated Area comparison (∫|H| df over window)
-                </div>
-                <div style={{ overflowX: 'auto', marginBottom: 12 }}>
-                  <table style={{ borderCollapse: 'collapse', minWidth: 400 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ ...THL, minWidth: 22 }}>ID</th>
-                        <th style={{ ...THL, minWidth: 200 }}>Variant</th>
-                        <th style={{ ...TH, minWidth: 90 }}>∫|H| df</th>
-                        <th style={{ ...TH, minWidth: 80 }}>Area ratio vs A</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metrics.map(v => {
-                        const areaA = metrics[0].area;
-                        const ratio = (Number.isFinite(v.area) && Number.isFinite(areaA) && areaA > 0) ? v.area / areaA : null;
-                        const col = VARIANT_COLORS[v.id];
-                        return (
-                          <tr key={v.id} style={{ borderBottom: '1px solid #1c1917' }}>
-                            <td style={{ ...TDL, color: col, fontWeight: 700 }}>{v.id}</td>
-                            <td style={{ ...TDL, color: '#d6d3d1' }}>{v.label}</td>
-                            <td style={{ ...TD, color: '#d6d3d1' }}>{Number.isFinite(v.area) ? v.area.toFixed(4) : '—'}</td>
-                            <td style={{ ...TD, color: ratio != null && Math.abs(ratio - 1) > 0.05 ? '#fbbf24' : '#57534e' }}>
-                              {ratio != null ? ratio.toFixed(4) : '—'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Interpretation verdict */}
-                <div style={{ padding: '8px 12px', background: '#1c1917', borderRadius: 6, border: `1px solid ${isPrimaryDriver ? '#4ade80' : '#292524'}`, fontSize: 10, ...MONO, lineHeight: 1.9 }}>
-                  <div style={{ color: isPrimaryDriver ? '#4ade80' : '#60a5fa', fontWeight: 700, marginBottom: 3 }}>
-                    Interpretation @ {activeHz} Hz:
-                  </div>
-                  {improvement == null ? (
-                    <span style={{ color: '#57534e' }}>MAE comparison unavailable — check that a valid seat, sub, and room are configured.</span>
-                  ) : isPrimaryDriver ? (
-                    <span style={{ color: '#4ade80' }}>
-                      "Transfer-function implementation is a primary parity driver."
-                      Best alternative ({rankedByMAE[0]?.id}: {rankedByMAE[0]?.label}) reduces MAE by {improvement.toFixed(2)} dB
-                      ({maes['A']?.toFixed(2)} → {bestMAE?.toFixed(2)} dB).
-                    </span>
-                  ) : (
-                    <span style={{ color: '#d6d3d1' }}>
-                      "Transfer-function shape is not the primary cause."
-                      Best alternative ({rankedByMAE[0]?.id}: {rankedByMAE[0]?.label}) changes MAE by only {improvement.toFixed(2)} dB.
-                      Parity gap originates elsewhere (source amplitude, coupling, or geometry).
-                    </span>
-                  )}
-                  {improvement != null && (
-                    <div style={{ color: '#57534e', marginTop: 3, fontSize: 8 }}>
-                      Production MAE: {prodMAE?.toFixed(3)} dB · Best variant MAE: {bestMAE?.toFixed(3)} dB · Threshold: 1.0 dB
-                    </div>
-                  )}
-                </div>
-              </>
-            );
-          })()}
-        </>
-      )}
+          </tbody>
+        </table>
+      </div>
     </div>
+  );
+}
+
+// ── 6-question panel ──────────────────────────────────────────────────────────
+function SixQuestions({ result }) {
+  const { questions, broaderCount, lowerCount, slowPhCount, avgBwRatio, avgMeanAmpDiff, avgPhDiff, discrepancy, nullDepth, nullPt, peakPt } = result;
+  const items = [
+    {
+      q: '1. Are individual resonances broader than expected?',
+      a: questions.q1_broader
+        ? `⚠ YES — ${broaderCount}/10 analysed modes have BW ratio > 1.15×. Average BW ratio = ${f2(avgBwRatio)}. The resonant window of each mode is wider than the classical second-order prediction, causing adjacent modes to overlap and fill in nulls.`
+        : `✓ NO — only ${broaderCount}/10 modes exceed 1.15× bandwidth. BW ratio = ${f2(avgBwRatio)}. Resonance width is consistent with classical prediction.`,
+      warn: questions.q1_broader,
+    },
+    {
+      q: '2. Are individual resonances lower in amplitude than expected?',
+      a: questions.q2_lower
+        ? `⚠ YES — ${lowerCount}/10 modes produce less peak contribution than the coupling-corrected classical reference. Average amplitude difference = ${f2(avgMeanAmpDiff)} dB. Modal energy appears suppressed, preventing full constructive/destructive build-up.`
+        : `✓ NO — modal amplitudes are broadly consistent with the classical reference (avg diff = ${f2(avgMeanAmpDiff)} dB). Amplitude is not the primary suppressor.`,
+      warn: questions.q2_lower,
+    },
+    {
+      q: '3. Is phase rotating too slowly through resonance?',
+      a: questions.q3_phaseSlow
+        ? `⚠ YES — ${slowPhCount}/10 modes show > 20° deviation from the expected −90° phase at resonance. Average mean phase difference vs classical = ${f1(avgPhDiff)}°. Slow phase rotation means the destructive interference window is narrower than REW models it.`
+        : `✓ NO — phase at resonance tracks the classical −90° expectation closely. Average deviation = ${f1(avgPhDiff)}°.`,
+      warn: questions.q3_phaseSlow,
+    },
+    {
+      q: '4. Is the damping implementation broadening resonances?',
+      a: questions.q4_dampBroad
+        ? `⚠ YES — average BW ratio = ${f2(avgBwRatio)} (> 1.2). The B44 resonantTransfer() implementation applies Q clamping (Math.min(baseQ, absorptionQ)) which systematically caps Q before the resonance calculation. This is equivalent to adding extra artificial damping and directly broadens each peak.`
+        : `✓ MODERATE — BW ratio ${f2(avgBwRatio)} is within 20% of classical. The Q-clamp may have minor influence but is not the dominant broadening mechanism.`,
+      warn: questions.q4_dampBroad,
+    },
+    {
+      q: '5. Is coupling coefficient reducing peak contrast?',
+      a: questions.q5_couplingLow
+        ? `⚠ YES — one or more modes has coupling |sc × rc| < 0.2. Low coupling means the mode contributes little energy at this seat/source combination, so cancellation at the null frequency is incomplete — insufficient modal pressure to null the direct field.`
+        : `✓ NO — coupling coefficients are moderate to high for the contributing modes. Coupling is not the primary loss mechanism.`,
+      warn: questions.q5_couplingLow,
+    },
+    {
+      q: '6. Does the TF implementation explain shallow nulls better than geometry?',
+      a: questions.q6_tfExplains
+        ? `✓ YES — the transfer-function audit explains ${discrepancy.total}% of the discrepancy vs REW: bandwidth broadening (${discrepancy.bwContrib}%), phase error (${discrepancy.phContrib}%), coupling loss (${discrepancy.cplContrib}%), amplitude suppression (${discrepancy.ampContrib}%). The TF implementation is the dominant cause, ahead of geometry differences.`
+        : `~ PARTIAL — TF implementation explains only ~${discrepancy.total}% of the discrepancy. Geometric factors (sub position, room ratio) likely dominate the remaining gap.`,
+      warn: !questions.q6_tfExplains,
+    },
+  ];
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 11, fontFamily: 'monospace', color: '#0f172a', marginBottom: 6 }}>
+        Transfer Function Diagnosis — 6 Questions
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {items.map((item, i) => (
+          <div key={i} style={{ border: `1px solid ${item.warn ? '#fca5a5' : '#bbf7d0'}`, borderRadius: 6, background: item.warn ? '#fff7f7' : '#f0fdf4', padding: '6px 10px' }}>
+            <div style={{ fontWeight: 700, fontSize: 10, fontFamily: 'monospace', color: '#1e293b', marginBottom: 2 }}>{item.q}</div>
+            <div style={{ fontSize: 10, fontFamily: 'monospace', color: item.warn ? '#7f1d1d' : '#14532d', lineHeight: 1.55 }}>{item.a}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Discrepancy estimate banner ───────────────────────────────────────────────
+function DiscrepancyBanner({ discrepancy }) {
+  const { bwContrib, phContrib, cplContrib, ampContrib, total } = discrepancy;
+  return (
+    <div style={{ border: '2px solid #0f172a', borderRadius: 8, background: '#0f172a', padding: '10px 14px', marginBottom: 10 }}>
+      <div style={{ fontWeight: 700, fontSize: 11, fontFamily: 'monospace', color: '#f1f5f9', marginBottom: 6 }}>
+        Estimated discrepancy explained by modal TF implementation
+      </div>
+      <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#94a3b8', marginBottom: 8, lineHeight: 1.6 }}>
+        "Based on the measured transfer-function shapes, an estimated <span style={{ color: '#fbbf24', fontWeight: 700 }}>{total}%</span> of the remaining discrepancy versus REW is explained by the modal transfer-function implementation. The individual contributions are:"
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {[
+          { label: 'Bandwidth broadening', value: `${bwContrib}%`, color: '#f87171' },
+          { label: 'Phase rotation error', value: `${phContrib}%`, color: '#fb923c' },
+          { label: 'Coupling suppression', value: `${cplContrib}%`, color: '#facc15' },
+          { label: 'Amplitude suppression', value: `${ampContrib}%`, color: '#a3e635' },
+          { label: 'TOTAL TF contribution', value: `${total}%`, color: '#67e8f9' },
+        ].map((item, i) => (
+          <div key={i} style={{ border: `1px solid ${item.color}66`, borderRadius: 5, padding: '4px 12px', minWidth: 130, background: item.color + '11' }}>
+            <div style={{ fontSize: 9, fontFamily: 'monospace', color: '#94a3b8' }}>{item.label}</div>
+            <div style={{ fontWeight: 700, color: item.color, fontSize: 14, fontFamily: 'monospace' }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+export default function TransferFunctionShapeAudit({ roomDims, seatingPositions, subsForSimulation, surfaceAbsorption }) {
+  const [ran, setRan] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const activeSeat = useMemo(() =>
+    (seatingPositions || []).find(s => s.isPrimary) || seatingPositions?.[0] || null,
+    [seatingPositions]);
+
+  const seatPos = useMemo(() => {
+    if (!activeSeat) return null;
+    return { x: +activeSeat.x, y: +activeSeat.y, z: Number.isFinite(+activeSeat.z) ? +activeSeat.z : 1.2 };
+  }, [activeSeat]);
+
+  const canRun = !!(roomDims?.widthM && roomDims?.lengthM && roomDims?.heightM && seatPos && subsForSimulation?.length > 0);
+
+  function go() {
+    if (!canRun) return;
+    setRunning(true);
+    setTimeout(() => {
+      try {
+        const rdims = { widthM: +roomDims.widthM, lengthM: +roomDims.lengthM, heightM: +roomDims.heightM };
+        const sa = surfaceAbsorption || { front: 0.3, back: 0.3, left: 0.3, right: 0.3, ceiling: 0.3, floor: 0.3 };
+        const sub = subsForSimulation[0];
+        const source = { x: +sub.x, y: +sub.y, z: Number.isFinite(+sub.z) ? +sub.z : 0.35 };
+        setResult(runAudit(rdims, seatPos, source, sa));
+        setRan(true);
+      } catch (e) {
+        setResult({ error: e.message });
+        setRan(true);
+      }
+      setRunning(false);
+    }, 30);
+  }
+
+  return (
+    <details style={{ border: '2px solid #1e1b4b', borderRadius: 8, background: '#f8fafc', padding: '8px 10px', marginTop: 10 }}>
+      <summary style={{ fontWeight: 700, color: '#1e1b4b', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}>
+        📐 Individual Modal Transfer Function Audit – are individual modes too broad?
+      </summary>
+
+      <div style={{ marginTop: 8 }}>
+        <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#475569', marginBottom: 8, lineHeight: 1.6 }}>
+          Compares each mode's B44 <code>resonantTransfer()</code> against the classical second-order resonator H(f).
+          Reports BW, phase, coupling and amplitude per mode. <strong>No production changes. Diagnostic only.</strong>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+          <button onClick={go} disabled={!canRun || running}
+            style={{ height: 30, padding: '0 14px', borderRadius: 6, border: `1px solid ${canRun && !running ? '#1e1b4b' : '#d1d5db'}`, background: canRun && !running ? '#1e1b4b' : '#f3f4f6', color: canRun && !running ? '#fff' : '#9ca3af', fontSize: 11, fontFamily: 'monospace', fontWeight: 700, cursor: canRun && !running ? 'pointer' : 'not-allowed' }}>
+            {running ? 'Analysing…' : ran ? 'Re-run TF Audit' : 'Run TF Shape Audit'}
+          </button>
+          {!canRun && <span style={{ fontSize: 10, color: '#b45309', fontFamily: 'monospace' }}>Need room dims + seat + at least one sub.</span>}
+        </div>
+
+        {result?.error && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, padding: '8px 12px', color: '#b91c1c', fontSize: 11, fontFamily: 'monospace' }}>
+            ⚠ Engine error: {result.error}
+          </div>
+        )}
+
+        {result && !result.error && (
+          <>
+            {/* Summary stats */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {[
+                { label: 'Null freq', v: `${f1(result.nullPt?.hz)} Hz`, c: NULL_COLOR },
+                { label: 'Peak freq', v: `${f1(result.peakPt?.hz)} Hz`, c: PEAK_COLOR },
+                { label: 'Null depth', v: `${f1(result.nullDepth)} dB`, c: result.nullDepth < 15 ? NULL_COLOR : PEAK_COLOR },
+                { label: 'Avg BW ratio', v: f2(result.avgBwRatio), c: result.avgBwRatio > 1.2 ? NULL_COLOR : PEAK_COLOR },
+                { label: 'Broader modes', v: `${result.broaderCount}/10`, c: result.broaderCount > 3 ? NULL_COLOR : PEAK_COLOR },
+                { label: 'Slow-phase modes', v: `${result.slowPhCount}/10`, c: result.slowPhCount > 3 ? NULL_COLOR : '#475569' },
+                { label: 'Total TF explains', v: `${result.discrepancy.total}%`, c: result.discrepancy.total > 50 ? NULL_COLOR : '#0369a1' },
+              ].map((item, i) => (
+                <div key={i} style={{ border: `1px solid ${item.c}44`, borderRadius: 6, background: '#fff', padding: '4px 12px', minWidth: 110 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: '#94a3b8' }}>{item.label}</div>
+                  <div style={{ fontWeight: 700, color: item.c, fontSize: 13, fontFamily: 'monospace' }}>{item.v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Null modes */}
+            <ModeMetricsTable analysisArr={result.nullAnalysis} label={`🔴 Top-5 modes at DEEPEST NULL (${f1(result.nullPt?.hz)} Hz)`} color={NULL_COLOR} />
+            <TfOverlayChart analysis={result.nullAnalysis} cohSum={result.nullCohSum} centreHz={result.nullPt?.hz} label="DEEPEST NULL" color={NULL_COLOR} />
+
+            {/* Peak modes */}
+            <ModeMetricsTable analysisArr={result.peakAnalysis} label={`🟢 Top-5 modes at HIGHEST PEAK (${f1(result.peakPt?.hz)} Hz)`} color={PEAK_COLOR} />
+            <TfOverlayChart analysis={result.peakAnalysis} cohSum={result.peakCohSum} centreHz={result.peakPt?.hz} label="HIGHEST PEAK" color={PEAK_COLOR} />
+
+            {/* 6 questions */}
+            <SixQuestions result={result} />
+
+            {/* Final discrepancy estimate */}
+            <DiscrepancyBanner discrepancy={result.discrepancy} />
+
+            <div style={{ fontSize: 9, fontFamily: 'monospace', color: '#94a3b8', lineHeight: 1.5 }}>
+              Diagnostic only. Classical reference: H(f) = 1 / (fn²−f²+j·fn·f/Q). B44: resonantTransfer() from modalCalculations.js.
+              First sub used. axialQ=4.0. Absorption from live UI.
+            </div>
+          </>
+        )}
+      </div>
+    </details>
   );
 }
