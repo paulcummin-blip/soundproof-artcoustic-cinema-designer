@@ -61,38 +61,79 @@ export function computeRoomModesLocal({ widthM, lengthM, heightM, fMax, c = SPEE
 }
 
 /**
- * Estimate modal Q using Sabine's equation (six-surface absorption model).
- * Returns a value clamped to [1, 80].
+ * Estimate modal Q using Sabine's equation — topology-aware (2026-06-29).
+ * Each mode is damped primarily by the surface pairs on its active axes.
+ * Axial modes: one opposing pair at PRIMARY_WEIGHT, others at residual.
+ * Tangential: two active pairs at primary, one at residual.
+ * Oblique: all three pairs at equal primary weight.
+ * Falls back to global six-surface average when mode indices are not provided.
  *
  * @param {object} params
  * @param {{widthM:number, lengthM:number, heightM:number}} params.roomDims
  * @param {{front:number, back:number, left:number, right:number, floor:number, ceiling:number}} params.surfaceAbsorption
- * @param {number} params.f0  - Mode centre frequency in Hz
+ * @param {number} params.f0   - Mode centre frequency in Hz
+ * @param {{nx:number, ny:number, nz:number}} [params.mode] - Mode indices for topology weighting
  * @returns {number}
  */
-export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
+export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, mode }) {
   const widthM  = Number(roomDims?.widthM)  || 1;
   const lengthM = Number(roomDims?.lengthM) || 1;
   const heightM = Number(roomDims?.heightM) || 1;
   const volume  = widthM * lengthM * heightM;
 
-  const surfaceFloor   = lengthM * widthM;
-  const surfaceCeiling = lengthM * widthM;
-  const surfaceFront   = widthM  * heightM;
-  const surfaceBack    = widthM  * heightM;
-  const surfaceLeft    = lengthM * heightM;
-  const surfaceRight   = lengthM * heightM;
+  const sa = surfaceAbsorption || {};
+  const aFront   = sa.front   ?? 0.3;
+  const aBack    = sa.back    ?? 0.3;
+  const aLeft    = sa.left    ?? 0.3;
+  const aRight   = sa.right   ?? 0.3;
+  const aFloor   = sa.floor   ?? 0.3;
+  const aCeiling = sa.ceiling ?? 0.3;
 
-  const absorptionArea =
-    surfaceFloor   * (surfaceAbsorption?.floor   ?? 0.3) +
-    surfaceCeiling * (surfaceAbsorption?.ceiling ?? 0.3) +
-    surfaceFront   * (surfaceAbsorption?.front   ?? 0.3) +
-    surfaceBack    * (surfaceAbsorption?.back    ?? 0.3) +
-    surfaceLeft    * (surfaceAbsorption?.left    ?? 0.3) +
-    surfaceRight   * (surfaceAbsorption?.right   ?? 0.3);
+  const sFrontBack = widthM  * heightM;
+  const sLeftRight = lengthM * heightM;
+  const sFloorCeil = lengthM * widthM;
 
-  const rt60  = 0.161 * volume / Math.max(absorptionArea, 1e-6);
-  const tau   = rt60 / 13.815;
+  // If no mode indices supplied, fall back to original global average.
+  if (!mode || (mode.nx == null && mode.ny == null && mode.nz == null)) {
+    const absorptionArea =
+      sFloorCeil * aFloor   + sFloorCeil * aCeiling +
+      sFrontBack * aFront   + sFrontBack * aBack    +
+      sLeftRight * aLeft    + sLeftRight * aRight;
+    const rt60    = 0.161 * volume / Math.max(absorptionArea, 1e-6);
+    const tau     = rt60 / 13.815;
+    return Math.max(1, Math.min(80, 2 * Math.PI * f0 * tau));
+  }
+
+  // Topology weights: active-axis surface pairs carry PRIMARY_WEIGHT,
+  // inactive pairs share RESIDUAL_WEIGHT. Sums to 1.0.
+  const PRIMARY_WEIGHT  = 0.80;
+  const RESIDUAL_WEIGHT = 0.20;
+
+  const hasX = (mode.nx ?? 0) > 0; // width axis  → left/right walls
+  const hasY = (mode.ny ?? 0) > 0; // length axis → front/back walls
+  const hasZ = (mode.nz ?? 0) > 0; // height axis → floor/ceiling
+
+  const activeCount   = (hasX ? 1 : 0) + (hasY ? 1 : 0) + (hasZ ? 1 : 0);
+  const inactiveCount = 3 - activeCount;
+
+  const primaryShare  = activeCount   > 0 ? PRIMARY_WEIGHT  / activeCount  : 0;
+  const residualShare = inactiveCount > 0 ? RESIDUAL_WEIGHT / inactiveCount : 0;
+
+  const weightFrontBack = hasY ? primaryShare : residualShare; // ny axis
+  const weightLeftRight = hasX ? primaryShare : residualShare; // nx axis
+  const weightFloorCeil = hasZ ? primaryShare : residualShare; // nz axis
+
+  const aFrontBackMean = (aFront + aBack)     / 2;
+  const aLeftRightMean = (aLeft  + aRight)    / 2;
+  const aFloorCeilMean = (aFloor + aCeiling)  / 2;
+
+  const weightedAbsorption =
+    (2 * sFrontBack * aFrontBackMean * weightFrontBack) +
+    (2 * sLeftRight * aLeftRightMean * weightLeftRight) +
+    (2 * sFloorCeil * aFloorCeilMean * weightFloorCeil);
+
+  const rt60    = 0.161 * volume / Math.max(weightedAbsorption, 1e-6);
+  const tau     = rt60 / 13.815;
   const qSabine = 2 * Math.PI * f0 * tau;
 
   return Math.max(1, Math.min(80, qSabine));

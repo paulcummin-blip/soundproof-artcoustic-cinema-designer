@@ -41,28 +41,86 @@ export function computeRoomModesLocal({ widthM, lengthM, heightM, fMax, c = SPEE
   return modes.sort((a, b) => a.freq - b.freq);
 }
 
-export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0 }) {
+// Topology-aware modal Q estimation (2026-06-29).
+// Each mode is damped primarily by the surface pairs on its active axes.
+// Axial modes: one opposing surface pair at full weight, others at residual weight.
+// Tangential: two active surface pairs at full weight, one at residual.
+// Oblique: all three surface pairs at full weight.
+// This ensures front-wall absorption strongly affects length-axis modes
+// but barely affects height or width modes — matching physical reality.
+export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, mode }) {
   const widthM  = Number(roomDims?.widthM)  || 1;
   const lengthM = Number(roomDims?.lengthM) || 1;
   const heightM = Number(roomDims?.heightM) || 1;
   const volume  = widthM * lengthM * heightM;
 
-  const surfaceFloor   = lengthM * widthM;
-  const surfaceCeiling = lengthM * widthM;
-  const surfaceFront   = widthM  * heightM;
-  const surfaceBack    = widthM  * heightM;
-  const surfaceLeft    = lengthM * heightM;
-  const surfaceRight   = lengthM * heightM;
+  const sa = surfaceAbsorption || {};
+  const aFront   = sa.front   ?? 0.3;
+  const aBack    = sa.back    ?? 0.3;
+  const aLeft    = sa.left    ?? 0.3;
+  const aRight   = sa.right   ?? 0.3;
+  const aFloor   = sa.floor   ?? 0.3;
+  const aCeiling = sa.ceiling ?? 0.3;
 
-  const absorptionArea =
-    surfaceFloor   * (surfaceAbsorption?.floor   ?? 0.3) +
-    surfaceCeiling * (surfaceAbsorption?.ceiling ?? 0.3) +
-    surfaceFront   * (surfaceAbsorption?.front   ?? 0.3) +
-    surfaceBack    * (surfaceAbsorption?.back    ?? 0.3) +
-    surfaceLeft    * (surfaceAbsorption?.left    ?? 0.3) +
-    surfaceRight   * (surfaceAbsorption?.right   ?? 0.3);
+  // Surface areas
+  const sFrontBack = widthM  * heightM; // front and back walls (same area)
+  const sLeftRight = lengthM * heightM; // left and right walls (same area)
+  const sFloorCeil = lengthM * widthM;  // floor and ceiling (same area)
 
-  const rt60    = 0.161 * volume / Math.max(absorptionArea, 1e-6);
+  // Determine which axes are active from mode indices.
+  // Falls back to global average if mode is not provided (backwards compat).
+  const nx = mode?.nx ?? -1;
+  const ny = mode?.ny ?? -1;
+  const nz = mode?.nz ?? -1;
+  const hasX = nx > 0; // width axis — damped by left/right walls
+  const hasY = ny > 0; // length axis — damped by front/back walls
+  const hasZ = nz > 0; // height axis — damped by floor/ceiling
+
+  // If no mode info supplied, use the original global average (safe fallback).
+  if (nx < 0) {
+    const absorptionArea =
+      sFloorCeil * aFloor +
+      sFloorCeil * aCeiling +
+      sFrontBack * aFront +
+      sFrontBack * aBack +
+      sLeftRight * aLeft +
+      sLeftRight * aRight;
+    const rt60    = 0.161 * volume / Math.max(absorptionArea, 1e-6);
+    const tau     = rt60 / 13.815;
+    const qSabine = 2 * Math.PI * f0 * tau;
+    return Math.max(1, Math.min(80, qSabine));
+  }
+
+  // Primary weight: 0.80 on active-axis surface pairs, residual 0.20 shared equally
+  // across non-active pairs. This preserves a realistic contribution from all
+  // surfaces (scattering, edge diffraction) while making damping topology-sensitive.
+  const PRIMARY_WEIGHT  = 0.80;
+  const RESIDUAL_WEIGHT = 0.20;
+
+  const activeCount = (hasX ? 1 : 0) + (hasY ? 1 : 0) + (hasZ ? 1 : 0);
+  const inactiveCount = 3 - activeCount;
+
+  // Effective absorption per surface pair: primary axis surfaces get PRIMARY_WEIGHT,
+  // inactive axes split the residual equally.
+  const primaryShare  = activeCount  > 0 ? PRIMARY_WEIGHT  / activeCount  : 0;
+  const residualShare = inactiveCount > 0 ? RESIDUAL_WEIGHT / inactiveCount : 0;
+
+  const weightFrontBack = hasY ? primaryShare : residualShare;
+  const weightLeftRight = hasX ? primaryShare : residualShare;
+  const weightFloorCeil = hasZ ? primaryShare : residualShare;
+
+  const aFrontBackMean = (aFront + aBack) / 2;
+  const aLeftRightMean = (aLeft  + aRight)  / 2;
+  const aFloorCeilMean = (aFloor + aCeiling) / 2;
+
+  const weightedAbsorption =
+    (2 * sFrontBack * aFrontBackMean * weightFrontBack) +
+    (2 * sLeftRight * aLeftRightMean * weightLeftRight) +
+    (2 * sFloorCeil * aFloorCeilMean * weightFloorCeil);
+
+  // RT60 normalised to actual room surface (Sabine equation stays in consistent units).
+  // We weight the *absorption contribution* of each pair, not the surface area.
+  const rt60    = 0.161 * volume / Math.max(weightedAbsorption, 1e-6);
   const tau     = rt60 / 13.815;
   const qSabine = 2 * Math.PI * f0 * tau;
 

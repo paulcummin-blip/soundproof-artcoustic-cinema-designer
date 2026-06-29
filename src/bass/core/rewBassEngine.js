@@ -806,6 +806,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           roomDims: { widthM, lengthM, heightM },
           surfaceAbsorption,
           f0: mode.freq,
+          mode,  // pass mode indices for topology-aware absorption weighting
         });
         // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
         const isAxialOverride = options?.overrideConstantAxialQ === true && mode.type === 'axial';
