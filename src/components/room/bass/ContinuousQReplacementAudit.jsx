@@ -16,7 +16,7 @@
  */
 import React, { useState, useMemo, useCallback } from 'react';
 import { simulateBassResponseRewCore } from '@/bass/core/rewBassEngine';
-import { estimateModeQLocal, computeRoomModesLocal } from '@/bass/core/modalCalculations';
+import { estimateModeQLocal, computeRoomModesLocal, modeShapeValueLocal, resonantTransfer } from '@/bass/core/modalCalculations';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const FLAT_CURVE = [{ hz: 20, db: 94 }, { hz: 80, db: 94 }, { hz: 200, db: 94 }];
@@ -216,20 +216,8 @@ function buildVariants() {
 }
 
 // ── Run one variant using pre-patched mode Q values ─────────────────────────
-// Since the engine doesn't have arbitrary Q formula injection, we inject a
-// pre-computed qValue into each mode before the engine processes it.
-// We re-use the existing `overrideAbsorptionAxialQ` flag for variant B,
-// and for C/D/E we inject via the `_customQMode` path that we emulate
-// by computing modes externally and passing them via options._injectedModes.
-//
-// However, the engine doesn't accept _injectedModes. So for C/D/E we run a
-// thin wrapper: compute modes+Q externally, then call a minimal pressure
-// summation loop using the same resonantTransfer and modeShapeValueLocal
-// primitives — exactly matching the engine's modal-only path.
-import { modeShapeValueLocal, resonantTransfer } from '@/bass/core/modalCalculations';
-
-const SPEED_OF_SOUND = 343;
-const MIN_DIST = 0.01;
+// C/D/E: compute modes+Q externally, then run minimal pressure summation
+// using the same resonantTransfer and modeShapeValueLocal primitives.
 
 function runModalOnlyWithCustomQ(roomDims, seatPos, sub, modes, flatCurve = 94) {
   const W = roomDims.widthM, L = roomDims.lengthM, H = roomDims.heightM;
