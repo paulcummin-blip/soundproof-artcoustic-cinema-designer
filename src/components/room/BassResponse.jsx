@@ -1905,6 +1905,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
         rewOverlaySeries={rewOverlaySeries}
         liveProductionData={multiSeries[0]?.data ?? null}
       />

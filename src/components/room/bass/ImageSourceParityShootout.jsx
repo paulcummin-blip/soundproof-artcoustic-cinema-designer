@@ -23,6 +23,7 @@ import ModalOverlapBandwidthAudit from "./ModalOverlapBandwidthAudit";
 import ModalFrequencyOrderingAudit from "./ModalFrequencyOrderingAudit";
 import ModalGenerationPipelineAudit from "./ModalGenerationPipelineAudit";
 import DegenerateModeGroupingAudit from "./DegenerateModeGroupingAudit";
+import RawPressureViolenceAudit from "./RawPressureViolenceAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -177,7 +178,7 @@ function ShootoutChart({ rows, rewOverlaySeries, visibleTraces }) {
 }
 
 // --- Main component ---
-export default function ImageSourceParityShootout({ roomDims, seatingPositions, subsForSimulation, rewOverlaySeries, liveProductionData }) {
+export default function ImageSourceParityShootout({ roomDims, seatingPositions, subsForSimulation, surfaceAbsorption, rewOverlaySeries, liveProductionData }) {
   // ModalQDampingSweep is rendered after the shootout results section (see bottom of JSX)
   const [ran, setRan] = useState(false);
   const [results, setResults] = useState(null);
@@ -523,6 +524,15 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
 
       {/* Degenerate Mode Grouping Audit */}
       <DegenerateModeGroupingAudit />
+
+      {/* Raw Pressure Violence Audit */}
+      <RawPressureViolenceAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+        liveProductionData={liveProductionData}
+      />
     </details>
   );
 }
