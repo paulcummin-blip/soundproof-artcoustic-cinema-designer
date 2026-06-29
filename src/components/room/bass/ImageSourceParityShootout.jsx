@@ -6,6 +6,7 @@ import {
   fmt1, computeMAE, analyseResponse, computeEstimateMetrics, estimateMatchVerdict,
 } from "./shootoutHelpers";
 import ModalQDampingSweep from "./ModalQDampingSweep";
+import ModalFamilyExcitationAudit from "./ModalFamilyExcitationAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -414,6 +415,13 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
         liveProductionData={liveProductionData}
+      />
+
+      {/* Modal Family Excitation Audit — collapsed by default */}
+      <ModalFamilyExcitationAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
       />
     </details>
   );
