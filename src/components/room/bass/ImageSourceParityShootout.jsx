@@ -8,6 +8,7 @@ import {
 import ModalQDampingSweep from "./ModalQDampingSweep";
 import ModalFamilyExcitationAudit from "./ModalFamilyExcitationAudit";
 import CanonicalModalDeviationAudit from "./CanonicalModalDeviationAudit";
+import CorrectionContributionAudit from "./CorrectionContributionAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -427,6 +428,13 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
 
       {/* Canonical Modal Deviation Audit — collapsed by default */}
       <CanonicalModalDeviationAudit />
+
+      {/* Correction Contribution Audit — collapsed by default */}
+      <CorrectionContributionAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+      />
     </details>
   );
 }
