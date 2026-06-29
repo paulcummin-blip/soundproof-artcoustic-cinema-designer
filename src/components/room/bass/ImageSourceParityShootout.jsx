@@ -21,6 +21,7 @@ import MultiRoomQRegressionTest from "./MultiRoomQRegressionTest";
 import AbsorptionTrendTest from "./AbsorptionTrendTest";
 import ModalOverlapBandwidthAudit from "./ModalOverlapBandwidthAudit";
 import ModalFrequencyOrderingAudit from "./ModalFrequencyOrderingAudit";
+import ModalGenerationPipelineAudit from "./ModalGenerationPipelineAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -515,6 +516,9 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
 
       {/* Modal Frequency Ordering & Nearest-Neighbour Audit */}
       <ModalFrequencyOrderingAudit />
+
+      {/* Modal Generation Pipeline Audit */}
+      <ModalGenerationPipelineAudit />
     </details>
   );
 }
