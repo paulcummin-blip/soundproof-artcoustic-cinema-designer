@@ -18,6 +18,7 @@ import AbsorptionSensitivityAudit from "./AbsorptionSensitivityAudit";
 import ZeroAbsorptionQTest from "./ZeroAbsorptionQTest";
 import ContinuousQReplacementAudit from "./ContinuousQReplacementAudit";
 import MultiRoomQRegressionTest from "./MultiRoomQRegressionTest";
+import AbsorptionTrendTest from "./AbsorptionTrendTest";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -503,6 +504,9 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
       />
+
+      {/* Absorption Monotonicity / Physical Trend Test */}
+      <AbsorptionTrendTest />
     </details>
   );
 }
