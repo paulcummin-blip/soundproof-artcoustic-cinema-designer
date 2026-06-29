@@ -22,6 +22,7 @@ import AbsorptionTrendTest from "./AbsorptionTrendTest";
 import ModalOverlapBandwidthAudit from "./ModalOverlapBandwidthAudit";
 import ModalFrequencyOrderingAudit from "./ModalFrequencyOrderingAudit";
 import ModalGenerationPipelineAudit from "./ModalGenerationPipelineAudit";
+import DegenerateModeGroupingAudit from "./DegenerateModeGroupingAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -519,6 +520,9 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
 
       {/* Modal Generation Pipeline Audit */}
       <ModalGenerationPipelineAudit />
+
+      {/* Degenerate Mode Grouping Audit */}
+      <DegenerateModeGroupingAudit />
     </details>
   );
 }
