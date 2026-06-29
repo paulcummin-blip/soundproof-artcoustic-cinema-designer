@@ -875,10 +875,16 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // Seat-distance effects are already handled separately by sourceCoupling / receiverCoupling.
     const modalGainScalarOption = Number(options?.modalGainScalar);
     const modalGainScalar = Number.isFinite(modalGainScalarOption) ? modalGainScalarOption : 1.0;
-    // REW parity production default: distance_normalized aligns modal excitation with REW's implicit Green's
-    // function distance attenuation. Audit result (4.00×6.00×2.40 m): existing MAE 7.20 dB → distance_normalized 2.85 dB.
-    // Explicit callers that pass modalSourceReferenceMode still win — this only affects the unset case.
-    const modalSourceReferenceMode = options?.modalSourceReferenceMode || (rewParityModalPhase ? 'room_volume' : 'distance_normalized');
+    // __FIX_MODAL_EXCITATION_DECOUPLED__ 2026-06-29
+    // Modal excitation must NOT be attenuated by listener distance. Room modes are a global
+    // pressure field excited by the source injecting energy into the room — the listener position
+    // does not reduce that energy. Only the direct/reflection paths carry geometric distance loss.
+    // Previous default ('distance_normalized') was suppressing modal energy at the seating position
+    // by applying -20*log10(d/1m) to modal amplitude, causing the 30–40 Hz null to be too shallow
+    // and absorption sensitivity to be masked.
+    // 'existing' = pure 1m reference amplitude, no listener distance penalty. Direct/reflection
+    // paths are unchanged — they still carry full geometric 1/r attenuation per their own code paths.
+    const modalSourceReferenceMode = options?.modalSourceReferenceMode || (rewParityModalPhase ? 'room_volume' : 'existing');
     const modalStorageMode = options?.modalStorageMode || 'none';
     const modalSourceAmplitudeBase = Math.pow(10, (curveDb + source.tuning.gainDb) / 20) * modalGainScalar;
     const roomVolumeM3 = widthM * lengthM * heightM;
