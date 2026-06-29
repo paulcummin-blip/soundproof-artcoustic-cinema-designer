@@ -133,6 +133,20 @@ function freqDependentQCap(freqHz) {
   return 20;
 }
 
+// __CANDIDATE_SMOOTH_SOFT_CAP__
+// Smooth Soft Cap candidate (2026-06-29). Addresses Variant F over-violence.
+// Uses a smooth power-law curve Q(f) = A * (f^-n) instead of hard band steps.
+// Target anchor points: 30Hz→40, 60Hz→28, 100Hz→18, 160Hz→13, 220Hz→10.
+// Fit: A = 200, n ≈ 0.52 gives a smooth descent matching those anchors.
+// This prevents the band-edge discontinuities that caused Variant F's peak explosion.
+// DO NOT use in production without audit. Gated by qStrategy option.
+function smoothSoftQCap(freqHz) {
+  const A = 200;
+  const n = 0.52;
+  const cap = A / Math.pow(Math.max(freqHz, 1), n);
+  return Math.max(8, Math.min(45, cap));
+}
+
 // modeShapeValueLocal — imported from modalCalculations.js
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
@@ -810,6 +824,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         } else if (qStrategy === 'freq_dependent_cap') {
           const fdCap = freqDependentQCap(mode.freq);
           finalQValue = Math.max(1, Math.min(absorptionQ, fdCap));
+        } else if (qStrategy === 'smooth_soft_cap') {
+          // __CANDIDATE_SMOOTH_SOFT_CAP__ — smooth power-law Q ceiling, no hard band steps.
+          const softCap = smoothSoftQCap(mode.freq);
+          finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
         } else {
           finalQValue = Math.max(1, Math.min(baseQ, absorptionQ));
         }
