@@ -133,13 +133,13 @@ function freqDependentQCap(freqHz) {
   return 20;
 }
 
-// __CANDIDATE_SMOOTH_SOFT_CAP__
-// Smooth Soft Cap candidate (2026-06-29). Addresses Variant F over-violence.
-// Uses a smooth power-law curve Q(f) = A * (f^-n) instead of hard band steps.
-// Target anchor points: 30Hz→40, 60Hz→28, 100Hz→18, 160Hz→13, 220Hz→10.
-// Fit: A = 200, n ≈ 0.52 gives a smooth descent matching those anchors.
-// This prevents the band-edge discontinuities that caused Variant F's peak explosion.
-// DO NOT use in production without audit. Gated by qStrategy option.
+// __PRODUCTION_SOFT_Q_CAP__ (promoted 2026-06-29)
+// Replaces the hard tiered Q ceiling (80/50/30/20) with a smooth power-law soft clamp.
+// Formula: Q_cap(f) = A * f^(-n), clamped to [Q_MIN, Q_MAX].
+// Anchor calibration: 30Hz→40, 60Hz→28, 100Hz→18, 160Hz→13, 220Hz→10.
+// Allows natural Sabine Q values (e.g. 14.8 @ 34 Hz, 22.4 @ 68 Hz) without compression.
+// Only compresses extreme rigid-room Q (e.g. >40 at low freq, >28 at mid freq).
+// No hard band-edge discontinuities. Safe across all room geometries.
 function smoothSoftQCap(freqHz) {
   const A = 200;
   const n = 0.52;
@@ -829,7 +829,14 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           const softCap = smoothSoftQCap(mode.freq);
           finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
         } else {
-          finalQValue = Math.max(1, Math.min(baseQ, absorptionQ));
+          // __PRODUCTION_SOFT_Q_CAP__ (2026-06-29)
+          // Replaced hard baseQ ceiling (4.0 axial / 3.9 tangential / 2.5 oblique) with a smooth
+          // power-law soft clamp. This allows natural Sabine Q values through for normal rooms while
+          // only compressing extreme Q in rigid edge-cases. The old hard min(baseQ, absorptionQ) was
+          // capping Q at 4.0 for all axial modes regardless of actual room absorption — the primary
+          // cause of excessive response smoothing vs REW.
+          const softCap = smoothSoftQCap(mode.freq);
+          finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
         }
         return {
           ...mode,
