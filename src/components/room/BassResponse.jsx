@@ -36,6 +36,7 @@ import AcousticSolverShootoutBatch4 from "@/components/room/bass/AcousticSolverS
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import ImageSourceParityShootout from "@/components/room/bass/ImageSourceParityShootout";
+import QClampBypassABTest from "@/components/room/bass/QClampBypassABTest";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1908,6 +1909,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         surfaceAbsorption={surfaceAbsorption}
         rewOverlaySeries={rewOverlaySeries}
         liveProductionData={multiSeries[0]?.data ?? null}
+      />
+
+      {/* ── Q Clamp Bypass A/B Test — diagnostic only ── */}
+      <QClampBypassABTest
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
       />
 
       {/* ── Geometry & REW Import (collapsed) ── */}
