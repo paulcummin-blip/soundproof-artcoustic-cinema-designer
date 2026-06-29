@@ -10,6 +10,7 @@ import ModalFamilyExcitationAudit from "./ModalFamilyExcitationAudit";
 import CanonicalModalDeviationAudit from "./CanonicalModalDeviationAudit";
 import CorrectionContributionAudit from "./CorrectionContributionAudit";
 import CanonicalGreensFunctionAudit from "./CanonicalGreensFunctionAudit";
+import ModalExcitationChainAudit from "./ModalExcitationChainAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -439,6 +440,13 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
 
       {/* Canonical Green's Function Audit — collapsed by default */}
       <CanonicalGreensFunctionAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+      />
+
+      {/* Modal Excitation Chain Audit — collapsed by default */}
+      <ModalExcitationChainAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
