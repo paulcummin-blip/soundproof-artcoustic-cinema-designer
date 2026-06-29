@@ -37,6 +37,7 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import ImageSourceParityShootout from "@/components/room/bass/ImageSourceParityShootout";
 import QClampBypassABTest from "@/components/room/bass/QClampBypassABTest";
+import FreqDepQAuditPanel from "@/components/room/bass/FreqDepQAuditPanel";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -235,6 +236,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
+  // __CANDIDATE_FREQ_DEP_Q__ — Q strategy selector. Default = production (unchanged).
+  const [qStrategy, setQStrategy] = useState('production');
   // Active test engine — set by RewRefinedEngineShootout promote button via window.__B44_ACTIVE_TEST_ENGINE__
   const [activeTestEngine, setActiveTestEngine] = useState(null);
   const lastStablePlotRef = useRef(null);
@@ -630,6 +633,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             rewParityModalMagnitudeScale: rewSourceCurveMode === 'flat_rew_reference' ? rewParityModalMagnitudeScale : 1.0, // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
             modalCoherenceMode, // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
             highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
+            qStrategy, // __CANDIDATE_FREQ_DEP_Q__
             }
         );
 
@@ -686,7 +690,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
       activeModalVectorPath: __b44ActiveModalVectorPath,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, qStrategy]);
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -1803,16 +1807,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Graph scale:</span>
-            <select
-              value={graphScaleMode}
-              onChange={e => setGraphScaleMode(e.target.value)}
-              style={{ height: 26, borderRadius: 6, border: '1px solid #DCDBD6', background: '#F8F8F7', fontSize: 11, padding: '0 6px', color: '#1B1A1A', fontFamily: 'monospace', cursor: 'pointer' }}
-            >
-              <option value="rew_fixed">REW-style fixed</option>
-              <option value="auto">Auto</option>
-            </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Q strategy:</span>
+              <select
+                value={qStrategy}
+                onChange={e => setQStrategy(e.target.value)}
+                style={{
+                  height: 26, borderRadius: 6, fontSize: 11, padding: '0 6px', fontFamily: 'monospace', cursor: 'pointer',
+                  border: qStrategy === 'freq_dependent_cap' ? '1px solid #2563eb' : '1px solid #DCDBD6',
+                  background: qStrategy === 'freq_dependent_cap' ? '#eff6ff' : '#F8F8F7',
+                  color: qStrategy === 'freq_dependent_cap' ? '#1e40af' : '#1B1A1A',
+                  fontWeight: qStrategy === 'freq_dependent_cap' ? 700 : 400,
+                }}
+              >
+                <option value="production">Production (static ceiling)</option>
+                <option value="freq_dependent_cap">⚡ Freq-dep cap — candidate</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Graph scale:</span>
+              <select
+                value={graphScaleMode}
+                onChange={e => setGraphScaleMode(e.target.value)}
+                style={{ height: 26, borderRadius: 6, border: '1px solid #DCDBD6', background: '#F8F8F7', fontSize: 11, padding: '0 6px', color: '#1B1A1A', fontFamily: 'monospace', cursor: 'pointer' }}
+              >
+                <option value="rew_fixed">REW-style fixed</option>
+                <option value="auto">Auto</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -1896,6 +1919,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
       </div>
 
+      {/* ── Active Q Strategy Label ── */}
+      {qStrategy === 'freq_dependent_cap' && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#1e40af', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
+          ⚡ Q strategy: Freq-Dep Cap (Variant F) — candidate mode
+        </div>
+      )}
+
       {/* ── Null Depth Audit Badge ── */}
       {multiSeries.length > 0 && multiSeries[0]?.data?.length > 0 && (
         <NullDepthAuditBadge rawData={multiSeries[0].data} />
@@ -1916,6 +1946,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
+      />
+
+      {/* ── Freq-Dep Q Audit Panel — Production vs Variant F ── */}
+      <FreqDepQAuditPanel
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+        rewOverlaySeries={rewOverlaySeries}
+        qStrategy={qStrategy}
       />
 
       {/* ── Geometry & REW Import (collapsed) ── */}

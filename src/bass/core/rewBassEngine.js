@@ -120,6 +120,19 @@ function estimateModeQByType(mode, axialQOverride = 4.0) {
   return 2.5;
 }
 
+// __CANDIDATE_FREQ_DEP_Q__
+// Variant F: frequency-dependent Q cap from Damping Bandwidth Parity Audit (2026-06-29).
+// Replaces the static baseQ ceiling with a cap that decreases with frequency,
+// matching the observed increasing modal density and boundary damping in REW.
+// Formula: finalQ = Math.max(1, Math.min(sabineQ, frequencyDependentCap(f)))
+// DO NOT use in production without further audit. Gated by qStrategy option.
+function freqDependentQCap(freqHz) {
+  if (freqHz < 50)  return 80;
+  if (freqHz < 85)  return 50;
+  if (freqHz < 160) return 30;
+  return 20;
+}
+
 // modeShapeValueLocal — imported from modalCalculations.js
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
@@ -781,19 +794,28 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           f0: mode.freq,
         });
         // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
-        // When overrideConstantAxialQ is true, axial modes bypass the Sabine absorptionQ clamp
-        // and use the user baseQ directly. Tangential and oblique modes are unaffected.
         const isAxialOverride = options?.overrideConstantAxialQ === true && mode.type === 'axial';
         // __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__
-        // When overrideAbsorptionAxialQ is true, axial modes use absorptionQ directly,
-        // bypassing the Math.min(baseQ, absorptionQ) clamp entirely.
-        // Tangential and oblique modes are unaffected.
         const isAbsorptionAxialOverride = options?.overrideAbsorptionAxialQ === true && mode.type === 'axial';
+        // __CANDIDATE_FREQ_DEP_Q__
+        // When qStrategy === 'freq_dependent_cap', replace the static baseQ ceiling with a
+        // frequency-dependent cap. Raw Sabine Q is used (absorptionQ), clamped per band.
+        // Production path (default) is unchanged.
+        const qStrategy = options?.qStrategy || 'production';
+        let finalQValue;
+        if (isAxialOverride) {
+          finalQValue = baseQ;
+        } else if (isAbsorptionAxialOverride) {
+          finalQValue = absorptionQ;
+        } else if (qStrategy === 'freq_dependent_cap') {
+          const fdCap = freqDependentQCap(mode.freq);
+          finalQValue = Math.max(1, Math.min(absorptionQ, fdCap));
+        } else {
+          finalQValue = Math.max(1, Math.min(baseQ, absorptionQ));
+        }
         return {
           ...mode,
-          qValue: isAxialOverride ? baseQ
-            : isAbsorptionAxialOverride ? absorptionQ
-            : Math.max(1, Math.min(baseQ, absorptionQ)),
+          qValue: finalQValue,
         };
       })
     : [];
