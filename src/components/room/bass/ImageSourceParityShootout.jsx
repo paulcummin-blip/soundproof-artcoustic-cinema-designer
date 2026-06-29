@@ -24,6 +24,7 @@ import ModalFrequencyOrderingAudit from "./ModalFrequencyOrderingAudit";
 import ModalGenerationPipelineAudit from "./ModalGenerationPipelineAudit";
 import DegenerateModeGroupingAudit from "./DegenerateModeGroupingAudit";
 import RawPressureViolenceAudit from "./RawPressureViolenceAudit";
+import ModalEnergyContributionAudit from "./ModalEnergyContributionAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -524,6 +525,14 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
 
       {/* Degenerate Mode Grouping Audit */}
       <DegenerateModeGroupingAudit />
+
+      {/* Modal Energy Contribution Audit */}
+      <ModalEnergyContributionAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
 
       {/* Raw Pressure Violence Audit */}
       <RawPressureViolenceAudit
