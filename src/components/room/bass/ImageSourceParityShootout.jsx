@@ -19,6 +19,7 @@ import ZeroAbsorptionQTest from "./ZeroAbsorptionQTest";
 import ContinuousQReplacementAudit from "./ContinuousQReplacementAudit";
 import MultiRoomQRegressionTest from "./MultiRoomQRegressionTest";
 import AbsorptionTrendTest from "./AbsorptionTrendTest";
+import ModalOverlapBandwidthAudit from "./ModalOverlapBandwidthAudit";
 
 // --- Engine constants ---
 const FLAT_SOURCE_CURVE = [{ hz: 20, db: 94 }, { hz: 50, db: 94 }, { hz: 100, db: 94 }, { hz: 200, db: 94 }];
@@ -507,6 +508,9 @@ export default function ImageSourceParityShootout({ roomDims, seatingPositions, 
 
       {/* Absorption Monotonicity / Physical Trend Test */}
       <AbsorptionTrendTest />
+
+      {/* Modal Overlap & Resonance Bandwidth Audit */}
+      <ModalOverlapBandwidthAudit />
     </details>
   );
 }
