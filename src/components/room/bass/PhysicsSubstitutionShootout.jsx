@@ -26,6 +26,7 @@ import {
   resonantTransfer,
 } from '@/bass/core/modalCalculations';
 import { REW_ESTIMATE, fmt1, computeEstimateMetrics, computeMAE } from './shootoutHelpers';
+import RegionalPhysicsAttributionAudit from './RegionalPhysicsAttributionAudit';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const C = 343;
@@ -642,6 +643,13 @@ export default function PhysicsSubstitutionShootout({
           </>
         )}
       </div>
+      {/* Regional Physics Attribution Audit — nested below shootout */}
+      <RegionalPhysicsAttributionAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
     </details>
   );
 }
