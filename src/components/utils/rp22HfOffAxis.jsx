@@ -440,10 +440,45 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   // Get model metadata for aim offset and dispersion
   const meta = getSpeakerModelMeta(modelKey);
   const aimOffsetDeg = meta?.builtInTiltDeg ?? getOverheadTiltDeg(modelKey) ?? 0;
-
-  // Built-in tilt reduces effective off-axis angle (simple discount)
   const tiltDeg = Number.isFinite(aimOffsetDeg) ? Number(aimOffsetDeg) : 0;
-  const effectiveAngleDeg = Math.max(0, rawAngleDeg - tiltDeg);
+
+  // Vector-based acoustic axis for speakers where aimTiltAtRsp === true
+  // (e.g. Spitfire Cloud: 22.5° tilt aimed toward the RSP)
+  let effectiveAngleDeg;
+  const useVectorTilt =
+    meta?.aimTiltAtRsp === true &&
+    tiltDeg > 0 &&
+    rspPos && isNum(rspPos.x) && isNum(rspPos.y);
+
+  if (useVectorTilt) {
+    const dx = rspPos.x - spk.x;
+    const dy = rspPos.y - spk.y;
+    const hLen = Math.hypot(dx, dy);
+
+    if (hLen > 1e-4) {
+      // Horizontal unit vector from speaker toward RSP
+      const aimX = dx / hLen;
+      const aimY = dy / hLen;
+
+      // Acoustic axis vector: straight-down rotated tiltDeg toward RSP
+      const tiltRad = tiltDeg * Math.PI / 180;
+      const axis = {
+        x: aimX * Math.sin(tiltRad),
+        y: aimY * Math.sin(tiltRad),
+        z: -Math.cos(tiltRad),
+      };
+
+      // Angle between acoustic axis and speaker→seat vector
+      const ang2 = angleBetweenDeg(axis, seatVec);
+      effectiveAngleDeg = Number.isFinite(ang2) ? ang2 : rawAngleDeg;
+    } else {
+      // RSP is directly below speaker — fall back to scalar
+      effectiveAngleDeg = Math.max(0, rawAngleDeg - tiltDeg);
+    }
+  } else {
+    // Original scalar behaviour — unchanged for all existing models
+    effectiveAngleDeg = Math.max(0, rawAngleDeg - tiltDeg);
+  }
 
   // Use model-specific dispersion windows if available
   // For overheads: use MAX(horizontal, vertical) per threshold (forgiving approach)
@@ -516,8 +551,10 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
     debug: {
       modelKey,
       rawAngleDeg,        // angle between straight-down axis and speaker→seat vector
-      aimOffsetDeg,       // built-in scalar tilt reduction (5° or 20°)
-      effectiveAngleDeg,  // rawAngleDeg - aimOffsetDeg (clamped to 0)
+      aimOffsetDeg,       // built-in tilt degrees
+      aimTiltAtRsp: meta?.aimTiltAtRsp ?? false,
+      useVectorTilt,      // true = vector path used; false = scalar fallback
+      effectiveAngleDeg,  // final off-axis angle used for scoring
       dispersionWindows: meta?.dispersion?.horizontal ? {
         minus1p5dB: meta.dispersion.horizontal.minus1p5dB ?? meta.dispersion.horizontal.minus1p5 ?? null,
         minus3dB: meta.dispersion.horizontal.minus3dB ?? meta.dispersion.horizontal.minus3 ?? null,

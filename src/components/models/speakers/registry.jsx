@@ -152,6 +152,39 @@ export const MODELS = [
     }
   },
 
+  { 
+    key: "spitfire-cloud", 
+    label: "Spitfire Cloud", 
+    category: "ARCHITECT", 
+    diameterMm: 300, 
+    depthMm: 73, 
+    round: true, 
+    sensitivity_dB_1w1m: 98, 
+    sensitivity_dB_2p83: 98, 
+    nominalOhms: 4, 
+    max_power: 120,
+    max_spl_cont_db_1m_halfspace: 114,
+    max_spl_peak_db_cf6_1m_halfspace: 120,
+    max_spl_cont_db_1m_anechoic: 108,
+    max_spl_peak_db_cf6_1m_anechoic: 114,
+    frequency_response_low: 100,
+    usable_lf_hz_minus6db: 97,
+    builtInTiltDeg: 22.5,
+    aimTiltAtRsp: true,
+    dispersion: {
+      horizontal: {
+        minus1p5dB: 45,
+        minus3dB: 45,
+        minus5dB: 45,
+      },
+      vertical: {
+        minus1p5dB: 22,
+        minus3dB: 22,
+        minus5dB: 22,
+      }
+    }
+  },
+
   // SUBWOOFERS — EXACT ORDER
   { 
     key: "sub2-12", 
@@ -306,6 +339,7 @@ export function getSpeakerModelMeta(modelName, orientation) {
       max_spl_peak_db_cf6_1m_anechoic: hit.max_spl_peak_db_cf6_1m_anechoic ?? null,
       hfOffAxis16k: finalHfOffAxis16k,
       builtInTiltDeg: hit.builtInTiltDeg ?? null,
+      aimTiltAtRsp: hit.aimTiltAtRsp ?? false,
       dispersion: finalDispersion,
       frequency_response_curve: hit.frequency_response_curve ?? null,
       price_gbp_exVat: hit.price_gbp_exVat ?? null,
@@ -364,6 +398,7 @@ export function getSpeakerModelMeta(modelName, orientation) {
     recommended_hpf_slope: hit.recommended_hpf_slope ?? null,
     hfOffAxis16k: finalHfOffAxis16k,
     builtInTiltDeg: hit.builtInTiltDeg ?? null,
+    aimTiltAtRsp: hit.aimTiltAtRsp ?? false,
     dispersion: finalDispersion,
     frequency_response_curve: hit.frequency_response_curve ?? null,
     price_gbp_exVat: hit.price_gbp_exVat ?? null,
