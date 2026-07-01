@@ -122,7 +122,7 @@ export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, mode }) {
   // Applies only to modes below 50 Hz, only to weightedAbsorption, before Q calc.
   // Does not touch Q cap, resonantTransfer, modal summation, family scales,
   // highOrderAxialScale, storageFactor, or modalGainScalar.
-  const LOW_FREQ_DAMPING_TEST_THRESHOLD_HZ = 50;
+  const LOW_FREQ_DAMPING_TEST_THRESHOLD_HZ = 55;
   const lowFreqDampingMultiplier = 1.5;
   if (Number.isFinite(f0) && f0 < LOW_FREQ_DAMPING_TEST_THRESHOLD_HZ) {
     weightedAbsorption = weightedAbsorption * lowFreqDampingMultiplier;
