@@ -113,10 +113,20 @@ export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, mode }) {
   const aLeftRightMean = (aLeft  + aRight)  / 2;
   const aFloorCeilMean = (aFloor + aCeiling) / 2;
 
-  const weightedAbsorption =
+  let weightedAbsorption =
     (2 * sFrontBack * aFrontBackMean * weightFrontBack) +
     (2 * sLeftRight * aLeftRightMean * weightLeftRight) +
     (2 * sFloorCeil * aFloorCeilMean * weightFloorCeil);
+
+  // TEMPORARY TEST ONLY (2026-07-01): low-frequency damping multiplier.
+  // Applies only to modes below 50 Hz, only to weightedAbsorption, before Q calc.
+  // Does not touch Q cap, resonantTransfer, modal summation, family scales,
+  // highOrderAxialScale, storageFactor, or modalGainScalar.
+  const LOW_FREQ_DAMPING_TEST_THRESHOLD_HZ = 50;
+  const lowFreqDampingMultiplier = 1.5;
+  if (Number.isFinite(f0) && f0 < LOW_FREQ_DAMPING_TEST_THRESHOLD_HZ) {
+    weightedAbsorption = weightedAbsorption * lowFreqDampingMultiplier;
+  }
 
   // RT60 normalised to actual room surface (Sabine equation stays in consistent units).
   // We weight the *absorption contribution* of each pair, not the surface area.
