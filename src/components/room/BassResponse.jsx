@@ -232,7 +232,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [modalCoherenceMode, setModalCoherenceMode] = useState('coherent');
   // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
   // Diagnostic scale applied to axial modes with order >= 2. Default 1.00 = no change.
-  const [highOrderAxialScale, setHighOrderAxialScale] = useState(1.0);
+  const [highOrderAxialScale, setHighOrderAxialScale] = useState(0.80); // __TEMP_PRODUCTION_PATH_TEST__ single-scalar test, revert after reporting
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
