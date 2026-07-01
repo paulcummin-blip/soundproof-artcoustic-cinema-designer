@@ -22,6 +22,7 @@
 
 import { computeSlidingOctaveDeviation } from "@/components/utils/rp22/slidingOctaveEngine";
 import { validatePolarModel } from "@/components/utils/rp22/polarModelValidation";
+import { loadMeasuredDataset } from "@/components/utils/rp22/measuredDatasetLoader";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -63,7 +64,21 @@ export function estimatePredictedResponse({ polarModel, horizontalOffAxisAngle, 
       horizontalOffAxisAngle: isNum(horizontalOffAxisAngle) ? horizontalOffAxisAngle : null,
       verticalOffAxisAngle: isNum(verticalOffAxisAngle) ? verticalOffAxisAngle : null,
       missingMeasuredData: true,
-      missingDataReason: validation.missingDataWarnings[0] || "No measured polar dataset available.",
+      missingDataReason: "Measured dataset unavailable",
+    };
+  }
+
+  // Resolve the named dataset (never embedded on polarModel itself — see file header).
+  const dataset = loadMeasuredDataset(polarModel.dataset);
+  if (!dataset.found) {
+    return {
+      predictedResponse: null,
+      selectedHorizontalAngle: null,
+      selectedVerticalAngle: null,
+      horizontalOffAxisAngle: isNum(horizontalOffAxisAngle) ? horizontalOffAxisAngle : null,
+      verticalOffAxisAngle: isNum(verticalOffAxisAngle) ? verticalOffAxisAngle : null,
+      missingMeasuredData: true,
+      missingDataReason: "Measured dataset unavailable",
     };
   }
 
@@ -71,11 +86,11 @@ export function estimatePredictedResponse({ polarModel, horizontalOffAxisAngle, 
   const targetH = isNum(devOverride?.forceHorizontalDeg) ? devOverride.forceHorizontalDeg : horizontalOffAxisAngle;
   const targetV = isNum(devOverride?.forceVerticalDeg) ? devOverride.forceVerticalDeg : verticalOffAxisAngle;
 
-  const selectedHorizontalAngle = findNearestMeasuredAngle(polarModel.horizontalAngles, targetH);
-  const selectedVerticalAngle = findNearestMeasuredAngle(polarModel.verticalAngles, targetV);
+  const selectedHorizontalAngle = findNearestMeasuredAngle(dataset.horizontalAngles, targetH);
+  const selectedVerticalAngle = findNearestMeasuredAngle(dataset.verticalAngles, targetV);
 
-  const hCurve = polarModel.horizontalDataset?.[selectedHorizontalAngle];
-  const vCurve = polarModel.verticalDataset?.[selectedVerticalAngle];
+  const hCurve = dataset.horizontal?.[selectedHorizontalAngle];
+  const vCurve = dataset.vertical?.[selectedVerticalAngle];
 
   if (!Array.isArray(hCurve) || !hCurve.length || !Array.isArray(vCurve) || !vCurve.length) {
     return {
@@ -85,7 +100,7 @@ export function estimatePredictedResponse({ polarModel, horizontalOffAxisAngle, 
       horizontalOffAxisAngle: isNum(horizontalOffAxisAngle) ? horizontalOffAxisAngle : null,
       verticalOffAxisAngle: isNum(verticalOffAxisAngle) ? verticalOffAxisAngle : null,
       missingMeasuredData: true,
-      missingDataReason: "Selected measured angle has no dataset — missing measured data.",
+      missingDataReason: "Measured dataset unavailable",
     };
   }
 
