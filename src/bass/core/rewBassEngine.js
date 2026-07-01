@@ -839,6 +839,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           const softCap = smoothSoftQCap(mode.freq);
           finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
         }
+        // __TEMP_LOW_MODE_AXIAL_Q_TEST__ (2026-07-01) — controlled, revertible test.
+        // Scope: axial modes with mode.freq in [25, 45] Hz only. Halves Q for this
+        // narrow band only — no effect on tangential/oblique modes, modes outside
+        // this band, gain, phase, coupling, or smoothing. Revert by deleting this block.
+        if (mode.type === 'axial' && mode.freq >= 25 && mode.freq <= 45) {
+          finalQValue = finalQValue * 0.50;
+        }
         return {
           ...mode,
           qValue: finalQValue,
