@@ -38,6 +38,7 @@ import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigation
 import ImageSourceParityShootout from "@/components/room/bass/ImageSourceParityShootout";
 import QClampBypassABTest from "@/components/room/bass/QClampBypassABTest";
 import FreqDepQAuditPanel from "@/components/room/bass/FreqDepQAuditPanel";
+import LiveModalContributorAudit from "@/components/room/bass/LiveModalContributorAudit";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -1952,6 +1953,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
+      />
+
+      {/* ── Live Modal Contributor Audit — temporary diagnostic ── */}
+      <LiveModalContributorAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
       />
 
       {/* ── Freq-Dep Q Audit Panel — Production vs Variant F ── */}
