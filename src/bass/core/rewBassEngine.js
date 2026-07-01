@@ -358,7 +358,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       ? modeOrder === 1
         ? 1.0
         : modeOrder === 2
-          ? 0.65
+          ? 0.45
           : 0.30
       : axialLightStorageFactor;
 

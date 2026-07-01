@@ -613,8 +613,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             modalSourceReferenceMode: _finalModalRefMode,
             modalGainScalar: _engineModalGainScalar,
             axialQ,
-            modalStorageMode: 'orderCompression', // __TEMP_TEST__ forced for storageFactor A/B test — revert after test
-
+            modalStorageMode,
             propagationPhaseScale, // Uses state value (default 0.10 for REW parity)
             pureDeterministicModalSum: rewSourceCurveMode === 'flat_rew_reference', // forced true for REW parity preset only
             disableReflectionPhaseJitter,
