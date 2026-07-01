@@ -8,7 +8,7 @@
 //
 // This file contains NO measurement data. It only reads whatever the dataset module exports.
 
-import { getMeasuredDatasetModule } from "@/components/data/polar/index";
+import { getMeasuredDatasetModule, preloadMeasuredDataset } from "@/components/data/polar/index";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -83,6 +83,22 @@ export function loadMeasuredDataset(datasetName) {
   const vertical = mod.vertical || {};
   const horizontalAngles = discoverAngles(horizontal);
   const verticalAngles = discoverAngles(vertical);
+
+  if (!horizontalAngles.length && !verticalAngles.length) {
+    // Dataset module exists but hasn't been fetched into cache yet — kick off the background
+    // fetch (fire-and-forget) so a subsequent call succeeds, and report unavailable for now.
+    preloadMeasuredDataset(datasetName);
+    return {
+      found: false,
+      horizontal: null,
+      vertical: null,
+      horizontalAngles: [],
+      verticalAngles: [],
+      frequencyRange: { lowHz: null, highHz: null },
+      frequencyResolution: { pointCount: 0, uniform: true, distinctGapsHz: [] },
+      missingDataWarnings: [`Measured dataset unavailable: "${datasetName}" is still loading.`],
+    };
+  }
 
   const warnings = [];
   if (!horizontalAngles.length) warnings.push(`Measured dataset unavailable: no horizontal angles found for "${datasetName}".`);
