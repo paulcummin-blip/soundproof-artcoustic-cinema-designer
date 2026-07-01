@@ -7,6 +7,10 @@
 
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { resolveSpeakerYaw } from "@/components/utils/speakerAimResolver";
+// RP22 P17 MEASURED ENGINE — Stage 1 scaffolding (inactive until a registry model declares
+// polarModel.type === "measured" with real PAS/FRD data). See measuredP17Engine.jsx header.
+import { computeMeasuredP17Response } from "@/components/utils/rp22/measuredP17Engine";
+import { validatePolarModel } from "@/components/utils/rp22/polarModelValidation";
 
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
 const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC", "TRL", "TRR"]);
@@ -577,6 +581,68 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
   
   if (!pos || !isNum(pos.x) || !isNum(pos.y)) return null;
 
+  // --- DUAL-MODE: measured polar model support (Stage 1 scaffolding) ---
+  // If this speaker model declares polarModel.type === "measured" AND its dataset is complete,
+  // use the measured P17 engine instead of the estimated dispersion-window path below. If
+  // polarModel is missing/incomplete (true for every current speaker), we safely fall through
+  // to the existing estimated path — guaranteeing zero behaviour change for existing speakers.
+  if (modelMeta?.polarModel?.type === "measured" && validatePolarModel(modelMeta.polarModel).readyForMeasuredP17) {
+    // Horizontal off-axis: reuse the same azimuth geometry already used for bed-layer surrounds.
+    const seatAzDeg = angleFromTo(pos, seat);
+    const resolvedYaw = resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole });
+    const horizontalOffAxisAngle = (isNum(seatAzDeg) && isNum(resolvedYaw))
+      ? shortestAngleDeg(seatAzDeg, resolvedYaw)
+      : null;
+
+    // Vertical off-axis: reuse the same straight-axis + tilt geometry already used for
+    // overheads, using the polarModel's own axisTiltDeg instead of the registry's builtInTiltDeg.
+    const spk3 = spkXYZ({ position: speaker.position }, roomHeightM);
+    const seat3 = seatXYZ(seat);
+    const downAxis = { x: 0, y: 0, z: -1 };
+    const seatVec3 = { x: seat3.x - spk3.x, y: seat3.y - spk3.y, z: seat3.z - spk3.z };
+    const rawVertAngle = angleBetweenDeg(downAxis, seatVec3);
+    const tiltDeg = isNum(modelMeta.polarModel.axisTiltDeg) ? modelMeta.polarModel.axisTiltDeg : 0;
+    const verticalOffAxisAngle = isNum(rawVertAngle) ? Math.max(0, rawVertAngle - tiltDeg) : null;
+
+    // RSP reference angles, for the seat-vs-RSP comparison inside the measured engine.
+    const rspAzDeg = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? angleFromTo(pos, mlpPos) : seatAzDeg;
+    const rspHorizontalOffAxisAngle = (isNum(rspAzDeg) && isNum(resolvedYaw))
+      ? shortestAngleDeg(rspAzDeg, resolvedYaw)
+      : horizontalOffAxisAngle;
+    const rspSeat3 = mlpPos ? seatXYZ(mlpPos) : seat3;
+    const rspSeatVec3 = { x: rspSeat3.x - spk3.x, y: rspSeat3.y - spk3.y, z: rspSeat3.z - spk3.z };
+    const rspRawVertAngle = angleBetweenDeg(downAxis, rspSeatVec3);
+    const rspVerticalOffAxisAngle = isNum(rspRawVertAngle) ? Math.max(0, rspRawVertAngle - tiltDeg) : verticalOffAxisAngle;
+
+    // Development-only validation mode override — forces the measured lookup to a specific
+    // measured angle. Inactive in production; set via globalThis for dev testing only.
+    const devOverride = (typeof globalThis.__B44_P17_VALIDATION_OVERRIDE__ === "object" && globalThis.__B44_P17_VALIDATION_OVERRIDE__)
+      ? globalThis.__B44_P17_VALIDATION_OVERRIDE__
+      : null;
+
+    const measured = computeMeasuredP17Response({
+      polarModel: modelMeta.polarModel,
+      seatHorizontalOffAxisAngle: horizontalOffAxisAngle,
+      seatVerticalOffAxisAngle: verticalOffAxisAngle,
+      rspHorizontalOffAxisAngle,
+      rspVerticalOffAxisAngle,
+      devOverride,
+    });
+
+    if (!measured.missingMeasuredData) {
+      return {
+        role,
+        offAxisDeg: quantiseAngleDown(horizontalOffAxisAngle ?? 0, 0.5),
+        rawAngleDeg: quantiseAngleDown(horizontalOffAxisAngle ?? 0, 0.5),
+        lossDb: isNum(measured.maximumDeviationDb) ? Number(measured.maximumDeviationDb.toFixed(1)) : 0,
+        measured: true,
+        measuredDiagnostics: measured,
+      };
+    }
+    // Missing measured data at this angle: fall through to the estimated path below.
+  }
+  // --- END DUAL-MODE BRANCH ---
+
   let offAxisDeg = null;
 
   // Overhead speakers: use vertical off-axis with RSP aim
@@ -723,6 +789,17 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       debug: diagnosticDebug,
     };
   }
+}
+
+// RP22 classification for the MEASURED P17 engine only (Stage 1 scaffolding — not yet wired
+// into any speaker, since no registry model currently declares polarModel.type === "measured").
+// The measured engine (measuredP17Engine.jsx) intentionally does NOT assign RP22 levels itself —
+// this is the single place that maps a measured maximum seat-to-RSP spread to an RP22 level.
+export function classifyMeasuredP17Level(maxDeviationDb) {
+  if (!isNum(maxDeviationDb)) return null;
+  if (maxDeviationDb <= 3) return 4;
+  if (maxDeviationDb <= 6) return 3;
+  return 2;
 }
 
 // P17: Compute surround/wide/overhead HF variance across all non-LCR speakers for all seats

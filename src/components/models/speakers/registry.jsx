@@ -307,6 +307,8 @@ export function getSpeakerModelMeta(modelName, orientation) {
       hfOffAxis16k: finalHfOffAxis16k,
       builtInTiltDeg: hit.builtInTiltDeg ?? null,
       dispersion: finalDispersion,
+      // RP22 P17 measured engine (Stage 1 scaffolding) — null for every current model.
+      polarModel: hit.polarModel ?? null,
       frequency_response_curve: hit.frequency_response_curve ?? null,
       price_gbp_exVat: hit.price_gbp_exVat ?? null,
     };
@@ -365,6 +367,8 @@ export function getSpeakerModelMeta(modelName, orientation) {
     hfOffAxis16k: finalHfOffAxis16k,
     builtInTiltDeg: hit.builtInTiltDeg ?? null,
     dispersion: finalDispersion,
+    // RP22 P17 measured engine (Stage 1 scaffolding) — null for every current model.
+    polarModel: hit.polarModel ?? null,
     frequency_response_curve: hit.frequency_response_curve ?? null,
     price_gbp_exVat: hit.price_gbp_exVat ?? null,
   };
