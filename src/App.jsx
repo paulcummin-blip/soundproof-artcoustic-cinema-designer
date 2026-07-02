@@ -54,16 +54,16 @@ const AuthenticatedApp = () => {
         {Object.entries(Pages).map(([path, Page]) => (
           <Route key={path} path={`/${path}`} element={<Page />} />
         ))}
-        <Route path="/admin" element={<LayoutWrapper currentPageName="AdminDashboard"><AdminDashboard /></LayoutWrapper>} />
-        <Route path="/admin/accounts" element={<LayoutWrapper currentPageName="AdminAccounts"><AdminAccounts /></LayoutWrapper>} />
-        <Route path="/admin/accounts/:accountId" element={<LayoutWrapper currentPageName="AccountDashboard"><AccountDashboard /></LayoutWrapper>} />
-        <Route path="/admin/system-health" element={<LayoutWrapper currentPageName="AdminSystemHealth"><AdminSystemHealth /></LayoutWrapper>} />
-        <Route path="/admin/products" element={<LayoutWrapper currentPageName="AdminProducts"><AdminPlaceholderPage title="Products" description="Speaker, subwoofer and accessory registry management." /></LayoutWrapper>} />
-        <Route path="/admin/datasets" element={<LayoutWrapper currentPageName="AdminDatasets"><AdminPlaceholderPage title="Measured Datasets" description="Measured polar dataset platform management and health checks." /></LayoutWrapper>} />
-        <Route path="/admin/pricing" element={<LayoutWrapper currentPageName="AdminPricing"><AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." /></LayoutWrapper>} />
-        <Route path="/admin/rp22-config" element={<LayoutWrapper currentPageName="AdminRP22Config"><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></LayoutWrapper>} />
-        <Route path="/admin/audit-log" element={<LayoutWrapper currentPageName="AdminAuditLog"><AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." /></LayoutWrapper>} />
-        <Route path="/admin/billing" element={<LayoutWrapper currentPageName="AdminBilling"><AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." /></LayoutWrapper>} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/accounts" element={<AdminAccounts />} />
+        <Route path="/admin/accounts/:accountId" element={<AccountDashboard />} />
+        <Route path="/admin/system-health" element={<AdminSystemHealth />} />
+        <Route path="/admin/products" element={<AdminPlaceholderPage title="Products" description="Speaker, subwoofer and accessory registry management." />} />
+        <Route path="/admin/datasets" element={<AdminPlaceholderPage title="Measured Datasets" description="Measured polar dataset platform management and health checks." />} />
+        <Route path="/admin/pricing" element={<AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." />} />
+        <Route path="/admin/rp22-config" element={<AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." />} />
+        <Route path="/admin/audit-log" element={<AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." />} />
+        <Route path="/admin/billing" element={<AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </LayoutWrapper>
