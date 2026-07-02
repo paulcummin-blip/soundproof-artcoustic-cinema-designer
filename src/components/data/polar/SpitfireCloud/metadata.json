@@ -1,0 +1,8 @@
+{
+  "name": "SpitfireCloud",
+  "description": "Measured PAS/FRD polar dataset for Spitfire Cloud. MLS SPL FRD measurements only (phase, GIFs, filters, diffraction, VituixCAD full-space and driver response files excluded). Verbatim source values, no smoothing/normalisation/resampling.",
+  "verticalAngles": [0, 15, 30, 45, 60, 75, 90, -15, -30, -45, -60],
+  "horizontalAngles": [],
+  "status": "vertical files present locally; horizontal files not yet synced into this folder",
+  "notes": "This file is not read by the loader (measuredDatasetLoader.jsx ignores metadata.json). It is documentation only."
+}
