@@ -41,7 +41,7 @@ export const MODELS = [
   // ARCHITECT (OVERHEAD) — EXACT ORDER
   { 
     key: "architect-mikro",
-    label: "ARCHITECT Mikro",
+    label: "MIKRO Ci",
     category: "ARCHITECT",
     widthMm: 54,     // short edge (left/right)
     depthMm: 138,    // long edge (front/back)
@@ -95,6 +95,7 @@ export const MODELS = [
     key: "architect-4-2", 
     label: "ARCHITECT 4-2", 
     category: "ARCHITECT", 
+    hiddenFromSelector: true,
     diameterMm: 300, 
     depthMm: 120, 
     round: true, 
@@ -125,6 +126,7 @@ export const MODELS = [
     key: "architect-pas2-2", 
     label: "ARCHITECT PAS2-2", 
     category: "ARCHITECT", 
+    hiddenFromSelector: true,
     diameterMm: 300, 
     depthMm: 150, 
     round: true, 
@@ -171,6 +173,32 @@ export const MODELS = [
     price_gbp_exVat: null,
     builtInTiltDeg: 22,
     // RP22 P17 MEASURED ENGINE — enabled for this model only (Stage 2C).
+    polarModel: {
+      type: "measured",
+      axisTiltDeg: 22,
+      dataset: "SpitfireCloud"
+    }
+  },
+
+  {
+    key: "architect-4-2-mk2",
+    label: "ARCHITECT 4-2 mk II",
+    category: "ARCHITECT",
+    diameterMm: 300,
+    depthMm: 300,
+    heightMm: 83,
+    round: true,
+    sensitivity_dB_1w1m: 98,
+    sensitivity_dB_2p83: 98,
+    nominalOhms: 4,
+    max_power: 120,
+    max_spl_cont_db_1m_halfspace: 114,
+    max_spl_peak_db_cf6_1m_halfspace: 120,
+    frequency_response_low: 100,
+    usable_lf_hz_minus6db: 97,
+    price_gbp_exVat: null,
+    builtInTiltDeg: 22,
+    // Same measured polar dataset as SPITFIRE CLOUD (per instruction — no new specs invented).
     polarModel: {
       type: "measured",
       axisTiltDeg: 22,
@@ -460,6 +488,7 @@ export function getSubwooferCurve(modelKey) {
 export function getModelsByCategoryOrdered() {
   const byCat = { LCR: [], SURROUNDS: [], ARCHITECT: [], SUBWOOFERS: [] };
   MODELS.forEach(m => { 
+    if (m.hiddenFromSelector) return; // Legacy models: excluded from selectors, still resolvable via getSpeakerModelMeta
     if (byCat[m.category]) { // Ensure category exists before pushing
       byCat[m.category].push(m); 
     }
