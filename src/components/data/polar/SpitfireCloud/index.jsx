@@ -10,7 +10,9 @@
 //
 // STILL NOT ENABLED: no speaker registry entry declares polarModel for Spitfire Cloud yet.
 
-const DATASET_URL = "https://media.base44.com/files/public/6a1166c68ddc81e5ea2cdf6b/cb4bbcfc8_SpitfireCloud_polar_dataset.json";
+// Stage 2B: updated to the COMPLETE measured dataset (adds vertical -30° and confirms vertical
+// 0° = horizontal 0°, both previously missing). Byte-for-byte source of truth — fetched verbatim.
+const DATASET_URL = "https://media.base44.com/files/public/6a1166c68ddc81e5ea2cdf6b/e8a7ab71b_SpitfireCloud_polar_dataset_COMPLETE.json";
 
 // Converts the source file's [frequencyHz, splDb] tuples into the loader's point-object shape.
 // This is a lossless reshape only — no numeric value is altered, dropped, smoothed or resampled.
