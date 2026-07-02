@@ -14,6 +14,7 @@ import AccountDashboard from './pages/AccountDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminSystemHealth from './pages/AdminSystemHealth';
 import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
+import AdminDatasetManager from './pages/AdminDatasetManager';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -58,7 +59,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/accounts" element={<AdminAccounts />} />
         <Route path="/admin/accounts/:accountId" element={<AccountDashboard />} />
         <Route path="/admin/system-health" element={<AdminSystemHealth />} />
-        <Route path="/admin/datasets" element={<AdminPlaceholderPage title="Measured Datasets" description="Measured polar dataset platform management and health checks." />} />
+        <Route path="/admin/datasets" element={<AdminDatasetManager />} />
         <Route path="/admin/pricing" element={<AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." />} />
         <Route path="/admin/rp22-config" element={<AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." />} />
         <Route path="/admin/audit-log" element={<AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." />} />
