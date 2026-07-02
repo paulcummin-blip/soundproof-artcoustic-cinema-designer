@@ -152,6 +152,32 @@ export const MODELS = [
     }
   },
 
+  {
+    key: "spitfire-cloud",
+    label: "Spitfire Cloud",
+    category: "ARCHITECT",
+    widthMm: 300,
+    depthMm: 300,
+    heightMm: 83,
+    round: false,
+    sensitivity_dB_1w1m: 98,
+    sensitivity_dB_2p83: 98,
+    nominalOhms: 4,
+    max_power: 120,
+    max_spl_cont_db_1m_halfspace: 114,
+    max_spl_peak_db_cf6_1m_halfspace: 120,
+    frequency_response_low: 100,
+    usable_lf_hz_minus6db: 97,
+    price_gbp_exVat: null,
+    builtInTiltDeg: 22,
+    // RP22 P17 MEASURED ENGINE — enabled for this model only (Stage 2C).
+    polarModel: {
+      type: "measured",
+      axisTiltDeg: 22,
+      dataset: "SpitfireCloud"
+    }
+  },
+
   // SUBWOOFERS — EXACT ORDER
   { 
     key: "sub2-12", 
