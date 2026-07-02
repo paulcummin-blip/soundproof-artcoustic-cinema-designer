@@ -154,7 +154,7 @@ export const MODELS = [
 
   {
     key: "spitfire-cloud",
-    label: "Spitfire Cloud",
+    label: "SPITFIRE CLOUD",
     category: "ARCHITECT",
     diameterMm: 300,
     depthMm: 300,
