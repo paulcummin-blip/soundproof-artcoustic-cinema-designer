@@ -68,7 +68,7 @@ export default function AdminDashboard() {
       description: "Speaker, subwoofer and accessory registry.",
       status: "Healthy",
       count: "—",
-      href: "/admin/products",
+      href: "/SpeakerDatabase",
     },
     {
       title: "Measured Datasets",
