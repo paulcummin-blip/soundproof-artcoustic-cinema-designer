@@ -15,10 +15,14 @@
  *   - sub drag state
  */
 import { useCallback } from "react";
+import { computeMlpProximityGuides } from "@/components/room/rv/utils/geometry/computeProximityGuides";
 
 export function useMlpDragHandler({
   lengthM,
+  widthM,
+  mlpDotX_m,
   setManualRspY_m,
+  setMlpDragInfo,
 }) {
   /**
    * Called on every mousemove when dragType === 'mlpMarker'.
@@ -44,7 +48,18 @@ export function useMlpDragHandler({
     const rounded = Math.round(clampedY * 100) / 100;
 
     setManualRspY_m(rounded);
-  }, [lengthM, setManualRspY_m]);
+
+    // Stage 1: live proximity dimension guides — temporary, drag-only.
+    if (typeof setMlpDragInfo === "function") {
+      const guides = computeMlpProximityGuides({
+        x: Number(mlpDotX_m),
+        y: rounded,
+        widthM: Number(widthM) || 4.5,
+        lengthM: roomLen,
+      });
+      if (guides) setMlpDragInfo({ visible: true, ...guides });
+    }
+  }, [lengthM, widthM, mlpDotX_m, setManualRspY_m, setMlpDragInfo]);
 
   return { handleMlpDrag };
 }

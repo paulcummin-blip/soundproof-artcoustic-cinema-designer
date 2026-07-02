@@ -18,6 +18,7 @@ import RvSeatHudLayer from "@/components/room/rv/render/RvSeatHudLayer";
 import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
+import RvMlpDragDims from "@/components/room/rv/render/RvMlpDragDims";
 
 export default function RvPlanCanvas({
   svgRef,
@@ -148,6 +149,7 @@ export default function RvPlanCanvas({
   onDismissCard,
   isPostDrag = false,
   roomElementDragInfo,
+  mlpDragInfo,
   dragType,
   isSeatSnapping = false,
   liveImpactMode = "summary",
@@ -601,6 +603,18 @@ export default function RvPlanCanvas({
                 dragInfo={roomElementDragInfo}
                 widthM={widthM}
                 lengthM={lengthM}
+                scale={scale}
+                meterToCanvasX={meterToCanvasX}
+                meterToCanvasY={meterToCanvasY}
+                svgW={svgWSafe}
+                svgH={svgHSafe}
+              />
+            )}
+
+            {/* RSP / MLP drag dimensions — Stage 1, temporary while dragging only */}
+            {dragType === 'mlpMarker' && mlpDragInfo?.visible && (
+              <RvMlpDragDims
+                dragInfo={mlpDragInfo}
                 scale={scale}
                 meterToCanvasX={meterToCanvasX}
                 meterToCanvasY={meterToCanvasY}

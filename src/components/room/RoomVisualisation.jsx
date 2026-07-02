@@ -1113,10 +1113,20 @@ const byId = useEntitiesById({
     handleSpeakerDragUpdate(speakerId, newCanvasPos);
   }, [handleSpeakerDragUpdate]);
 
+  // MLP/RSP drag proximity dimension guides (Stage 1) — temporary, drag-only.
+  const [mlpDragInfo, setMlpDragInfo] = useState(null);
+
+  useEffect(() => {
+    if (dragType !== 'mlpMarker') setMlpDragInfo(null);
+  }, [dragType]);
+
   const { handleMlpDrag } = useMlpDragHandler({
     canvasToRoom,
     lengthM,
+    widthM,
+    mlpDotX_m,
     setManualRspY_m: onSetManualRspY_m,
+    setMlpDragInfo,
     dragOffsetRoomRef,
   });
 
@@ -1983,6 +1993,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         isPostDrag={!dragging && showLiveImpactCard}
         liveImpactMode={liveImpactMode}
         roomElementDragInfo={roomElementDragInfo}
+        mlpDragInfo={mlpDragInfo}
         dragType={dragType}
         isSeatSnapping={isSeatSnapping}
       />
