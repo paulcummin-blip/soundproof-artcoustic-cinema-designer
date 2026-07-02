@@ -15,6 +15,13 @@ const MEASURED_DATASET_PRELOADERS = {
   SpitfireCloud: fetchSpitfireCloudDataset,
 };
 
+// Eagerly kick off every dataset fetch as soon as this module is first imported (app start /
+// RP22 engine load), instead of waiting for the first P17 miss. This does not make the data
+// synchronously available on the very first render, but it removes the "first-run" gap in
+// practice: by the time a user reaches a seat/report calculation, the fetch has almost always
+// already resolved in the background.
+Object.values(MEASURED_DATASET_PRELOADERS).forEach((preload) => preload());
+
 export function getMeasuredDatasetModule(datasetName) {
   if (!datasetName) return null;
   return MEASURED_DATASETS[datasetName] || null;
