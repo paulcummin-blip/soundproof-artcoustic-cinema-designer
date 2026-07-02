@@ -11,6 +11,9 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AdminAccounts from './pages/AdminAccounts';
 import AccountDashboard from './pages/AccountDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminSystemHealth from './pages/AdminSystemHealth';
+import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -51,8 +54,16 @@ const AuthenticatedApp = () => {
         {Object.entries(Pages).map(([path, Page]) => (
           <Route key={path} path={`/${path}`} element={<Page />} />
         ))}
+        <Route path="/admin" element={<LayoutWrapper currentPageName="AdminDashboard"><AdminDashboard /></LayoutWrapper>} />
         <Route path="/admin/accounts" element={<LayoutWrapper currentPageName="AdminAccounts"><AdminAccounts /></LayoutWrapper>} />
         <Route path="/admin/accounts/:accountId" element={<LayoutWrapper currentPageName="AccountDashboard"><AccountDashboard /></LayoutWrapper>} />
+        <Route path="/admin/system-health" element={<LayoutWrapper currentPageName="AdminSystemHealth"><AdminSystemHealth /></LayoutWrapper>} />
+        <Route path="/admin/products" element={<LayoutWrapper currentPageName="AdminProducts"><AdminPlaceholderPage title="Products" description="Speaker, subwoofer and accessory registry management." /></LayoutWrapper>} />
+        <Route path="/admin/datasets" element={<LayoutWrapper currentPageName="AdminDatasets"><AdminPlaceholderPage title="Measured Datasets" description="Measured polar dataset platform management and health checks." /></LayoutWrapper>} />
+        <Route path="/admin/pricing" element={<LayoutWrapper currentPageName="AdminPricing"><AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." /></LayoutWrapper>} />
+        <Route path="/admin/rp22-config" element={<LayoutWrapper currentPageName="AdminRP22Config"><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></LayoutWrapper>} />
+        <Route path="/admin/audit-log" element={<LayoutWrapper currentPageName="AdminAuditLog"><AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." /></LayoutWrapper>} />
+        <Route path="/admin/billing" element={<LayoutWrapper currentPageName="AdminBilling"><AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." /></LayoutWrapper>} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </LayoutWrapper>

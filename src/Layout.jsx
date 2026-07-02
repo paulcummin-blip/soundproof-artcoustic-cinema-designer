@@ -187,14 +187,14 @@ export default function Layout({ children, currentPageName }) {
               {/* Admin section — only visible to admin users */}
               {isAdmin && (() => {
                 const currentPath = typeof window !== "undefined" ? (window.location?.pathname || "") : "";
-                const isActive = currentPath === "/admin/accounts" || currentPath.startsWith("/admin/");
+                const isActive = currentPath.startsWith("/admin");
                 return (
                   <div className="mb-4 mt-2">
                     <div className="text-xs font-medium text-brand-text-label mb-1 px-3" style={{ fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#625143' }}>
                       Admin
                     </div>
                     <a
-                      href="/admin/accounts"
+                      href="/admin"
                       className={`
                         group flex items-center gap-3 px-3 py-2 rounded-md text-sm
                         border transition-all duration-200 ease-out cursor-pointer select-none
@@ -206,7 +206,7 @@ export default function Layout({ children, currentPageName }) {
                       `}
                     >
                       <Database className={`w-4 h-4 transition-all duration-200 ${isActive ? 'text-brand-primary' : 'text-brand-text-muted group-hover:text-brand-text-label'} group-hover:-translate-y-[1px]`} />
-                      <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>Accounts</span>
+                      <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>Admin Dashboard</span>
                     </a>
                   </div>
                 );
