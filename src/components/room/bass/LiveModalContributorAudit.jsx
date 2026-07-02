@@ -10,7 +10,8 @@ import { simulateBassResponseRewCore } from '@/bass/core/rewBassEngine';
 
 // Identical to REW_SOURCE_CURVES.flat_rew_reference in BassResponse.jsx — the
 // source curve actually used by the live graph (flat 94 dB reference).
-const LIVE_SOURCE_CURVE = [
+// Exported so other diagnostic panels reuse the exact same values instead of duplicating them.
+export const LIVE_SOURCE_CURVE = [
   { hz: 20, db: 94 },
   { hz: 50, db: 94 },
   { hz: 100, db: 94 },
@@ -20,7 +21,8 @@ const LIVE_SOURCE_CURVE = [
 // Identical option set BassResponse.jsx passes to simulateBassResponseRewCore
 // when rewSourceCurveMode === 'flat_rew_reference' && rewParityFieldMode === 'full_field'
 // (the current default/live state — dev panel that could change these is hidden).
-function buildLiveEngineOptions(frequencyHz, surfaceAbsorption) {
+// Exported so other diagnostic panels reuse the exact same options instead of duplicating them.
+export function buildLiveEngineOptions(frequencyHz, surfaceAbsorption) {
   return {
     enableReflections: false,
     enableModes: true,

@@ -296,7 +296,7 @@ function buildPartialCoherenceDiagnostic({ frequencyHz, preModalRe, preModalIm, 
   };
 }
 
-function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal', highOrderAxialScale = 1.0, axialFamilyScale = 1.0, tangentialFamilyScale = 1.0, obliqueFamilyScale = 1.0) {
+function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, widthM, lengthM, heightM, modalSourceAmplitude, modalStorageMode = 'none', pureDeterministicModalSum = false, disableModalPropagationPhase = false, mute68HzAxialMode = false, propagationPhaseScale = 0.5, delayMs = 0, polarity = 0, debugMode200Multiplier = 1.0, debugModalHSign = 'normal', highOrderAxialScale = 1.0, axialFamilyScale = 1.0, tangentialFamilyScale = 1.0, obliqueFamilyScale = 1.0, muteModeKey = null) {
   // Direct pressure sum — starts at zero, no identity seed.
   // Modal contributions are true acoustic pressure additions, not a transfer function.
   let modalSumRe = 0;
@@ -351,6 +351,9 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
 
     const modeOrder = Math.abs(mode.nx) + Math.abs(mode.ny) + Math.abs(mode.nz);
     const isMuted68HzAxialMode = mute68HzAxialMode === true && mode.type === 'axial' && Math.abs(mode.freq - 68.6) <= 0.2;
+    // __TEMP_DIAGNOSTIC_MUTE_MODE_KEY__ — generic single-mode mute for the Modal Importance audit.
+    // Only active when muteModeKey is explicitly passed (never by production/BassResponse.jsx).
+    const isMutedByKey = !!muteModeKey && mode.nx === muteModeKey.nx && mode.ny === muteModeKey.ny && mode.nz === muteModeKey.nz;
     const axialLightStorageFactor = modalStorageMode === 'light' && mode.type === 'axial'
       ? 1 + (0.06 / (1 + Math.pow((frequencyHz - mode.freq) / Math.max(mode.freq * 0.08, 1e-6), 2)))
       : 1.0;
@@ -437,7 +440,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
 
     // True pressure accumulation: direct sum of all modal pressure contributions.
     // Temporary REW parity diagnostic: optionally mute only the 68.6 Hz axial mode from active modal sum.
-    if (!isMuted68HzAxialMode) {
+    if (!isMuted68HzAxialMode && !isMutedByKey) {
       // High-order axial modal amplitude correction for REW parity.
       // Keeps Q unchanged; reduces stored pressure contribution for axial harmonics only.
       // Axial modes with modeOrder >= 2 (e.g. 2,0,0 at 68.6 Hz) are over-estimated by the engine
@@ -492,7 +495,11 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
         modalTransferMagnitude: activeTransferMagnitudeAtNull,
         rawModalMagnitude: rawMagnitudeBeforeStorage,
         estimatedResonanceMagnitude,
-        mutedFromActiveModalSum: isMuted68HzAxialMode,
+        mutedFromActiveModalSum: isMuted68HzAxialMode || isMutedByKey,
+        // __TEMP_DIAGNOSTIC_ADDITIVE_FIELDS__ — read-only extra fields for Live Modal Vector Build panel.
+        transferReal: modalContrib.transferReal,
+        transferImag: modalContrib.transferImag,
+        transferPhaseDeg: (Math.atan2(modalContrib.transferImag, modalContrib.transferReal) * 180) / Math.PI,
       });
     }
 
@@ -549,7 +556,7 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
           receiverCoupling,
           combinedCoupling,
           storageFactor,
-          mutedFromActiveModalSum: isMuted68HzAxialMode,
+          mutedFromActiveModalSum: isMuted68HzAxialMode || isMutedByKey,
           transferRe: perturbedStoredModalContrib.real,
           transferIm: perturbedStoredModalContrib.imag,
         };
@@ -569,12 +576,16 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
       }
     : null;
 
+  // Copy taken BEFORE sorting — preserves the engine's true accumulation order (modes.forEach order),
+  // needed by the Running Vector Build audit. Array.sort() below mutates in place, so this must come first.
+  const contributorsInEngineOrder = [...activeModalContributorRows];
   const _debugActiveModalVectorBreakdown = {
     frequencyHz,
     modalSumRe,
     modalSumIm,
     contributors: activeModalContributorRows
       .sort((a, b) => b.activeMagnitude - a.activeMagnitude),
+    contributorsInEngineOrder,
   };
 
   return {
@@ -666,6 +677,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const axialFamilyScale = Number.isFinite(Number(options?.axialFamilyScale)) ? Number(options.axialFamilyScale) : 1.0;
   const tangentialFamilyScale = Number.isFinite(Number(options?.tangentialFamilyScale)) ? Number(options.tangentialFamilyScale) : 1.0;
   const obliqueFamilyScale = Number.isFinite(Number(options?.obliqueFamilyScale)) ? Number(options.obliqueFamilyScale) : 1.0;
+  // __TEMP_DIAGNOSTIC_MUTE_MODE_KEY__ — only active when explicitly passed (Modal Importance audit only).
+  const muteModeKey = options?.muteModeKey && Number.isFinite(Number(options.muteModeKey.nx)) && Number.isFinite(Number(options.muteModeKey.ny)) && Number.isFinite(Number(options.muteModeKey.nz))
+    ? { nx: Number(options.muteModeKey.nx), ny: Number(options.muteModeKey.ny), nz: Number(options.muteModeKey.nz) }
+    : null;
 
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM)) {
     throw new Error('roomDims must include finite widthM, lengthM, and heightM values.');
@@ -856,6 +871,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const partialCoherenceDiagnosticSeries = [];
   const distributedCoherenceDiagnosticSeries = [];
   const splitCoherenceDiagnosticSeries = [];
+  // __TEMP_DIAGNOSTIC_ADDITIVE_FIELDS__ — read-only per-frequency vector breakdown for Live Modal Vector Build panel.
+  const perFrequencyVectorDebug = [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
@@ -1048,6 +1065,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     let modalCapScale = null;
     let modalSumMagnitudeBeforeCap = null;
     let modalSumMagnitudeAfterCap = null;
+    // __TEMP_DIAGNOSTIC_ADDITIVE_FIELDS__ — captures the modal vector actually added to sumRe/sumIm this frequency.
+    let _finalModalSumRe = 0;
+    let _finalModalSumIm = 0;
 
     // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
     if (enableModes) {
@@ -1069,7 +1089,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         Number.isFinite(Number(options?.debugMode200Multiplier)) ? Number(options.debugMode200Multiplier) : 1.0, // __TEMP_REW_PARITY_MODE_200_SCALE__
         debugModalHSign, // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
         highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
-        axialFamilyScale, tangentialFamilyScale, obliqueFamilyScale // __TEMP_DIAGNOSTIC_FAMILY_SCALES__
+        axialFamilyScale, tangentialFamilyScale, obliqueFamilyScale, // __TEMP_DIAGNOSTIC_FAMILY_SCALES__
+        muteModeKey // __TEMP_DIAGNOSTIC_MUTE_MODE_KEY__
       );
 
       _debugStrongestModeForRow = _debugStrongestMode ?? null;
@@ -1205,9 +1226,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       if (_modalCoherenceMode === 'distributed') {
         sumRe = prevRe + diagnosticModalSumRe;
         sumIm = prevIm + diagnosticModalSumIm;
+        _finalModalSumRe = diagnosticModalSumRe;
+        _finalModalSumIm = diagnosticModalSumIm;
       } else {
         sumRe = prevRe + modalSumRe;
         sumIm = prevIm + modalSumIm;
+        _finalModalSumRe = modalSumRe;
+        _finalModalSumIm = modalSumIm;
       }
 
       const modalTransferRe = null;
@@ -1492,6 +1517,17 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       });
     });
 
+    // __TEMP_DIAGNOSTIC_ADDITIVE_FIELDS__ — read-only, does not affect sumRe/sumIm or any returned complexPressure value.
+    perFrequencyVectorDebug.push({
+      frequencyHz,
+      directRe, directIm,
+      reflectionRe, reflectionIm,
+      modalSumRe: _finalModalSumRe,
+      modalSumIm: _finalModalSumIm,
+      finalRe: sumRe,
+      finalIm: sumIm,
+    });
+
     return { re: sumRe, im: sumIm };
   });
 
@@ -1584,6 +1620,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     partialCoherenceDiagnosticSeries,
     distributedCoherenceDiagnosticSeries,
     splitCoherenceDiagnosticSeries,
+    perFrequencyVectorDebug,
   };
 }
 
