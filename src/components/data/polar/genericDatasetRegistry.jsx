@@ -15,6 +15,8 @@
 // metadata or hard-coded lists. Missing angles are tolerated; extra angles are picked up
 // automatically. Unknown/future metadata fields are ignored, not validated against.
 
+import { runDatasetHealthCheck } from "@/components/data/polar/datasetHealthCheck";
+
 const metadataFiles = import.meta.glob("./*/metadata.json", { eager: true });
 const horizontalFiles = import.meta.glob("./*/horizontal/*.json", { eager: true });
 const verticalFiles = import.meta.glob("./*/vertical/*.json", { eager: true });
@@ -91,6 +93,11 @@ for (const name of discoverDatasetNames()) {
     horizontal: buildAngleMap(horizontalFiles, name, "horizontal"),
     vertical: buildAngleMap(verticalFiles, name, "vertical"),
   };
+}
+
+// Developer-only health check — dev builds only, never runs/logs in production.
+if (import.meta.env.DEV) {
+  runDatasetHealthCheck(GENERIC_DATASETS, { horizontalFiles, verticalFiles });
 }
 
 /** Returns { metadata, horizontal, vertical } for a discovered dataset, or null. */
