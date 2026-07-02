@@ -198,10 +198,11 @@ export const MODELS = [
     usable_lf_hz_minus6db: 97,
     price_gbp_exVat: null,
     builtInTiltDeg: 22,
+    // Architect 4-2 Mk2 shares the measured polar dataset with Spitfire Cloud.
     polarModel: {
       type: "measured",
       axisTiltDeg: 22,
-      dataset: "Architect42Mk2"
+      dataset: "SpitfireCloud"
     }
   },
 
