@@ -6,6 +6,7 @@ import {
   listGenericDatasets,
   getGenericDataset,
   validateGenericDataset,
+  isGenericDatasetUsable,
 } from "@/components/data/polar/genericDatasetRegistry";
 
 export function buildDatasetRows() {
@@ -33,4 +34,26 @@ export function buildDatasetRows() {
       validation,
     };
   });
+}
+
+// Aggregate registry-wide stats for the Measured Dataset Platform panel on System Health.
+// Read-only — derives everything from the existing exported registry/validation functions.
+export function getDatasetPlatformStats() {
+  const names = listGenericDatasets();
+  let ready = 0;
+  let warnings = 0;
+  let errors = 0;
+
+  for (const name of names) {
+    const usable = isGenericDatasetUsable(name);
+    const validation = validateGenericDataset(name);
+    if (usable) {
+      ready++;
+      if (validation.messages.length > 0) warnings++;
+    } else {
+      errors++;
+    }
+  }
+
+  return { discovered: names.length, ready, warnings, errors };
 }

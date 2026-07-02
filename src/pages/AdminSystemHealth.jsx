@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { getDatasetPlatformStats } from "@/components/admin/datasets/datasetManagerHelpers";
+import { getProductStats } from "@/components/admin/system-health/productDatasetStats";
+import StatSection from "@/components/admin/system-health/StatSection";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -72,6 +75,9 @@ export default function AdminSystemHealth() {
     return () => { mounted = false; };
   }, [isAdmin]);
 
+  const datasetStats = useMemo(() => getDatasetPlatformStats(), []);
+  const productStats = useMemo(() => getProductStats(), []);
+
   if (isLoadingAuth) {
     return <div style={{ padding: 48, textAlign: "center", color: BRAND.subtext }}>Checking access…</div>;
   }
@@ -96,8 +102,6 @@ export default function AdminSystemHealth() {
 
   const rows = [
     { label: "Users", value: userCount !== null ? `${userCount} registered` : "—", status: "Healthy", last: "Just now" },
-    { label: "Products", value: "Registry data placeholder", status: "Healthy", last: "—" },
-    { label: "Measured Datasets", value: "Generic dataset platform active", status: "Healthy", last: "—" },
     { label: "Database", value: "Base44 entity store", status: "Connected", last: "—" },
     { label: "GitHub Sync", value: "Not configured", status: "Not Connected", last: "—" },
     { label: "Last Build", value: "Placeholder — no build data yet", status: "Unknown", last: "—" },
@@ -118,6 +122,24 @@ export default function AdminSystemHealth() {
           Live status of core systems (placeholder data where noted)
         </div>
       </div>
+
+      <StatSection
+        title="Measured Dataset Platform"
+        stats={[
+          { label: "Datasets discovered", value: datasetStats.discovered },
+          { label: "Datasets ready", value: datasetStats.ready },
+          { label: "Datasets with warnings", value: datasetStats.warnings },
+          { label: "Datasets with errors", value: datasetStats.errors },
+        ]}
+      />
+
+      <StatSection
+        title="Products"
+        stats={[
+          { label: "Registered products", value: productStats.registered },
+          { label: "Products linked to measured datasets", value: productStats.linked },
+        ]}
+      />
 
       <div style={{
         background: BRAND.card, border: `1px solid ${BRAND.border}`,
