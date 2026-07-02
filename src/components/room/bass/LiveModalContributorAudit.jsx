@@ -29,6 +29,11 @@ export function buildLiveEngineOptions(frequencyHz, surfaceAbsorption) {
     surfaceAbsorption,
     freqMinHz: frequencyHz,
     freqMaxHz: frequencyHz + 0.01,
+    // Mode generation must use the same fMax as the production bass graph (20-200 Hz) so
+    // higher-frequency modes can still contribute their resonant tails at the evaluated
+    // frequency — matching the production modal set exactly. The evaluated frequency itself
+    // stays pinned to frequencyHz via freqMinHz/freqMaxHz above.
+    modeGenerationFMaxHz: 200,
     smoothing: 'none',
     modalSourceReferenceMode: 'distance_normalized',
     modalGainScalar: 1.0,

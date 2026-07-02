@@ -808,12 +808,22 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       )
     : [];
 
+  // __DIAGNOSTIC_MODE_GENERATION_FMAX__ — decouples the mode-generation ceiling from the
+  // evaluated frequency-axis ceiling (freqMaxHz). Defaults to freqMaxHz when not supplied,
+  // so production callers (which never pass this) are completely unaffected. Diagnostic
+  // panels that evaluate a single narrow frequency window (freqMaxHz = target + 0.01) pass
+  // this separately (e.g. 200 Hz) so higher-frequency modes can still contribute their
+  // resonant tails at the evaluated frequency, matching the production graph's mode set.
+  const modeGenerationFMaxHz = Number.isFinite(Number(options?.modeGenerationFMaxHz))
+    ? Number(options.modeGenerationFMaxHz)
+    : freqMaxHz;
+
   const modes = enableModes
     ? computeRoomModesLocal({
         widthM,
         lengthM,
         heightM,
-        fMax: freqMaxHz,
+        fMax: modeGenerationFMaxHz,
         c: SPEED_OF_SOUND_MPS,
       }).map((mode) => {
         const baseQ = estimateModeQByType(mode, axialQ);
