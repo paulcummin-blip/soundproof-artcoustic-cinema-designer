@@ -22,6 +22,18 @@
       ],
       "default": "account_user",
       "description": "Role within the account"
+    },
+    "app_role": {
+      "type": "string",
+      "enum": [
+        "Super Admin",
+        "Administrator",
+        "Designer Pro",
+        "Designer Lite",
+        "Viewer"
+      ],
+      "default": "Designer Lite",
+      "description": "Business-level Role used by the Role & Permission Engine to determine module access"
     }
   }
 }
