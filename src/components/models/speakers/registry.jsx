@@ -198,11 +198,10 @@ export const MODELS = [
     usable_lf_hz_minus6db: 97,
     price_gbp_exVat: null,
     builtInTiltDeg: 22,
-    // Same measured polar dataset as SPITFIRE CLOUD (per instruction — no new specs invented).
     polarModel: {
       type: "measured",
       axisTiltDeg: 22,
-      dataset: "SpitfireCloud"
+      dataset: "Architect42Mk2"
     }
   },
 
