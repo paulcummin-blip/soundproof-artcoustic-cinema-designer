@@ -44,6 +44,7 @@ import SourceCurveABCAudit from "@/components/room/bass/SourceCurveABCAudit";
 import AxialPhaseSignParityAudit from "@/components/room/bass/AxialPhaseSignParityAudit";
 import ModeAxisIdentityAudit from "@/components/room/bass/ModeAxisIdentityAudit";
 import DirectModalVectorBalanceAudit from "@/components/room/bass/DirectModalVectorBalanceAudit";
+import ReflectionModalDoubleCountingAudit from "@/components/room/bass/ReflectionModalDoubleCountingAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -1096,6 +1097,9 @@ export default function BassDiagnosticsPanel({
 
       {/* ── Direct/Modal Vector Balance Audit — temporary diagnostic (fixed test case) ── */}
       <DirectModalVectorBalanceAudit />
+
+      {/* ── Reflection/Modal Double-Counting A/B Audit — temporary diagnostic (fixed test case) ── */}
+      <ReflectionModalDoubleCountingAudit />
 
       {/* ── Freq-Dep Q Audit Panel — Production vs Variant F ── */}
       <FreqDepQAuditPanel
