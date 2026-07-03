@@ -39,6 +39,7 @@ import ModalExcitationAudit from "@/components/room/bass/ModalExcitationAudit";
 import ModalPhaseRotationABTest from "@/components/room/bass/ModalPhaseRotationABTest";
 import ModalEnergyBudgetAudit from "@/components/room/bass/ModalEnergyBudgetAudit";
 import SourceExcitationRealityAudit from "@/components/room/bass/SourceExcitationRealityAudit";
+import SourceCurveRootCauseAudit from "@/components/room/bass/SourceCurveRootCauseAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -1062,6 +1063,14 @@ export default function BassDiagnosticsPanel({
 
       {/* ── Source Excitation Reality Audit — temporary diagnostic ── */}
       <SourceExcitationRealityAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
+
+      {/* ── Source Curve Root Cause Audit — temporary diagnostic ── */}
+      <SourceCurveRootCauseAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
