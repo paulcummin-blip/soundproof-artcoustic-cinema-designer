@@ -34,6 +34,7 @@ import ModalTransferSkirtShapeAudit from "@/components/room/bass/ModalTransferSk
 import IsolatedModalTransferRootCauseAudit from "@/components/room/bass/IsolatedModalTransferRootCauseAudit";
 import FrequencyScalingChainAudit from "@/components/room/bass/FrequencyScalingChainAudit";
 import QTransferResolutionAudit from "@/components/room/bass/QTransferResolutionAudit";
+import PressureAssemblyAudit from "@/components/room/bass/PressureAssemblyAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -1017,6 +1018,14 @@ export default function BassDiagnosticsPanel({
 
       {/* ── Q And Transfer Resolution Audit — temporary strict audit ── */}
       <QTransferResolutionAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
+
+      {/* ── Pressure Assembly Audit — temporary strict audit ── */}
+      <PressureAssemblyAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
