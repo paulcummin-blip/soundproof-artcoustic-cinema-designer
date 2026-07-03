@@ -28,6 +28,7 @@ import ProjectionMathematicsAudit from "@/components/room/bass/ProjectionMathema
 import DominantModeConstructionAudit from "@/components/room/bass/DominantModeConstructionAudit";
 import RewTransferFunctionParityAudit from "@/components/room/bass/RewTransferFunctionParityAudit";
 import ModalPhysicsInputAudit from "@/components/room/bass/ModalPhysicsInputAudit";
+import ModalEquationForensicsAudit from "@/components/room/bass/ModalEquationForensicsAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -964,6 +965,14 @@ export default function BassDiagnosticsPanel({
 
       {/* ── Modal Physics Input Audit — temporary strict audit ── */}
       <ModalPhysicsInputAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
+
+      {/* ── Modal Equation Forensics Audit — temporary strict audit ── */}
+      <ModalEquationForensicsAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
