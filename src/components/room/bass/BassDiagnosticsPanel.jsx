@@ -32,6 +32,7 @@ import ModalEquationForensicsAudit from "@/components/room/bass/ModalEquationFor
 import MultiModeInteractionAudit from "@/components/room/bass/MultiModeInteractionAudit";
 import ModalTransferSkirtShapeAudit from "@/components/room/bass/ModalTransferSkirtShapeAudit";
 import IsolatedModalTransferRootCauseAudit from "@/components/room/bass/IsolatedModalTransferRootCauseAudit";
+import FrequencyScalingChainAudit from "@/components/room/bass/FrequencyScalingChainAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -999,6 +1000,14 @@ export default function BassDiagnosticsPanel({
 
       {/* ── Isolated Modal Transfer Root Cause Audit — temporary strict audit ── */}
       <IsolatedModalTransferRootCauseAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
+
+      {/* ── Frequency Scaling Chain Audit — temporary strict audit ── */}
+      <FrequencyScalingChainAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
