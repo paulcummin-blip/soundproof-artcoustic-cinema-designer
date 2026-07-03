@@ -20,6 +20,7 @@ import QClampBypassABTest from "@/components/room/bass/QClampBypassABTest";
 import FreqDepQAuditPanel from "@/components/room/bass/FreqDepQAuditPanel";
 import LiveModalContributorAudit from "@/components/room/bass/LiveModalContributorAudit";
 import LiveModalVectorBuildPanel from "@/components/room/bass/LiveModalVectorBuildPanel";
+import NullRecoveryMechanismAudit from "@/components/room/bass/NullRecoveryMechanismAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -892,6 +893,14 @@ export default function BassDiagnosticsPanel({
 
       {/* ── Live Modal Vector Build — temporary diagnostic ── */}
       <LiveModalVectorBuildPanel
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
+
+      {/* ── Null Recovery Mechanism Audit — temporary diagnostic ── */}
+      <NullRecoveryMechanismAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
