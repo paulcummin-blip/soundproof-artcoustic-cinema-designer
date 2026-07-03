@@ -5,7 +5,7 @@
 // or project data is modified — this only reads engine debug output and does extra maths on it.
 
 import { simulateBassResponseRewCore } from '@/bass/core/rewBassEngine';
-import { LIVE_SOURCE_CURVE, buildLiveEngineOptions } from '@/components/room/bass/LiveModalContributorAudit';
+import { LIVE_SOURCE_CURVE, buildLiveEngineOptions } from '@/components/room/bass/liveBassAuditOptions';
 
 export function fmt(v, d = 3) { return Number.isFinite(v) ? v.toFixed(d) : '—'; }
 function mag(re, im) { return Math.sqrt(re * re + im * im); }
