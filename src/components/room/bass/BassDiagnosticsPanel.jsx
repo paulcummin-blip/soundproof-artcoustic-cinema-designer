@@ -29,6 +29,7 @@ import DominantModeConstructionAudit from "@/components/room/bass/DominantModeCo
 import RewTransferFunctionParityAudit from "@/components/room/bass/RewTransferFunctionParityAudit";
 import ModalPhysicsInputAudit from "@/components/room/bass/ModalPhysicsInputAudit";
 import ModalEquationForensicsAudit from "@/components/room/bass/ModalEquationForensicsAudit";
+import MultiModeInteractionAudit from "@/components/room/bass/MultiModeInteractionAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -973,6 +974,14 @@ export default function BassDiagnosticsPanel({
 
       {/* ── Modal Equation Forensics Audit — temporary strict audit ── */}
       <ModalEquationForensicsAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
+
+      {/* ── Multi-Mode Interaction Audit — temporary strict audit ── */}
+      <MultiModeInteractionAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
