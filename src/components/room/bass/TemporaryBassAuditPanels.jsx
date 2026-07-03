@@ -36,6 +36,7 @@ import ReflectionModalDoubleCountingAudit from "@/components/room/bass/Reflectio
 import ReflectionVectorPhaseTraceAudit from "@/components/room/bass/ReflectionVectorPhaseTraceAudit";
 import ReflectionOrderContributionAudit from "@/components/room/bass/ReflectionOrderContributionAudit";
 import SchroederHandoffABAudit from "@/components/room/bass/SchroederHandoffABAudit";
+import RewReferenceFeatureMatchAudit from "@/components/room/bass/RewReferenceFeatureMatchAudit";
 import FreqDepQAuditPanel from "@/components/room/bass/FreqDepQAuditPanel";
 
 export default function TemporaryBassAuditPanels({
@@ -83,6 +84,7 @@ export default function TemporaryBassAuditPanels({
       <ReflectionVectorPhaseTraceAudit />
       <ReflectionOrderContributionAudit />
       <SchroederHandoffABAudit />
+      <RewReferenceFeatureMatchAudit />
       <FreqDepQAuditPanel
         roomDims={roomDims}
         seatingPositions={seatingPositions}
