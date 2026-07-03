@@ -23,6 +23,7 @@ import LiveModalVectorBuildPanel from "@/components/room/bass/LiveModalVectorBui
 import NullRecoveryMechanismAudit from "@/components/room/bass/NullRecoveryMechanismAudit";
 import NullVectorDecompositionAudit from "@/components/room/bass/NullVectorDecompositionAudit";
 import LiveVectorGeometryAudit from "@/components/room/bass/LiveVectorGeometryAudit";
+import PhaseEvolutionModalTransferAudit from "@/components/room/bass/PhaseEvolutionModalTransferAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -919,6 +920,14 @@ export default function BassDiagnosticsPanel({
 
       {/* ── Live Vector Geometry Audit — temporary diagnostic ── */}
       <LiveVectorGeometryAudit
+        roomDims={roomDims}
+        seatingPositions={seatingPositions}
+        subsForSimulation={subsForSimulation}
+        surfaceAbsorption={surfaceAbsorption}
+      />
+
+      {/* ── Phase Evolution & Modal Transfer Investigation — temporary strict audit ── */}
+      <PhaseEvolutionModalTransferAudit
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
