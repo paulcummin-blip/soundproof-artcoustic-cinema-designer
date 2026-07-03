@@ -42,6 +42,7 @@ import SourceExcitationRealityAudit from "@/components/room/bass/SourceExcitatio
 import SourceCurveRootCauseAudit from "@/components/room/bass/SourceCurveRootCauseAudit";
 import SourceCurveABCAudit from "@/components/room/bass/SourceCurveABCAudit";
 import AxialPhaseSignParityAudit from "@/components/room/bass/AxialPhaseSignParityAudit";
+import ModeAxisIdentityAudit from "@/components/room/bass/ModeAxisIdentityAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -1085,6 +1086,9 @@ export default function BassDiagnosticsPanel({
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
       />
+
+      {/* ── Mode Axis Identity Audit — temporary diagnostic (fixed test case) ── */}
+      <ModeAxisIdentityAudit />
 
       {/* ── Axial Phase Sign Parity Audit — temporary diagnostic (fixed test case) ── */}
       <AxialPhaseSignParityAudit />
