@@ -1,9 +1,11 @@
 // TemporaryBassAuditPanels.jsx
 // Extracted from BassDiagnosticsPanel.jsx (no behaviour/physics/graph changes) to keep
-// that file under the line-count guideline. Renders the always-visible temporary
-// diagnostic audit panels for the Bass Response page, in the same order as before.
+// that file under the line-count guideline. Renders the temporary diagnostic audit
+// panels for the Bass Response page, grouped into collapsible sections for usability.
+// UI organisation only — no audit logic, calculations, or props were changed.
 
 import React from "react";
+import CollapsibleDiagnosticSection from "@/components/room/bass/CollapsibleDiagnosticSection";
 import ImageSourceParityShootout from "@/components/room/bass/ImageSourceParityShootout";
 import QClampBypassABTest from "@/components/room/bass/QClampBypassABTest";
 import LiveModalContributorAudit from "@/components/room/bass/LiveModalContributorAudit";
@@ -51,60 +53,73 @@ export default function TemporaryBassAuditPanels({
 }) {
   return (
     <>
-      <ImageSourceParityShootout
-        roomDims={roomDims}
-        seatingPositions={seatingPositions}
-        subsForSimulation={subsForSimulation}
-        surfaceAbsorption={surfaceAbsorption}
-        rewOverlaySeries={rewOverlaySeries}
-        liveProductionData={multiSeries[0]?.data ?? null}
-      />
-      <QClampBypassABTest roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} />
-      <LiveModalContributorAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <LiveModalVectorBuildPanel roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <NullRecoveryMechanismAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <NullVectorDecompositionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <LiveVectorGeometryAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <PhaseEvolutionModalTransferAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <ProjectionMathematicsAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <DominantModeConstructionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <RewTransferFunctionParityAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <ModalPhysicsInputAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <ModalEquationForensicsAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <MultiModeInteractionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <ModalTransferSkirtShapeAudit roomDims={roomDims} seatingPositions={seatingPositions} surfaceAbsorption={surfaceAbsorption} />
-      <IsolatedModalTransferRootCauseAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <FrequencyScalingChainAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <QTransferResolutionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <PressureAssemblyAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <ModalExcitationAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <ModalPhaseRotationABTest roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <ModalEnergyBudgetAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <SourceExcitationRealityAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <SourceCurveRootCauseAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <SourceCurveABCAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} />
-      <ModeAxisIdentityAudit />
-      <AxialPhaseSignParityAudit />
-      <DirectModalVectorBalanceAudit />
-      <ReflectionModalDoubleCountingAudit />
-      <ReflectionVectorPhaseTraceAudit />
-      <ReflectionOrderContributionAudit />
-      <SchroederHandoffABAudit />
-      <RewReferenceFeatureMatchAudit />
-      <LfReflectionHandoffPrototypeBenchmark />
-      <ReflectionInjectionLocationAudit />
-      <FreqDepQAuditPanel
-        roomDims={roomDims}
-        seatingPositions={seatingPositions}
-        subsForSimulation={subsForSimulation}
-        surfaceAbsorption={surfaceAbsorption}
-        rewOverlaySeries={rewOverlaySeries}
-        qStrategy={qStrategy}
-      />
-      <ModalTransferConstructionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
-      <ModalDistanceScalingABAudit />
-      <ImageSourceGeometryAudit />
-      <ModalAccumulationArchitectureAudit />
+      <CollapsibleDiagnosticSection title="Active Audits" defaultOpen={true}>
+        <DirectModalVectorBalanceAudit />
+        <ReflectionModalDoubleCountingAudit />
+        <ReflectionVectorPhaseTraceAudit />
+        <ReflectionOrderContributionAudit />
+        <ReflectionInjectionLocationAudit />
+        <ModalTransferConstructionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <SchroederHandoffABAudit />
+      </CollapsibleDiagnosticSection>
+
+      <CollapsibleDiagnosticSection title="Archived Audits" defaultOpen={false}>
+        <LiveVectorGeometryAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <ProjectionMathematicsAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <DominantModeConstructionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <RewTransferFunctionParityAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <ModalPhysicsInputAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <ModalEquationForensicsAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <MultiModeInteractionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <ModalTransferSkirtShapeAudit roomDims={roomDims} seatingPositions={seatingPositions} surfaceAbsorption={surfaceAbsorption} />
+        <IsolatedModalTransferRootCauseAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <FrequencyScalingChainAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <QTransferResolutionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <PressureAssemblyAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <ModalExcitationAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <ModalPhaseRotationABTest roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <ModalEnergyBudgetAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <SourceExcitationRealityAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <SourceCurveRootCauseAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <SourceCurveABCAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} />
+        <ModeAxisIdentityAudit />
+        <AxialPhaseSignParityAudit />
+        <ModalDistanceScalingABAudit />
+        <ImageSourceGeometryAudit />
+
+        {/* Additional completed/legacy investigations, kept available exactly as before */}
+        <ImageSourceParityShootout
+          roomDims={roomDims}
+          seatingPositions={seatingPositions}
+          subsForSimulation={subsForSimulation}
+          surfaceAbsorption={surfaceAbsorption}
+          rewOverlaySeries={rewOverlaySeries}
+          liveProductionData={multiSeries[0]?.data ?? null}
+        />
+        <QClampBypassABTest roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} />
+        <LiveModalContributorAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <LiveModalVectorBuildPanel roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <NullRecoveryMechanismAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <NullVectorDecompositionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <PhaseEvolutionModalTransferAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+        <RewReferenceFeatureMatchAudit />
+        <LfReflectionHandoffPrototypeBenchmark />
+        <FreqDepQAuditPanel
+          roomDims={roomDims}
+          seatingPositions={seatingPositions}
+          subsForSimulation={subsForSimulation}
+          surfaceAbsorption={surfaceAbsorption}
+          rewOverlaySeries={rewOverlaySeries}
+          qStrategy={qStrategy}
+        />
+        <ModalAccumulationArchitectureAudit />
+      </CollapsibleDiagnosticSection>
+
+      <CollapsibleDiagnosticSection title="Future Audits" defaultOpen={false}>
+        <div style={{ padding: "8px 4px", fontFamily: "monospace", fontSize: 12, color: "#6b7280" }}>
+          No future diagnostics yet.
+        </div>
+      </CollapsibleDiagnosticSection>
     </>
   );
 }
