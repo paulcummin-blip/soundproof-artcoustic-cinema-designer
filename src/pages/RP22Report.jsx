@@ -25,6 +25,7 @@ import { base44 } from '@/api/base44Client';
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import ReportHeader from '../components/report/ReportHeader';
+import ReportCover from '../components/report/ReportCover';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
@@ -1254,16 +1255,7 @@ function RP22ReportInner() {
                         <section id="pdf-cover">
                             {/* ── Page 1: Logo + title + RP22/RP23 explanations ── */}
                             <div className="print-page-break-after print-summary">
-                                <div style={{ maxWidth: '185mm', margin: '0 auto 0 auto', textAlign: 'center' }}>
-                                    <img
-                                        src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
-                                        alt="SoundProof"
-                                        style={{ width: "100%", height: "auto", marginBottom: "14mm" }}
-                                    />
-                                    <div style={{ fontSize: '30pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.15, marginBottom: '12mm' }}>
-                                        RP22 Compliance Report
-                                    </div>
-                                </div>
+                                <ReportCover variant="print" />
                                 {/* RP22 explanation */}
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '8mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '10.5pt', color: '#3E4349', lineHeight: 1.75, textAlign: 'left' }}>
                                     <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', fontSize: '11pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>

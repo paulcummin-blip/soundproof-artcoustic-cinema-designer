@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useActiveProjectId } from '@/components/state/project-session';
 import { ArrowLeft, FileText, Download } from 'lucide-react';
 import { generateSVG, generateDXF, downloadTextFile } from '../utils/cadExport';
-import ReportBrandCover from './ReportBrandCover';
+import ReportCover from './ReportCover';
 
 export default function ReportHeader({
     app,
@@ -129,11 +129,8 @@ export default function ReportHeader({
 
     return (
         <div>
-        <ReportBrandCover />
-        <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex-1">
-                <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
-            </div>
+        <ReportCover variant="screen" />
+        <div className="flex items-start justify-end gap-4 mb-6">
             <div className="flex gap-3 items-center">
                 <Button
                     type="button"
