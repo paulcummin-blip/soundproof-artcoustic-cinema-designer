@@ -134,6 +134,31 @@ export default function Layout({ children, currentPageName }) {
                   objectFit: 'contain',
                 }}
               />
+              <div style={{ marginTop: 6 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: '#1B1A1A',
+                  }}
+                >
+                  Professional Home Cinema Engineering
+                </div>
+                <div
+                  style={{
+                    fontSize: 8,
+                    fontWeight: 500,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    color: '#625143',
+                    marginTop: 2,
+                  }}
+                >
+                  Powered by Artcoustic Design Intelligence (ADI)
+                </div>
+              </div>
             </div>
 
             <nav className="flex-1 px-3 py-2">
