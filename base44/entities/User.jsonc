@@ -34,6 +34,65 @@
       ],
       "default": "Designer Lite",
       "description": "Business-level Role used by the Role & Permission Engine to determine module access"
+    },
+    "license_account_type": {
+      "type": "string",
+      "enum": [
+        "Free",
+        "Standard",
+        "Professional",
+        "Enterprise",
+        "Internal"
+      ],
+      "default": "Free",
+      "description": "Commercial licensing plan tier. Infrastructure only \u2014 not enforced anywhere yet."
+    },
+    "license_account_status": {
+      "type": "string",
+      "enum": [
+        "Active",
+        "Trial",
+        "Suspended",
+        "Disabled"
+      ],
+      "default": "Active",
+      "description": "Licensing account status. Infrastructure only \u2014 not enforced anywhere yet."
+    },
+    "license_active_project_allowance": {
+      "type": "number",
+      "default": 2,
+      "description": "Active project allowance for this user's plan (Free=2, Standard=5, Professional=12, Enterprise=30, Internal=999999). Manually overridable. Not enforced anywhere yet."
+    },
+    "license_override_allowance": {
+      "type": "number",
+      "nullable": true,
+      "description": "If populated, overrides the plan-based active project allowance. Not enforced anywhere yet."
+    },
+    "license_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Per-user licensing toggle reserved for future use. Not used anywhere yet."
+    },
+    "license_subscription_id": {
+      "type": "string",
+      "description": "Future billing field \u2014 subscription identifier. Not used anywhere yet."
+    },
+    "license_payment_status": {
+      "type": "string",
+      "description": "Future billing field \u2014 payment status. Not used anywhere yet."
+    },
+    "license_renewal_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Future billing field \u2014 renewal date. Not used anywhere yet."
+    },
+    "license_credit_balance": {
+      "type": "number",
+      "description": "Future billing field \u2014 credit balance. Not used anywhere yet."
+    },
+    "license_billing_notes": {
+      "type": "string",
+      "description": "Future billing field \u2014 internal billing notes. Not used anywhere yet."
     }
   }
 }

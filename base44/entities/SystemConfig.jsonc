@@ -1,0 +1,12 @@
+{
+  "name": "SystemConfig",
+  "type": "object",
+  "description": "Singleton global configuration record for the application. Expected to have exactly one record.",
+  "properties": {
+    "project_licensing_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Global feature flag for commercial project licensing. Default OFF. Not connected to any enforcement logic yet \u2014 infrastructure only."
+    }
+  }
+}

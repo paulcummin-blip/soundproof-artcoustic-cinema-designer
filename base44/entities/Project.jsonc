@@ -327,6 +327,51 @@
     "account_id": {
       "type": "string",
       "description": "ID of the Account this project belongs to"
+    },
+    "lifecycle_status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Active",
+        "Archived"
+      ],
+      "default": "Draft",
+      "description": "Informational project lifecycle stage for future licensing. Not enforced anywhere yet \u2014 existing projects remain fully editable regardless of value."
+    },
+    "metrics_last_opened": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Analytics only \u2014 last time this project was opened. Not wired to any tracking yet."
+    },
+    "metrics_last_modified": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Analytics only \u2014 last time this project was modified. Not wired to any tracking yet."
+    },
+    "metrics_session_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Analytics only \u2014 number of sessions. Not wired to any tracking yet."
+    },
+    "metrics_total_minutes_used": {
+      "type": "number",
+      "default": 0,
+      "description": "Analytics only \u2014 total minutes used. Not wired to any tracking yet."
+    },
+    "metrics_reports_generated": {
+      "type": "number",
+      "default": 0,
+      "description": "Analytics only \u2014 number of reports generated. Not wired to any tracking yet."
+    },
+    "metrics_bass_simulations_run": {
+      "type": "number",
+      "default": 0,
+      "description": "Analytics only \u2014 number of bass simulations run. Not wired to any tracking yet."
+    },
+    "metrics_exports": {
+      "type": "number",
+      "default": 0,
+      "description": "Analytics only \u2014 number of exports. Not wired to any tracking yet."
     }
   },
   "required": [

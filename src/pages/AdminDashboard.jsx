@@ -112,6 +112,13 @@ export default function AdminDashboard() {
       count: "—",
       href: "/admin/billing",
     },
+    {
+      title: "Project Licensing",
+      description: "Commercial licensing infrastructure. Internal users only — not yet enforced.",
+      status: "Setup Required",
+      count: "Feature flag OFF",
+      href: "/admin/project-licensing",
+    },
   ];
 
   return (
