@@ -63,6 +63,7 @@ import Case035NullCauseIsolationAudit from "@/components/room/bass/Case035NullCa
 import Case036FinalPressureCombinationAudit from "@/components/room/bass/Case036FinalPressureCombinationAudit";
 import Case037OffResonanceModalTailAudit from "@/components/room/bass/Case037OffResonanceModalTailAudit";
 import Case038Full30HzVectorLedger from "@/components/room/bass/Case038Full30HzVectorLedger";
+import Case039ModalTransferPhaseFunctionAudit from "@/components/room/bass/Case039ModalTransferPhaseFunctionAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -190,8 +191,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case036FinalPressureCombinationAudit /> },
   { key: "case-037-off-resonance-modal-tail", title: "Case 037 — Off-Resonance Modal Tail Audit", status: "RETIRED",
     render: (ctx) => <Case037OffResonanceModalTailAudit /> },
-  { key: "case-038-full-30hz-vector-ledger", title: "Case 038 — Full 30 Hz Vector Ledger",
+  { key: "case-038-full-30hz-vector-ledger", title: "Case 038 — Full 30 Hz Vector Ledger", status: "RETIRED",
     render: (ctx) => <Case038Full30HzVectorLedger /> },
+  { key: "case-039-modal-transfer-phase-function", title: "Case 039 — Modal Transfer Phase Function Audit",
+    render: (ctx) => <Case039ModalTransferPhaseFunctionAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
