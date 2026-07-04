@@ -652,6 +652,11 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   // When rewParityModalPhase is true, both propagationPhaseScale and disableModalPropagationPhase
   // are forced to their zero/true values regardless of caller options.
   const rewParityModalPhase = options?.rewParityModalPhase === true;
+  // __TEMP_PROTOTYPE_LF_REFLECTION_HANDOFF__ (2026-07-04)
+  // Prototype parity test only — default false, production behaviour unchanged unless enabled.
+  // When true: below Schroeder, image-source reflections contribute 0 (direct + modal only).
+  // From Schroeder to Schroeder+40Hz, reflections fade in linearly. Above that, unchanged.
+  const lfReflectionHandoffPrototype = options?.lfReflectionHandoffPrototype === true;
   // Mode-only parity gate: suppresses direct path and image/reflection contributions
   // when the caller is running a REW modal-only parity comparison.
   // Does not affect normal product mode (rewSourceCurveMode !== 'flat_rew_reference').
@@ -945,6 +950,13 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       sumIm += directIm;
     }
 
+    // __TEMP_PROTOTYPE_LF_REFLECTION_HANDOFF__ (2026-07-04)
+    // Prototype-only scale for image-source reflections. Default 1 (no change) when the
+    // prototype flag is off. When on: 0 below Schroeder, linear fade over the next 40Hz, 1 above.
+    const reflectionHandoffScale = lfReflectionHandoffPrototype
+      ? Math.max(0, Math.min(1, (frequencyHz - schroederFrequency) / 40))
+      : 1;
+
     // First-order reflections
     imageSources.forEach((imageSource, reflectionIndex) => {
       const imageDx = imageSource.x - seat.x;
@@ -977,8 +989,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const reflectionCoherenceWeight = disableReflectionCoherenceWeight
         ? 1
         : Math.min(0.75, Math.max(0.25, 0.25 + 0.5 * Math.max(0, Math.min(1, (frequencyHz - 20) / 140))));
-      const imageRe = reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase);
-      const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase);
+      const imageRe = reflectionCoherenceWeight * imageAmplitude * Math.cos(imageTotalPhase) * reflectionHandoffScale;
+      const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase) * reflectionHandoffScale;
       reflectionRe += imageRe;
       reflectionIm += imageIm;
       // Suppress reflection contributions in mode-only parity mode.
