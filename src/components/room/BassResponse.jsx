@@ -212,6 +212,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
   // __CANDIDATE_FREQ_DEP_Q__ — Q strategy selector. Default = production (unchanged).
   const [qStrategy, setQStrategy] = useState('production');
+  // Temporary comparison toggle for the REW-style Absorption Authority candidate — see graph controls below.
+  const [overlayProduction, setOverlayProduction] = useState(false);
   // Active test engine — set by RewRefinedEngineShootout promote button via window.__B44_ACTIVE_TEST_ENGINE__
   const [activeTestEngine, setActiveTestEngine] = useState(null);
   const lastStablePlotRef = useRef(null);
@@ -435,8 +437,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return sources;
   }, [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById, autoAlignDelays, subTuningSignature]);
 
-  // Run bass simulation engine
-  const simulationResults = useMemo(() => {
+  // Run bass simulation engine — parameterized by qStrategy so the exact same engine call
+  // can be re-run with a different Q strategy for the temporary overlay comparison below,
+  // without any duplicated simulation or plotting logic (one engine, one renderer).
+  const runSimulation = useCallback((qStrategyOverride) => {
     if (hasNoSeats || hasNoSubs || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
       return { seatResponses: {}, metrics: null, audit: null };
     }
@@ -607,7 +611,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             rewParityModalMagnitudeScale: rewSourceCurveMode === 'flat_rew_reference' ? rewParityModalMagnitudeScale : 1.0, // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
             modalCoherenceMode, // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
             highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
-            qStrategy, // __CANDIDATE_FREQ_DEP_Q__
+            qStrategy: qStrategyOverride, // __CANDIDATE_FREQ_DEP_Q__
             }
         );
 
@@ -664,7 +668,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
       activeModalVectorPath: __b44ActiveModalVectorPath,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, qStrategy]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale]);
+
+  const simulationResults = useMemo(() => runSimulation(qStrategy), [runSimulation, qStrategy]);
+  // Temporary overlay: re-runs the identical engine with qStrategy forced to 'production',
+  // for the "Overlay Production" comparison toggle only. No second engine, no duplicated logic.
+  const overlayProductionResults = useMemo(
+    () => (overlayProduction ? runSimulation('production') : null),
+    [runSimulation, overlayProduction]
+  );
 
   // Build one clean series per selected seat
   const multiSeries = useMemo(() => {
@@ -727,10 +739,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { id: 'rew-overlay', color: '#f97316', label: 'REW', data: sorted };
   }, [rewOverlayText, normalizeRewOverlay, multiSeries]);
 
+  // Temporary overlay series: the identical Production run (qStrategy forced to 'production'),
+  // for the primary selected seat only — grey, for direct visual comparison against the
+  // currently-selected Q strategy curve. No second engine or plotting path is introduced.
+  const overlayProductionSeries = useMemo(() => {
+    if (!overlayProduction || !overlayProductionResults) return null;
+    const sid = selectedSeatIds[0];
+    const response = overlayProductionResults.seatResponses?.[sid];
+    if (!response?.freqsHz || !response?.splDb) return null;
+    const data = response.freqsHz
+      .map((frequency, i) => ({ frequency, spl: Number.isFinite(response.splDb[i]) ? response.splDb[i] : null }))
+      .filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
+    return { id: 'overlay-production', color: '#9CA3AF', label: 'Production', data };
+  }, [overlayProduction, overlayProductionResults, selectedSeatIds]);
+
   const multiSeriesForGraph = useMemo(() => {
-    if (!showRewOverlay || !rewOverlaySeries) return multiSeries;
-    return [...multiSeries, rewOverlaySeries];
-  }, [multiSeries, rewOverlaySeries, showRewOverlay]);
+    // When overlaying, highlight the active REW-style Absorption Authority curve in green
+    // so it's clearly distinguishable from the grey Production overlay curve.
+    let out = (overlayProduction && qStrategy === 'rew_absorption_authority')
+      ? multiSeries.map((s, i) => (i === 0 ? { ...s, color: '#16a34a' } : s))
+      : multiSeries;
+    if (overlayProductionSeries) out = [...out, overlayProductionSeries];
+    if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
+    return out;
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy]);
 
   // Keep a single-seat "selectedSeat" reference for the graph title + per-seat detail cards
   const primarySelectedSeat = useMemo(() => {
@@ -994,6 +1026,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value="production">Production — smooth Q cap</option>
                  <option value="freq_dependent_cap">⚡ Freq-dep cap — Variant F (diagnostic)</option>
                  <option value="smooth_soft_cap">🔬 Smooth soft cap (same as production)</option>
+                 <option value="rew_absorption_authority">REW-style Absorption Authority (Experimental)</option>
               </select>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1088,6 +1121,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
           )}
         </div>
+
+        {/* ── Temporary overlay toggle for the REW-style Absorption Authority candidate ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+          <input
+            type="checkbox"
+            id="overlay-production-toggle"
+            checked={overlayProduction}
+            onChange={(e) => setOverlayProduction(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+          />
+          <label htmlFor="overlay-production-toggle" style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
+            Overlay Production {overlayProduction && <span style={{ color: '#9CA3AF' }}>(grey = Production</span>}{overlayProduction && qStrategy === 'rew_absorption_authority' && <span style={{ color: '#16a34a' }}>, green = REW-style Absorption Authority)</span>}{overlayProduction && qStrategy !== 'rew_absorption_authority' && <span style={{ color: '#9CA3AF' }}>)</span>}
+          </label>
+        </div>
       </div>
 
       {/* ── Active Q Strategy Label ── */}
@@ -1099,6 +1146,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {qStrategy === 'smooth_soft_cap' && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#166534', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
           🔬 Q strategy: Smooth Soft Cap — same as production default
+        </div>
+      )}
+      {qStrategy === 'rew_absorption_authority' && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#065f46', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
+          🧪 Q strategy: REW-style Absorption Authority — experimental candidate
         </div>
       )}
 
