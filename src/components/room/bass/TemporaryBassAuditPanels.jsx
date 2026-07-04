@@ -40,6 +40,7 @@ import RewReferenceFeatureMatchAudit from "@/components/room/bass/RewReferenceFe
 import LfReflectionHandoffPrototypeBenchmark from "@/components/room/bass/LfReflectionHandoffPrototypeBenchmark";
 import ReflectionInjectionLocationAudit from "@/components/room/bass/ReflectionInjectionLocationAudit";
 import FreqDepQAuditPanel from "@/components/room/bass/FreqDepQAuditPanel";
+import ModalTransferConstructionAudit from "@/components/room/bass/ModalTransferConstructionAudit";
 
 export default function TemporaryBassAuditPanels({
   roomDims, seatingPositions, subsForSimulation, surfaceAbsorption,
@@ -97,6 +98,7 @@ export default function TemporaryBassAuditPanels({
         rewOverlaySeries={rewOverlaySeries}
         qStrategy={qStrategy}
       />
+      <ModalTransferConstructionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
     </>
   );
 }
