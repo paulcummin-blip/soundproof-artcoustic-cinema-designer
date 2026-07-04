@@ -67,6 +67,7 @@ import Case039ModalTransferPhaseFunctionAudit from "@/components/room/bass/Case0
 import Case040OffResonanceModalMagnitudeFalloffAudit from "@/components/room/bass/Case040OffResonanceModalMagnitudeFalloffAudit";
 import Case041MultiRoomModalSourceAmplitudeCheck from "@/components/room/bass/Case041MultiRoomModalSourceAmplitudeCheck";
 import Case042ResonantTransferEquationParityCheck from "@/components/room/bass/Case042ResonantTransferEquationParityCheck";
+import Case043SourceReceiverCouplingParityAudit from "@/components/room/bass/Case043SourceReceiverCouplingParityAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -202,8 +203,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case040OffResonanceModalMagnitudeFalloffAudit /> },
   { key: "case-041-multi-room-modal-source-amplitude-check", title: "Case 041 — Multi-Room Modal Source Amplitude Check", status: "RETIRED",
     render: (ctx) => <Case041MultiRoomModalSourceAmplitudeCheck /> },
-  { key: "case-042-resonant-transfer-equation-parity-check", title: "Case 042 — Resonant Transfer Equation Parity Check",
+  { key: "case-042-resonant-transfer-equation-parity-check", title: "Case 042 — Resonant Transfer Equation Parity Check", status: "RETIRED",
     render: (ctx) => <Case042ResonantTransferEquationParityCheck /> },
+  { key: "case-043-source-receiver-coupling-parity-audit", title: "Case 043 — Source / Receiver Coupling Equation Parity Audit",
+    render: (ctx) => <Case043SourceReceiverCouplingParityAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
