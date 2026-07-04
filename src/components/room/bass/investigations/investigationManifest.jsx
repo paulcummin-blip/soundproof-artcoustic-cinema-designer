@@ -54,6 +54,7 @@ import ModalAccumulationArchitectureAudit from "@/components/room/bass/ModalAccu
 import FrontWallAbsorptionSensitivityAudit from "@/components/room/bass/FrontWallAbsorptionSensitivityAudit";
 import AbsorptionAuthorityAudit from "@/components/room/bass/AbsorptionAuthorityAudit";
 import ModalQTransferAuthorityAudit from "@/components/room/bass/ModalQTransferAuthorityAudit";
+import StorageFactorDominanceAudit from "@/components/room/bass/StorageFactorDominanceAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -163,8 +164,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <FrontWallAbsorptionSensitivityAudit /> },
   { key: "absorption-authority", title: "Absorption Authority Audit", status: "RETIRED",
     render: (ctx) => <AbsorptionAuthorityAudit /> },
-  { key: "modal-q-transfer-authority", title: "Modal Q Transfer Authority Audit",
+  { key: "modal-q-transfer-authority", title: "Modal Q Transfer Authority Audit", status: "RETIRED",
     render: (ctx) => <ModalQTransferAuthorityAudit /> },
+  { key: "storage-factor-dominance", title: "Case 027 — Storage Factor Dominance Audit",
+    render: (ctx) => <StorageFactorDominanceAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
