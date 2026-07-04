@@ -8,8 +8,10 @@ import { useAppState } from "../AppStateProvider";
 import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
 import { simulateBassResponseRewCore, simulateBassResponseRewParityField } from "@/bass/core/rewBassEngine";
+import { computeRoomModesLocal } from "@/bass/core/modalCalculations.js";
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
+import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import { Label } from "@/components/ui/label";
@@ -214,6 +216,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [qStrategy, setQStrategy] = useState('production');
   // Temporary comparison toggle for the REW-style Absorption Authority candidate — see graph controls below.
   const [overlayProduction, setOverlayProduction] = useState(false);
+
+  // Modal Resonance Line Toggles — display-only, session-only state. Does not affect
+  // bass calculation, SPL response, or mode generation; only filters which resonance
+  // ReferenceLines are drawn on the graph.
+  const [modalLineToggles, setModalLineToggles] = useState({
+    axialLength: true,
+    axialWidth: true,
+    axialHeight: true,
+    tangentialLW: true,
+    tangentialLH: true,
+    tangentialWH: true,
+    oblique: true,
+  });
+  const toggleModalLine = (key) => setModalLineToggles(prev => ({ ...prev, [key]: !prev[key] }));
+  const setAllModalLines = (value) => setModalLineToggles({
+    axialLength: value, axialWidth: value, axialHeight: value,
+    tangentialLW: value, tangentialLH: value, tangentialWH: value, oblique: value,
+  });
   // Active test engine — set by RewRefinedEngineShootout promote button via window.__B44_ACTIVE_TEST_ENGINE__
   const [activeTestEngine, setActiveTestEngine] = useState(null);
   const lastStablePlotRef = useRef(null);
@@ -775,6 +795,36 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return null;
   }, [selectedSeatIds, seatingPositions, simulationResults.seatResponses]);
 
+  // Modal Resonance Line Toggles — display-only mode frequency generation for the graph's
+  // vertical resonance ReferenceLines. Uses the same pure computeRoomModesLocal used by the
+  // production engine (read-only), but this output is never fed back into any SPL calculation.
+  const roomModesForDisplay = useMemo(() => {
+    if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) return [];
+    return computeRoomModesLocal({ widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM, fMax: 200 });
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
+
+  const modeMarkersForGraph = useMemo(() => {
+    const axial = [];
+    const tangential = [];
+    const oblique = [];
+    roomModesForDisplay.forEach((mode) => {
+      const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
+      const n = [mode.nx, mode.ny, mode.nz];
+      if (activeAxes === 1) {
+        if (mode.ny > 0 && modalLineToggles.axialLength) axial.push({ fHz: mode.freq, n, axisLabel: 'Length' });
+        else if (mode.nx > 0 && modalLineToggles.axialWidth) axial.push({ fHz: mode.freq, n, axisLabel: 'Width' });
+        else if (mode.nz > 0 && modalLineToggles.axialHeight) axial.push({ fHz: mode.freq, n, axisLabel: 'Height' });
+      } else if (activeAxes === 2) {
+        if (mode.nx > 0 && mode.ny > 0 && modalLineToggles.tangentialLW) tangential.push({ fHz: mode.freq, n });
+        else if (mode.nx > 0 && mode.nz > 0 && modalLineToggles.tangentialWH) tangential.push({ fHz: mode.freq, n });
+        else if (mode.ny > 0 && mode.nz > 0 && modalLineToggles.tangentialLH) tangential.push({ fHz: mode.freq, n });
+      } else if (activeAxes === 3 && modalLineToggles.oblique) {
+        oblique.push({ fHz: mode.freq, n });
+      }
+    });
+    return { axial, tangential, oblique };
+  }, [roomModesForDisplay, modalLineToggles]);
+
   // Schroeder frequency
   const schroederFrequency = React.useMemo(() => {
     const w = roomDims?.widthM ?? 0;
@@ -1103,8 +1153,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               toggles={{}}
               crossoverFrequency={80}
               modeFrequencies={[]}
-              showModeMarkers={false}
-              modeMarkers={{ axial: [], tangential: [], oblique: [] }}
+              showModeMarkers={true}
+              modeMarkers={modeMarkersForGraph}
               linearHzAxis={false}
               rewStyleMode={true}
               yDomain={graphScaleMode === 'rew_fixed' ? [60, 120] : undefined}
@@ -1135,6 +1185,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             Overlay Production {overlayProduction && <span style={{ color: '#9CA3AF' }}>(grey = Production</span>}{overlayProduction && qStrategy === 'rew_absorption_authority' && <span style={{ color: '#16a34a' }}>, green = REW-style Absorption Authority)</span>}{overlayProduction && qStrategy !== 'rew_absorption_authority' && <span style={{ color: '#9CA3AF' }}>)</span>}
           </label>
         </div>
+
+        <ModalResonanceLineToggles
+          toggles={modalLineToggles}
+          onToggle={toggleModalLine}
+          onSetAll={setAllModalLines}
+        />
       </div>
 
       {/* ── Active Q Strategy Label ── */}
