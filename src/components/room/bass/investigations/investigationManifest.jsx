@@ -56,6 +56,7 @@ import AbsorptionAuthorityAudit from "@/components/room/bass/AbsorptionAuthority
 import ModalQTransferAuthorityAudit from "@/components/room/bass/ModalQTransferAuthorityAudit";
 import StorageFactorDominanceAudit from "@/components/room/bass/StorageFactorDominanceAudit";
 import RootCauseShootoutAudit from "@/components/room/bass/RootCauseShootoutAudit";
+import ModalFieldInternalShootoutAudit from "@/components/room/bass/ModalFieldInternalShootoutAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -169,8 +170,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <ModalQTransferAuthorityAudit /> },
   { key: "storage-factor-dominance", title: "Case 027 — Storage Factor Dominance Audit", status: "RETIRED",
     render: (ctx) => <StorageFactorDominanceAudit /> },
-  { key: "root-cause-shootout", title: "Case 030 — Root Cause Shootout",
+  { key: "root-cause-shootout", title: "Case 030 — Root Cause Shootout", status: "RETIRED",
     render: (ctx) => <RootCauseShootoutAudit /> },
+  { key: "modal-field-internal-shootout", title: "Case 031 — Modal Field Internal Shootout",
+    render: (ctx) => <ModalFieldInternalShootoutAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
