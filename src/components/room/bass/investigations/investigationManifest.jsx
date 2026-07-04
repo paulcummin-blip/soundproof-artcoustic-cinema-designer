@@ -68,6 +68,7 @@ import Case040OffResonanceModalMagnitudeFalloffAudit from "@/components/room/bas
 import Case041MultiRoomModalSourceAmplitudeCheck from "@/components/room/bass/Case041MultiRoomModalSourceAmplitudeCheck";
 import Case042ResonantTransferEquationParityCheck from "@/components/room/bass/Case042ResonantTransferEquationParityCheck";
 import Case043SourceReceiverCouplingParityAudit from "@/components/room/bass/Case043SourceReceiverCouplingParityAudit";
+import Case044RewAxisMappingFinalCheck from "@/components/room/bass/Case044RewAxisMappingFinalCheck";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -207,6 +208,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case042ResonantTransferEquationParityCheck /> },
   { key: "case-043-source-receiver-coupling-parity-audit", title: "Case 043 — Source / Receiver Coupling Equation Parity Audit",
     render: (ctx) => <Case043SourceReceiverCouplingParityAudit /> },
+  { key: "case-044-rew-axis-mapping-final-check", title: "Case 044 — REW Axis Mapping Final Check",
+    render: (ctx) => <Case044RewAxisMappingFinalCheck /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
