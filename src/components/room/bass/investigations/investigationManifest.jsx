@@ -64,6 +64,7 @@ import Case036FinalPressureCombinationAudit from "@/components/room/bass/Case036
 import Case037OffResonanceModalTailAudit from "@/components/room/bass/Case037OffResonanceModalTailAudit";
 import Case038Full30HzVectorLedger from "@/components/room/bass/Case038Full30HzVectorLedger";
 import Case039ModalTransferPhaseFunctionAudit from "@/components/room/bass/Case039ModalTransferPhaseFunctionAudit";
+import Case040OffResonanceModalMagnitudeFalloffAudit from "@/components/room/bass/Case040OffResonanceModalMagnitudeFalloffAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -193,8 +194,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case037OffResonanceModalTailAudit /> },
   { key: "case-038-full-30hz-vector-ledger", title: "Case 038 — Full 30 Hz Vector Ledger", status: "RETIRED",
     render: (ctx) => <Case038Full30HzVectorLedger /> },
-  { key: "case-039-modal-transfer-phase-function", title: "Case 039 — Modal Transfer Phase Function Audit",
+  { key: "case-039-modal-transfer-phase-function", title: "Case 039 — Modal Transfer Phase Function Audit", status: "RETIRED",
     render: (ctx) => <Case039ModalTransferPhaseFunctionAudit /> },
+  { key: "case-040-off-resonance-modal-magnitude-falloff", title: "Case 040 — Off-Resonance Modal Magnitude Falloff Audit",
+    render: (ctx) => <Case040OffResonanceModalMagnitudeFalloffAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
