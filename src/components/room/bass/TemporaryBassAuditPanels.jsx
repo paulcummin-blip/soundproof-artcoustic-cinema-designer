@@ -41,6 +41,7 @@ import LfReflectionHandoffPrototypeBenchmark from "@/components/room/bass/LfRefl
 import ReflectionInjectionLocationAudit from "@/components/room/bass/ReflectionInjectionLocationAudit";
 import FreqDepQAuditPanel from "@/components/room/bass/FreqDepQAuditPanel";
 import ModalTransferConstructionAudit from "@/components/room/bass/ModalTransferConstructionAudit";
+import ModalDistanceScalingABAudit from "@/components/room/bass/ModalDistanceScalingABAudit";
 
 export default function TemporaryBassAuditPanels({
   roomDims, seatingPositions, subsForSimulation, surfaceAbsorption,
@@ -99,6 +100,7 @@ export default function TemporaryBassAuditPanels({
         qStrategy={qStrategy}
       />
       <ModalTransferConstructionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
+      <ModalDistanceScalingABAudit />
     </>
   );
 }
