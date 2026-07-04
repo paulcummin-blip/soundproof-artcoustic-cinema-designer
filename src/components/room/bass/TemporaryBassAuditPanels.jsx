@@ -47,6 +47,7 @@ import ModalDistanceScalingABAudit from "@/components/room/bass/ModalDistanceSca
 import ImageSourceGeometryAudit from "@/components/room/bass/ImageSourceGeometryAudit";
 import ModalAccumulationArchitectureAudit from "@/components/room/bass/ModalAccumulationArchitectureAudit";
 import FrontWallAbsorptionSensitivityAudit from "@/components/room/bass/FrontWallAbsorptionSensitivityAudit";
+import AbsorptionAuthorityAudit from "@/components/room/bass/AbsorptionAuthorityAudit";
 
 export default function TemporaryBassAuditPanels({
   roomDims, seatingPositions, subsForSimulation, surfaceAbsorption,
@@ -115,6 +116,7 @@ export default function TemporaryBassAuditPanels({
         />
         <ModalAccumulationArchitectureAudit />
         <FrontWallAbsorptionSensitivityAudit />
+        <AbsorptionAuthorityAudit />
       </CollapsibleDiagnosticSection>
 
       <CollapsibleDiagnosticSection title="Future Audits" defaultOpen={false}>
