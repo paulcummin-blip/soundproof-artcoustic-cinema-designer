@@ -60,6 +60,7 @@ import ModalFieldInternalShootoutAudit from "@/components/room/bass/ModalFieldIn
 import ModalPhaseReceiverCouplingDecisionAudit from "@/components/room/bass/ModalPhaseReceiverCouplingDecisionAudit";
 import AbsorptionAuthorityRootCauseAudit from "@/components/room/bass/AbsorptionAuthorityRootCauseAudit";
 import Case035NullCauseIsolationAudit from "@/components/room/bass/Case035NullCauseIsolationAudit";
+import Case036FinalPressureCombinationAudit from "@/components/room/bass/Case036FinalPressureCombinationAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -181,8 +182,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <ModalPhaseReceiverCouplingDecisionAudit /> },
   { key: "absorption-authority-root-cause", title: "Case 033 — Absorption Authority Root Cause Audit", status: "RETIRED",
     render: (ctx) => <AbsorptionAuthorityRootCauseAudit /> },
-  { key: "case-035-null-cause-isolation", title: "Case 035 — 30 Hz Null Cause Isolation",
+  { key: "case-035-null-cause-isolation", title: "Case 035 — 30 Hz Null Cause Isolation", status: "RETIRED",
     render: (ctx) => <Case035NullCauseIsolationAudit /> },
+  { key: "case-036-final-pressure-combination", title: "Case 036 — Final Pressure Combination Audit",
+    render: (ctx) => <Case036FinalPressureCombinationAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
