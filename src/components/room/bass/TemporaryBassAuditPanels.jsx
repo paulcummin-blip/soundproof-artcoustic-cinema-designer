@@ -42,6 +42,7 @@ import ReflectionInjectionLocationAudit from "@/components/room/bass/ReflectionI
 import FreqDepQAuditPanel from "@/components/room/bass/FreqDepQAuditPanel";
 import ModalTransferConstructionAudit from "@/components/room/bass/ModalTransferConstructionAudit";
 import ModalDistanceScalingABAudit from "@/components/room/bass/ModalDistanceScalingABAudit";
+import ImageSourceGeometryAudit from "@/components/room/bass/ImageSourceGeometryAudit";
 
 export default function TemporaryBassAuditPanels({
   roomDims, seatingPositions, subsForSimulation, surfaceAbsorption,
@@ -101,6 +102,7 @@ export default function TemporaryBassAuditPanels({
       />
       <ModalTransferConstructionAudit roomDims={roomDims} seatingPositions={seatingPositions} subsForSimulation={subsForSimulation} surfaceAbsorption={surfaceAbsorption} />
       <ModalDistanceScalingABAudit />
+      <ImageSourceGeometryAudit />
     </>
   );
 }
