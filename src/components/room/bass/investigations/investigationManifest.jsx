@@ -65,6 +65,7 @@ import Case037OffResonanceModalTailAudit from "@/components/room/bass/Case037Off
 import Case038Full30HzVectorLedger from "@/components/room/bass/Case038Full30HzVectorLedger";
 import Case039ModalTransferPhaseFunctionAudit from "@/components/room/bass/Case039ModalTransferPhaseFunctionAudit";
 import Case040OffResonanceModalMagnitudeFalloffAudit from "@/components/room/bass/Case040OffResonanceModalMagnitudeFalloffAudit";
+import Case041MultiRoomModalSourceAmplitudeCheck from "@/components/room/bass/Case041MultiRoomModalSourceAmplitudeCheck";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -196,8 +197,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case038Full30HzVectorLedger /> },
   { key: "case-039-modal-transfer-phase-function", title: "Case 039 — Modal Transfer Phase Function Audit", status: "RETIRED",
     render: (ctx) => <Case039ModalTransferPhaseFunctionAudit /> },
-  { key: "case-040-off-resonance-modal-magnitude-falloff", title: "Case 040 — Off-Resonance Modal Magnitude Falloff Audit",
+  { key: "case-040-off-resonance-modal-magnitude-falloff", title: "Case 040 — Off-Resonance Modal Magnitude Falloff Audit", status: "RETIRED",
     render: (ctx) => <Case040OffResonanceModalMagnitudeFalloffAudit /> },
+  { key: "case-041-multi-room-modal-source-amplitude-check", title: "Case 041 — Multi-Room Modal Source Amplitude Check",
+    render: (ctx) => <Case041MultiRoomModalSourceAmplitudeCheck /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
