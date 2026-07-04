@@ -57,6 +57,7 @@ import ModalQTransferAuthorityAudit from "@/components/room/bass/ModalQTransferA
 import StorageFactorDominanceAudit from "@/components/room/bass/StorageFactorDominanceAudit";
 import RootCauseShootoutAudit from "@/components/room/bass/RootCauseShootoutAudit";
 import ModalFieldInternalShootoutAudit from "@/components/room/bass/ModalFieldInternalShootoutAudit";
+import ModalPhaseReceiverCouplingDecisionAudit from "@/components/room/bass/ModalPhaseReceiverCouplingDecisionAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -172,8 +173,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <StorageFactorDominanceAudit /> },
   { key: "root-cause-shootout", title: "Case 030 — Root Cause Shootout", status: "RETIRED",
     render: (ctx) => <RootCauseShootoutAudit /> },
-  { key: "modal-field-internal-shootout", title: "Case 031 — Modal Field Internal Shootout",
+  { key: "modal-field-internal-shootout", title: "Case 031 — Modal Field Internal Shootout", status: "RETIRED",
     render: (ctx) => <ModalFieldInternalShootoutAudit /> },
+  { key: "modal-phase-receiver-coupling-decision", title: "Case 032 — Modal Phase / Receiver Coupling Decision Test",
+    render: (ctx) => <ModalPhaseReceiverCouplingDecisionAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
