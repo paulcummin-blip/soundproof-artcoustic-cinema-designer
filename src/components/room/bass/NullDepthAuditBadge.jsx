@@ -39,19 +39,8 @@ function detectNullDepthFromSeries(data) {
   return detectNullDepth(freqsHz, splDb);
 }
 
-// ─── 1/6 octave fractional-octave smoothing ──────────────────────────────────
-function smoothFractionalOctave(data, width = 6) {
-  if (!Array.isArray(data) || data.length < 3) return data;
-  const sorted = [...data].sort((a, b) => a.frequency - b.frequency);
-  return sorted.map(({ frequency }) => {
-    const fLow  = frequency * Math.pow(2, -0.5 / width);
-    const fHigh = frequency * Math.pow(2,  0.5 / width);
-    const pts = sorted.filter(p => p.frequency >= fLow && p.frequency <= fHigh && Number.isFinite(p.spl));
-    if (pts.length === 0) return { frequency, spl: null };
-    const avg = pts.reduce((s, p) => s + p.spl, 0) / pts.length;
-    return { frequency, spl: avg };
-  });
-}
+// ─── Fractional-octave smoothing (matches the graph's display smoothing control) ──────
+import { applyBassSmoothing, bassSmoothingLabel } from './bassGraphSmoothing';
 
 // ─── Component ───────────────────────────────────────────────────────────────
 /**
@@ -63,8 +52,10 @@ function smoothFractionalOctave(data, width = 6) {
  *
  * Props:
  *   rawData — array of { frequency, spl } — pre-display engine output (multiSeries[0].data)
+ *   smoothingMode — 'none' | 'sixth' | 'third' — the currently DISPLAYED graph smoothing
+ *                   (Bass Response Smoothing control). Defaults to 'none'.
  */
-export default function NullDepthAuditBadge({ rawData }) {
+export default function NullDepthAuditBadge({ rawData, smoothingMode = 'none' }) {
   const audit = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length < 3) return null;
 
@@ -72,8 +63,8 @@ export default function NullDepthAuditBadge({ rawData }) {
     const { nullHz: rawHz, nullDepthDb: rawDepthDb } = detectNullDepthFromSeries(rawData);
     if (rawHz === null || rawDepthDb === null) return null;
 
-    // Smoothed null depth — 1/6 octave applied first, then same depth detection
-    const smoothedData = smoothFractionalOctave(rawData, 6)
+    // Displayed null depth — using whatever smoothing the graph currently shows
+    const smoothedData = applyBassSmoothing(rawData, smoothingMode)
       .filter(p => Number.isFinite(p.spl));
     const { nullHz: smoothedHz, nullDepthDb: smoothedDepthDb } = detectNullDepthFromSeries(smoothedData);
 
@@ -83,7 +74,7 @@ export default function NullDepthAuditBadge({ rawData }) {
       : null;
 
     return { rawHz, rawDepthDb, smoothedHz, smoothedDepthDb, fillDb };
-  }, [rawData]);
+  }, [rawData, smoothingMode]);
 
   if (!audit) return null;
 
@@ -161,7 +152,7 @@ export default function NullDepthAuditBadge({ rawData }) {
           <span style={{ fontWeight: 700 }}>{fmt1(rawHz)} Hz / {fmt1(rawDepthDb)} dB depth</span>
         </div>
         <div>
-          <span style={{ opacity: 0.7 }}>Displayed (1/6 oct): </span>
+          <span style={{ opacity: 0.7 }}>Displayed ({bassSmoothingLabel(smoothingMode)}): </span>
           <span style={{ fontWeight: 700 }}>{fmt1(smoothedHz ?? rawHz)} Hz / {fmt1(smoothedDepthDb)} dB depth</span>
         </div>
         <div>

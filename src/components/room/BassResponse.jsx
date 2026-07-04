@@ -14,6 +14,7 @@ import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
+import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -212,6 +213,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
+  // Bass Response Smoothing — display-only. Does not touch simulation, modal calculations,
+  // raw null-depth detection, or SPL normalisation. 'none' preserves prior graph behaviour
+  // (the graph previously plotted the raw unsmoothed curve).
+  const [bassSmoothingMode, setBassSmoothingMode] = useState('none');
   // __CANDIDATE_FREQ_DEP_Q__ — Q strategy selector. Default = production (unchanged).
   const [qStrategy, setQStrategy] = useState('production');
   // Temporary comparison toggle for the REW-style Absorption Authority candidate — see graph controls below.
@@ -780,9 +785,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       ? multiSeries.map((s, i) => (i === 0 ? { ...s, color: '#16a34a' } : s))
       : multiSeries;
     if (overlayProductionSeries) out = [...out, overlayProductionSeries];
+    // Apply the selected display smoothing to calculated curves only (not the pasted REW overlay).
+    out = out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy]);
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode]);
 
   // Keep a single-seat "selectedSeat" reference for the graph title + per-seat detail cards
   const primarySelectedSeat = useMemo(() => {
@@ -1090,6 +1097,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value="auto">Auto</option>
               </select>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>
+              <select
+                value={bassSmoothingMode}
+                onChange={e => setBassSmoothingMode(e.target.value)}
+                style={{ height: 26, borderRadius: 6, border: '1px solid #DCDBD6', background: '#F8F8F7', fontSize: 11, padding: '0 6px', color: '#1B1A1A', fontFamily: 'monospace', cursor: 'pointer' }}
+              >
+                <option value="none">None</option>
+                <option value="sixth">1/6 octave</option>
+                <option value="third">1/3 octave</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -1172,6 +1191,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           )}
         </div>
 
+        {/* Displayed smoothing label */}
+        <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
+          Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
+        </div>
+
         {/* ── Temporary overlay toggle for the REW-style Absorption Authority candidate ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
           <input
@@ -1212,7 +1236,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       {/* ── Null Depth Audit Badge ── */}
       {multiSeries.length > 0 && multiSeries[0]?.data?.length > 0 && (
-        <NullDepthAuditBadge rawData={multiSeries[0].data} />
+        <NullDepthAuditBadge rawData={multiSeries[0].data} smoothingMode={bassSmoothingMode} />
       )}
 
       {/* ── Diagnostic panel wiring extracted to BassDiagnosticsPanel.jsx ── */}
