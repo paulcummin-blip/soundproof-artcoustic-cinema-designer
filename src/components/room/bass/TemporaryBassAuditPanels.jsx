@@ -48,6 +48,7 @@ import ImageSourceGeometryAudit from "@/components/room/bass/ImageSourceGeometry
 import ModalAccumulationArchitectureAudit from "@/components/room/bass/ModalAccumulationArchitectureAudit";
 import FrontWallAbsorptionSensitivityAudit from "@/components/room/bass/FrontWallAbsorptionSensitivityAudit";
 import AbsorptionAuthorityAudit from "@/components/room/bass/AbsorptionAuthorityAudit";
+import ModalQTransferAuthorityAudit from "@/components/room/bass/ModalQTransferAuthorityAudit";
 
 export default function TemporaryBassAuditPanels({
   roomDims, seatingPositions, subsForSimulation, surfaceAbsorption,
@@ -117,6 +118,7 @@ export default function TemporaryBassAuditPanels({
         <ModalAccumulationArchitectureAudit />
         <FrontWallAbsorptionSensitivityAudit />
         <AbsorptionAuthorityAudit />
+        <ModalQTransferAuthorityAudit />
       </CollapsibleDiagnosticSection>
 
       <CollapsibleDiagnosticSection title="Future Audits" defaultOpen={false}>
