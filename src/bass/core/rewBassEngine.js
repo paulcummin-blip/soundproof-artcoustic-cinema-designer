@@ -147,6 +147,43 @@ function smoothSoftQCap(freqHz) {
   return Math.max(8, Math.min(45, cap));
 }
 
+// __CANDIDATE_REW_ABSORPTION_AUTHORITY__ (2026-07-04)
+// New selectable Q strategy: "REW-style absorption authority". Production 'smooth_soft_cap'
+// strategy (default) is completely unchanged — this is only active when a caller explicitly
+// passes qStrategy: 'rew_absorption_authority'.
+// Goal: give surface absorption real, visible authority over modal damping/SPL, matching the
+// much stronger absorption sensitivity seen in REW. The production soft cap (ceiling ~45,
+// floor ~8) compresses most of the natural Sabine Q swing between low and high absorption
+// before it reaches the resonant transfer function, so raising absorption from 0.30 to 1.00
+// barely moves the final curve. This strategy instead maps the room's average absorption
+// coefficient directly onto a wide Q range (low absorption → high, sharp-peaked Q; full
+// absorption → low, near-critically-damped Q), using the physical Sabine Q only as an
+// upper ceiling so the mapping never invents damping the room's absorption input didn't
+// justify. Mode frequencies, source/receiver geometry, and graph rendering are untouched —
+// only the finalQValue assigned to each mode changes.
+function rewAbsorptionAuthorityQ(freqHz, absorptionQ, surfaceAbsorption) {
+  const avgAbsorption = (
+    (surfaceAbsorption?.front ?? 0.3) +
+    (surfaceAbsorption?.back ?? 0.3) +
+    (surfaceAbsorption?.left ?? 0.3) +
+    (surfaceAbsorption?.right ?? 0.3) +
+    (surfaceAbsorption?.floor ?? 0.3) +
+    (surfaceAbsorption?.ceiling ?? 0.3)
+  ) / 6;
+
+  // Frequency-dependent ceiling for the near-rigid (avgAbsorption -> 0) end — raised relative
+  // to the production smoothSoftQCap so low-absorption rooms show genuinely sharp modal peaks/nulls.
+  const rigidRoomCeilingQ = smoothSoftQCap(freqHz) * 1.6;
+  const fullAbsorptionFloorQ = 1.3; // near-critical damping when the room is fully absorptive
+
+  // Monotonic authority curve: absorption drives Q from the rigid-room ceiling down to the
+  // full-absorption floor. Exponent < 1 keeps the mid-range (e.g. 0.30) close to a REW-like
+  // baseline while still leaving strong headroom for the 0.30 -> 1.00 move to be dramatic.
+  const authorityQ = rigidRoomCeilingQ - (rigidRoomCeilingQ - fullAbsorptionFloorQ) * Math.pow(avgAbsorption, 0.85);
+
+  return Math.max(1, Math.min(absorptionQ, authorityQ));
+}
+
 // modeShapeValueLocal — imported from modalCalculations.js
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
@@ -859,6 +896,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           // __CANDIDATE_SMOOTH_SOFT_CAP__ — smooth power-law Q ceiling, no hard band steps.
           const softCap = smoothSoftQCap(mode.freq);
           finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
+        } else if (qStrategy === 'rew_absorption_authority') {
+          // __CANDIDATE_REW_ABSORPTION_AUTHORITY__ — new selectable strategy, gives surface
+          // absorption strong, visible authority over modal Q/SPL. See function doc above.
+          finalQValue = rewAbsorptionAuthorityQ(mode.freq, absorptionQ, surfaceAbsorption);
         } else {
           // __PRODUCTION_SOFT_Q_CAP__ (2026-06-29)
           // Replaced hard baseQ ceiling (4.0 axial / 3.9 tangential / 2.5 oblique) with a smooth

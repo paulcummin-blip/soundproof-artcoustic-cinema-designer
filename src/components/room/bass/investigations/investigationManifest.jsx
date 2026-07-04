@@ -59,6 +59,7 @@ import RootCauseShootoutAudit from "@/components/room/bass/RootCauseShootoutAudi
 import ModalFieldInternalShootoutAudit from "@/components/room/bass/ModalFieldInternalShootoutAudit";
 import ModalPhaseReceiverCouplingDecisionAudit from "@/components/room/bass/ModalPhaseReceiverCouplingDecisionAudit";
 import AbsorptionAuthorityRootCauseAudit from "@/components/room/bass/AbsorptionAuthorityRootCauseAudit";
+import RewStyleAbsorptionAuthorityCheck from "@/components/room/bass/RewStyleAbsorptionAuthorityCheck";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -178,8 +179,10 @@ const RAW_ENTRIES = [
     render: (ctx) => <ModalFieldInternalShootoutAudit /> },
   { key: "modal-phase-receiver-coupling-decision", title: "Case 032 — Modal Phase / Receiver Coupling Decision Test", status: "RETIRED",
     render: (ctx) => <ModalPhaseReceiverCouplingDecisionAudit /> },
-  { key: "absorption-authority-root-cause", title: "Case 033 — Absorption Authority Root Cause Audit",
+  { key: "absorption-authority-root-cause", title: "Case 033 — Absorption Authority Root Cause Audit", status: "RETIRED",
     render: (ctx) => <AbsorptionAuthorityRootCauseAudit /> },
+  { key: "rew-style-absorption-authority-check", title: "Case 034 — REW-style Absorption Authority Check",
+    render: (ctx) => <RewStyleAbsorptionAuthorityCheck /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
