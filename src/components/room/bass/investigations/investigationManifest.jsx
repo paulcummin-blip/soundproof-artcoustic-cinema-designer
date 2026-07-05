@@ -81,6 +81,7 @@ import Case053ListenerCoordinateVerificationAudit from "@/components/room/bass/C
 import Case054ModalPhaseValidationAudit from "@/components/room/bass/Case054ModalPhaseValidationAudit";
 import Case055ModalEigenfunctionSpatialBasisAudit from "@/components/room/bass/Case055ModalEigenfunctionSpatialBasisAudit";
 import Case056DirectReflectionPathValidationAudit from "@/components/room/bass/Case056DirectReflectionPathValidationAudit";
+import Case057CorrectRewReferenceBaselineResetAudit from "@/components/room/bass/Case057CorrectRewReferenceBaselineResetAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -246,6 +247,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case055ModalEigenfunctionSpatialBasisAudit /> },
   { key: "case-056-direct-reflection-path-validation", title: "Case 056 — Direct / Reflection Path Validation",
     render: (ctx) => <Case056DirectReflectionPathValidationAudit /> },
+  { key: "case-057-correct-rew-reference-baseline-reset", title: "Case 057 — Correct REW Reference Baseline Reset",
+    render: (ctx) => <Case057CorrectRewReferenceBaselineResetAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
