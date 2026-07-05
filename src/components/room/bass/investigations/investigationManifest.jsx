@@ -75,6 +75,7 @@ import Case047FiveRoomBandwidthScaleCalibrationAudit from "@/components/room/bas
 import Case048DampingUnitScaleFactorAudit from "@/components/room/bass/Case048DampingUnitScaleFactorAudit";
 import Case049SourceExcitationModelShootoutAudit from "@/components/room/bass/Case049SourceExcitationModelShootoutAudit";
 import Case050ComplexSummationIntegrityAudit from "@/components/room/bass/Case050ComplexSummationIntegrityAudit";
+import Case051TextbookAnalyticalSolverCrossCheckAudit from "@/components/room/bass/Case051TextbookAnalyticalSolverCrossCheckAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -228,6 +229,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case049SourceExcitationModelShootoutAudit /> },
   { key: "case-050-complex-summation-integrity-audit", title: "Case 050 — Complex Summation Integrity Audit",
     render: (ctx) => <Case050ComplexSummationIntegrityAudit /> },
+  { key: "case-051-textbook-analytical-solver-cross-check", title: "Case 051 — Textbook Analytical Solver Cross-Check",
+    render: (ctx) => <Case051TextbookAnalyticalSolverCrossCheckAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
