@@ -78,6 +78,7 @@ import Case050ComplexSummationIntegrityAudit from "@/components/room/bass/Case05
 import Case051TextbookAnalyticalSolverCrossCheckAudit from "@/components/room/bass/Case051TextbookAnalyticalSolverCrossCheckAudit";
 import Case052SeatPositionNullAlignmentAudit from "@/components/room/bass/Case052SeatPositionNullAlignmentAudit";
 import Case053ListenerCoordinateVerificationAudit from "@/components/room/bass/Case053ListenerCoordinateVerificationAudit";
+import Case054ModalPhaseValidationAudit from "@/components/room/bass/Case054ModalPhaseValidationAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -237,6 +238,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case052SeatPositionNullAlignmentAudit /> },
   { key: "case-053-listener-coordinate-verification", title: "Case 053 — Listener Coordinate Verification",
     render: (ctx) => <Case053ListenerCoordinateVerificationAudit /> },
+  { key: "case-054-modal-phase-validation", title: "Case 054 — Modal Phase Validation",
+    render: (ctx) => <Case054ModalPhaseValidationAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
