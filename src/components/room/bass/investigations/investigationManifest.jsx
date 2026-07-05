@@ -80,6 +80,7 @@ import Case052SeatPositionNullAlignmentAudit from "@/components/room/bass/Case05
 import Case053ListenerCoordinateVerificationAudit from "@/components/room/bass/Case053ListenerCoordinateVerificationAudit";
 import Case054ModalPhaseValidationAudit from "@/components/room/bass/Case054ModalPhaseValidationAudit";
 import Case055ModalEigenfunctionSpatialBasisAudit from "@/components/room/bass/Case055ModalEigenfunctionSpatialBasisAudit";
+import Case056DirectReflectionPathValidationAudit from "@/components/room/bass/Case056DirectReflectionPathValidationAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -243,6 +244,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case054ModalPhaseValidationAudit /> },
   { key: "case-055-modal-eigenfunction-spatial-basis", title: "Case 055 — Modal Eigenfunction Spatial Basis Audit",
     render: (ctx) => <Case055ModalEigenfunctionSpatialBasisAudit /> },
+  { key: "case-056-direct-reflection-path-validation", title: "Case 056 — Direct / Reflection Path Validation",
+    render: (ctx) => <Case056DirectReflectionPathValidationAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
