@@ -72,6 +72,7 @@ import Case044RewAxisMappingFinalCheck from "@/components/room/bass/Case044RewAx
 import Case045ModalOverlapWeightingShootoutAudit from "@/components/room/bass/Case045ModalOverlapWeightingShootoutAudit";
 import Case046ModalContributionNormalisationShootoutAudit from "@/components/room/bass/Case046ModalContributionNormalisationShootoutAudit";
 import Case047FiveRoomBandwidthScaleCalibrationAudit from "@/components/room/bass/Case047FiveRoomBandwidthScaleCalibrationAudit";
+import Case048DampingUnitScaleFactorAudit from "@/components/room/bass/Case048DampingUnitScaleFactorAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -219,6 +220,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case046ModalContributionNormalisationShootoutAudit /> },
   { key: "case-047-five-room-bandwidth-scale-calibration", title: "Case 047 — Five-Room Bandwidth Scale Calibration",
     render: (ctx) => <Case047FiveRoomBandwidthScaleCalibrationAudit /> },
+  { key: "case-048-damping-unit-scale-factor-audit", title: "Case 048 — Damping Unit / Scale Factor Audit",
+    render: (ctx) => <Case048DampingUnitScaleFactorAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
