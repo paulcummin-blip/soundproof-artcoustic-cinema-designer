@@ -219,6 +219,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [bassSmoothingMode, setBassSmoothingMode] = useState('none');
   // __CANDIDATE_FREQ_DEP_Q__ — Q strategy selector. Default = production (unchanged).
   const [qStrategy, setQStrategy] = useState('production');
+  // __CANDIDATE_REW_MODAL_BANDWIDTH__ — bandwidth scale for the "REW-style Modal Bandwidth"
+  // experimental Q strategy. Only used when qStrategy === 'rew_modal_bandwidth'.
+  const [rewModalBandwidthScale, setRewModalBandwidthScale] = useState(0.55);
   // Temporary comparison toggle for the REW-style Absorption Authority candidate — see graph controls below.
   const [overlayProduction, setOverlayProduction] = useState(false);
 
@@ -637,6 +640,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             modalCoherenceMode, // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
             highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
             qStrategy: qStrategyOverride, // __CANDIDATE_FREQ_DEP_Q__
+            rewModalBandwidthScale, // __CANDIDATE_REW_MODAL_BANDWIDTH__
             }
         );
 
@@ -693,7 +697,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
       activeModalVectorPath: __b44ActiveModalVectorPath,
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale]);
 
   const simulationResults = useMemo(() => runSimulation(qStrategy), [runSimulation, qStrategy]);
   // Temporary overlay: re-runs the identical engine with qStrategy forced to 'production',
@@ -1084,8 +1088,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                  <option value="freq_dependent_cap">⚡ Freq-dep cap — Variant F (diagnostic)</option>
                  <option value="smooth_soft_cap">🔬 Smooth soft cap (same as production)</option>
                  <option value="rew_absorption_authority">REW-style Absorption Authority (Experimental)</option>
+                 <option value="rew_modal_bandwidth">REW-style Modal Bandwidth (Experimental)</option>
               </select>
             </div>
+            {qStrategy === 'rew_modal_bandwidth' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Bandwidth scale:</span>
+                <select
+                  value={rewModalBandwidthScale}
+                  onChange={e => setRewModalBandwidthScale(parseFloat(e.target.value))}
+                  style={{ height: 26, borderRadius: 6, border: '1px solid #93c5fd', background: '#eff6ff', fontSize: 11, padding: '0 6px', color: '#1e40af', fontFamily: 'monospace', cursor: 'pointer' }}
+                >
+                  <option value="0.45">0.45</option>
+                  <option value="0.55">0.55</option>
+                  <option value="0.65">0.65</option>
+                  <option value="0.75">0.75</option>
+                  <option value="1.00">1.00</option>
+                </select>
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Graph scale:</span>
               <select
@@ -1231,6 +1252,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {qStrategy === 'rew_absorption_authority' && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#065f46', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
           🧪 Q strategy: REW-style Absorption Authority — experimental candidate
+        </div>
+      )}
+      {qStrategy === 'rew_modal_bandwidth' && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#1e40af', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
+          🧪 Q strategy: REW-style Modal Bandwidth (scale {rewModalBandwidthScale.toFixed(2)}) — experimental candidate
         </div>
       )}
 

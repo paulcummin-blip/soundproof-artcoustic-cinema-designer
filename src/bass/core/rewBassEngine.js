@@ -184,6 +184,22 @@ function rewAbsorptionAuthorityQ(freqHz, absorptionQ, surfaceAbsorption) {
   return Math.max(1, Math.min(absorptionQ, authorityQ));
 }
 
+// __CANDIDATE_REW_MODAL_BANDWIDTH__ (2026-07-05)
+// New selectable Q strategy: "REW-style Modal Bandwidth". Production 'smooth_soft_cap' strategy
+// (default) is completely unchanged — this is only active when a caller explicitly passes
+// qStrategy: 'rew_modal_bandwidth'. Goal: broaden modal peak/null skirts (slower low-end
+// recovery, wider resonance bandwidth) to better match REW's observed envelope shape, WITHOUT
+// touching modal frequencies, source/receiver coupling, source amplitude, direct field,
+// reflections, or graph rendering. Only the effective Q fed into resonantTransfer() changes:
+// effectiveQ = finalQ * bandwidthScale, where finalQ is computed identically to the production
+// smooth soft cap (Math.max(1, Math.min(absorptionQ, smoothSoftQCap(freq)))).
+function rewModalBandwidthQ(freqHz, absorptionQ, bandwidthScale) {
+  const softCap = smoothSoftQCap(freqHz);
+  const finalQ = Math.max(1, Math.min(absorptionQ, softCap));
+  const scale = Number.isFinite(Number(bandwidthScale)) ? Number(bandwidthScale) : 0.55;
+  return Math.max(1, finalQ * scale);
+}
+
 // modeShapeValueLocal — imported from modalCalculations.js
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
@@ -900,6 +916,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           // __CANDIDATE_REW_ABSORPTION_AUTHORITY__ — new selectable strategy, gives surface
           // absorption strong, visible authority over modal Q/SPL. See function doc above.
           finalQValue = rewAbsorptionAuthorityQ(mode.freq, absorptionQ, surfaceAbsorption);
+        } else if (qStrategy === 'rew_modal_bandwidth') {
+          // __CANDIDATE_REW_MODAL_BANDWIDTH__ — broadens modal skirts only. See function doc above.
+          finalQValue = rewModalBandwidthQ(mode.freq, absorptionQ, options?.rewModalBandwidthScale);
         } else {
           // __PRODUCTION_SOFT_Q_CAP__ (2026-06-29)
           // Replaced hard baseQ ceiling (4.0 axial / 3.9 tangential / 2.5 oblique) with a smooth
