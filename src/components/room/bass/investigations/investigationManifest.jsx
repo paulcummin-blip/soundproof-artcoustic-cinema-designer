@@ -73,6 +73,7 @@ import Case045ModalOverlapWeightingShootoutAudit from "@/components/room/bass/Ca
 import Case046ModalContributionNormalisationShootoutAudit from "@/components/room/bass/Case046ModalContributionNormalisationShootoutAudit";
 import Case047FiveRoomBandwidthScaleCalibrationAudit from "@/components/room/bass/Case047FiveRoomBandwidthScaleCalibrationAudit";
 import Case048DampingUnitScaleFactorAudit from "@/components/room/bass/Case048DampingUnitScaleFactorAudit";
+import Case049SourceExcitationModelShootoutAudit from "@/components/room/bass/Case049SourceExcitationModelShootoutAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -222,6 +223,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case047FiveRoomBandwidthScaleCalibrationAudit /> },
   { key: "case-048-damping-unit-scale-factor-audit", title: "Case 048 — Damping Unit / Scale Factor Audit",
     render: (ctx) => <Case048DampingUnitScaleFactorAudit /> },
+  { key: "case-049-source-excitation-model-shootout", title: "Case 049 — Source Excitation Model Shootout",
+    render: (ctx) => <Case049SourceExcitationModelShootoutAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
