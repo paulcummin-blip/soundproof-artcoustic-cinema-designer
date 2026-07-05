@@ -71,6 +71,7 @@ import Case043SourceReceiverCouplingParityAudit from "@/components/room/bass/Cas
 import Case044RewAxisMappingFinalCheck from "@/components/room/bass/Case044RewAxisMappingFinalCheck";
 import Case045ModalOverlapWeightingShootoutAudit from "@/components/room/bass/Case045ModalOverlapWeightingShootoutAudit";
 import Case046ModalContributionNormalisationShootoutAudit from "@/components/room/bass/Case046ModalContributionNormalisationShootoutAudit";
+import Case047FiveRoomBandwidthScaleCalibrationAudit from "@/components/room/bass/Case047FiveRoomBandwidthScaleCalibrationAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -216,6 +217,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case045ModalOverlapWeightingShootoutAudit /> },
   { key: "case-046-modal-contribution-normalisation-shootout", title: "Case 046 — Modal Contribution Normalisation Shootout",
     render: (ctx) => <Case046ModalContributionNormalisationShootoutAudit /> },
+  { key: "case-047-five-room-bandwidth-scale-calibration", title: "Case 047 — Five-Room Bandwidth Scale Calibration",
+    render: (ctx) => <Case047FiveRoomBandwidthScaleCalibrationAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
