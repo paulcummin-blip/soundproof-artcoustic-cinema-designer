@@ -82,6 +82,7 @@ import Case054ModalPhaseValidationAudit from "@/components/room/bass/Case054Moda
 import Case055ModalEigenfunctionSpatialBasisAudit from "@/components/room/bass/Case055ModalEigenfunctionSpatialBasisAudit";
 import Case056DirectReflectionPathValidationAudit from "@/components/room/bass/Case056DirectReflectionPathValidationAudit";
 import Case057CorrectRewReferenceBaselineResetAudit from "@/components/room/bass/Case057CorrectRewReferenceBaselineResetAudit";
+import Case058AutomaticRewCurveDigitisationAudit from "@/components/room/bass/Case058AutomaticRewCurveDigitisationAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -249,6 +250,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case056DirectReflectionPathValidationAudit /> },
   { key: "case-057-correct-rew-reference-baseline-reset", title: "Case 057 — Correct REW Reference Baseline Reset",
     render: (ctx) => <Case057CorrectRewReferenceBaselineResetAudit /> },
+  { key: "case-058-automatic-rew-curve-digitisation", title: "Case 058 — Automatic REW Curve Digitisation & Full-Curve Parity",
+    render: (ctx) => <Case058AutomaticRewCurveDigitisationAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
