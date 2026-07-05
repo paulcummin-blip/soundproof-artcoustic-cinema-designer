@@ -58,7 +58,10 @@ function localBaseline(series, centreHz, outerHz, excludeHz) {
 }
 
 function nearestSpl(series, targetHz) {
-  const p = series.reduce((best, pt) => (Math.abs(pt.frequency - targetHz) < Math.abs(best.frequency - targetHz) ? pt : best), series[0]);
+  if (!Array.isArray(series) || series.length === 0) return null;
+  const valid = series.filter((pt) => pt && Number.isFinite(pt.frequency) && Number.isFinite(pt.spl));
+  if (valid.length === 0) return null;
+  const p = valid.reduce((best, pt) => (Math.abs(pt.frequency - targetHz) < Math.abs(best.frequency - targetHz) ? pt : best), valid[0]);
   return p ? p.spl : null;
 }
 
