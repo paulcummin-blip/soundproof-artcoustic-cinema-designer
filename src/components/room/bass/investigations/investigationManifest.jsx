@@ -83,6 +83,7 @@ import Case055ModalEigenfunctionSpatialBasisAudit from "@/components/room/bass/C
 import Case056DirectReflectionPathValidationAudit from "@/components/room/bass/Case056DirectReflectionPathValidationAudit";
 import Case057CorrectRewReferenceBaselineResetAudit from "@/components/room/bass/Case057CorrectRewReferenceBaselineResetAudit";
 import Case058AutomaticRewCurveDigitisationAudit from "@/components/room/bass/Case058AutomaticRewCurveDigitisationAudit";
+import Case059EnergyBudgetAbsoluteLevelAudit from "@/components/room/bass/Case059EnergyBudgetAbsoluteLevelAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -252,6 +253,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case057CorrectRewReferenceBaselineResetAudit /> },
   { key: "case-058-automatic-rew-curve-digitisation", title: "Case 058 — Automatic REW Curve Digitisation & Full-Curve Parity",
     render: (ctx) => <Case058AutomaticRewCurveDigitisationAudit /> },
+  { key: "case-059-energy-budget-absolute-level-audit", title: "Case 059 — Energy Budget / Absolute Level Audit",
+    render: (ctx) => <Case059EnergyBudgetAbsoluteLevelAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
