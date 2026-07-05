@@ -74,6 +74,7 @@ import Case046ModalContributionNormalisationShootoutAudit from "@/components/roo
 import Case047FiveRoomBandwidthScaleCalibrationAudit from "@/components/room/bass/Case047FiveRoomBandwidthScaleCalibrationAudit";
 import Case048DampingUnitScaleFactorAudit from "@/components/room/bass/Case048DampingUnitScaleFactorAudit";
 import Case049SourceExcitationModelShootoutAudit from "@/components/room/bass/Case049SourceExcitationModelShootoutAudit";
+import Case050ComplexSummationIntegrityAudit from "@/components/room/bass/Case050ComplexSummationIntegrityAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -225,6 +226,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case048DampingUnitScaleFactorAudit /> },
   { key: "case-049-source-excitation-model-shootout", title: "Case 049 — Source Excitation Model Shootout",
     render: (ctx) => <Case049SourceExcitationModelShootoutAudit /> },
+  { key: "case-050-complex-summation-integrity-audit", title: "Case 050 — Complex Summation Integrity Audit",
+    render: (ctx) => <Case050ComplexSummationIntegrityAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
