@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine.js";
 import { useAppState } from "@/components/AppStateProvider";
 
@@ -121,7 +120,16 @@ export default function Case052SeatPositionNullAlignmentAudit() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
 
-  const hasValidInputs = !!appState;
+  let validityReason = null;
+  try {
+    const { seatX, earZ, sub } = resolveLiveSeatAndSub(appState);
+    if (!Number.isFinite(seatX)) validityReason = "seat X position";
+    else if (!Number.isFinite(earZ)) validityReason = "seat ear height";
+    else if (!sub || !Number.isFinite(sub.x) || !Number.isFinite(sub.y)) validityReason = "subwoofer position";
+  } catch (e) {
+    validityReason = "room/seat/sub data";
+  }
+  const hasValidInputs = !validityReason;
 
   const runAudit = () => {
     setRunning(true);
@@ -180,14 +188,30 @@ export default function Case052SeatPositionNullAlignmentAudit() {
         Room 5.9m L × 3.5m W × 2.7m H · sub front-right · absorption 0.30 all surfaces · seat Y sweep {fmt(SEAT_Y_START, 2)}–{fmt(SEAT_Y_END, 2)}m, step {SEAT_Y_STEP}m, seat X and ear height held at current live values. Nothing runs until you click Run Audit.
       </div>
 
-      {!hasValidInputs && (
-        <div style={{ color: "#92400e", fontWeight: 600 }}>Waiting for valid room/seat/sub data</div>
-      )}
+      <button
+        type="button"
+        onClick={runAudit}
+        disabled={!hasValidInputs || running}
+        style={{
+          marginBottom: 10,
+          padding: "10px 20px",
+          fontSize: 12,
+          fontWeight: 700,
+          borderRadius: 6,
+          border: "1px solid #92400e",
+          cursor: (!hasValidInputs || running) ? "not-allowed" : "pointer",
+          backgroundColor: (!hasValidInputs || running) ? "#d6d3d1" : "#b45309",
+          color: (!hasValidInputs || running) ? "#57534e" : "#fffbeb",
+          opacity: 1,
+        }}
+      >
+        {running ? "Running…" : "Run Audit"}
+      </button>
 
-      {hasValidInputs && (
-        <Button onClick={runAudit} disabled={running} style={{ marginBottom: 10 }}>
-          {running ? "Running…" : "Run Audit"}
-        </Button>
+      {!hasValidInputs && (
+        <div style={{ color: "#92400e", fontWeight: 600, marginBottom: 10 }}>
+          Waiting for valid data — missing: {validityReason}
+        </div>
       )}
 
       {error && (
