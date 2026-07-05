@@ -426,9 +426,18 @@ function normalizeSubTuning(tuning) {
 
 // Main simulation engine
 export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options = {} }) {
-  // Guards
-  if (!roomDims || !roomDims.widthM || !roomDims.lengthM || !roomDims.heightM) {
-    return { seatResponses: {}, metrics: null };
+  // Strict input guard — roomDims must be a defined object with finite, positive dimensions.
+  // Prevents "Cannot read properties of undefined (reading 'widthM')" when called before
+  // room dimensions are ready (e.g. during initial render or diagnostic panel mount).
+  const _widthM = Number(roomDims?.widthM);
+  const _lengthM = Number(roomDims?.lengthM);
+  const _heightM = Number(roomDims?.heightM);
+  if (!roomDims || !Number.isFinite(_widthM) || _widthM <= 0 || !Number.isFinite(_lengthM) || _lengthM <= 0 || !Number.isFinite(_heightM) || _heightM <= 0) {
+    if (typeof window !== 'undefined' && !window.__B44_WARNED_ROOMDIMS__) {
+      window.__B44_WARNED_ROOMDIMS__ = true;
+      console.warn('[simulateBassAtSeats] Skipped: roomDims missing or non-finite (widthM/lengthM/heightM).');
+    }
+    return { seatResponses: {}, metrics: null, audit: null };
   }
   
   if (!Array.isArray(seats) || seats.length === 0) {
