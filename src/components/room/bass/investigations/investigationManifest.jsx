@@ -76,7 +76,6 @@ import Case048DampingUnitScaleFactorAudit from "@/components/room/bass/Case048Da
 import Case049SourceExcitationModelShootoutAudit from "@/components/room/bass/Case049SourceExcitationModelShootoutAudit";
 import Case050ComplexSummationIntegrityAudit from "@/components/room/bass/Case050ComplexSummationIntegrityAudit";
 import Case051TextbookAnalyticalSolverCrossCheckAudit from "@/components/room/bass/Case051TextbookAnalyticalSolverCrossCheckAudit";
-import Case052SeatPositionNullAlignmentAudit from "@/components/room/bass/Case052SeatPositionNullAlignmentAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -232,8 +231,6 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case050ComplexSummationIntegrityAudit /> },
   { key: "case-051-textbook-analytical-solver-cross-check", title: "Case 051 — Textbook Analytical Solver Cross-Check",
     render: (ctx) => <Case051TextbookAnalyticalSolverCrossCheckAudit /> },
-  { key: "case-052-seat-position-null-alignment", title: "Case 052 — Seat-Position Null Alignment Test",
-    render: (ctx) => <Case052SeatPositionNullAlignmentAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
