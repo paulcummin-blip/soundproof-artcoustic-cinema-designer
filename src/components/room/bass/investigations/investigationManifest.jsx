@@ -69,6 +69,7 @@ import Case041MultiRoomModalSourceAmplitudeCheck from "@/components/room/bass/Ca
 import Case042ResonantTransferEquationParityCheck from "@/components/room/bass/Case042ResonantTransferEquationParityCheck";
 import Case043SourceReceiverCouplingParityAudit from "@/components/room/bass/Case043SourceReceiverCouplingParityAudit";
 import Case044RewAxisMappingFinalCheck from "@/components/room/bass/Case044RewAxisMappingFinalCheck";
+import Case045ModalOverlapWeightingShootoutAudit from "@/components/room/bass/Case045ModalOverlapWeightingShootoutAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -210,6 +211,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case043SourceReceiverCouplingParityAudit /> },
   { key: "case-044-rew-axis-mapping-final-check", title: "Case 044 — REW Axis Mapping Final Check",
     render: (ctx) => <Case044RewAxisMappingFinalCheck /> },
+  { key: "case-045-modal-overlap-weighting-shootout", title: "Case 045 — Modal Overlap Weighting Shootout",
+    render: (ctx) => <Case045ModalOverlapWeightingShootoutAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
