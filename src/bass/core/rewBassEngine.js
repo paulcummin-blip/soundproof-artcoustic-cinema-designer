@@ -1218,10 +1218,16 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // __CANDIDATE_AB_CORRECTED_MODAL__ — override the legacy modal sum with the A&B corrected
       // term only when explicitly selected. Direct path, reflections, and Q assignment above are
       // untouched; this only replaces the additive modal pressure vector before it is summed in.
+      // Gain basis matches Case 065/071 Variant B exactly: S_UNIT = 10^(curveDb/20), i.e. the pure
+      // source reference level with no gainDb, no modalGainScalar, and no distance/room-volume
+      // normalisation folded in (modalSourceAmplitude1m is NOT used here — it can carry extra
+      // distance-based attenuation depending on modalSourceReferenceMode, which is not part of
+      // the validated Case 071 formula and was causing the flattened response).
       if (options?.qStrategy === 'ab_corrected') {
+        const abSourceUnit = Math.pow(10, curveDb / 20);
         const abResult = abCorrectedModalTransferLocal(
           frequencyHz, modes, source, seat, { widthM, lengthM, heightM },
-          modalSourceAmplitude1m, source.tuning.delayMs, source.tuning.polarity
+          abSourceUnit, source.tuning.delayMs, source.tuning.polarity
         );
         modalSumRe = abResult.modalSumRe;
         modalSumIm = abResult.modalSumIm;
