@@ -522,7 +522,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         const _effectiveFieldMode = rewParityFieldMode;
 
         // REW parity isolation: flat_rew_reference + full_field → direct + modes only, no reflections, no late field
-        const _fieldReflections = _isParityFullField ? false
+        // __CANDIDATE_AB_CORRECTED_MODAL__ — the A&B strategy must match Case 071's validated
+        // engine options (enableReflections: true), bypassing this legacy parity-isolation gate.
+        const _fieldReflections = qStrategy === 'ab_corrected' ? true
+          : _isParityFullField ? false
           : _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes' ? false
           : _effectiveFieldMode === 'reflections_only' ? true
           : enableRewCoreReflections;
