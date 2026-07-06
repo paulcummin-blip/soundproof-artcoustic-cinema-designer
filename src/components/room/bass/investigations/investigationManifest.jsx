@@ -95,6 +95,7 @@ import Case067AmplitudeCalibrationChainAudit from "@/components/room/bass/Case06
 import Case068ResidualShapeErrorBandIsolation from "@/components/room/bass/Case068ResidualShapeErrorBandIsolation";
 import Case069FundamentalAxialModeFormationAudit from "@/components/room/bass/Case069FundamentalAxialModeFormationAudit";
 import Case070PositionSensitivityCoordinateVerificationAudit from "@/components/room/bass/Case070PositionSensitivityCoordinateVerificationAudit";
+import Case071FiveRoomABCorrectionValidation from "@/components/room/bass/Case071FiveRoomABCorrectionValidation";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -288,6 +289,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case069FundamentalAxialModeFormationAudit /> },
   { key: "case-070-position-sensitivity-coordinate-verification-audit", title: "Case 070 — Position Sensitivity / Coordinate Verification Audit",
     render: (ctx) => <Case070PositionSensitivityCoordinateVerificationAudit /> },
+  { key: "case-071-five-room-ab-correction-validation", title: "Case 071 — Five-Room A&B Correction Validation",
+    render: (ctx) => <Case071FiveRoomABCorrectionValidation /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
