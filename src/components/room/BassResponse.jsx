@@ -14,6 +14,7 @@ import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
+import Case072AbCorrectedRuntimeVerification from "@/components/room/bass/Case072AbCorrectedRuntimeVerification";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1267,6 +1268,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '6px 10px', marginTop: -4, marginBottom: 4 }}>
           Experimental Allen &amp; Berkley modal correction active — improves REW parity in Case 071 validation.
         </div>
+      )}
+
+      {/* __TEMP_CASE072_VERIFICATION__ — temporary runtime verification panel, ab_corrected only */}
+      {qStrategy === 'ab_corrected' && (
+        <Case072AbCorrectedRuntimeVerification />
       )}
 
       {/* ── Null Depth Audit Badge ── */}
