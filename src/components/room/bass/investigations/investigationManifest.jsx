@@ -84,6 +84,7 @@ import Case056DirectReflectionPathValidationAudit from "@/components/room/bass/C
 import Case057CorrectRewReferenceBaselineResetAudit from "@/components/room/bass/Case057CorrectRewReferenceBaselineResetAudit";
 import Case058AutomaticRewCurveDigitisationAudit from "@/components/room/bass/Case058AutomaticRewCurveDigitisationAudit";
 import Case059EnergyBudgetAbsoluteLevelAudit from "@/components/room/bass/Case059EnergyBudgetAbsoluteLevelAudit";
+import Case060PressureUnitSummationScalingAudit from "@/components/room/bass/Case060PressureUnitSummationScalingAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -255,6 +256,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case058AutomaticRewCurveDigitisationAudit /> },
   { key: "case-059-energy-budget-absolute-level-audit", title: "Case 059 — Energy Budget / Absolute Level Audit",
     render: (ctx) => <Case059EnergyBudgetAbsoluteLevelAudit /> },
+  { key: "case-060-pressure-unit-summation-scaling-audit", title: "Case 060 — Pressure Unit / Summation Scaling Audit",
+    render: (ctx) => <Case060PressureUnitSummationScalingAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
