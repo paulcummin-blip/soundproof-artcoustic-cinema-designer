@@ -91,6 +91,7 @@ import Case063AllenBerkleyModalEquationAudit from "@/components/room/bass/Case06
 import Case064AllenBerkleyAppendixAEquationAudit from "@/components/room/bass/Case064AllenBerkleyAppendixAEquationAudit";
 import Case065AllenBerkleyModalReplacementTest from "@/components/room/bass/Case065AllenBerkleyModalReplacementTest";
 import Case066ResidualErrorSourceIsolation from "@/components/room/bass/Case066ResidualErrorSourceIsolation";
+import Case067AmplitudeCalibrationChainAudit from "@/components/room/bass/Case067AmplitudeCalibrationChainAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -276,6 +277,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case065AllenBerkleyModalReplacementTest /> },
   { key: "case-066-residual-error-source-isolation", title: "Case 066 — Residual Error Source Isolation",
     render: (ctx) => <Case066ResidualErrorSourceIsolation /> },
+  { key: "case-067-amplitude-calibration-chain-audit", title: "Case 067 — Amplitude Calibration Chain Audit",
+    render: (ctx) => <Case067AmplitudeCalibrationChainAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
