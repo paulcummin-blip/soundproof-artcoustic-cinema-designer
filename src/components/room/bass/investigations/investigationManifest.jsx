@@ -94,6 +94,7 @@ import Case066ResidualErrorSourceIsolation from "@/components/room/bass/Case066R
 import Case067AmplitudeCalibrationChainAudit from "@/components/room/bass/Case067AmplitudeCalibrationChainAudit";
 import Case068ResidualShapeErrorBandIsolation from "@/components/room/bass/Case068ResidualShapeErrorBandIsolation";
 import Case069FundamentalAxialModeFormationAudit from "@/components/room/bass/Case069FundamentalAxialModeFormationAudit";
+import Case070PositionSensitivityCoordinateVerificationAudit from "@/components/room/bass/Case070PositionSensitivityCoordinateVerificationAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -285,6 +286,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case068ResidualShapeErrorBandIsolation /> },
   { key: "case-069-fundamental-axial-mode-formation-audit", title: "Case 069 — Fundamental Axial Mode Formation Audit",
     render: (ctx) => <Case069FundamentalAxialModeFormationAudit /> },
+  { key: "case-070-position-sensitivity-coordinate-verification-audit", title: "Case 070 — Position Sensitivity / Coordinate Verification Audit",
+    render: (ctx) => <Case070PositionSensitivityCoordinateVerificationAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
