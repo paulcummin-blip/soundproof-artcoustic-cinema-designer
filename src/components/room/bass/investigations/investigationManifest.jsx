@@ -85,6 +85,7 @@ import Case057CorrectRewReferenceBaselineResetAudit from "@/components/room/bass
 import Case058AutomaticRewCurveDigitisationAudit from "@/components/room/bass/Case058AutomaticRewCurveDigitisationAudit";
 import Case059EnergyBudgetAbsoluteLevelAudit from "@/components/room/bass/Case059EnergyBudgetAbsoluteLevelAudit";
 import Case060PressureUnitSummationScalingAudit from "@/components/room/bass/Case060PressureUnitSummationScalingAudit";
+import Case061ModalEnergyDoubleCountingAudit from "@/components/room/bass/Case061ModalEnergyDoubleCountingAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -258,6 +259,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case059EnergyBudgetAbsoluteLevelAudit /> },
   { key: "case-060-pressure-unit-summation-scaling-audit", title: "Case 060 — Pressure Unit / Summation Scaling Audit",
     render: (ctx) => <Case060PressureUnitSummationScalingAudit /> },
+  { key: "case-061-modal-energy-double-counting-audit", title: "Case 061 — Modal Energy Double-Counting Audit",
+    render: (ctx) => <Case061ModalEnergyDoubleCountingAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
