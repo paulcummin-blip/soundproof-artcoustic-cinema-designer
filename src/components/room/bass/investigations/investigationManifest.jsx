@@ -87,6 +87,7 @@ import Case059EnergyBudgetAbsoluteLevelAudit from "@/components/room/bass/Case05
 import Case060PressureUnitSummationScalingAudit from "@/components/room/bass/Case060PressureUnitSummationScalingAudit";
 import Case061ModalEnergyDoubleCountingAudit from "@/components/room/bass/Case061ModalEnergyDoubleCountingAudit";
 import Case062ModalNormalisationSourceAudit from "@/components/room/bass/Case062ModalNormalisationSourceAudit";
+import Case063AllenBerkleyModalEquationAudit from "@/components/room/bass/Case063AllenBerkleyModalEquationAudit";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -264,6 +265,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case061ModalEnergyDoubleCountingAudit /> },
   { key: "case-062-modal-normalisation-source-audit", title: "Case 062 — Modal Normalisation Source Audit",
     render: (ctx) => <Case062ModalNormalisationSourceAudit /> },
+  { key: "case-063-allen-berkley-modal-equation-audit", title: "Case 063 — Allen & Berkley Modal Equation Audit",
+    render: (ctx) => <Case063AllenBerkleyModalEquationAudit /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
