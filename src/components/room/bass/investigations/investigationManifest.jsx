@@ -89,6 +89,7 @@ import Case061ModalEnergyDoubleCountingAudit from "@/components/room/bass/Case06
 import Case062ModalNormalisationSourceAudit from "@/components/room/bass/Case062ModalNormalisationSourceAudit";
 import Case063AllenBerkleyModalEquationAudit from "@/components/room/bass/Case063AllenBerkleyModalEquationAudit";
 import Case064AllenBerkleyAppendixAEquationAudit from "@/components/room/bass/Case064AllenBerkleyAppendixAEquationAudit";
+import Case065AllenBerkleyModalReplacementTest from "@/components/room/bass/Case065AllenBerkleyModalReplacementTest";
 
 // Chronological order: oldest first, newest (current investigation) last.
 // `status` is explicit metadata; omit it to default to RETIRED (auto-assigned below),
@@ -270,6 +271,8 @@ const RAW_ENTRIES = [
     render: (ctx) => <Case063AllenBerkleyModalEquationAudit /> },
   { key: "case-064-allen-berkley-appendix-a-equation-audit", title: "Case 064 — Allen & Berkley Appendix A Equation Audit",
     render: (ctx) => <Case064AllenBerkleyAppendixAEquationAudit /> },
+  { key: "case-065-allen-berkley-modal-replacement-test", title: "Case 065 — Allen & Berkley Modal Equation Replacement Test",
+    render: (ctx) => <Case065AllenBerkleyModalReplacementTest /> },
 ];
 
 const BASE_TIMESTAMP_MS = new Date("2026-07-04T09:00:00Z").getTime();
