@@ -202,6 +202,46 @@ function rewModalBandwidthQ(freqHz, absorptionQ, bandwidthScale) {
 
 // modeShapeValueLocal — imported from modalCalculations.js
 
+// __CANDIDATE_AB_CORRECTED_MODAL__ (Case 065 / Case 071 validated)
+// Selectable modal strategy: "Allen & Berkley corrected modal equation (experimental)".
+// Only active when qStrategy === 'ab_corrected'. Production 'smooth_soft_cap' path (default)
+// is completely unchanged. Replaces ONLY the modal pressure contribution — direct path,
+// reflection path, Q assignment, mode frequencies, and source/receiver coupling (mode shapes)
+// are untouched. Uses Allen & Berkley (1979) Appendix A Eq. A2 dimensional Green's function
+// form (k_r² − k² real part, k·k_r/Q imaginary part, 1/V room-volume normalisation) instead of
+// the legacy 1−β² normalised resonant transfer function. Matches Case 065 / Case 071 variant B.
+function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity) {
+  const { widthM, lengthM, heightM } = dims;
+  const roomVolumeM3 = widthM * lengthM * heightM;
+  const k = (2 * Math.PI * frequencyHz) / SPEED_OF_SOUND_MPS;
+  const tuningPhase = (-2 * Math.PI * frequencyHz * (delayMs / 1000)) + (polarity === 180 ? Math.PI : 0);
+  const tuningCos = Math.cos(tuningPhase);
+  const tuningSin = Math.sin(tuningPhase);
+
+  let modalSumRe = 0;
+  let modalSumIm = 0;
+
+  modes.forEach((mode) => {
+    const sourceCoupling = modeShapeValueLocal(mode, source.x, source.y, source.z, { widthM, lengthM, heightM });
+    const receiverCoupling = modeShapeValueLocal(mode, seat.x, seat.y, seat.z, { widthM, lengthM, heightM });
+    const combinedCoupling = sourceCoupling * receiverCoupling;
+
+    const kr = (2 * Math.PI * mode.freq) / SPEED_OF_SOUND_MPS;
+    const realDen = kr * kr - k * k;
+    const imagDen = (k * kr) / Math.max(mode.qValue, 1e-6);
+    const denomSq = realDen * realDen + imagDen * imagDen;
+
+    const gain = modalSourceAmplitude1m * combinedCoupling * (1 / roomVolumeM3);
+    const contribRe = gain * (realDen / denomSq);
+    const contribIm = gain * (-imagDen / denomSq);
+
+    modalSumRe += (contribRe * tuningCos) - (contribIm * tuningSin);
+    modalSumIm += (contribRe * tuningSin) + (contribIm * tuningCos);
+  });
+
+  return { modalSumRe, modalSumIm };
+}
+
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
 // Modal Green's function: coupling = Ψ_source * Ψ_receiver, resonant transfer H(f, f0, Q).
 // pressureMagnitude = modalSourceAmplitude * combinedCoupling * resonanceMagnitude
@@ -1174,6 +1214,18 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         axialFamilyScale, tangentialFamilyScale, obliqueFamilyScale, // __TEMP_DIAGNOSTIC_FAMILY_SCALES__
         muteModeKey // __TEMP_DIAGNOSTIC_MUTE_MODE_KEY__
       );
+
+      // __CANDIDATE_AB_CORRECTED_MODAL__ — override the legacy modal sum with the A&B corrected
+      // term only when explicitly selected. Direct path, reflections, and Q assignment above are
+      // untouched; this only replaces the additive modal pressure vector before it is summed in.
+      if (options?.qStrategy === 'ab_corrected') {
+        const abResult = abCorrectedModalTransferLocal(
+          frequencyHz, modes, source, seat, { widthM, lengthM, heightM },
+          modalSourceAmplitude1m, source.tuning.delayMs, source.tuning.polarity
+        );
+        modalSumRe = abResult.modalSumRe;
+        modalSumIm = abResult.modalSumIm;
+      }
 
       _debugStrongestModeForRow = _debugStrongestMode ?? null;
 

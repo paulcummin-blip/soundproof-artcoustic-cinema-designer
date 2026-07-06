@@ -1089,6 +1089,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                  <option value="smooth_soft_cap">🔬 Smooth soft cap (same as production)</option>
                  <option value="rew_absorption_authority">REW-style Absorption Authority (Experimental)</option>
                  <option value="rew_modal_bandwidth">REW-style Modal Bandwidth (Experimental)</option>
+                 <option value="ab_corrected">Allen &amp; Berkley corrected modal equation (experimental)</option>
               </select>
             </div>
             {qStrategy === 'rew_modal_bandwidth' && (
@@ -1257,6 +1258,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {qStrategy === 'rew_modal_bandwidth' && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#1e40af', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
           🧪 Q strategy: REW-style Modal Bandwidth (scale {rewModalBandwidthScale.toFixed(2)}) — experimental candidate
+        </div>
+      )}
+      {qStrategy === 'ab_corrected' && (
+        <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '6px 10px', marginTop: -4, marginBottom: 4 }}>
+          Experimental Allen &amp; Berkley modal correction active — improves REW parity in Case 071 validation.
         </div>
       )}
 
