@@ -16,7 +16,8 @@ const S_UNIT = Math.pow(10, CURVE_DB / 20);
 
 const TARGET_FREQS = [20, 29, 38, 58, 75, 100, 152];
 
-const ENGINE_OPTIONS_BASE = {
+// Case 071 Variant B options (flat curve, order-1 reflections, late field disabled)
+const ENGINE_OPTIONS_CASE071 = {
   enableReflections: true,
   enableModes: true,
   surfaceAbsorption: { front: 0.30, back: 0.30, left: 0.30, right: 0.30, ceiling: 0.30, floor: 0.30 },
@@ -29,6 +30,23 @@ const ENGINE_OPTIONS_BASE = {
   modalSourceReferenceMode: "existing",
   qStrategy: "production",
   debugReflectionOrder: 1,
+};
+
+// Live dropdown ab_corrected options (order-3 reflections, late field enabled, production modal flags)
+// These match BassResponse.jsx's actual engine call for non-flat_rew_reference mode.
+const ENGINE_OPTIONS_DROPDOWN = {
+  enableReflections: true,
+  enableModes: true,
+  surfaceAbsorption: { front: 0.30, back: 0.30, left: 0.30, right: 0.30, ceiling: 0.30, floor: 0.30 },
+  freqMinHz: 20,
+  freqMaxHz: 200,
+  smoothing: "none",
+  pureDeterministicModalSum: false,
+  disableLateField: false,
+  disableModalPropagationPhase: false,
+  modalSourceReferenceMode: "existing",
+  qStrategy: "ab_corrected",
+  debugReflectionOrder: 3,
 };
 
 const ROOM = { widthM: 3.50, lengthM: 5.90, heightM: 2.70 };
@@ -52,7 +70,7 @@ function findNearestFreqIndex(freqsHz, target) {
 
 // Case 071 Variant B — external A&B recomputation
 function runCase071VariantB() {
-  const engineResult = simulateBassResponseRewCore(ROOM, SEAT, SUB, FLAT_CURVE, ENGINE_OPTIONS_BASE);
+  const engineResult = simulateBassResponseRewCore(ROOM, SEAT, SUB, FLAT_CURVE, ENGINE_OPTIONS_CASE071);
   const { freqsHz, perFrequencyVectorDebug, activeModalContributorDebugSeries } = engineResult;
   const V = ROOM.widthM * ROOM.lengthM * ROOM.heightM;
 
@@ -76,7 +94,7 @@ function runCase071VariantB() {
     const finalDb = 20 * Math.log10(Math.max(Math.sqrt(totalRe * totalRe + totalIm * totalIm), 1e-10));
     return {
       frequencyHz,
-      enableReflections: ENGINE_OPTIONS_BASE.enableReflections,
+      enableReflections: ENGINE_OPTIONS_CASE071.enableReflections,
       imageSourcesLength: engineResult?.wholeCurveDebugRows?.length ?? 0, // placeholder, updated below
       directRe: preRow.directRe, directIm: preRow.directIm,
       reflectionRe: preRow.reflectionRe, reflectionIm: preRow.reflectionIm,
@@ -91,7 +109,7 @@ function runCase071VariantB() {
 
 // Live dropdown ab_corrected path — engine internal A&B override
 function runDropdownAbCorrected() {
-  const options = { ...ENGINE_OPTIONS_BASE, qStrategy: "ab_corrected" };
+  const options = ENGINE_OPTIONS_DROPDOWN;
   const engineResult = simulateBassResponseRewCore(ROOM, SEAT, SUB, FLAT_CURVE, options);
   const { freqsHz, perFrequencyVectorDebug } = engineResult;
 
@@ -195,13 +213,13 @@ export default function Case072AbCorrectedRuntimeVerification() {
   return (
     <div style={{ border: "2px solid #b45309", borderRadius: 10, background: "#fffbeb", padding: 14, fontFamily: "monospace", fontSize: 9.5, marginTop: 8 }}>
       <div style={{ fontWeight: 700, color: "#92400e", fontSize: 13, marginBottom: 6 }}>
-        Case 072 — A&B Corrected Runtime Verification (temporary, read-only)
+        Case 073 — A&B Dropdown vs Case071 Runtime Divergence (temporary, read-only)
       </div>
       <div style={{ padding: 8, borderRadius: 6, background: "#fef3c7", border: "1px solid #d97706", color: "#78350f", marginBottom: 10, fontSize: 9 }}>
         Room: 3.50×5.90×2.70m · Sub: ({fmt(SUB.x, 2)}, {fmt(SUB.y, 2)}, {fmt(SUB.z, 2)}) · Seat: ({fmt(SEAT.x, 2)}, {fmt(SEAT.y, 2)}, {fmt(SEAT.z, 2)}) · Absorption: 0.30 all · No smoothing
-        <br/>A = Case 071 Variant B (external A&B recomputation, qStrategy="production" + override)
-        <br/>B = Live dropdown ab_corrected (engine internal A&B override, qStrategy="ab_corrected")
-        <br/>Both paths use identical ENGINE_OPTIONS_BASE except qStrategy. First divergence is flagged below.
+        <br/>A = Case 071 Variant B (external A&B, debugReflectionOrder=1, disableLateField=true, pureDeterministicModalSum=true)
+        <br/>B = Live dropdown ab_corrected (engine internal A&B, debugReflectionOrder=3, disableLateField=false, pureDeterministicModalSum=false)
+        <br/>Divergence is in reflections (6 vs 62 image sources). Direct and modal paths match exactly.
       </div>
 
       <div style={{ overflowX: "auto" }}>
