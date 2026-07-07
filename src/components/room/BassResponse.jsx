@@ -14,9 +14,7 @@ import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
-import Case072AbCorrectedRuntimeVerification from "@/components/room/bass/Case072AbCorrectedRuntimeVerification";
-import Case090RewForensicAuditDashboard from "@/components/room/bass/Case090RewForensicAuditDashboard";
-import Case098RewMarkerValidationPanel from "@/components/room/bass/Case098RewMarkerValidationPanel";
+import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1298,28 +1296,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
       )}
 
-      {/* __TEMP_CASE072_VERIFICATION__ — temporary runtime verification panel, ab_corrected only */}
-      {qStrategy === 'ab_corrected' && auditPanelInputs && (
-        <Case072AbCorrectedRuntimeVerification {...auditPanelInputs} />
-      )}
-
-      {/* __TEMP_CASE090_FORENSIC_AUDIT_DASHBOARD__ — temporary, read-only, ab_corrected only */}
-      {qStrategy === 'ab_corrected' && auditPanelInputs && (
-        <Case090RewForensicAuditDashboard
-          roomDims={auditPanelInputs.roomDims}
-          seat={auditPanelInputs.seat}
-          subs={auditPanelInputs.subs}
-          surfaceAbsorption={auditPanelInputs.surfaceAbsorption}
-          sourceCurve={auditPanelInputs.sourceCurve}
-          qStrategy={auditPanelInputs.qStrategy}
-          simulationResults={simulationResults}
-          multiSeriesForGraph={multiSeriesForGraph}
-        />
-      )}
-
-      {/* __TEMP_CASE098_REW_MARKER_VALIDATION__ — temporary, read-only, fixed reference room (5.0×5.0×2.4) */}
+      {/* __TEMP_CASE099_THREE_ROOM_BENCHMARK__ — temporary, read-only, ab_corrected only.
+          Replaces Case072/Case090/Case098 single-room audits with one three-room benchmark. */}
       {qStrategy === 'ab_corrected' && (
-        <Case098RewMarkerValidationPanel />
+        <Case099RewThreeRoomBenchmark />
       )}
 
       {/* ── Null Depth Audit Badge ── */}
