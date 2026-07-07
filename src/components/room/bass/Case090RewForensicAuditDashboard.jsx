@@ -81,18 +81,50 @@ function sumMultiSubComplex(complexResults) {
 }
 
 // ── Metrics ──
-function bandRms(series, loHz, hiHz) {
+// Average SPL magnitude in dB (formerly mislabelled RMS). Energy-averaged dB.
+function bandAverageSpl(series, loHz, hiHz) {
   const band = series.filter((p) => p.hz >= loHz && p.hz < hiHz && Number.isFinite(p.db));
   if (!band.length) return null;
   const meanSq = band.reduce((acc, p) => acc + 10 ** (p.db / 10), 0) / band.length;
   return 10 * Math.log10(meanSq);
 }
 
-function fullRms(series) {
+function fullAverageSpl(series) {
   const all = series.filter((p) => Number.isFinite(p.db));
   if (!all.length) return null;
   const meanSq = all.reduce((acc, p) => acc + 10 ** (p.db / 10), 0) / all.length;
   return 10 * Math.log10(meanSq);
+}
+
+// True RMS ERROR: sqrt(mean((B44 - REW)^2)) — linear dB differences.
+function bandRmsError(b44Series, rewSeries, loHz, hiHz) {
+  const n = Math.min(b44Series.length, rewSeries.length);
+  let sumSq = 0;
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    const hz = b44Series[i].hz;
+    if (hz < loHz || hz >= hiHz) continue;
+    const e = (b44Series[i].db || 0) - (rewSeries[i].db || 0);
+    if (!Number.isFinite(e)) continue;
+    sumSq += e * e;
+    count++;
+  }
+  if (!count) return null;
+  return Math.sqrt(sumSq / count);
+}
+
+function fullRmsError(b44Series, rewSeries) {
+  const n = Math.min(b44Series.length, rewSeries.length);
+  let sumSq = 0;
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    const e = (b44Series[i].db || 0) - (rewSeries[i].db || 0);
+    if (!Number.isFinite(e)) continue;
+    sumSq += e * e;
+    count++;
+  }
+  if (!count) return null;
+  return Math.sqrt(sumSq / count);
 }
 
 function maxError(b44Series, rewSeries) {
@@ -198,36 +230,38 @@ function runIsolatedEngine(roomDims, seat, subs, surfaceAbsorption, sourceCurve,
 // ── Section 1: REW Parity Summary ──
 function Section1RewParitySummary({ b44Series, rewSeries }) {
   const stats = useMemo(() => {
-    const rmsLow = bandRms(b44Series, 20, 60);
-    const rmsMid = bandRms(b44Series, 60, 120);
-    const rmsHigh = bandRms(b44Series, 120, 200);
-    const rmsFull = fullRms(b44Series);
-    const rewRmsLow = bandRms(rewSeries, 20, 60);
-    const rewRmsMid = bandRms(rewSeries, 60, 120);
-    const rewRmsHigh = bandRms(rewSeries, 120, 200);
-    const rewRmsFull = fullRms(rewSeries);
+    // Corrected metrics: RMS ERROR = sqrt(mean((B44 - REW)^2))
+    const rmsErrLow = bandRmsError(b44Series, rewSeries, 20, 60);
+    const rmsErrMid = bandRmsError(b44Series, rewSeries, 60, 120);
+    const rmsErrHigh = bandRmsError(b44Series, rewSeries, 120, 200);
+    const rmsErrFull = fullRmsError(b44Series, rewSeries);
+    // Average SPL (kept for reference, correctly labelled)
+    const avgSplLow = bandAverageSpl(b44Series, 20, 60);
+    const avgSplMid = bandAverageSpl(b44Series, 60, 120);
+    const avgSplHigh = bandAverageSpl(b44Series, 120, 200);
+    const avgSplFull = fullAverageSpl(b44Series);
     const { maxAbsErr, worstHz } = maxError(b44Series, rewSeries);
     const corr = pearsonCorrelation(b44Series, rewSeries);
     const b44Peak = findPeak(b44Series, 20, 200);
     const rewPeak = findPeak(rewSeries, 20, 200);
     const b44Null = findNull(b44Series, 20, 200);
     const rewNull = findNull(rewSeries, 20, 200);
-    const overallRmsDelta = (rmsFull ?? 0) - (rewRmsFull ?? 0);
-    const pass = Math.abs(maxAbsErr) < 3.0 && Math.abs(overallRmsDelta) < 1.5 && (corr ?? 0) > 0.85;
+    const pass = Math.abs(maxAbsErr) < 3.0 && (rmsErrFull ?? 999) < 1.5 && (corr ?? 0) > 0.85;
     return {
-      rmsLow, rmsMid, rmsHigh, rmsFull,
-      rewRmsLow, rewRmsMid, rewRmsHigh, rewRmsFull,
+      rmsErrLow, rmsErrMid, rmsErrHigh, rmsErrFull,
+      avgSplLow, avgSplMid, avgSplHigh, avgSplFull,
       maxAbsErr, worstHz, corr,
       b44Peak, rewPeak, b44Null, rewNull,
-      overallRmsDelta, pass,
+      pass,
     };
   }, [b44Series, rewSeries]);
 
   const rows = [
-    ["RMS 20–60 Hz", stats.rewRmsLow, stats.rmsLow, (stats.rmsLow ?? 0) - (stats.rewRmsLow ?? 0)],
-    ["RMS 60–120 Hz", stats.rewRmsMid, stats.rmsMid, (stats.rmsMid ?? 0) - (stats.rewRmsMid ?? 0)],
-    ["RMS 120–200 Hz", stats.rewRmsHigh, stats.rmsHigh, (stats.rmsHigh ?? 0) - (stats.rewRmsHigh ?? 0)],
-    ["Overall RMS", stats.rewRmsFull, stats.rmsFull, stats.overallRmsDelta],
+    ["RMS Error 20–60 Hz", "—", stats.rmsErrLow, stats.rmsErrLow],
+    ["RMS Error 60–120 Hz", "—", stats.rmsErrMid, stats.rmsErrMid],
+    ["RMS Error 120–200 Hz", "—", stats.rmsErrHigh, stats.rmsErrHigh],
+    ["Overall RMS Error", "—", stats.rmsErrFull, stats.rmsErrFull],
+    ["Average SPL (full)", "—", stats.avgSplFull, stats.avgSplFull],
     ["Maximum error", null, stats.maxAbsErr, stats.maxAbsErr],
     ["Correlation coefficient", 1.0, stats.corr, (stats.corr ?? 0) - 1.0],
     ["Peak frequency error (Hz)", stats.rewPeak?.hz, stats.b44Peak?.hz, (stats.b44Peak?.hz ?? 0) - (stats.rewPeak?.hz ?? 0)],
@@ -481,9 +515,9 @@ function Section5CandidateSolver({ roomDims, seat, subs, surfaceAbsorption, sour
         );
         series = run.splSeries;
       } catch (e) {
-        return { label: def.label, rms: null, maxErr: null, corr: null, peakErr: null, nullErr: null, score: 999 };
+        return { label: def.label, rmsErr: null, maxErr: null, corr: null, peakErr: null, nullErr: null, score: 999 };
       }
-      const rms = fullRms(series);
+      const rmsErr = fullRmsError(series, rewSeries);
       const { maxAbsErr } = maxError(series, rewSeries);
       const corr = pearsonCorrelation(series, rewSeries);
       const b44Peak = findPeak(series, 20, 200);
@@ -492,8 +526,9 @@ function Section5CandidateSolver({ roomDims, seat, subs, surfaceAbsorption, sour
       const rewNull = findNull(rewSeries, 20, 200);
       const peakErr = Math.abs((b44Peak?.db ?? 0) - (rewPeak?.db ?? 0));
       const nullErr = Math.abs((b44Null?.db ?? 0) - (rewNull?.db ?? 0));
-      const score = (maxAbsErr ?? 999) - (corr ?? 0) * 5 + (nullErr ?? 0) * 0.5;
-      return { label: def.label, rms, maxErr: maxAbsErr, corr, peakErr, nullErr, score };
+      // Rank by corrected RMS error + max error only.
+      const score = (rmsErr ?? 999) + (maxAbsErr ?? 0) * 0.5;
+      return { label: def.label, rmsErr, maxErr: maxAbsErr, corr, peakErr, nullErr, score };
     });
   }, [roomDims, seat, subs, surfaceAbsorption, sourceCurve, rewSeries]);
 
@@ -509,7 +544,7 @@ function Section5CandidateSolver({ roomDims, seat, subs, surfaceAbsorption, sour
         <thead>
           <tr>
             <th style={styles.th}>Candidate</th>
-            <th style={styles.th}>Overall RMS</th>
+            <th style={styles.th}>RMS Error</th>
             <th style={styles.th}>Max Err</th>
             <th style={styles.th}>Correlation</th>
             <th style={styles.th}>Peak Err</th>
@@ -527,7 +562,7 @@ function Section5CandidateSolver({ roomDims, seat, subs, surfaceAbsorption, sour
             return (
               <tr key={c.label}>
                 <td style={styles.td}>{c.label}</td>
-                <td style={styles.tdMono}>{fmt(c.rms, 2)}</td>
+                <td style={styles.tdMono}>{fmt(c.rmsErr, 2)}</td>
                 <td style={styles.tdMono}>{fmt(c.maxErr, 2)}</td>
                 <td style={styles.tdMono}>{fmt(c.corr, 3)}</td>
                 <td style={styles.tdMono}>{fmt(c.peakErr, 2)}</td>
@@ -550,21 +585,18 @@ function Section5CandidateSolver({ roomDims, seat, subs, surfaceAbsorption, sour
 function useSensitivityMatrix({ roomDims, seat, subs, surfaceAbsorption, sourceCurve, baselineSeries, rewSeries }) {
   return useMemo(() => {
     if (!roomDims || !seat || !subs?.length) return [];
-    const baselineRms = fullRms(baselineSeries);
+    const baselineRmsErr = fullRmsError(baselineSeries, rewSeries);
     const baselineMaxErr = maxError(baselineSeries, rewSeries).maxAbsErr;
+    // Inert controls (tangential/oblique family scale, √V scale) are NOT consumed by the
+    // ab_corrected engine path and would produce misleading 0.00 rows — omitted to keep
+    // the matrix honest. Only engine-active levers remain.
     const probes = {
       "Q +10%": { axialQ: 4.4 },
       "Q -10%": { axialQ: 3.6 },
       "Reflection gain +10%": { reflectionGainScale: 1.1 },
       "Reflection gain -10%": { reflectionGainScale: 0.9 },
-      "Tangential weighting +10%": { tangentialFamilyScale: 1.1 },
-      "Tangential weighting -10%": { tangentialFamilyScale: 0.9 },
-      "Oblique weighting +10%": { obliqueFamilyScale: 1.1 },
-      "Oblique weighting -10%": { obliqueFamilyScale: 0.9 },
       "Absorption +10%": { surfaceAbsorptionOverride: 0.33 },
       "Absorption -10%": { surfaceAbsorptionOverride: 0.27 },
-      "√V +10%": { sqrtVScale: 1.1 },
-      "√V -10%": { sqrtVScale: 0.9 },
     };
     return Object.entries(probes).map(([label, opts]) => {
       let override = { ...opts };
@@ -584,9 +616,9 @@ function useSensitivityMatrix({ roomDims, seat, subs, surfaceAbsorption, sourceC
         return { label, rmsChange: null, maxErrChange: null, values: {} };
       }
       const series = run.splSeries;
-      const rms = fullRms(series);
+      const rmsErr = fullRmsError(series, rewSeries);
       const { maxAbsErr } = maxError(series, rewSeries);
-      const rmsChange = (rms ?? 0) - (baselineRms ?? 0);
+      const rmsChange = (rmsErr ?? 0) - (baselineRmsErr ?? 0);
       const maxErrChange = (maxAbsErr ?? 0) - (baselineMaxErr ?? 0);
       const vals = {};
       TARGET_FREQUENCIES_HZ.forEach((f) => {
@@ -607,10 +639,10 @@ function useRankedMatrix(matrix) {
 function Section6RemainingErrorDiagnosis({ baselineSeries, rewSeries, matrix }) {
   const { diagnosis, reason } = useMemo(() => {
     const { maxAbsErr, worstHz } = maxError(baselineSeries, rewSeries);
-    const midLow = bandRms(baselineSeries, 60, 120);
-    const rewMidLow = bandRms(rewSeries, 60, 120);
-    const midDelta = (midLow ?? 0) - (rewMidLow ?? 0);
-    const lowDelta = (bandRms(baselineSeries, 20, 60) ?? 0) - (bandRms(rewSeries, 20, 60) ?? 0);
+    const fullErr = fullRmsError(baselineSeries, rewSeries);
+    const midErr = bandRmsError(baselineSeries, rewSeries, 60, 120);
+    const lowErr = bandRmsError(baselineSeries, rewSeries, 20, 60);
+    const highErr = bandRmsError(baselineSeries, rewSeries, 120, 200);
 
     // Determine dominant influence from sensitivity matrix (top-ranked param)
     const top = matrix?.[0];
@@ -618,15 +650,15 @@ function Section6RemainingErrorDiagnosis({ baselineSeries, rewSeries, matrix }) 
     let d = "Phase summation";
     let r = "";
 
-    if (worstHz && worstHz >= 85 && worstHz <= 105 && midDelta < -1.0) {
+    if (worstHz && worstHz >= 85 && worstHz <= 105 && midErr > 1.0) {
       d = "Tangential weighting";
-      r = `Worst error at ${worstHz.toFixed(1)} Hz is in the mid-bass range where tangential/oblique modes dominate. RMS 60–120 Hz is ${midDelta.toFixed(2)} dB below REW. The sensitivity matrix shows ${topLabel} as the most influential lever.`;
-    } else if (lowDelta > 2.0) {
+      r = `Worst error at ${worstHz.toFixed(1)} Hz is in the mid-bass range where non-axial modes dominate. Band RMS error 60–120 Hz is ${midErr.toFixed(2)} dB. The sensitivity matrix shows ${topLabel} as the most influential lever.`;
+    } else if (lowErr > 2.0) {
       d = "Reflection model";
-      r = `Low-band RMS 20–60 Hz over-predicts REW by ${lowDelta.toFixed(2)} dB; the reflection coherence/SBIR contribution is the dominant lever in this band.`;
-    } else if (Math.abs(maxAbsErr) < 2.0) {
+      r = `Low-band RMS error 20–60 Hz is ${lowErr.toFixed(2)} dB; the reflection coherence/SBIR contribution is the dominant lever in this band.`;
+    } else if (Math.abs(maxAbsErr) < 2.0 && (fullErr ?? 999) < 1.0) {
       d = "Modal density";
-      r = `Maximum error is now only ${maxAbsErr.toFixed(2)} dB — residual is broadband modal density, not a single dominant cause.`;
+      r = `Max error ${maxAbsErr.toFixed(2)} dB, full RMS error ${fullErr.toFixed(2)} dB — residual is broadband modal density, not a single dominant cause.`;
     } else if (topLabel.includes("Reflection")) {
       d = "Reflection model";
       r = `Reflection gain is the top-ranked sensitivity parameter (${topLabel}); residual error dominated by image-source scaling.`;
@@ -634,8 +666,8 @@ function Section6RemainingErrorDiagnosis({ baselineSeries, rewSeries, matrix }) 
       d = "Q / bandwidth";
       r = `${topLabel} is the top-ranked parameter; modal bandwidth/damping calibration is the dominant residual lever.`;
     } else {
-      d = "Tangential weighting";
-      r = `Default diagnosis: non-axial modal weighting in the ${worstHz?.toFixed(0)} Hz region.`;
+      d = "Broadband residual";
+      r = `No single lever dominates. Max error ${maxAbsErr.toFixed(2)} dB, full RMS error ${fullErr.toFixed(2)} dB, high-band ${highErr.toFixed(2)} dB.`;
     }
     return { diagnosis: d, reason: r };
   }, [baselineSeries, rewSeries, matrix]);
@@ -652,16 +684,16 @@ function Section6RemainingErrorDiagnosis({ baselineSeries, rewSeries, matrix }) 
 function Section7Recommendation({ baselineSeries, rewSeries }) {
   const rec = useMemo(() => {
     const { maxAbsErr } = maxError(baselineSeries, rewSeries);
-    const lowDelta = (bandRms(baselineSeries, 20, 60) ?? 0) - (bandRms(rewSeries, 20, 60) ?? 0);
-    const midDelta = (bandRms(baselineSeries, 60, 120) ?? 0) - (bandRms(rewSeries, 60, 120) ?? 0);
+    const lowErr = bandRmsError(baselineSeries, rewSeries, 20, 60);
+    const midErr = bandRmsError(baselineSeries, rewSeries, 60, 120);
     const corr = pearsonCorrelation(baselineSeries, rewSeries);
-    if (Math.abs(maxAbsErr) < 2.0 && Math.abs(midDelta) < 1.0 && (corr ?? 0) > 0.95) {
+    if (Math.abs(maxAbsErr) < 2.0 && (midErr ?? 999) < 1.0 && (corr ?? 0) > 0.95) {
       return "Parity now good enough.";
     }
     if (Math.abs(maxAbsErr) < 1.5) {
       return "Small tuning required.";
     }
-    if (Math.abs(maxAbsErr) >= 1.5 && Math.abs(midDelta) > 1.5) {
+    if (Math.abs(maxAbsErr) >= 1.5 && (midErr ?? 0) > 1.5) {
       return "One dominant error remains.";
     }
     return "Small tuning required.";
