@@ -1118,7 +1118,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 border: '1px solid #84cc16', background: '#f7fee7', borderRadius: 6,
                 padding: '3px 8px', whiteSpace: 'nowrap',
               }}>
-                A&B corrected + √V reconciliation active
+                A&B corrected + √V + 70–120 Hz Q boost active
               </div>
               )}
               {qStrategy === 'rew_modal_bandwidth' && (
@@ -1292,7 +1292,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
       {qStrategy === 'ab_corrected' && (
         <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '6px 10px', marginTop: -4, marginBottom: 4 }}>
-          Experimental Allen &amp; Berkley modal correction active — improves REW parity in Case 071 validation.
+          Experimental Allen &amp; Berkley modal correction active — improves REW parity in Case 071 validation. Case 089 adds a fixed 1.5× Q boost for modes 70–120 Hz only (all other modes unchanged).
         </div>
       )}
 

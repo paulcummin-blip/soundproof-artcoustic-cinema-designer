@@ -1225,8 +1225,19 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       // the validated Case 071 formula and was causing the flattened response).
       if (options?.qStrategy === 'ab_corrected') {
         const abSourceUnit = Math.pow(10, curveDb / 20);
+        // __CASE089_MIDBAND_Q_BOOST__ (2026-07-07)
+        // Experimental only — gated strictly behind qStrategy === 'ab_corrected'. Production
+        // (default) path is completely unchanged. Applies a fixed 1.5× Q multiplier to modes
+        // whose natural frequency lies in the 70–120 Hz band only. All other modes retain their
+        // original Q. Direct path, reflections, source curve, geometry, smoothing, modal
+        // frequencies, and graph rendering are untouched.
+        const abModes = modes.map((mode) => {
+          const inMidBand = mode.freq >= 70 && mode.freq <= 120;
+          if (!inMidBand) return mode;
+          return { ...mode, qValue: mode.qValue * 1.5 };
+        });
         const abResult = abCorrectedModalTransferLocal(
-          frequencyHz, modes, source, seat, { widthM, lengthM, heightM },
+          frequencyHz, abModes, source, seat, { widthM, lengthM, heightM },
           abSourceUnit, source.tuning.delayMs, source.tuning.polarity
         );
         // __CANDIDATE_AB_SQRT_V_RECONCILIATION__ (Case 082 Variant B, 2026-07-07)
