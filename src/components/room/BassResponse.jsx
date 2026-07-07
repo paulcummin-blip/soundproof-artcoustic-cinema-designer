@@ -1111,8 +1111,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                  <option value="rew_modal_bandwidth">REW-style Modal Bandwidth (Experimental)</option>
                  <option value="ab_corrected">Allen &amp; Berkley corrected modal equation (experimental)</option>
               </select>
-            </div>
-            {qStrategy === 'rew_modal_bandwidth' && (
+              </div>
+              {qStrategy === 'ab_corrected' && (
+              <div style={{
+                fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: '#4d7c0f',
+                border: '1px solid #84cc16', background: '#f7fee7', borderRadius: 6,
+                padding: '3px 8px', whiteSpace: 'nowrap',
+              }}>
+                A&B corrected + √V reconciliation active
+              </div>
+              )}
+              {qStrategy === 'rew_modal_bandwidth' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Bandwidth scale:</span>
                 <select

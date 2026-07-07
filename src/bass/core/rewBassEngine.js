@@ -1229,8 +1229,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
           frequencyHz, modes, source, seat, { widthM, lengthM, heightM },
           abSourceUnit, source.tuning.delayMs, source.tuning.polarity
         );
-        modalSumRe = abResult.modalSumRe;
-        modalSumIm = abResult.modalSumIm;
+        // __CANDIDATE_AB_SQRT_V_RECONCILIATION__ (Case 082 Variant B, 2026-07-07)
+        // Experimental only — gated strictly behind qStrategy === 'ab_corrected'. Production
+        // ('smooth_soft_cap' / default) path is completely unchanged. Reconciles the A&B Appendix
+        // A2 1/V room-volume normalisation with the legacy direct/reflection 1/√V reference
+        // convention by multiplying the A&B modal pressure sum by √V before superposition. Direct
+        // path, reflections, Q, smoothing, source curve, geometry, and graph rendering are untouched.
+        const abSqrtVScale = Math.sqrt(Math.max(roomVolumeM3, 1e-6));
+        modalSumRe = abResult.modalSumRe * abSqrtVScale;
+        modalSumIm = abResult.modalSumIm * abSqrtVScale;
       }
 
       _debugStrongestModeForRow = _debugStrongestMode ?? null;
