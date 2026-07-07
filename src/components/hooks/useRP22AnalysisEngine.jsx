@@ -13,6 +13,13 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
+import { useSeatResponses } from "@/components/room/hooks/useSeatResponses";
+import {
+  computeTransitionFrequencyHz,
+  computeParam18BassExtension,
+  computeParam19Deviation,
+  computeParam20SeatConsistency,
+} from "@/components/utils/rp22BassMetrics";
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -356,6 +363,8 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
 export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers }) => {
+  // Per-seat bass response curves from the CURRENT bass engine (no maths changed).
+  const seatResponses = useSeatResponses();
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -773,6 +782,86 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     };
 
     gradedParameters.secondary = null;
+
+    // ── RP22 Bass Parameters (18 / 19 / 20) — from current bass engine output ──
+    // Source-of-truth: per-seat { frequency, spl } curves from BassResponseEngine.
+    let bassP18 = null;
+    let bassP19 = null;
+    let bassP20 = null;
+    // Declared OUTSIDE the try so the per-seat P20 block below can read it.
+    const rspSeatIdForBass =
+      (primarySeats.length > 0 && primarySeats[0]?.id) ||
+      (safeSeats[0]?.id) ||
+      null;
+    try {
+      const transitionHz = computeTransitionFrequencyHz({
+        widthM: dimensions?.widthM ?? dimensions?.width,
+        lengthM: dimensions?.lengthM ?? dimensions?.length,
+        heightM: dimensions?.heightM ?? dimensions?.height,
+      });
+
+      const rspBassResponse = rspSeatIdForBass
+        ? (seatResponses.find((r) => String(r?.seatId) === String(rspSeatIdForBass))?.responseData) || null
+        : null;
+      const usableSeatResponses = Array.isArray(seatResponses) ? seatResponses : [];
+
+      if (rspBassResponse && Array.isArray(rspBassResponse) && rspBassResponse.length > 0) {
+        bassP18 = computeParam18BassExtension(rspBassResponse);
+        if (transitionHz != null) {
+          bassP19 = computeParam19Deviation(rspBassResponse, transitionHz);
+          bassP20 = computeParam20SeatConsistency({
+            rspResponse: rspBassResponse,
+            perSeatResponses: usableSeatResponses,
+            transitionHz,
+            rspSeatId: rspSeatIdForBass,
+          });
+        }
+      }
+    } catch (e) {
+      // Audits must NEVER crash the engine/UI
+      bassP18 = null; bassP19 = null; bassP20 = null;
+    }
+
+    const p18CatalogEntry = RP22_CATALOG["18"];
+    gradedParameters.primary[18] = bassP18
+      ? {
+          title: p18CatalogEntry?.title || "In-room bass extension -3 dB cutoff frequency point",
+          level: bassP18.level,
+          value: bassP18.value,
+          formatted: bassP18.formatted,
+          unit: p18CatalogEntry?.unit || "Hz",
+          status: "ok",
+          note: bassP18.note,
+        }
+      : {
+          title: p18CatalogEntry?.title || "In-room bass extension -3 dB cutoff frequency point",
+          level: null,
+          value: null,
+          unit: p18CatalogEntry?.unit || "Hz",
+          status: "no_data",
+          note: "Predicted design-stage value from current bass engine.",
+        };
+
+    const p19CatalogEntry = RP22_CATALOG["19"];
+    gradedParameters.primary[19] = bassP19
+      ? {
+          title: p19CatalogEntry?.title || "Frequency response below transition frequency at RSP",
+          level: bassP19.level,
+          value: bassP19.maxDevDb,
+          formatted: bassP19.formatted,
+          unit: p19CatalogEntry?.unit || "± dB",
+          status: "ok",
+          transitionHz: bassP19.transitionHz,
+          note: bassP19.note,
+        }
+      : {
+          title: p19CatalogEntry?.title || "Frequency response below transition frequency at RSP",
+          level: null,
+          value: null,
+          unit: p19CatalogEntry?.unit || "± dB",
+          status: "no_data",
+          note: "Calculated from 1/3-octave smoothed predicted response.",
+        };
 
     // Compute per-seat RP22 metrics (P9, P10, P16, P17, P20)
     const seatMetrics = new Map();
@@ -1228,8 +1317,44 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P20 - Reserved for future FR implementation (LF variance)
-      // requires per-seat frequency-response prediction
+      // P20 — Seat-to-seat bass consistency below transition frequency
+      //   Source: per-seat smoothed bass curves vs RSP from current bass engine.
+      //   The locked RSP seat (and the synthetic "mlp") carry the worst-seat
+      //   summary so the existing panel "Achieved (RSP):" line surfaces the
+      //   room-level result. Other real seats carry their own per-seat deviation.
+      if (bassP20) {
+        const isRspSeat =
+          (rspSeatIdForBass != null && String(seat.id) === String(rspSeatIdForBass)) ||
+          !!seat.__isSyntheticMLP;
+        if (isRspSeat) {
+          const worstDev = bassP20.worstSeatDeviationDb;
+          const worstLvl = bassP20.worstSeatLevel; // 4/3/2 or null
+          const worstDbTxt = `Worst: ±${worstDev.toFixed(1)} dB${bassP20.isSingleSeat ? ' (single seat)' : (bassP20.worstSeatId ? ` (${bassP20.worstSeatId})` : '')}${worstLvl == null ? ' · Below L2' : ''}`;
+          metrics.p20 = {
+            valueDb: worstDev,
+            level: worstLvl,
+            formatted: worstDbTxt,
+            worstSeatId: bassP20.worstSeatId,
+            worstSeatDeviationDb: worstDev,
+            worstSeatLevel: worstLvl,
+            isSingleSeat: !!bassP20.isSingleSeat,
+            transitionHz: bassP20.transitionHz,
+            note: bassP20.note,
+          };
+        } else {
+          const perSeat = bassP20.perSeat.find((s) => String(s.seatId) === String(seat.id));
+          if (perSeat) {
+            metrics.p20 = {
+              valueDb: perSeat.deviationDb,
+              level: perSeat.level,
+              formatted: `±${perSeat.deviationDb.toFixed(1)} dB`,
+              transitionHz: bassP20.transitionHz,
+              note: bassP20.note,
+            };
+          }
+        }
+      }
+      // else: metrics.p20 stays null → existing "Not Calculated" fallback
       
       seatMetrics.set(seatId, metrics);
     }
@@ -1351,6 +1476,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     p15ConstructionLevel,
     screen?.mountMode,
     screen?.floatDepthM,
+    seatResponses,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };

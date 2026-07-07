@@ -1,192 +1,332 @@
-// rp22BassMetrics.js
-// Pure helper functions for computing RP22 P14/P18/P19 from bass simulation data
+// utils/rp22BassMetrics.jsx
+// RP22 bass-derived Parameter 18 / 19 / 20 calculations that rely on the
+// CURRENT bass engine output (BassResponseEngine). This file does NOT modify
+// any acoustic maths — it only post-processes the existing per-seat
+// { frequency, spl } response arrays that the engine already produces.
+//
+// Sources:
+//   - BassResponseEngine.simulateResponseWithExtras(...) → responseData = [{ frequency, spl }]
+//   - applyBassSmoothing(data, 'third') — display-only 1/3-octave smoothing.
 
-// Internal helper: 1/3 octave smoothing
-function apply13OctaveSmoothing(freqsHz, splDb) {
-  if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
-    return splDb;
+import { applyBassSmoothing } from '../room/bass/bassGraphSmoothing';
+
+const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+
+function toSplCurve(responseData) {
+  if (!Array.isArray(responseData)) return [];
+  const arr = [];
+  for (let i = 0; i < responseData.length; i++) {
+    const p = responseData[i];
+    if (!p) continue;
+    const f = Number(p.frequency);
+    const s = Number(p.spl);
+    if (isNum(f) && isNum(s)) arr.push({ frequency: f, spl: s });
   }
-  
-  if (freqsHz.length !== splDb.length) {
-    return splDb;
-  }
-  
-  const smoothed = [];
-  
-  for (let i = 0; i < freqsHz.length; i++) {
-    const fc = freqsHz[i];
-    const fLow = fc / Math.pow(2, 1/6);  // Lower edge of 1/3 octave
-    const fHigh = fc * Math.pow(2, 1/6); // Upper edge of 1/3 octave
-    
-    // Find all points within this band
-    const bandPoints = [];
-    for (let j = 0; j < freqsHz.length; j++) {
-      if (freqsHz[j] >= fLow && freqsHz[j] <= fHigh) {
-        bandPoints.push(splDb[j]);
-      }
-    }
-    
-    // Average SPL in band
-    const avgSpl = bandPoints.length > 0 
-      ? bandPoints.reduce((a, b) => a + b, 0) / bandPoints.length
-      : splDb[i];
-    
-    smoothed.push(avgSpl);
-  }
-  
-  return smoothed;
+  return arr;
 }
 
-// P19: Max deviation from target below Schroeder frequency (1/3 octave smoothing)
-export function computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz }) {
-  // Input validation
-  if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
-    return { resultDb: null, details: { reason: "missing_data" } };
+function smoothThird(curve) {
+  if (!Array.isArray(curve) || curve.length === 0) return [];
+  const smoothed = applyBassSmoothing(curve, 'third');
+  // normalise + filter nulls produced by smoothing when data is too sparse
+  const out = [];
+  for (let i = 0; i < smoothed.length; i++) {
+    const f = Number(smoothed[i].frequency);
+    if (!isNum(f)) continue;
+    const s = Number(smoothed[i].spl);
+    if (!isNum(s)) continue;
+    out.push({ frequency: f, spl: s });
   }
-  
-  if (freqsHz.length !== splDb.length) {
-    return { resultDb: null, details: { reason: "array_length_mismatch" } };
-  }
-  
-  if (typeof schroederHz !== 'number' || !isFinite(schroederHz)) {
-    return { resultDb: null, details: { reason: "invalid_schroeder" } };
-  }
-  
-  // Default target is flat (0 dB)
-  const target = Array.isArray(targetDb) && targetDb.length === freqsHz.length
-    ? targetDb
-    : freqsHz.map(() => 0);
-  
-  // Apply 1/3 octave smoothing
-  const smoothedSplDb = apply13OctaveSmoothing(freqsHz, splDb);
-  
-  // Filter to frequencies below Schroeder
-  const belowSchroeder = [];
-  for (let i = 0; i < freqsHz.length; i++) {
-    if (freqsHz[i] <= schroederHz) {
-      const dev = Math.abs(smoothedSplDb[i] - target[i]);
-      if (isFinite(dev)) {
-        belowSchroeder.push(dev);
-      }
-    }
-  }
-  
-  if (belowSchroeder.length === 0) {
-    return { resultDb: null, details: { reason: "no_points_below_schroeder" } };
-  }
-  
-  const maxDev = Math.max(...belowSchroeder);
-  
-  return {
-    resultDb: maxDev,
-    details: {
-      bandHz: [Math.min(...freqsHz.filter(f => f <= schroederHz)), schroederHz],
-      pointsEvaluated: belowSchroeder.length
-    }
-  };
+  return out;
 }
 
-// P18: In-room -3dB extension frequency
+function median(values) {
+  if (!Array.isArray(values) || values.length === 0) return null;
+  const copy = values.slice().sort((a, b) => a - b);
+  const mid = Math.floor(copy.length / 2);
+  return copy.length % 2 === 0
+    ? (copy[mid - 1] + copy[mid]) / 2
+    : copy[mid];
+}
+
+function valAt(curve, f) {
+  if (!Array.isArray(curve) || curve.length === 0 || !isNum(f)) return null;
+  if (f <= curve[0].frequency) return curve[0].spl;
+  if (f >= curve[curve.length - 1].frequency) return curve[curve.length - 1].spl;
+  for (let i = 0; i < curve.length - 1; i++) {
+    if (f >= curve[i].frequency && f <= curve[i + 1].frequency) {
+      const span = curve[i + 1].frequency - curve[i].frequency;
+      if (span === 0) return curve[i].spl;
+      const r = (f - curve[i].frequency) / span;
+      return curve[i].spl + (curve[i + 1].spl - curve[i].spl) * r;
+    }
+  }
+  return null;
+}
+
+// ── Legacy exports consumed by src/components/bass/bassSimulationEngine.jsx ──
+// These pre-date the per-seat consumer above and operate on parallel
+// freqsHz / splDb arrays (the format the simulation engine produces).
+// Signatures are kept stable; only implementations are provided here.
+
+const arrAt = (freqs, vals, f) => {
+  if (!Array.isArray(freqs) || freqs.length === 0 || !Number.isFinite(f)) return null;
+  if (f <= freqs[0]) return vals[0];
+  if (f >= freqs[freqs.length - 1]) return vals[vals.length - 1];
+  for (let i = 0; i < freqs.length - 1; i++) {
+    if (f >= freqs[i] && f <= freqs[i + 1]) {
+      const span = freqs[i + 1] - freqs[i];
+      if (span === 0) return vals[i];
+      const r = (f - freqs[i]) / span;
+      return vals[i] + (vals[i + 1] - vals[i]) * r;
+    }
+  }
+  return null;
+};
+
+// P14 — peak total LFE SPL capability in the requested band (Hz).
+export function computeP14MaxLfeSpl({ freqsHz, splDb, band = [20, 80] }) {
+  if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
+    return { maxSplDb: null, details: { band, samples: 0 } };
+  }
+  const [fLo, fHi] = band;
+  const inBand = [];
+  for (let i = 0; i < freqsHz.length; i++) {
+    if (freqsHz[i] >= fLo && freqsHz[i] <= fHi && isNum(splDb[i])) inBand.push(splDb[i]);
+  }
+  if (inBand.length === 0) return { maxSplDb: null, details: { band, samples: 0 } };
+  const maxSplDb = Math.max(...inBand);
+  return { maxSplDb, details: { band, samples: inBand.length } };
+}
+
+// P18 — in-room -3 dB extension frequency.
+// Walks from low to high and finds the lowest frequency where the smoothed
+// response reaches -3 dB relative to the per-frequency target, staying above.
 export function computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz = 10, maxHz = 200 }) {
-  // Input validation
   if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
-    return { f3Hz: null, details: { reason: "missing_data" } };
+    return { f3Hz: null, details: { samples: 0 } };
   }
-  
-  if (freqsHz.length !== splDb.length) {
-    return { f3Hz: null, details: { reason: "array_length_mismatch" } };
-  }
-  
-  // Default target is flat (0 dB)
-  const target = Array.isArray(targetDb) && targetDb.length === freqsHz.length
-    ? targetDb
-    : freqsHz.map(() => 0);
-  
-  // Compute deviation from target
-  const deviation = splDb.map((spl, i) => spl - target[i]);
-  
-  // Find reference level in 50-80 Hz band
-  const refBand = [];
+  // Reference level = median of splDb in 60-200 Hz band (usable-bass reference).
+  const refIdxs = [];
   for (let i = 0; i < freqsHz.length; i++) {
-    if (freqsHz[i] >= 50 && freqsHz[i] <= 80) {
-      refBand.push(deviation[i]);
-    }
+    if (freqsHz[i] >= 60 && freqsHz[i] <= 200 && isNum(splDb[i])) refIdxs.push(i);
   }
-  
-  if (refBand.length === 0) {
-    return { f3Hz: null, details: { reason: "no_reference_band" } };
-  }
-  
-  const refLevel = refBand.reduce((a, b) => a + b, 0) / refBand.length;
-  const targetLevel = refLevel - 3; // -3dB relative to reference
-  
-  // Find lowest frequency where deviation reaches targetLevel
-  // Search from low to high frequency
-  let f3Hz = null;
-  
+  const refVals = (refIdxs.length > 0 ? refIdxs : freqsHz.map((_, i) => i))
+    .map((i) => splDb[i])
+    .filter(isNum);
+  const refDb = median(refVals);
+  if (!isNum(refDb)) return { f3Hz: null, details: { samples: 0 } };
+  const cutoffDb = refDb - 3;
+
+  // Walk from low to high; first bin at/above cutoff within [minHz,maxHz].
+  let f3 = null;
   for (let i = 0; i < freqsHz.length; i++) {
-    if (freqsHz[i] < minHz || freqsHz[i] > maxHz) continue;
-    
-    if (deviation[i] >= targetLevel) {
-      // Linear interpolation if we have a previous point
-      if (i > 0 && freqsHz[i - 1] >= minHz) {
-        const f1 = freqsHz[i - 1];
-        const f2 = freqsHz[i];
-        const d1 = deviation[i - 1];
-        const d2 = deviation[i];
-        
-        // Interpolate to find exact crossing point
-        const ratio = (targetLevel - d1) / (d2 - d1);
-        f3Hz = f1 + ratio * (f2 - f1);
-      } else {
-        f3Hz = freqsHz[i];
-      }
+    const f = freqsHz[i];
+    if (f < minHz || f > maxHz) continue;
+    if (!isNum(splDb[i])) continue;
+    if (splDb[i] >= cutoffDb) { f3 = f; break; }
+  }
+  return { f3Hz: f3, details: { refDb, cutoffDb, samples: freqsHz.length } };
+}
+
+// P19 — max absolute deviation of splDb from targetDb below Schroeder freq.
+export function computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz }) {
+  if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
+    return { resultDb: null, details: { samples: 0 } };
+  }
+  if (!isNum(schroederHz) || schroederHz <= 0) {
+    return { resultDb: null, details: { samples: 0 } };
+  }
+  // If targetDb is an array (one value per freq), compare directly; else treat as scalar flat target.
+  const tgtArr = Array.isArray(targetDb) && targetDb.length === freqsHz.length;
+  let maxDev = 0;
+  let used = 0;
+  for (let i = 0; i < freqsHz.length; i++) {
+    if (freqsHz[i] > schroederHz) continue;
+    if (!isNum(splDb[i])) continue;
+    const ref = tgtArr ? targetDb[i] : targetDb;
+    if (!isNum(ref)) continue;
+    const d = Math.abs(splDb[i] - ref);
+    if (d > maxDev) maxDev = d;
+    used++;
+  }
+  return { resultDb: used > 0 ? maxDev : null, details: { schroederHz, samples: used } };
+}
+
+export function computeTransitionFrequencyHz(roomDims, rt60 = 0.4) {
+  const w = Number(roomDims?.widthM ?? roomDims?.width);
+  const l = Number(roomDims?.lengthM ?? roomDims?.length);
+  const h = Number(roomDims?.heightM ?? roomDims?.height);
+  if (!isNum(w) || !isNum(l) || !isNum(h) || w <= 0 || l <= 0 || h <= 0) return null;
+  const V = w * l * h;
+  if (!isNum(V) || V <= 0) return null;
+  const fs = 2000 * Math.sqrt(Math.max(rt60, 0.05) / V);
+  return isNum(fs) && fs > 0 ? fs : null;
+}
+
+// Parameter 18 — In-room bass extension -3 dB cutoff frequency.
+// "Find the lowest frequency where the response remains within -3 dB of the
+//  usable bass target/reference level."
+//  Reference level = median SPL across the 60–200 Hz usable-bass band of the
+//  smoothed RSP curve (the band where response should be flat in a tuned room).
+export function computeParam18BassExtension(rspResponse) {
+  if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
+  const curve = toSplCurve(rspResponse);
+  if (curve.length === 0) return null;
+
+  const smoothed = smoothThird(curve);
+  const refSet = smoothed.filter((p) => p.frequency >= 60 && p.frequency <= 200);
+  const bandUsed = refSet.length > 0 ? refSet : smoothed;
+  const refDb = median(bandUsed.map((p) => p.spl));
+  if (!isNum(refDb)) return null;
+
+  const cutoffDb = refDb - 3;
+  const sorted = smoothed.slice().sort((a, b) => a.frequency - b.frequency);
+
+  let result = null;
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].spl >= cutoffDb) {
+      result = sorted[i];
       break;
     }
   }
-  
+  if (!result) return null;
+
+  let level = 0; // below L1
+  if (result.frequency <= 15) level = 4;
+  else if (result.frequency <= 18) level = 3;
+  else if (result.frequency <= 25) level = 2;
+  else if (result.frequency <= 30) level = 1;
+
   return {
-    f3Hz,
-    details: {
-      refLevel,
-      targetLevel,
-      refBandHz: [50, 80]
-    }
+    hz: result.frequency,
+    medianDb: refDb,
+    cutoffDb,
+    level: level >= 1 ? `L${level}` : null,
+    value: result.frequency,
+    formatted: `${Math.round(result.frequency)} Hz`,
+    note: 'Predicted design-stage value from current bass engine.',
   };
 }
 
-// P14: Maximum LFE SPL capability at RSP (20-80 Hz)
-export function computeP14MaxLfeSpl({ freqsHz, splDb, band = [20, 80] }) {
-  // Input validation
-  if (!Array.isArray(freqsHz) || !Array.isArray(splDb) || freqsHz.length === 0) {
-    return { maxSplDb: null, details: { reason: "missing_data" } };
+// Parameter 19 — Frequency response below transition frequency at RSP, relative
+// to target curve (1/3-octave smoothing).
+//
+//  Target curve: with no user-selectable target in the app yet, we use the
+//  median SPL of the 1/3-octave smoothed RSP curve (i.e. flat-target) across
+//  the smoothed bass band. Max absolute deviation below the transition
+//  frequency is returned.
+export function computeParam19Deviation(rspResponse, transitionHz) {
+  if (!isNum(transitionHz) || transitionHz <= 0) return null;
+  if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
+  const curve = toSplCurve(rspResponse);
+  if (curve.length === 0) return null;
+
+  const smoothed = smoothThird(curve);
+  if (smoothed.length === 0) return null;
+
+  const bandHigh = smoothed.filter((p) => p.frequency >= 70 && p.frequency <= 200);
+  const bandUsed = bandHigh.length > 0 ? bandHigh : smoothed;
+  const refDb = median(bandUsed.map((p) => p.spl));
+  if (!isNum(refDb)) return null;
+
+  const below = smoothed.filter((p) => p.frequency <= transitionHz);
+  if (below.length === 0) return null;
+
+  let maxDev = 0;
+  for (let i = 0; i < below.length; i++) {
+    const d = Math.abs(below[i].spl - refDb);
+    if (d > maxDev) maxDev = d;
   }
-  
-  if (freqsHz.length !== splDb.length) {
-    return { maxSplDb: null, details: { reason: "array_length_mismatch" } };
-  }
-  
-  const [minHz, maxHz] = band;
-  
-  // Filter to band
-  const bandSpl = [];
-  for (let i = 0; i < freqsHz.length; i++) {
-    if (freqsHz[i] >= minHz && freqsHz[i] <= maxHz && isFinite(splDb[i])) {
-      bandSpl.push(splDb[i]);
-    }
-  }
-  
-  if (bandSpl.length === 0) {
-    return { maxSplDb: null, details: { reason: "no_points_in_band" } };
-  }
-  
-  const maxSplDb = Math.max(...bandSpl);
-  
+
+  let level = null;
+  if (maxDev <= 2) level = 4;
+  else if (maxDev <= 3) level = 3;
+  else if (maxDev <= 4) level = 2;
+  else if (maxDev <= 5) level = 1;
+
   return {
-    maxSplDb,
-    details: {
-      bandHz: band,
-      pointsEvaluated: bandSpl.length
+    maxDevDb: maxDev,
+    targetDb: refDb,
+    transitionHz,
+    level: level != null ? `L${level}` : null,
+    formatted: `±${maxDev.toFixed(1)} dB`,
+    note: 'Calculated from 1/3-octave smoothed predicted response.',
+  };
+}
+
+function levelForDeviation(dev) {
+  if (dev <= 2) return 4;
+  if (dev <= 3) return 3;
+  if (dev <= 4) return 2;
+  return null; // "N/A" — below L2 floor (Param 20 has no L1)
+}
+
+// Parameter 20 — Seat-to-seat frequency response below transition, relative to
+// RSP, per seat, 1/3-octave smoothing. The worst (non-RSP) seat result is the
+// achieved room value.
+export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, transitionHz, rspSeatId }) {
+  if (!isNum(transitionHz) || transitionHz <= 0) return null;
+  if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
+
+  const rspSmoothed = smoothThird(toSplCurve(rspResponse));
+  if (rspSmoothed.length === 0) return null;
+
+  const rspBandFreqs = rspSmoothed
+    .filter((p) => p.frequency <= transitionHz)
+    .map((p) => p.frequency);
+  if (rspBandFreqs.length === 0) return null;
+
+  const perSeat = [];
+  for (let i = 0; i < (perSeatResponses || []).length; i++) {
+    const entry = perSeatResponses[i];
+    if (!entry || !Array.isArray(entry.responseData) || entry.responseData.length === 0) continue;
+    const seatCurve = smoothThird(toSplCurve(entry.responseData));
+    if (seatCurve.length === 0) continue;
+
+    let maxDev = 0;
+    for (let j = 0; j < rspBandFreqs.length; j++) {
+      const f = rspBandFreqs[j];
+      const rspSpl = valAt(rspSmoothed, f);
+      const seatSpl = valAt(seatCurve, f);
+      if (rspSpl != null && seatSpl != null) {
+        const d = Math.abs(seatSpl - rspSpl);
+        if (d > maxDev) maxDev = d;
+      }
     }
+    const isRsp = rspSeatId != null && String(entry.seatId) === String(rspSeatId);
+    const dev = isRsp ? 0 : maxDev;
+    perSeat.push({
+      seatId: entry.seatId,
+      isPrimary: !!entry.isPrimary,
+      isRsp,
+      deviationDb: dev,
+      level: levelForDeviation(dev),
+    });
+  }
+  if (perSeat.length === 0) return null;
+
+  const other = perSeat.filter((s) => !s.isRsp);
+  // Worst (max deviation) across non-RSP seats; fall back to RSP with single seat config.
+  let worst = null;
+  if (other.length > 0) {
+    worst = other.reduce((acc, s) => s.deviationDb > (acc ? acc.deviationDb : -Infinity) ? s : acc, null);
+  } else {
+    worst = perSeat[0] || null;
+  }
+  if (!worst) return null;
+
+  const worstDev = worst.deviationDb;
+  const worstLevel = levelForDeviation(worstDev);
+
+  return {
+    perSeat,
+    rspSeatId,
+    worstSeatId: worst.seatId,
+    worstSeatDeviationDb: worstDev,
+    worstSeatLevel: worstLevel,
+    transitionHz,
+    isSingleSeat: other.length === 0,
+    note: 'Seat-to-seat consistency relative to RSP using 1/3-octave smoothing.',
   };
 }
