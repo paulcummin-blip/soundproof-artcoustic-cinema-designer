@@ -122,7 +122,7 @@ export function estimateModeQLocal({ roomDims, surfaceAbsorption, f0, mode }) {
   // We weight the *absorption contribution* of each pair, not the surface area.
   const rt60    = 0.161 * volume / Math.max(weightedAbsorption, 1e-6);
   const tau     = rt60 / 13.815;
-  const qSabine = 2 * Math.PI * f0 * tau;
+  let qSabine = 2 * Math.PI * f0 * tau;
 
   return Math.max(1, Math.min(80, qSabine));
 }
