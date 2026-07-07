@@ -58,7 +58,8 @@ export default function BassGraph({
   yMax,
   showAxialOnly = false,
   refDb = 85,
-  disableHighlight = false
+  disableHighlight = false,
+  renderToken = ''
 }) {
     const lastValidYDomainRef = React.useRef(null);
 
@@ -324,11 +325,42 @@ export default function BassGraph({
       finalYTicks = yTicks;
     }
 
-    // __TEMP_DIAGNOSTIC__ chartRenderKey — force LineChart remount when plotted data changes.
-    // Remove after confirming whether Recharts holds stale rendered output.
+    // chartRenderKey — forces LineChart remount when plotted data changes.
+    // Case 079: previous version only hashed the first row + row count, which left
+    // the key unchanged when a qStrategy switch altered mid/late-curve values but
+    // left the first plotted point (≈20 Hz, below the first mode) identical — so
+    // Recharts reconciled instead of remounting and the curve did not repaint.
+    // Fix: sample SPL at several indices across the whole band (first, 1/4, mid,
+    // 3/4, last) for every series, plus row count. Any value change now flips the
+    // key and forces a clean remount/redraw. Rendering fix only — no data change.
     const activeData = isMulti ? multiChartData : chartData;
-    const firstRow = activeData?.[0];
-    const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${activeData?.length ?? 0}_${firstRow ? JSON.stringify(firstRow) : 'empty'}`;
+    const _rowCount = activeData?.length ?? 0;
+    let _splSample = '';
+    if (_rowCount > 0 && activeData) {
+        const sampleIdx = [
+            0,
+            Math.floor(_rowCount / 4),
+            Math.floor(_rowCount / 2),
+            Math.floor((_rowCount * 3) / 4),
+            _rowCount - 1,
+        ];
+        for (const idx of sampleIdx) {
+            const row = activeData[idx];
+            if (!row || isMulti) {
+                // Multi-series rows carry spl_<id> keys; concatenate their values.
+                if (row && isMulti) {
+                    const vals = Object.keys(row).filter(k => k.startsWith('spl_')).sort().map(k => row[k]);
+                    _splSample += vals.map(v => (Number.isFinite(v) ? Number(v).toFixed(4) : 'null')).join(',');
+                } else {
+                    _splSample += 'null';
+                }
+            } else {
+                _splSample += Number.isFinite(row.spl) ? Number(row.spl).toFixed(4) : 'null';
+            }
+            _splSample += '|';
+        }
+    }
+    const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${_rowCount}|${renderToken}|${_splSample}`;
 
     // Render mode markers with hover tooltips (REW parity overlay)
     const renderModeMarkers = () => {

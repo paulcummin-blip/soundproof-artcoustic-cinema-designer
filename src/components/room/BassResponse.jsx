@@ -1225,6 +1225,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               showAxialOnly={false}
               refDb={85}
               disableHighlight={false}
+              renderToken={qStrategy}
             />
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
