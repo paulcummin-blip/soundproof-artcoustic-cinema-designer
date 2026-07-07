@@ -525,7 +525,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         // REW parity isolation: flat_rew_reference + full_field → direct + modes only, no reflections, no late field
         // __CANDIDATE_AB_CORRECTED_MODAL__ — the A&B strategy must match Case 071's validated
         // engine options (enableReflections: true), bypassing this legacy parity-isolation gate.
-        const _fieldReflections = qStrategy === 'ab_corrected' ? true
+        const _fieldReflections = qStrategyOverride === 'ab_corrected' ? true
           : _isParityFullField ? false
           : _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes' ? false
           : _effectiveFieldMode === 'reflections_only' ? true
@@ -798,6 +798,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     return out;
   }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode]);
+
+  // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
+  // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
+  // Response graph, plus the raw seat response (B, pre-smoothing) and plotted series (C).
+  const auditPanelInputs = useMemo(() => {
+    if (qStrategy !== 'ab_corrected') return null;
+    const sid = selectedSeatIds[0];
+    const seat = seatingPositions?.find(s => (s.id || `${s.x}-${s.y}`) === sid) || null;
+    const subs = Array.isArray(subsForSimulation) ? subsForSimulation : [];
+    const firstSub = subs[0] || null;
+    const subCurve = firstSub ? getSubwooferCurve(firstSub.modelKey) : null;
+    const sourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
+    const rawSeatResponse = simulationResults?.seatResponses?.[sid] || null;
+    const graphData = multiSeriesForGraph[0]?.data || null;
+    return { roomDims, seat, subs, surfaceAbsorption, sourceCurve, qStrategy, graphData, rawSeatResponse };
+  }, [qStrategy, selectedSeatIds, seatingPositions, subsForSimulation, rewSourceCurveMode, roomDims, surfaceAbsorption, simulationResults, multiSeriesForGraph]);
 
   // Keep a single-seat "selectedSeat" reference for the graph title + per-seat detail cards
   const primarySelectedSeat = useMemo(() => {
@@ -1271,8 +1287,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
 
       {/* __TEMP_CASE072_VERIFICATION__ — temporary runtime verification panel, ab_corrected only */}
-      {qStrategy === 'ab_corrected' && (
-        <Case072AbCorrectedRuntimeVerification />
+      {qStrategy === 'ab_corrected' && auditPanelInputs && (
+        <Case072AbCorrectedRuntimeVerification {...auditPanelInputs} />
       )}
 
       {/* ── Null Depth Audit Badge ── */}

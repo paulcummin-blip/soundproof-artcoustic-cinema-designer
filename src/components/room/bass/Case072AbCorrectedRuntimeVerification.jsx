@@ -1,26 +1,25 @@
 import React, { useMemo } from "react";
 import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine.js";
 
-// Case 072 — A&B Corrected Runtime Verification (temporary, read-only).
-// Runs Case 071 Variant B and the live dropdown ab_corrected path for the SAME fixed room
-// (3.50×5.90×2.70m, sub front-right, seat 60% length) and compares per-frequency vector
-// debug values at 20, 29, 38, 58, 75, 100, 152 Hz. Stops at the first numerical divergence.
+// Case 072 / 077 — A&B Corrected Runtime Verification (temporary, read-only).
+// Post-Case077: uses LIVE room/seat/sub/absorption/source-curve passed from BassResponse.jsx
+// (the same data that feeds the visible Bass Response graph) — no hardcoded room.
 //
-// No equations, scaling, geometry, or smoothing are changed. This panel only READS engine
-// output and displays it. It is rendered only when qStrategy === 'ab_corrected'.
+// Compares three data sources, all on the LIVE project geometry:
+//   A — Case 071-style external A&B recomputation (production qStrategy + external modal term)
+//   B — live ab_corrected engine result (raw seat response feeding the graph, pre-smoothing)
+//   C — actual plotted graph series (multiSeriesForGraph[0].data, post-smoothing)
+//
+// No equations, scaling, Q, geometry, or smoothing are changed. This panel only READS engine
+// output and displays it. Rendered only when qStrategy === 'ab_corrected'.
 
 const C = 343;
-const CURVE_DB = 94;
-const FLAT_CURVE = [{ hz: 20, db: CURVE_DB }, { hz: 200, db: CURVE_DB }];
-const S_UNIT = Math.pow(10, CURVE_DB / 20);
-
 const TARGET_FREQS = [20, 29, 38, 58, 75, 100, 152];
 
-// Case 071 Variant B options (flat curve, order-1 reflections, late field disabled)
+// Case 071 Variant B options (flat-mode engine options, external A&B modal replacement)
 const ENGINE_OPTIONS_CASE071 = {
   enableReflections: true,
   enableModes: true,
-  surfaceAbsorption: { front: 0.30, back: 0.30, left: 0.30, right: 0.30, ceiling: 0.30, floor: 0.30 },
   freqMinHz: 20,
   freqMaxHz: 200,
   smoothing: "none",
@@ -32,34 +31,13 @@ const ENGINE_OPTIONS_CASE071 = {
   debugReflectionOrder: 1,
 };
 
-// Live dropdown ab_corrected options — mirrors BassResponse.jsx's actual engine call.
-// Post-Case074: debugReflectionOrder is now forced to 1 when qStrategy === "ab_corrected"
-// (same branch as flat_rew_reference). Updated here to match, for accurate audit only.
-const ENGINE_OPTIONS_DROPDOWN = {
-  enableReflections: true,
-  enableModes: true,
-  surfaceAbsorption: { front: 0.30, back: 0.30, left: 0.30, right: 0.30, ceiling: 0.30, floor: 0.30 },
-  freqMinHz: 20,
-  freqMaxHz: 200,
-  smoothing: "none",
-  pureDeterministicModalSum: false,
-  disableLateField: false,
-  disableModalPropagationPhase: false,
-  modalSourceReferenceMode: "existing",
-  qStrategy: "ab_corrected",
-  debugReflectionOrder: 1,
-};
-
-const ROOM = { widthM: 3.50, lengthM: 5.90, heightM: 2.70 };
-const SUB = { x: ROOM.widthM - 0.30, y: 0.15, z: 0.35, modelKey: "SUB2-12", tuning: { gainDb: 0, delayMs: 0, polarity: 0 } };
-const SEAT = { x: ROOM.widthM / 2, y: ROOM.lengthM * 0.60, z: 1.2 };
-
 function fmt(v, d = 4) {
   if (!Number.isFinite(v)) return "—";
   return Number(v).toFixed(d);
 }
 
 function findNearestFreqIndex(freqsHz, target) {
+  if (!Array.isArray(freqsHz) || freqsHz.length === 0) return 0;
   let bestIdx = 0;
   let bestDist = Math.abs(freqsHz[0] - target);
   for (let i = 1; i < freqsHz.length; i++) {
@@ -69,214 +47,197 @@ function findNearestFreqIndex(freqsHz, target) {
   return bestIdx;
 }
 
-// Case 071 Variant B — external A&B recomputation
-function runCase071VariantB() {
-  const engineResult = simulateBassResponseRewCore(ROOM, SEAT, SUB, FLAT_CURVE, ENGINE_OPTIONS_CASE071);
-  const { freqsHz, perFrequencyVectorDebug, activeModalContributorDebugSeries } = engineResult;
-  const V = ROOM.widthM * ROOM.lengthM * ROOM.heightM;
+// Interpolate source curve dB at a given frequency (linear between bracketing points)
+function sourceCurveDbAt(sourceCurve, hz) {
+  if (!Array.isArray(sourceCurve) || sourceCurve.length === 0) return 94;
+  if (hz <= sourceCurve[0].hz) return sourceCurve[0].db;
+  const last = sourceCurve[sourceCurve.length - 1];
+  if (hz >= last.hz) return last.db;
+  for (let i = 0; i < sourceCurve.length - 1; i++) {
+    const p0 = sourceCurve[i], p1 = sourceCurve[i + 1];
+    if (hz >= p0.hz && hz <= p1.hz) {
+      const t = p1.hz === p0.hz ? 0 : (hz - p0.hz) / (p1.hz - p0.hz);
+      return p0.db + t * (p1.db - p0.db);
+    }
+  }
+  return last.db;
+}
 
-  const rows = freqsHz.map((frequencyHz, i) => {
-    const preRow = perFrequencyVectorDebug[i];
-    const contributorRow = activeModalContributorDebugSeries[i];
-    const k = (2 * Math.PI * frequencyHz) / C;
-    let modalRe = 0, modalIm = 0;
-    (contributorRow?.contributors || []).forEach((c) => {
-      const f0 = c.modeFrequencyHz, q = c.qValue, coupling = c.combinedCoupling;
-      const kr = (2 * Math.PI * f0) / C;
-      const realDen = kr * kr - k * k;
-      const imagDen = (k * kr) / Math.max(q, 1e-6);
-      const denomSq = realDen * realDen + imagDen * imagDen;
-      const gain = S_UNIT * coupling * (1 / V);
-      modalRe += gain * (realDen / denomSq);
-      modalIm += gain * (-imagDen / denomSq);
+// Case 071 Variant B — external A&B recomputation on LIVE geometry.
+// Loops over all live subs and sums complex pressure, mirroring the graph path's multi-sub
+// summation in BassResponse.jsx. Modal term is reconstructed externally from the engine's
+// per-frequency contributor debug series; direct + reflection come from perFrequencyVectorDebug.
+function runCase071VariantB(roomDims, seat, subs, surfaceAbsorption, sourceCurve) {
+  const V = roomDims.widthM * roomDims.lengthM * roomDims.heightM;
+  const optionsBase = { ...ENGINE_OPTIONS_CASE071, surfaceAbsorption };
+  let freqsHz = null;
+  let sumRe = null;
+  let sumIm = null;
+
+  subs.forEach((sub) => {
+    const engineResult = simulateBassResponseRewCore(roomDims, seat, sub, sourceCurve, optionsBase);
+    const { freqsHz: fH, perFrequencyVectorDebug, activeModalContributorDebugSeries } = engineResult;
+    if (!freqsHz) {
+      freqsHz = fH;
+      sumRe = new Array(fH.length).fill(0);
+      sumIm = new Array(fH.length).fill(0);
+    }
+    fH.forEach((frequencyHz, i) => {
+      const preRow = perFrequencyVectorDebug[i];
+      const contributorRow = activeModalContributorDebugSeries[i];
+      const k = (2 * Math.PI * frequencyHz) / C;
+      let modalRe = 0, modalIm = 0;
+      (contributorRow?.contributors || []).forEach((cc) => {
+        const f0 = cc.modeFrequencyHz, q = cc.qValue, coupling = cc.combinedCoupling;
+        const kr = (2 * Math.PI * f0) / C;
+        const realDen = kr * kr - k * k;
+        const imagDen = (k * kr) / Math.max(q, 1e-6);
+        const denomSq = realDen * realDen + imagDen * imagDen;
+        const sUnit = Math.pow(10, sourceCurveDbAt(sourceCurve, frequencyHz) / 20);
+        const gain = sUnit * coupling * (1 / V);
+        modalRe += gain * (realDen / denomSq);
+        modalIm += gain * (-imagDen / denomSq);
+      });
+      sumRe[i] += preRow.directRe + preRow.reflectionRe + modalRe;
+      sumIm[i] += preRow.directIm + preRow.reflectionIm + modalIm;
     });
-    const totalRe = preRow.directRe + preRow.reflectionRe + modalRe;
-    const totalIm = preRow.directIm + preRow.reflectionIm + modalIm;
-    const finalDb = 20 * Math.log10(Math.max(Math.sqrt(totalRe * totalRe + totalIm * totalIm), 1e-10));
-    return {
-      frequencyHz,
-      enableReflections: ENGINE_OPTIONS_CASE071.enableReflections,
-      imageSourcesLength: engineResult?.wholeCurveDebugRows?.length ?? 0, // placeholder, updated below
-      directRe: preRow.directRe, directIm: preRow.directIm,
-      reflectionRe: preRow.reflectionRe, reflectionIm: preRow.reflectionIm,
-      modalRe, modalIm,
-      totalRe, totalIm,
-      finalDb,
-    };
   });
-
-  return { freqsHz, rows };
-}
-
-// Live dropdown ab_corrected path — engine internal A&B override
-function runDropdownAbCorrected() {
-  const options = ENGINE_OPTIONS_DROPDOWN;
-  const engineResult = simulateBassResponseRewCore(ROOM, SEAT, SUB, FLAT_CURVE, options);
-  const { freqsHz, perFrequencyVectorDebug } = engineResult;
-
-  // Count image sources by re-running buildImageSources logic is internal to the engine,
-  // but we can infer from perFrequencyVectorDebug: if reflectionRe !== 0, imageSources is populated.
-  // For an exact count, we check the first frequency bin's reflection values.
-  const imageSourcesPopulated = perFrequencyVectorDebug.some(r => r.reflectionRe !== 0 || r.reflectionIm !== 0);
 
   const rows = freqsHz.map((frequencyHz, i) => {
-    const row = perFrequencyVectorDebug[i];
-    const finalDb = 20 * Math.log10(Math.max(Math.sqrt(row.finalRe * row.finalRe + row.finalIm * row.finalIm), 1e-10));
-    return {
-      frequencyHz,
-      enableReflections: options.enableReflections,
-      imageSourcesPopulated,
-      directRe: row.directRe, directIm: row.directIm,
-      reflectionRe: row.reflectionRe, reflectionIm: row.reflectionIm,
-      modalRe: row.modalSumRe, modalIm: row.modalSumIm,
-      totalRe: row.finalRe, totalIm: row.finalIm,
-      finalDb,
-    };
+    const finalDb = 20 * Math.log10(Math.max(Math.sqrt(sumRe[i] * sumRe[i] + sumIm[i] * sumIm[i]), 1e-10));
+    return { frequencyHz, finalDb };
   });
-
   return { freqsHz, rows };
 }
 
-export default function Case072AbCorrectedRuntimeVerification() {
-  const { comparison, firstDivergence } = useMemo(() => {
-    const case071 = runCase071VariantB();
-    const dropdown = runDropdownAbCorrected();
+export default function Case072AbCorrectedRuntimeVerification({
+  roomDims, seat, subs, surfaceAbsorption, sourceCurve, qStrategy, graphData, rawSeatResponse,
+}) {
+  const { comparison, firstDivergence, ready, headerInfo } = useMemo(() => {
+    const hasInputs = roomDims && roomDims.widthM && roomDims.lengthM && roomDims.heightM
+      && seat && Array.isArray(subs) && subs.length > 0
+      && Array.isArray(sourceCurve) && sourceCurve.length > 0
+      && rawSeatResponse && Array.isArray(rawSeatResponse.freqsHz) && Array.isArray(rawSeatResponse.splDb)
+      && Array.isArray(graphData) && graphData.length > 0;
 
+    if (!hasInputs) {
+      return { comparison: [], firstDivergence: null, ready: false, headerInfo: null };
+    }
+
+    const case071 = runCase071VariantB(roomDims, seat, subs, surfaceAbsorption, sourceCurve);
+
+    const graphFreqs = graphData.map((p) => p.frequency);
     const comparison = TARGET_FREQS.map((targetHz) => {
       const idxA = findNearestFreqIndex(case071.freqsHz, targetHz);
-      const idxB = findNearestFreqIndex(dropdown.freqsHz, targetHz);
-      const rowA = case071.rows[idxA];
-      const rowB = dropdown.rows[idxB];
-
+      const idxB = findNearestFreqIndex(rawSeatResponse.freqsHz, targetHz);
+      const idxC = findNearestFreqIndex(graphFreqs, targetHz);
+      const aDb = case071.rows[idxA]?.finalDb;
+      const bDb = rawSeatResponse.splDb[idxB];
+      const cDb = graphData[idxC]?.spl;
       return {
         targetHz,
-        actualFreqA: rowA.frequencyHz,
-        actualFreqB: rowB.frequencyHz,
-        enableReflectionsA: rowA.enableReflections,
-        enableReflectionsB: rowB.enableReflections,
-        imageSourcesPopulatedA: case071.rows.some(r => r.reflectionRe !== 0 || r.reflectionIm !== 0),
-        imageSourcesPopulatedB: rowB.imageSourcesPopulated,
-        directReA: rowA.directRe, directReB: rowB.directRe,
-        directImA: rowA.directIm, directImB: rowB.directIm,
-        reflectionReA: rowA.reflectionRe, reflectionReB: rowB.reflectionRe,
-        reflectionImA: rowA.reflectionIm, reflectionImB: rowB.reflectionIm,
-        modalReA: rowA.modalRe, modalReB: rowB.modalRe,
-        modalImA: rowA.modalIm, modalImB: rowB.modalIm,
-        totalReA: rowA.totalRe, totalReB: rowB.totalRe,
-        totalImA: rowA.totalIm, totalImB: rowB.totalIm,
-        finalDbA: rowA.finalDb, finalDbB: rowB.finalDb,
+        aDb, bDb, cDb,
+        abDelta: Number.isFinite(aDb) && Number.isFinite(bDb) ? aDb - bDb : null,
+        bcDelta: Number.isFinite(bDb) && Number.isFinite(cDb) ? bDb - cDb : null,
       };
     });
 
-    // Find first divergence across all compared fields
-    const fields = [
-      "enableReflections", "imageSourcesPopulated",
-      "directRe", "directIm", "reflectionRe", "reflectionIm",
-      "modalRe", "modalIm", "totalRe", "totalIm", "finalDb",
-    ];
-    const tolerance = 1e-6;
+    // Stop at first B-C divergence
+    const tolerance = 0.01;
     let firstDivergence = null;
-
     for (const cmp of comparison) {
-      for (const field of fields) {
-        const a = cmp[`${field}A`];
-        const b = cmp[`${field}B`];
-        if (typeof a === "boolean" || typeof b === "boolean") {
-          if (a !== b) {
-            firstDivergence = { targetHz: cmp.targetHz, field, valueA: a, valueB: b };
-            break;
-          }
-        } else if (Math.abs(a - b) > tolerance) {
-          firstDivergence = { targetHz: cmp.targetHz, field, valueA: a, valueB: b, delta: a - b };
-          break;
-        }
+      if (cmp.bcDelta === null || Math.abs(cmp.bcDelta) > tolerance) {
+        firstDivergence = {
+          targetHz: cmp.targetHz,
+          field: "B vs C (final dB)",
+          bDb: cmp.bDb, cDb: cmp.cDb, delta: cmp.bcDelta,
+        };
+        break;
       }
-      if (firstDivergence) break;
     }
 
-    return { comparison, firstDivergence };
-  }, []);
+    const firstSub = subs[0] || {};
+    const headerInfo = {
+      room: `${fmt(roomDims.widthM, 2)}×${fmt(roomDims.lengthM, 2)}×${fmt(roomDims.heightM, 2)}m`,
+      sub: `(${fmt(firstSub.x, 2)}, ${fmt(firstSub.y, 2)}, ${fmt(firstSub.z, 2)}) ${firstSub.modelKey || '—'} (n=${subs.length})`,
+      seat: `(${fmt(seat.x, 2)}, ${fmt(seat.y, 2)}, ${fmt(seat.z, 2)})`,
+      absorption: `F${fmt(surfaceAbsorption?.front, 2)} B${fmt(surfaceAbsorption?.back, 2)} L${fmt(surfaceAbsorption?.left, 2)} R${fmt(surfaceAbsorption?.right, 2)} C${fmt(surfaceAbsorption?.ceiling, 2)} Fl${fmt(surfaceAbsorption?.floor, 2)}`,
+      sourceCurve: sourceCurve[0] ? `${sourceCurve[0].db}…${sourceCurve[sourceCurve.length - 1].db} dB` : '—',
+    };
 
-  const fields = [
-    { key: "enableReflections", label: "enableReflections", isBool: true },
-    { key: "imageSourcesPopulated", label: "imageSources populated", isBool: true },
-    { key: "directRe", label: "directRe" },
-    { key: "directIm", label: "directIm" },
-    { key: "reflectionRe", label: "reflectionRe" },
-    { key: "reflectionIm", label: "reflectionIm" },
-    { key: "modalRe", label: "modalRe" },
-    { key: "modalIm", label: "modalIm" },
-    { key: "totalRe", label: "totalRe" },
-    { key: "totalIm", label: "totalIm" },
-    { key: "finalDb", label: "final dB", digits: 2 },
-  ];
+    return { comparison, firstDivergence, ready: true, headerInfo };
+  }, [roomDims, seat, subs, surfaceAbsorption, sourceCurve, graphData, rawSeatResponse]);
+
+  if (!ready || !headerInfo) {
+    return (
+      <div style={{ border: "2px solid #b45309", borderRadius: 10, background: "#fffbeb", padding: 14, fontFamily: "monospace", fontSize: 9.5, marginTop: 8 }}>
+        <div style={{ fontWeight: 700, color: "#92400e", fontSize: 13, marginBottom: 6 }}>
+          Case 077 — Live Graph Runtime Verification (temporary, read-only)
+        </div>
+        <div style={{ color: "#78350f" }}>Waiting for live room/seat/sub data…</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ border: "2px solid #b45309", borderRadius: 10, background: "#fffbeb", padding: 14, fontFamily: "monospace", fontSize: 9.5, marginTop: 8 }}>
       <div style={{ fontWeight: 700, color: "#92400e", fontSize: 13, marginBottom: 6 }}>
-        Case 073 — A&B Dropdown vs Case071 Runtime Divergence (temporary, read-only)
+        Case 077 — Live Graph Runtime Verification (temporary, read-only)
       </div>
       <div style={{ padding: 8, borderRadius: 6, background: "#fef3c7", border: "1px solid #d97706", color: "#78350f", marginBottom: 10, fontSize: 9 }}>
-        Room: 3.50×5.90×2.70m · Sub: ({fmt(SUB.x, 2)}, {fmt(SUB.y, 2)}, {fmt(SUB.z, 2)}) · Seat: ({fmt(SEAT.x, 2)}, {fmt(SEAT.y, 2)}, {fmt(SEAT.z, 2)}) · Absorption: 0.30 all · No smoothing
-        <br/>A = Case 071 Variant B (external A&B, debugReflectionOrder=1, disableLateField=true, pureDeterministicModalSum=true)
-        <br/>B = Live dropdown ab_corrected (engine internal A&B, debugReflectionOrder=1 post-Case074, disableLateField=false, pureDeterministicModalSum=false)
-        <br/>Case074 fix applied — both now use order-1 reflections (6 image sources). Verify below.
+        <b>LIVE geometry</b> — Room: {headerInfo.room} · Sub: {headerInfo.sub} · Seat: {headerInfo.seat}
+        <br/>Absorption: {headerInfo.absorption} · Source curve: {headerInfo.sourceCurve} · No smoothing on A/B
+        <br/>A = Case 071 external A&B recomputation (live geometry, production qStrategy + external modal)
+        <br/>B = live ab_corrected raw seat response feeding the graph (pre-smoothing)
+        <br/>C = actual plotted graph series (post-smoothing)
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 7.5 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 8 }}>
           <thead>
             <tr style={{ background: "#fef3c7" }}>
               <th style={{ textAlign: "left", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>Target Hz</th>
-              <th style={{ textAlign: "left", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>Field</th>
-              <th style={{ textAlign: "right", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>A — Case071 B</th>
-              <th style={{ textAlign: "right", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>B — Dropdown</th>
-              <th style={{ textAlign: "right", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>Δ</th>
-              <th style={{ textAlign: "center", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>Match?</th>
+              <th style={{ textAlign: "right", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>A — Case071 dB</th>
+              <th style={{ textAlign: "right", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>B — Raw (ab_corrected) dB</th>
+              <th style={{ textAlign: "right", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>C — Plotted dB</th>
+              <th style={{ textAlign: "right", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>A−B Δ</th>
+              <th style={{ textAlign: "right", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>B−C Δ</th>
+              <th style={{ textAlign: "center", padding: "3px 4px", borderBottom: "1px solid #d97706", whiteSpace: "nowrap" }}>B=C?</th>
             </tr>
           </thead>
           <tbody>
-            {comparison.map((cmp) =>
-              fields.map((f) => {
-                const a = cmp[`${f.key}A`];
-                const b = cmp[`${f.key}B`];
-                const isBool = f.isBool;
-                const delta = isBool ? (a === b ? 0 : 1) : (Number.isFinite(a) && Number.isFinite(b) ? a - b : null);
-                const match = isBool ? a === b : (Number.isFinite(delta) && Math.abs(delta) < 1e-6);
-                const isDivergence = firstDivergence && firstDivergence.targetHz === cmp.targetHz && firstDivergence.field === f.key;
-                return (
-                  <tr
-                    key={`${cmp.targetHz}-${f.key}`}
-                    style={{
-                      background: isDivergence ? "#fecaca" : match ? "#f0fdf4" : "#fee2e2",
-                    }}
-                  >
-                    <td style={{ padding: "2px 4px", fontWeight: 700 }}>{cmp.targetHz}</td>
-                    <td style={{ padding: "2px 4px" }}>{f.label}</td>
-                    <td style={{ padding: "2px 4px", textAlign: "right" }}>{isBool ? String(a) : fmt(a, f.digits ?? 4)}</td>
-                    <td style={{ padding: "2px 4px", textAlign: "right" }}>{isBool ? String(b) : fmt(b, f.digits ?? 4)}</td>
-                    <td style={{ padding: "2px 4px", textAlign: "right" }}>{isBool ? (match ? "0" : "≠") : (delta === null ? "—" : fmt(delta, 4))}</td>
-                    <td style={{ padding: "2px 4px", textAlign: "center", fontWeight: 700 }}>{match ? "✓" : "✗"}</td>
-                  </tr>
-                );
-              })
-            )}
+            {comparison.map((cmp) => {
+              const bcMatch = cmp.bcDelta !== null && Math.abs(cmp.bcDelta) <= 0.01;
+              const isDivergence = firstDivergence && firstDivergence.targetHz === cmp.targetHz;
+              return (
+                <tr key={cmp.targetHz} style={{ background: isDivergence ? "#fecaca" : bcMatch ? "#f0fdf4" : "#fee2e2" }}>
+                  <td style={{ padding: "2px 4px", fontWeight: 700 }}>{cmp.targetHz}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{fmt(cmp.aDb, 2)}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{fmt(cmp.bDb, 2)}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{fmt(cmp.cDb, 2)}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{cmp.abDelta === null ? "—" : fmt(cmp.abDelta, 2)}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{cmp.bcDelta === null ? "—" : fmt(cmp.bcDelta, 2)}</td>
+                  <td style={{ padding: "2px 4px", textAlign: "center", fontWeight: 700 }}>{bcMatch ? "✓" : "✗"}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {firstDivergence ? (
         <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: "#fecaca", border: "1px solid #dc2626", color: "#7f1d1d" }}>
-          <div style={{ fontWeight: 700, fontSize: 11 }}>FIRST DIVERGENCE at {firstDivergence.targetHz} Hz — field: {firstDivergence.field}</div>
+          <div style={{ fontWeight: 700, fontSize: 11 }}>FIRST B−C DIVERGENCE at {firstDivergence.targetHz} Hz — field: {firstDivergence.field}</div>
           <div style={{ marginTop: 4 }}>
-            A (Case071 B): {String(firstDivergence.valueA)}
-            <br/>B (Dropdown): {String(firstDivergence.valueB)}
-            {firstDivergence.delta !== undefined && <><br/>Δ: {fmt(firstDivergence.delta, 6)}</>}
+            B (Raw ab_corrected): {String(firstDivergence.bDb)}
+            <br/>C (Plotted graph): {String(firstDivergence.cDb)}
+            {firstDivergence.delta !== null && <><br/>Δ (B−C): {fmt(firstDivergence.delta, 4)}</>}
+            <br/><i>Variable: <code>graphData[].spl</code> vs <code>rawSeatResponse.splDb[]</code> — divergence indicates the smoothing/dedup layer in <code>multiSeriesForGraph</code> (BassResponse.jsx) alters plotted values vs raw engine output.</i>
           </div>
         </div>
       ) : (
         <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: "#dcfce7", border: "1px solid #16a34a", color: "#14532d" }}>
-          <div style={{ fontWeight: 700, fontSize: 11 }}>✓ ALL FIELDS MATCH — no divergence detected at any target frequency.</div>
+          <div style={{ fontWeight: 700, fontSize: 11 }}>✓ B = C at all target frequencies — the audit panel reads the same live data that feeds the visible graph.</div>
         </div>
       )}
     </div>
