@@ -15,6 +15,7 @@ import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLine
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case072AbCorrectedRuntimeVerification from "@/components/room/bass/Case072AbCorrectedRuntimeVerification";
+import Case090RewForensicAuditDashboard from "@/components/room/bass/Case090RewForensicAuditDashboard";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1299,6 +1300,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* __TEMP_CASE072_VERIFICATION__ — temporary runtime verification panel, ab_corrected only */}
       {qStrategy === 'ab_corrected' && auditPanelInputs && (
         <Case072AbCorrectedRuntimeVerification {...auditPanelInputs} />
+      )}
+
+      {/* __TEMP_CASE090_FORENSIC_AUDIT_DASHBOARD__ — temporary, read-only, ab_corrected only */}
+      {qStrategy === 'ab_corrected' && auditPanelInputs && (
+        <Case090RewForensicAuditDashboard
+          roomDims={auditPanelInputs.roomDims}
+          seat={auditPanelInputs.seat}
+          subs={auditPanelInputs.subs}
+          surfaceAbsorption={auditPanelInputs.surfaceAbsorption}
+          sourceCurve={auditPanelInputs.sourceCurve}
+          qStrategy={auditPanelInputs.qStrategy}
+          simulationResults={simulationResults}
+          multiSeriesForGraph={multiSeriesForGraph}
+        />
       )}
 
       {/* ── Null Depth Audit Badge ── */}
