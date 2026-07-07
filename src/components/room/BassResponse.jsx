@@ -16,6 +16,7 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case072AbCorrectedRuntimeVerification from "@/components/room/bass/Case072AbCorrectedRuntimeVerification";
 import Case090RewForensicAuditDashboard from "@/components/room/bass/Case090RewForensicAuditDashboard";
+import Case098RewMarkerValidationPanel from "@/components/room/bass/Case098RewMarkerValidationPanel";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1314,6 +1315,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           simulationResults={simulationResults}
           multiSeriesForGraph={multiSeriesForGraph}
         />
+      )}
+
+      {/* __TEMP_CASE098_REW_MARKER_VALIDATION__ — temporary, read-only, fixed reference room (5.0×5.0×2.4) */}
+      {qStrategy === 'ab_corrected' && (
+        <Case098RewMarkerValidationPanel />
       )}
 
       {/* ── Null Depth Audit Badge ── */}
