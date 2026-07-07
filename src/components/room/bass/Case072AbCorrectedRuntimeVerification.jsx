@@ -32,8 +32,9 @@ const ENGINE_OPTIONS_CASE071 = {
   debugReflectionOrder: 1,
 };
 
-// Live dropdown ab_corrected options (order-3 reflections, late field enabled, production modal flags)
-// These match BassResponse.jsx's actual engine call for non-flat_rew_reference mode.
+// Live dropdown ab_corrected options — mirrors BassResponse.jsx's actual engine call.
+// Post-Case074: debugReflectionOrder is now forced to 1 when qStrategy === "ab_corrected"
+// (same branch as flat_rew_reference). Updated here to match, for accurate audit only.
 const ENGINE_OPTIONS_DROPDOWN = {
   enableReflections: true,
   enableModes: true,
@@ -46,7 +47,7 @@ const ENGINE_OPTIONS_DROPDOWN = {
   disableModalPropagationPhase: false,
   modalSourceReferenceMode: "existing",
   qStrategy: "ab_corrected",
-  debugReflectionOrder: 3,
+  debugReflectionOrder: 1,
 };
 
 const ROOM = { widthM: 3.50, lengthM: 5.90, heightM: 2.70 };
@@ -218,8 +219,8 @@ export default function Case072AbCorrectedRuntimeVerification() {
       <div style={{ padding: 8, borderRadius: 6, background: "#fef3c7", border: "1px solid #d97706", color: "#78350f", marginBottom: 10, fontSize: 9 }}>
         Room: 3.50×5.90×2.70m · Sub: ({fmt(SUB.x, 2)}, {fmt(SUB.y, 2)}, {fmt(SUB.z, 2)}) · Seat: ({fmt(SEAT.x, 2)}, {fmt(SEAT.y, 2)}, {fmt(SEAT.z, 2)}) · Absorption: 0.30 all · No smoothing
         <br/>A = Case 071 Variant B (external A&B, debugReflectionOrder=1, disableLateField=true, pureDeterministicModalSum=true)
-        <br/>B = Live dropdown ab_corrected (engine internal A&B, debugReflectionOrder=3, disableLateField=false, pureDeterministicModalSum=false)
-        <br/>Divergence is in reflections (6 vs 62 image sources). Direct and modal paths match exactly.
+        <br/>B = Live dropdown ab_corrected (engine internal A&B, debugReflectionOrder=1 post-Case074, disableLateField=false, pureDeterministicModalSum=false)
+        <br/>Case074 fix applied — both now use order-1 reflections (6 image sources). Verify below.
       </div>
 
       <div style={{ overflowX: "auto" }}>
