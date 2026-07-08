@@ -218,8 +218,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // raw null-depth detection, or SPL normalisation. 'none' preserves prior graph behaviour
   // (the graph previously plotted the raw unsmoothed curve).
   const [bassSmoothingMode, setBassSmoothingMode] = useState('none');
-  // __CANDIDATE_FREQ_DEP_Q__ — Q strategy selector. Default = production (unchanged).
-  const [qStrategy, setQStrategy] = useState('production');
+  // Q strategy selector. Default = approved Allen & Berkley corrected model.
+  const [qStrategy, setQStrategy] = useState('ab_corrected');
   // __CANDIDATE_REW_MODAL_BANDWIDTH__ — bandwidth scale for the "REW-style Modal Bandwidth"
   // experimental Q strategy. Only used when qStrategy === 'rew_modal_bandwidth'.
   const [rewModalBandwidthScale, setRewModalBandwidthScale] = useState(0.55);
@@ -1091,6 +1091,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             Bass Response
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {IS_DEVELOPMENT_MODE && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Q strategy:</span>
               <select
@@ -1104,24 +1105,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   fontWeight: qStrategy === 'freq_dependent_cap' ? 700 : 400,
                 }}
               >
-                <option value="production">Production — smooth Q cap</option>
+                <option value="ab_corrected">Allen &amp; Berkley corrected</option>
+                <option value="production">Production — smooth Q cap (debug)</option>
                  <option value="freq_dependent_cap">⚡ Freq-dep cap — Variant F (diagnostic)</option>
                  <option value="smooth_soft_cap">🔬 Smooth soft cap (same as production)</option>
                  <option value="rew_absorption_authority">REW-style Absorption Authority (Experimental)</option>
                  <option value="rew_modal_bandwidth">REW-style Modal Bandwidth (Experimental)</option>
-                 <option value="ab_corrected">Allen &amp; Berkley corrected modal equation (experimental)</option>
               </select>
               </div>
-              {qStrategy === 'ab_corrected' && (
-              <div style={{
-                fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: '#4d7c0f',
-                border: '1px solid #84cc16', background: '#f7fee7', borderRadius: 6,
-                padding: '3px 8px', whiteSpace: 'nowrap',
-              }}>
-                A&B corrected + √V + 70–120 Hz Q boost active
-              </div>
               )}
-              {qStrategy === 'rew_modal_bandwidth' && (
+              {IS_DEVELOPMENT_MODE && qStrategy === 'rew_modal_bandwidth' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Bandwidth scale:</span>
                 <select
@@ -1269,36 +1262,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         />
       </div>
 
-      {/* ── Active Q Strategy Label ── */}
-      {qStrategy === 'freq_dependent_cap' && (
+      {/* ── Active Q Strategy Label (debug mode only) ── */}
+      {IS_DEVELOPMENT_MODE && qStrategy === 'freq_dependent_cap' && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#1e40af', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
           ⚡ Q strategy: Freq-Dep Cap (Variant F) — candidate mode
         </div>
       )}
-      {qStrategy === 'smooth_soft_cap' && (
+      {IS_DEVELOPMENT_MODE && qStrategy === 'smooth_soft_cap' && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#166534', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
           🔬 Q strategy: Smooth Soft Cap — same as production default
         </div>
       )}
-      {qStrategy === 'rew_absorption_authority' && (
+      {IS_DEVELOPMENT_MODE && qStrategy === 'rew_absorption_authority' && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#065f46', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
           🧪 Q strategy: REW-style Absorption Authority — experimental candidate
         </div>
       )}
-      {qStrategy === 'rew_modal_bandwidth' && (
+      {IS_DEVELOPMENT_MODE && qStrategy === 'rew_modal_bandwidth' && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontFamily: 'monospace', color: '#1e40af', fontWeight: 700, marginTop: -8, marginBottom: 4 }}>
           🧪 Q strategy: REW-style Modal Bandwidth (scale {rewModalBandwidthScale.toFixed(2)}) — experimental candidate
         </div>
       )}
-      {qStrategy === 'ab_corrected' && (
-        <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#1e3a8a', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, padding: '6px 10px', marginTop: -4, marginBottom: 4 }}>
-          Experimental Allen &amp; Berkley modal correction active — improves REW parity in Case 071 validation. Case 089 adds a fixed 1.5× Q boost for modes 70–120 Hz only (all other modes unchanged).
-        </div>
-      )}
 
-      {/* __TEMP_CASE099_THREE_ROOM_BENCHMARK__ — temporary, read-only, ab_corrected only.
-          Replaces Case072/Case090/Case098 single-room audits with one three-room benchmark. */}
-      {qStrategy === 'ab_corrected' && (
+      {/* Case099 REW parity benchmark — debug mode only, hidden from normal users */}
+      {IS_DEVELOPMENT_MODE && qStrategy === 'ab_corrected' && (
         <Case099RewThreeRoomBenchmark />
       )}
 
