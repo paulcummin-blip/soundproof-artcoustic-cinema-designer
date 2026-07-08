@@ -1151,9 +1151,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </select>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Design EQ (RP22 P14):</span>
+              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Design EQ for P14:</span>
               <Switch checked={!!designEqEnabled} onCheckedChange={setDesignEqEnabled} />
-              <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost +6dB)</span>
+              <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost +6dB) · Scoring only — raw graph unchanged</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>
