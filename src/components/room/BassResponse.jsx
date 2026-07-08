@@ -173,7 +173,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // REW Core is the production engine — not user-controllable.
   const useRewCoreTestMode = true;
   const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(false);
-  const [rewSourceCurveMode, setRewSourceCurveMode] = useState(REW_PARITY_PRESET.rewSourceCurveMode);
+  // Production default must be 'product' so each subwoofer's real registry curve reaches the
+  // engine. REW_PARITY_PRESET.rewSourceCurveMode ('flat_rew_reference') is a flat synthetic
+  // reference used only for the debug parity preset (via resetToParityPreset) — it must never
+  // be the default, since it replaces every product's curve with an identical flat curve.
+  const [rewSourceCurveMode, setRewSourceCurveMode] = useState('product');
   // Production default: 'existing' preserves the product curve's absolute SPL (pure 1m
   // reference amplitude, no listener-distance normalisation of modal excitation). The REW
   // parity preset's 'distance_normalized' value is for debug/parity comparison only — it
