@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export default function RP22Summary({ analysis }) {
     if (!analysis) return null;
 
-    const { calculatedSPL, rp22Level, factors } = analysis;
+    const { calculatedSPL, rp22Level, factors, isDesignEstimate, continuousSplOffsetDb } = analysis;
 
     return (
         <Card className="bg-[#FFFFFF] border-[#DCDBD6] relative overflow-hidden">
@@ -41,6 +40,11 @@ export default function RP22Summary({ analysis }) {
                             <li>Destructive Nulls Count: {factors.nullCount || 0}</li>
                         </ul>
                     </div>
+                )}
+                {isDesignEstimate && (
+                    <p className="text-xs text-[#8B7F76] font-body italic">
+                        Design-stage product estimate. Continuous SPL offset applied: {continuousSplOffsetDb?.toFixed(0)} dB.
+                    </p>
                 )}
             </CardContent>
             <img

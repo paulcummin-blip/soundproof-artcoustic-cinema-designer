@@ -1,7 +1,7 @@
 // bassSimulationEngine.js
 // Pure calculation engine for bass simulation (no React)
 
-import { getSubwooferCurve } from "@/components/models/speakers/registry";
+import { getSubwooferCurve, isGraphDerivedEstimate, getSubwooferContinuousOffsetDb } from "@/components/models/speakers/registry";
 import { 
   computeP14MaxLfeSpl, 
   computeP18InRoomF3, 
@@ -814,6 +814,19 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
   const p14Result = computeP14MaxLfeSpl({ freqsHz, splDb, band: [20, 80] });
   const p18Result = computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz: 10, maxHz: 200 });
   const p19Result = computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz });
+
+  // ── P14-ONLY continuous SPL derating (isolated, adjustable placeholder) ──
+  // Does not affect P18/P19, the source curve, or any modal/room maths.
+  const activeSubModels = (subs || []).map(s => s.modelKey).filter(Boolean);
+  const isDesignEstimate = activeSubModels.some(m => isGraphDerivedEstimate(m));
+  const offsetsUsed = activeSubModels
+    .filter(m => isGraphDerivedEstimate(m))
+    .map(m => getSubwooferContinuousOffsetDb(m));
+  const continuousSplOffsetDb = offsetsUsed.length > 0
+    ? offsetsUsed.reduce((a, b) => a + b, 0) / offsetsUsed.length
+    : 0;
+  const maxSplGraphDb = p14Result.maxSplDb;
+  const continuousSplDb = Number.isFinite(maxSplGraphDb) ? maxSplGraphDb + continuousSplOffsetDb : null;
   
   // Debug logging (controlled by global flag)
   if (globalThis.__B44_LOGS) {
@@ -961,7 +974,13 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
   
   return {
     p14: { 
-      maxSplDb: p14Result.maxSplDb ?? 0,
+      maxSplDb: continuousSplDb ?? p14Result.maxSplDb ?? 0,
+      maxSplGraphDb: maxSplGraphDb ?? 0,
+      continuousSplOffsetDb,
+      isDesignEstimate,
+      note: isDesignEstimate
+        ? `Design-stage product estimate. Continuous SPL offset applied: ${continuousSplOffsetDb.toFixed(0)} dB.`
+        : null,
       details: p14Result.details
     },
     p18: { 

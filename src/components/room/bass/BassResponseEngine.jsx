@@ -1,5 +1,5 @@
 import { subPerformance } from "@/components/data/subwooferData";
-import { getSubResponseCurve } from "@/components/models/speakers/registry";
+import { getSubResponseCurve, isGraphDerivedEstimate, getSubwooferContinuousOffsetDb } from "@/components/models/speakers/registry";
 
 export class BassResponseEngine {
     constructor() {
@@ -132,13 +132,28 @@ export class BassResponseEngine {
         if(activeSubs.length === 0) return { calculatedSPL: 0, rp22Level: 'N/A', factors: {} };
         
         // For Parameter 14, we need the PEAK SPL, not the average.
+        // This is the raw graph-derived value — unmodified, still used for P18/P19/P20.
         const peakSPL = Math.max(...responseData.map(p => p.spl));
 
+        // ── P14-ONLY continuous SPL derating ──────────────────────────────────
+        // continuousSplOffsetDb is an isolated, adjustable placeholder (default -6 dB)
+        // stored per product in the registry. It is NOT applied to the simulation curve,
+        // to P18, P19, or P20 — only to this Parameter 14 continuous-capability figure.
+        // Defaults to 0 for any subwoofer without a graph-derived-estimate flag.
+        const isDesignEstimate = activeSubs.some(sub => isGraphDerivedEstimate(sub.model));
+        const offsetsUsed = activeSubs
+            .filter(sub => isGraphDerivedEstimate(sub.model))
+            .map(sub => getSubwooferContinuousOffsetDb(sub.model));
+        const continuousSplOffsetDb = offsetsUsed.length > 0
+            ? offsetsUsed.reduce((a, b) => a + b, 0) / offsetsUsed.length
+            : 0;
+        const continuousSplDb = peakSPL + continuousSplOffsetDb;
+
         let rp22Level = 'Below Level 1';
-        if (peakSPL >= 123) rp22Level = 'Level 4';
-        else if (peakSPL >= 120) rp22Level = 'Level 3';
-        else if (peakSPL >= 117) rp22Level = 'Level 2';
-        else if (peakSPL >= 114) rp22Level = 'Level 1';
+        if (continuousSplDb >= 123) rp22Level = 'Level 4';
+        else if (continuousSplDb >= 120) rp22Level = 'Level 3';
+        else if (continuousSplDb >= 117) rp22Level = 'Level 2';
+        else if (continuousSplDb >= 114) rp22Level = 'Level 1';
         
         const avgBoundaryGain = activeSubs.reduce((sum, sub) => sum + this.calculateBoundaryGain(sub.position, roomDimensions), 0) / activeSubs.length;
         
@@ -147,7 +162,10 @@ export class BassResponseEngine {
         const modalVariation = peakSPL - troughSPL;
 
         return { 
-            calculatedSPL: peakSPL, 
+            calculatedSPL: continuousSplDb,
+            maxSplGraphDb: peakSPL,
+            continuousSplOffsetDb,
+            isDesignEstimate,
             rp22Level, 
             modalVariation,
             factors: { summationGain: 10 * Math.log10(activeSubs.length), boundaryGain: avgBoundaryGain, nullCount: 0 }

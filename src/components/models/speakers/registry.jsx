@@ -227,7 +227,10 @@ export const MODELS = [
     currency: "GBP",
     vatIncluded: true,
     vatRate: 0.20,
-    frequency_response_curve: [[15, 80], [20, 86], [25, 90], [30, 92], [40, 94], [50, 94], [63, 93], [80, 91], [100, 87], [125, 82], [160, 75], [200, 68]]
+    graphDerivedDesignEstimate: true,
+    continuousSplOffsetDb: -6,
+    notes: "graph-derived design estimate, not lab-certified data",
+    frequency_response_curve: [[20, 110], [25, 112], [30, 115], [35, 118], [40, 119], [50, 119.5], [63, 119], [80, 118.5], [100, 117.5], [125, 116.5], [160, 115.5], [200, 114.5]]
   },
   { 
     key: "sub3-12", 
@@ -249,7 +252,10 @@ export const MODELS = [
     currency: "GBP",
     vatIncluded: true,
     vatRate: 0.20,
-    frequency_response_curve: [[15, 83], [20, 89], [25, 93], [30, 95], [40, 97], [50, 97], [63, 96], [80, 94], [100, 90], [125, 85], [160, 78], [200, 71]]
+    graphDerivedDesignEstimate: true,
+    continuousSplOffsetDb: -6,
+    notes: "graph-derived design estimate, not lab-certified data",
+    frequency_response_curve: [[20, 115], [25, 118], [30, 122], [35, 124], [40, 124.5], [50, 125], [63, 125], [80, 125], [100, 125.5], [125, 126], [160, 122], [200, 119]]
   },
   { 
     key: "sub4-12", 
@@ -271,7 +277,10 @@ export const MODELS = [
     currency: "GBP",
     vatIncluded: true,
     vatRate: 0.20,
-    frequency_response_curve: [[15, 85], [20, 91], [25, 95], [30, 97], [40, 99], [50, 99], [63, 98], [80, 96], [100, 92], [125, 87], [160, 80], [200, 73]]
+    graphDerivedDesignEstimate: true,
+    continuousSplOffsetDb: -6,
+    notes: "graph-derived design estimate, not lab-certified data",
+    frequency_response_curve: [[20, 123], [25, 123.5], [30, 124.5], [35, 125], [40, 125], [50, 124.8], [63, 124.8], [80, 125], [100, 125.2], [125, 125.5], [160, 121], [200, 119]]
   },
 ];
 
@@ -455,6 +464,23 @@ export function hasSpeakerModel(modelName) {
   }));
 }
 
+// GRAPH-DERIVED DESIGN ESTIMATE ACCESSORS (subwoofer product data)
+// continuousSplOffsetDb is an adjustable, isolated safety derating applied ONLY to
+// RP22 Parameter 14 (long-term continuous SPL). It must NOT be treated as fact until
+// Artcoustic confirms whether the source graph represents peak, continuous, or design-max
+// output. Defaults to 0 for any model without the flag (legacy/generic curves unaffected).
+export function isGraphDerivedEstimate(modelKey) {
+  const key = normaliseModelKey(modelKey);
+  const model = MODELS.find(m => m.key === key);
+  return !!model?.graphDerivedDesignEstimate;
+}
+
+export function getSubwooferContinuousOffsetDb(modelKey) {
+  const key = normaliseModelKey(modelKey);
+  const model = MODELS.find(m => m.key === key);
+  return Number.isFinite(model?.continuousSplOffsetDb) ? model.continuousSplOffsetDb : 0;
+}
+
 // VALIDATION HELPER
 export function isValidCurve(curve) {
   if (!Array.isArray(curve)) return false;
@@ -498,4 +524,4 @@ export function getModelsByCategoryOrdered() {
   return ordered;
 }
 
-export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, CATEGORY_ORDER, MODELS };
+export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getSubwooferContinuousOffsetDb, CATEGORY_ORDER, MODELS };
