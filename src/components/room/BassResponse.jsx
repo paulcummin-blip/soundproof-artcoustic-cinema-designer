@@ -174,7 +174,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const useRewCoreTestMode = true;
   const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(false);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState(REW_PARITY_PRESET.rewSourceCurveMode);
-  const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState(REW_PARITY_PRESET.modalSourceReferenceMode);
+  // Production default: 'existing' preserves the product curve's absolute SPL (pure 1m
+  // reference amplitude, no listener-distance normalisation of modal excitation). The REW
+  // parity preset's 'distance_normalized' value is for debug/parity comparison only — it
+  // must never be the product simulator's default, since it removes absolute SPL differences
+  // between subwoofer product curves.
+  const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState('existing');
   const [modalGainScalar, setModalGainScalar] = useState(1.0);
   const [axialQ, setAxialQ] = useState(4.0);
   const [modalStorageMode, setModalStorageMode] = useState("none");
