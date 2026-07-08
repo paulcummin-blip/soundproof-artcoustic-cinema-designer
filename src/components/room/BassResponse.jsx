@@ -16,6 +16,7 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
+import { applyDesignEqCurve } from "@/components/utils/rp22BassMetrics";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -803,10 +804,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : multiSeries;
     if (overlayProductionSeries) out = [...out, overlayProductionSeries];
     // Apply the selected display smoothing to calculated curves only (not the pasted REW overlay).
-    out = out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
+    // When Design EQ is ON, the graph shows the same post-EQ curve used for P14 scoring
+    // (1/3-octave basis, cut -10dB / boost +6dB) instead of the plain display smoothing.
+    out = out.map((s) => ({
+      ...s,
+      data: designEqEnabled ? applyDesignEqCurve(s.data) : applyBassSmoothing(s.data, bassSmoothingMode),
+    }));
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode]);
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled]);
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -1153,7 +1159,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Design EQ for P14:</span>
               <Switch checked={!!designEqEnabled} onCheckedChange={setDesignEqEnabled} />
-              <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost +6dB) · Scoring only — raw graph unchanged</span>
+              <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost +6dB)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>
@@ -1253,6 +1259,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         {/* Displayed smoothing label */}
         <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
           Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
+        </div>
+        <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
+          {designEqEnabled ? 'Showing post-EQ curve for P14 scoring' : 'Showing raw simulated curve'}
         </div>
 
         {/* Allen & Berkley model attribution — presentation only, no simulation/scaling logic */}

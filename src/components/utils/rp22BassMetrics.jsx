@@ -164,6 +164,26 @@ export function computeTransitionFrequencyHz(roomDims, rt60 = 0.4) {
   return isNum(fs) && fs > 0 ? fs : null;
 }
 
+// Shared Design EQ transform — 1/3-octave smoothed basis, nudged toward its own
+// flat median, clamped to +6 dB boost / -10 dB cut. It never "repairs" a narrow
+// raw null, since it only ever operates on the already-smoothed curve.
+// Used by both computeParam14LfeCapability (scoring) and the Bass Response graph
+// (display), so P14 and the graph always agree on the same post-EQ curve.
+export function applyDesignEqCurve(curveData) {
+  if (!Array.isArray(curveData) || curveData.length === 0) return curveData || [];
+  const smoothed = smoothThird(toSplCurve(curveData));
+  if (smoothed.length === 0) return [];
+  const targetDb = median(smoothed.map((p) => p.spl));
+  if (!isNum(targetDb)) return smoothed;
+  const MAX_BOOST_DB = 6;
+  const MAX_CUT_DB = -10;
+  return smoothed.map((p) => {
+    const diff = targetDb - p.spl;
+    const clamped = Math.max(MAX_CUT_DB, Math.min(MAX_BOOST_DB, diff));
+    return { frequency: p.frequency, spl: p.spl + clamped };
+  });
+}
+
 // Parameter 14 — LFE total SPL capability at RSP (post design-EQ), 1/3-octave
 // smoothed. Design EQ (when enabled) nudges the smoothed curve toward its own
 // flat median, clamped to +6 dB boost / -10 dB cut — it never "repairs" a
@@ -176,19 +196,7 @@ export function computeParam14LfeCapability(rspResponse, designEqEnabled, band =
   const smoothed = smoothThird(curve);
   if (smoothed.length === 0) return null;
 
-  let evalCurve = smoothed;
-  if (designEqEnabled) {
-    const targetDb = median(smoothed.map((p) => p.spl));
-    if (isNum(targetDb)) {
-      const MAX_BOOST_DB = 6;
-      const MAX_CUT_DB = -10;
-      evalCurve = smoothed.map((p) => {
-        const diff = targetDb - p.spl;
-        const clamped = Math.max(MAX_CUT_DB, Math.min(MAX_BOOST_DB, diff));
-        return { frequency: p.frequency, spl: p.spl + clamped };
-      });
-    }
-  }
+  const evalCurve = designEqEnabled ? applyDesignEqCurve(rspResponse) : smoothed;
 
   const [fLo, fHi] = band;
   const inBand = evalCurve.filter((p) => p.frequency >= fLo && p.frequency <= fHi);
