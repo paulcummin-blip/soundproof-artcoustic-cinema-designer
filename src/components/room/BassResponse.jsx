@@ -1246,6 +1246,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
         </div>
 
+        {/* Allen & Berkley model attribution — presentation only, no simulation/scaling logic */}
+        <p className="text-center text-[11px] font-normal text-muted-foreground mt-2 mb-2">
+          Simulation based on the Allen & Berkley (1978) room acoustics model with Artcoustic Loudspeakers engineering data.
+        </p>
+
         {/* ── Temporary overlay toggle for the REW-style Absorption Authority candidate ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
           <input
