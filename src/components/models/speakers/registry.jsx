@@ -228,8 +228,13 @@ export const MODELS = [
     vatIncluded: true,
     vatRate: 0.20,
     graphDerivedDesignEstimate: true,
-    continuousSplOffsetDb: -6,
-    notes: "graph-derived design estimate, not lab-certified data",
+    notes: "Dolby DART approved continuous SPL data",
+    dolbyDartApproved: true,
+    approvedContinuousSplAt1mDb: 120,
+    approvedContinuousSplAt30HzDb: 118,
+    approvedPeakSplDb: 126,
+    approvedFrequencyRangeHz: [25, 170],
+    approvedUsableLfHzMinus6dB: 22,
     frequency_response_curve: [[20, 110], [25, 112], [30, 115], [35, 118], [40, 119], [50, 119.5], [63, 119], [80, 118.5], [100, 117.5], [125, 116.5], [160, 115.5], [200, 114.5]]
   },
   { 
@@ -253,8 +258,13 @@ export const MODELS = [
     vatIncluded: true,
     vatRate: 0.20,
     graphDerivedDesignEstimate: true,
-    continuousSplOffsetDb: -6,
-    notes: "graph-derived design estimate, not lab-certified data",
+    notes: "Dolby DART approved continuous SPL data",
+    dolbyDartApproved: true,
+    approvedContinuousSplAt1mDb: 125,
+    approvedContinuousSplAt30HzDb: 122,
+    approvedPeakSplDb: 131,
+    approvedFrequencyRangeHz: [25, 170],
+    approvedUsableLfHzMinus6dB: 22,
     frequency_response_curve: [[20, 115], [25, 118], [30, 122], [35, 124], [40, 124.5], [50, 125], [63, 125], [80, 125], [100, 125.5], [125, 126], [160, 122], [200, 119]]
   },
   { 
@@ -278,8 +288,13 @@ export const MODELS = [
     vatIncluded: true,
     vatRate: 0.20,
     graphDerivedDesignEstimate: true,
-    continuousSplOffsetDb: -6,
-    notes: "graph-derived design estimate, not lab-certified data",
+    notes: "Dolby DART approved continuous SPL data",
+    dolbyDartApproved: true,
+    approvedContinuousSplAt1mDb: 126,
+    approvedContinuousSplAt30HzDb: 126,
+    approvedPeakSplDb: 132,
+    approvedFrequencyRangeHz: [15, 170],
+    approvedUsableLfHzMinus6dB: 12,
     frequency_response_curve: [[20, 123], [25, 123.5], [30, 124.5], [35, 125], [40, 125], [50, 124.8], [63, 124.8], [80, 125], [100, 125.2], [125, 125.5], [160, 121], [200, 119]]
   },
 ];
@@ -475,10 +490,30 @@ export function isGraphDerivedEstimate(modelKey) {
   return !!model?.graphDerivedDesignEstimate;
 }
 
-export function getSubwooferContinuousOffsetDb(modelKey) {
+// Approved Dolby DART continuous SPL data — used directly for RP22 Parameter 14.
+// Returns null if the model has no approved DART data (P14 falls back to graph-derived value).
+export function getApprovedContinuousSplDb(modelKey) {
   const key = normaliseModelKey(modelKey);
   const model = MODELS.find(m => m.key === key);
-  return Number.isFinite(model?.continuousSplOffsetDb) ? model.continuousSplOffsetDb : 0;
+  return model?.dolbyDartApproved && Number.isFinite(model.approvedContinuousSplAt1mDb)
+    ? model.approvedContinuousSplAt1mDb
+    : null;
+}
+
+export function getApprovedContinuousSplAt30HzDb(modelKey) {
+  const key = normaliseModelKey(modelKey);
+  const model = MODELS.find(m => m.key === key);
+  return model?.dolbyDartApproved && Number.isFinite(model.approvedContinuousSplAt30HzDb)
+    ? model.approvedContinuousSplAt30HzDb
+    : null;
+}
+
+export function getApprovedPeakSplDb(modelKey) {
+  const key = normaliseModelKey(modelKey);
+  const model = MODELS.find(m => m.key === key);
+  return model?.dolbyDartApproved && Number.isFinite(model.approvedPeakSplDb)
+    ? model.approvedPeakSplDb
+    : null;
 }
 
 // VALIDATION HELPER
@@ -524,4 +559,4 @@ export function getModelsByCategoryOrdered() {
   return ordered;
 }
 
-export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getSubwooferContinuousOffsetDb, CATEGORY_ORDER, MODELS };
+export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, CATEGORY_ORDER, MODELS };

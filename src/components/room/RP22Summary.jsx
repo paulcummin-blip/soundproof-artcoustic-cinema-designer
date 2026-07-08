@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 export default function RP22Summary({ analysis }) {
     if (!analysis) return null;
 
-    const { calculatedSPL, rp22Level, factors, isDesignEstimate, continuousSplOffsetDb } = analysis;
+    const { calculatedSPL, rp22Level, factors, isDesignEstimate, note } = analysis;
 
     return (
         <Card className="bg-[#FFFFFF] border-[#DCDBD6] relative overflow-hidden">
@@ -41,9 +41,9 @@ export default function RP22Summary({ analysis }) {
                         </ul>
                     </div>
                 )}
-                {isDesignEstimate && (
+                {isDesignEstimate && note && (
                     <p className="text-xs text-[#8B7F76] font-body italic">
-                        Design-stage product estimate. Continuous SPL offset applied: {continuousSplOffsetDb?.toFixed(0)} dB.
+                        {note}
                     </p>
                 )}
             </CardContent>

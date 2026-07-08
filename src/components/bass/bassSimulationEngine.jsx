@@ -1,7 +1,7 @@
 // bassSimulationEngine.js
 // Pure calculation engine for bass simulation (no React)
 
-import { getSubwooferCurve, isGraphDerivedEstimate, getSubwooferContinuousOffsetDb } from "@/components/models/speakers/registry";
+import { getSubwooferCurve, getApprovedContinuousSplDb } from "@/components/models/speakers/registry";
 import { 
   computeP14MaxLfeSpl, 
   computeP18InRoomF3, 
@@ -815,18 +815,17 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
   const p18Result = computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz: 10, maxHz: 200 });
   const p19Result = computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz });
 
-  // ── P14-ONLY continuous SPL derating (isolated, adjustable placeholder) ──
-  // Does not affect P18/P19, the source curve, or any modal/room maths.
+  // ── P14: approved Dolby DART continuous SPL @ 1m ──────────────────────────
+  // Uses the approved product figure directly (no offset). Does not affect
+  // P18/P19, the source curve, or any modal/room maths.
   const activeSubModels = (subs || []).map(s => s.modelKey).filter(Boolean);
-  const isDesignEstimate = activeSubModels.some(m => isGraphDerivedEstimate(m));
-  const offsetsUsed = activeSubModels
-    .filter(m => isGraphDerivedEstimate(m))
-    .map(m => getSubwooferContinuousOffsetDb(m));
-  const continuousSplOffsetDb = offsetsUsed.length > 0
-    ? offsetsUsed.reduce((a, b) => a + b, 0) / offsetsUsed.length
-    : 0;
+  const approvedSplValues = activeSubModels.map(m => getApprovedContinuousSplDb(m));
+  const isDesignEstimate = activeSubModels.length > 0 && approvedSplValues.every(v => v !== null);
+  const summationGainDb = activeSubModels.length > 0 ? 10 * Math.log10(activeSubModels.length) : 0;
   const maxSplGraphDb = p14Result.maxSplDb;
-  const continuousSplDb = Number.isFinite(maxSplGraphDb) ? maxSplGraphDb + continuousSplOffsetDb : null;
+  const continuousSplDb = isDesignEstimate
+    ? Math.max(...approvedSplValues) + summationGainDb
+    : maxSplGraphDb;
   
   // Debug logging (controlled by global flag)
   if (globalThis.__B44_LOGS) {
@@ -976,10 +975,9 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
     p14: { 
       maxSplDb: continuousSplDb ?? p14Result.maxSplDb ?? 0,
       maxSplGraphDb: maxSplGraphDb ?? 0,
-      continuousSplOffsetDb,
       isDesignEstimate,
       note: isDesignEstimate
-        ? `Design-stage product estimate. Continuous SPL offset applied: ${continuousSplOffsetDb.toFixed(0)} dB.`
+        ? "P14 uses approved maximum continuous SPL @ 1m from Dolby DART product data."
         : null,
       details: p14Result.details
     },

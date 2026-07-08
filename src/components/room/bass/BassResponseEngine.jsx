@@ -1,5 +1,5 @@
 import { subPerformance } from "@/components/data/subwooferData";
-import { getSubResponseCurve, isGraphDerivedEstimate, getSubwooferContinuousOffsetDb } from "@/components/models/speakers/registry";
+import { getSubResponseCurve, getApprovedContinuousSplDb } from "@/components/models/speakers/registry";
 
 export class BassResponseEngine {
     constructor() {
@@ -131,23 +131,19 @@ export class BassResponseEngine {
         const activeSubs = subwoofers.filter(sub => sub.enabled && sub.model);
         if(activeSubs.length === 0) return { calculatedSPL: 0, rp22Level: 'N/A', factors: {} };
         
-        // For Parameter 14, we need the PEAK SPL, not the average.
-        // This is the raw graph-derived value — unmodified, still used for P18/P19/P20.
+        // maxSplGraphDb — the raw graph-derived value, unmodified, used for P18/P19/P20.
         const peakSPL = Math.max(...responseData.map(p => p.spl));
 
-        // ── P14-ONLY continuous SPL derating ──────────────────────────────────
-        // continuousSplOffsetDb is an isolated, adjustable placeholder (default -6 dB)
-        // stored per product in the registry. It is NOT applied to the simulation curve,
-        // to P18, P19, or P20 — only to this Parameter 14 continuous-capability figure.
-        // Defaults to 0 for any subwoofer without a graph-derived-estimate flag.
-        const isDesignEstimate = activeSubs.some(sub => isGraphDerivedEstimate(sub.model));
-        const offsetsUsed = activeSubs
-            .filter(sub => isGraphDerivedEstimate(sub.model))
-            .map(sub => getSubwooferContinuousOffsetDb(sub.model));
-        const continuousSplOffsetDb = offsetsUsed.length > 0
-            ? offsetsUsed.reduce((a, b) => a + b, 0) / offsetsUsed.length
-            : 0;
-        const continuousSplDb = peakSPL + continuousSplOffsetDb;
+        // ── P14: approved Dolby DART continuous SPL @ 1m ───────────────────────
+        // Uses the approved product figure directly (no -6 dB offset). Multi-sub
+        // summation gain is still applied on top of the approved per-unit value.
+        // Falls back to the graph-derived peak for any subwoofer without approved data.
+        const approvedSplValues = activeSubs.map(sub => getApprovedContinuousSplDb(sub.model));
+        const isDesignEstimate = approvedSplValues.every(v => v !== null);
+        const summationGainDb = 10 * Math.log10(activeSubs.length);
+        const continuousSplDb = isDesignEstimate
+            ? Math.max(...approvedSplValues) + summationGainDb
+            : peakSPL;
 
         let rp22Level = 'Below Level 1';
         if (continuousSplDb >= 123) rp22Level = 'Level 4';
@@ -164,11 +160,13 @@ export class BassResponseEngine {
         return { 
             calculatedSPL: continuousSplDb,
             maxSplGraphDb: peakSPL,
-            continuousSplOffsetDb,
             isDesignEstimate,
+            note: isDesignEstimate
+                ? "P14 uses approved maximum continuous SPL @ 1m from Dolby DART product data."
+                : null,
             rp22Level, 
             modalVariation,
-            factors: { summationGain: 10 * Math.log10(activeSubs.length), boundaryGain: avgBoundaryGain, nullCount: 0 }
+            factors: { summationGain: summationGainDb, boundaryGain: avgBoundaryGain, nullCount: 0 }
         };
     }
 }
