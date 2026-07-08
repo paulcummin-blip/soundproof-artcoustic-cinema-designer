@@ -1086,10 +1086,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
-        {/* __TEMP_DEBUG_BUILD_MARKER__ — Case 101: proves this BassResponse.jsx is live. Remove after verification. */}
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", fontFamily: "monospace", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 10px", marginBottom: 8, display: "inline-block" }}>
-          DEBUG BUILD: CASE099 ONLY
-        </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
             Bass Response
