@@ -16,10 +16,12 @@ import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/vi
 import { useSeatResponses } from "@/components/room/hooks/useSeatResponses";
 import {
   computeTransitionFrequencyHz,
+  computeParam14LfeCapability,
   computeParam18BassExtension,
   computeParam19Deviation,
   computeParam20SeatConsistency,
 } from "@/components/utils/rp22BassMetrics";
+import { useAppState } from "@/components/AppStateProvider";
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -365,6 +367,8 @@ const getCanonicalRole = (role) => String(role || "").toUpperCase();
 export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers }) => {
   // Per-seat bass response curves from the CURRENT bass engine (no maths changed).
   const seatResponses = useSeatResponses();
+  // Shared room setting — read here so P14 always matches the Bass Response graph toggle.
+  const { designEqEnabled } = useAppState() || {};
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -785,6 +789,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     // ── RP22 Bass Parameters (18 / 19 / 20) — from current bass engine output ──
     // Source-of-truth: per-seat { frequency, spl } curves from BassResponseEngine.
+    let bassP14 = null;
     let bassP18 = null;
     let bassP19 = null;
     let bassP20 = null;
@@ -806,6 +811,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const usableSeatResponses = Array.isArray(seatResponses) ? seatResponses : [];
 
       if (rspBassResponse && Array.isArray(rspBassResponse) && rspBassResponse.length > 0) {
+        bassP14 = computeParam14LfeCapability(rspBassResponse, designEqEnabled);
         bassP18 = computeParam18BassExtension(rspBassResponse);
         if (transitionHz != null) {
           bassP19 = computeParam19Deviation(rspBassResponse, transitionHz);
@@ -819,8 +825,30 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
     } catch (e) {
       // Audits must NEVER crash the engine/UI
-      bassP18 = null; bassP19 = null; bassP20 = null;
+      bassP14 = null; bassP18 = null; bassP19 = null; bassP20 = null;
     }
+
+    const p14CatalogEntry = RP22_CATALOG["14"];
+    gradedParameters.primary[14] = bassP14
+      ? {
+          title: p14CatalogEntry?.title || "LFE frequencies total SPL capability at RSP",
+          level: bassP14.level,
+          value: bassP14.value,
+          formatted: bassP14.formatted,
+          unit: p14CatalogEntry?.unit || "dB SPL (C)",
+          status: "ok",
+          designEqEnabled: bassP14.designEqEnabled,
+          note: bassP14.note,
+        }
+      : {
+          title: p14CatalogEntry?.title || "LFE frequencies total SPL capability at RSP",
+          level: null,
+          value: null,
+          unit: p14CatalogEntry?.unit || "dB SPL (C)",
+          status: "no_data",
+          designEqEnabled: !!designEqEnabled,
+          note: "Post-EQ design estimate at RSP using selected subwoofer product data.",
+        };
 
     const p18CatalogEntry = RP22_CATALOG["18"];
     gradedParameters.primary[18] = bassP18
@@ -1477,6 +1505,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     screen?.mountMode,
     screen?.floatDepthM,
     seatResponses,
+    designEqEnabled,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };

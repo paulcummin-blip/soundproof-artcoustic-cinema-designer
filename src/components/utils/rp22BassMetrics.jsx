@@ -164,6 +164,54 @@ export function computeTransitionFrequencyHz(roomDims, rt60 = 0.4) {
   return isNum(fs) && fs > 0 ? fs : null;
 }
 
+// Parameter 14 — LFE total SPL capability at RSP (post design-EQ), 1/3-octave
+// smoothed. Design EQ (when enabled) nudges the smoothed curve toward its own
+// flat median, clamped to +6 dB boost / -10 dB cut — it never "repairs" a
+// narrow raw null, since it only ever operates on the already-smoothed curve.
+export function computeParam14LfeCapability(rspResponse, designEqEnabled, band = [20, 120]) {
+  if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
+  const curve = toSplCurve(rspResponse);
+  if (curve.length === 0) return null;
+
+  const smoothed = smoothThird(curve);
+  if (smoothed.length === 0) return null;
+
+  let evalCurve = smoothed;
+  if (designEqEnabled) {
+    const targetDb = median(smoothed.map((p) => p.spl));
+    if (isNum(targetDb)) {
+      const MAX_BOOST_DB = 6;
+      const MAX_CUT_DB = -10;
+      evalCurve = smoothed.map((p) => {
+        const diff = targetDb - p.spl;
+        const clamped = Math.max(MAX_CUT_DB, Math.min(MAX_BOOST_DB, diff));
+        return { frequency: p.frequency, spl: p.spl + clamped };
+      });
+    }
+  }
+
+  const [fLo, fHi] = band;
+  const inBand = evalCurve.filter((p) => p.frequency >= fLo && p.frequency <= fHi);
+  const bandUsed = inBand.length > 0 ? inBand : evalCurve;
+  const minSpl = Math.min(...bandUsed.map((p) => p.spl));
+  if (!isNum(minSpl)) return null;
+
+  let level = 0;
+  if (minSpl >= 123) level = 4;
+  else if (minSpl >= 120) level = 3;
+  else if (minSpl >= 117) level = 2;
+  else if (minSpl >= 114) level = 1;
+
+  return {
+    value: minSpl,
+    level: level >= 1 ? `L${level}` : null,
+    formatted: `${minSpl.toFixed(1)} dB`,
+    designEqEnabled: !!designEqEnabled,
+    band,
+    note: 'Post-EQ design estimate at RSP using selected subwoofer product data.',
+  };
+}
+
 // Parameter 18 — In-room bass extension -3 dB cutoff frequency.
 // "Find the lowest frequency where the response remains within -3 dB of the
 //  usable bass target/reference level."

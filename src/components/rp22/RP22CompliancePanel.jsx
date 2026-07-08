@@ -922,9 +922,11 @@ export default function RP22CompliancePanel({
           const resolvedParam = (p.id === 12 || p.id === 13)
             ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode) }
             : p;
+          const p14Result = p.id === 14 ? analysisResult?.gradedParameters?.primary?.[14] : null;
           const targetBasisNote =
             p.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
             p.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
+            p14Result ? `Design EQ: ${p14Result.designEqEnabled ? "On" : "Off"} (cut -10 dB / boost +6 dB) — ${p14Result.note || "Post-EQ design estimate at RSP using selected subwoofer product data."}` :
             null;
           const debugMetric = String(reportSource).startsWith("seat:")
             ? (() => {

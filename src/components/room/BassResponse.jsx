@@ -80,7 +80,7 @@ const REW_SOURCE_CURVES = {
 };
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
-  const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave } = useAppState();
+  const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave, designEqEnabled, setDesignEqEnabled } = useAppState();
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
@@ -1149,6 +1149,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value="rew_fixed">REW-style fixed</option>
                 <option value="auto">Auto</option>
               </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Design EQ (RP22 P14):</span>
+              <Switch checked={!!designEqEnabled} onCheckedChange={setDesignEqEnabled} />
+              <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost +6dB)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>

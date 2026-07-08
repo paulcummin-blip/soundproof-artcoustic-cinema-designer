@@ -664,6 +664,13 @@ function useDesignerState() {
     (__autosavePayload && __autosavePayload.p21EarlyReflectionPreset) ? __autosavePayload.p21EarlyReflectionPreset : 'l3'
   ));
 
+  // RP22 Parameter 14 Design EQ — shared room setting. Read by useRP22AnalysisEngine
+  // (P14 calculation) and the Bass Response graph toggle, so both stay in sync.
+  const [designEqEnabled, setDesignEqEnabled] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.designEqEnabled === "boolean") ? __autosavePayload.designEqEnabled : false
+  ));
+  const setDesignEqEnabledSafe = useCallback((v) => setDesignEqEnabled(!!v), []);
+
   const [p12Mode, setP12Mode] = useState(null);
   const [p12Level, setP12Level] = useState(null);
 
@@ -1853,6 +1860,8 @@ function useDesignerState() {
     setP15ConstructionLevelSafe,
     p21EarlyReflectionPreset,
     setP21EarlyReflectionPresetSafe,
+    designEqEnabled,
+    setDesignEqEnabled: setDesignEqEnabledSafe,
     mlpOverride,
     setMlpOverride,
     clearMlpOverride,
@@ -1948,6 +1957,8 @@ function useDesignerState() {
     setP15ConstructionLevelSafe,
     p21EarlyReflectionPreset,
     setP21EarlyReflectionPresetSafe,
+    designEqEnabled,
+    setDesignEqEnabledSafe,
     mlpOverride,
     setMlpOverride,
     clearMlpOverride,
