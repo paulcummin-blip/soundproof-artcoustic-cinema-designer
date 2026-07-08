@@ -21,7 +21,6 @@ import {
   computeParam19Deviation,
   computeParam20SeatConsistency,
 } from "@/components/utils/rp22BassMetrics";
-import { useAppState } from "@/components/AppStateProvider";
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -367,8 +366,8 @@ const getCanonicalRole = (role) => String(role || "").toUpperCase();
 export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers }) => {
   // Per-seat bass response curves from the CURRENT bass engine (no maths changed).
   const seatResponses = useSeatResponses();
-  // Shared room setting — read here so P14 always matches the Bass Response graph toggle.
-  const { designEqEnabled } = useAppState() || {};
+  // RP22 P14 is always post-EQ — it does not follow the Bass Response graph's visual
+  // raw/EQ toggle (that toggle is display-only). See computeParam14LfeCapability call below.
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -811,7 +810,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const usableSeatResponses = Array.isArray(seatResponses) ? seatResponses : [];
 
       if (rspBassResponse && Array.isArray(rspBassResponse) && rspBassResponse.length > 0) {
-        bassP14 = computeParam14LfeCapability(rspBassResponse, designEqEnabled);
+        // RP22 P14 is always post-EQ (true) — decoupled from the Bass Response graph's
+        // visual raw/EQ toggle, which is display-only.
+        bassP14 = computeParam14LfeCapability(rspBassResponse, true);
         bassP18 = computeParam18BassExtension(rspBassResponse);
         if (transitionHz != null) {
           bassP19 = computeParam19Deviation(rspBassResponse, transitionHz);
@@ -837,7 +838,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           formatted: bassP14.formatted,
           unit: p14CatalogEntry?.unit || "dB SPL (C)",
           status: "ok",
-          designEqEnabled: bassP14.designEqEnabled,
+          designEqEnabled: true,
           note: bassP14.note,
         }
       : {
@@ -846,7 +847,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           value: null,
           unit: p14CatalogEntry?.unit || "dB SPL (C)",
           status: "no_data",
-          designEqEnabled: !!designEqEnabled,
+          designEqEnabled: true,
           note: "Post-EQ design estimate at RSP using selected subwoofer product data.",
         };
 
@@ -1505,7 +1506,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     screen?.mountMode,
     screen?.floatDepthM,
     seatResponses,
-    designEqEnabled,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };

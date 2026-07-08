@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
+import P14LevelPill from '@/components/room/P14LevelPill';
 import optimiseSubwooferLayout from '@/components/room/bass/SubwooferOptimiser';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
@@ -232,6 +233,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
+        <div className="flex items-center justify-end mb-2">
+          <P14LevelPill />
+        </div>
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Front Subwoofers</h4>
