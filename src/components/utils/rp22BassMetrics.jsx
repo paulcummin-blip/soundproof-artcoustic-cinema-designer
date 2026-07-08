@@ -170,15 +170,21 @@ export function computeTransitionFrequencyHz(roomDims, rt60 = 0.4) {
 // Used by both computeParam14LfeCapability (scoring) and the Bass Response graph
 // (display), so P14 and the graph always agree on the same post-EQ curve.
 export function applyDesignEqCurve(curveData) {
-  if (!Array.isArray(curveData) || curveData.length === 0) return curveData || [];
-  const smoothed = smoothThird(toSplCurve(curveData));
-  if (smoothed.length === 0) return [];
+  const raw = toSplCurve(curveData);
+  if (raw.length === 0) return curveData || [];
+  const smoothed = smoothThird(raw);
+  if (smoothed.length === 0) return raw;
   const targetDb = median(smoothed.map((p) => p.spl));
-  if (!isNum(targetDb)) return smoothed;
+  if (!isNum(targetDb)) return raw;
   const MAX_BOOST_DB = 6;
   const MAX_CUT_DB = -10;
-  return smoothed.map((p) => {
-    const diff = targetDb - p.spl;
+  // Gain is derived from the broad (smoothed) trend at each raw frequency, then
+  // applied to the RAW value — this cuts broad peaks / lifts broad troughs while
+  // leaving narrow modal peaks and nulls exactly where the raw response put them.
+  return raw.map((p) => {
+    const smoothedAtF = valAt(smoothed, p.frequency);
+    const basis = isNum(smoothedAtF) ? smoothedAtF : p.spl;
+    const diff = targetDb - basis;
     const clamped = Math.max(MAX_CUT_DB, Math.min(MAX_BOOST_DB, diff));
     return { frequency: p.frequency, spl: p.spl + clamped };
   });

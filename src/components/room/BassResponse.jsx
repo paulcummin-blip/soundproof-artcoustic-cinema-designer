@@ -1240,7 +1240,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               modeMarkers={modeMarkersForGraph}
               linearHzAxis={false}
               rewStyleMode={true}
-              yDomain={graphScaleMode === 'rew_fixed' ? [60, 120] : undefined}
+              yDomain={graphScaleMode === 'rew_fixed' ? [70, 140] : undefined}
               xDomain={graphScaleMode === 'rew_fixed'
                 ? (multiSeriesForGraph[0]?.data?.some(p => p.frequency > 200) ? [20, 300] : [20, 200])
                 : [20, 200]}
