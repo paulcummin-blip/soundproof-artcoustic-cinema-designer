@@ -1011,3 +1011,110 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
     designerWarnings
   };
 }
+
+// ── CONVERGENCE WRAPPER (Step 1 — read-only, not wired to any UI yet) ───────
+// Thin adapter proving bassSimulationEngine.jsx can produce the same output
+// shape as BassResponseEngine.simulateResponseWithExtras, so P14/P18/P19 can
+// eventually consume a single engine. No production path calls this yet.
+//
+// Legacy input format:
+//   subwoofers: [{ position:{x,y,z}, model, enabled, gainDb, phaseAdjust, delay, polarity }]
+//   seatPosition: { x, y, z }
+//   roomDimensions: { length, width, height }  (metres)
+//
+// Output (mimics BassResponseEngine.simulateResponseWithExtras):
+//   { responseData: [{ frequency, spl }, ...], rp22Analysis: {...} | null }
+export function simulateResponseWithExtrasWrapper(subwoofers, seatPosition, roomDimensions) {
+  if (!seatPosition || !roomDimensions) return { responseData: [], rp22Analysis: null };
+
+  const subs = Array.isArray(subwoofers) ? subwoofers : [];
+  if (subs.length === 0) return { responseData: [], rp22Analysis: null };
+
+  // Convert legacy sub format → bassSimulationEngine format
+  const engineSubs = subs
+    .filter(s => s && s.position && s.model)
+    .map((s, i) => ({
+      id: s.id || `wrapper-sub-${i}`,
+      modelKey: s.model,
+      x: Number(s.position.x),
+      y: Number(s.position.y),
+      z: Number.isFinite(Number(s.position.z)) ? Number(s.position.z) : 0.35,
+      tuning: {
+        gainDb: Number(s.gainDb) || 0,
+        delayMs: Number(s.delay) || 0,
+        polarity: s.polarity === -1 ? 180 : 0,
+      },
+    }));
+
+  if (engineSubs.length === 0) return { responseData: [], rp22Analysis: null };
+
+  // Convert room dimensions (legacy uses length/width/height; engine uses *M)
+  const roomDims = {
+    widthM: Number(roomDimensions.width) || Number(roomDimensions.widthM) || 4,
+    lengthM: Number(roomDimensions.length) || Number(roomDimensions.lengthM) || 6,
+    heightM: Number(roomDimensions.height) || Number(roomDimensions.heightM) || 2.6,
+  };
+
+  // Wrap single seat
+  const seats = [{
+    id: 'wrapper-seat',
+    x: Number(seatPosition.x),
+    y: Number(seatPosition.y),
+    z: Number.isFinite(Number(seatPosition.z)) ? Number(seatPosition.z) : 1.2,
+    isPrimary: true,
+  }];
+
+  // Call existing engine with default splConfig
+  const result = simulateBassAtSeats({
+    roomDims,
+    seats,
+    subs: engineSubs,
+    splConfig: {
+      globalPowerW: 100,
+      globalEqHeadroomDb: 0,
+      radiationMode: 'half-space',
+      modesEnabled: true,
+      roomDamping: 20,
+      sbirEnabled: true,
+    },
+    options: {},
+  });
+
+  const seatResponse = result?.seatResponses?.['wrapper-seat'];
+  if (!seatResponse || !seatResponse.freqsHz || !seatResponse.splDb) {
+    return { responseData: [], rp22Analysis: null };
+  }
+
+  // Convert freqsHz/splDb arrays → [{ frequency, spl }] (full 1 Hz resolution)
+  const responseData = seatResponse.freqsHz.map((f, i) => ({
+    frequency: f,
+    spl: Number.isFinite(seatResponse.splDb[i]) ? seatResponse.splDb[i] : 0,
+  }));
+
+  // Build rp22Analysis from metrics to mimic legacy shape
+  const m = result?.metrics;
+  const rp22Analysis = m ? {
+    calculatedSPL: m.p14?.maxSplDb ?? 0,
+    maxSplGraphDb: m.p14?.maxSplGraphDb ?? 0,
+    isDesignEstimate: m.p14?.isDesignEstimate ?? false,
+    note: m.p14?.note ?? null,
+    rp22Level: _wrapperLevelLabel(m.p14?.maxSplDb),
+    modalVariation: m.p19?.maxDeviationDb ?? 0,
+    factors: {
+      summationGain: 0,
+      boundaryGain: 0,
+      nullCount: 0,
+    },
+  } : null;
+
+  return { responseData, rp22Analysis };
+}
+
+function _wrapperLevelLabel(spl) {
+  if (!Number.isFinite(spl)) return 'Below Level 1';
+  if (spl >= 123) return 'Level 4';
+  if (spl >= 120) return 'Level 3';
+  if (spl >= 117) return 'Level 2';
+  if (spl >= 114) return 'Level 1';
+  return 'Below Level 1';
+}
