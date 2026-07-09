@@ -495,7 +495,10 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
   const roomDamping = splConfig?.roomDamping ?? 20; // Q value: 8 (dead) to 35 (lively)
   const sbirEnabled = splConfig?.sbirEnabled === true; // SBIR reflections toggle
   
-  const dbPower = 10 * Math.log10(Math.max(1, powerW));
+  // Subwoofer frequency_response_curve values are maximum continuous SPL at 1m
+  // (already power/capability-scaled), NOT 1W/1m sensitivity.
+  // Therefore dbPower must NOT be added to db0 for curve-based subwoofer response.
+  const dbPower = 0;
   const dbEq = -eqHeadroomDb;
   
   // Precompute room modes (do this once)
