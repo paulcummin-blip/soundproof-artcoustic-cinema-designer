@@ -9,7 +9,8 @@ import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
 import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis";
-import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { getSpeakerModelMeta, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
+import { useAppState } from "@/components/AppStateProvider";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
@@ -367,6 +368,23 @@ const getCanonicalRole = (role) => String(role || "").toUpperCase();
 export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers }) => {
   // Per-seat bass response curves from the CURRENT bass engine (no maths changed).
   const seatResponses = useSeatResponses();
+  // Active subwoofer models — used to enforce the product LF boost guard in the
+  // RP22 Design EQ stage (applyDesignEqCurve). We take the MOST restrictive
+  // (highest) approved usable -6 dB limit across enabled subs, since a multi-sub
+  // system cannot be boosted below the worst sub's usable LF limit.
+  const appState = useAppState();
+  const subwoofers = appState?.subwoofers ?? null;
+  const designEqUsableLfHz = (() => {
+    const subs = Array.isArray(subwoofers) ? subwoofers : [];
+    let maxLf = null;
+    for (const s of subs) {
+      if (!s || s.enabled === false) continue;
+      const m = MODELS.find((x) => x.key === normaliseModelKey(s.model));
+      const lf = m?.approvedUsableLfHzMinus6dB;
+      if (isNum(lf)) maxLf = maxLf == null ? lf : Math.max(maxLf, lf);
+    }
+    return maxLf;
+  })();
   // RP22 P14 is always post-EQ — it does not follow the Bass Response graph's visual
   // raw/EQ toggle (that toggle is display-only). See computeParam14LfeCapability call below.
 
@@ -822,7 +840,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         // to avoid a second application.
         const rp22BassComplianceUsesDesignEq = true;
         const finalRspBassCurve = rp22BassComplianceUsesDesignEq
-          ? applyDesignEqCurve(rspBassResponse)
+          ? applyDesignEqCurve(rspBassResponse, designEqUsableLfHz)
           : rspBassResponse;
         bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
         bassP18 = computeParam18BassExtension(finalRspBassCurve);
@@ -1555,6 +1573,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     screen?.mountMode,
     screen?.floatDepthM,
     seatResponses,
+    designEqUsableLfHz,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };

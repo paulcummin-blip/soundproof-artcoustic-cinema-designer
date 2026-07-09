@@ -169,7 +169,7 @@ export function computeTransitionFrequencyHz(roomDims, rt60 = 0.4) {
 // raw null, since it only ever operates on the already-smoothed curve.
 // Used by both computeParam14LfeCapability (scoring) and the Bass Response graph
 // (display), so P14 and the graph always agree on the same post-EQ curve.
-export function applyDesignEqCurve(curveData) {
+export function applyDesignEqCurve(curveData, usableLfHz) {
   const raw = toSplCurve(curveData);
   if (raw.length === 0) return curveData || [];
   const smoothed = smoothThird(raw);
@@ -178,6 +178,11 @@ export function applyDesignEqCurve(curveData) {
   if (!isNum(targetDb)) return raw;
   const MAX_BOOST_DB = 6;
   const MAX_CUT_DB = -10;
+  // Product LF guard: below the subwoofer's approved usable -6 dB limit, positive
+  // EQ boost is physically unfounded (the driver cannot produce it). Cuts remain
+  // allowed; boosts are clamped to 0 dB in that region. The existing ±6 / -10
+  // limits are unchanged elsewhere.
+  const lfHz = isNum(usableLfHz) && usableLfHz > 0 ? usableLfHz : null;
   // Gain is derived from the broad (smoothed) trend at each raw frequency, then
   // applied to the RAW value — this cuts broad peaks / lifts broad troughs while
   // leaving narrow modal peaks and nulls exactly where the raw response put them.
@@ -185,7 +190,10 @@ export function applyDesignEqCurve(curveData) {
     const smoothedAtF = valAt(smoothed, p.frequency);
     const basis = isNum(smoothedAtF) ? smoothedAtF : p.spl;
     const diff = targetDb - basis;
-    const clamped = Math.max(MAX_CUT_DB, Math.min(MAX_BOOST_DB, diff));
+    let clamped = Math.max(MAX_CUT_DB, Math.min(MAX_BOOST_DB, diff));
+    if (lfHz != null && p.frequency < lfHz) {
+      clamped = Math.min(0, clamped);
+    }
     return { frequency: p.frequency, spl: p.spl + clamped };
   });
 }
@@ -374,6 +382,10 @@ export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, t
   for (let i = 0; i < (perSeatResponses || []).length; i++) {
     const entry = perSeatResponses[i];
     if (!entry || !Array.isArray(entry.responseData) || entry.responseData.length === 0) continue;
+    // P20 measures seat-to-seat consistency across REAL seats only.
+    // The synthetic "rsp" response (measured at the green RSP marker) is the
+    // reference curve, not a real seat — exclude it from the comparison set.
+    if (entry.seatId === "rsp" || entry.__isSyntheticRsp === true) continue;
     const seatCurve = smoothThird(toSplCurve(entry.responseData));
     if (seatCurve.length === 0) continue;
 
@@ -398,6 +410,11 @@ export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, t
     });
   }
   if (perSeat.length === 0) return null;
+
+  // Seat-to-seat consistency requires at least 2 real seats. With fewer than
+  // 2 real seats there is nothing to compare (the RSP reference alone is not a
+  // "seat-to-seat" measurement), so report no_data.
+  if (perSeat.length < 2) return null;
 
   const other = perSeat.filter((s) => !s.isRsp);
   // Worst (max deviation) across non-RSP seats; fall back to RSP with single seat config.
