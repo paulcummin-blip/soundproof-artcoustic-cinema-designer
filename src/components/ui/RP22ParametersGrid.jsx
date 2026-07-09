@@ -1,4 +1,5 @@
 import React from "react";
+import { rp22Parameters } from "@/components/data/rp22Parameters";
 
 // tiny pill using inline styles only
 function Pill({ level }) {
@@ -24,30 +25,12 @@ function Pill({ level }) {
   return <span style={{ ...base, ...pal }}>{pal.text}</span>;
 }
 
-// minimal list of 21 parameter labels (keep order stable)
-const PARAM_LABELS = [
-  "1. Minimum distance between listener area and walls",
-  "2. Decoder/renderer capability & discrete zones",
-  "3. Screen wall speakers outside zonal locations",
-  "4. Max SPL difference between screen speakers",
-  "5. Max horizontal angle between surround speakers",
-  "6. Surround vertical placement",
-  "7. Surround to listener distance",
-  "8. Surround to screen level consistency",
-  "9. Bass management & sub placement",
-  "10. Sub coverage consistency",
-  "11. Seat-to-seat response variance",
-  "12. Boundary interference mitigation",
-  "13. Reverberation time (broadband)",
-  "14. Reverberation time (bands)",
-  "15. Noise floor",
-  "16. Speaker directivity suitability",
-  "17. Amplifier headroom",
-  "18. Screen gain / brightness balance",
-  "19. Seat sightlines",
-  "20. Acoustic isolation target",
-  "21. Calibration completeness",
-];
+// Build the displayed list from the official parameter definitions,
+// sorted by parameter number/id — no second source of truth.
+const PARAM_LABELS = rp22Parameters
+  .slice()
+  .sort((a, b) => a.number - b.number)
+  .map((p) => `${p.number}. ${p.name}`);
 
 export default function RP22ParametersGrid({ rp22 }) {
   // Normalize the graded parameters into a simple array of levels
