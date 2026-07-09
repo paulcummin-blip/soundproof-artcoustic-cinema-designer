@@ -795,10 +795,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     let bassP20 = null;
     let __p18DebugData = null; // TEMP debug capture (read-only)
     // Declared OUTSIDE the try so the per-seat P20 block below can read it.
+    // Prefer the synthetic "rsp" entry (measured at the green RSP marker);
+    // fall back to the first primary / first seat only if it is absent.
     const rspSeatIdForBass =
-      (primarySeats.length > 0 && primarySeats[0]?.id) ||
-      (safeSeats[0]?.id) ||
-      null;
+      (Array.isArray(seatResponses) && seatResponses.some(r => r?.seatId === "rsp"))
+        ? "rsp"
+        : (primarySeats.length > 0 && primarySeats[0]?.id) ||
+          (safeSeats[0]?.id) ||
+          null;
     try {
       const transitionHz = computeTransitionFrequencyHz({
         widthM: dimensions?.widthM ?? dimensions?.width,

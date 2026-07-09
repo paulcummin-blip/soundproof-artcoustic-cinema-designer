@@ -7,7 +7,7 @@ const isNum = v => typeof v === 'number' && Number.isFinite(v);
 
 export const useSeatResponses = () => {
   const appState = useAppState();
-  const { subwoofers, seatingPositions, dimensions, roomDims } = appState || {};
+  const { subwoofers, seatingPositions, dimensions, roomDims, mlpY_m } = appState || {};
 
   // Normalise + validate subs, but keep full object shape (wrapper expects .position)
   const simSubs = useMemo(() => {
@@ -44,11 +44,22 @@ export const useSeatResponses = () => {
     height: roomDims?.heightM ?? dimensions?.height ?? 2.6,
   };
 
+  // Green RSP / MLP marker coordinate — same source as the visual marker
+  // (mlpAnchorEffective in RoomDesigner.jsx): x = room width / 2, y = mlpY_m, z = 1.2.
+  const rspCoord = useMemo(() => {
+    const y = mlpY_m;
+    const w = dims.width;
+    if (!isNum(y) || !isNum(w) || w <= 0) return null;
+    return { x: w / 2, y, z: 1.2 };
+  }, [mlpY_m, dims.width]);
+
   const seatResponses = useMemo(() => {
-    if (seatsSafe.length === 0 || simSubs.length === 0) return [];
+    if (simSubs.length === 0) return [];
+    const hasRsp = rspCoord && isNum(rspCoord.x) && isNum(rspCoord.y);
+    if (seatsSafe.length === 0 && !hasRsp) return [];
 
     try {
-      return seatsSafe.map(seat => {
+      const real = seatsSafe.map(seat => {
         const { responseData, rp22Analysis } =
           simulateResponseWithExtrasWrapper(simSubs, seat, dims) || {};
         return {
@@ -58,6 +69,23 @@ export const useSeatResponses = () => {
           factors: rp22Analysis?.factors || null,
         };
       });
+
+      // Synthetic RSP response at the green RSP / MLP marker coordinate so
+      // P14/P18/P19 measure at the actual RSP, not the first seat.
+      if (hasRsp) {
+        const { responseData, rp22Analysis } =
+          simulateResponseWithExtrasWrapper(simSubs, rspCoord, dims) || {};
+        if (Array.isArray(responseData) && responseData.length > 0) {
+          real.push({
+            seatId: "rsp",
+            isPrimary: true,
+            __isSyntheticRsp: true,
+            responseData,
+            factors: rp22Analysis?.factors || null,
+          });
+        }
+      }
+      return real;
     } catch (e) {
       // Fail safe: never crash the UI
       return seatsSafe.map(seat => ({
@@ -69,7 +97,7 @@ export const useSeatResponses = () => {
       }));
     }
   // stringify to avoid stale results when arrays mutate in place
-  }, [JSON.stringify(seatsSafe), JSON.stringify(simSubs), dims.width, dims.length, dims.height]);
+  }, [JSON.stringify(seatsSafe), JSON.stringify(simSubs), dims.width, dims.length, dims.height, rspCoord]);
 
   return seatResponses;
 };
