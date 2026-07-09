@@ -39,7 +39,10 @@ export function generateTargetCurve(freqsHz) {
 }
 
 // Linear interpolation between curve points
-export function interpolateCurveDb(curvePoints, hz) {
+// lfUsableHz (optional): approved -6 dB low-frequency point. When provided and
+// below the first curve point, the response stays flat down to lfUsableHz then
+// rolls off below it. Otherwise the rolloff is anchored at the first curve point.
+export function interpolateCurveDb(curvePoints, hz, lfUsableHz) {
   if (!Array.isArray(curvePoints) || curvePoints.length === 0) {
     return 90; // fallback sensitivity
   }
@@ -49,12 +52,27 @@ export function interpolateCurveDb(curvePoints, hz) {
     hz: p.hz || p.frequency || p[0],
     db: p.db || p.spl || p[1]
   })).sort((a, b) => a.hz - b.hz);
-  
-  // Clamp to endpoints
-  if (hz <= points[0].hz) return points[0].db;
-  if (hz >= points[points.length - 1].hz) return points[points.length - 1].db;
-  
-  // Linear interpolation
+
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
+
+  // Clamp above the highest curve point (unchanged)
+  if (hz >= lastPoint.hz) return lastPoint.db;
+
+  // Below the first curve point: conservative downward extrapolation (rolloff)
+  if (hz < firstPoint.hz) {
+    const anchorHz = (Number.isFinite(lfUsableHz) && lfUsableHz > 0 && lfUsableHz < firstPoint.hz)
+      ? lfUsableHz
+      : firstPoint.hz;
+    const anchorDb = firstPoint.db;
+    // Flat extension between the anchor and the first measured curve point
+    if (hz >= anchorHz) return anchorDb;
+    // 12 dB/octave rolloff below the anchor
+    const octaves = Math.log2(anchorHz / hz);
+    return anchorDb - 12 * octaves;
+  }
+
+  // Linear interpolation (unchanged)
   for (let i = 0; i < points.length - 1; i++) {
     const p1 = points[i];
     const p2 = points[i + 1];
@@ -65,7 +83,7 @@ export function interpolateCurveDb(curvePoints, hz) {
     }
   }
   
-  return points[0].db;
+  return firstPoint.db;
 }
 
 // Calculate boundary gain based on position
@@ -546,8 +564,8 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
         const dz = sub.z - seatPos.z;
         const d = Math.max(MIN_DISTANCE, Math.sqrt(dx*dx + dy*dy + dz*dz));
 
-        // Baseline SPL from curve
-        const db0 = interpolateCurveDb(curve, f);
+        // Baseline SPL from curve (pass approved -6 dB LF point for below-range rolloff)
+        const db0 = interpolateCurveDb(curve, f, sub.approvedUsableLfHzMinus6dB ?? sub.lfUsableHz);
 
         // Distance loss
         const dbDist = -20 * Math.log10(d / 1);
