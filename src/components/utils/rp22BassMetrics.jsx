@@ -242,33 +242,61 @@ export function computeParam18BassExtension(rspResponse) {
   const refDb = median(bandUsed.map((p) => p.spl));
   if (!isNum(refDb)) return null;
 
-  const cutoffDb = refDb - 3;
+  const thresholdDb = refDb - 3;
   const sorted = smoothed.slice().sort((a, b) => a.frequency - b.frequency);
+  if (sorted.length === 0) return null;
 
-  let result = null;
-  for (let i = 0; i < sorted.length; i++) {
-    if (sorted[i].spl >= cutoffDb) {
-      result = sorted[i];
-      break;
+  // Case 1: lowest bin already at/above threshold — the true cutoff is at or
+  // below the lowest simulated bin. Report as a bounded result ("≤ X Hz") and
+  // score using that bin's frequency.
+  if (sorted[0].spl >= thresholdDb) {
+    const f3 = sorted[0].frequency;
+    let level = 0; // below L1
+    if (f3 <= 15) level = 4;
+    else if (f3 <= 18) level = 3;
+    else if (f3 <= 25) level = 2;
+    else if (f3 <= 30) level = 1;
+    return {
+      hz: f3,
+      medianDb: refDb,
+      cutoffDb: thresholdDb,
+      bounded: true,
+      level: level >= 1 ? `L${level}` : null,
+      value: f3,
+      formatted: `≤ ${Math.round(f3)} Hz`,
+      note: 'Predicted design-stage value from current bass engine. Cutoff is at or below the lowest simulated bin.',
+    };
+  }
+
+  // Case 2: scan upward for the first below→above threshold crossing and
+  // linearly interpolate the true -3 dB frequency between the two bins.
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    if (!isNum(a.spl) || !isNum(b.spl)) continue;
+    if (a.spl < thresholdDb && b.spl >= thresholdDb) {
+      const frac = (thresholdDb - a.spl) / (b.spl - a.spl);
+      const f3 = a.frequency + (b.frequency - a.frequency) * frac;
+      let level = 0; // below L1
+      if (f3 <= 15) level = 4;
+      else if (f3 <= 18) level = 3;
+      else if (f3 <= 25) level = 2;
+      else if (f3 <= 30) level = 1;
+      return {
+        hz: f3,
+        medianDb: refDb,
+        cutoffDb: thresholdDb,
+        bounded: false,
+        level: level >= 1 ? `L${level}` : null,
+        value: f3,
+        formatted: `${Math.round(f3)} Hz`,
+        note: 'Predicted design-stage value from current bass engine.',
+      };
     }
   }
-  if (!result) return null;
 
-  let level = 0; // below L1
-  if (result.frequency <= 15) level = 4;
-  else if (result.frequency <= 18) level = 3;
-  else if (result.frequency <= 25) level = 2;
-  else if (result.frequency <= 30) level = 1;
-
-  return {
-    hz: result.frequency,
-    medianDb: refDb,
-    cutoffDb,
-    level: level >= 1 ? `L${level}` : null,
-    value: result.frequency,
-    formatted: `${Math.round(result.frequency)} Hz`,
-    note: 'Predicted design-stage value from current bass engine.',
-  };
+  // Case 3: no crossing found — response never reaches -3 dB of reference.
+  return null;
 }
 
 // Parameter 19 — Frequency response below transition frequency at RSP, relative
