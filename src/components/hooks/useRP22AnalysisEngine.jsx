@@ -811,11 +811,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const usableSeatResponses = Array.isArray(seatResponses) ? seatResponses : [];
 
       if (rspBassResponse && Array.isArray(rspBassResponse) && rspBassResponse.length > 0) {
-        // RP22 P14/P18/P19 share one final post-EQ RSP curve so compliance metrics
-        // agree with the displayed bass curve. Design EQ is applied once here;
-        // P14 receives designEqEnabled=false to avoid a second application.
-        const designEqEnabled = true;
-        const finalRspBassCurve = designEqEnabled
+        // RP22 P14/P18/P19 are compliance/design estimates and always use the
+        // post-EQ design curve. The Bass Response EQ toggle is visual only.
+        // Design EQ is applied once here; P14 receives designEqEnabled=false
+        // to avoid a second application.
+        const rp22BassComplianceUsesDesignEq = true;
+        const finalRspBassCurve = rp22BassComplianceUsesDesignEq
           ? applyDesignEqCurve(rspBassResponse)
           : rspBassResponse;
         bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
