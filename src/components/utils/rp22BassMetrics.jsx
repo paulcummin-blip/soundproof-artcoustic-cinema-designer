@@ -295,11 +295,12 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
   const below = smoothed.filter((p) => p.frequency <= transitionHz);
   if (below.length === 0) return null;
 
-  let maxDev = 0;
+  let rawMaxDev = 0;
   for (let i = 0; i < below.length; i++) {
     const d = Math.abs(below[i].spl - refDb);
-    if (d > maxDev) maxDev = d;
+    if (d > rawMaxDev) rawMaxDev = d;
   }
+  const maxDev = Math.ceil(Math.abs(rawMaxDev));
 
   let level = null;
   if (maxDev <= 2) level = 4;
@@ -312,7 +313,7 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
     targetDb: refDb,
     transitionHz,
     level: level != null ? `L${level}` : null,
-    formatted: `±${maxDev.toFixed(1)} dB`,
+    formatted: `±${maxDev} dB`,
     note: 'Calculated from 1/3-octave smoothed predicted response.',
   };
 }

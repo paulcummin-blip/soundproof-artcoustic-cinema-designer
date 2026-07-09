@@ -20,6 +20,7 @@ import {
   computeParam18BassExtension,
   computeParam19Deviation,
   computeParam20SeatConsistency,
+  applyDesignEqCurve,
 } from "@/components/utils/rp22BassMetrics";
 
 // Safe helpers
@@ -810,12 +811,17 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const usableSeatResponses = Array.isArray(seatResponses) ? seatResponses : [];
 
       if (rspBassResponse && Array.isArray(rspBassResponse) && rspBassResponse.length > 0) {
-        // RP22 P14 is always post-EQ (true) — decoupled from the Bass Response graph's
-        // visual raw/EQ toggle, which is display-only.
-        bassP14 = computeParam14LfeCapability(rspBassResponse, true);
-        bassP18 = computeParam18BassExtension(rspBassResponse);
+        // RP22 P14/P18/P19 share one final post-EQ RSP curve so compliance metrics
+        // agree with the displayed bass curve. Design EQ is applied once here;
+        // P14 receives designEqEnabled=false to avoid a second application.
+        const designEqEnabled = true;
+        const finalRspBassCurve = designEqEnabled
+          ? applyDesignEqCurve(rspBassResponse)
+          : rspBassResponse;
+        bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
+        bassP18 = computeParam18BassExtension(finalRspBassCurve);
         if (transitionHz != null) {
-          bassP19 = computeParam19Deviation(rspBassResponse, transitionHz);
+          bassP19 = computeParam19Deviation(finalRspBassCurve, transitionHz);
           bassP20 = computeParam20SeatConsistency({
             rspResponse: rspBassResponse,
             perSeatResponses: usableSeatResponses,
