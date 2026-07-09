@@ -1,7 +1,7 @@
 // hooks/useSeatResponses.jsx
 import { useMemo } from 'react';
 import { useAppState } from '../../AppStateProvider';
-import { BassResponseEngine } from '../bass/BassResponseEngine'; // <-- adjust if the file lives elsewhere
+import { simulateResponseWithExtrasWrapper } from '@/components/bass/bassSimulationEngine';
 
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 
@@ -9,10 +9,7 @@ export const useSeatResponses = () => {
   const appState = useAppState();
   const { subwoofers, seatingPositions, dimensions, roomDims } = appState || {};
 
-  // Create the engine once
-  const bassEngine = useMemo(() => new BassResponseEngine(), []);
-
-  // Normalise + validate subs, but keep full object shape (engine expects .position)
+  // Normalise + validate subs, but keep full object shape (wrapper expects .position)
   const simSubs = useMemo(() => {
     const subs = Array.isArray(subwoofers) ? subwoofers : [];
     return subs
@@ -52,13 +49,13 @@ export const useSeatResponses = () => {
 
     try {
       return seatsSafe.map(seat => {
-        const { responseData, factors } =
-          bassEngine.simulateResponseWithExtras(simSubs, seat, dims) || {};
+        const { responseData, rp22Analysis } =
+          simulateResponseWithExtrasWrapper(simSubs, seat, dims) || {};
         return {
           seatId: seat.id ?? `${seat.x.toFixed(2)}-${seat.y.toFixed(2)}`,
           isPrimary: !!seat.isPrimary,
           responseData: Array.isArray(responseData) ? responseData : [],
-          factors: factors || null,
+          factors: rp22Analysis?.factors || null,
         };
       });
     } catch (e) {
@@ -72,7 +69,7 @@ export const useSeatResponses = () => {
       }));
     }
   // stringify to avoid stale results when arrays mutate in place
-  }, [JSON.stringify(seatsSafe), JSON.stringify(simSubs), dims.width, dims.length, dims.height, bassEngine]);
+  }, [JSON.stringify(seatsSafe), JSON.stringify(simSubs), dims.width, dims.length, dims.height]);
 
   return seatResponses;
 };
