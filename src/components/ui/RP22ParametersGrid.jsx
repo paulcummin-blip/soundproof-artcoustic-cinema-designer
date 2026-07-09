@@ -72,14 +72,48 @@ export default function RP22ParametersGrid({ rp22 }) {
 
   return (
     <div style={{ display: "grid", gap: 8 }}>
-      {PARAM_LABELS.map((label, i) => (
-        <div key={i} style={cardStyle}>
-          <div style={rowStyle}>
-            <div style={labelStyle}>{label}</div>
-            <Pill level={levels[i]} />
+      {PARAM_LABELS.map((label, i) => {
+        const isP18 = i === 17; // Parameter 18 (1-based id = i+1)
+        let p18Debug = null;
+        if (isP18) {
+          try {
+            const src = rp22?.gradedParameters?.primary?.[18] ?? null;
+            const dbg = rp22?.__p18Debug ?? null;
+            const splAt = dbg?.splAtFreqs ?? {};
+            p18Debug = (
+              <div style={{
+                marginTop: 8, paddingTop: 8, borderTop: "1px dashed #C1B6AD",
+                fontSize: 10, lineHeight: 1.35, color: "#625143",
+                fontFamily: "monospace", wordBreak: "break-all",
+              }}>
+                <div><b>source:</b> gradedParameters.primary[18]</div>
+                <div><b>value:</b> {String(src?.value)}</div>
+                <div><b>formatted:</b> {String(src?.formatted)}</div>
+                <div><b>level:</b> {String(src?.level)}</div>
+                <div><b>responseData source seatId:</b> {String(dbg?.rspSeatId)}</div>
+                <div><b>responseData first point:</b> {dbg?.sorted0 ? JSON.stringify(dbg.sorted0) : "n/a"}</div>
+                <div><b>responseData @15Hz:</b> {String(splAt[15])}</div>
+                <div><b>responseData @20Hz:</b> {String(splAt[20])}</div>
+                <div><b>responseData @22Hz:</b> {String(splAt[22])}</div>
+                <div><b>responseData @25Hz:</b> {String(splAt[25])}</div>
+                <div><b>responseData @40Hz:</b> {String(splAt[40])}</div>
+                <div><b>responseData @60Hz:</b> {String(splAt[60])}</div>
+              </div>
+            );
+          } catch (e) {
+            p18Debug = <div style={{ fontSize: 10, color: "#A7302F", marginTop: 8 }}>P18 debug render error: {String(e)}</div>;
+          }
+        }
+        return (
+          <div key={i} style={cardStyle}>
+            <div style={rowStyle}>
+              <div style={labelStyle}>{label}</div>
+              <Pill level={levels[i]} />
+            </div>
+            {p18Debug}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
