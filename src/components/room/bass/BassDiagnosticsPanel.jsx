@@ -17,6 +17,7 @@ import AcousticSolverShootoutBatch4 from "@/components/room/bass/AcousticSolverS
 import ArchivedInvestigations from "@/components/room/bass/ArchivedInvestigations";
 import ImageSourceParityShootout from "@/components/room/bass/ImageSourceParityShootout";
 import TemporaryBassAuditPanels from "@/components/room/bass/TemporaryBassAuditPanels";
+import Sub2P18TestButton from "@/components/room/bass/Sub2P18TestButton";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -861,6 +862,9 @@ export default function BassDiagnosticsPanel({
         </details>
       )}
       {/* Developer Bass Diagnostics end */}
+
+      {/* ── TEMP: SUB2-12 P18 Test Harness (debug only) ── */}
+      <Sub2P18TestButton />
 
       {/* ── Image-Source Parity Shootout (temporary production exposure) ── */}
       <ImageSourceParityShootout
