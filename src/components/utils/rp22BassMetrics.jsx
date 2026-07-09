@@ -265,6 +265,7 @@ export function computeParam18BassExtension(rspResponse) {
       value: f3,
       formatted: `≤ ${Math.round(f3)} Hz`,
       note: 'Predicted design-stage value from current bass engine. Cutoff is at or below the lowest simulated bin.',
+      __debug: { refDb, thresholdDb, sorted0: sorted[0], branch: 'case1_bounded' },
     };
   }
 
@@ -291,6 +292,7 @@ export function computeParam18BassExtension(rspResponse) {
         value: f3,
         formatted: `${Math.round(f3)} Hz`,
         note: 'Predicted design-stage value from current bass engine.',
+        __debug: { refDb, thresholdDb, sorted0: sorted[0], branch: 'case2_interpolated' },
       };
     }
   }

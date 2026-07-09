@@ -793,6 +793,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     let bassP18 = null;
     let bassP19 = null;
     let bassP20 = null;
+    let __p18DebugData = null; // TEMP debug capture (read-only)
     // Declared OUTSIDE the try so the per-seat P20 block below can read it.
     const rspSeatIdForBass =
       (primarySeats.length > 0 && primarySeats[0]?.id) ||
@@ -821,6 +822,38 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           : rspBassResponse;
         bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
         bassP18 = computeParam18BassExtension(finalRspBassCurve);
+        // TEMP P18 debug capture (inside try where finalRspBassCurve is in scope)
+        __p18DebugData = (() => {
+          const curve = Array.isArray(finalRspBassCurve) ? finalRspBassCurve : [];
+          const valAtF = (f) => {
+            if (curve.length === 0 || !isNum(f)) return null;
+            if (f <= curve[0].frequency) return curve[0].spl;
+            if (f >= curve[curve.length - 1].frequency) return curve[curve.length - 1].spl;
+            for (let i = 0; i < curve.length - 1; i++) {
+              if (f >= curve[i].frequency && f <= curve[i + 1].frequency) {
+                const span = curve[i + 1].frequency - curve[i].frequency;
+                if (span === 0) return curve[i].spl;
+                const r = (f - curve[i].frequency) / span;
+                return curve[i].spl + (curve[i + 1].spl - curve[i].spl) * r;
+              }
+            }
+            return null;
+          };
+          const freqs = [10, 15, 16, 20, 22, 25, 31.5, 40, 60, 80, 100];
+          const splAtFreqs = {};
+          for (const f of freqs) splAtFreqs[f] = valAtF(f);
+          const dbg = bassP18?.__debug || null;
+          return {
+            rspSeatId: rspSeatIdForBass,
+            responseDataLength: Array.isArray(rspBassResponse) ? rspBassResponse.length : 0,
+            splAtFreqs,
+            refDb: dbg?.refDb ?? null,
+            thresholdDb: dbg?.thresholdDb ?? null,
+            sorted0: dbg?.sorted0 ?? null,
+            branch: dbg?.branch ?? (bassP18 ? "unknown" : "null/no_data"),
+            returnedP18: bassP18,
+          };
+        })();
         if (transitionHz != null) {
           bassP19 = computeParam19Deviation(finalRspBassCurve, transitionHz);
           bassP20 = computeParam20SeatConsistency({
@@ -877,6 +910,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           status: "no_data",
           note: "Predicted design-stage value from current bass engine.",
         };
+
+    if (__p18DebugData) __p18DebugData.gradedPrimary18 = gradedParameters.primary[18] ?? null;
 
     const p19CatalogEntry = RP22_CATALOG["19"];
     gradedParameters.primary[19] = bassP19
@@ -1469,6 +1504,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     return {
       gradedParameters,
+      __p18Debug: __p18DebugData,
       p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis) || {}).perSide,
       param5,
       surroundGaps,
