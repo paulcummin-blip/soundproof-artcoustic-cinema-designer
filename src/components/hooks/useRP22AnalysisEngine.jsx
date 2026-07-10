@@ -884,41 +884,41 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           ? applyDesignEqCurve(rspBassResponse, designEqUsableLfHz)
           : rspBassResponse;
         bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
+        const p18InputCurve = finalRspBassCurve;
+        const p18TargetFrequencies = [15, 16, 18, 20, 22, 25];
+        const nearestRawEntries = (curve) => p18TargetFrequencies.map((targetHz) => {
+          if (!Array.isArray(curve) || curve.length === 0) return { targetHz, entry: null };
+          const entry = curve.reduce((nearest, point) => (
+            Math.abs(point.frequency - targetHz) < Math.abs(nearest.frequency - targetHz) ? point : nearest
+          ));
+          return { targetHz, entry };
+        });
+        // TEMP P18 input capture — references and entries are observed immediately before the live call.
+        __p18DebugData = {
+          inputVariableName: "p18InputCurve",
+          exactArgument: "computeParam18BassExtension(p18InputCurve, bassP14)",
+          inputReference: temporaryReferenceId(p18InputCurve),
+          inputLength: Array.isArray(p18InputCurve) ? p18InputCurve.length : 0,
+          inputFirst10Entries: Array.isArray(p18InputCurve) ? p18InputCurve.slice(0, 10) : [],
+          rspBassResponseReference: temporaryReferenceId(rspBassResponse),
+          rspBassResponseLength: Array.isArray(rspBassResponse) ? rspBassResponse.length : 0,
+          rspBassResponseNearestEntries: nearestRawEntries(rspBassResponse),
+          finalRspBassCurveReference: temporaryReferenceId(finalRspBassCurve),
+          finalRspBassCurveLength: Array.isArray(finalRspBassCurve) ? finalRspBassCurve.length : 0,
+          finalRspBassCurveNearestEntries: nearestRawEntries(finalRspBassCurve),
+          finalEqualsRspByReference: finalRspBassCurve === rspBassResponse,
+          designEqEnabledAtP18Call: rp22BassComplianceUsesDesignEq,
+          rspSeatId: rspSeatIdForBass,
+          p14Value: bassP14?.value ?? null,
+        };
         temporaryP18ExecutionCount += 1;
-        bassP18 = computeParam18BassExtension(finalRspBassCurve, bassP14);
+        bassP18 = computeParam18BassExtension(p18InputCurve, bassP14);
         temporaryTrace.p18ExecutionCount = temporaryP18ExecutionCount;
         temporaryTrace.p18 = { value: bassP18?.value ?? null, formatted: bassP18?.formatted ?? null, level: bassP18?.level ?? null };
-        // TEMP P18 debug capture (inside try where finalRspBassCurve is in scope)
-        __p18DebugData = (() => {
-          const curve = Array.isArray(finalRspBassCurve) ? finalRspBassCurve : [];
-          const valAtF = (f) => {
-            if (curve.length === 0 || !isNum(f)) return null;
-            if (f <= curve[0].frequency) return curve[0].spl;
-            if (f >= curve[curve.length - 1].frequency) return curve[curve.length - 1].spl;
-            for (let i = 0; i < curve.length - 1; i++) {
-              if (f >= curve[i].frequency && f <= curve[i + 1].frequency) {
-                const span = curve[i + 1].frequency - curve[i].frequency;
-                if (span === 0) return curve[i].spl;
-                const r = (f - curve[i].frequency) / span;
-                return curve[i].spl + (curve[i + 1].spl - curve[i].spl) * r;
-              }
-            }
-            return null;
-          };
-          const freqs = [10, 15, 16, 20, 22, 25, 31.5, 40, 60, 80, 100];
-          const splAtFreqs = {};
-          for (const f of freqs) splAtFreqs[f] = valAtF(f);
-          return {
-            rspSeatId: rspSeatIdForBass,
-            responseDataLength: Array.isArray(rspBassResponse) ? rspBassResponse.length : 0,
-            splAtFreqs,
-            p14Value: bassP14?.value ?? null,
-            targets: bassP18?.targets ?? null,
-            officialCoupledLevel: bassP18?.officialCoupledLevel ?? null,
-            branch: bassP18 ? "envelope" : "null/no_data",
-            returnedP18: bassP18,
-          };
-        })();
+        __p18DebugData.targets = bassP18?.targets ?? null;
+        __p18DebugData.officialCoupledLevel = bassP18?.officialCoupledLevel ?? null;
+        __p18DebugData.branch = bassP18 ? "envelope" : "null/no_data";
+        __p18DebugData.returnedP18 = bassP18;
         if (transitionHz != null) {
           temporaryP19ExecutionCount += 1;
           temporaryTrace.p19ExecutionCount = temporaryP19ExecutionCount;
