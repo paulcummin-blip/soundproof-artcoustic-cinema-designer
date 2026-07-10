@@ -325,12 +325,18 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
       const resonMag = Math.sqrt(resonator.real * resonator.real + resonator.imag * resonator.imag);
       const resonMagDb = 20 * Math.log10(Math.max(1e-10, resonMag));
       
+      const contributionReal = resonator.real - 1;
+      const contributionImag = resonator.imag;
       modeContributions.push({
         nx: mode.nx,
         ny: mode.ny,
         nz: mode.nz,
         f0Hz: mode.fHz,
         coupling,
+        contributionReal,
+        contributionImag,
+        contributionMagnitude: Math.hypot(contributionReal, contributionImag),
+        contributionPhaseRad: Math.atan2(contributionImag, contributionReal),
         resonMagDb,
         resonReal: resonator.real,
         resonImag: resonator.imag
@@ -375,7 +381,7 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
       debug: {
         pre: { real: sumReal, imag: sumImag, mag: preMag, db: preDb },
         modeSum: { real: modeSumReal, imag: modeSumImag, mag: sumMag, db: sumDb },
-        H: { real: Hreal, imag: Himag, mag: Hmag, db: Hdb },
+        H: { real: Hreal, imag: Himag, mag: Hmag, db: Hdb, phaseRad: Math.atan2(Himag, Hreal) },
         post: { real: finalReal, imag: finalImag, mag: postMag, db: postDb },
         top: topModes,
         modesPassedBandwidth: modesPassedBandwidth,
@@ -542,6 +548,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
     const splDb = freqsHz.map(f => {
       let sumReal = 0;
       let sumImag = 0;
+      const probeContributors = [];
       
       // Check if this frequency should be audited
       const shouldAudit = auditEnabled && 
@@ -666,16 +673,24 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
         const filteredReal = modeResult.real;
         const filteredImag = modeResult.imag;
         
-        // Capture probe data if requested
+        // TEMPORARY LIVE ENGINE PROBE — expose exact values already produced by
+        // this runtime path. No value here feeds back into the simulation.
         if (shouldProbe && modeResult.debug) {
-          modeProbe.rows.push({
-            frequencyHz: f,
-            seatId,
+          probeContributors.push({
             subId: sub.id || `sub-${subIdx}`,
-            pre: modeResult.debug.pre,
-            modeMult: modeResult.debug.modeMult,
-            post: modeResult.debug.post,
-            topModes: modeResult.debug.top
+            modelKey: sub.modelKey,
+            db0,
+            distance: d,
+            dbDist,
+            dbBoundary,
+            dbGain,
+            dbEq,
+            direct: { real: subReal, imag: subImag },
+            sbirComposite: { real: totalSubReal, imag: totalSubImag },
+            preModal: modeResult.debug.pre,
+            modalMultiplier: modeResult.debug.H,
+            filtered: { real: filteredReal, imag: filteredImag },
+            topModes: modeResult.debug.top,
           });
         }
 
@@ -735,6 +750,15 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
           magnitude,
           spl,
           finalSplDb: finalSpl
+        });
+      }
+
+      if (shouldProbe) {
+        modeProbe.rows.push({
+          frequencyHz: f,
+          seatId,
+          contributors: probeContributors,
+          final: { sumReal, sumImag, finalSplDb: finalSpl },
         });
       }
 
