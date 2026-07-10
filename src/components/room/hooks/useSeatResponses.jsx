@@ -60,12 +60,13 @@ export const useSeatResponses = () => {
 
     try {
       const real = seatsSafe.map(seat => {
-        const { responseData, rp22Analysis } =
+        const { responseData, capabilityResponseData, rp22Analysis } =
           simulateResponseWithExtrasWrapper(simSubs, seat, dims) || {};
         return {
           seatId: seat.id ?? `${seat.x.toFixed(2)}-${seat.y.toFixed(2)}`,
           isPrimary: !!seat.isPrimary,
           responseData: Array.isArray(responseData) ? responseData : [],
+          capabilityResponseData: Array.isArray(capabilityResponseData) ? capabilityResponseData : [],
           factors: rp22Analysis?.factors || null,
         };
       });
@@ -73,7 +74,7 @@ export const useSeatResponses = () => {
       // Synthetic RSP response at the green RSP / MLP marker coordinate so
       // P14/P18/P19 measure at the actual RSP, not the first seat.
       if (hasRsp) {
-        const { responseData, rp22Analysis } =
+        const { responseData, capabilityResponseData, rp22Analysis } =
           simulateResponseWithExtrasWrapper(simSubs, rspCoord, dims) || {};
         if (Array.isArray(responseData) && responseData.length > 0) {
           real.push({
@@ -81,6 +82,7 @@ export const useSeatResponses = () => {
             isPrimary: true,
             __isSyntheticRsp: true,
             responseData,
+            capabilityResponseData: Array.isArray(capabilityResponseData) ? capabilityResponseData : [],
             factors: rp22Analysis?.factors || null,
           });
         }
@@ -92,6 +94,7 @@ export const useSeatResponses = () => {
         seatId: seat.id ?? `${seat.x}-${seat.y}`,
         isPrimary: !!seat.isPrimary,
         responseData: [],
+        capabilityResponseData: [],
         factors: null,
         error: 'bass-sim-error',
       }));

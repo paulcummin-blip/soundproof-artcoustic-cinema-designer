@@ -768,7 +768,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
     // Detect nulls for this seat
     const nullInfo = detectNulls(freqsHz, splDb, [20, 80]);
     
-    seatResponses[seatId] = { freqsHz, splDb, nulls: nullInfo };
+    seatResponses[seatId] = { freqsHz, splDb, capabilitySplDb: splDb.slice(), nulls: nullInfo };
   });
   
   // Force audit probe entry at 50 Hz for visibility test
@@ -1068,12 +1068,12 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
 //   roomDimensions: { length, width, height }  (metres)
 //
 // Output (mimics BassResponseEngine.simulateResponseWithExtras):
-//   { responseData: [{ frequency, spl }, ...], rp22Analysis: {...} | null }
+//   { responseData: [{ frequency, spl }, ...], capabilityResponseData: [{ frequency, spl }, ...], rp22Analysis: {...} | null }
 export function simulateResponseWithExtrasWrapper(subwoofers, seatPosition, roomDimensions) {
-  if (!seatPosition || !roomDimensions) return { responseData: [], rp22Analysis: null };
+  if (!seatPosition || !roomDimensions) return { responseData: [], capabilityResponseData: [], rp22Analysis: null };
 
   const subs = Array.isArray(subwoofers) ? subwoofers : [];
-  if (subs.length === 0) return { responseData: [], rp22Analysis: null };
+  if (subs.length === 0) return { responseData: [], capabilityResponseData: [], rp22Analysis: null };
 
   // Convert legacy sub format → bassSimulationEngine format
   const engineSubs = subs
@@ -1091,7 +1091,7 @@ export function simulateResponseWithExtrasWrapper(subwoofers, seatPosition, room
       },
     }));
 
-  if (engineSubs.length === 0) return { responseData: [], rp22Analysis: null };
+  if (engineSubs.length === 0) return { responseData: [], capabilityResponseData: [], rp22Analysis: null };
 
   // Convert room dimensions (legacy uses length/width/height; engine uses *M)
   const roomDims = {
@@ -1127,13 +1127,17 @@ export function simulateResponseWithExtrasWrapper(subwoofers, seatPosition, room
 
   const seatResponse = result?.seatResponses?.['wrapper-seat'];
   if (!seatResponse || !seatResponse.freqsHz || !seatResponse.splDb) {
-    return { responseData: [], rp22Analysis: null };
+    return { responseData: [], capabilityResponseData: [], rp22Analysis: null };
   }
 
   // Convert freqsHz/splDb arrays → [{ frequency, spl }] (full 1 Hz resolution)
   const responseData = seatResponse.freqsHz.map((f, i) => ({
     frequency: f,
     spl: Number.isFinite(seatResponse.splDb[i]) ? seatResponse.splDb[i] : 0,
+  }));
+  const capabilityResponseData = seatResponse.freqsHz.map((f, i) => ({
+    frequency: f,
+    spl: Number.isFinite(seatResponse.capabilitySplDb?.[i]) ? seatResponse.capabilitySplDb[i] : 0,
   }));
 
   // Build rp22Analysis from metrics to mimic legacy shape
@@ -1152,7 +1156,7 @@ export function simulateResponseWithExtrasWrapper(subwoofers, seatPosition, room
     },
   } : null;
 
-  return { responseData, rp22Analysis };
+  return { responseData, capabilityResponseData, rp22Analysis };
 }
 
 function _wrapperLevelLabel(spl) {
