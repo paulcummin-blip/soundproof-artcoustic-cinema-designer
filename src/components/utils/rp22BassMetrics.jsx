@@ -384,17 +384,18 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
   }
   const maxDev = Math.ceil(Math.abs(rawMaxDev));
 
-  let level = null;
-  if (maxDev <= 2) level = 4;
-  else if (maxDev <= 3) level = 3;
-  else if (maxDev <= 4) level = 2;
-  else if (maxDev <= 5) level = 1;
+  let level = "FAIL";
+  if (maxDev <= 2) level = "L4";
+  else if (maxDev <= 3) level = "L3";
+  else if (maxDev <= 4) level = "L2";
+  else if (maxDev <= 5) level = "L1";
 
   return {
     maxDevDb: maxDev,
     targetDb: refDb,
     transitionHz,
-    level: level != null ? `L${level}` : null,
+    level,
+    status: level === "FAIL" ? "fail" : "ok",
     formatted: `±${maxDev} dB`,
     note: 'Calculated from 1/3-octave smoothed predicted response.',
   };

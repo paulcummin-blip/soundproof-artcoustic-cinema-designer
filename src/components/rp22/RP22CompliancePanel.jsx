@@ -750,6 +750,13 @@ export default function RP22CompliancePanel({
         return "—";
       }
 
+      // P19: a valid calculated deviation above L1 is FAIL, not missing data.
+      if (pid === 19) {
+        if (!res || res.status === "no_data" || !Number.isFinite(res.value)) return "—";
+        if (res.status === "fail" || String(res.level).toUpperCase() === "FAIL") return "FAIL";
+        return res.level ?? "—";
+      }
+
       // If engine gave a usable level, use it
       if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) {
         return res.level; // may be "L1".."L4" or numeric
