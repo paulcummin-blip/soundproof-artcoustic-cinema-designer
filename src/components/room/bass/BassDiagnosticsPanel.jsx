@@ -19,6 +19,7 @@ import ImageSourceParityShootout from "@/components/room/bass/ImageSourceParityS
 import TemporaryBassAuditPanels from "@/components/room/bass/TemporaryBassAuditPanels";
 import Sub2P18TestButton from "@/components/room/bass/Sub2P18TestButton";
 import LiveEngineProbe from "@/components/room/bass/LiveEngineProbe";
+import DirectStagePhysicsTable from "@/components/room/bass/DirectStagePhysicsTable";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -863,6 +864,8 @@ export default function BassDiagnosticsPanel({
         </details>
       )}
       {/* Developer Bass Diagnostics end */}
+
+      <DirectStagePhysicsTable response={simulationResults?.seatResponses?.[selectedSeatIds[0]]} />
 
       {/* ── TEMPORARY LIVE ENGINE PROBE — display-only diagnostic ── */}
       <LiveEngineProbe roomDims={roomDims} subsForSimulation={subsForSimulation} />

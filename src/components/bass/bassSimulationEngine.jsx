@@ -545,9 +545,16 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
       modeProbe.seatIdUsed = seatId;
     }
     
+    const directOnlySplDb = [];
+    const directPlusSbirSplDb = [];
+    const finalRoomSplDb = [];
     const splDb = freqsHz.map(f => {
       let sumReal = 0;
       let sumImag = 0;
+      let directOnlySumReal = 0;
+      let directOnlySumImag = 0;
+      let directPlusSbirSumReal = 0;
+      let directPlusSbirSumImag = 0;
       const probeContributors = [];
       
       // Check if this frequency should be audited
@@ -724,6 +731,13 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
           });
         }
 
+        // Diagnostic-only observation sums. These reuse the already-computed direct,
+        // direct-plus-SBIR, and final complex values without changing the live response path.
+        directOnlySumReal += subReal;
+        directOnlySumImag += subImag;
+        directPlusSbirSumReal += totalSubReal;
+        directPlusSbirSumImag += totalSubImag;
+
         // Accumulate
         sumReal += filteredReal;
         sumImag += filteredImag;
@@ -738,6 +752,13 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
 
       const spl = 20 * Math.log10(magnitude);
       const finalSpl = spl; // already floored in linear domain
+      const toSplDb = (real, imag) => 20 * Math.log10(Math.max(
+        Math.sqrt(real * real + imag * imag),
+        floorLinear,
+      ));
+      directOnlySplDb.push(toSplDb(directOnlySumReal, directOnlySumImag));
+      directPlusSbirSplDb.push(toSplDb(directPlusSbirSumReal, directPlusSbirSumImag));
+      finalRoomSplDb.push(toSplDb(sumReal, sumImag));
 
       // Record summation audit data
       if (shouldAudit) {
@@ -768,7 +789,13 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
     // Detect nulls for this seat
     const nullInfo = detectNulls(freqsHz, splDb, [20, 80]);
     
-    seatResponses[seatId] = { freqsHz, splDb, capabilitySplDb: splDb.slice(), nulls: nullInfo };
+    seatResponses[seatId] = {
+      freqsHz,
+      splDb,
+      capabilitySplDb: splDb.slice(),
+      nulls: nullInfo,
+      debugPhysics: { directOnlySplDb, directPlusSbirSplDb, finalRoomSplDb },
+    };
   });
   
   // Force audit probe entry at 50 Hz for visibility test
