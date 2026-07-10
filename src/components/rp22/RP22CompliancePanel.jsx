@@ -6,7 +6,19 @@ import { renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-/* ---------- Helpers ---------- */
+let p18TraceReferenceCount = 0;
+const p18TraceReferences = new WeakMap();
+
+const getP18TraceReference = (analysisResult) => {
+  if (!analysisResult || (typeof analysisResult !== "object" && typeof analysisResult !== "function")) return "unavailable";
+  if (!p18TraceReferences.has(analysisResult)) {
+    p18TraceReferenceCount += 1;
+    p18TraceReferences.set(analysisResult, p18TraceReferenceCount);
+  }
+  return p18TraceReferences.get(analysisResult);
+};
+
+/* ---------- Helpers */
 
 // Horizontal FOV → distance (m)
 function distanceForFov(widthM, fovDeg) {
@@ -1021,6 +1033,25 @@ export default function RP22CompliancePanel({
                   {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
                   <span style={{ color: "#213428" }}>{achievedValue}</span>
                 </div>
+                {p.id === 18 && (() => {
+                  const p18 = analysisResult?.gradedParameters?.primary?.[18] || null;
+                  return (
+                    <pre style={{ marginTop: 8, padding: 8, overflowX: "auto", whiteSpace: "pre-wrap", fontSize: 10, lineHeight: 1.4, color: "#1B1A1A", background: "#F6F3EE", border: "1px solid #C1B6AD", borderRadius: 4 }}>
+{`BUILD MARKER: P18-LIVE-TRACE-01
+analysisResult reference: ${getP18TraceReference(analysisResult)}
+gradedParameters.primary[18].level: ${String(p18?.level)}
+gradedParameters.primary[18].formatted: ${String(p18?.formatted)}
+gradedParameters.primary[18].value: ${String(p18?.value)}
+gradedParameters.primary[18].officialCoupledLevel: ${String(p18?.officialCoupledLevel)}
+gradedParameters.primary[18].targets: ${JSON.stringify(p18?.targets)}
+achievedValue: ${String(achievedValue)}
+lvl: ${String(lvl)}
+window.location.href: ${window.location.href}
+build/version: ${import.meta.env?.VITE_APP_VERSION || "unavailable"}
+render timestamp: ${new Date().toISOString()}`}
+                    </pre>
+                  );
+                })()}
                 {targetBasisNote && (
                   <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
                     {targetBasisNote}
