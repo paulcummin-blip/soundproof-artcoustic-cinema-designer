@@ -19,10 +19,9 @@ function Pill({ level }) {
     3: { background: "#E9ECEF", color: "#3E4349", text: "L3" },
     2: { background: "#EFEAE4", color: "#625143", text: "L2" },
     1: { background: "#FBE9E7", color: "#A7302F", text: "L1" },
-    0: { background: "#FBE9E7", color: "#A7302F", text: "FAIL" },
-    [-1]: { background: "#F3F4F6", color: "#9CA3AF", text: "—" },
+    0: { background: "#FBE9E7", color: "#A7302F", text: "Fail" },
   };
-  const pal = map[level ?? -1];
+  const pal = map[level ?? 0];
   return <span style={{ ...base, ...pal }}>{pal.text}</span>;
 }
 
@@ -40,16 +39,6 @@ export default function RP22ParametersGrid({ rp22 }) {
     return PARAM_LABELS.map((_, i) => {
       const paramId = i + 1;
       const paramData = graded[paramId];
-
-      // P14: level is stored as a string "L1".."L4" or null. Distinguish
-      // "no data" (—) from "below L1" (FAIL) using the status field.
-      if (paramId === 14) {
-        if (!paramData || paramData.status === "no_data") return -1; // "—"
-        const m = String(paramData?.level ?? "").match(/^L(\d)$/i);
-        if (m) return Math.max(0, Math.min(4, parseInt(m[1], 10)));
-        return 0; // valid calc but below L1 → FAIL
-      }
-
       const lvl = typeof paramData?.level === "number" ? paramData.level : 0;
       return Math.max(0, Math.min(4, lvl));
     });
@@ -85,34 +74,6 @@ export default function RP22ParametersGrid({ rp22 }) {
     <div style={{ display: "grid", gap: 8 }}>
       {PARAM_LABELS.map((label, i) => {
         const isP18 = i === 17; // Parameter 18 (1-based id = i+1)
-        const isP14 = i === 13; // Parameter 14 (1-based id = i+1)
-
-        let p14Display = null;
-        if (isP14) {
-          try {
-            const p14src = rp22?.gradedParameters?.primary?.[14] ?? null;
-            const rawVal = typeof p14src?.value === "number" ? p14src.value : null;
-            const hasData = p14src && p14src.status !== "no_data" && rawVal != null;
-            const displayVal = hasData ? Math.ceil(rawVal) : null;
-            p14Display = hasData ? (
-              <div style={{
-                marginTop: 8, paddingTop: 8, borderTop: "1px dashed #C1B6AD",
-                fontSize: 11, lineHeight: 1.4, color: "#3E4349",
-                fontFamily: "Didact Gothic, sans-serif",
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: "#625143", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
-                  Achieved SPL (rounded up)
-                </div>
-                <div style={{ fontWeight: 700, fontSize: 16, color: "#213428" }}>
-                  {displayVal} dB
-                </div>
-              </div>
-            ) : null;
-          } catch (e) {
-            p14Display = null;
-          }
-        }
-
         let p18Debug = null;
         if (isP18) {
           try {
@@ -202,7 +163,6 @@ export default function RP22ParametersGrid({ rp22 }) {
               <div style={labelStyle}>{label}</div>
               <Pill level={levels[i]} />
             </div>
-            {p14Display}
             {p18Debug}
           </div>
         );
