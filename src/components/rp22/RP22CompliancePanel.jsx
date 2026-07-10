@@ -739,6 +739,17 @@ export default function RP22CompliancePanel({
         return "—";
       }
 
+      // P14: show FAIL pill when a live P14 value is below L1 (114 dB).
+      // "—" only when there is genuinely no calculated P14 data.
+      if (pid === 14) {
+        if (res && res.status === "no_data") return "—";
+        if (res && Number.isFinite(res.value) && res.value < 114) return "FAIL";
+        if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) {
+          return res.level;
+        }
+        return "—";
+      }
+
       // If engine gave a usable level, use it
       if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) {
         return res.level; // may be "L1".."L4" or numeric
@@ -803,6 +814,11 @@ export default function RP22CompliancePanel({
           const paramDef = RP22_PARAMS.find(p => p.id === pid);
           const unit = paramDef?.unit || "";
           return unit ? `${Math.round(v)} ${unit}` : String(Math.round(v));
+        }
+
+        // P14: display ceil'd achieved SPL (e.g. 111.4 → "112 dB"). Display only.
+        if (pid === 14 && typeof v === "number" && Number.isFinite(v)) {
+          return `${Math.ceil(v)} dB`;
         }
 
         if (res.formatted) return res.formatted;
