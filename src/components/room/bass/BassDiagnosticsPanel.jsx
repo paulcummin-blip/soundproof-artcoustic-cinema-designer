@@ -866,7 +866,7 @@ export default function BassDiagnosticsPanel({
       )}
       {/* Developer Bass Diagnostics end */}
 
-      <DirectStagePhysicsTable response={simulationResults?.seatResponses?.[selectedSeatIds[0]]} />
+      <DirectStagePhysicsTable response={simulationResults?.seatResponses?.[selectedSeatIds[0]]} subs={subsForSimulation} />
 
       {/* TEMPORARY P18/P19 execution trace — display-only */}
       {(() => {
