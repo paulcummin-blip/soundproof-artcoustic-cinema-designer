@@ -864,18 +864,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           const freqs = [10, 15, 16, 20, 22, 25, 31.5, 40, 60, 80, 100];
           const splAtFreqs = {};
           for (const f of freqs) splAtFreqs[f] = valAtF(f);
-          const dbg = bassP18?.__debug || null;
           return {
             rspSeatId: rspSeatIdForBass,
             responseDataLength: Array.isArray(rspBassResponse) ? rspBassResponse.length : 0,
             splAtFreqs,
-            p14Level: dbg?.p14Level ?? null,
-            candidateLevel: dbg?.candidateLevel ?? null,
-            requiredSplDb: dbg?.requiredSplDb ?? null,
-            cutoffDb: dbg?.cutoffDb ?? null,
-            crossingHz: dbg?.crossingHz ?? null,
-            p18Limit: dbg?.p18Limit ?? null,
-            branch: dbg?.branch ?? (bassP18 ? "unknown" : "null/no_data"),
+            p14Value: bassP14?.value ?? null,
+            targets: bassP18?.targets ?? null,
+            officialCoupledLevel: bassP18?.officialCoupledLevel ?? null,
+            branch: bassP18 ? "envelope" : "null/no_data",
             returnedP18: bassP18,
           };
         })();
@@ -926,6 +922,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           unit: p18CatalogEntry?.unit || "Hz",
           status: "ok",
           note: bassP18.note,
+          targets: bassP18.targets || [],
+          officialCoupledLevel: bassP18.officialCoupledLevel || null,
         }
       : {
           title: p18CatalogEntry?.title || "In-room bass extension -3 dB cutoff frequency point",
@@ -934,6 +932,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           unit: p18CatalogEntry?.unit || "Hz",
           status: "no_data",
           note: "Predicted design-stage value from current bass engine.",
+          targets: [],
+          officialCoupledLevel: null,
         };
 
     if (__p18DebugData) __p18DebugData.gradedPrimary18 = gradedParameters.primary[18] ?? null;

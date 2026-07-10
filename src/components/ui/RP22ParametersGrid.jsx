@@ -80,24 +80,77 @@ export default function RP22ParametersGrid({ rp22 }) {
             const src = rp22?.gradedParameters?.primary?.[18] ?? null;
             const dbg = rp22?.__p18Debug ?? null;
             const splAt = dbg?.splAtFreqs ?? {};
+            const targets = Array.isArray(src?.targets) ? src.targets : [];
+            const officialLevel = src?.officialCoupledLevel ?? null;
+
+            const capabilityRows = targets.length > 0
+              ? targets.map((t) => {
+                  const extText = !t.achievable || t.extensionHz == null
+                    ? "Not achievable"
+                    : t.bounded
+                      ? `≤ ${Math.round(t.extensionHz)} Hz`
+                      : `${Math.round(t.extensionHz)} Hz`;
+                  const passes = t.achievable && t.extensionHz != null && t.passesFrequency;
+                  return (
+                    <div key={t.level} style={{
+                      display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 8,
+                      alignItems: "center", padding: "2px 0",
+                    }}>
+                      <span style={{ fontWeight: 600, color: "#3E4349" }}>{t.targetSplDb} dB</span>
+                      <span style={{ textAlign: "center", color: "#625143" }}>→</span>
+                      <span style={{
+                        fontWeight: 600,
+                        color: !t.achievable ? "#A7302F" : passes ? "#213428" : "#625143",
+                      }}>{extText}</span>
+                    </div>
+                  );
+                })
+              : null;
+
+            const officialRow = (
+              <div style={{
+                marginTop: 6, paddingTop: 6, borderTop: "1px solid #C1B6AD",
+                fontSize: 12, fontWeight: 600, color: "#213428",
+                fontFamily: "Didact Gothic, sans-serif",
+              }}>
+                Official coupled RP22 result: {officialLevel ?? "No level achieved"}
+              </div>
+            );
+
             p18Debug = (
               <div style={{
                 marginTop: 8, paddingTop: 8, borderTop: "1px dashed #C1B6AD",
-                fontSize: 10, lineHeight: 1.35, color: "#625143",
-                fontFamily: "monospace", wordBreak: "break-all",
+                fontSize: 11, lineHeight: 1.4, color: "#3E4349",
+                fontFamily: "Didact Gothic, sans-serif",
               }}>
-                <div><b>source:</b> gradedParameters.primary[18]</div>
-                <div><b>value:</b> {String(src?.value)}</div>
-                <div><b>formatted:</b> {String(src?.formatted)}</div>
-                <div><b>level:</b> {String(src?.level)}</div>
-                <div><b>responseData source seatId:</b> {String(dbg?.rspSeatId)}</div>
-                <div><b>responseData first point:</b> {dbg?.sorted0 ? JSON.stringify(dbg.sorted0) : "n/a"}</div>
-                <div><b>responseData @15Hz:</b> {String(splAt[15])}</div>
-                <div><b>responseData @20Hz:</b> {String(splAt[20])}</div>
-                <div><b>responseData @22Hz:</b> {String(splAt[22])}</div>
-                <div><b>responseData @25Hz:</b> {String(splAt[25])}</div>
-                <div><b>responseData @40Hz:</b> {String(splAt[40])}</div>
-                <div><b>responseData @60Hz:</b> {String(splAt[60])}</div>
+                {capabilityRows && (
+                  <div style={{ marginBottom: 4 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: "#625143", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
+                      Bass capability by SPL
+                    </div>
+                    {capabilityRows}
+                  </div>
+                )}
+                {officialRow}
+                <div style={{
+                  marginTop: 8, paddingTop: 8, borderTop: "1px dashed #C1B6AD",
+                  fontSize: 10, lineHeight: 1.35, color: "#625143",
+                  fontFamily: "monospace", wordBreak: "break-all",
+                }}>
+                  <div><b>source:</b> gradedParameters.primary[18]</div>
+                  <div><b>value:</b> {String(src?.value)}</div>
+                  <div><b>formatted:</b> {String(src?.formatted)}</div>
+                  <div><b>level:</b> {String(src?.level)}</div>
+                  <div><b>officialCoupledLevel:</b> {String(officialLevel)}</div>
+                  <div><b>p14Value:</b> {String(dbg?.p14Value)}</div>
+                  <div><b>responseData source seatId:</b> {String(dbg?.rspSeatId)}</div>
+                  <div><b>responseData @15Hz:</b> {String(splAt[15])}</div>
+                  <div><b>responseData @20Hz:</b> {String(splAt[20])}</div>
+                  <div><b>responseData @22Hz:</b> {String(splAt[22])}</div>
+                  <div><b>responseData @25Hz:</b> {String(splAt[25])}</div>
+                  <div><b>responseData @40Hz:</b> {String(splAt[40])}</div>
+                  <div><b>responseData @60Hz:</b> {String(splAt[60])}</div>
+                </div>
               </div>
             );
           } catch (e) {
