@@ -234,78 +234,91 @@ export function computeParam14LfeCapability(rspResponse, designEqEnabled, band =
   };
 }
 
-// Parameter 18 — In-room bass extension -3 dB cutoff frequency.
-// "Find the lowest frequency where the response remains within -3 dB of the
-//  usable bass target/reference level."
-//  Reference level = median SPL across the 60–200 Hz usable-bass band of the
-//  smoothed RSP curve (the band where response should be flat in a tuned room).
-export function computeParam18BassExtension(rspResponse) {
+// Parameter 18 — In-room bass extension -3 dB cutoff frequency, level-coupled
+// to P14 (LFE SPL capability). The -3 dB cutoff is measured against the P14
+// candidate's required SPL threshold, NOT the curve's own 60–200 Hz median.
+// P18 can never grade higher than P14.
+//
+// P14 thresholds (dB SPL): L1=114, L2=117, L3=120, L4=123
+// P18 frequency limits (Hz): L1≤30, L2≤25, L3≤18, L4≤15
+export function computeParam18BassExtension(rspResponse, p14Result) {
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
+
+  // P14 gate — if P14 didn't reach L1, P18 cannot grade.
+  if (!p14Result || !p14Result.level) return null;
+  const p14LevelMatch = String(p14Result.level).match(/^L(\d)$/i);
+  if (!p14LevelMatch) return null;
+  const p14Level = parseInt(p14LevelMatch[1], 10);
+  if (p14Level < 1) return null;
+
   const curve = toSplCurve(rspResponse);
   if (curve.length === 0) return null;
 
   const smoothed = smoothThird(curve);
-  const refSet = smoothed.filter((p) => p.frequency >= 60 && p.frequency <= 200);
-  const bandUsed = refSet.length > 0 ? refSet : smoothed;
-  const refDb = median(bandUsed.map((p) => p.spl));
-  if (!isNum(refDb)) return null;
+  if (smoothed.length === 0) return null;
 
-  const thresholdDb = refDb - 3;
   const sorted = smoothed.slice().sort((a, b) => a.frequency - b.frequency);
   if (sorted.length === 0) return null;
 
-  // Case 1: lowest bin already at/above threshold — the true cutoff is at or
-  // below the lowest simulated bin. Report as a bounded result ("≤ X Hz") and
-  // score using that bin's frequency.
-  if (sorted[0].spl >= thresholdDb) {
-    const f3 = sorted[0].frequency;
-    let level = 0; // below L1
-    if (f3 <= 15) level = 4;
-    else if (f3 <= 18) level = 3;
-    else if (f3 <= 25) level = 2;
-    else if (f3 <= 30) level = 1;
-    return {
-      hz: f3,
-      medianDb: refDb,
-      cutoffDb: thresholdDb,
-      bounded: true,
-      level: level >= 1 ? `L${level}` : null,
-      value: f3,
-      formatted: `≤ ${Math.round(f3)} Hz`,
-      note: 'Predicted design-stage value from current bass engine. Cutoff is at or below the lowest simulated bin.',
-      __debug: { refDb, thresholdDb, sorted0: sorted[0], branch: 'case1_bounded' },
-    };
-  }
+  const P14_THRESHOLDS = { 4: 123, 3: 120, 2: 117, 1: 114 };
+  const P18_LIMITS = { 4: 15, 3: 18, 2: 25, 1: 30 };
 
-  // Case 2: scan upward for the first below→above threshold crossing and
-  // linearly interpolate the true -3 dB frequency between the two bins.
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const a = sorted[i];
-    const b = sorted[i + 1];
-    if (!isNum(a.spl) || !isNum(b.spl)) continue;
-    if (a.spl < thresholdDb && b.spl >= thresholdDb) {
-      const frac = (thresholdDb - a.spl) / (b.spl - a.spl);
-      const f3 = a.frequency + (b.frequency - a.frequency) * frac;
-      let level = 0; // below L1
-      if (f3 <= 15) level = 4;
-      else if (f3 <= 18) level = 3;
-      else if (f3 <= 25) level = 2;
-      else if (f3 <= 30) level = 1;
+  // Evaluate from L4 down to L1; return the highest passing candidate.
+  for (let candidate = 4; candidate >= 1; candidate--) {
+    // P18 can never grade above P14.
+    if (candidate > p14Level) continue;
+
+    const requiredSplDb = P14_THRESHOLDS[candidate];
+    const cutoffDb = requiredSplDb - 3;
+    const p18Limit = P18_LIMITS[candidate];
+
+    // Case 1: lowest bin already at/above cutoff — bounded result ("≤ X Hz").
+    if (sorted[0].spl >= cutoffDb) {
+      const f3 = sorted[0].frequency;
+      if (f3 <= p18Limit) {
+        return {
+          hz: f3,
+          cutoffDb,
+          bounded: true,
+          level: `L${candidate}`,
+          value: f3,
+          formatted: `≤ ${Math.round(f3)} Hz`,
+          note: 'Predicted design-stage value from current bass engine. Cutoff is at or below the lowest simulated bin.',
+          __debug: { p14Level, candidateLevel: candidate, requiredSplDb, cutoffDb, crossingHz: f3, p18Limit, branch: 'case1_bounded' },
+        };
+      }
+      continue; // bounded but doesn't meet frequency limit — try lower candidate
+    }
+
+    // Case 2: scan upward for the first below→above crossing, interpolate.
+    let crossingHz = null;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      if (!isNum(a.spl) || !isNum(b.spl)) continue;
+      if (a.spl < cutoffDb && b.spl >= cutoffDb) {
+        const frac = (cutoffDb - a.spl) / (b.spl - a.spl);
+        crossingHz = a.frequency + (b.frequency - a.frequency) * frac;
+        break;
+      }
+    }
+
+    if (crossingHz != null && crossingHz <= p18Limit) {
       return {
-        hz: f3,
-        medianDb: refDb,
-        cutoffDb: thresholdDb,
+        hz: crossingHz,
+        cutoffDb,
         bounded: false,
-        level: level >= 1 ? `L${level}` : null,
-        value: f3,
-        formatted: `${Math.round(f3)} Hz`,
+        level: `L${candidate}`,
+        value: crossingHz,
+        formatted: `${Math.round(crossingHz)} Hz`,
         note: 'Predicted design-stage value from current bass engine.',
-        __debug: { refDb, thresholdDb, sorted0: sorted[0], branch: 'case2_interpolated' },
+        __debug: { p14Level, candidateLevel: candidate, requiredSplDb, cutoffDb, crossingHz, p18Limit, branch: 'case2_interpolated' },
       };
     }
+    // No crossing or doesn't meet limit — try lower candidate.
   }
 
-  // Case 3: no crossing found — response never reaches -3 dB of reference.
+  // No candidate passed both P14 and P18 thresholds.
   return null;
 }
 

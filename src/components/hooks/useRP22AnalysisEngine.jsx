@@ -843,7 +843,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           ? applyDesignEqCurve(rspBassResponse, designEqUsableLfHz)
           : rspBassResponse;
         bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
-        bassP18 = computeParam18BassExtension(finalRspBassCurve);
+        bassP18 = computeParam18BassExtension(finalRspBassCurve, bassP14);
         // TEMP P18 debug capture (inside try where finalRspBassCurve is in scope)
         __p18DebugData = (() => {
           const curve = Array.isArray(finalRspBassCurve) ? finalRspBassCurve : [];
@@ -869,9 +869,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             rspSeatId: rspSeatIdForBass,
             responseDataLength: Array.isArray(rspBassResponse) ? rspBassResponse.length : 0,
             splAtFreqs,
-            refDb: dbg?.refDb ?? null,
-            thresholdDb: dbg?.thresholdDb ?? null,
-            sorted0: dbg?.sorted0 ?? null,
+            p14Level: dbg?.p14Level ?? null,
+            candidateLevel: dbg?.candidateLevel ?? null,
+            requiredSplDb: dbg?.requiredSplDb ?? null,
+            cutoffDb: dbg?.cutoffDb ?? null,
+            crossingHz: dbg?.crossingHz ?? null,
+            p18Limit: dbg?.p18Limit ?? null,
             branch: dbg?.branch ?? (bassP18 ? "unknown" : "null/no_data"),
             returnedP18: bassP18,
           };
