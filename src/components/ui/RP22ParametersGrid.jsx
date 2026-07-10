@@ -20,9 +20,8 @@ function Pill({ level }) {
     2: { background: "#EFEAE4", color: "#625143", text: "L2" },
     1: { background: "#FBE9E7", color: "#A7302F", text: "L1" },
     0: { background: "#FBE9E7", color: "#A7302F", text: "Fail" },
-    "-1": { background: "#F3F4F6", color: "#9CA3AF", text: "—" },
   };
-  const pal = map[level ?? 0] ?? map[0];
+  const pal = map[level ?? 0];
   return <span style={{ ...base, ...pal }}>{pal.text}</span>;
 }
 
@@ -40,12 +39,6 @@ export default function RP22ParametersGrid({ rp22 }) {
     return PARAM_LABELS.map((_, i) => {
       const paramId = i + 1;
       const paramData = graded[paramId];
-      // P14: distinguish "no data" (—) from "below L1 with valid data" (Fail)
-      if (paramId === 14) {
-        if (!paramData || paramData.status === "no_data") return -1;
-        const lvl14 = typeof paramData.level === "number" ? paramData.level : 0;
-        return Math.max(0, Math.min(4, lvl14));
-      }
       const lvl = typeof paramData?.level === "number" ? paramData.level : 0;
       return Math.max(0, Math.min(4, lvl));
     });
@@ -81,23 +74,6 @@ export default function RP22ParametersGrid({ rp22 }) {
     <div style={{ display: "grid", gap: 8 }}>
       {PARAM_LABELS.map((label, i) => {
         const isP18 = i === 17; // Parameter 18 (1-based id = i+1)
-        const isP14 = i === 13; // Parameter 14 (1-based id = i+1)
-
-        let p14Display = null;
-        if (isP14) {
-          const p14Src = rp22?.gradedParameters?.primary?.[14] ?? null;
-          if (p14Src && p14Src.status === "ok" && typeof p14Src.value === "number" && Number.isFinite(p14Src.value)) {
-            p14Display = (
-              <div style={{
-                marginTop: 6, fontSize: 11, fontWeight: 600, color: "#3E4349",
-                fontFamily: "Didact Gothic, sans-serif",
-              }}>
-                Achieved: {Math.ceil(p14Src.value)} dB
-              </div>
-            );
-          }
-        }
-
         let p18Debug = null;
         if (isP18) {
           try {
@@ -187,7 +163,6 @@ export default function RP22ParametersGrid({ rp22 }) {
               <div style={labelStyle}>{label}</div>
               <Pill level={levels[i]} />
             </div>
-            {p14Display}
             {p18Debug}
           </div>
         );
