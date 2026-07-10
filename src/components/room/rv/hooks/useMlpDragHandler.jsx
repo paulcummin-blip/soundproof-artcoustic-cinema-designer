@@ -16,6 +16,9 @@
  */
 import { useCallback } from "react";
 import { computeMlpProximityGuides } from "@/components/room/rv/utils/geometry/computeProximityGuides";
+import { recordTemporaryP18P19DragMove } from "@/components/hooks/useRP22AnalysisEngine";
+
+let temporaryRSPDragMoveCount = 0;
 
 export function useMlpDragHandler({
   lengthM,
@@ -48,6 +51,11 @@ export function useMlpDragHandler({
     const rounded = Math.round(clampedY * 100) / 100;
 
     setManualRspY_m(rounded);
+    recordTemporaryP18P19DragMove({
+      dragMoveCount: ++temporaryRSPDragMoveCount,
+      liveRspCoordinate: { x: Number(mlpDotX_m), y: rounded, z: 1.2 },
+      exactStateSetter: "setManualRspY_m",
+    });
 
     // Stage 1: live proximity dimension guides — temporary, drag-only.
     if (typeof setMlpDragInfo === "function") {

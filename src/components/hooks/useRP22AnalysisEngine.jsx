@@ -24,6 +24,26 @@ import {
   applyDesignEqCurve,
 } from "@/components/utils/rp22BassMetrics";
 
+// TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
+let temporaryAnalysisRunId = 0;
+let temporaryP18ExecutionCount = 0;
+let temporaryP19ExecutionCount = 0;
+let temporaryReferenceCounter = 0;
+let temporaryLatestP18P19Trace = {};
+const temporaryReferenceIds = new WeakMap();
+const temporaryReferenceId = (value) => {
+  if (!value || (typeof value !== "object" && typeof value !== "function")) return null;
+  if (!temporaryReferenceIds.has(value)) temporaryReferenceIds.set(value, ++temporaryReferenceCounter);
+  return temporaryReferenceIds.get(value);
+};
+export const getTemporaryP18P19Trace = () => temporaryLatestP18P19Trace;
+export const recordTemporaryP18P19DragMove = (payload) => {
+  temporaryLatestP18P19Trace = { ...temporaryLatestP18P19Trace, temporaryDragMove: payload };
+};
+export const recordTemporaryP18P19DragEnd = (payload) => {
+  temporaryLatestP18P19Trace = { ...temporaryLatestP18P19Trace, temporaryDragEnd: payload };
+};
+
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -441,6 +461,17 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
   };
 
   const memoizedResult = useMemo(() => {
+    const temporaryRunId = ++temporaryAnalysisRunId;
+    const temporaryTimestamp = new Date().toISOString();
+    const temporaryTrace = {
+      analysisRunId: temporaryRunId,
+      timestamp: temporaryTimestamp,
+      p18ExecutionCount: temporaryP18ExecutionCount,
+      p19ExecutionCount: temporaryP19ExecutionCount,
+      mainTryCatchThrew: false,
+      caughtErrorMessage: null,
+      caughtErrorStack: null,
+    };
     const gradedParameters = { primary: {}, secondary: null };
 
     const safeSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
@@ -456,6 +487,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       : 2.5;
 
     if (safeSpeakers.length === 0 || safeSeats.length === 0) {
+      temporaryLatestP18P19Trace = { ...temporaryTrace, earlyReturn: true };
       return { gradedParameters, analysisDetails: { hasSecondarySeating: false } };
     }
 
@@ -831,6 +863,15 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const rspBassResponse = rspSeatIdForBass
         ? (seatResponses.find((r) => String(r?.seatId) === String(rspSeatIdForBass))?.responseData) || null
         : null;
+      temporaryTrace.rspSeatIdForBass = rspSeatIdForBass;
+      temporaryTrace.rspCoordinate = {
+        x: Number(dimensions?.widthM ?? dimensions?.width) / 2,
+        y: appState?.mlpY_m ?? null,
+        z: 1.2,
+      };
+      temporaryTrace.seatResponsesReference = temporaryReferenceId(seatResponses);
+      temporaryTrace.rspBassResponseReference = temporaryReferenceId(rspBassResponse);
+      temporaryTrace.rspBassResponseLength = Array.isArray(rspBassResponse) ? rspBassResponse.length : 0;
       const usableSeatResponses = Array.isArray(seatResponses) ? seatResponses : [];
 
       if (rspBassResponse && Array.isArray(rspBassResponse) && rspBassResponse.length > 0) {
@@ -843,7 +884,10 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           ? applyDesignEqCurve(rspBassResponse, designEqUsableLfHz)
           : rspBassResponse;
         bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
+        temporaryP18ExecutionCount += 1;
         bassP18 = computeParam18BassExtension(finalRspBassCurve, bassP14);
+        temporaryTrace.p18ExecutionCount = temporaryP18ExecutionCount;
+        temporaryTrace.p18 = { value: bassP18?.value ?? null, formatted: bassP18?.formatted ?? null, level: bassP18?.level ?? null };
         // TEMP P18 debug capture (inside try where finalRspBassCurve is in scope)
         __p18DebugData = (() => {
           const curve = Array.isArray(finalRspBassCurve) ? finalRspBassCurve : [];
@@ -876,7 +920,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           };
         })();
         if (transitionHz != null) {
+          temporaryP19ExecutionCount += 1;
+          temporaryTrace.p19ExecutionCount = temporaryP19ExecutionCount;
+          temporaryTrace.p19InputCurveReference = temporaryReferenceId(finalRspBassCurve);
+          temporaryTrace.transitionHz = transitionHz;
           bassP19 = computeParam19Deviation(finalRspBassCurve, transitionHz);
+          temporaryTrace.p19 = { value: bassP19?.maxDevDb ?? null, formatted: bassP19?.formatted ?? null, level: bassP19?.level ?? null, status: bassP19 ? "ok" : "no_data" };
           bassP20 = computeParam20SeatConsistency({
             rspResponse: rspBassResponse,
             perSeatResponses: usableSeatResponses,
@@ -887,8 +936,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
     } catch (e) {
       // Audits must NEVER crash the engine/UI
+      temporaryTrace.mainTryCatchThrew = true;
+      temporaryTrace.caughtErrorMessage = e?.message ?? String(e);
+      temporaryTrace.caughtErrorStack = e?.stack ?? null;
       bassP14 = null; bassP18 = null; bassP19 = null; bassP20 = null;
     }
+    temporaryLatestP18P19Trace = {
+      ...temporaryTrace,
+      p18: temporaryTrace.p18 ?? { value: null, formatted: null, level: null },
+      p19: temporaryTrace.p19 ?? { value: null, formatted: null, level: null, status: "not_executed" },
+    };
 
     const p14CatalogEntry = RP22_CATALOG["14"];
     gradedParameters.primary[14] = bassP14

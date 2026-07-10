@@ -2,6 +2,9 @@
 
 import { useCallback } from "react";
 import { sideWallX } from "@/components/room/rv/utils/rvGeometry";
+import { recordTemporaryP18P19DragEnd } from "@/components/hooks/useRP22AnalysisEngine";
+
+let temporaryRSPDragEndCount = 0;
 
 export function useMouseUpHandler({
   dragType,
@@ -33,6 +36,15 @@ export function useMouseUpHandler({
   _lastValidDraftRearSubsRef,
 }) {
   const handleMouseUp = useCallback((e) => {
+    // TEMPORARY P18/P19 trace: RSP uses setManualRspY_m on pointer move; this handler has no separate RSP commit setter.
+    if (dragType === "mlpMarker") {
+      recordTemporaryP18P19DragEnd({
+        dragEndCount: ++temporaryRSPDragEndCount,
+        committedRspCoordinate: null,
+        exactStateSetter: "none — RSP coordinate is written by setManualRspY_m during pointer move",
+      });
+    }
+
     // Signal to RoomDesigner that dragging ended
     if (isDraggingRef) {
       isDraggingRef.current = false;

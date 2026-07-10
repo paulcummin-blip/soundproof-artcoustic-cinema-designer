@@ -20,6 +20,7 @@ import TemporaryBassAuditPanels from "@/components/room/bass/TemporaryBassAuditP
 import Sub2P18TestButton from "@/components/room/bass/Sub2P18TestButton";
 import LiveEngineProbe from "@/components/room/bass/LiveEngineProbe";
 import DirectStagePhysicsTable from "@/components/room/bass/DirectStagePhysicsTable";
+import { getTemporaryP18P19Trace } from "@/components/hooks/useRP22AnalysisEngine";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
@@ -866,6 +867,28 @@ export default function BassDiagnosticsPanel({
       {/* Developer Bass Diagnostics end */}
 
       <DirectStagePhysicsTable response={simulationResults?.seatResponses?.[selectedSeatIds[0]]} />
+
+      {/* TEMPORARY P18/P19 execution trace — display-only */}
+      {(() => {
+        const trace = getTemporaryP18P19Trace();
+        const text = (value) => value == null ? "—" : String(value);
+        const coordinate = (point) => point ? `x=${text(point.x)}, y=${text(point.y)}, z=${text(point.z)}` : "—";
+        return (
+          <div style={{ border: "2px solid #7c3aed", borderRadius: 6, background: "#faf5ff", padding: "8px 10px", fontSize: 10, fontFamily: "monospace", marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: "#5b21b6", marginBottom: 6 }}>TEMPORARY P18/P19 Execution Trace</div>
+            <div>analysisRunId: {text(trace.analysisRunId)} | timestamp: {text(trace.timestamp)}</div>
+            <div>rspSeatIdForBass: {text(trace.rspSeatIdForBass)} | current RSP: {coordinate(trace.rspCoordinate)}</div>
+            <div>seatResponses ref: {text(trace.seatResponsesReference)} | rspBassResponse ref: {text(trace.rspBassResponseReference)} | length: {text(trace.rspBassResponseLength)}</div>
+            <div>P18 executions: {text(trace.p18ExecutionCount)} | value: {text(trace.p18?.value)} | formatted: {text(trace.p18?.formatted)} | level: {text(trace.p18?.level)}</div>
+            <div>P19 executions: {text(trace.p19ExecutionCount)} | input curve ref: {text(trace.p19InputCurveReference)} | transitionHz: {text(trace.transitionHz)}</div>
+            <div>P19 value: {text(trace.p19?.value)} | formatted: {text(trace.p19?.formatted)} | level: {text(trace.p19?.level)} | status: {text(trace.p19?.status)}</div>
+            <div>main try/catch threw: {String(trace.mainTryCatchThrew)}{trace.caughtErrorMessage ? ` | error: ${trace.caughtErrorMessage}` : ""}</div>
+            {trace.caughtErrorStack && <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 0", color: "#991b1b" }}>{trace.caughtErrorStack}</pre>}
+            <div style={{ borderTop: "1px solid #ddd6fe", marginTop: 6, paddingTop: 5 }}>pointer move #{text(trace.temporaryDragMove?.dragMoveCount)} | RSP: {coordinate(trace.temporaryDragMove?.liveRspCoordinate)} | setter: {text(trace.temporaryDragMove?.exactStateSetter)}</div>
+            <div>pointer up #{text(trace.temporaryDragEnd?.dragEndCount)} | committed RSP: {coordinate(trace.temporaryDragEnd?.committedRspCoordinate)} | setter: {text(trace.temporaryDragEnd?.exactStateSetter)}</div>
+          </div>
+        );
+      })()}
 
       {/* ── TEMPORARY LIVE ENGINE PROBE — display-only diagnostic ── */}
       <LiveEngineProbe roomDims={roomDims} subsForSimulation={subsForSimulation} />
