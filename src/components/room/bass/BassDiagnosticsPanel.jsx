@@ -866,7 +866,14 @@ export default function BassDiagnosticsPanel({
       )}
       {/* Developer Bass Diagnostics end */}
 
-      <DirectStagePhysicsTable response={simulationResults?.seatResponses?.[selectedSeatIds[0]]} subs={subsForSimulation} />
+      <DirectStagePhysicsTable
+        response={simulationResults?.seatResponses?.[selectedSeatIds[0]]}
+        subs={subsForSimulation}
+        rspPosition={(() => {
+          const rsp = (seatingPositions || []).find((seat) => seat?.isPrimary) || seatingPositions?.[0];
+          return rsp ? { x: rsp.x, y: rsp.y, z: Number.isFinite(Number(rsp.z)) ? Number(rsp.z) : 1.2 } : null;
+        })()}
+      />
 
       {/* TEMPORARY P18/P19 execution trace — display-only */}
       {(() => {
