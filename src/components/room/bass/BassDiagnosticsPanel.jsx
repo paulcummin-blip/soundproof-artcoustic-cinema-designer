@@ -22,6 +22,7 @@ import LiveEngineProbe from "@/components/room/bass/LiveEngineProbe";
 import DirectStagePhysicsTable from "@/components/room/bass/DirectStagePhysicsTable";
 import RoomTransferInvarianceTest05 from "@/components/room/bass/RoomTransferInvarianceTest05";
 import ManufacturerCurveValidationTest06 from "@/components/room/bass/ManufacturerCurveValidationTest06";
+import MeasurementSpaceValidationTest07 from "@/components/room/bass/MeasurementSpaceValidationTest07";
 import { getTemporaryP18P19Trace } from "@/components/hooks/useRP22AnalysisEngine";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
@@ -879,6 +880,7 @@ export default function BassDiagnosticsPanel({
 
       <RoomTransferInvarianceTest05 seatingPositions={seatingPositions} subs={subsForSimulation} />
       <ManufacturerCurveValidationTest06 seatingPositions={seatingPositions} subs={subsForSimulation} />
+      <MeasurementSpaceValidationTest07 seatingPositions={seatingPositions} subs={subsForSimulation} />
 
       {/* TEMPORARY P18/P19 execution trace — display-only */}
       {(() => {
