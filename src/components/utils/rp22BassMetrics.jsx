@@ -49,6 +49,36 @@ function median(values) {
     : copy[mid];
 }
 
+const ARTCOUSTIC_HOUSE_CURVE = [
+  { frequency: 15, offsetDb: 6.0 },
+  { frequency: 20, offsetDb: 6.0 },
+  { frequency: 30, offsetDb: 6.0 },
+  { frequency: 40, offsetDb: 5.0 },
+  { frequency: 50, offsetDb: 4.0 },
+  { frequency: 63, offsetDb: 3.0 },
+  { frequency: 80, offsetDb: 2.5 },
+  { frequency: 100, offsetDb: 2.0 },
+  { frequency: 120, offsetDb: 1.5 },
+  { frequency: 150, offsetDb: 1.2 },
+  { frequency: 200, offsetDb: 0.8 },
+  { frequency: 400, offsetDb: 0.0 },
+];
+
+function artcousticHouseCurveOffsetAt(frequency) {
+  if (!isNum(frequency) || frequency <= ARTCOUSTIC_HOUSE_CURVE[0].frequency) return 6.0;
+  const last = ARTCOUSTIC_HOUSE_CURVE[ARTCOUSTIC_HOUSE_CURVE.length - 1];
+  if (frequency >= last.frequency) return 0.0;
+  for (let i = 0; i < ARTCOUSTIC_HOUSE_CURVE.length - 1; i++) {
+    const low = ARTCOUSTIC_HOUSE_CURVE[i];
+    const high = ARTCOUSTIC_HOUSE_CURVE[i + 1];
+    if (frequency >= low.frequency && frequency <= high.frequency) {
+      const ratio = (frequency - low.frequency) / (high.frequency - low.frequency);
+      return low.offsetDb + (high.offsetDb - low.offsetDb) * ratio;
+    }
+  }
+  return 0.0;
+}
+
 function valAt(curve, f) {
   if (!Array.isArray(curve) || curve.length === 0 || !isNum(f)) return null;
   if (f <= curve[0].frequency) return curve[0].spl;
@@ -174,8 +204,9 @@ export function applyDesignEqCurve(curveData, usableLfHz) {
   if (raw.length === 0) return curveData || [];
   const smoothed = smoothThird(raw);
   if (smoothed.length === 0) return raw;
-  const targetDb = median(smoothed.map((p) => p.spl));
-  if (!isNum(targetDb)) return raw;
+  const anchorBand = smoothed.filter((p) => p.frequency >= 150 && p.frequency <= 200);
+  const anchorDb = median((anchorBand.length > 0 ? anchorBand : smoothed).map((p) => p.spl));
+  if (!isNum(anchorDb)) return raw;
   const MAX_BOOST_DB = 6;
   const MAX_CUT_DB = -10;
   // Product LF guard: below the subwoofer's approved usable -6 dB limit, positive
@@ -189,7 +220,8 @@ export function applyDesignEqCurve(curveData, usableLfHz) {
   return raw.map((p) => {
     const smoothedAtF = valAt(smoothed, p.frequency);
     const basis = isNum(smoothedAtF) ? smoothedAtF : p.spl;
-    const diff = targetDb - basis;
+    const targetAtFrequencyDb = anchorDb + artcousticHouseCurveOffsetAt(p.frequency);
+    const diff = targetAtFrequencyDb - basis;
     let clamped = Math.max(MAX_CUT_DB, Math.min(MAX_BOOST_DB, diff));
     if (lfHz != null && p.frequency < lfHz) {
       clamped = Math.min(0, clamped);
