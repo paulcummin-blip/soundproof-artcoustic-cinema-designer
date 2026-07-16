@@ -4,65 +4,12 @@ import {
   modeShapeValueLocal,
   resonantTransfer,
 } from './modalCalculations.js';
+import { buildFrequencyAxis, interpolateCurveDb } from './rewCorePrimitives.js';
 
 const SPEED_OF_SOUND_MPS = 343;
 const MIN_DISTANCE_M = 0.01;
 
-// Frequency axis generation
-function buildFrequencyAxis(freqMinHz, freqMaxHz) {
-  const minHz = Math.max(1, Number(freqMinHz) || 15);
-  const maxHz = Math.max(minHz, Number(freqMaxHz) || 200);
-  const freqsHz = [];
 
-  const octaves = Math.log2(maxHz / minHz);
-  const pointsPerOctave = 96;
-  const totalPoints = Math.ceil(octaves * pointsPerOctave);
-
-  for (let index = 0; index <= totalPoints; index += 1) {
-    const hz = minHz * Math.pow(2, index / pointsPerOctave);
-    if (hz > maxHz) break;
-    freqsHz.push(hz);
-  }
-
-  if (freqsHz[freqsHz.length - 1] !== maxHz) {
-    freqsHz.push(maxHz);
-  }
-
-  return freqsHz;
-}
-
-function interpolateCurveDb(curvePoints, hz) {
-  if (!Array.isArray(curvePoints) || curvePoints.length === 0) {
-    return 90;
-  }
-
-  const points = curvePoints
-    .map((point) => ({
-      hz: Number(point?.hz ?? point?.frequency ?? point?.[0]),
-      db: Number(point?.db ?? point?.spl ?? point?.[1]),
-    }))
-    .filter((point) => Number.isFinite(point.hz) && Number.isFinite(point.db))
-    .sort((a, b) => a.hz - b.hz);
-
-  if (points.length === 0) {
-    return 90;
-  }
-
-  if (hz <= points[0].hz) return points[0].db;
-  if (hz >= points[points.length - 1].hz) return points[points.length - 1].db;
-
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const left = points[index];
-    const right = points[index + 1];
-
-    if (hz >= left.hz && hz <= right.hz) {
-      const ratio = (hz - left.hz) / (right.hz - left.hz);
-      return left.db + (right.db - left.db) * ratio;
-    }
-  }
-
-  return points[0].db;
-}
 
 function normalizeSubTuning(tuning) {
   const defaults = { gainDb: 0, delayMs: 0, polarity: 0 };
@@ -210,8 +157,9 @@ function rewModalBandwidthQ(freqHz, absorptionQ, bandwidthScale) {
 // are untouched. Uses Allen & Berkley (1979) Appendix A Eq. A2 dimensional Green's function
 // form (k_r² − k² real part, k·k_r/Q imaginary part, 1/V room-volume normalisation) instead of
 // the legacy 1−β² normalised resonant transfer function. Matches Case 065 / Case 071 variant B.
-function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity) {
+function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, modalSourceAmplitude1m, delayMs, polarity, captureContributions = false) {
   const { widthM, lengthM, heightM } = dims;
+  const contributions = [];
   const roomVolumeM3 = widthM * lengthM * heightM;
   const k = (2 * Math.PI * frequencyHz) / SPEED_OF_SOUND_MPS;
   const tuningPhase = (-2 * Math.PI * frequencyHz * (delayMs / 1000)) + (polarity === 180 ? Math.PI : 0);
@@ -235,11 +183,14 @@ function abCorrectedModalTransferLocal(frequencyHz, modes, source, seat, dims, m
     const contribRe = gain * (realDen / denomSq);
     const contribIm = gain * (-imagDen / denomSq);
 
-    modalSumRe += (contribRe * tuningCos) - (contribIm * tuningSin);
-    modalSumIm += (contribRe * tuningSin) + (contribIm * tuningCos);
+    const tunedRe = (contribRe * tuningCos) - (contribIm * tuningSin);
+    const tunedIm = (contribRe * tuningSin) + (contribIm * tuningCos);
+    modalSumRe += tunedRe;
+    modalSumIm += tunedIm;
+    if (captureContributions) contributions.push({ nx: mode.nx, ny: mode.ny, nz: mode.nz, type: mode.type, f0: mode.freq, q: mode.qValue, sourceCoupling, receiverCoupling, combinedCoupling, gain, reBeforeScale: contribRe, imBeforeScale: contribIm, tunedRe, tunedIm });
   });
 
-  return { modalSumRe, modalSumIm };
+  return { modalSumRe, modalSumIm, contributions };
 }
 
 // Returns a complex pressure contribution (re, im) for one mode at the receiver position.
@@ -799,6 +750,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const freqMinHz = options?.freqMinHz;
   const freqMaxHz = options?.freqMaxHz;
   const freqsHz = buildFrequencyAxis(freqMinHz, freqMaxHz);
+  const captureFrequencies = options?.runtimeVectorCapture === true
+    ? [20, freqsHz.reduce((best, hz) => Math.abs(hz - 34.3) < Math.abs(best - 34.3) ? hz : best, freqsHz[0])]
+    : [];
+  const runtimeVectorCapture = [];
   const schroederFrequency = 2000 * Math.sqrt(0.4 / (widthM * lengthM * heightM));
 
   // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__
@@ -890,7 +845,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
             Math.pow(Math.sqrt(1 - sa.floor),   floorHits) *
             Math.pow(Math.sqrt(1 - sa.ceiling), ceilingHits);
 
-          sources.push({ x: imgX, y: imgY, z: imgZ, reflectionCoefficient: rc, order: totalOrder });
+          const boundary = rx < 0 ? 'left' : rx > 0 ? 'right' : ry < 0 ? 'front' : ry > 0 ? 'rear' : rz < 0 ? 'floor' : 'ceiling';
+          sources.push({ x: imgX, y: imgY, z: imgZ, reflectionCoefficient: rc, order: totalOrder, boundary });
         }
       }
     }
@@ -990,6 +946,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   const perFrequencyVectorDebug = [];
 
   const complexPressure = freqsHz.map((frequencyHz) => {
+    const captureThisFrequency = captureFrequencies.includes(frequencyHz);
+    const capturedReflections = [];
     const curveDb = interpolateCurveDb(subProductCurve, frequencyHz);
     let sumRe = 0;
     let sumIm = 0;
@@ -1093,6 +1051,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       const imageIm = reflectionCoherenceWeight * imageAmplitude * Math.sin(imageTotalPhase) * reflectionHandoffScale;
       reflectionRe += imageRe;
       reflectionIm += imageIm;
+      if (captureThisFrequency) capturedReflections.push({ boundary: imageSource.boundary, x: imageSource.x, y: imageSource.y, z: imageSource.z, distanceM: imageDistanceM, reflectionCoefficient: imageSource.reflectionCoefficient, coherenceWeight: reflectionCoherenceWeight, phase: imageTotalPhase, re: imageRe, im: imageIm });
       // Suppress reflection contributions in mode-only parity mode.
       // rewParityModalPhase legacy path preserved; isModeOnlyParity is the new gate.
       if (!rewParityModalPhase && !isModeOnlyParity) {
@@ -1190,6 +1149,8 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     // __TEMP_DIAGNOSTIC_ADDITIVE_FIELDS__ — captures the modal vector actually added to sumRe/sumIm this frequency.
     let _finalModalSumRe = 0;
     let _finalModalSumIm = 0;
+    let abCapture = null;
+    let abSqrtVScale = null;
 
     // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
     if (enableModes) {
@@ -1238,7 +1199,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         });
         const abResult = abCorrectedModalTransferLocal(
           frequencyHz, abModes, source, seat, { widthM, lengthM, heightM },
-          abSourceUnit, source.tuning.delayMs, source.tuning.polarity
+          abSourceUnit, source.tuning.delayMs, source.tuning.polarity, captureThisFrequency
         );
         // __CANDIDATE_AB_SQRT_V_RECONCILIATION__ (Case 082 Variant B, 2026-07-07)
         // Experimental only — gated strictly behind qStrategy === 'ab_corrected'. Production
@@ -1246,9 +1207,10 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
         // A2 1/V room-volume normalisation with the legacy direct/reflection 1/√V reference
         // convention by multiplying the A&B modal pressure sum by √V before superposition. Direct
         // path, reflections, Q, smoothing, source curve, geometry, and graph rendering are untouched.
-        const abSqrtVScale = Math.sqrt(Math.max(roomVolumeM3, 1e-6));
+        abSqrtVScale = Math.sqrt(Math.max(roomVolumeM3, 1e-6));
         modalSumRe = abResult.modalSumRe * abSqrtVScale;
         modalSumIm = abResult.modalSumIm * abSqrtVScale;
+        if (captureThisFrequency) abCapture = abResult.contributions.map((item) => ({ ...item, reAfterScale: item.tunedRe * abSqrtVScale, imAfterScale: item.tunedIm * abSqrtVScale }));
       }
 
       _debugStrongestModeForRow = _debugStrongestMode ?? null;
@@ -1537,6 +1499,15 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
       postModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
     }
     const finalSplDb = 20 * Math.log10(postModalMagnitude);
+    if (captureThisFrequency) runtimeVectorCapture.push({
+      frequencyHz, source: { modelKey: source.modelKey, x: source.x, y: source.y, z: source.z }, receiver: seat,
+      direct: { curveDb, distanceM, distanceLossDb, userGainDb: source.tuning.gainDb, amplitude, timeOfFlightPhase, delayPhase, polarityPhase, directRe, directIm, directMagnitude: Math.hypot(directRe, directIm), directSplDb: 20 * Math.log10(Math.max(Math.hypot(directRe, directIm), 1e-10)) },
+      reflections: capturedReflections, reflectionRe, reflectionIm, directPlusReflectionRe: directRe + reflectionRe, directPlusReflectionIm: directIm + reflectionIm,
+      directPlusReflectionMagnitude: Math.hypot(directRe + reflectionRe, directIm + reflectionIm), directPlusReflectionSplDb: 20 * Math.log10(Math.max(Math.hypot(directRe + reflectionRe, directIm + reflectionIm), 1e-10)),
+      preModalRe: partialCoherencePreModalRe, preModalIm: partialCoherencePreModalIm, preModalMagnitude, preModalSplDb: 20 * Math.log10(Math.max(preModalMagnitude, 1e-10)),
+      abSqrtVScale, modes: abCapture || [], modalRe: _finalModalSumRe, modalIm: _finalModalSumIm, modalMagnitude: Math.hypot(_finalModalSumRe, _finalModalSumIm), modalSplEquivalentDb: 20 * Math.log10(Math.max(Math.hypot(_finalModalSumRe, _finalModalSumIm), 1e-10)),
+      finalRe: sumRe, finalIm: sumIm, finalMagnitude: postModalMagnitude, finalSplDb,
+    });
     if (enableModes && !partialCoherenceDiagnostic) {
       partialCoherenceDiagnostic = buildPartialCoherenceDiagnostic({
         frequencyHz,
@@ -1779,6 +1750,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     distributedCoherenceDiagnosticSeries,
     splitCoherenceDiagnosticSeries,
     perFrequencyVectorDebug,
+    runtimeVectorCapture,
   };
 }
 

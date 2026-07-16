@@ -12,6 +12,7 @@ import { computeRoomModesLocal } from "@/bass/core/modalCalculations.js";
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
+import ProductionVectorCaptureTest10 from "@/components/room/bass/ProductionVectorCaptureTest10";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
@@ -512,6 +513,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     let __b44StepDebugCapture = null;
     let __b44WholeCurveDebugCapture = null;
     let __b44ActiveModalVectorPath = null;
+    const __b44RuntimeCaptureByHz = new Map();
     const debugSeatId = selectedSeatIds[0] || null;
     const debugSubForCapture = subsForSimulation[0] || null;
 
@@ -656,6 +658,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
             qStrategy: qStrategyOverride, // __CANDIDATE_FREQ_DEP_Q__
             rewModalBandwidthScale, // __CANDIDATE_REW_MODAL_BANDWIDTH__
+            runtimeVectorCapture: !designEqEnabled && bassSmoothingMode === 'none',
             }
         );
 
@@ -675,6 +678,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             __b44WholeCurveDebugCapture.modalOnlySeries = rewResult.modalOnlySeries;
             __b44WholeCurveDebugCapture.postModalSeries = rewResult.postModalSeries;
           }
+        }
+
+        if (seatId === debugSeatId && Array.isArray(rewResult.runtimeVectorCapture)) {
+          rewResult.runtimeVectorCapture.forEach((row) => {
+            const existing = __b44RuntimeCaptureByHz.get(row.frequencyHz) || { frequencyHz: row.frequencyHz, subs: [] };
+            existing.subs.push({ subId: sub.id, ...row });
+            __b44RuntimeCaptureByHz.set(row.frequencyHz, existing);
+          });
         }
 
         if (!freqsHz) {
@@ -699,11 +710,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             const magnitude = Math.sqrt(re * re + im * im);
             return 20 * Math.log10(Math.max(magnitude, 1e-10));
           }),
+          _sumRe: sumRe,
+          _sumIm: sumIm,
           nulls: { count: 0, worstDb: 0, nulls: [] },
         };
       }
     });
 
+    const runtimeVectorCapture = Array.from(__b44RuntimeCaptureByHz.values()).map((row) => {
+      const response = seatResponses[debugSeatId];
+      const index = response?.freqsHz?.findIndex((hz) => hz === row.frequencyHz) ?? -1;
+      const finalRe = index >= 0 ? response._sumRe?.[index] : null;
+      const finalIm = index >= 0 ? response._sumIm?.[index] : null;
+      const directRe = row.subs.reduce((sum, item) => sum + item.direct.directRe, 0);
+      const directIm = row.subs.reduce((sum, item) => sum + item.direct.directIm, 0);
+      const modalRe = row.subs.reduce((sum, item) => sum + item.modalRe, 0);
+      const modalIm = row.subs.reduce((sum, item) => sum + item.modalIm, 0);
+      const preModalRe = row.subs.reduce((sum, item) => sum + item.preModalRe, 0);
+      const preModalIm = row.subs.reduce((sum, item) => sum + item.preModalIm, 0);
+      const directPlusReflectionRe = row.subs.reduce((sum, item) => sum + item.directPlusReflectionRe, 0);
+      const directPlusReflectionIm = row.subs.reduce((sum, item) => sum + item.directPlusReflectionIm, 0);
+      const magnitude = Math.hypot(finalRe, finalIm);
+      return { ...row, directRe, directIm, modalRe, modalIm, preModalRe, preModalIm, preModalMagnitude: Math.hypot(preModalRe, preModalIm), preModalSplDb: 20 * Math.log10(Math.max(Math.hypot(preModalRe, preModalIm), 1e-10)), directPlusReflectionRe, directPlusReflectionIm, directPlusReflectionSplDb: 20 * Math.log10(Math.max(Math.hypot(directPlusReflectionRe, directPlusReflectionIm), 1e-10)), finalRe, finalIm, finalMagnitude: magnitude, finalSplDb: 20 * Math.log10(Math.max(magnitude, 1e-10)), plottedGraphValueDb: 20 * Math.log10(Math.max(magnitude, 1e-10)) };
+    });
     return {
       seatResponses,
       metrics: null,
@@ -711,8 +740,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
       wholeCurveDebugRows: __b44WholeCurveDebugCapture,
       activeModalVectorPath: __b44ActiveModalVectorPath,
+      runtimeVectorCapture: { rows: runtimeVectorCapture },
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale, designEqEnabled, bassSmoothingMode]);
 
   const simulationResults = useMemo(() => runSimulation(qStrategy), [runSimulation, qStrategy]);
   // Temporary overlay: re-runs the identical engine with qStrategy forced to 'production',
@@ -1265,6 +1295,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {designEqEnabled ? 'Showing post-EQ curve for P14 scoring' : 'Showing raw simulated curve'}
         </div>
+
+        <ProductionVectorCaptureTest10
+          capture={simulationResults.runtimeVectorCapture}
+          designEqEnabled={designEqEnabled}
+          smoothingMode={bassSmoothingMode}
+        />
 
         {/* Allen & Berkley model attribution — presentation only, no simulation/scaling logic */}
         <p className="text-center text-[11px] font-normal text-muted-foreground mt-2 mb-2">
