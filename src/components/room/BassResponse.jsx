@@ -9,7 +9,7 @@ import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
 import { simulateBassResponseRewCore, simulateBassResponseRewParityField } from "@/bass/core/rewBassEngine";
 import { computeRoomModesLocal } from "@/bass/core/modalCalculations.js";
-import { getSubwooferCurve } from "@/components/models/speakers/registry";
+import { getApprovedContinuousSplDb, getSubwooferCurve, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
 import ProductionVectorCaptureTest10 from "@/components/room/bass/ProductionVectorCaptureTest10";
@@ -478,6 +478,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return sources;
   }, [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById, autoAlignDelays, subTuningSignature]);
 
+  const designEqSystemLimits = useMemo(() => {
+    const activeSubs = subsForSimulation.filter((sub) => sub?.modelKey);
+    const capabilityValues = activeSubs.map((sub) => getApprovedContinuousSplDb(sub.modelKey));
+    const amplitudes = capabilityValues
+      .filter(Number.isFinite)
+      .map((capabilityDb) => Math.pow(10, capabilityDb / 20));
+    const usableLfValues = activeSubs
+      .map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.modelKey))?.approvedUsableLfHzMinus6dB)
+      .filter(Number.isFinite);
+    return {
+      usableLfHz: usableLfValues.length > 0 ? Math.max(...usableLfValues) : null,
+      systemContinuousCapabilityDb: activeSubs.length > 0 && amplitudes.length === activeSubs.length
+        ? 20 * Math.log10(amplitudes.reduce((sum, amplitude) => sum + amplitude, 0))
+        : null,
+    };
+  }, [subsForSimulation]);
+
   // Run bass simulation engine — parameterized by qStrategy so the exact same engine call
   // can be re-run with a different Q strategy for the temporary overlay comparison below,
   // without any duplicated simulation or plotting logic (one engine, one renderer).
@@ -839,11 +856,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // (1/3-octave basis, cut -10dB / boost +6dB) instead of the plain display smoothing.
     out = out.map((s) => ({
       ...s,
-      data: designEqEnabled ? applyDesignEqCurve(s.data) : applyBassSmoothing(s.data, bassSmoothingMode),
+      data: designEqEnabled
+        ? applyDesignEqCurve(s.data, designEqSystemLimits.usableLfHz, designEqSystemLimits.systemContinuousCapabilityDb)
+        : applyBassSmoothing(s.data, bassSmoothingMode),
     }));
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled]);
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, designEqSystemLimits]);
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -1191,7 +1210,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Design EQ for P14:</span>
               <Switch checked={!!designEqEnabled} onCheckedChange={setDesignEqEnabled} />
-              <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost +6dB)</span>
+              <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost up to +6dB, capability-limited)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>

@@ -11,9 +11,10 @@ import { useMemo } from 'react';
 import { useAppState } from '@/components/AppStateProvider';
 import { useSeatResponses } from '@/components/room/hooks/useSeatResponses';
 import { computeParam14LfeCapability } from '@/components/utils/rp22BassMetrics';
+import { MODELS, normaliseModelKey } from '@/components/models/speakers/registry';
 
 export function useLiveP14Level() {
-  const { seatingPositions } = useAppState() || {};
+  const { seatingPositions, subwoofers } = useAppState() || {};
   const seatResponses = useSeatResponses();
 
   return useMemo(() => {
@@ -30,7 +31,27 @@ export function useLiveP14Level() {
       return { hasData: false, level: null, valueDb: null, formatted: null };
     }
 
-    const result = computeParam14LfeCapability(rspResponse, true);
+    const activeSubs = (Array.isArray(subwoofers) ? subwoofers : []).filter((sub) => sub?.enabled !== false);
+    const models = activeSubs
+      .map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.model)))
+      .filter(Boolean);
+    const usableLfValues = models.map((model) => model.approvedUsableLfHzMinus6dB).filter(Number.isFinite);
+    const capabilityValues = models.map((model) => model.approvedContinuousSplAt1mDb);
+    const amplitudes = capabilityValues
+      .filter(Number.isFinite)
+      .map((capabilityDb) => Math.pow(10, capabilityDb / 20));
+    const usableLfHz = usableLfValues.length > 0 ? Math.max(...usableLfValues) : null;
+    const systemContinuousCapabilityDb = activeSubs.length > 0 && models.length === activeSubs.length && amplitudes.length === activeSubs.length
+      ? 20 * Math.log10(amplitudes.reduce((sum, amplitude) => sum + amplitude, 0))
+      : null;
+
+    const result = computeParam14LfeCapability(
+      rspResponse,
+      true,
+      [20, 120],
+      usableLfHz,
+      systemContinuousCapabilityDb
+    );
     if (!result) {
       return { hasData: false, level: null, valueDb: null, formatted: null };
     }
@@ -41,5 +62,5 @@ export function useLiveP14Level() {
       valueDb: result.value,
       formatted: result.formatted,
     };
-  }, [seatingPositions, seatResponses]);
+  }, [seatingPositions, seatResponses, subwoofers]);
 }

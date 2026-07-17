@@ -394,17 +394,28 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
   // system cannot be boosted below the worst sub's usable LF limit.
   const appState = useAppState();
   const subwoofers = appState?.subwoofers ?? null;
-  const designEqUsableLfHz = (() => {
+  const designEqSystemLimits = (() => {
     const subs = Array.isArray(subwoofers) ? subwoofers : [];
     let maxLf = null;
+    const capabilityValues = [];
     for (const s of subs) {
       if (!s || s.enabled === false) continue;
       const m = MODELS.find((x) => x.key === normaliseModelKey(s.model));
       const lf = m?.approvedUsableLfHzMinus6dB;
       if (isNum(lf)) maxLf = maxLf == null ? lf : Math.max(maxLf, lf);
+      capabilityValues.push(m?.approvedContinuousSplAt1mDb);
     }
-    return maxLf;
+    const amplitudes = capabilityValues
+      .filter(isNum)
+      .map((capabilityDb) => Math.pow(10, capabilityDb / 20));
+    return {
+      usableLfHz: maxLf,
+      systemContinuousCapabilityDb: capabilityValues.length > 0 && amplitudes.length === capabilityValues.length
+        ? 20 * Math.log10(amplitudes.reduce((sum, amplitude) => sum + amplitude, 0))
+        : null,
+    };
   })();
+  const designEqUsableLfHz = designEqSystemLimits.usableLfHz;
   // RP22 P14 is always post-EQ — it does not follow the Bass Response graph's visual
   // raw/EQ toggle (that toggle is display-only). See computeParam14LfeCapability call below.
 
@@ -881,7 +892,11 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         // to avoid a second application.
         const rp22BassComplianceUsesDesignEq = true;
         const finalRspBassCurve = rp22BassComplianceUsesDesignEq
-          ? applyDesignEqCurve(rspBassResponse, designEqUsableLfHz)
+          ? applyDesignEqCurve(
+              rspBassResponse,
+              designEqSystemLimits.usableLfHz,
+              designEqSystemLimits.systemContinuousCapabilityDb
+            )
           : rspBassResponse;
         bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
         const p18InputCurve = finalRspBassCurve;
@@ -1634,6 +1649,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     screen?.floatDepthM,
     seatResponses,
     designEqUsableLfHz,
+    designEqSystemLimits.systemContinuousCapabilityDb,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };
