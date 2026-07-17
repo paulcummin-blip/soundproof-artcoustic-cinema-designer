@@ -395,24 +395,13 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
   const appState = useAppState();
   const subwoofers = appState?.subwoofers ?? null;
   const designEqSystemLimits = (() => {
-    const subs = Array.isArray(subwoofers) ? subwoofers : [];
-    let maxLf = null;
-    const capabilityValues = [];
-    for (const s of subs) {
-      if (!s || s.enabled === false) continue;
-      const m = MODELS.find((x) => x.key === normaliseModelKey(s.model));
-      const lf = m?.approvedUsableLfHzMinus6dB;
-      if (isNum(lf)) maxLf = maxLf == null ? lf : Math.max(maxLf, lf);
-      capabilityValues.push(m?.approvedContinuousSplAt1mDb);
-    }
-    const amplitudes = capabilityValues
-      .filter(isNum)
-      .map((capabilityDb) => Math.pow(10, capabilityDb / 20));
+    const activeSubs = (Array.isArray(subwoofers) ? subwoofers : []).filter((sub) => sub?.enabled !== false);
+    const usableLfValues = activeSubs
+      .map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.model))?.approvedUsableLfHzMinus6dB)
+      .filter(isNum);
     return {
-      usableLfHz: maxLf,
-      systemContinuousCapabilityDb: capabilityValues.length > 0 && amplitudes.length === capabilityValues.length
-        ? 20 * Math.log10(amplitudes.reduce((sum, amplitude) => sum + amplitude, 0))
-        : null,
+      activeSubs,
+      usableLfHz: usableLfValues.length ? Math.max(...usableLfValues) : null,
     };
   })();
   const designEqUsableLfHz = designEqSystemLimits.usableLfHz;
@@ -895,7 +884,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           ? applyDesignEqCurve(
               rspBassResponse,
               designEqSystemLimits.usableLfHz,
-              designEqSystemLimits.systemContinuousCapabilityDb
+              designEqSystemLimits.activeSubs
             )
           : rspBassResponse;
         bassP14 = computeParam14LfeCapability(finalRspBassCurve, false);
@@ -1649,7 +1638,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     screen?.floatDepthM,
     seatResponses,
     designEqUsableLfHz,
-    designEqSystemLimits.systemContinuousCapabilityDb,
+    designEqSystemLimits.activeSubs,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };

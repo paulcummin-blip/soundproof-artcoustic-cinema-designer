@@ -9,6 +9,7 @@
 //   - applyBassSmoothing(data, 'third') — display-only 1/3-octave smoothing.
 
 import { applyBassSmoothing } from '../room/bass/bassGraphSmoothing';
+import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -199,46 +200,48 @@ export function computeTransitionFrequencyHz(roomDims, rt60 = 0.4) {
 // "repairs" a narrow raw null, since it only ever operates on the smoothed curve.
 // Used by both computeParam14LfeCapability (scoring) and the Bass Response graph
 // (display), so P14 and the graph always agree on the same post-EQ curve.
-export function applyDesignEqCurve(curveData, usableLfHz, systemContinuousCapabilityDb) {
+export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
   const raw = toSplCurve(curveData);
-  if (raw.length === 0) return curveData || [];
+  if (raw.length === 0) return { curve: curveData || [], diagnostics: [] };
   const smoothed = smoothThird(raw);
-  if (smoothed.length === 0) return raw;
+  if (smoothed.length === 0) return { curve: raw, diagnostics: [] };
   const anchorBand = smoothed.filter((p) => p.frequency >= 150 && p.frequency <= 200);
   const anchorDb = median((anchorBand.length > 0 ? anchorBand : smoothed).map((p) => p.spl));
-  if (!isNum(anchorDb)) return raw;
+  if (!isNum(anchorDb)) return { curve: raw, diagnostics: [] };
   const MAX_BOOST_DB = 6;
   const MAX_CUT_DB = -10;
-  const capabilityDb = isNum(systemContinuousCapabilityDb) ? systemContinuousCapabilityDb : null;
-  // Product LF guard: below the subwoofer's approved usable -6 dB limit, positive
-  // EQ boost is physically unfounded (the driver cannot produce it). Cuts remain
-  // allowed; boosts are clamped to 0 dB in that region. The existing ±6 / -10
-  // limits are unchanged elsewhere.
   const lfHz = isNum(usableLfHz) && usableLfHz > 0 ? usableLfHz : null;
-  // Gain is derived from the broad (smoothed) trend at each raw frequency, then
-  // applied to the RAW value — this cuts broad peaks / lifts broad troughs while
-  // leaving narrow modal peaks and nulls exactly where the raw response put them.
-  return raw.map((p) => {
+  const diagnostics = [];
+  const curve = raw.map((p) => {
     const smoothedAtF = valAt(smoothed, p.frequency);
     const basis = isNum(smoothedAtF) ? smoothedAtF : p.spl;
     const targetAtFrequencyDb = anchorDb + artcousticHouseCurveOffsetAt(p.frequency);
     const diff = targetAtFrequencyDb - basis;
-    let clamped = Math.max(MAX_CUT_DB, Math.min(MAX_BOOST_DB, diff));
-    if (clamped > 0 && capabilityDb != null) {
-      clamped = Math.min(clamped, Math.max(0, capabilityDb - p.spl));
-    }
-    if (lfHz != null && p.frequency < lfHz) {
-      clamped = Math.min(0, clamped);
-    }
-    return { frequency: p.frequency, spl: p.spl + clamped };
+    const requestedBoostDb = Math.max(0, Math.min(MAX_BOOST_DB, diff));
+    const allowance = getSourceDomainBoostAllowance({
+      frequency: p.frequency,
+      requestedBoostDb,
+      activeSubs,
+      usableLfHz: lfHz,
+      maxBoostDb: MAX_BOOST_DB,
+    });
+    const appliedBoostDb = diff > 0 ? allowance.allowedBoostDb : 0;
+    const appliedCutDb = diff <= 0 ? Math.max(MAX_CUT_DB, diff) : 0;
+    diagnostics.push({ frequency: p.frequency, requestedBoostDb, appliedBoostDb, allowance });
+    return { frequency: p.frequency, spl: p.spl + appliedBoostDb + appliedCutDb };
   });
+  return { curve, diagnostics };
+}
+
+export function applyDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
+  return calculateDesignEqCurve(curveData, usableLfHz, activeSubs).curve;
 }
 
 // Parameter 14 — LFE total SPL capability at RSP (post design-EQ), 1/3-octave
 // smoothed. Design EQ (when enabled) shapes the curve toward the Artcoustic
 // house curve, bounded by +6 dB boost / -10 dB cut — it never "repairs" a
 // narrow raw null, since it only ever operates on the already-smoothed curve.
-export function computeParam14LfeCapability(rspResponse, designEqEnabled, band = [20, 120], usableLfHz, systemContinuousCapabilityDb) {
+export function computeParam14LfeCapability(rspResponse, designEqEnabled, band = [20, 120], usableLfHz, activeSubs = []) {
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
   const curve = toSplCurve(rspResponse);
   if (curve.length === 0) return null;
@@ -247,7 +250,7 @@ export function computeParam14LfeCapability(rspResponse, designEqEnabled, band =
   if (smoothed.length === 0) return null;
 
   const evalCurve = designEqEnabled
-    ? applyDesignEqCurve(rspResponse, usableLfHz, systemContinuousCapabilityDb)
+    ? applyDesignEqCurve(rspResponse, usableLfHz, activeSubs)
     : smoothed;
 
   const [fLo, fHi] = band;

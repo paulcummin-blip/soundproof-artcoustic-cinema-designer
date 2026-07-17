@@ -36,21 +36,14 @@ export function useLiveP14Level() {
       .map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.model)))
       .filter(Boolean);
     const usableLfValues = models.map((model) => model.approvedUsableLfHzMinus6dB).filter(Number.isFinite);
-    const capabilityValues = models.map((model) => model.approvedContinuousSplAt1mDb);
-    const amplitudes = capabilityValues
-      .filter(Number.isFinite)
-      .map((capabilityDb) => Math.pow(10, capabilityDb / 20));
     const usableLfHz = usableLfValues.length > 0 ? Math.max(...usableLfValues) : null;
-    const systemContinuousCapabilityDb = activeSubs.length > 0 && models.length === activeSubs.length && amplitudes.length === activeSubs.length
-      ? 20 * Math.log10(amplitudes.reduce((sum, amplitude) => sum + amplitude, 0))
-      : null;
 
     const result = computeParam14LfeCapability(
       rspResponse,
       true,
       [20, 120],
       usableLfHz,
-      systemContinuousCapabilityDb
+      activeSubs
     );
     if (!result) {
       return { hasData: false, level: null, valueDb: null, formatted: null };

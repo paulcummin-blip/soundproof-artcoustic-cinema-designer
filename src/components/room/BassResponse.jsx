@@ -9,7 +9,7 @@ import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
 import { simulateBassResponseRewCore, simulateBassResponseRewParityField } from "@/bass/core/rewBassEngine";
 import { computeRoomModesLocal } from "@/bass/core/modalCalculations.js";
-import { getApprovedContinuousSplDb, getSubwooferCurve, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
+import { getSubwooferCurve, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
 import ProductionVectorCaptureTest10 from "@/components/room/bass/ProductionVectorCaptureTest10";
@@ -17,7 +17,8 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
-import { applyDesignEqCurve } from "@/components/utils/rp22BassMetrics";
+import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/rp22BassMetrics";
+import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
 import P14LevelPill from "@/components/room/P14LevelPill";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -480,18 +481,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const designEqSystemLimits = useMemo(() => {
     const activeSubs = subsForSimulation.filter((sub) => sub?.modelKey);
-    const capabilityValues = activeSubs.map((sub) => getApprovedContinuousSplDb(sub.modelKey));
-    const amplitudes = capabilityValues
-      .filter(Number.isFinite)
-      .map((capabilityDb) => Math.pow(10, capabilityDb / 20));
     const usableLfValues = activeSubs
       .map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.modelKey))?.approvedUsableLfHzMinus6dB)
       .filter(Number.isFinite);
     return {
+      activeSubs,
       usableLfHz: usableLfValues.length > 0 ? Math.max(...usableLfValues) : null,
-      systemContinuousCapabilityDb: activeSubs.length > 0 && amplitudes.length === activeSubs.length
-        ? 20 * Math.log10(amplitudes.reduce((sum, amplitude) => sum + amplitude, 0))
-        : null,
     };
   }, [subsForSimulation]);
 
@@ -844,6 +839,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { id: 'overlay-production', color: '#9CA3AF', label: 'Production', data };
   }, [overlayProduction, overlayProductionResults, selectedSeatIds]);
 
+  const designEqGraphResult = useMemo(
+    () => calculateDesignEqCurve(multiSeries[0]?.data || [], designEqSystemLimits.usableLfHz, designEqSystemLimits.activeSubs),
+    [multiSeries, designEqSystemLimits]
+  );
+
   const multiSeriesForGraph = useMemo(() => {
     // When overlaying, highlight the active REW-style Absorption Authority curve in green
     // so it's clearly distinguishable from the grey Production overlay curve.
@@ -857,7 +857,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     out = out.map((s) => ({
       ...s,
       data: designEqEnabled
-        ? applyDesignEqCurve(s.data, designEqSystemLimits.usableLfHz, designEqSystemLimits.systemContinuousCapabilityDb)
+        ? applyDesignEqCurve(s.data, designEqSystemLimits.usableLfHz, designEqSystemLimits.activeSubs)
         : applyBassSmoothing(s.data, bassSmoothingMode),
     }));
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
@@ -1314,6 +1314,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {designEqEnabled ? 'Showing post-EQ curve for P14 scoring' : 'Showing raw simulated curve'}
         </div>
+        {designEqEnabled && <SourceDomainCapabilityDiagnostic
+          activeSubs={designEqSystemLimits.activeSubs}
+          rawCurve={multiSeries[0]?.data}
+          postEqCurve={designEqGraphResult.curve}
+          usableLfHz={designEqSystemLimits.usableLfHz}
+          eqDiagnostics={designEqGraphResult.diagnostics}
+        />}
 
         <ProductionVectorCaptureTest10
           capture={simulationResults.runtimeVectorCapture}
