@@ -9,7 +9,9 @@
 //   - applyBassSmoothing(data, 'third') — display-only 1/3-octave smoothing.
 
 import { applyBassSmoothing } from '../room/bass/bassGraphSmoothing';
-import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
+import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
+
+export { applyDesignEqCurve, calculateDesignEqCurve };
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -195,47 +197,9 @@ export function computeTransitionFrequencyHz(roomDims, rt60 = 0.4) {
   return isNum(fs) && fs > 0 ? fs : null;
 }
 
-// Shared Design EQ transform — 1/3-octave smoothed basis, shaped toward the
-// Artcoustic house curve and bounded by +6 dB boost / -10 dB cut. It never
-// "repairs" a narrow raw null, since it only ever operates on the smoothed curve.
-// Used by both computeParam14LfeCapability (scoring) and the Bass Response graph
-// (display), so P14 and the graph always agree on the same post-EQ curve.
-export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
-  const raw = toSplCurve(curveData);
-  if (raw.length === 0) return { curve: curveData || [], diagnostics: [] };
-  const smoothed = smoothThird(raw);
-  if (smoothed.length === 0) return { curve: raw, diagnostics: [] };
-  const anchorBand = smoothed.filter((p) => p.frequency >= 150 && p.frequency <= 200);
-  const anchorDb = median((anchorBand.length > 0 ? anchorBand : smoothed).map((p) => p.spl));
-  if (!isNum(anchorDb)) return { curve: raw, diagnostics: [] };
-  const MAX_BOOST_DB = 6;
-  const MAX_CUT_DB = -10;
-  const lfHz = isNum(usableLfHz) && usableLfHz > 0 ? usableLfHz : null;
-  const diagnostics = [];
-  const curve = raw.map((p) => {
-    const smoothedAtF = valAt(smoothed, p.frequency);
-    const basis = isNum(smoothedAtF) ? smoothedAtF : p.spl;
-    const targetAtFrequencyDb = anchorDb + artcousticHouseCurveOffsetAt(p.frequency);
-    const diff = targetAtFrequencyDb - basis;
-    const requestedBoostDb = Math.max(0, Math.min(MAX_BOOST_DB, diff));
-    const allowance = getSourceDomainBoostAllowance({
-      frequency: p.frequency,
-      requestedBoostDb,
-      activeSubs,
-      usableLfHz: lfHz,
-      maxBoostDb: MAX_BOOST_DB,
-    });
-    const appliedBoostDb = diff > 0 ? allowance.allowedBoostDb : 0;
-    const appliedCutDb = diff <= 0 ? Math.max(MAX_CUT_DB, diff) : 0;
-    diagnostics.push({ frequency: p.frequency, requestedBoostDb, appliedBoostDb, allowance });
-    return { frequency: p.frequency, spl: p.spl + appliedBoostDb + appliedCutDb };
-  });
-  return { curve, diagnostics };
-}
-
-export function applyDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
-  return calculateDesignEqCurve(curveData, usableLfHz, activeSubs).curve;
-}
+// Shared Design EQ transform lives in designEqCalibration.js. It is consumed by
+// both P14 scoring and the Bass Response graph so the displayed and assessed
+// post-calibration curves always remain identical.
 
 // Parameter 14 — LFE total SPL capability at RSP (post design-EQ), 1/3-octave
 // smoothed. Design EQ (when enabled) shapes the curve toward the Artcoustic
