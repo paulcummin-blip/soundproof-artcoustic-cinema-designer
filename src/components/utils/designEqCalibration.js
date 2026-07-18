@@ -137,28 +137,36 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     .map((point) => ({ ...point, deviationDb: deviationAt(thirdOctave, point.frequency, anchorDb) }));
   const peakRegions = findRegions(trendPoints, "peak").sort((a, b) => b.severityDb - a.severityDb);
   const valleyRegions = findRegions(trendPoints, "valley").sort((a, b) => b.severityDb - a.severityDb);
-  // A premium calibration normally removes the dominant excess first, then uses
-  // its remaining filters for credible broad deficits before minor cleanup.
-  const candidates = [peakRegions[0], ...valleyRegions, ...peakRegions.slice(1)].filter(Boolean).slice(0, 10);
-  const filters = candidates.map((region, index) => {
+  // Remove the dominant broad excess first. A single filter is limited to -10 dB,
+  // so a severe, broad peak can use two overlapping smooth bells before any valley fill.
+  const regions = [peakRegions[0], ...valleyRegions, ...peakRegions.slice(1)].filter(Boolean);
+  const filters = [];
+  for (const region of regions) {
+    if (filters.length >= 10) break;
     const isPeak = region.kind === "peak";
-    const requestedGainDb = isPeak
-      ? -Math.min(10, region.severityDb * 0.8)
+    const totalGainDb = isPeak
+      ? -Math.min(20, region.severityDb * 0.9)
       : Math.min(6, region.severityDb * 0.75);
-    const filter = {
-      band: index + 1,
-      enabled: true,
-      type: "Peak",
-      frequencyHz: region.centrePoint.frequency,
-      gainDb: requestedGainDb,
-      Q: qForRegion(region),
-      startHz: region.startHz,
-      endHz: region.endHz,
-      widthOctaves: region.widthOctaves,
-      reason: isPeak ? "Broad peak above Artcoustic target" : "Broad valley below Artcoustic target",
-    };
-    return limitBoostForCapability(filter, activeSubs, usableLfHz, options.requestedSystemOutputDb);
-  }).filter((filter) => filter.gainDb < -0.1 || filter.gainDb > 0.1);
+    const passes = isPeak ? Math.min(2, Math.ceil(Math.abs(totalGainDb) / 10)) : 1;
+    for (let pass = 0; pass < passes && filters.length < 10; pass += 1) {
+      const filter = {
+        band: filters.length + 1,
+        enabled: true,
+        type: "Peak",
+        frequencyHz: region.centrePoint.frequency,
+        gainDb: totalGainDb / passes,
+        Q: qForRegion(region),
+        startHz: region.startHz,
+        endHz: region.endHz,
+        widthOctaves: region.widthOctaves,
+        reason: isPeak
+          ? `Broad peak reduction ${pass + 1}/${passes} above Artcoustic target`
+          : "Broad valley below Artcoustic target",
+      };
+      const constrained = limitBoostForCapability(filter, activeSubs, usableLfHz, options.requestedSystemOutputDb);
+      if (constrained.gainDb < -0.1 || constrained.gainDb > 0.1) filters.push(constrained);
+    }
+  }
   const filterBank = emptyFilters(filters);
   const combinedEqCurve = raw.map((point) => ({
     frequency: point.frequency,

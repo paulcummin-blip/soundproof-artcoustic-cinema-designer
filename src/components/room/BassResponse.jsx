@@ -1316,7 +1316,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
         </div>
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
-          {designEqEnabled ? 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate' : 'Showing raw simulated curve'}
+          {designEqEnabled ? (optimisationResult.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate') : 'Showing raw simulated curve'}
         </div>
         {designEqEnabled && <>
           <BassOptimiserValidationPanel

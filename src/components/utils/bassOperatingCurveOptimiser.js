@@ -74,10 +74,15 @@ function buildCandidate({ rawCurve, activeSubs, usableLfHz, transitionHz, operat
   const splDb = finalPostEqCurve.map((point) => point.spl);
   const p14 = computeParam14LfeCapability(finalPostEqCurve, false);
   const p18 = computeParam18BassExtension(finalPostEqCurve, p14);
+  const l1Extension = p18?.targets?.find((target) => target.level === "L1");
+  // P19 only assesses the frequency span the candidate can validly claim through
+  // the canonical P18 envelope; its lower edge is the canonical L1 extension result.
+  const assessmentStartHz = l1Extension?.extensionHz ?? l1Extension?.limitHz ?? 30;
+  const assessedCurve = finalPostEqCurve.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= transitionHz);
   const p19 = computeP19DeviationBelowSchroeder({
-    freqsHz,
-    splDb,
-    targetDb: freqsHz.map((frequency) => operatingTargetDb + houseOffset(frequency)),
+    freqsHz: assessedCurve.map((point) => point.frequency),
+    splDb: assessedCurve.map((point) => point.spl),
+    targetDb: assessedCurve.map((point) => operatingTargetDb + houseOffset(point.frequency)),
     schroederHz: transitionHz,
   });
   const achievedP14Db = p14?.value ?? null;
@@ -92,7 +97,7 @@ function buildCandidate({ rawCurve, activeSubs, usableLfHz, transitionHz, operat
     achievedP18Level < 1 && "P18 does not meet the 30 Hz L1 extension limit",
     achievedP19Level < 1 && "P19 exceeds the ±5 dB house-curve tolerance",
   ].filter(Boolean).join("; ");
-  return { operatingTargetDb, requestedTargetSpl: operatingTargetDb, requestedP14Level: `Target ${operatingTargetDb.toFixed(1)} dB`, achievedP14Db, achievedP14Level, achievedP18Level, achievedP18FrequencyHz, achievedP19Level, achievedP19VariationDb, generatedFilterBank: eq.filters, finalPostEqCurve, capabilityLimitedFrequencies, capabilityLimitedRanges: capabilityRanges(capabilityLimitedFrequencies), allAtLeastL1, rejectionReason };
+  return { operatingTargetDb, requestedTargetSpl: operatingTargetDb, requestedP14Level: `Target ${operatingTargetDb.toFixed(1)} dB`, achievedP14Db, achievedP14Level, achievedP18Level, achievedP18FrequencyHz, achievedP19Level, achievedP19VariationDb, p19AssessmentStartHz: assessmentStartHz, p19AssessmentEndHz: transitionHz, generatedFilterBank: eq.filters, finalPostEqCurve, capabilityLimitedFrequencies, capabilityLimitedRanges: capabilityRanges(capabilityLimitedFrequencies), allAtLeastL1, rejectionReason };
 }
 
 function meaningfulCandidates(validCandidates, selected) {
@@ -111,13 +116,16 @@ export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz 
   if (!rawCurve.length || !activeSubs.length) return { selectedMode, achievedP14Level: "FAIL", achievedP14Db: null, achievedP18Level: "FAIL", achievedP18FrequencyHz: null, achievedP19Level: "FAIL", achievedP19VariationDb: null, selectedFilters: [], finalPostEqCurve: [], candidates: [], displayCandidates: [], rejectedCandidates: [], warningCode: "MISSING_BASS_INPUT", warningMessage: "A raw response curve and at least one active subwoofer are required." };
   const capabilityBand = rawCurve.filter((point) => point.frequency >= 20 && point.frequency <= 120).map((point) => getSystemSourceCapability(activeSubs, point.frequency)).filter(number);
   const maximumCredibleTargetDb = capabilityBand.length ? Math.max(114, Math.min(123, Math.floor(Math.min(...capabilityBand) * 2) / 2)) : 123;
-  const targets = [];
-  for (let target = maximumCredibleTargetDb; target >= 114; target -= 0.5) targets.push(Math.round(target * 2) / 2);
+  // Balanced starts by proving the minimum shared operating target before considering higher output.
+  const targets = [114];
+  for (let target = maximumCredibleTargetDb; target > 114; target -= 0.5) targets.push(Math.round(target * 2) / 2);
   const candidates = targets.map((operatingTargetDb) => buildCandidate({ rawCurve, activeSubs, usableLfHz, transitionHz, operatingTargetDb }));
   const validCandidates = candidates.filter((candidate) => candidate.allAtLeastL1);
   const selectedByMode = Object.fromEntries(["balanced", "spl", "extension", "accuracy"].map((mode) => [mode, select(validCandidates, mode)]));
-  const selected = selectedByMode[selectedMode];
+  const validSelection = selectedByMode[selectedMode];
+  // A failed search still returns its strongest fully-calibrated attempt: never raw data or zero filters.
+  const selected = validSelection || select(candidates, selectedMode) || candidates[0];
   const highestInvalidCandidate = candidates.find((candidate) => !candidate.allAtLeastL1) || null;
-  if (!selected) return { selectedMode, selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null, achievedP18Level: "FAIL", achievedP18FrequencyHz: null, achievedP19Level: "FAIL", achievedP19VariationDb: null, selectedFilters: [], finalPostEqCurve: [], candidates, displayCandidates: [], rejectedCandidates: candidates, highestInvalidCandidate, selectedByMode, warningCode: "NO_VALID_OPERATING_CURVE", warningMessage: "No calibrated operating curve meets Level 1 for P14, P18, and P19 after searching from the credible maximum down to 114 dB." };
-  return { selectedMode, selectedP14TargetDb: selected.operatingTargetDb, achievedP14Level: levelLabel(selected.achievedP14Level), achievedP14Db: selected.achievedP14Db, achievedP18Level: levelLabel(selected.achievedP18Level), achievedP18FrequencyHz: selected.achievedP18FrequencyHz, achievedP19Level: levelLabel(selected.achievedP19Level), achievedP19VariationDb: selected.achievedP19VariationDb, selectedFilters: selected.generatedFilterBank, finalPostEqCurve: selected.finalPostEqCurve, capabilityLimitedFrequencies: selected.capabilityLimitedFrequencies, capabilityLimitedRanges: selected.capabilityLimitedRanges, selectedCandidate: selected, candidates, displayCandidates: meaningfulCandidates(validCandidates, selected), rejectedCandidates: candidates.filter((candidate) => !candidate.allAtLeastL1), highestInvalidCandidate, selectedByMode, warningCode: null, warningMessage: null };
+  const isBestCalibratedAttempt = !validSelection;
+  return { selectedMode, selectedP14TargetDb: selected.operatingTargetDb, achievedP14Level: levelLabel(selected.achievedP14Level), achievedP14Db: selected.achievedP14Db, achievedP18Level: levelLabel(selected.achievedP18Level), achievedP18FrequencyHz: selected.achievedP18FrequencyHz, achievedP19Level: levelLabel(selected.achievedP19Level), achievedP19VariationDb: selected.achievedP19VariationDb, selectedFilters: selected.generatedFilterBank, finalPostEqCurve: selected.finalPostEqCurve, capabilityLimitedFrequencies: selected.capabilityLimitedFrequencies, capabilityLimitedRanges: selected.capabilityLimitedRanges, selectedCandidate: selected, candidates, displayCandidates: meaningfulCandidates(validCandidates.length ? validCandidates : candidates, selected), rejectedCandidates: candidates.filter((candidate) => !candidate.allAtLeastL1), highestInvalidCandidate, selectedByMode, isBestCalibratedAttempt, warningCode: isBestCalibratedAttempt ? "NO_VALID_OPERATING_CURVE" : null, warningMessage: isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : null };
 }
