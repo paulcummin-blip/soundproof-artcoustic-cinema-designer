@@ -17,7 +17,7 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
-import { optimiseBassSystem } from "@/components/utils/bassOptimisationEngine";
+import { optimiseBassSystem } from "@/components/utils/bassOperatingCurveOptimiser";
 import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
 import DesignEqFilterBankDiagnostic from "@/components/room/bass/DesignEqFilterBankDiagnostic";
 import BassOptimiserValidationPanel from "@/components/room/bass/BassOptimiserValidationPanel";
