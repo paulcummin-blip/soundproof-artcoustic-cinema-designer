@@ -22,14 +22,16 @@ function getModelKey(sub) {
   return normaliseModelKey(sub?.modelKey ?? sub?.model ?? "");
 }
 
-function getSubGainDb(sub) {
-  const gain = sub?.tuning?.gainDb ?? sub?.gainDb ?? 0;
-  return isFiniteNumber(gain) ? Number(gain) : 0;
+function getCombinedRequestedOutputDb(activeSubs) {
+  const configured = (activeSubs || []).map((sub) => sub?.tuning?.requestedOutputDb ?? sub?.requestedOutputDb)
+    .find(isFiniteNumber);
+  return isFiniteNumber(configured) ? Number(configured) : 114;
 }
 
-function getRequestedOperatingLevelDb(sub) {
-  const requested = sub?.tuning?.requestedOutputDb ?? sub?.requestedOutputDb ?? 114;
-  return isFiniteNumber(requested) ? Number(requested) : 114;
+function getOverallLfeGainDb(activeSubs) {
+  const configured = (activeSubs || []).map((sub) => sub?.tuning?.overallLfeGainDb ?? sub?.overallLfeGainDb)
+    .find(isFiniteNumber);
+  return isFiniteNumber(configured) ? Number(configured) : 0;
 }
 
 export function getUsableLfHz(activeSubs) {
@@ -45,12 +47,10 @@ export function getSystemSourceCapability(activeSubs, frequency) {
 }
 
 export function getCurrentSystemSourceOutput(activeSubs) {
-  // This is the requested operating level before Design EQ, not the product's
-  // maximum capability curve. A configured requestedOutputDb takes precedence;
-  // 114 dB per sub is the default cinema operating reference.
-  const levels = (activeSubs || []).map((sub) => getRequestedOperatingLevelDb(sub) + getSubGainDb(sub));
-  if (!levels.length || levels.some((level) => !isFiniteNumber(level))) return null;
-  return 20 * Math.log10(levels.reduce((sum, level) => sum + dbToPressure(level), 0));
+  if (!(activeSubs || []).length) return null;
+  // The LFE target is one processor output shared by the complete subwoofer
+  // system. Cabinets raise maximum capability; they do not duplicate demand.
+  return getCombinedRequestedOutputDb(activeSubs) + getOverallLfeGainDb(activeSubs);
 }
 
 export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6 }) {
