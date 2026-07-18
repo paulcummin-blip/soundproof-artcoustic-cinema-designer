@@ -1,25 +1,24 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { mergeBassGraphSeries } from '@/components/room/bass/bassGraphSeriesAlignment';
 
-const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-        // Use actual hovered point frequency (full precision), only round for display
-        const actualFreq = payload[0]?.payload?.frequency;
-        const freqDisplay = Number.isFinite(Number(actualFreq)) 
-            ? `${Number(actualFreq).toFixed(2)} Hz` 
-            : (Number.isFinite(Number(label)) ? `${Number(label).toFixed(2)} Hz` : String(label));
-        
-        const splValue = payload[0]?.value;
-        const splDisplay = Number.isFinite(Number(splValue)) ? `${Number(splValue).toFixed(1)} dB` : 'N/A';
-        
-        return (
-            <div className="bg-white/80 backdrop-blur-sm p-3 border border-[#DCDBD6] rounded-lg shadow-lg font-body">
-                <p className="font-bold text-[#1B1A1A]">{freqDisplay}</p>
-                <p className="text-[#213428]">{`SPL: ${splDisplay}`}</p>
-            </div>
-        );
-    }
-    return null;
+const CustomTooltip = ({ active, payload, label, series = [] }) => {
+    if (!active || !payload?.length) return null;
+    const row = payload[0]?.payload;
+    const actualFreq = row?.frequency;
+    const freqDisplay = Number.isFinite(Number(actualFreq))
+        ? `${Number(actualFreq).toFixed(2)} Hz`
+        : (Number.isFinite(Number(label)) ? `${Number(label).toFixed(2)} Hz` : String(label));
+    const visibleSeries = series.filter((item) => Number.isFinite(Number(row?.[`spl_${item.id}`])));
+
+    return (
+        <div className="bg-white/80 backdrop-blur-sm p-3 border border-[#DCDBD6] rounded-lg shadow-lg font-body">
+            <p className="font-bold text-[#1B1A1A]">{freqDisplay}</p>
+            {visibleSeries.length > 1
+                ? visibleSeries.map((item) => <p key={item.id} style={{ color: item.color }}>{item.label || item.id}: {Number(row[`spl_${item.id}`]).toFixed(1)} dB</p>)
+                : <p className="text-[#213428]">SPL: {Number(visibleSeries.length ? row[`spl_${visibleSeries[0].id}`] : payload[0]?.value).toFixed(1)} dB</p>}
+        </div>
+    );
 };
 
 // REW mode plot range debug (proof we're plotting the right numbers)
@@ -68,17 +67,7 @@ export default function BassGraph({
 
     const multiChartData = React.useMemo(() => {
       if (!isMulti) return null;
-      // All series share the same frequency axis — use the first series as the frequency spine.
-      // Index-based mapping avoids floating-point epsilon mismatches in find().
-      const spine = multiSeries[0].data; // already sorted + deduped in BassResponse
-      return spine.map((point, i) => {
-        const row = { frequency: point.frequency };
-        multiSeries.forEach(s => {
-          const p = s.data[i];
-          row[`spl_${s.id}`] = (p && Number.isFinite(p.spl)) ? p.spl : null;
-        });
-        return row;
-      });
+      return mergeBassGraphSeries(multiSeries);
     }, [isMulti, multiSeries]);
 
     let data = responseData;
@@ -478,7 +467,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                         allowDecimals={false}
                     />
-                    <Tooltip content={<CustomTooltip />} shared={false} cursor={false} />
+                    <Tooltip content={(props) => <CustomTooltip {...props} series={isMulti ? multiSeries : []} />} shared cursor={false} />
 
                     {rewStyleMode && rp22Levels && rp22Levels.map(level => (
                         Number.isFinite(level.spl) && (
