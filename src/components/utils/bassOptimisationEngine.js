@@ -64,12 +64,12 @@ function extensionResult(curve) {
 
 function rankCandidate(candidate, mode) {
   const levels = [candidate.achievedP14Level, candidate.achievedP18Level, candidate.achievedP19Level];
-  const min = Math.min(...levels);
-  const total = levels.reduce((sum, level) => sum + level, 0);
-  const primary = mode === "spl" ? candidate.achievedP14Level
-    : mode === "extension" ? candidate.achievedP18Level
-    : mode === "accuracy" ? candidate.achievedP19Level : min;
-  return [primary, min, total, candidate.achievedP14Level];
+  const lowestLevel = Math.min(...levels);
+  const totalLevel = levels.reduce((sum, level) => sum + level, 0);
+  if (mode === "spl") return [candidate.achievedP14Level, candidate.achievedP14Db ?? -Infinity, candidate.requestedTargetSpl];
+  if (mode === "extension") return [candidate.achievedP18Level, -(candidate.achievedP18FrequencyHz ?? Infinity), candidate.achievedP14Level];
+  if (mode === "accuracy") return [candidate.achievedP19Level, -(candidate.achievedP19VariationDb ?? Infinity), candidate.achievedP14Level];
+  return [lowestLevel, totalLevel, candidate.achievedP14Level, candidate.achievedP14Db ?? -Infinity];
 }
 
 function compareCandidates(a, b, mode) {
@@ -128,7 +128,7 @@ function buildCandidate({ rawCurve, activeSubs, usableLfHz, transitionHz, target
 export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, priorityMode = "balanced" }) {
   const selectedMode = ["balanced", "spl", "extension", "accuracy"].includes(priorityMode) ? priorityMode : "balanced";
   if (!rawCurve.length || !activeSubs.length) {
-    return { selectedMode, selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP18Level: "FAIL", achievedP18FrequencyHz: null, achievedP19Level: "FAIL", achievedP19VariationDb: null, selectedFilters: [], finalPostEqCurve: [], capabilityLimitedFrequencies: [], candidates: [], rejectedCandidates: [], warningCode: "MISSING_BASS_INPUT", warningMessage: "A raw response curve and at least one active subwoofer are required." };
+    return { selectedMode, selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null, achievedP18Level: "FAIL", achievedP18FrequencyHz: null, achievedP19Level: "FAIL", achievedP19VariationDb: null, selectedFilters: [], finalPostEqCurve: [], capabilityLimitedFrequencies: [], candidates: [], rejectedCandidates: [], warningCode: "MISSING_BASS_INPUT", warningMessage: "A raw response curve and at least one active subwoofer are required." };
   }
   const candidates = P14_TARGETS.map((target) => buildCandidate({ rawCurve, activeSubs, usableLfHz, transitionHz, target, priorityMode: selectedMode }));
   const validCandidates = candidates.filter((candidate) => candidate.allAtLeastL1);
@@ -136,12 +136,13 @@ export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz 
   const selected = [...pool].sort((a, b) => compareCandidates(a, b, selectedMode))[0] || null;
   const rejectedCandidates = candidates.filter((candidate) => !candidate.allAtLeastL1);
   if (!selected) {
-    return { selectedMode, selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP18Level: "FAIL", achievedP18FrequencyHz: null, achievedP19Level: "FAIL", achievedP19VariationDb: null, selectedFilters: [], finalPostEqCurve: [], capabilityLimitedFrequencies: [], candidates, rejectedCandidates, warningCode: "NO_L1_BALANCED_SOLUTION", warningMessage: "No credible calibration reaches Level 1 for P14, P18, and P19 together." };
+    return { selectedMode, selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null, achievedP18Level: "FAIL", achievedP18FrequencyHz: null, achievedP19Level: "FAIL", achievedP19VariationDb: null, selectedFilters: [], finalPostEqCurve: [], capabilityLimitedFrequencies: [], candidates, rejectedCandidates, warningCode: "NO_L1_BALANCED_SOLUTION", warningMessage: "No credible calibration reaches Level 1 for P14, P18, and P19 together." };
   }
   return {
     selectedMode,
     selectedP14TargetDb: selected.requestedTargetSpl,
     achievedP14Level: levelLabel(selected.achievedP14Level),
+    achievedP14Db: selected.achievedP14Db,
     achievedP18Level: levelLabel(selected.achievedP18Level),
     achievedP18FrequencyHz: selected.achievedP18FrequencyHz,
     achievedP19Level: levelLabel(selected.achievedP19Level),
@@ -149,6 +150,7 @@ export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz 
     selectedFilters: selected.generatedFilterBank,
     finalPostEqCurve: selected.finalPostEqCurve,
     capabilityLimitedFrequencies: selected.capabilityLimitedFrequencies,
+    selectedCandidate: selected,
     candidates,
     rejectedCandidates,
     warningCode: selected.allAtLeastL1 ? null : "PRIORITY_MODE_BELOW_L1",

@@ -229,6 +229,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
+  const [optimiserPriorityMode, setOptimiserPriorityMode] = useState('balanced');
   // Bass Response Smoothing — display-only. Does not touch simulation, modal calculations,
   // raw null-depth detection, or SPL normalisation. 'none' preserves prior graph behaviour
   // (the graph previously plotted the raw unsmoothed curve).
@@ -852,8 +853,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     activeSubs: designEqSystemLimits.activeSubs,
     usableLfHz: designEqSystemLimits.usableLfHz,
     transitionHz: optimisationTransitionHz,
-    priorityMode: "balanced",
-  }), [multiSeries, designEqSystemLimits, optimisationTransitionHz]);
+    priorityMode: optimiserPriorityMode,
+  }), [multiSeries, designEqSystemLimits, optimisationTransitionHz, optimiserPriorityMode]);
 
   const multiSeriesForGraph = useMemo(() => {
     // When overlaying, highlight the active REW-style Absorption Authority curve in green
@@ -1318,7 +1319,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {designEqEnabled ? 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate' : 'Showing raw simulated curve'}
         </div>
         {designEqEnabled && <>
-          <BassOptimiserValidationPanel result={optimisationResult} />
+          <BassOptimiserValidationPanel
+            result={optimisationResult}
+            priorityMode={optimiserPriorityMode}
+            onPriorityModeChange={setOptimiserPriorityMode}
+          />
           <DesignEqFilterBankDiagnostic
             filters={optimisationResult.selectedFilters}
             combinedEqCurve={(multiSeries[0]?.data || []).map((point) => {
