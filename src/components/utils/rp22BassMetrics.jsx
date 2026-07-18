@@ -15,6 +15,16 @@ export { applyDesignEqCurve, calculateDesignEqCurve };
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
+// Shared production operating definitions for the envelope optimiser and RP22 bass metrics.
+export function getCanonicalBassOperatingLevels() {
+  return [
+    { level: "L1", value: 1, p14TargetDb: 114, p14UpperHz: 120, p18LimitHz: 30, p18CutoffDb: 111, p19ToleranceDb: 5 },
+    { level: "L2", value: 2, p14TargetDb: 117, p14UpperHz: 120, p18LimitHz: 25, p18CutoffDb: 114, p19ToleranceDb: 4 },
+    { level: "L3", value: 3, p14TargetDb: 120, p14UpperHz: 120, p18LimitHz: 18, p18CutoffDb: 117, p19ToleranceDb: 3 },
+    { level: "L4", value: 4, p14TargetDb: 123, p14UpperHz: 120, p18LimitHz: 15, p18CutoffDb: 120, p19ToleranceDb: 2 },
+  ];
+}
+
 function toSplCurve(responseData) {
   if (!Array.isArray(responseData)) return [];
   const arr = [];
@@ -67,7 +77,7 @@ const ARTCOUSTIC_HOUSE_CURVE = [
   { frequency: 400, offsetDb: 0.0 },
 ];
 
-function artcousticHouseCurveOffsetAt(frequency) {
+export function artcousticHouseCurveOffsetAt(frequency) {
   if (!isNum(frequency) || frequency <= ARTCOUSTIC_HOUSE_CURVE[0].frequency) return 6.0;
   const last = ARTCOUSTIC_HOUSE_CURVE[ARTCOUSTIC_HOUSE_CURVE.length - 1];
   if (frequency >= last.frequency) return 0.0;

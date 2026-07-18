@@ -132,8 +132,10 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   const anchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
   if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
 
+  const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
+  const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
   const trendPoints = thirdOctave
-    .filter((point) => point.frequency >= 20 && point.frequency <= 200)
+    .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
     .map((point) => ({ ...point, deviationDb: deviationAt(thirdOctave, point.frequency, anchorDb) }));
   const peakRegions = findRegions(trendPoints, "peak").sort((a, b) => b.severityDb - a.severityDb);
   const valleyRegions = findRegions(trendPoints, "valley").sort((a, b) => b.severityDb - a.severityDb);
