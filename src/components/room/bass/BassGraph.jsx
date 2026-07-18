@@ -530,6 +530,7 @@ export default function BassGraph({
                          dataKey={`spl_${s.id}`}
                         stroke={s.color}
                         strokeWidth={2}
+                        strokeDasharray={s.strokeDasharray}
                         dot={false}
                         activeDot={false}
                         connectNulls={false}

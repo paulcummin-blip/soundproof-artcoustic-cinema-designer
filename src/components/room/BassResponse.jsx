@@ -19,6 +19,7 @@ import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThree
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/rp22BassMetrics";
 import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
+import DesignEqFilterBankDiagnostic from "@/components/room/bass/DesignEqFilterBankDiagnostic";
 import P14LevelPill from "@/components/room/P14LevelPill";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -854,12 +855,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Apply the selected display smoothing to calculated curves only (not the pasted REW overlay).
     // When Design EQ is ON, the graph shows the same post-EQ curve used for P14 scoring
     // (1/3-octave basis, cut -10dB / boost +6dB) instead of the plain display smoothing.
-    out = out.map((s) => ({
-      ...s,
-      data: designEqEnabled
-        ? applyDesignEqCurve(s.data, designEqSystemLimits.usableLfHz, designEqSystemLimits.activeSubs)
-        : applyBassSmoothing(s.data, bassSmoothingMode),
-    }));
+    out = designEqEnabled
+      ? out.flatMap((s) => {
+        const postEq = applyDesignEqCurve(s.data, designEqSystemLimits.usableLfHz, designEqSystemLimits.activeSubs);
+        return [
+          { ...s, id: `${s.id}-raw`, label: "Raw room", color: "#94A3B8", strokeDasharray: "4 4", data: s.data },
+          { ...s, id: `${s.id}-eq`, label: "Post-EQ", data: postEq },
+        ];
+      })
+      : out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     return out;
   }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, designEqSystemLimits]);
@@ -1281,7 +1285,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {multiSeries.length > 0 ? (
             <BassGraph
               multiSeries={multiSeriesForGraph}
-              responseData={multiSeriesForGraph[0]?.data ?? []}
+              responseData={(designEqEnabled ? multiSeriesForGraph.find((series) => series.id.endsWith("-eq")) : multiSeriesForGraph[0])?.data ?? []}
               schroederFrequency={schroederFrequency}
               rp22Levels={rp22Levels}
               toggles={{}}
@@ -1314,13 +1318,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {designEqEnabled ? 'Showing post-EQ curve for P14 scoring' : 'Showing raw simulated curve'}
         </div>
-        {designEqEnabled && <SourceDomainCapabilityDiagnostic
-          activeSubs={designEqSystemLimits.activeSubs}
-          rawCurve={multiSeries[0]?.data}
-          postEqCurve={designEqGraphResult.curve}
-          usableLfHz={designEqSystemLimits.usableLfHz}
-          eqDiagnostics={designEqGraphResult.diagnostics}
-        />}
+        {designEqEnabled && <>
+          <DesignEqFilterBankDiagnostic
+            filters={designEqGraphResult.filters}
+            combinedEqCurve={designEqGraphResult.combinedEqCurve}
+          />
+          <SourceDomainCapabilityDiagnostic
+            activeSubs={designEqSystemLimits.activeSubs}
+            rawCurve={multiSeries[0]?.data}
+            postEqCurve={designEqGraphResult.curve}
+            usableLfHz={designEqSystemLimits.usableLfHz}
+            eqDiagnostics={designEqGraphResult.diagnostics}
+          />
+        </>}
 
         <ProductionVectorCaptureTest10
           capture={simulationResults.runtimeVectorCapture}

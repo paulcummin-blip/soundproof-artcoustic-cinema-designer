@@ -51,68 +51,133 @@ function deviationAt(curve, frequency, anchorDb) {
   return isNumber(spl) ? spl - (anchorDb + houseCurveOffset(frequency)) : null;
 }
 
-function persistsAcross(curve, frequency, anchorDb, widthOctaves, predicate) {
-  const ratio = Math.pow(2, widthOctaves / 2);
-  const lowDeviation = deviationAt(curve, frequency / ratio, anchorDb);
-  const highDeviation = deviationAt(curve, frequency * ratio, anchorDb);
-  return predicate(lowDeviation) && predicate(highDeviation);
+function octaveWidth(startHz, endHz) {
+  return startHz > 0 && endHz > startHz ? Math.log2(endHz / startHz) : 0;
+}
+
+function findRegions(points, kind) {
+  const threshold = kind === "peak" ? 3 : -2;
+  const matches = (point) => kind === "peak" ? point.deviationDb >= threshold : point.deviationDb <= threshold;
+  const minimumWidth = kind === "peak" ? 1 / 6 : 1 / 3;
+  const regions = [];
+  let current = [];
+  const finish = () => {
+    if (!current.length) return;
+    const startHz = current[0].frequency;
+    const endHz = current[current.length - 1].frequency;
+    const width = octaveWidth(startHz, endHz);
+    if (width >= minimumWidth) {
+      const centrePoint = current.reduce((best, point) => kind === "peak"
+        ? (point.deviationDb > best.deviationDb ? point : best)
+        : (point.deviationDb < best.deviationDb ? point : best));
+      regions.push({ kind, startHz, endHz, widthOctaves: width, centrePoint, severityDb: Math.abs(centrePoint.deviationDb) });
+    }
+    current = [];
+  };
+  points.forEach((point) => {
+    if (matches(point)) current.push(point);
+    else finish();
+  });
+  finish();
+  return regions;
+}
+
+function qForRegion(region) {
+  const bandwidthHz = Math.max(region.endHz - region.startHz, 0.01);
+  return Math.max(0.5, Math.min(10, region.centrePoint.frequency / bandwidthHz));
+}
+
+function bellResponseDb(frequencyHz, filter) {
+  if (!filter.enabled || !isNumber(frequencyHz) || frequencyHz <= 0) return 0;
+  const halfWidth = Math.max(filter.widthOctaves / 2, 0.05);
+  const distance = Math.log2(frequencyHz / filter.frequencyHz) / halfWidth;
+  return filter.gainDb * Math.exp(-0.5 * distance * distance);
+}
+
+function limitBoostForCapability(filter, activeSubs, usableLfHz) {
+  if (filter.gainDb <= 0) return filter;
+  const frequencies = [filter.startHz, (filter.startHz + filter.frequencyHz) / 2, filter.frequencyHz, (filter.frequencyHz + filter.endHz) / 2, filter.endHz];
+  const allowed = frequencies.map((frequency) => getSourceDomainBoostAllowance({
+    frequency,
+    requestedBoostDb: filter.gainDb,
+    activeSubs,
+    usableLfHz,
+    maxBoostDb: 6,
+  }).allowedBoostDb).filter(isNumber);
+  const gainDb = allowed.length ? Math.min(filter.gainDb, ...allowed) : filter.gainDb;
+  return { ...filter, gainDb };
+}
+
+function emptyFilters(filters) {
+  return [...filters, ...Array.from({ length: Math.max(0, 10 - filters.length) }, (_, index) => ({
+    band: filters.length + index + 1,
+    enabled: false,
+    type: "Peak",
+    frequencyHz: null,
+    gainDb: 0,
+    Q: null,
+    startHz: null,
+    endHz: null,
+    reason: "Unused",
+  }))];
 }
 
 export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
   const raw = normaliseCurve(curveData);
-  if (!raw.length) return { curve: curveData || [], diagnostics: [] };
+  if (!raw.length) return { curve: curveData || [], diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
 
   const thirdOctave = applyBassSmoothing(raw, "third");
   const referenceBand = thirdOctave.filter((point) => point.frequency >= 150 && point.frequency <= 200);
   const anchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
-  if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [] };
+  if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
 
-  const curve = raw.map((point) => {
-    const thirdOctaveDb = interpolate(thirdOctave, point.frequency) ?? point.spl;
-    const targetDb = anchorDb + houseCurveOffset(point.frequency);
-    const deviationDb = thirdOctaveDb - targetDb;
-    const isBroadPeak = deviationDb >= 3 && persistsAcross(
-      thirdOctave, point.frequency, anchorDb, 1 / 6, (value) => isNumber(value) && value >= 3,
-    );
-    const isBroadValley = deviationDb <= -2 && persistsAcross(
-      thirdOctave, point.frequency, anchorDb, 1 / 3, (value) => isNumber(value) && value <= -2,
-    );
-
-    // Prioritise broad excess-energy removal. Narrow spikes and cancellations do
-    // not satisfy the persistence tests and are intentionally left uncorrected.
-    const cutDb = isBroadPeak ? -Math.min(10, deviationDb * 0.8) : 0;
-    const requestedBoostDb = isBroadValley ? Math.min(6, Math.abs(deviationDb) * 0.75) : 0;
-    const allowance = getSourceDomainBoostAllowance({
-      frequency: point.frequency,
-      requestedBoostDb,
-      activeSubs,
-      usableLfHz,
-      maxBoostDb: 6,
-    });
-    const appliedBoostDb = allowance.allowedBoostDb;
-    const appliedCorrectionDb = cutDb + appliedBoostDb;
-
-    return {
-      frequency: point.frequency,
-      spl: point.spl + appliedCorrectionDb,
-      diagnostic: {
-        targetDb,
-        thirdOctaveDb,
-        deviationDb,
-        isBroadPeak,
-        isBroadValley,
-        requestedBoostDb,
-        appliedBoostDb,
-        appliedCutDb: cutDb,
-        appliedCorrectionDb,
-        allowance,
-      },
+  const trendPoints = thirdOctave
+    .filter((point) => point.frequency >= 20 && point.frequency <= 200)
+    .map((point) => ({ ...point, deviationDb: deviationAt(thirdOctave, point.frequency, anchorDb) }));
+  const peakRegions = findRegions(trendPoints, "peak").sort((a, b) => b.severityDb - a.severityDb);
+  const valleyRegions = findRegions(trendPoints, "valley").sort((a, b) => b.severityDb - a.severityDb);
+  // A premium calibration normally removes the dominant excess first, then uses
+  // its remaining filters for credible broad deficits before minor cleanup.
+  const candidates = [peakRegions[0], ...valleyRegions, ...peakRegions.slice(1)].filter(Boolean).slice(0, 10);
+  const filters = candidates.map((region, index) => {
+    const isPeak = region.kind === "peak";
+    const requestedGainDb = isPeak
+      ? -Math.min(10, region.severityDb * 0.8)
+      : Math.min(6, region.severityDb * 0.75);
+    const filter = {
+      band: index + 1,
+      enabled: true,
+      type: "Peak",
+      frequencyHz: region.centrePoint.frequency,
+      gainDb: requestedGainDb,
+      Q: qForRegion(region),
+      startHz: region.startHz,
+      endHz: region.endHz,
+      widthOctaves: region.widthOctaves,
+      reason: isPeak ? "Broad peak above Artcoustic target" : "Broad valley below Artcoustic target",
     };
-  });
+    return limitBoostForCapability(filter, activeSubs, usableLfHz);
+  }).filter((filter) => filter.gainDb < -0.1 || filter.gainDb > 0.1);
+  const filterBank = emptyFilters(filters);
+  const combinedEqCurve = raw.map((point) => ({
+    frequency: point.frequency,
+    spl: filters.reduce((sum, filter) => sum + bellResponseDb(point.frequency, filter), 0),
+  }));
+  const curve = raw.map((point, index) => ({
+    frequency: point.frequency,
+    spl: point.spl + combinedEqCurve[index].spl,
+  }));
 
   return {
-    curve: curve.map(({ frequency, spl }) => ({ frequency, spl })),
-    diagnostics: curve.map(({ frequency, diagnostic }) => ({ frequency, ...diagnostic })),
+    curve,
+    filters: filterBank,
+    combinedEqCurve,
+    diagnostics: curve.map((point, index) => ({
+      frequency: point.frequency,
+      targetDb: anchorDb + houseCurveOffset(point.frequency),
+      trendDb: interpolate(thirdOctave, point.frequency),
+      appliedCorrectionDb: combinedEqCurve[index].spl,
+    })),
   };
 }
 
