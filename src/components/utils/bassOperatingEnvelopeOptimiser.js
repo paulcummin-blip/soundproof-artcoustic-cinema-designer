@@ -1,16 +1,10 @@
 import { calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
-import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, getCanonicalBassOperatingLevels, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
-import { getSystemSourceCapability } from "@/components/utils/subwooferCapability";
+import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
+import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
-
-function median(values) {
-  const sorted = values.filter(isNumber).sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length ? (sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2) : null;
-}
 
 function levelFromValue(value, definitions, key, lowerIsBetter = false) {
   if (!isNumber(value)) return 0;
@@ -48,23 +42,16 @@ function makeRequests(definitions) {
 function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions }) {
   const assessmentStartHz = request.p18.p18LimitHz;
   const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
-  const reference = median(rawCurve.filter((point) => point.frequency >= 150 && point.frequency <= 200).map((point) => point.spl));
-  const gainDb = isNumber(reference) ? request.p14.p14TargetDb - reference : 0;
-  const operatingCurve = rawCurve.map((point) => ({ ...point, spl: point.spl + gainDb }));
-  const eq = calculateDesignEqCurve(operatingCurve, usableLfHz, activeSubs, {
+  const eq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
     requestedSystemOutputDb: request.p14.p14TargetDb,
+    targetAnchorDb: request.p14.p14TargetDb,
     assessmentStartHz,
     assessmentEndHz,
   });
-  const capabilityLimitedFrequencies = [];
-  const finalPostEqCurve = eq.curve.map((point) => {
-    const capability = getSystemSourceCapability(activeSubs, point.frequency);
-    const spl = isNumber(capability) ? Math.min(point.spl, capability) : point.spl;
-    if (isNumber(capability) && point.spl > capability) capabilityLimitedFrequencies.push(point.frequency);
-    return { frequency: point.frequency, spl };
-  });
+  const finalPostEqCurve = eq.curve;
+  const capabilityLimitedFrequencies = eq.filters.filter((filter) => filter.enabled && filter.gainDb > 0 && filter.gainDb < 6).map((filter) => filter.frequencyHz);
   const p14 = computeParam14LfeCapability(finalPostEqCurve, false, [assessmentStartHz, assessmentEndHz]);
-  const p18 = computeParam18BassExtension(finalPostEqCurve, p14);
+  const p18 = computeParam18BassExtension(finalPostEqCurve);
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third");
   const assessedCurve = smoothed.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz);
   const p19 = computeP19DeviationBelowSchroeder({
@@ -76,7 +63,7 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
   const achievedP14Db = p14?.value ?? null;
   const achievedP14Level = levelFromValue(achievedP14Db, definitions, "p14TargetDb");
   const achievedP18FrequencyHz = p18?.value ?? null;
-  const achievedP18Level = levelFromValue(achievedP18FrequencyHz, definitions, "p18LimitHz", true);
+  const achievedP18Level = Number(String(p18?.level || "").replace("L", "")) || 0;
   const achievedP19VariationDb = p19?.resultDb ?? null;
   const achievedP19Level = levelFromValue(achievedP19VariationDb, definitions, "p19ToleranceDb", true);
   const meetsRequestedEnvelope = achievedP14Level >= request.p14.value && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
@@ -117,7 +104,7 @@ function displayCandidates(candidates, selected) {
 export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, priorityMode = "balanced" }) {
   const mode = ["balanced", "spl", "extension", "accuracy"].includes(priorityMode) ? priorityMode : "balanced";
   if (!rawCurve.length || !activeSubs.length) return { selectedMode: mode, selectedFilters: [], finalPostEqCurve: [], candidates: [], displayCandidates: [], warningMessage: "A raw response curve and active subwoofer system are required." };
-  const definitions = getCanonicalBassOperatingLevels();
+  const definitions = getRp22BassOperatingDefinitions();
   const candidates = makeRequests(definitions).map((request) => buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions }));
   const validCandidates = candidates.filter((candidate) => candidate.meetsRequestedEnvelope);
   const selectedByMode = Object.fromEntries(["balanced", "spl", "extension", "accuracy"].map((candidateMode) => [candidateMode, [...validCandidates].sort((a, b) => compareCandidates(a, b, candidateMode))[0] || null]));

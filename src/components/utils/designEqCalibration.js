@@ -129,7 +129,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
   const thirdOctave = applyBassSmoothing(raw, "third");
   const referenceBand = thirdOctave.filter((point) => point.frequency >= 150 && point.frequency <= 200);
-  const anchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
+  const rawAnchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
+  const anchorDb = isNumber(options.targetAnchorDb) ? Number(options.targetAnchorDb) : rawAnchorDb;
   if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;

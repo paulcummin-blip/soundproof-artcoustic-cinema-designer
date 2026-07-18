@@ -10,20 +10,12 @@
 
 import { applyBassSmoothing } from '../room/bass/bassGraphSmoothing';
 import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
+import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 
 export { applyDesignEqCurve, calculateDesignEqCurve };
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
-// Shared production operating definitions for the envelope optimiser and RP22 bass metrics.
-export function getCanonicalBassOperatingLevels() {
-  return [
-    { level: "L1", value: 1, p14TargetDb: 114, p14UpperHz: 120, p18LimitHz: 30, p18CutoffDb: 111, p19ToleranceDb: 5 },
-    { level: "L2", value: 2, p14TargetDb: 117, p14UpperHz: 120, p18LimitHz: 25, p18CutoffDb: 114, p19ToleranceDb: 4 },
-    { level: "L3", value: 3, p14TargetDb: 120, p14UpperHz: 120, p18LimitHz: 18, p18CutoffDb: 117, p19ToleranceDb: 3 },
-    { level: "L4", value: 4, p14TargetDb: 123, p14UpperHz: 120, p18LimitHz: 15, p18CutoffDb: 120, p19ToleranceDb: 2 },
-  ];
-}
 
 function toSplCurve(responseData) {
   if (!Array.isArray(responseData)) return [];
@@ -249,122 +241,50 @@ export function computeParam14LfeCapability(rspResponse, designEqEnabled, band =
   };
 }
 
-// Parameter 18 — In-room bass extension capability envelope, level-coupled
-// to P14 (LFE SPL capability). For each RP22 operating target (L1–L4), the
-// -3 dB cutoff is measured against that target's required SPL threshold.
-// P18 can never grade higher than P14.
-//
-// P14 thresholds (dB SPL): L1=114, L2=117, L3=120, L4=123
-// P18 frequency limits (Hz): L1≤30, L2≤25, L3≤18, L4≤15
-export function computeParam18BassExtension(rspResponse, p14Result) {
+// Parameter 18 — independent in-room -3 dB extension assessment.
+// Each level uses its own catalogue-derived SPL cutoff and frequency limit; P14
+// is deliberately not an input to this grade.
+export function computeParam18BassExtension(rspResponse) {
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
+  const sorted = smoothThird(toSplCurve(rspResponse)).sort((a, b) => a.frequency - b.frequency);
+  if (!sorted.length) return null;
 
-  const curve = toSplCurve(rspResponse);
-  if (curve.length === 0) return null;
-
-  const smoothed = smoothThird(curve);
-  if (smoothed.length === 0) return null;
-
-  const sorted = smoothed.slice().sort((a, b) => a.frequency - b.frequency);
-  if (sorted.length === 0) return null;
-
-  const p14Value = p14Result && isNum(p14Result.value) ? p14Result.value : null;
-
-  const TARGETS = [
-    { level: "L1", targetSplDb: 114, cutoffDb: 111, limitHz: 30 },
-    { level: "L2", targetSplDb: 117, cutoffDb: 114, limitHz: 25 },
-    { level: "L3", targetSplDb: 120, cutoffDb: 117, limitHz: 18 },
-    { level: "L4", targetSplDb: 123, cutoffDb: 120, limitHz: 15 },
-  ];
-
-  const targets = TARGETS.map((t) => {
-    const achievable = isNum(p14Value) && p14Value >= t.targetSplDb;
-    if (!achievable) {
-      return {
-        level: t.level,
-        targetSplDb: t.targetSplDb,
-        cutoffDb: t.cutoffDb,
-        extensionHz: null,
-        achievable: false,
-        bounded: false,
-        passesFrequency: false,
-      };
-    }
-
-    // Lowest bin already at/above cutoff — bounded result ("≤ X Hz").
-    if (sorted[0].spl >= t.cutoffDb) {
-      const ext = sorted[0].frequency;
-      return {
-        level: t.level,
-        targetSplDb: t.targetSplDb,
-        cutoffDb: t.cutoffDb,
-        extensionHz: ext,
-        achievable: true,
-        bounded: true,
-        passesFrequency: ext <= t.limitHz,
-      };
-    }
-
-    // Scan upward for the first below→above crossing, interpolate.
-    let crossingHz = null;
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const a = sorted[i];
-      const b = sorted[i + 1];
-      if (!isNum(a.spl) || !isNum(b.spl)) continue;
-      if (a.spl < t.cutoffDb && b.spl >= t.cutoffDb) {
-        const frac = (t.cutoffDb - a.spl) / (b.spl - a.spl);
-        crossingHz = a.frequency + (b.frequency - a.frequency) * frac;
-        break;
+  const targets = getRp22BassOperatingDefinitions().map((definition) => {
+    const cutoffDb = definition.p18CutoffDb;
+    let extensionHz = null;
+    let bounded = false;
+    if (sorted[0].spl >= cutoffDb) {
+      extensionHz = sorted[0].frequency;
+      bounded = true;
+    } else {
+      for (let index = 0; index < sorted.length - 1; index += 1) {
+        const low = sorted[index];
+        const high = sorted[index + 1];
+        if (low.spl < cutoffDb && high.spl >= cutoffDb) {
+          const ratio = (cutoffDb - low.spl) / (high.spl - low.spl);
+          extensionHz = low.frequency + (high.frequency - low.frequency) * ratio;
+          break;
+        }
       }
     }
-
-    if (crossingHz == null) {
-      return {
-        level: t.level,
-        targetSplDb: t.targetSplDb,
-        cutoffDb: t.cutoffDb,
-        extensionHz: null,
-        achievable: false,
-        bounded: false,
-        passesFrequency: false,
-      };
-    }
-
     return {
-      level: t.level,
-      targetSplDb: t.targetSplDb,
-      cutoffDb: t.cutoffDb,
-      extensionHz: crossingHz,
-      achievable: true,
-      bounded: false,
-      passesFrequency: crossingHz <= t.limitHz,
+      level: definition.level,
+      targetSplDb: definition.p14TargetDb,
+      cutoffDb,
+      limitHz: definition.p18LimitHz,
+      extensionHz,
+      bounded,
+      passesFrequency: extensionHz != null && extensionHz <= definition.p18LimitHz,
     };
   });
 
-  // Evaluate L4 down to L1; return the highest passing coupled level.
-  let officialCoupledLevel = null;
-  let winningTarget = null;
-  for (let i = targets.length - 1; i >= 0; i--) {
-    const t = targets[i];
-    if (t.achievable && t.extensionHz != null && t.passesFrequency) {
-      officialCoupledLevel = t.level;
-      winningTarget = t;
-      break;
-    }
-  }
-
+  const winningTarget = targets.slice().reverse().find((target) => target.passesFrequency) || null;
   return {
     targets,
-    officialCoupledLevel,
-    level: officialCoupledLevel,
-    value: winningTarget ? winningTarget.extensionHz : null,
-    formatted:
-      winningTarget == null
-        ? null
-        : winningTarget.bounded
-          ? `≤ ${Math.round(winningTarget.extensionHz)} Hz`
-          : `${Math.round(winningTarget.extensionHz)} Hz`,
-    note: 'Predicted design-stage value from current bass engine. Capability envelope level-coupled to P14.',
+    level: winningTarget?.level || null,
+    value: winningTarget?.extensionHz ?? null,
+    formatted: winningTarget == null ? null : winningTarget.bounded ? `≤ ${Math.round(winningTarget.extensionHz)} Hz` : `${Math.round(winningTarget.extensionHz)} Hz`,
+    note: "Predicted design-stage extension from the shared calibrated response; independently graded from P14.",
   };
 }
 
