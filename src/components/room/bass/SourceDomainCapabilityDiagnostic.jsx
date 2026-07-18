@@ -6,12 +6,18 @@ const TARGET_HZ = [20, 25, 35, 45, 50, 70, 100];
 const fmt = (value) => Number.isFinite(value) ? value.toFixed(1) : "—";
 const at = (curve, frequency) => curve?.reduce((best, point) => Math.abs(point.frequency - frequency) < Math.abs(best.frequency - frequency) ? point : best, curve[0])?.spl;
 
-export default function SourceDomainCapabilityDiagnostic({ activeSubs, rawCurve, postEqCurve, usableLfHz, eqDiagnostics }) {
+export default function SourceDomainCapabilityDiagnostic({ activeSubs, rawCurve, postEqCurve, usableLfHz, eqDiagnostics, optimisationResult }) {
   const rows = useMemo(() => TARGET_HZ.map((frequency) => {
     const firstSub = activeSubs?.[0];
     const oneSubCapability = firstSub ? interpolateCapabilityCurve(getSubwooferCurve(firstSub.modelKey ?? firstSub.model), frequency) : null;
     const trace = eqDiagnostics?.find((entry) => Math.abs(entry.frequency - frequency) < 0.51);
-    const allowance = trace?.allowance ?? getSourceDomainBoostAllowance({ frequency, requestedBoostDb: 0, activeSubs, usableLfHz });
+    const allowance = trace?.allowance ?? getSourceDomainBoostAllowance({
+      frequency,
+      requestedBoostDb: 0,
+      activeSubs,
+      usableLfHz,
+      requestedSystemOutputDb: optimisationResult?.selectedP14TargetDb,
+    });
     const rawSpl = at(rawCurve, frequency);
     const finalSpl = at(postEqCurve, frequency);
     return {
@@ -20,10 +26,10 @@ export default function SourceDomainCapabilityDiagnostic({ activeSubs, rawCurve,
       combinedSystemCapability: getSystemSourceCapability(activeSubs, frequency),
       combinedRequestedOutput: allowance.currentSystemSourceOutputDb,
       availableSystemHeadroom: allowance.availableHeadroomDb,
-      aggregateEq: trace?.appliedCorrectionDb,
+      aggregateEq: Number.isFinite(rawSpl) && Number.isFinite(finalSpl) ? finalSpl - rawSpl : trace?.appliedCorrectionDb,
       finalSpl,
     };
-  }), [activeSubs, rawCurve, postEqCurve, usableLfHz, eqDiagnostics]);
+  }), [activeSubs, rawCurve, postEqCurve, usableLfHz, eqDiagnostics, optimisationResult]);
 
   if (!activeSubs?.length || !rawCurve?.length || !postEqCurve?.length) return null;
   return <details className="mt-3 rounded border border-slate-300 bg-slate-50 p-3 text-xs">

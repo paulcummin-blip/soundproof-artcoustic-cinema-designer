@@ -17,9 +17,10 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
-import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/rp22BassMetrics";
+import { optimiseBassSystem } from "@/components/utils/bassOptimisationEngine";
 import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
 import DesignEqFilterBankDiagnostic from "@/components/room/bass/DesignEqFilterBankDiagnostic";
+import BassOptimiserValidationPanel from "@/components/room/bass/BassOptimiserValidationPanel";
 import P14LevelPill from "@/components/room/P14LevelPill";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -840,10 +841,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { id: 'overlay-production', color: '#9CA3AF', label: 'Production', data };
   }, [overlayProduction, overlayProductionResults, selectedSeatIds]);
 
-  const designEqGraphResult = useMemo(
-    () => calculateDesignEqCurve(multiSeries[0]?.data || [], designEqSystemLimits.usableLfHz, designEqSystemLimits.activeSubs),
-    [multiSeries, designEqSystemLimits]
-  );
+
+  const optimisationTransitionHz = useMemo(() => {
+    const volume = (roomDims?.widthM || 0) * (roomDims?.lengthM || 0) * (roomDims?.heightM || 0);
+    return volume > 0 ? 2000 * Math.sqrt(0.4 / volume) : 120;
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
+
+  const optimisationResult = useMemo(() => optimiseBassSystem({
+    rawCurve: multiSeries[0]?.data || [],
+    activeSubs: designEqSystemLimits.activeSubs,
+    usableLfHz: designEqSystemLimits.usableLfHz,
+    transitionHz: optimisationTransitionHz,
+    priorityMode: "balanced",
+  }), [multiSeries, designEqSystemLimits, optimisationTransitionHz]);
 
   const multiSeriesForGraph = useMemo(() => {
     // When overlaying, highlight the active REW-style Absorption Authority curve in green
@@ -855,18 +865,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Apply the selected display smoothing to calculated curves only (not the pasted REW overlay).
     // When Design EQ is ON, the graph shows the same post-EQ curve used for P14 scoring
     // (1/3-octave basis, cut -10dB / boost +6dB) instead of the plain display smoothing.
-    out = designEqEnabled
-      ? out.flatMap((s) => {
-        const postEq = applyDesignEqCurve(s.data, designEqSystemLimits.usableLfHz, designEqSystemLimits.activeSubs);
-        return [
-          { ...s, id: `${s.id}-raw`, label: "Raw room", color: "#94A3B8", strokeDasharray: "4 4", data: s.data },
-          { ...s, id: `${s.id}-eq`, label: "Post-EQ", data: postEq },
-        ];
-      })
+    out = designEqEnabled && optimisationResult.finalPostEqCurve.length
+      ? [
+        { ...out[0], id: `${out[0].id}-raw`, label: "Raw room", color: "#94A3B8", strokeDasharray: "4 4", data: out[0].data },
+        { ...out[0], id: `${out[0].id}-eq`, label: "Optimised post-EQ", data: optimisationResult.finalPostEqCurve },
+      ]
       : out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, designEqSystemLimits]);
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult]);
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -925,16 +932,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { axial, tangential, oblique };
   }, [roomModesForDisplay, modalLineToggles]);
 
-  // Schroeder frequency
-  const schroederFrequency = React.useMemo(() => {
-    const w = roomDims?.widthM ?? 0;
-    const l = roomDims?.lengthM ?? 0;
-    const h = roomDims?.heightM ?? 0;
-    if (!(w > 0 && l > 0 && h > 0)) return 0;
-    const volume = w * l * h;
-    const rt60 = 0.4;
-    return 2000 * Math.sqrt(rt60 / volume);
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
+  // Shared transition frequency for graph markers and the optimiser validation path.
+  const schroederFrequency = optimisationTransitionHz;
 
   const rp22Levels = React.useMemo(() => ([
     { level: "L1", spl: 114, color: "#C1B6AD" },
@@ -1123,7 +1122,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
-        <P14LevelPill />
+        <P14LevelPill optimiserResult={designEqEnabled ? optimisationResult : null} />
 
       </div>
       
@@ -1316,19 +1315,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
         </div>
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
-          {designEqEnabled ? 'Showing post-EQ curve for P14 scoring' : 'Showing raw simulated curve'}
+          {designEqEnabled ? 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate' : 'Showing raw simulated curve'}
         </div>
         {designEqEnabled && <>
+          <BassOptimiserValidationPanel result={optimisationResult} />
           <DesignEqFilterBankDiagnostic
-            filters={designEqGraphResult.filters}
-            combinedEqCurve={designEqGraphResult.combinedEqCurve}
+            filters={optimisationResult.selectedFilters}
+            combinedEqCurve={(multiSeries[0]?.data || []).map((point) => {
+              const finalPoint = optimisationResult.finalPostEqCurve.find((candidate) => candidate.frequency === point.frequency);
+              return { frequency: point.frequency, spl: (finalPoint?.spl ?? point.spl) - point.spl };
+            })}
           />
           <SourceDomainCapabilityDiagnostic
             activeSubs={designEqSystemLimits.activeSubs}
             rawCurve={multiSeries[0]?.data}
-            postEqCurve={designEqGraphResult.curve}
+            postEqCurve={optimisationResult.finalPostEqCurve}
             usableLfHz={designEqSystemLimits.usableLfHz}
-            eqDiagnostics={designEqGraphResult.diagnostics}
+            optimisationResult={optimisationResult}
           />
         </>}
 
