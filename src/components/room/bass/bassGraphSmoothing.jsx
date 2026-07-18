@@ -6,6 +6,7 @@ const SMOOTHING_LABELS = {
   none: 'None',
   sixth: '1/6 octave',
   third: '1/3 octave',
+  octave: '1 octave',
 };
 
 function smoothFractionalOctave(data, width) {
@@ -21,11 +22,12 @@ function smoothFractionalOctave(data, width) {
   });
 }
 
-// mode: 'none' | 'sixth' | 'third'
+// mode: 'none' | 'sixth' | 'third' | 'octave'
 export function applyBassSmoothing(data, mode) {
   if (!Array.isArray(data) || data.length === 0) return data;
   if (mode === 'sixth') return smoothFractionalOctave(data, 6);
   if (mode === 'third') return smoothFractionalOctave(data, 3);
+  if (mode === 'octave') return smoothFractionalOctave(data, 1);
   return data;
 }
 

@@ -46,10 +46,11 @@ function median(values) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-function broadDipConfidence(thirdOctaveSpl, sixthOctaveSpl) {
-  if (!isNumber(thirdOctaveSpl) || !isNumber(sixthOctaveSpl)) return 0;
-  // A dip that disappears at 1/3 octave is a local cancellation, not a useful EQ target.
-  return Math.max(0, Math.min(1, 1 - Math.max(0, thirdOctaveSpl - sixthOctaveSpl) / 6));
+function broadRegionConfidence(octaveSpl, thirdOctaveSpl) {
+  if (!isNumber(octaveSpl) || !isNumber(thirdOctaveSpl)) return 0;
+  // A feature that changes materially between 1/3 and one octave is too local
+  // for a client-facing correction filter; retain it as room character instead.
+  return Math.max(0, Math.min(1, 1 - Math.abs(octaveSpl - thirdOctaveSpl) / 5));
 }
 
 export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
@@ -57,30 +58,31 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
   if (!raw.length) return { curve: curveData || [], diagnostics: [] };
 
   const thirdOctave = applyBassSmoothing(raw, "third");
-  const sixthOctave = applyBassSmoothing(raw, "sixth");
-  const referenceBand = thirdOctave.filter((point) => point.frequency >= 150 && point.frequency <= 200);
-  const anchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
+  const octaveTrend = applyBassSmoothing(raw, "octave");
+  const referenceBand = octaveTrend.filter((point) => point.frequency >= 150 && point.frequency <= 200);
+  const anchorDb = median((referenceBand.length ? referenceBand : octaveTrend).map((point) => point.spl));
   if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [] };
 
   const curve = raw.map((point) => {
-    const trendDb = interpolate(thirdOctave, point.frequency) ?? point.spl;
-    const sixthOctaveDb = interpolate(sixthOctave, point.frequency);
+    const trendDb = interpolate(octaveTrend, point.frequency) ?? point.spl;
+    const thirdOctaveDb = interpolate(thirdOctave, point.frequency);
     const targetDb = anchorDb + houseCurveOffset(point.frequency);
     const deviationDb = trendDb - targetDb;
-    const dipConfidence = broadDipConfidence(trendDb, sixthOctaveDb);
+    const broadness = broadRegionConfidence(trendDb, thirdOctaveDb);
+    const excessDb = Math.max(0, Math.abs(deviationDb) - 2);
 
-    // Premium calibration practice: take broad excess energy down decisively,
-    // use only small, well-supported fills, and leave local cancellation alone.
-    const cutDb = deviationDb > 0 ? Math.max(-12, -deviationDb) : 0;
-    const requestedBoostDb = deviationDb < 0
-      ? Math.min(3, -deviationDb) * dipConfidence
+    // ARC/Dirac-style policy: leave a ±2 dB broad window untouched, partially
+    // shape only octave-scale trends, and deliberately retain local cancellations.
+    const cutDb = deviationDb > 2 ? -Math.min(6, excessDb * 0.65) * broadness : 0;
+    const requestedBoostDb = deviationDb < -2
+      ? Math.min(2.5, excessDb * 0.45) * broadness
       : 0;
     const allowance = getSourceDomainBoostAllowance({
       frequency: point.frequency,
       requestedBoostDb,
       activeSubs,
       usableLfHz,
-      maxBoostDb: 3,
+      maxBoostDb: 2.5,
     });
     const appliedBoostDb = allowance.allowedBoostDb;
     const appliedCorrectionDb = cutDb + appliedBoostDb;
@@ -91,9 +93,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
       diagnostic: {
         targetDb,
         trendDb,
-        sixthOctaveDb,
+        thirdOctaveDb,
         deviationDb,
-        dipConfidence,
+        broadness,
         requestedBoostDb,
         appliedBoostDb,
         appliedCutDb: cutDb,
