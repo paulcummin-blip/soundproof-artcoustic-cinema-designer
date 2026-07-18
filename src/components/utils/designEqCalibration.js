@@ -94,7 +94,7 @@ function bellResponseDb(frequencyHz, filter) {
   return filter.gainDb * Math.exp(-0.5 * distance * distance);
 }
 
-function limitBoostForCapability(filter, activeSubs, usableLfHz) {
+function limitBoostForCapability(filter, activeSubs, usableLfHz, requestedSystemOutputDb) {
   if (filter.gainDb <= 0) return filter;
   const frequencies = [filter.startHz, (filter.startHz + filter.frequencyHz) / 2, filter.frequencyHz, (filter.frequencyHz + filter.endHz) / 2, filter.endHz];
   const allowed = frequencies.map((frequency) => getSourceDomainBoostAllowance({
@@ -103,6 +103,7 @@ function limitBoostForCapability(filter, activeSubs, usableLfHz) {
     activeSubs,
     usableLfHz,
     maxBoostDb: 6,
+    requestedSystemOutputDb,
   }).allowedBoostDb).filter(isNumber);
   const gainDb = allowed.length ? Math.min(filter.gainDb, ...allowed) : filter.gainDb;
   return { ...filter, gainDb };
@@ -122,7 +123,7 @@ function emptyFilters(filters) {
   }))];
 }
 
-export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
+export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], options = {}) {
   const raw = normaliseCurve(curveData);
   if (!raw.length) return { curve: curveData || [], diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
 
@@ -156,7 +157,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
       widthOctaves: region.widthOctaves,
       reason: isPeak ? "Broad peak above Artcoustic target" : "Broad valley below Artcoustic target",
     };
-    return limitBoostForCapability(filter, activeSubs, usableLfHz);
+    return limitBoostForCapability(filter, activeSubs, usableLfHz, options.requestedSystemOutputDb);
   }).filter((filter) => filter.gainDb < -0.1 || filter.gainDb > 0.1);
   const filterBank = emptyFilters(filters);
   const combinedEqCurve = raw.map((point) => ({

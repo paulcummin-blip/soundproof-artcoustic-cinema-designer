@@ -53,10 +53,13 @@ export function getCurrentSystemSourceOutput(activeSubs) {
   return getCombinedRequestedOutputDb(activeSubs) + getOverallLfeGainDb(activeSubs);
 }
 
-export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6 }) {
+export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6, requestedSystemOutputDb }) {
   const requested = Math.max(0, Number(requestedBoostDb) || 0);
   const systemCapabilityDb = getSystemSourceCapability(activeSubs, frequency);
-  const currentSystemSourceOutputDb = getCurrentSystemSourceOutput(activeSubs);
+  const configuredSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
+  const currentSystemSourceOutputDb = isFiniteNumber(requestedSystemOutputDb)
+    ? Number(requestedSystemOutputDb)
+    : configuredSystemOutputDb;
   const availableHeadroomDb = isFiniteNumber(systemCapabilityDb) && isFiniteNumber(currentSystemSourceOutputDb)
     ? systemCapabilityDb - currentSystemSourceOutputDb : null;
   const normalAllowedBoostDb = availableHeadroomDb == null ? Math.min(requested, maxBoostDb) : Math.max(0, Math.min(requested, maxBoostDb, availableHeadroomDb));
