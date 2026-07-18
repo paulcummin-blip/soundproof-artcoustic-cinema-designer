@@ -46,11 +46,16 @@ function median(values) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-function broadRegionConfidence(octaveSpl, thirdOctaveSpl) {
-  if (!isNumber(octaveSpl) || !isNumber(thirdOctaveSpl)) return 0;
-  // A feature that changes materially between 1/3 and one octave is too local
-  // for a client-facing correction filter; retain it as room character instead.
-  return Math.max(0, Math.min(1, 1 - Math.abs(octaveSpl - thirdOctaveSpl) / 5));
+function deviationAt(curve, frequency, anchorDb) {
+  const spl = interpolate(curve, frequency);
+  return isNumber(spl) ? spl - (anchorDb + houseCurveOffset(frequency)) : null;
+}
+
+function persistsAcross(curve, frequency, anchorDb, widthOctaves, predicate) {
+  const ratio = Math.pow(2, widthOctaves / 2);
+  const lowDeviation = deviationAt(curve, frequency / ratio, anchorDb);
+  const highDeviation = deviationAt(curve, frequency * ratio, anchorDb);
+  return predicate(lowDeviation) && predicate(highDeviation);
 }
 
 export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
@@ -58,31 +63,31 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
   if (!raw.length) return { curve: curveData || [], diagnostics: [] };
 
   const thirdOctave = applyBassSmoothing(raw, "third");
-  const octaveTrend = applyBassSmoothing(raw, "octave");
-  const referenceBand = octaveTrend.filter((point) => point.frequency >= 150 && point.frequency <= 200);
-  const anchorDb = median((referenceBand.length ? referenceBand : octaveTrend).map((point) => point.spl));
+  const referenceBand = thirdOctave.filter((point) => point.frequency >= 150 && point.frequency <= 200);
+  const anchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
   if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [] };
 
   const curve = raw.map((point) => {
-    const trendDb = interpolate(octaveTrend, point.frequency) ?? point.spl;
-    const thirdOctaveDb = interpolate(thirdOctave, point.frequency);
+    const thirdOctaveDb = interpolate(thirdOctave, point.frequency) ?? point.spl;
     const targetDb = anchorDb + houseCurveOffset(point.frequency);
-    const deviationDb = trendDb - targetDb;
-    const broadness = broadRegionConfidence(trendDb, thirdOctaveDb);
-    const excessDb = Math.max(0, Math.abs(deviationDb) - 2);
+    const deviationDb = thirdOctaveDb - targetDb;
+    const isBroadPeak = deviationDb >= 3 && persistsAcross(
+      thirdOctave, point.frequency, anchorDb, 1 / 6, (value) => isNumber(value) && value >= 3,
+    );
+    const isBroadValley = deviationDb <= -2 && persistsAcross(
+      thirdOctave, point.frequency, anchorDb, 1 / 3, (value) => isNumber(value) && value <= -2,
+    );
 
-    // ARC/Dirac-style policy: leave a ±2 dB broad window untouched, partially
-    // shape only octave-scale trends, and deliberately retain local cancellations.
-    const cutDb = deviationDb > 2 ? -Math.min(6, excessDb * 0.65) * broadness : 0;
-    const requestedBoostDb = deviationDb < -2
-      ? Math.min(2.5, excessDb * 0.45) * broadness
-      : 0;
+    // Prioritise broad excess-energy removal. Narrow spikes and cancellations do
+    // not satisfy the persistence tests and are intentionally left uncorrected.
+    const cutDb = isBroadPeak ? -Math.min(10, deviationDb * 0.8) : 0;
+    const requestedBoostDb = isBroadValley ? Math.min(6, Math.abs(deviationDb) * 0.75) : 0;
     const allowance = getSourceDomainBoostAllowance({
       frequency: point.frequency,
       requestedBoostDb,
       activeSubs,
       usableLfHz,
-      maxBoostDb: 2.5,
+      maxBoostDb: 6,
     });
     const appliedBoostDb = allowance.allowedBoostDb;
     const appliedCorrectionDb = cutDb + appliedBoostDb;
@@ -92,10 +97,10 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
       spl: point.spl + appliedCorrectionDb,
       diagnostic: {
         targetDb,
-        trendDb,
         thirdOctaveDb,
         deviationDb,
-        broadness,
+        isBroadPeak,
+        isBroadValley,
         requestedBoostDb,
         appliedBoostDb,
         appliedCutDb: cutDb,

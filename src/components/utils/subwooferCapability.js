@@ -27,6 +27,11 @@ function getSubGainDb(sub) {
   return isFiniteNumber(gain) ? Number(gain) : 0;
 }
 
+function getRequestedOperatingLevelDb(sub) {
+  const requested = sub?.tuning?.requestedOutputDb ?? sub?.requestedOutputDb ?? 114;
+  return isFiniteNumber(requested) ? Number(requested) : 114;
+}
+
 export function getUsableLfHz(activeSubs) {
   const values = (activeSubs || []).map((sub) => MODELS.find((model) => model.key === getModelKey(sub))?.approvedUsableLfHzMinus6dB)
     .filter(isFiniteNumber);
@@ -39,11 +44,11 @@ export function getSystemSourceCapability(activeSubs, frequency) {
   return 20 * Math.log10(levels.reduce((sum, level) => sum + dbToPressure(level), 0));
 }
 
-export function getCurrentSystemSourceOutput(activeSubs, frequency) {
-  const levels = (activeSubs || []).map((sub) => {
-    const baseline = interpolateCapabilityCurve(getSubwooferCurve(getModelKey(sub)), frequency);
-    return isFiniteNumber(baseline) ? baseline + getSubGainDb(sub) : null;
-  });
+export function getCurrentSystemSourceOutput(activeSubs) {
+  // This is the requested operating level before Design EQ, not the product's
+  // maximum capability curve. A configured requestedOutputDb takes precedence;
+  // 114 dB per sub is the default cinema operating reference.
+  const levels = (activeSubs || []).map((sub) => getRequestedOperatingLevelDb(sub) + getSubGainDb(sub));
   if (!levels.length || levels.some((level) => !isFiniteNumber(level))) return null;
   return 20 * Math.log10(levels.reduce((sum, level) => sum + dbToPressure(level), 0));
 }
@@ -51,16 +56,17 @@ export function getCurrentSystemSourceOutput(activeSubs, frequency) {
 export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6 }) {
   const requested = Math.max(0, Number(requestedBoostDb) || 0);
   const systemCapabilityDb = getSystemSourceCapability(activeSubs, frequency);
-  const currentSystemSourceOutputDb = getCurrentSystemSourceOutput(activeSubs, frequency);
-  const headroomDb = isFiniteNumber(systemCapabilityDb) && isFiniteNumber(currentSystemSourceOutputDb)
+  const currentSystemSourceOutputDb = getCurrentSystemSourceOutput(activeSubs);
+  const availableHeadroomDb = isFiniteNumber(systemCapabilityDb) && isFiniteNumber(currentSystemSourceOutputDb)
     ? systemCapabilityDb - currentSystemSourceOutputDb : null;
-  const normalAllowedBoostDb = headroomDb == null ? Math.min(requested, maxBoostDb) : Math.max(0, Math.min(requested, maxBoostDb, headroomDb));
+  const normalAllowedBoostDb = availableHeadroomDb == null ? Math.min(requested, maxBoostDb) : Math.max(0, Math.min(requested, maxBoostDb, availableHeadroomDb));
   const lf = isFiniteNumber(usableLfHz) ? Number(usableLfHz) : null;
   const rampFraction = lf == null ? 1 : Math.max(0, Math.min(1, (Number(frequency) - lf) / 5));
   return {
     systemCapabilityDb,
     currentSystemSourceOutputDb,
-    headroomDb,
+    availableHeadroomDb,
+    headroomDb: availableHeadroomDb,
     requestedBoostDb: requested,
     lfRampFraction: rampFraction,
     lfRampLimitDb: normalAllowedBoostDb * rampFraction,
