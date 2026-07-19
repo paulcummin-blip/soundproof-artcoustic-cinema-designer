@@ -867,8 +867,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       id: "house-curve",
       kind: "house-curve",
       label: "Artcoustic house curve",
-      color: "#A09386",
-      strokeDasharray: "5 4",
+      color: "#625143",
+      strokeDasharray: "6 4",
       data: optimisationResult.finalPostEqCurve
         .filter((point) => point.frequency >= candidate.assessmentStartHz && point.frequency <= candidate.assessmentEndHz)
         .map((point) => ({ frequency: point.frequency, spl: anchorDb + artcousticHouseCurveOffsetAt(point.frequency) })),

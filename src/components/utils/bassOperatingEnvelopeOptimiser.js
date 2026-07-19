@@ -13,16 +13,27 @@ function levelFromValue(value, definitions, key, lowerIsBetter = false) {
 }
 
 function compareCandidates(a, b, mode) {
-  const levels = (candidate) => [candidate.achievedP14Level, candidate.achievedP18Level, candidate.achievedP19Level];
   const rank = (candidate) => {
-    const values = levels(candidate);
-    const minimum = Math.min(...values);
-    const spread = Math.max(...values) - minimum;
-    const total = values.reduce((sum, value) => sum + value, 0);
     if (mode === "spl") return [candidate.achievedP14Level, candidate.achievedP14Db, -candidate.achievedP19VariationDb];
     if (mode === "extension") return [candidate.achievedP18Level, -candidate.achievedP18FrequencyHz, -candidate.achievedP19VariationDb];
     if (mode === "accuracy") return [candidate.achievedP19Level, -candidate.achievedP19VariationDb, candidate.achievedP14Level];
-    return [minimum, -spread, total, -candidate.achievedP19VariationDb, candidate.achievedP14Db];
+
+    const orderedLevels = [
+      Number(candidate.achievedP14Level) || 0,
+      Number(candidate.achievedP18Level) || 0,
+      Number(candidate.achievedP19Level) || 0,
+    ].sort((a, b) => a - b);
+    const p19Variation = Number.isFinite(candidate.achievedP19VariationDb)
+      ? candidate.achievedP19VariationDb
+      : Infinity;
+    const p14Db = Number.isFinite(candidate.achievedP14Db)
+      ? candidate.achievedP14Db
+      : -Infinity;
+    const p18Hz = Number.isFinite(candidate.achievedP18FrequencyHz)
+      ? candidate.achievedP18FrequencyHz
+      : Infinity;
+
+    return [orderedLevels[0], orderedLevels[1], orderedLevels[2], -p19Variation, p14Db, -p18Hz];
   };
   const aRank = rank(a);
   const bRank = rank(b);
