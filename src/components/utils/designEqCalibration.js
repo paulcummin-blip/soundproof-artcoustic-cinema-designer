@@ -3,6 +3,7 @@ import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapab
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 const isNumber = (value) => Number.isFinite(Number(value));
+const DESIGN_EQ_SAMPLE_RATE = 48000;
 
 function normaliseCurve(curveData) {
   return (Array.isArray(curveData) ? curveData : [])
@@ -71,11 +72,67 @@ function qForRegion(region) {
   return Math.max(0.5, Math.min(10, region.centrePoint.frequency / bandwidthHz));
 }
 
-function bellResponseDb(frequencyHz, filter) {
-  if (!filter.enabled || !isNumber(frequencyHz) || frequencyHz <= 0) return 0;
-  const halfWidth = Math.max(filter.widthOctaves / 2, 0.05);
-  const distance = Math.log2(frequencyHz / filter.frequencyHz) / halfWidth;
-  return filter.gainDb * Math.exp(-0.5 * distance * distance);
+export function peakingEqResponseDb(frequencyHz, filter) {
+  const evaluationHz = Number(frequencyHz);
+  const requestedCentreHz = Number(filter?.frequencyHz);
+  const centreHz = Math.min(requestedCentreHz, DESIGN_EQ_SAMPLE_RATE * 0.45);
+  const gainDb = Number(filter?.gainDb);
+  const q = Number(filter?.Q);
+
+  if (!filter?.enabled
+    || !Number.isFinite(evaluationHz) || evaluationHz <= 0
+    || !Number.isFinite(centreHz) || centreHz <= 0
+    || !Number.isFinite(q) || q <= 0
+    || !Number.isFinite(gainDb)) return 0;
+
+  const A = 10 ** (gainDb / 40);
+  const w0 = 2 * Math.PI * centreHz / DESIGN_EQ_SAMPLE_RATE;
+  const alpha = Math.sin(w0) / (2 * q);
+  const unnormalisedB0 = 1 + alpha * A;
+  const unnormalisedB1 = -2 * Math.cos(w0);
+  const unnormalisedB2 = 1 - alpha * A;
+  const a0 = 1 + alpha / A;
+  const unnormalisedA1 = -2 * Math.cos(w0);
+  const unnormalisedA2 = 1 - alpha / A;
+
+  if (![A, w0, alpha, unnormalisedB0, unnormalisedB1, unnormalisedB2, a0, unnormalisedA1, unnormalisedA2].every(Number.isFinite) || a0 === 0) return 0;
+
+  const b0 = unnormalisedB0 / a0;
+  const b1 = unnormalisedB1 / a0;
+  const b2 = unnormalisedB2 / a0;
+  const a1 = unnormalisedA1 / a0;
+  const a2 = unnormalisedA2 / a0;
+  const w = 2 * Math.PI * evaluationHz / DESIGN_EQ_SAMPLE_RATE;
+  const numeratorReal = b0 + b1 * Math.cos(w) + b2 * Math.cos(2 * w);
+  const numeratorImag = -(b1 * Math.sin(w) + b2 * Math.sin(2 * w));
+  const denominatorReal = 1 + a1 * Math.cos(w) + a2 * Math.cos(2 * w);
+  const denominatorImag = -(a1 * Math.sin(w) + a2 * Math.sin(2 * w));
+  const numeratorMagnitude = Math.hypot(numeratorReal, numeratorImag);
+  const denominatorMagnitude = Math.hypot(denominatorReal, denominatorImag);
+
+  if (![b0, b1, b2, a1, a2, numeratorMagnitude, denominatorMagnitude].every(Number.isFinite)
+    || denominatorMagnitude <= 0 || numeratorMagnitude <= 0) return 0;
+
+  const responseDb = 20 * Math.log10(numeratorMagnitude / denominatorMagnitude);
+  return Number.isFinite(responseDb) ? responseDb : 0;
+}
+
+export function getDesignEqPeakingResponseValidation() {
+  const cases = [
+    { label: "35 Hz, -6 dB, Q 1", filter: { enabled: true, frequencyHz: 35, gainDb: -6, Q: 1 }, centreHz: 35 },
+    { label: "35 Hz, -6 dB, Q 4", filter: { enabled: true, frequencyHz: 35, gainDb: -6, Q: 4 }, centreHz: 35 },
+    { label: "50 Hz, +3 dB, Q 2", filter: { enabled: true, frequencyHz: 50, gainDb: 3, Q: 2 }, centreHz: 50 },
+    { label: "0 dB gain", filter: { enabled: true, frequencyHz: 50, gainDb: 0, Q: 2 }, centreHz: 50 },
+  ];
+  const qOne = cases[0].filter;
+  const qFour = cases[1].filter;
+  return {
+    centreResponses: cases.map(({ label, filter, centreHz }) => ({ label, responseDb: peakingEqResponseDb(centreHz, filter) })),
+    offCentre35Hz: {
+      q1At40Hz: peakingEqResponseDb(40, qOne),
+      q4At40Hz: peakingEqResponseDb(40, qFour),
+    },
+  };
 }
 
 function limitBoostForCapability(filter, activeSubs, usableLfHz, requestedSystemOutputDb) {
@@ -157,7 +214,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       }, activeSubs, usableLfHz, options.requestedSystemOutputDb);
       if (Math.abs(candidate.gainDb) <= 0.1) continue;
 
-      const nextCurve = curve.map((point) => ({ ...point, spl: point.spl + bellResponseDb(point.frequency, candidate) }));
+      const nextCurve = curve.map((point) => ({ ...point, spl: point.spl + peakingEqResponseDb(point.frequency, candidate) }));
       const nextTrend = applyBassSmoothing(nextCurve, "third");
       const before = Math.abs(region.centrePoint.deviationDb);
       const after = Math.abs(deviationAt(nextTrend, region.centrePoint.frequency, anchorDb));
@@ -174,7 +231,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   const filterBank = emptyFilters(filters);
   const combinedEqCurve = raw.map((point) => ({
     frequency: point.frequency,
-    spl: filters.reduce((sum, filter) => sum + bellResponseDb(point.frequency, filter), 0),
+    spl: filters.reduce((sum, filter) => sum + peakingEqResponseDb(point.frequency, filter), 0),
   }));
   curve = raw.map((point, index) => ({
     frequency: point.frequency,
