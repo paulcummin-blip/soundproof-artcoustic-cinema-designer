@@ -182,7 +182,7 @@ function completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, 
   };
 }
 
-function createsBroadBelowTargetWorsening(beforeTrend, afterMetrics, anchorDb) {
+function createsBroadBelowTargetWorsening(beforeTrend, afterMetrics, anchorDb, targetToleranceDb) {
   let regionStartHz = null;
   let regionEndHz = null;
   const closesMaterialRegion = () => {
@@ -197,7 +197,7 @@ function createsBroadBelowTargetWorsening(beforeTrend, afterMetrics, anchorDb) {
   for (const point of afterMetrics.points) {
     const beforeDeviationDb = deviationAt(beforeTrend, point.frequency, anchorDb);
     const isWorseBelowTarget = Number.isFinite(beforeDeviationDb)
-      && point.deviationDb < 0
+      && point.deviationDb < -targetToleranceDb
       && point.deviationDb <= beforeDeviationDb - 0.25;
     if (isWorseBelowTarget) {
       if (regionStartHz === null) regionStartHz = point.frequency;
@@ -244,12 +244,14 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     if (!currentMetrics) break;
 
     const acceptableCandidates = [];
+    const gainScales = [1, 0.75, 0.5];
+    const qMultipliers = [1, 1.5, 2, 3];
     for (const region of regions) {
       const isPeak = region.kind === "peak";
       const requestedGainDb = isPeak
         ? -Math.min(10, region.severityDb * 0.85)
         : Math.min(6, region.severityDb * 0.75);
-      const candidate = limitBoostForCapability({
+      const baseCandidate = limitBoostForCapability({
         band: filters.length + 1,
         enabled: true,
         type: "Peak",
@@ -261,30 +263,52 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
         widthOctaves: region.widthOctaves,
         reason: isPeak ? "Residual broad peak above Artcoustic target" : "Residual broad valley below Artcoustic target",
       }, activeSubs, usableLfHz, options.requestedSystemOutputDb);
-      if (Math.abs(candidate.gainDb) <= 0.1) continue;
+      if (Math.abs(baseCandidate.gainDb) <= 0.1) continue;
 
-      const nextCurve = curve.map((point) => ({ ...point, spl: point.spl + peakingEqResponseDb(point.frequency, candidate) }));
-      const nextTrend = applyBassSmoothing(nextCurve, "third");
-      const nextMetrics = completeBandResidualMetrics(nextTrend, assessmentStartHz, assessmentEndHz, anchorDb);
-      if (!nextMetrics) continue;
+      const seenVariants = new Set();
+      for (const gainScale of gainScales) {
+        for (const qMultiplier of qMultipliers) {
+          const scaledCandidate = {
+            ...baseCandidate,
+            gainDb: baseCandidate.gainDb * gainScale,
+            Q: Math.max(0.5, Math.min(10, baseCandidate.Q * qMultiplier)),
+          };
+          const candidate = scaledCandidate.gainDb > 0
+            ? limitBoostForCapability(scaledCandidate, activeSubs, usableLfHz, options.requestedSystemOutputDb)
+            : scaledCandidate;
+          const variantKey = `${candidate.gainDb.toFixed(4)}:${candidate.Q.toFixed(4)}`;
+          if (seenVariants.has(variantKey) || Math.abs(candidate.gainDb) <= 0.1) continue;
+          seenVariants.add(variantKey);
 
-      const before = Math.abs(region.centrePoint.deviationDb);
-      const after = Math.abs(deviationAt(nextTrend, region.centrePoint.frequency, anchorDb));
-      const localImprovementDb = before - after;
-      const maximumDeviationReductionDb = currentMetrics.maximumAbsoluteDeviationDb - nextMetrics.maximumAbsoluteDeviationDb;
-      const rmsReductionDb = currentMetrics.rmsDeviationDb - nextMetrics.rmsDeviationDb;
-      const createsWorseBelowTargetResidual = createsBroadBelowTargetWorsening(trend, nextMetrics, anchorDb);
-      const acceptable = localImprovementDb >= 0.05
-        && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
-        && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10)
-        && !createsWorseBelowTargetResidual;
-      if (acceptable) acceptableCandidates.push({
-        filter: candidate,
-        curve: nextCurve,
-        maximumDeviationReductionDb,
-        rmsReductionDb,
-        localImprovementDb,
-      });
+          const nextCurve = curve.map((point) => ({ ...point, spl: point.spl + peakingEqResponseDb(point.frequency, candidate) }));
+          const nextTrend = applyBassSmoothing(nextCurve, "third");
+          const nextMetrics = completeBandResidualMetrics(nextTrend, assessmentStartHz, assessmentEndHz, anchorDb);
+          if (!nextMetrics) continue;
+
+          const before = Math.abs(region.centrePoint.deviationDb);
+          const after = Math.abs(deviationAt(nextTrend, region.centrePoint.frequency, anchorDb));
+          const localImprovementDb = before - after;
+          const maximumDeviationReductionDb = currentMetrics.maximumAbsoluteDeviationDb - nextMetrics.maximumAbsoluteDeviationDb;
+          const rmsReductionDb = currentMetrics.rmsDeviationDb - nextMetrics.rmsDeviationDb;
+          const createsWorseBelowTargetResidual = createsBroadBelowTargetWorsening(
+            trend,
+            nextMetrics,
+            anchorDb,
+            targetToleranceDb,
+          );
+          const acceptable = localImprovementDb >= 0.05
+            && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
+            && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10)
+            && !createsWorseBelowTargetResidual;
+          if (acceptable) acceptableCandidates.push({
+            filter: candidate,
+            curve: nextCurve,
+            maximumDeviationReductionDb,
+            rmsReductionDb,
+            localImprovementDb,
+          });
+        }
+      }
     }
 
     acceptableCandidates.sort((a, b) =>
