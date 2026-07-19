@@ -182,7 +182,7 @@ function completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, 
   };
 }
 
-function createsBroadBelowTargetWorsening(beforeTrend, afterMetrics, anchorDb, targetToleranceDb) {
+function createsBroadBelowTargetWorsening(beforeTrend, afterMetrics, anchorDb, fittingToleranceDb) {
   let regionStartHz = null;
   let regionEndHz = null;
   const closesMaterialRegion = () => {
@@ -197,7 +197,7 @@ function createsBroadBelowTargetWorsening(beforeTrend, afterMetrics, anchorDb, t
   for (const point of afterMetrics.points) {
     const beforeDeviationDb = deviationAt(beforeTrend, point.frequency, anchorDb);
     const isWorseBelowTarget = Number.isFinite(beforeDeviationDb)
-      && point.deviationDb < -targetToleranceDb
+      && point.deviationDb < -fittingToleranceDb
       && point.deviationDb <= beforeDeviationDb - 0.25;
     if (isWorseBelowTarget) {
       if (regionStartHz === null) regionStartHz = point.frequency;
@@ -207,6 +207,14 @@ function createsBroadBelowTargetWorsening(beforeTrend, afterMetrics, anchorDb, t
     }
   }
   return closesMaterialRegion();
+}
+
+function minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz) {
+  const values = curve
+    .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
+    .map((point) => Number(point.spl))
+    .filter(Number.isFinite);
+  return values.length ? Math.min(...values) : null;
 }
 
 export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], options = {}) {
@@ -221,7 +229,10 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
-  const targetToleranceDb = Number.isFinite(Number(options.targetToleranceDb)) ? Number(options.targetToleranceDb) : 0;
+  const requestedFittingToleranceDb = Number.isFinite(Number(options.fittingToleranceDb))
+    ? Number(options.fittingToleranceDb)
+    : 2;
+  const fittingToleranceDb = Math.max(1, Math.min(5, requestedFittingToleranceDb));
   const filters = [];
   let curve = raw;
 
@@ -233,16 +244,23 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const trendPoints = trend
       .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
       .map((point) => ({ ...point, deviationDb: deviationAt(trend, point.frequency, anchorDb) }));
-    const peakDiscoveryThresholdDb = Math.max(1, Math.min(3, targetToleranceDb));
+    const currentMetrics = completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, anchorDb);
+    if (!currentMetrics || currentMetrics.maximumAbsoluteDeviationDb <= fittingToleranceDb) break;
+
+    const peakDiscoveryThresholdDb = Math.max(1, Math.min(3, fittingToleranceDb));
     const regions = [
       ...findRegions(trendPoints, "peak", peakDiscoveryThresholdDb),
       ...findRegions(trendPoints, "valley"),
     ].sort((a, b) => b.severityDb - a.severityDb);
-    if (!regions.length || regions[0].severityDb <= targetToleranceDb) break;
+    if (!regions.length) break;
 
-    const currentMetrics = completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, anchorDb);
-    if (!currentMetrics) break;
-
+    const currentMinimumSpl = minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz);
+    if (!Number.isFinite(currentMinimumSpl)) break;
+    const requestedSystemOutputDb = Number(options.requestedSystemOutputDb);
+    const minimumAllowedSpl = Math.min(
+      currentMinimumSpl,
+      Number.isFinite(requestedSystemOutputDb) ? requestedSystemOutputDb : currentMinimumSpl,
+    ) - 0.05;
     const acceptableCandidates = [];
     const gainScales = [1, 0.75, 0.5];
     const qMultipliers = [1, 1.5, 2, 3];
@@ -294,12 +312,15 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
             trend,
             nextMetrics,
             anchorDb,
-            targetToleranceDb,
+            fittingToleranceDb,
           );
+          const candidateMinimumSpl = minimumSplAcrossBand(nextCurve, assessmentStartHz, assessmentEndHz);
           const acceptable = localImprovementDb >= 0.05
             && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
             && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10)
-            && !createsWorseBelowTargetResidual;
+            && !createsWorseBelowTargetResidual
+            && Number.isFinite(candidateMinimumSpl)
+            && candidateMinimumSpl >= minimumAllowedSpl;
           if (acceptable) acceptableCandidates.push({
             filter: candidate,
             curve: nextCurve,

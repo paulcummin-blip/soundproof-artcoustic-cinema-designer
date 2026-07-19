@@ -57,6 +57,7 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     requestedSystemOutputDb: request.p14.p14TargetDb,
     targetAnchorDb: request.p14.p14TargetDb,
     targetToleranceDb: request.p19.p19ToleranceDb,
+    fittingToleranceDb: 2,
     assessmentStartHz,
     assessmentEndHz,
   });
