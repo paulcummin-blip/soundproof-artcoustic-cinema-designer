@@ -40,8 +40,8 @@ function octaveWidth(startHz, endHz) {
   return startHz > 0 && endHz > startHz ? Math.log2(endHz / startHz) : 0;
 }
 
-function findRegions(points, kind) {
-  const threshold = kind === "peak" ? 3 : -2;
+function findRegions(points, kind, peakThresholdDb = 3) {
+  const threshold = kind === "peak" ? peakThresholdDb : -2;
   const matches = (point) => kind === "peak" ? point.deviationDb >= threshold : point.deviationDb <= threshold;
   const minimumWidth = kind === "peak" ? 1 / 6 : 1 / 3;
   const regions = [];
@@ -182,6 +182,33 @@ function completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, 
   };
 }
 
+function createsBroadBelowTargetWorsening(beforeTrend, afterMetrics, anchorDb) {
+  let regionStartHz = null;
+  let regionEndHz = null;
+  const closesMaterialRegion = () => {
+    const isMaterial = regionStartHz !== null
+      && regionEndHz !== null
+      && octaveWidth(regionStartHz, regionEndHz) >= 1 / 6;
+    regionStartHz = null;
+    regionEndHz = null;
+    return isMaterial;
+  };
+
+  for (const point of afterMetrics.points) {
+    const beforeDeviationDb = deviationAt(beforeTrend, point.frequency, anchorDb);
+    const isWorseBelowTarget = Number.isFinite(beforeDeviationDb)
+      && point.deviationDb < 0
+      && point.deviationDb <= beforeDeviationDb - 0.25;
+    if (isWorseBelowTarget) {
+      if (regionStartHz === null) regionStartHz = point.frequency;
+      regionEndHz = point.frequency;
+    } else if (closesMaterialRegion()) {
+      return true;
+    }
+  }
+  return closesMaterialRegion();
+}
+
 export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], options = {}) {
   const raw = normaliseCurve(curveData);
   if (!raw.length) return { curve: curveData || [], diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
@@ -206,8 +233,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const trendPoints = trend
       .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
       .map((point) => ({ ...point, deviationDb: deviationAt(trend, point.frequency, anchorDb) }));
+    const peakDiscoveryThresholdDb = Math.max(1, Math.min(3, targetToleranceDb));
     const regions = [
-      ...findRegions(trendPoints, "peak"),
+      ...findRegions(trendPoints, "peak", peakDiscoveryThresholdDb),
       ...findRegions(trendPoints, "valley"),
     ].sort((a, b) => b.severityDb - a.severityDb);
     if (!regions.length || regions[0].severityDb <= targetToleranceDb) break;
@@ -245,10 +273,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       const localImprovementDb = before - after;
       const maximumDeviationReductionDb = currentMetrics.maximumAbsoluteDeviationDb - nextMetrics.maximumAbsoluteDeviationDb;
       const rmsReductionDb = currentMetrics.rmsDeviationDb - nextMetrics.rmsDeviationDb;
-      const createsWorseBelowTargetResidual = nextMetrics.points.some((point) => {
-        const previousDeviationDb = deviationAt(trend, point.frequency, anchorDb);
-        return point.deviationDb < 0 && point.deviationDb < previousDeviationDb - 0.25;
-      });
+      const createsWorseBelowTargetResidual = createsBroadBelowTargetWorsening(trend, nextMetrics, anchorDb);
       const acceptable = localImprovementDb >= 0.05
         && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
         && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10)
