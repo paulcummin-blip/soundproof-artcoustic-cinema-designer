@@ -1,10 +1,6 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
-
-const HOUSE_CURVE = [
-  [15, 6], [30, 6], [40, 5], [50, 4], [63, 3], [80, 2.5],
-  [100, 2], [120, 1.5], [150, 1.2], [200, 0.8], [400, 0],
-];
+import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 
@@ -26,18 +22,6 @@ function interpolate(curve, frequency) {
   return low.spl + (high.spl - low.spl) * ratio;
 }
 
-function houseCurveOffset(frequency) {
-  if (frequency <= HOUSE_CURVE[0][0]) return HOUSE_CURVE[0][1];
-  for (let index = 1; index < HOUSE_CURVE.length; index += 1) {
-    const [highFrequency, highOffset] = HOUSE_CURVE[index];
-    const [lowFrequency, lowOffset] = HOUSE_CURVE[index - 1];
-    if (frequency <= highFrequency) {
-      const ratio = (frequency - lowFrequency) / (highFrequency - lowFrequency);
-      return lowOffset + (highOffset - lowOffset) * ratio;
-    }
-  }
-  return 0;
-}
 
 function median(values) {
   const sorted = values.filter(isNumber).sort((a, b) => a - b);
@@ -48,7 +32,7 @@ function median(values) {
 
 function deviationAt(curve, frequency, anchorDb) {
   const spl = interpolate(curve, frequency);
-  return isNumber(spl) ? spl - (anchorDb + houseCurveOffset(frequency)) : null;
+  return isNumber(spl) ? spl - (anchorDb + artcousticHouseCurveOffsetAt(frequency)) : null;
 }
 
 function octaveWidth(startHz, endHz) {
@@ -135,47 +119,64 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
-  const trendPoints = thirdOctave
-    .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
-    .map((point) => ({ ...point, deviationDb: deviationAt(thirdOctave, point.frequency, anchorDb) }));
-  const peakRegions = findRegions(trendPoints, "peak").sort((a, b) => b.severityDb - a.severityDb);
-  const valleyRegions = findRegions(trendPoints, "valley").sort((a, b) => b.severityDb - a.severityDb);
-  // Remove the dominant broad excess first. A single filter is limited to -10 dB,
-  // so a severe, broad peak can use two overlapping smooth bells before any valley fill.
-  const regions = [peakRegions[0], ...valleyRegions, ...peakRegions.slice(1)].filter(Boolean);
+  const targetToleranceDb = Number.isFinite(Number(options.targetToleranceDb)) ? Number(options.targetToleranceDb) : 0;
   const filters = [];
-  for (const region of regions) {
-    if (filters.length >= 10) break;
-    const isPeak = region.kind === "peak";
-    const totalGainDb = isPeak
-      ? -Math.min(20, region.severityDb * 0.9)
-      : Math.min(6, region.severityDb * 0.75);
-    const passes = isPeak ? Math.min(2, Math.ceil(Math.abs(totalGainDb) / 10)) : 1;
-    for (let pass = 0; pass < passes && filters.length < 10; pass += 1) {
-      const filter = {
+  let curve = raw;
+
+  // Fit one broad residual at a time. Each pass re-smooths the cumulative curve,
+  // allowing a severe modal peak to receive a complementary filter when its first
+  // wide correction leaves a physically meaningful residual.
+  while (filters.length < 10) {
+    const trend = applyBassSmoothing(curve, "third");
+    const trendPoints = trend
+      .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
+      .map((point) => ({ ...point, deviationDb: deviationAt(trend, point.frequency, anchorDb) }));
+    const regions = [
+      ...findRegions(trendPoints, "peak"),
+      ...findRegions(trendPoints, "valley"),
+    ].sort((a, b) => b.severityDb - a.severityDb);
+    if (!regions.length || regions[0].severityDb <= targetToleranceDb) break;
+
+    let chosen = null;
+    for (const region of regions) {
+      const isPeak = region.kind === "peak";
+      const requestedGainDb = isPeak
+        ? -Math.min(10, region.severityDb * 0.85)
+        : Math.min(6, region.severityDb * 0.75);
+      const candidate = limitBoostForCapability({
         band: filters.length + 1,
         enabled: true,
         type: "Peak",
         frequencyHz: region.centrePoint.frequency,
-        gainDb: totalGainDb / passes,
+        gainDb: requestedGainDb,
         Q: qForRegion(region),
         startHz: region.startHz,
         endHz: region.endHz,
         widthOctaves: region.widthOctaves,
-        reason: isPeak
-          ? `Broad peak reduction ${pass + 1}/${passes} above Artcoustic target`
-          : "Broad valley below Artcoustic target",
-      };
-      const constrained = limitBoostForCapability(filter, activeSubs, usableLfHz, options.requestedSystemOutputDb);
-      if (constrained.gainDb < -0.1 || constrained.gainDb > 0.1) filters.push(constrained);
+        reason: isPeak ? "Residual broad peak above Artcoustic target" : "Residual broad valley below Artcoustic target",
+      }, activeSubs, usableLfHz, options.requestedSystemOutputDb);
+      if (Math.abs(candidate.gainDb) <= 0.1) continue;
+
+      const nextCurve = curve.map((point) => ({ ...point, spl: point.spl + bellResponseDb(point.frequency, candidate) }));
+      const nextTrend = applyBassSmoothing(nextCurve, "third");
+      const before = Math.abs(region.centrePoint.deviationDb);
+      const after = Math.abs(deviationAt(nextTrend, region.centrePoint.frequency, anchorDb));
+      if (after < before - 0.05) {
+        chosen = { filter: candidate, curve: nextCurve };
+        break;
+      }
     }
+    if (!chosen) break;
+    filters.push(chosen.filter);
+    curve = chosen.curve;
   }
+
   const filterBank = emptyFilters(filters);
   const combinedEqCurve = raw.map((point) => ({
     frequency: point.frequency,
     spl: filters.reduce((sum, filter) => sum + bellResponseDb(point.frequency, filter), 0),
   }));
-  const curve = raw.map((point, index) => ({
+  curve = raw.map((point, index) => ({
     frequency: point.frequency,
     spl: point.spl + combinedEqCurve[index].spl,
   }));
@@ -186,7 +187,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     combinedEqCurve,
     diagnostics: curve.map((point, index) => ({
       frequency: point.frequency,
-      targetDb: anchorDb + houseCurveOffset(point.frequency),
+      targetDb: anchorDb + artcousticHouseCurveOffsetAt(point.frequency),
       trendDb: interpolate(thirdOctave, point.frequency),
       appliedCorrectionDb: combinedEqCurve[index].spl,
     })),

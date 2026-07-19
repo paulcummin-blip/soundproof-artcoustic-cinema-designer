@@ -45,6 +45,7 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
   const eq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
     requestedSystemOutputDb: request.p14.p14TargetDb,
     targetAnchorDb: request.p14.p14TargetDb,
+    targetToleranceDb: request.p19.p19ToleranceDb,
     assessmentStartHz,
     assessmentEndHz,
   });

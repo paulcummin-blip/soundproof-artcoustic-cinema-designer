@@ -24,6 +24,7 @@ import BassOptimiserValidationPanel from "@/components/room/bass/BassOptimiserVa
 import P14LevelPill from "@/components/room/P14LevelPill";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code.
@@ -230,6 +231,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
   const [optimiserPriorityMode, setOptimiserPriorityMode] = useState('balanced');
+  const [houseCurveOverride, setHouseCurveOverride] = useState(null);
+  const showHouseCurve = houseCurveOverride ?? !!designEqEnabled;
   // Bass Response Smoothing — display-only. Does not touch simulation, modal calculations,
   // raw null-depth detection, or SPL normalisation. 'none' preserves prior graph behaviour
   // (the graph previously plotted the raw unsmoothed curve).
@@ -856,6 +859,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     priorityMode: optimiserPriorityMode,
   }), [multiSeries, designEqSystemLimits, optimisationTransitionHz, optimiserPriorityMode]);
 
+  const houseCurveSeries = useMemo(() => {
+    const candidate = optimisationResult.selectedCandidate;
+    const anchorDb = optimisationResult.selectedP14TargetDb;
+    if (!showHouseCurve || !candidate || !Number.isFinite(anchorDb)) return null;
+    return {
+      id: "house-curve",
+      kind: "house-curve",
+      label: "Artcoustic house curve",
+      color: "#A09386",
+      strokeDasharray: "5 4",
+      data: optimisationResult.finalPostEqCurve
+        .filter((point) => point.frequency >= candidate.assessmentStartHz && point.frequency <= candidate.assessmentEndHz)
+        .map((point) => ({ frequency: point.frequency, spl: anchorDb + artcousticHouseCurveOffsetAt(point.frequency) })),
+    };
+  }, [showHouseCurve, optimisationResult]);
+
   const multiSeriesForGraph = useMemo(() => {
     // When overlaying, highlight the active REW-style Absorption Authority curve in green
     // so it's clearly distinguishable from the grey Production overlay curve.
@@ -868,13 +887,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // (1/3-octave basis, cut -10dB / boost +6dB) instead of the plain display smoothing.
     out = designEqEnabled && optimisationResult.finalPostEqCurve.length
       ? [
-        { ...out[0], id: `${out[0].id}-raw`, label: "Raw room", color: "#94A3B8", strokeDasharray: "4 4", data: out[0].data },
-        { ...out[0], id: `${out[0].id}-eq`, label: "Optimised post-EQ", data: optimisationResult.finalPostEqCurve },
+        { ...out[0], id: `${out[0].id}-raw`, kind: "raw", label: "Raw", color: "#94A3B8", strokeDasharray: "4 4", data: out[0].data },
+        { ...out[0], id: `${out[0].id}-eq`, kind: "post-eq", label: "Post-EQ", color: "#16A34A", data: optimisationResult.finalPostEqCurve },
       ]
       : out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
+    if (houseCurveSeries) out = [...out, houseCurveSeries];
     return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult]);
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult, houseCurveSeries]);
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -1215,6 +1235,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Design EQ for P14:</span>
               <Switch checked={!!designEqEnabled} onCheckedChange={setDesignEqEnabled} />
               <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost up to +6dB, capability-limited)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show house curve:</span>
+              <Switch checked={showHouseCurve} onCheckedChange={setHouseCurveOverride} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>

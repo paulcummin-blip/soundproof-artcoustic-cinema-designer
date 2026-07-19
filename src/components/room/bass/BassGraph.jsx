@@ -10,6 +10,9 @@ const CustomTooltip = ({ active, payload, label, series = [] }) => {
         ? `${Number(actualFreq).toFixed(2)} Hz`
         : (Number.isFinite(Number(label)) ? `${Number(label).toFixed(2)} Hz` : String(label));
     const visibleSeries = series.filter((item) => Number.isFinite(Number(row?.[`spl_${item.id}`])));
+    const postEq = visibleSeries.find((item) => item.kind === "post-eq");
+    const houseCurve = visibleSeries.find((item) => item.kind === "house-curve");
+    const residual = postEq && houseCurve ? row[`spl_${postEq.id}`] - row[`spl_${houseCurve.id}`] : null;
 
     return (
         <div className="bg-white/80 backdrop-blur-sm p-3 border border-[#DCDBD6] rounded-lg shadow-lg font-body">
@@ -17,6 +20,7 @@ const CustomTooltip = ({ active, payload, label, series = [] }) => {
             {visibleSeries.length > 1
                 ? visibleSeries.map((item) => <p key={item.id} style={{ color: item.color }}>{item.label || item.id}: {Number(row[`spl_${item.id}`]).toFixed(1)} dB</p>)
                 : <p className="text-[#213428]">SPL: {Number(visibleSeries.length ? row[`spl_${visibleSeries[0].id}`] : payload[0]?.value).toFixed(1)} dB</p>}
+            {Number.isFinite(residual) && <p className="text-[#625143]">Residual: {residual >= 0 ? "+" : ""}{residual.toFixed(1)} dB</p>}
         </div>
     );
 };
@@ -518,8 +522,10 @@ export default function BassGraph({
                         type="linear" 
                          dataKey={`spl_${s.id}`}
                         stroke={s.color}
-                        strokeWidth={2}
+                        strokeWidth={s.kind === "house-curve" ? 1 : 2}
+                        strokeOpacity={s.kind === "house-curve" ? 0.58 : 1}
                         strokeDasharray={s.strokeDasharray}
+                        label={s.kind === "house-curve" ? (props) => props.payload?.frequency === s.data[s.data.length - 1]?.frequency ? <text x={props.x + 6} y={props.y} fill="#8B7F76" fontSize={10}>Artcoustic house curve</text> : null : undefined}
                         dot={false}
                         activeDot={false}
                         connectNulls={false}
