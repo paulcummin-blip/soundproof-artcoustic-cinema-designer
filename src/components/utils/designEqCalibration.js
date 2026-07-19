@@ -217,6 +217,29 @@ function minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz) {
   return values.length ? Math.min(...values) : null;
 }
 
+function buildCheckpoint({ filters, curve, originalTrend, assessmentStartHz, assessmentEndHz, anchorDb, fittingToleranceDb, requestedSystemOutputDb }) {
+  const trend = applyBassSmoothing(curve, "third");
+  const metrics = completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, anchorDb);
+  const minimumSpl = minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz);
+  const broadBelowTargetWorsening = filters.length > 0 && metrics
+    ? createsBroadBelowTargetWorsening(originalTrend, metrics, anchorDb, fittingToleranceDb)
+    : false;
+  const p14Safe = Number.isFinite(requestedSystemOutputDb)
+    ? Number.isFinite(minimumSpl) && minimumSpl >= requestedSystemOutputDb - 0.05
+    : Number.isFinite(minimumSpl);
+  return {
+    filters: filters.map((filter) => ({ ...filter })),
+    curve: curve.map((point) => ({ ...point })),
+    trend: trend.map((point) => ({ ...point })),
+    maximumAbsoluteDeviationDb: metrics?.maximumAbsoluteDeviationDb ?? Infinity,
+    rmsDeviationDb: metrics?.rmsDeviationDb ?? Infinity,
+    worstResidualFrequencyHz: metrics?.worstResidualFrequencyHz ?? null,
+    minimumSpl,
+    broadBelowTargetWorsening,
+    p14Safe,
+  };
+}
+
 export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], options = {}) {
   const raw = normaliseCurve(curveData);
   if (!raw.length) return { curve: curveData || [], diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
@@ -233,8 +256,21 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     ? Number(options.fittingToleranceDb)
     : 2;
   const fittingToleranceDb = Math.max(1, Math.min(5, requestedFittingToleranceDb));
+  const requestedSystemOutputDb = Number(options.requestedSystemOutputDb);
   const filters = [];
   let curve = raw;
+  let stopReason = "no safe improvement remained";
+  const checkpoints = [buildCheckpoint({
+    filters,
+    curve,
+    originalTrend: thirdOctave,
+    assessmentStartHz,
+    assessmentEndHz,
+    anchorDb,
+    fittingToleranceDb,
+    requestedSystemOutputDb,
+  })];
+  const iterationTrace = [];
 
   // Fit one broad residual at a time. Each pass re-smooths the cumulative curve,
   // allowing a severe modal peak to receive a complementary filter when its first
@@ -245,7 +281,11 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
       .map((point) => ({ ...point, deviationDb: deviationAt(trend, point.frequency, anchorDb) }));
     const currentMetrics = completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, anchorDb);
-    if (!currentMetrics || currentMetrics.maximumAbsoluteDeviationDb <= fittingToleranceDb) break;
+    if (!currentMetrics) break;
+    if (currentMetrics.maximumAbsoluteDeviationDb <= fittingToleranceDb) {
+      stopReason = "fitting tolerance achieved";
+      break;
+    }
 
     const peakDiscoveryThresholdDb = Math.max(1, Math.min(3, fittingToleranceDb));
     const regions = [
@@ -256,11 +296,6 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
     const currentMinimumSpl = minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz);
     if (!Number.isFinite(currentMinimumSpl)) break;
-    const requestedSystemOutputDb = Number(options.requestedSystemOutputDb);
-    const minimumAllowedSpl = Math.min(
-      currentMinimumSpl,
-      Number.isFinite(requestedSystemOutputDb) ? requestedSystemOutputDb : currentMinimumSpl,
-    ) - 0.05;
     const acceptableCandidates = [];
     const gainScales = [1, 0.75, 0.5];
     const qMultipliers = [1, 1.5, 2, 3];
@@ -308,19 +343,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
           const localImprovementDb = before - after;
           const maximumDeviationReductionDb = currentMetrics.maximumAbsoluteDeviationDb - nextMetrics.maximumAbsoluteDeviationDb;
           const rmsReductionDb = currentMetrics.rmsDeviationDb - nextMetrics.rmsDeviationDb;
-          const createsWorseBelowTargetResidual = createsBroadBelowTargetWorsening(
-            trend,
-            nextMetrics,
-            anchorDb,
-            fittingToleranceDb,
-          );
-          const candidateMinimumSpl = minimumSplAcrossBand(nextCurve, assessmentStartHz, assessmentEndHz);
           const acceptable = localImprovementDb >= 0.05
             && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
-            && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10)
-            && !createsWorseBelowTargetResidual
-            && Number.isFinite(candidateMinimumSpl)
-            && candidateMinimumSpl >= minimumAllowedSpl;
+            && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
           if (acceptable) acceptableCandidates.push({
             filter: candidate,
             curve: nextCurve,
@@ -342,12 +367,51 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     if (!chosen) break;
     filters.push(chosen.filter);
     curve = chosen.curve;
+    const checkpoint = buildCheckpoint({
+      filters,
+      curve,
+      originalTrend: thirdOctave,
+      assessmentStartHz,
+      assessmentEndHz,
+      anchorDb,
+      fittingToleranceDb,
+      requestedSystemOutputDb,
+    });
+    checkpoints.push(checkpoint);
+    iterationTrace.push({
+      iteration: filters.length,
+      selectedFrequencyHz: chosen.filter.frequencyHz,
+      gainDb: chosen.filter.gainDb,
+      Q: chosen.filter.Q,
+      maximumDeviationBeforeDb: currentMetrics.maximumAbsoluteDeviationDb,
+      maximumDeviationAfterDb: checkpoint.maximumAbsoluteDeviationDb,
+      rmsBeforeDb: currentMetrics.rmsDeviationDb,
+      rmsAfterDb: checkpoint.rmsDeviationDb,
+      minimumSplBeforeDb: currentMinimumSpl,
+      minimumSplAfterDb: checkpoint.minimumSpl,
+      p14Safe: checkpoint.p14Safe,
+      broadBelowTargetWorsening: checkpoint.broadBelowTargetWorsening,
+    });
   }
+  if (filters.length >= 10) stopReason = "ten-band ceiling reached";
 
-  const filterBank = emptyFilters(filters);
+  const safeCheckpoints = checkpoints.filter((checkpoint) => checkpoint.p14Safe && !checkpoint.broadBelowTargetWorsening);
+  const rankedCheckpoints = safeCheckpoints.length
+    ? [...safeCheckpoints].sort((a, b) =>
+      a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+      || a.rmsDeviationDb - b.rmsDeviationDb
+      || a.filters.length - b.filters.length)
+    : [...checkpoints].sort((a, b) =>
+      b.minimumSpl - a.minimumSpl
+      || a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+      || a.rmsDeviationDb - b.rmsDeviationDb
+      || a.filters.length - b.filters.length);
+  const selectedCheckpoint = rankedCheckpoints[0];
+  const selectedFilters = selectedCheckpoint.filters;
+  const filterBank = emptyFilters(selectedFilters);
   const combinedEqCurve = raw.map((point) => ({
     frequency: point.frequency,
-    spl: filters.reduce((sum, filter) => sum + peakingEqResponseDb(point.frequency, filter), 0),
+    spl: selectedFilters.reduce((sum, filter) => sum + peakingEqResponseDb(point.frequency, filter), 0),
   }));
   curve = raw.map((point, index) => ({
     frequency: point.frequency,
@@ -358,6 +422,17 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     curve,
     filters: filterBank,
     combinedEqCurve,
+    iterationTrace,
+    stopReason,
+    selectedCheckpoint: {
+      enabledFilterCount: selectedFilters.length,
+      maximumAbsoluteDeviationDb: selectedCheckpoint.maximumAbsoluteDeviationDb,
+      rmsDeviationDb: selectedCheckpoint.rmsDeviationDb,
+      worstResidualFrequencyHz: selectedCheckpoint.worstResidualFrequencyHz,
+      minimumSpl: selectedCheckpoint.minimumSpl,
+      p14Safe: selectedCheckpoint.p14Safe,
+      broadBelowTargetWorsening: selectedCheckpoint.broadBelowTargetWorsening,
+    },
     diagnostics: curve.map((point, index) => ({
       frequency: point.frequency,
       targetDb: anchorDb + artcousticHouseCurveOffsetAt(point.frequency),
