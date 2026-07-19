@@ -2,6 +2,12 @@ import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { mergeBassGraphSeries } from '@/components/room/bass/bassGraphSeriesAlignment';
 
+const hasFiniteValue = (value) =>
+  value !== null &&
+  value !== undefined &&
+  value !== "" &&
+  Number.isFinite(Number(value));
+
 const CustomTooltip = ({ active, payload, label, series = [] }) => {
     if (!active || !payload?.length) return null;
     const row = payload[0]?.payload;
@@ -9,21 +15,30 @@ const CustomTooltip = ({ active, payload, label, series = [] }) => {
     const freqDisplay = Number.isFinite(Number(actualFreq))
         ? `${Number(actualFreq).toFixed(2)} Hz`
         : (Number.isFinite(Number(label)) ? `${Number(label).toFixed(2)} Hz` : String(label));
-    const visibleSeries = series.filter((item) => Number.isFinite(Number(row?.[`spl_${item.id}`])));
+    const visibleSeries = series.filter((item) => hasFiniteValue(row?.[`spl_${item.id}`]));
     const raw = visibleSeries.find((item) => item.kind === "raw");
     const postEq = visibleSeries.find((item) => item.kind === "post-eq");
     const houseCurve = visibleSeries.find((item) => item.kind === "house-curve");
-    const eqApplied = raw && postEq ? row[`spl_${postEq.id}`] - row[`spl_${raw.id}`] : null;
-    const residual = postEq && houseCurve ? row[`spl_${postEq.id}`] - row[`spl_${houseCurve.id}`] : null;
+    const rawValue = raw ? row[`spl_${raw.id}`] : null;
+    const postEqValue = postEq ? row[`spl_${postEq.id}`] : null;
+    const houseCurveValue = houseCurve ? row[`spl_${houseCurve.id}`] : null;
+    const eqApplied = hasFiniteValue(rawValue) && hasFiniteValue(postEqValue) ? Number(postEqValue) - Number(rawValue) : null;
+    const residual = hasFiniteValue(postEqValue) && hasFiniteValue(houseCurveValue) ? Number(postEqValue) - Number(houseCurveValue) : null;
+    const fallbackValue = visibleSeries.length
+      ? row[`spl_${visibleSeries[0].id}`]
+      : payload.find((item) => hasFiniteValue(item?.value))?.value;
 
     return (
         <div className="bg-white/80 backdrop-blur-sm p-3 border border-[#DCDBD6] rounded-lg shadow-lg font-body">
             <p className="font-bold text-[#1B1A1A]">{freqDisplay}</p>
             {visibleSeries.length > 1
-                ? visibleSeries.map((item) => <p key={item.id} style={{ color: item.color }}>{item.label || item.id}: {Number(row[`spl_${item.id}`]).toFixed(1)} dB</p>)
-                : <p className="text-[#213428]">SPL: {Number(visibleSeries.length ? row[`spl_${visibleSeries[0].id}`] : payload[0]?.value).toFixed(1)} dB</p>}
-            {Number.isFinite(eqApplied) && <p className="text-[#3E4349]">EQ applied: {eqApplied >= 0 ? "+" : ""}{eqApplied.toFixed(1)} dB</p>}
-            {Number.isFinite(residual) && <p className="text-[#625143]">Residual: {residual >= 0 ? "+" : ""}{residual.toFixed(1)} dB</p>}
+                ? visibleSeries.map((item) => {
+                    const value = row[`spl_${item.id}`];
+                    return hasFiniteValue(value) ? <p key={item.id} style={{ color: item.color }}>{item.label || item.id}: {Number(value).toFixed(1)} dB</p> : null;
+                  })
+                : hasFiniteValue(fallbackValue) && <p className="text-[#213428]">SPL: {Number(fallbackValue).toFixed(1)} dB</p>}
+            {hasFiniteValue(eqApplied) && <p className="text-[#3E4349]">EQ applied: {eqApplied >= 0 ? "+" : ""}{Number(eqApplied).toFixed(1)} dB</p>}
+            {hasFiniteValue(residual) && <p className="text-[#625143]">Residual: {residual >= 0 ? "+" : ""}{Number(residual).toFixed(1)} dB</p>}
         </div>
     );
 };

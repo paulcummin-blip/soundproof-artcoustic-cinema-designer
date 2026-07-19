@@ -862,6 +862,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const houseCurveSeries = useMemo(() => {
     const candidate = optimisationResult.selectedCandidate;
     const anchorDb = optimisationResult.selectedP14TargetDb;
+    const displayStartHz = 20;
     if (!showHouseCurve || !candidate || !Number.isFinite(anchorDb)) return null;
     return {
       id: "house-curve",
@@ -870,7 +871,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       color: "#625143",
       strokeDasharray: "6 4",
       data: optimisationResult.finalPostEqCurve
-        .filter((point) => point.frequency >= candidate.assessmentStartHz && point.frequency <= candidate.assessmentEndHz)
+        .filter((point) => point.frequency >= displayStartHz && point.frequency <= candidate.assessmentEndHz)
         .map((point) => ({ frequency: point.frequency, spl: anchorDb + artcousticHouseCurveOffsetAt(point.frequency) })),
     };
   }, [showHouseCurve, optimisationResult]);
