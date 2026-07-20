@@ -1,0 +1,362 @@
+
+========== 1. COMPLETE SELECTED EQ BANK ==========
+Selected start: empty
+Objective: Worst real seat
+Stop reason: no residual regions found
+Limiting reason: boost-limited
+Enabled filters: 8
+
+  Band 1: 40.00 Hz | gain 5.58 dB | Q 4.82 | enabled true | reason: Residual valley below house curve
+  Band 2: 97.00 Hz | gain -4.65 dB | Q 4.34 | enabled true | reason: Residual peak above house curve
+  Band 3: 39.00 Hz | gain 0.65 dB | Q 3.99 | enabled true | reason: Residual valley below house curve
+  Band 4: 73.00 Hz | gain -3.65 dB | Q 8.00 | enabled true | reason: Residual peak above house curve
+  Band 5: 77.00 Hz | gain -1.98 dB | Q 5.37 | enabled true | reason: Residual peak above house curve
+  Band 6: 104.00 Hz | gain -1.27 dB | Q 6.50 | enabled true | reason: Residual peak above house curve
+  Band 7: 29.00 Hz | gain -2.64 dB | Q 8.70 | enabled true | reason: Residual peak above house curve
+  Band 8: 25.00 Hz | gain -1.29 dB | Q 7.50 | enabled true | reason: Residual peak above house curve
+
+========== 2. INDIVIDUAL FILTER CONTRIBUTIONS AT PROBE FREQUENCIES ==========
+
+  29.75 Hz:
+    Band 1 (40.00 Hz, gain 5.58 dB, Q 4.82): 0.623 dB
+    Band 2 (97.00 Hz, gain -4.65 dB, Q 4.34): -0.029 dB
+    Band 3 (39.00 Hz, gain 0.65 dB, Q 3.99): 0.112 dB
+    Band 4 (73.00 Hz, gain -3.65 dB, Q 8.00): -0.014 dB
+    Band 5 (77.00 Hz, gain -1.98 dB, Q 5.37): -0.014 dB
+    Band 7 (29.00 Hz, gain -2.64 dB, Q 8.70): -2.201 dB
+    Band 8 (25.00 Hz, gain -1.29 dB, Q 7.50): -0.164 dB
+    TOTAL EQ: -1.69 dB (visible: -5.30 dB)
+  39.14 Hz:
+    Band 1 (40.00 Hz, gain 5.58 dB, Q 4.82): 5.328 dB
+    Band 2 (97.00 Hz, gain -4.65 dB, Q 4.34): -0.059 dB
+    Band 3 (39.00 Hz, gain 0.65 dB, Q 3.99): 0.649 dB
+    Band 4 (73.00 Hz, gain -3.65 dB, Q 8.00): -0.033 dB
+    Band 5 (77.00 Hz, gain -1.98 dB, Q 5.37): -0.032 dB
+    Band 7 (29.00 Hz, gain -2.64 dB, Q 8.70): -0.092 dB
+    Band 8 (25.00 Hz, gain -1.29 dB, Q 7.50): -0.026 dB
+    TOTAL EQ: 5.73 dB (visible: 0.80 dB)
+  77.16 Hz:
+    Band 1 (40.00 Hz, gain 5.58 dB, Q 4.82): 0.126 dB
+    Band 2 (97.00 Hz, gain -4.65 dB, Q 4.34): -0.947 dB
+    Band 3 (39.00 Hz, gain 0.65 dB, Q 3.99): 0.018 dB
+    Band 4 (73.00 Hz, gain -3.65 dB, Q 8.00): -2.040 dB
+    Band 5 (77.00 Hz, gain -1.98 dB, Q 5.37): -1.975 dB
+    Band 6 (104.00 Hz, gain -1.27 dB, Q 6.50): -0.077 dB
+    TOTAL EQ: -4.90 dB (visible: -1.50 dB)
+  101.52 Hz:
+    Band 1 (40.00 Hz, gain 5.58 dB, Q 4.82): 0.055 dB
+    Band 2 (97.00 Hz, gain -4.65 dB, Q 4.34): -3.999 dB
+    Band 4 (73.00 Hz, gain -3.65 dB, Q 8.00): -0.126 dB
+    Band 5 (77.00 Hz, gain -1.98 dB, Q 5.37): -0.198 dB
+    Band 6 (104.00 Hz, gain -1.27 dB, Q 6.50): -1.152 dB
+    TOTAL EQ: -5.42 dB (visible: -2.10 dB)
+
+========== 3. RAW AND SMOOTHED RESIDUALS AT PROBE FREQUENCIES ==========
+
+  Freq   | RawBefore | RawTarget | RawDev  | SmBefore | SmTarget | SmAfter  | SmDev   | SmAfterTarget | SmAfterDev
+  -------|-----------|-----------|---------|----------|----------|----------|---------|---------------|----------
+  29.75 |     122.5 |     120.0 |     2.5 |    122.1 |    120.0 |    121.2 |     1.2 |         120.0 |      1.2
+  39.14 |     107.4 |     119.1 |   -11.6 |    111.2 |    119.1 |    115.6 |    -3.5 |         119.1 |     -3.5
+  77.16 |     123.2 |     116.6 |     6.6 |    121.9 |    116.6 |    117.5 |     0.9 |         116.6 |      0.9
+  101.52 |     123.5 |     116.0 |     7.5 |    121.2 |    116.0 |    116.6 |     0.7 |         116.0 |      0.7
+
+========== 4. FILTER(S) CAUSING THE 29.75 Hz CORRECTION ==========
+
+  Total EQ at 29.75 Hz: -1.69 dB (visible: -5.30 dB)
+  Contributing filters (sorted by magnitude):
+    Band 7: 29.00 Hz, gain -2.64 dB, Q 8.70 → -2.201 dB
+    Band 1: 40.00 Hz, gain 5.58 dB, Q 4.82 → 0.623 dB
+    Band 8: 25.00 Hz, gain -1.29 dB, Q 7.50 → -0.164 dB
+    Band 3: 39.00 Hz, gain 0.65 dB, Q 3.99 → 0.112 dB
+    Band 2: 97.00 Hz, gain -4.65 dB, Q 4.34 → -0.029 dB
+    Band 5: 77.00 Hz, gain -1.98 dB, Q 5.37 → -0.014 dB
+    Band 4: 73.00 Hz, gain -3.65 dB, Q 8.00 → -0.014 dB
+  Dominant filter: CUT, Q 8.70 (NARROW)
+  The raw deviation at 29.75 Hz is 2.54 dB above target.
+  A cut of 2.64 dB is APPLIED — cuts do not require product headroom.
+
+========== 5. RESIDUAL REGION DISCOVERY FOR 77 Hz AND 101 Hz ==========
+
+  Post-EQ smoothed residual peak regions (threshold +1 dB, min width 1/6 oct):
+  Post-EQ smoothed residual valley regions (threshold -1 dB, min width 1/3 oct):
+  Pre-EQ smoothed peak regions (threshold +1 dB, min width 1/6 oct):
+    22.00–32.00 Hz, centre 27.00 Hz, severity 2.30 dB, width 0.541 oct
+    59.00–120.00 Hz, centre 97.00 Hz, severity 5.45 dB, width 1.024 oct
+  Pre-EQ smoothed valley regions (threshold -1 dB, min width 1/3 oct):
+    33.00–47.00 Hz, centre 40.00 Hz, severity 7.91 dB, width 0.510 oct
+  77 Hz peak discovered pre-EQ: YES
+  101 Hz peak discovered pre-EQ: YES
+  Pre-EQ smoothed deviation at 77 Hz: 5.29 dB (threshold +1 dB)
+  Pre-EQ smoothed deviation at 101 Hz: 5.19 dB (threshold +1 dB)
+
+========== 6. CANDIDATES CONSIDERED NEAR 35, 39, 77, 101 Hz ==========
+
+  All discovered pre-EQ residual regions (Accuracy profile, ±1 dB threshold):
+    VALLEY 33.00–47.00 Hz, centre 40.00 Hz, severity 7.91 dB, Q 2.86
+    PEAK 59.00–120.00 Hz, centre 97.00 Hz, severity 5.45 dB, Q 1.59
+    PEAK 22.00–32.00 Hz, centre 27.00 Hz, severity 2.30 dB, Q 2.70
+
+  --- Near 35 Hz ---
+    Region: valley 33.00–47.00 Hz, centre 40.00 Hz, severity 7.91 dB
+    Base candidate: 40.00 Hz, gain 5.93 dB, Q 2.86 (after capability limiting)
+    Trial 1: 40.00 Hz, gain 5.93 dB, Q 2.86 → INVALID (source-domain headroom exceeded)
+    Trial 2: 40.00 Hz, gain 5.93 dB, Q 4.29 → INVALID (source-domain headroom exceeded)
+    Trial 3: 40.00 Hz, gain 5.93 dB, Q 5.71 → INVALID (source-domain headroom exceeded)
+    Trial 4: 40.00 Hz, gain 5.93 dB, Q 8.57 → INVALID (source-domain headroom exceeded)
+    Trial 5: 40.00 Hz, gain 5.93 dB, Q 8.00 → INVALID (source-domain headroom exceeded)
+    Trial 6: 40.00 Hz, gain 5.93 dB, Q 10.00 → VALID (all limits passed)
+    Trial 7: 40.00 Hz, gain 4.45 dB, Q 2.86 → INVALID (source-domain headroom exceeded)
+    Trial 8: 40.00 Hz, gain 4.45 dB, Q 4.29 → INVALID (source-domain headroom exceeded)
+    Trial 9: 40.00 Hz, gain 4.45 dB, Q 5.71 → INVALID (source-domain headroom exceeded)
+    Trial 10: 40.00 Hz, gain 4.45 dB, Q 8.57 → VALID (all limits passed)
+    Trial 11: 40.00 Hz, gain 4.45 dB, Q 8.00 → VALID (all limits passed)
+    Trial 12: 40.00 Hz, gain 4.45 dB, Q 10.00 → VALID (all limits passed)
+    Trial 13: 40.00 Hz, gain 2.97 dB, Q 2.86 → INVALID (source-domain headroom exceeded)
+    Trial 14: 40.00 Hz, gain 2.97 dB, Q 4.29 → INVALID (source-domain headroom exceeded)
+    Trial 15: 40.00 Hz, gain 2.97 dB, Q 5.71 → INVALID (source-domain headroom exceeded)
+    Trial 16: 40.00 Hz, gain 2.97 dB, Q 8.57 → VALID (all limits passed)
+    Trial 17: 40.00 Hz, gain 2.97 dB, Q 8.00 → VALID (all limits passed)
+    Trial 18: 40.00 Hz, gain 2.97 dB, Q 10.00 → VALID (all limits passed)
+    Region: peak 22.00–32.00 Hz, centre 27.00 Hz, severity 2.30 dB
+    Base candidate: 27.00 Hz, gain -1.95 dB, Q 2.70 (after capability limiting)
+    Trial 1: 27.00 Hz, gain -1.95 dB, Q 2.70 → VALID (all limits passed)
+    Trial 2: 27.00 Hz, gain -1.95 dB, Q 4.05 → VALID (all limits passed)
+    Trial 3: 27.00 Hz, gain -1.95 dB, Q 5.40 → VALID (all limits passed)
+    Trial 4: 27.00 Hz, gain -1.95 dB, Q 8.10 → VALID (all limits passed)
+    Trial 5: 27.00 Hz, gain -1.95 dB, Q 8.00 → VALID (all limits passed)
+    Trial 6: 27.00 Hz, gain -1.95 dB, Q 10.00 → VALID (all limits passed)
+    Trial 7: 27.00 Hz, gain -1.46 dB, Q 2.70 → VALID (all limits passed)
+    Trial 8: 27.00 Hz, gain -1.46 dB, Q 4.05 → VALID (all limits passed)
+    Trial 9: 27.00 Hz, gain -1.46 dB, Q 5.40 → VALID (all limits passed)
+    Trial 10: 27.00 Hz, gain -1.46 dB, Q 8.10 → VALID (all limits passed)
+    Trial 11: 27.00 Hz, gain -1.46 dB, Q 8.00 → VALID (all limits passed)
+    Trial 12: 27.00 Hz, gain -1.46 dB, Q 10.00 → VALID (all limits passed)
+    Trial 13: 27.00 Hz, gain -0.98 dB, Q 2.70 → VALID (all limits passed)
+    Trial 14: 27.00 Hz, gain -0.98 dB, Q 4.05 → VALID (all limits passed)
+    Trial 15: 27.00 Hz, gain -0.98 dB, Q 5.40 → VALID (all limits passed)
+    Trial 16: 27.00 Hz, gain -0.98 dB, Q 8.10 → VALID (all limits passed)
+    Trial 17: 27.00 Hz, gain -0.98 dB, Q 8.00 → VALID (all limits passed)
+    Trial 18: 27.00 Hz, gain -0.98 dB, Q 10.00 → VALID (all limits passed)
+  --- Near 39 Hz ---
+    Region: valley 33.00–47.00 Hz, centre 40.00 Hz, severity 7.91 dB
+    Base candidate: 40.00 Hz, gain 5.93 dB, Q 2.86 (after capability limiting)
+    Trial 1: 40.00 Hz, gain 5.93 dB, Q 2.86 → INVALID (source-domain headroom exceeded)
+    Trial 2: 40.00 Hz, gain 5.93 dB, Q 4.29 → INVALID (source-domain headroom exceeded)
+    Trial 3: 40.00 Hz, gain 5.93 dB, Q 5.71 → INVALID (source-domain headroom exceeded)
+    Trial 4: 40.00 Hz, gain 5.93 dB, Q 8.57 → INVALID (source-domain headroom exceeded)
+    Trial 5: 40.00 Hz, gain 5.93 dB, Q 8.00 → INVALID (source-domain headroom exceeded)
+    Trial 6: 40.00 Hz, gain 5.93 dB, Q 10.00 → VALID (all limits passed)
+    Trial 7: 40.00 Hz, gain 4.45 dB, Q 2.86 → INVALID (source-domain headroom exceeded)
+    Trial 8: 40.00 Hz, gain 4.45 dB, Q 4.29 → INVALID (source-domain headroom exceeded)
+    Trial 9: 40.00 Hz, gain 4.45 dB, Q 5.71 → INVALID (source-domain headroom exceeded)
+    Trial 10: 40.00 Hz, gain 4.45 dB, Q 8.57 → VALID (all limits passed)
+    Trial 11: 40.00 Hz, gain 4.45 dB, Q 8.00 → VALID (all limits passed)
+    Trial 12: 40.00 Hz, gain 4.45 dB, Q 10.00 → VALID (all limits passed)
+    Trial 13: 40.00 Hz, gain 2.97 dB, Q 2.86 → INVALID (source-domain headroom exceeded)
+    Trial 14: 40.00 Hz, gain 2.97 dB, Q 4.29 → INVALID (source-domain headroom exceeded)
+    Trial 15: 40.00 Hz, gain 2.97 dB, Q 5.71 → INVALID (source-domain headroom exceeded)
+    Trial 16: 40.00 Hz, gain 2.97 dB, Q 8.57 → VALID (all limits passed)
+    Trial 17: 40.00 Hz, gain 2.97 dB, Q 8.00 → VALID (all limits passed)
+    Trial 18: 40.00 Hz, gain 2.97 dB, Q 10.00 → VALID (all limits passed)
+  --- Near 77 Hz ---
+    Region: peak 59.00–120.00 Hz, centre 97.00 Hz, severity 5.45 dB
+    Base candidate: 97.00 Hz, gain -4.63 dB, Q 1.59 (after capability limiting)
+    Trial 1: 97.00 Hz, gain -4.63 dB, Q 1.59 → VALID (all limits passed)
+    Trial 2: 97.00 Hz, gain -4.63 dB, Q 2.39 → VALID (all limits passed)
+    Trial 3: 97.00 Hz, gain -4.63 dB, Q 3.18 → VALID (all limits passed)
+    Trial 4: 97.00 Hz, gain -4.63 dB, Q 4.77 → VALID (all limits passed)
+    Trial 5: 97.00 Hz, gain -4.63 dB, Q 8.00 → VALID (all limits passed)
+    Trial 6: 97.00 Hz, gain -4.63 dB, Q 10.00 → VALID (all limits passed)
+    Trial 7: 97.00 Hz, gain -3.47 dB, Q 1.59 → VALID (all limits passed)
+    Trial 8: 97.00 Hz, gain -3.47 dB, Q 2.39 → VALID (all limits passed)
+    Trial 9: 97.00 Hz, gain -3.47 dB, Q 3.18 → VALID (all limits passed)
+    Trial 10: 97.00 Hz, gain -3.47 dB, Q 4.77 → VALID (all limits passed)
+    Trial 11: 97.00 Hz, gain -3.47 dB, Q 8.00 → VALID (all limits passed)
+    Trial 12: 97.00 Hz, gain -3.47 dB, Q 10.00 → VALID (all limits passed)
+    Trial 13: 97.00 Hz, gain -2.32 dB, Q 1.59 → VALID (all limits passed)
+    Trial 14: 97.00 Hz, gain -2.32 dB, Q 2.39 → VALID (all limits passed)
+    Trial 15: 97.00 Hz, gain -2.32 dB, Q 3.18 → VALID (all limits passed)
+    Trial 16: 97.00 Hz, gain -2.32 dB, Q 4.77 → VALID (all limits passed)
+    Trial 17: 97.00 Hz, gain -2.32 dB, Q 8.00 → VALID (all limits passed)
+    Trial 18: 97.00 Hz, gain -2.32 dB, Q 10.00 → VALID (all limits passed)
+  --- Near 101 Hz ---
+    Region: peak 59.00–120.00 Hz, centre 97.00 Hz, severity 5.45 dB
+    Base candidate: 97.00 Hz, gain -4.63 dB, Q 1.59 (after capability limiting)
+    Trial 1: 97.00 Hz, gain -4.63 dB, Q 1.59 → VALID (all limits passed)
+    Trial 2: 97.00 Hz, gain -4.63 dB, Q 2.39 → VALID (all limits passed)
+    Trial 3: 97.00 Hz, gain -4.63 dB, Q 3.18 → VALID (all limits passed)
+    Trial 4: 97.00 Hz, gain -4.63 dB, Q 4.77 → VALID (all limits passed)
+    Trial 5: 97.00 Hz, gain -4.63 dB, Q 8.00 → VALID (all limits passed)
+    Trial 6: 97.00 Hz, gain -4.63 dB, Q 10.00 → VALID (all limits passed)
+    Trial 7: 97.00 Hz, gain -3.47 dB, Q 1.59 → VALID (all limits passed)
+    Trial 8: 97.00 Hz, gain -3.47 dB, Q 2.39 → VALID (all limits passed)
+    Trial 9: 97.00 Hz, gain -3.47 dB, Q 3.18 → VALID (all limits passed)
+    Trial 10: 97.00 Hz, gain -3.47 dB, Q 4.77 → VALID (all limits passed)
+    Trial 11: 97.00 Hz, gain -3.47 dB, Q 8.00 → VALID (all limits passed)
+    Trial 12: 97.00 Hz, gain -3.47 dB, Q 10.00 → VALID (all limits passed)
+    Trial 13: 97.00 Hz, gain -2.32 dB, Q 1.59 → VALID (all limits passed)
+    Trial 14: 97.00 Hz, gain -2.32 dB, Q 2.39 → VALID (all limits passed)
+    Trial 15: 97.00 Hz, gain -2.32 dB, Q 3.18 → VALID (all limits passed)
+    Trial 16: 97.00 Hz, gain -2.32 dB, Q 4.77 → VALID (all limits passed)
+    Trial 17: 97.00 Hz, gain -2.32 dB, Q 8.00 → VALID (all limits passed)
+    Trial 18: 97.00 Hz, gain -2.32 dB, Q 10.00 → VALID (all limits passed)
+
+========== 7. PRODUCT CAPABILITY CALCULATION AT 39.14 Hz ==========
+
+  Usable LF limit (usableLfHz): 22 Hz
+  System capability at 39.14 Hz: 125.47 dB
+  Current system source output: 114.00 dB
+  Available headroom: 11.47 dB
+  LF ramp fraction: 1.000
+  LF ramp limit: 6.00 dB
+  Permitted total boost (allowedBoostDb): 6.00 dB
+  Current aggregate EQ at 39.14 Hz: 5.73 dB
+  Remaining boost allowance: 0.27 dB
+  Required boost to target: 11.65 dB
+  Required boost to P19 tolerance (±0 dB): 11.65 dB
+  Full target capability limited: YES
+
+========== DIAGNOSTIC EXPERIMENTS ==========
+
+  Baseline (selected bank): worst 3.52 dB, mean 3.52 dB, RMS 0.83 dB, P19 level 2
+
+  --- Experiment A: Replace 30 Hz overcut filter with higher-Q alternatives ---
+  Dominant filter at 29.75 Hz: band 7, 29.00 Hz, gain -2.64 dB, Q 8.70
+  Q4 replacement:
+    Bank valid: YES 
+    Worst 3.85 dB (L2), mean 3.85 dB, RMS 0.86 dB
+    Smoothed deviations: 29.75=0.56, 39.14=-3.83, 77.16=0.88, 101.52=0.66
+    29.75 Hz pulled below target by -0.56 dB 
+  Q6 replacement:
+    Bank valid: YES 
+    Worst 3.63 dB (L2), mean 3.63 dB, RMS 0.83 dB
+    Smoothed deviations: 29.75=0.89, 39.14=-3.61, 77.16=0.90, 101.52=0.67
+    29.75 Hz pulled below target by -0.89 dB 
+  Q8 replacement:
+    Bank valid: YES 
+    Worst 3.53 dB (L2), mean 3.53 dB, RMS 0.83 dB
+    Smoothed deviations: 29.75=1.15, 39.14=-3.52, 77.16=0.90, 101.52=0.68
+    29.75 Hz pulled below target by -1.15 dB 
+  Q10 replacement:
+    Bank valid: YES 
+    Worst 3.49 dB (L2), mean 3.49 dB, RMS 0.83 dB
+    Smoothed deviations: 29.75=1.36, 39.14=-3.48, 77.16=0.91, 101.52=0.68
+    29.75 Hz pulled below target by -1.36 dB 
+
+  --- Experiment B: Targeted cuts at 77 and 101 Hz ---
+  +cut77 -3dB Q4, +cut101 -3dB Q4:
+    Bank valid: YES 
+    Worst 3.64 dB (L2), mean 3.64 dB, RMS 1.56 dB
+    Smoothed deviations: 29.75=1.17, 39.14=-3.63, 77.16=-2.10, 101.52=-2.29
+    29.75 Hz pulled below target by -1.17 dB 
+  +cut77 -5dB Q4, +cut101 -5dB Q4:
+    Bank valid: YES 
+    Worst 4.82 dB (L1), mean 4.82 dB, RMS 2.50 dB
+    Smoothed deviations: 29.75=1.13, 39.14=-3.72, 77.16=-4.10, 101.52=-4.27
+    29.75 Hz pulled below target by -1.13 dB 
+  +cut77 -7dB Q4, +cut101 -7dB Q4:
+    Bank valid: YES 
+    Worst 6.87 dB (L0), mean 6.87 dB, RMS 3.51 dB
+    Smoothed deviations: 29.75=1.08, 39.14=-3.83, 77.16=-6.11, 101.52=-6.26
+    29.75 Hz pulled below target by -1.08 dB 
+  +cut77 -10dB Q4, +cut101 -10dB Q4:
+    Bank valid: NO (cut)
+    Worst 9.98 dB (L0), mean 9.98 dB, RMS 5.08 dB
+    Smoothed deviations: 29.75=0.99, 39.14=-4.01, 77.16=-9.15, 101.52=-9.26
+    29.75 Hz pulled below target by -0.99 dB 
+  +cut77 -15dB Q4, +cut101 -15dB Q4:
+    Bank valid: NO (cut)
+    Worst 15.25 dB (L0), mean 15.25 dB, RMS 7.83 dB
+    Smoothed deviations: 29.75=0.78, 39.14=-4.45, 77.16=-14.27, 101.52=-14.33
+    29.75 Hz pulled below target by -0.78 dB 
+
+  --- Experiment C: Boost at 39 Hz within product capability ---
+  Permitted boost at 39 Hz: 6.00 dB (LF ramp 1.000, headroom 11.47 dB)
+  +boost39 1dB Q2:
+    Bank valid: NO (boost, headroom)
+    Worst 2.58 dB (L3), mean 2.58 dB, RMS 0.81 dB
+    Smoothed deviations: 29.75=1.69, 39.14=-2.57, 77.16=1.01, 101.52=0.73
+    29.75 Hz pulled below target by -1.69 dB 
+  +boost39 2dB Q2:
+    Bank valid: NO (boost, headroom)
+    Worst 2.38 dB (L3), mean 2.38 dB, RMS 0.88 dB
+    Smoothed deviations: 29.75=2.15, 39.14=-1.63, 77.16=1.12, 101.52=0.78
+    29.75 Hz pulled below target by -2.15 dB 
+  +boost39 3dB Q2:
+    Bank valid: NO (boost, headroom)
+    Worst 2.99 dB (L3), mean 2.99 dB, RMS 1.04 dB
+    Smoothed deviations: 29.75=2.61, 39.14=-0.70, 77.16=1.23, 101.52=0.83
+    29.75 Hz pulled below target by -2.61 dB 
+
+  --- Experiment D: Combined best-case ---
+  Q8@30Hz + cut77 -7dB + cut101 -7dB + boost39 3.00dB:
+    Bank valid: YES 
+    Worst 6.88 dB (L0), mean 6.88 dB, RMS 3.51 dB
+    Smoothed deviations: 29.75=1.00, 39.14=-3.84, 77.16=-6.11, 101.52=-6.26
+    29.75 Hz pulled below target by -1.00 dB 
+
+========== FORENSIC SUMMARY: TEST / EXPECTED / ACTUAL / DELTA / SEVERITY / NEXT TEST ==========
+
+  TEST:     29.75 Hz EQ correction magnitude
+  EXPECTED: ≤ +2.6 dB cut (raw peak is +2.6 dB above target; cut should not overshoot below target)
+  ACTUAL:   -1.69 dB
+  DELTA:    0.91 dB overcut
+  SEVERITY: HIGH
+  NEXT:     Replace broad low-Q cut with Q≥8 narrow cut or reduce gain to −2.6 dB
+
+  TEST:     29.75 Hz post-EQ deviation from target
+  EXPECTED: ≥ −1.0 dB (not more than 1 dB below target)
+  ACTUAL:   1.23 dB
+  DELTA:    —
+  SEVERITY: HIGH
+  NEXT:     Constrain 29.75 Hz cut so post-EQ ≥ target − 1 dB
+
+  TEST:     29.75 Hz product-limit justification for cut
+  EXPECTED: N/A — cuts do not require product headroom; product limits only restrict positive boost
+  ACTUAL:   Cut applied without product-limit constraint
+  DELTA:    —
+  SEVERITY: INFO
+  NEXT:     Do not describe 29.75 Hz as product-limited
+
+  TEST:     39.14 Hz boost vs required correction
+  EXPECTED: +11.6 dB to reach target (subject to product capability)
+  ACTUAL:   +5.73 dB
+  DELTA:    5.92 dB under-boosted
+  SEVERITY: MEDIUM
+  NEXT:     Check if smoothed deviation at 39 Hz is below discovery threshold or if product capability limits boost
+
+  TEST:     39.14 Hz product capability
+  EXPECTED: Permitted boost ≥ required boost if headroom allows
+  ACTUAL:   permitted 6.00 dB, headroom 11.47 dB, LF ramp 1.000
+  DELTA:    —
+  SEVERITY: MEDIUM
+  NEXT:     If permitted < required, classify as product-limited; if permitted ≥ required, investigate discovery threshold
+
+  TEST:     77.16 Hz peak correction
+  EXPECTED: −6.6 dB to reach target (within −15 dB cut limit)
+  ACTUAL:   -4.90 dB
+  DELTA:    1.71 dB under-corrected
+  SEVERITY: MEDIUM
+  NEXT:     Check if 77 Hz peak was discovered as a residual region; if not, investigate smoothing/width threshold
+
+  TEST:     101.52 Hz peak correction
+  EXPECTED: −7.5 dB to reach target (within −15 dB cut limit)
+  ACTUAL:   -5.42 dB
+  DELTA:    2.08 dB under-corrected
+  SEVERITY: MEDIUM
+  NEXT:     Check if 101 Hz peak was discovered as a residual region; if not, investigate smoothing/width threshold
+
+  TEST:     Bank validation status
+  EXPECTED: allOk = true (boost ≤ +6.05, cut ≥ −15.05, headroom ok)
+  ACTUAL:   PASS (boost 5.96 dB @ 40.00 Hz, cut -5.77 dB @ 74.00 Hz)
+  DELTA:    —
+  SEVERITY: INFO
+  NEXT:     If FAIL, investigate which limit is exceeded
+
+  TEST:     Worst-seat P19 level
+  EXPECTED: L1 or higher (≤5 dB deviation)
+  ACTUAL:   L2 (3.52 dB)
+  DELTA:    —
+  SEVERITY: INFO
+  NEXT:     If FAIL, investigate which residual region dominates
+
