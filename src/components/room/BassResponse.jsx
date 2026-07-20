@@ -261,6 +261,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // RSP graph visibility — defaults to true (RSP is the default visible series).
   // Toggling this only affects graph display, never the optimiser or P14/P18/P19.
   const [showRsp, setShowRsp] = useState(true);
+  // Real-seat overlay visibility — presentation only. When Design EQ is enabled,
+  // real-seat curves are hidden by default and shown only when this toggle is on.
+  // Never affects candidate generation, P19, P20, or the selected EQ bank.
+  const [showRealSeatOverlays, setShowRealSeatOverlays] = useState(false);
 
   // Modal Resonance Line Toggles — display-only, session-only state. Does not affect
   // bass calculation, SPL response, or mode generation; only filters which resonance
@@ -948,14 +952,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const anchorDb = optimisationResult.selectedP14TargetDb;
     const displayStartHz = 20;
     if (!showHouseCurve || !candidate || !Number.isFinite(anchorDb)) return null;
+    const assessmentEndHz = candidate.assessmentEndHz;
     return {
       id: "house-curve",
       kind: "house-curve",
-      label: "Artcoustic house curve",
+      label: `House-curve target — P19 band ${displayStartHz}–${Math.round(assessmentEndHz)} Hz`,
+      tooltipLabel: "House-curve target",
       color: "#625143",
-      strokeDasharray: "6 4",
+      strokeWidth: 2.25,
+      strokeDasharray: "10 5",
       data: optimisationResult.finalPostEqCurve
-        .filter((point) => point.frequency >= displayStartHz && point.frequency <= candidate.assessmentEndHz)
+        .filter((point) => point.frequency >= displayStartHz && point.frequency <= assessmentEndHz)
         .map((point) => ({ frequency: point.frequency, spl: anchorDb + artcousticHouseCurveOffsetAt(point.frequency) })),
     };
   }, [showHouseCurve, optimisationResult]);
@@ -973,21 +980,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       const rawSeries = {
         id: "rsp-raw",
         kind: "raw",
-        label: "Raw (RSP)",
-        color: "#94A3B8",
-        strokeDasharray: "4 4",
+        label: "RSP before EQ",
+        tooltipLabel: "RSP before EQ",
+        color: "#64748B",
+        strokeWidth: 1.75,
+        strokeDasharray: "6 4",
         data: applyBassSmoothing(rspRawCurve, bassSmoothingMode),
       };
       const postEqSeries = {
         id: "rsp-eq",
         kind: "post-eq",
-        label: "Post-EQ (RSP)",
+        label: "RSP after EQ",
+        tooltipLabel: "RSP after EQ",
         color: "#16A34A",
+        strokeWidth: 2.5,
         data: applyBassSmoothing(optimisationResult.finalPostEqCurve, bassSmoothingMode),
       };
-      const seatOverlays = out
-        .filter((s) => s.id !== "rsp")
-        .map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
+      // Real-seat overlays — only included when the user explicitly enables them.
+      // Thin, muted lines so they remain visually subordinate to the three primary curves.
+      const seatOverlays = showRealSeatOverlays
+        ? out
+            .filter((s) => s.id !== "rsp")
+            .map((s) => ({
+              ...s,
+              kind: "real-seat-overlay",
+              strokeWidth: 1.25,
+              strokeOpacity: 0.5,
+              data: applyBassSmoothing(s.data, bassSmoothingMode),
+            }))
+        : [];
       out = [rawSeries, postEqSeries, ...seatOverlays];
     } else {
       out = out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
@@ -995,7 +1016,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     if (houseCurveSeries) out = [...out, houseCurveSeries];
     return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult, houseCurveSeries, rspRawCurve]);
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult, houseCurveSeries, rspRawCurve, showRealSeatOverlays]);
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -1346,6 +1367,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show house curve:</span>
               <Switch checked={showHouseCurve} onCheckedChange={setHouseCurveOverride} />
             </div>
+            {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show real-seat overlays:</span>
+                <Switch checked={showRealSeatOverlays} onCheckedChange={setShowRealSeatOverlays} />
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Smoothing:</span>
               <select
@@ -1430,6 +1457,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                 );
               })}
+            </div>
+          );
+        })()}
+
+        {/* Fixed curve key — derived from series metadata so the key, graph and tooltip cannot drift apart */}
+        {designEqEnabled && multiSeriesForGraph.length > 0 && (() => {
+          const primaryCurves = multiSeriesForGraph.filter(s => s.kind === "raw" || s.kind === "post-eq" || s.kind === "house-curve");
+          const realSeatOverlays = multiSeriesForGraph.filter(s => s.kind === "real-seat-overlay");
+          if (primaryCurves.length === 0) return null;
+          return (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", marginBottom: 8, padding: "6px 10px", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6 }}>
+              {primaryCurves.map(s => (
+                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <svg width="32" height="8" style={{ flexShrink: 0 }}>
+                    <line x1="0" y1="4" x2="32" y2="4" stroke={s.color} strokeWidth={s.strokeWidth ?? 2} strokeDasharray={s.strokeDasharray} opacity={s.strokeOpacity ?? 1} />
+                  </svg>
+                  <span style={{ fontSize: 10, color: "#1B1A1A", fontFamily: "monospace" }}>{s.label}</span>
+                </div>
+              ))}
+              {realSeatOverlays.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 10, borderLeft: "1px solid #DCDBD6" }}>
+                  <span style={{ fontSize: 10, color: "#8B7F76", fontFamily: "monospace" }}>Real-seat overlays:</span>
+                  {realSeatOverlays.map(s => (
+                    <span key={s.id} style={{ fontSize: 10, color: s.color, fontFamily: "monospace" }}>{s.id}</span>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()}

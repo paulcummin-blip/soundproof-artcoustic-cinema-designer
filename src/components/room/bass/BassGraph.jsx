@@ -34,7 +34,7 @@ const CustomTooltip = ({ active, payload, label, series = [] }) => {
             {visibleSeries.length > 1
                 ? visibleSeries.map((item) => {
                     const value = row[`spl_${item.id}`];
-                    return hasFiniteValue(value) ? <p key={item.id} style={{ color: item.color }}>{item.label || item.id}: {Number(value).toFixed(1)} dB</p> : null;
+                    return hasFiniteValue(value) ? <p key={item.id} style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p> : null;
                   })
                 : hasFiniteValue(fallbackValue) && <p className="text-[#213428]">SPL: {Number(fallbackValue).toFixed(1)} dB</p>}
             {hasFiniteValue(eqApplied) && <p className="text-[#3E4349]">EQ applied: {eqApplied >= 0 ? "+" : ""}{Number(eqApplied).toFixed(1)} dB</p>}
@@ -540,10 +540,9 @@ export default function BassGraph({
                         type="linear" 
                          dataKey={`spl_${s.id}`}
                         stroke={s.color}
-                        strokeWidth={2}
-                        strokeOpacity={1}
+                        strokeWidth={s.strokeWidth ?? 2}
+                        strokeOpacity={s.strokeOpacity ?? 1}
                         strokeDasharray={s.strokeDasharray}
-                        label={s.kind === "house-curve" ? (props) => props.payload?.frequency === s.data[s.data.length - 1]?.frequency ? <text x={props.x + 6} y={props.y} fill={s.color} fontSize={10} fontWeight={600}>Artcoustic house curve</text> : null : undefined}
                         dot={false}
                         activeDot={false}
                         connectNulls={false}
