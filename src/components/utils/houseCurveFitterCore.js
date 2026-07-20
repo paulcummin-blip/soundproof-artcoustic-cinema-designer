@@ -47,14 +47,18 @@ export function compareHouseCurveMetrics(a, b) {
   const aWorstDev = variationOr(a.worstSeatMaxDeviationDb ?? a.worstRealSeatHouseCurveVariationDb);
   const bWorstDev = variationOr(b.worstSeatMaxDeviationDb ?? b.worstRealSeatHouseCurveVariationDb);
   if (Math.abs(aWorstDev - bWorstDev) > WORST_EQUIV_DB) return aWorstDev - bWorstDev;
-  // 3. Mean seat maximum deviation (lower is better, within MEAN_EQUIV_DB is equivalent)
-  const aMean = variationOr(a.meanSeatMaxDeviationDb);
-  const bMean = variationOr(b.meanSeatMaxDeviationDb);
-  if (Math.abs(aMean - bMean) > MEAN_EQUIV_DB) return aMean - bMean;
-  // 4. RMS target error (lower is better, RMS_EPSILON_DB epsilon)
-  const aRms = variationOr(a.rmsSeatTargetErrorDb);
-  const bRms = variationOr(b.rmsSeatTargetErrorDb);
-  if (Math.abs(aRms - bRms) > RMS_EPSILON_DB) return aRms - bRms;
+  // 3. Mean seat maximum deviation (skip if either side unavailable)
+  const aMean = a.meanSeatMaxDeviationDb;
+  const bMean = b.meanSeatMaxDeviationDb;
+  if (Number.isFinite(aMean) && Number.isFinite(bMean)) {
+    if (Math.abs(aMean - bMean) > MEAN_EQUIV_DB) return aMean - bMean;
+  }
+  // 4. RMS target error (skip if either side unavailable)
+  const aRms = a.rmsSeatTargetErrorDb;
+  const bRms = b.rmsSeatTargetErrorDb;
+  if (Number.isFinite(aRms) && Number.isFinite(bRms)) {
+    if (Math.abs(aRms - bRms) > RMS_EPSILON_DB) return aRms - bRms;
+  }
   // 5. RSP P19 deviation (lower is better)
   const aRspDev = variationOr(a.rspMaxDeviationDb ?? a.achievedP19VariationDb);
   const bRspDev = variationOr(b.rspMaxDeviationDb ?? b.achievedP19VariationDb);
@@ -81,11 +85,11 @@ export function houseCurveP19Level(deviationDb) {
   return 0;
 }
 
-// Apply shared filter bank to a seat's raw response, smooth, and calculate per-seat
-// house-curve deviation metrics in the assessment band.
-function calculateSeatMetrics(seatRaw, filters, assessmentStartHz, assessmentEndHz, anchorDb) {
-  const corrected = buildCurveFromBank(seatRaw, filters);
-  const smoothed = applyBassSmoothing(corrected, "third");
+// Calculate per-seat house-curve deviation metrics from an already-corrected curve.
+// Uses the identical 1/3-octave smoothing, assessment band, and target curve as the
+// house-curve fitter. Shared between the fitter and the production optimiser.
+function calculateSeatMetricsFromCorrected(correctedCurve, assessmentStartHz, assessmentEndHz, anchorDb) {
+  const smoothed = applyBassSmoothing(correctedCurve, "third");
   const assessedPoints = smoothed
     .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
     .map((p) => ({
@@ -100,6 +104,38 @@ function calculateSeatMetrics(seatRaw, filters, assessmentStartHz, assessmentEnd
   const rmsDev = Math.sqrt(assessedPoints.reduce((sum, p) => sum + p.deviationDb ** 2, 0) / assessedPoints.length);
   const worstPoint = assessedPoints.reduce((best, p) => Math.abs(p.deviationDb) > Math.abs(best.deviationDb) ? p : best);
   return { maxAbsDeviationDb: maxAbsDev, rmsDeviationDb: rmsDev, worstFrequencyHz: worstPoint.frequency };
+}
+
+// Apply shared filter bank to a seat's raw response, smooth, and calculate per-seat
+// house-curve deviation metrics in the assessment band.
+function calculateSeatMetrics(seatRaw, filters, assessmentStartHz, assessmentEndHz, anchorDb) {
+  const corrected = buildCurveFromBank(seatRaw, filters);
+  return calculateSeatMetricsFromCorrected(corrected, assessmentStartHz, assessmentEndHz, anchorDb);
+}
+
+// Calculate metrics across a set of already-corrected seat curves. Used by the
+// production optimiser to compute uniform worst/mean/RMS metrics for every
+// candidate profile (Standard, Accuracy, house-curve) from perSeatPostEqCurves.
+export function calculateAllSeatMetricsFromCorrected(correctedCurves, assessmentStartHz, assessmentEndHz, anchorDb) {
+  const seatMetrics = [];
+  for (const seat of correctedCurves) {
+    const curve = Array.isArray(seat.responseData) ? seat.responseData : seat.raw;
+    if (!Array.isArray(curve) || curve.length === 0) continue;
+    const metrics = calculateSeatMetricsFromCorrected(curve, assessmentStartHz, assessmentEndHz, anchorDb);
+    if (metrics) seatMetrics.push({ seatId: seat.seatId, isPrimary: seat.isPrimary, ...metrics });
+  }
+  if (!seatMetrics.length) return null;
+  const worstSeat = seatMetrics.reduce((worst, m) => m.maxAbsDeviationDb > worst.maxAbsDeviationDb ? m : worst);
+  const meanMaxDev = seatMetrics.reduce((sum, m) => sum + m.maxAbsDeviationDb, 0) / seatMetrics.length;
+  const rmsTargetError = Math.sqrt(seatMetrics.reduce((sum, m) => sum + m.rmsDeviationDb ** 2, 0) / seatMetrics.length);
+  return {
+    seatMetrics,
+    worstSeatId: worstSeat.seatId,
+    worstSeatMaxDeviationDb: worstSeat.maxAbsDeviationDb,
+    worstSeatP19Level: houseCurveP19Level(worstSeat.maxAbsDeviationDb),
+    meanSeatMaxDeviationDb: meanMaxDev,
+    rmsSeatTargetErrorDb: rmsTargetError,
+  };
 }
 
 // Calculate metrics across a set of seats for a given filter bank.

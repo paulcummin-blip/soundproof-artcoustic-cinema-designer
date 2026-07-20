@@ -4,6 +4,7 @@ import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOper
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { selectBestCandidate } from "@/components/utils/optimiserRanking";
 import { calculateHouseCurveEqCurve } from "@/components/utils/houseCurveFitter";
+import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCurveFitterCore";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -41,7 +42,7 @@ function makeRequests(definitions) {
   return requests;
 }
 
-function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult, perSeatRawCurves }) {
+export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult, perSeatRawCurves }) {
   const assessmentStartHz = request.p18.p18LimitHz;
   const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
   const eq = eqResult;
@@ -129,6 +130,17 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
   }
   worstRealSeatHouseCurveLevel = levelFromValue(worstRealSeatHouseCurveVariationDb, definitions, "p19ToleranceDb", true);
 
+  // Uniform seat metrics: calculate the same worst/mean/RMS metrics for every
+  // candidate profile using the identical 1/3-octave smoothing, assessment band,
+  // and target curve used by houseCurveFitterCore.js. When no real seats exist,
+  // calculate equivalent fallback values from the RSP.
+  const seatsForUniformMetrics = perSeatPostEqCurves.length > 0
+    ? perSeatPostEqCurves
+    : [{ seatId: "rsp", isPrimary: true, responseData: finalPostEqCurve }];
+  const uniformSeatMetrics = calculateAllSeatMetricsFromCorrected(
+    seatsForUniformMetrics, assessmentStartHz, assessmentEndHz, targetAnchorDb
+  );
+
   // P20 seat consistency (reuse existing helper — do not implement a second version).
   // P20 is N/A when fewer than 2 real seats; FAIL/0 when 2+ seats but outside all tolerances.
   let achievedP20Level = 0;
@@ -190,13 +202,16 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     achievedP20VariationDb,
     worstP20SeatId,
     p20Available,
-    // House-curve specific fields (present for house_curve profile)
-    worstSeatP19Level: eq.worstSeatP19Level,
-    worstSeatMaxDeviationDb: eq.worstSeatMaxDeviationDb,
-    worstSeatId: eq.worstSeatId,
-    meanSeatMaxDeviationDb: eq.meanSeatMaxDeviationDb,
-    rmsSeatTargetErrorDb: eq.rmsSeatTargetErrorDb,
-    perSeatMetrics: eq.perSeatMetrics,
+    // Uniform seat metrics — calculated identically for every profile (Standard,
+    // Accuracy, house-curve) from perSeatPostEqCurves using the same 1/3-octave
+    // smoothing, assessment band, and target curve as houseCurveFitterCore.js.
+    // When no real seats exist, equivalent fallback values are calculated from RSP.
+    worstSeatP19Level: uniformSeatMetrics?.worstSeatP19Level ?? 0,
+    worstSeatMaxDeviationDb: uniformSeatMetrics?.worstSeatMaxDeviationDb ?? null,
+    worstSeatId: uniformSeatMetrics?.worstSeatId ?? null,
+    meanSeatMaxDeviationDb: uniformSeatMetrics?.meanSeatMaxDeviationDb ?? null,
+    rmsSeatTargetErrorDb: uniformSeatMetrics?.rmsSeatTargetErrorDb ?? null,
+    perSeatMetrics: uniformSeatMetrics?.seatMetrics ?? [],
     houseCurveStopReason: eq.stopReason,
     houseCurveBankLimits: eq.bankLimits,
     houseCurveLimitingReason: eq.limitingReason,
@@ -257,7 +272,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       phase, completedTasks, totalTasks,
       completedRequests: completedTasks, totalRequests: totalTasks, // backward compat for BassCalculationStatus
       uniqueCoreFits: coreFitCache.size, bankEvaluations: totalCompletedBankEvaluations,
-      standardFitCount, accuracyFitCount,
+      standardFitCount, accuracyFitCount, houseCurveFitCount,
     });
   };
   report("Preparing response curves", 0);
@@ -366,7 +381,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     performanceSummary: {
       totalOptimiserTimeMs: t1 - t0,
       requestCount: requests.length,
-      profileCount: FIT_PROFILES_TO_GENERATE.length,
+      profileCount: FIT_PROFILES_TO_GENERATE.length + 1, // Standard + Accuracy + house-curve
       uniqueCoreFitCount: coreFitCache.size,
       standardFitCount,
       accuracyFitCount,

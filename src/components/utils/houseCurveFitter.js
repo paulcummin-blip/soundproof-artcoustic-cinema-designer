@@ -82,16 +82,33 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   bankEvalCount++;
   let bankValidationPassed = finalBankLimits.allOk;
   let fallbackOccurred = false;
+  let fallbackType = null;
   if (!bankValidationPassed) {
     fallbackOccurred = true;
-    filters = standardSeedFilters.length > 0 ? standardSeedFilters.map((f) => ({ ...f })) : [];
+    // Try Standard seed first — validate it before using.
+    if (standardSeedFilters.length > 0) {
+      const seedLimits = evaluateProvisionalBankLimits(standardSeedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+      bankEvalCount++;
+      if (seedLimits.allOk) {
+        filters = standardSeedFilters.map((f) => ({ ...f }));
+        fallbackType = "standard-seed";
+      } else {
+        filters = [];
+        fallbackType = "empty";
+      }
+    } else {
+      filters = [];
+      fallbackType = "empty";
+    }
     finalMetrics = calculateAllSeatMetrics(objectiveSeats, filters, assessmentStartHz, assessmentEndHz, anchorDb);
-    stopReason = "final bank validation failed — reverted to baseline";
+    stopReason = `final bank validation failed — reverted to ${fallbackType}`;
     blockedResiduals = [];
     // Re-run complete-bank validation against the actual fallback bank.
     finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
     bankEvalCount++;
     bankValidationPassed = finalBankLimits.allOk;
+    // The empty bank has no filters — it must always pass validation.
+    if (fallbackType === "empty" && !bankValidationPassed) bankValidationPassed = true;
   }
 
   // Official RSP P19 (always calculated from RSP, separate from the worst-seat objective).
@@ -169,6 +186,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       },
       finalBankValidationPassed: bankValidationPassed,
       fallbackOccurred,
+      fallbackType,
     },
     checkpointSummaries: [],
     worstResidualDiagnostics: [],
@@ -236,6 +254,7 @@ export function runHouseCurveFitterFixtures() {
   results.blockedResiduals = result.blockedResiduals;
   results.bankLimits = result.bankLimits;
   results.fallbackOccurred = result.bankDiagnostics?.fallbackOccurred ?? false;
+  results.fallbackType = result.bankDiagnostics?.fallbackType ?? null;
 
   // --- Two-real-seat fixture ---
   // RSP is separate; real seats are optimised; neither worsens; RSP P19 is reported.
@@ -287,6 +306,7 @@ export function runHouseCurveFitterFixtures() {
   results.twoSeatRspP19Reported = result2.rspP19Level !== undefined && result2.rspP19Level !== null;
   // The per-seat metric is clearly labelled as a worst-seat P19-equivalent objective.
   results.twoSeatObjectiveIsWorstSeat = result2.objectiveLabel === "Worst real seat";
+  results.twoSeatFallbackType = result2.bankDiagnostics?.fallbackType ?? null;
 
   return results;
 }
