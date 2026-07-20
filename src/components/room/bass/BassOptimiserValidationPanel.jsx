@@ -54,6 +54,8 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
             const worstResiduals = Array.isArray(candidate?.designEqWorstResidualDiagnostics) ? candidate.designEqWorstResidualDiagnostics : [];
             const reason = candidate?.designEqSelectionReason;
             const sbl = bd?.selectedBankLimits;
+            const revDiag = candidate?.designEqRevisionDiagnostics;
+            const revisionAttempts = Array.isArray(revDiag?.attempts) ? revDiag.attempts : [];
             return (
               <div className="mt-2 border-t border-slate-300 pt-2">
                 {reason && <div className="mb-2 font-mono text-[10px] text-slate-800"><strong>Selection reason:</strong> {reason}</div>}
@@ -104,10 +106,10 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                 )}
                 {worstResiduals.length > 0 && (
                   <div className="mt-2 overflow-x-auto">
-                    <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Worst-residual capability diagnostics (8 largest, 1/3-octave smoothed)</div>
-                    <table className="min-w-[1400px] text-right font-mono text-[10px] text-slate-700">
+                    <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Worst-residual capability diagnostics (up to 8 distinct regions, 1/3-octave smoothed)</div>
+                    <table className="min-w-[1600px] text-right font-mono text-[10px] text-slate-700">
                       <thead className="border-b border-slate-300 text-slate-500">
-                        <tr>{["Freq", "Target", "Post-EQ", "Signed res", "Abs res", "Agg EQ", "Permitted boost", "Remaining boost", "LF ramp", "Cap-limited"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
+                        <tr>{["Freq", "Target", "Post-EQ", "Signed res", "Abs res", "Agg EQ", "Permitted boost", "Remaining point boost", "Req to target", "Req to P19 tol", "Full-target cap-lim", "P19-tol cap-lim", "LF ramp"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
                       </thead>
                       <tbody>
                         {worstResiduals.map((row) => (
@@ -119,9 +121,40 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                             <td className="px-2 py-1">{fmt(row.absoluteResidualDb, " dB")}</td>
                             <td className="px-2 py-1">{fmt(row.aggregateEqContributionDb, " dB")}</td>
                             <td className="px-2 py-1">{fmt(row.sourceDomainPermittedTotalBoostDb, " dB")}</td>
-                            <td className="px-2 py-1">{fmt(row.remainingPermittedAggregateBoostDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.remainingPointBoostDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.requiredBoostToTargetDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.requiredBoostToP19ToleranceDb, " dB")}</td>
+                            <td className="px-2 py-1"><strong className={row.fullTargetCapabilityLimited ? "text-amber-700" : "text-emerald-700"}>{row.fullTargetCapabilityLimited ? "Yes" : "No"}</strong></td>
+                            <td className="px-2 py-1"><strong className={row.p19ToleranceCapabilityLimited ? "text-rose-700" : "text-emerald-700"}>{row.p19ToleranceCapabilityLimited ? "Yes" : "No"}</strong></td>
                             <td className="px-2 py-1">{fmt(row.usableLfRampFraction)}</td>
-                            <td className="px-2 py-1"><strong className={row.capabilityLimited ? "text-amber-700" : "text-slate-500"}>{row.capabilityLimited ? "Yes" : "No"}</strong></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {revisionAttempts.length > 0 && (
+                  <div className="mt-2 overflow-x-auto">
+                    <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Revision attempts ({revDiag?.attemptCount ?? 0} total, {revDiag?.acceptedCount ?? 0} accepted)</div>
+                    <table className="min-w-[1500px] text-right font-mono text-[10px] text-slate-700">
+                      <thead className="border-b border-slate-300 text-slate-500">
+                        <tr>{["Filter idx", "Old gain", "Proposed gain", "Accepted gain", "Bank max boost", "Bank max cut", "Max dev before", "Max dev after", "RMS before", "RMS after", "Accepted", "Rejection reason"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {revisionAttempts.map((row, i) => (
+                          <tr className={`border-b border-slate-200 ${row.accepted ? "bg-emerald-50" : ""}`} key={i}>
+                            <td className="px-2 py-1 font-semibold">{row.filterIndex}</td>
+                            <td className="px-2 py-1">{fmt(row.oldGainDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.proposedGainDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.acceptedGainDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.bankMaxBoostDb, " dB")} @ {fmt(row.bankMaxBoostHz, " Hz")}</td>
+                            <td className="px-2 py-1">{fmt(row.bankMaxCutDb, " dB")} @ {fmt(row.bankMaxCutHz, " Hz")}</td>
+                            <td className="px-2 py-1">{fmt(row.maximumDeviationBeforeDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.maximumDeviationAfterDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.rmsBeforeDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.rmsAfterDb, " dB")}</td>
+                            <td className="px-2 py-1"><strong className={row.accepted ? "text-emerald-700" : "text-rose-700"}>{row.accepted ? "Yes" : "No"}</strong></td>
+                            <td className="px-2 py-1 text-left">{row.rejectionReason || "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -133,29 +166,29 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
           })()}
           {trace.length > 0 && (
             <div className="mt-2 overflow-x-auto">
-              <table className="min-w-[1700px] text-right font-mono text-[10px] text-slate-700">
+              <table className="min-w-[2100px] text-right font-mono text-[10px] text-slate-700">
                 <thead className="border-b border-slate-300 text-slate-500">
-                  <tr>{["Iter", "Freq", "Gain", "Q", "Max before", "Max after", "RMS before", "RMS after", "Raw min before", "Raw min after", "P14 min before", "P14 min after", "P14-safe", "Broad worse", "Gain pre-bank", "Gain post-bank", "Agg boost after", "Agg cut after"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
+                  <tr>{["Op", "Action", "Freq", "Gain", "Q", "Replaced", "Old gain", "Gain delta", "Max before", "Max after", "RMS before", "RMS after", "P14 min before", "P14 min after", "P14-safe", "Broad worse", "Agg boost after", "Agg cut after"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
                 </thead>
                 <tbody>
                   {trace.map((row) => (
                     <tr className="border-b border-slate-200" key={row.iteration}>
                       <td className="px-2 py-1 font-semibold">{row.iteration}</td>
+                      <td className="px-2 py-1"><strong className={row.action === "revise" ? "text-indigo-700" : "text-slate-700"}>{row.action || "append"}</strong></td>
                       <td className="px-2 py-1">{fmt(row.selectedFrequencyHz, " Hz")}</td>
                       <td className="px-2 py-1">{fmt(row.gainDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.Q)}</td>
+                      <td className="px-2 py-1">{row.replacedFilterIndex ?? "—"}</td>
+                      <td className="px-2 py-1">{fmt(row.oldGainDb, " dB")}</td>
+                      <td className="px-2 py-1">{fmt(row.gainDeltaDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.maximumDeviationBeforeDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.maximumDeviationAfterDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.rmsBeforeDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.rmsAfterDb, " dB")}</td>
-                      <td className="px-2 py-1">{fmt(row.rawMinimumSplBeforeDb, " dB")}</td>
-                      <td className="px-2 py-1">{fmt(row.rawMinimumSplAfterDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.p14MinimumSplBeforeDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.p14MinimumSplAfterDb, " dB")}</td>
                       <td className="px-2 py-1"><strong className={row.p14Safe ? "text-emerald-700" : "text-rose-700"}>{row.p14Safe ? "Yes" : "No"}</strong></td>
                       <td className="px-2 py-1"><strong className={row.broadBelowTargetWorsening ? "text-rose-700" : "text-emerald-700"}>{row.broadBelowTargetWorsening ? "Yes" : "No"}</strong></td>
-                      <td className="px-2 py-1">{fmt(row.gainBeforeBankLimiting, " dB")}</td>
-                      <td className="px-2 py-1">{fmt(row.gainAfterBankLimiting, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.aggregateMaxBoostAfterDb, " dB")} @ {fmt(row.aggregateMaxBoostAfterHz, " Hz")}</td>
                       <td className="px-2 py-1">{fmt(row.aggregateMaxCutAfterDb, " dB")} @ {fmt(row.aggregateMaxCutAfterHz, " Hz")}</td>
                     </tr>

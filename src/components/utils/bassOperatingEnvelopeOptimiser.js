@@ -112,6 +112,7 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     designEqCheckpointSummaries: eq.checkpointSummaries,
     designEqWorstResidualDiagnostics: eq.worstResidualDiagnostics,
     designEqSelectionReason: eq.selectionReason,
+    designEqRevisionDiagnostics: eq.revisionDiagnostics,
     p14CheckpointDeltaDb,
     capabilityLimitedFrequencies,
     meetsRequestedEnvelope,
