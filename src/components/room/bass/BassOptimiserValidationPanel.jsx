@@ -53,13 +53,49 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       const allCandidates = Array.isArray(result.candidates) ? result.candidates : [];
       const credible = allCandidates.filter((c) => Number.isFinite(c.achievedP19VariationDb));
       const bestStd = credible.filter((c) => (c.designEqFitProfile || "standard") === "standard").sort((a, b) => a.achievedP19VariationDb - b.achievedP19VariationDb)[0];
-      const bestAcc = credible.filter((c) => c.designEqFitProfile === "accuracy").sort((a, b) => a.achievedP19VariationDb - b.achievedP19VariationDb)[0];
+      const bestHc = credible.filter((c) => c.designEqFitProfile === "house_curve").sort((a, b) => a.achievedP19VariationDb - b.achievedP19VariationDb)[0];
       const sel = result.selectedCandidate;
       const selProfile = sel ? (sel.designEqFitProfile || "standard") : "—";
       const selP19 = sel && Number.isFinite(sel.achievedP19VariationDb) ? `±${sel.achievedP19VariationDb.toFixed(1)} dB` : "—";
       return <div className="mt-1 font-mono text-[10px] text-slate-600">
-        Best Standard accuracy: {bestStd ? `±${bestStd.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Best Accuracy-profile accuracy: {bestAcc ? `±${bestAcc.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Selected: {selProfile} {selP19}
+        Best Standard accuracy: {bestStd ? `±${bestStd.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Best house-curve accuracy: {bestHc ? `±${bestHc.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Selected: {selProfile} {selP19}
       </div>;
+    })()}
+    {result.selectedCandidate?.designEqFitProfile === "house_curve" && (() => {
+      const c = result.selectedCandidate;
+      const hbl = c.houseCurveBankLimits || {};
+      const psm = Array.isArray(c.perSeatMetrics) ? c.perSeatMetrics : [];
+      const baselineDev = c.houseCurveBaselineWorstSeatDeviation;
+      const worstDev = c.worstSeatMaxDeviationDb;
+      const diff = (Number.isFinite(baselineDev) && Number.isFinite(worstDev)) ? (worstDev - baselineDev).toFixed(1) : "—";
+      return <details className="mt-2 rounded border border-indigo-300 bg-indigo-50 p-2 text-[10px]" open>
+        <summary className="cursor-pointer font-mono font-semibold text-indigo-900">House-curve seat-aware diagnostics</summary>
+        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
+          <span>Objective: <strong className="text-slate-900">Worst-seat house-curve accuracy</strong></span>
+          <span>Official RSP P19: <strong className="text-slate-900">{result.achievedP19Level} (±{fmt(c.achievedP19VariationDb, " dB")})</strong></span>
+          <span>Worst-seat P19: <strong className="text-slate-900">L{c.worstSeatP19Level || 0} (±{fmt(c.worstSeatMaxDeviationDb, " dB")}) @ {c.worstSeatId || "—"}</strong></span>
+          <span>Mean seat max dev: <strong className="text-slate-900">{fmt(c.meanSeatMaxDeviationDb, " dB")}</strong></span>
+          <span>RMS seat target error: <strong className="text-slate-900">{fmt(c.rmsSeatTargetErrorDb, " dB")}</strong></span>
+          <span>Selected filters: <strong className="text-slate-900">{c.designEqSelectedCheckpoint?.enabledFilterCount ?? "—"}</strong></span>
+          <span>Max aggregate boost: <strong className="text-slate-900">{fmt(hbl.maxAggregateBoostDb, " dB")} @ {fmt(hbl.maxAggregateBoostHz, " Hz")}</strong></span>
+          <span>Max aggregate cut: <strong className="text-slate-900">{fmt(hbl.maxAggregateCutDb, " dB")} @ {fmt(hbl.maxAggregateCutHz, " Hz")}</strong></span>
+          <span>Diff from Standard baseline: <strong className={Number.isFinite(diff) && Number(diff) <= 0 ? "text-emerald-700" : "text-amber-700"}>{diff} dB</strong></span>
+          <span>Limiting reason: <strong className="text-slate-900">{c.houseCurveLimitingReason || "—"}</strong></span>
+          <span>Stop reason: <strong className="text-slate-900">{c.houseCurveStopReason || "—"}</strong></span>
+        </div>
+        {psm.length > 0 && (
+          <div className="mt-2 overflow-x-auto">
+            <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Per-seat house-curve deviation</div>
+            <table className="min-w-[500px] text-right font-mono text-[10px] text-slate-700">
+              <thead className="border-b border-slate-300 text-slate-500"><tr>{["Seat", "Max dev", "RMS dev", "Worst Hz", "Level"].map((l) => <th className="px-2 py-1" key={l}>{l}</th>)}</tr></thead>
+              <tbody>{psm.map((s) => {
+                const lvl = s.maxAbsDeviationDb <= 2 ? 4 : s.maxAbsDeviationDb <= 3 ? 3 : s.maxAbsDeviationDb <= 4 ? 2 : s.maxAbsDeviationDb <= 5 ? 1 : 0;
+                return <tr className="border-b border-slate-200" key={s.seatId}><td className="px-2 py-1 font-semibold text-left">{s.seatId}{s.isPrimary ? " (RSP)" : ""}</td><td className="px-2 py-1">±{fmt(s.maxAbsDeviationDb, " dB")}</td><td className="px-2 py-1">{fmt(s.rmsDeviationDb, " dB")}</td><td className="px-2 py-1">{fmt(s.worstFrequencyHz, " Hz")}</td><td className="px-2 py-1"><strong className={lvl > 0 ? "text-emerald-700" : "text-rose-700"}>L{lvl}</strong></td></tr>;
+              })}</tbody>
+            </table>
+          </div>
+        )}
+      </details>;
     })()}
     {result.priorityRerankTimeMs != null && <div className="mt-1 font-mono text-[10px] text-slate-600">Priority rerank: {fmtMs(result.priorityRerankTimeMs)} ms | Heavy pool reused: {result.heavyPoolReused ? "Yes" : "No"} | Pool: {result.physicallyCredibleCount ?? 0} credible / {result.requestedEnvelopeValidCount ?? 0} valid / {result.generatedCandidateCount ?? 0} generated</div>}
     {result.performanceSummary && (

@@ -3,6 +3,7 @@ import { computeParam14LfeCapability, computeParam18BassExtension, computeP19Dev
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { selectBestCandidate } from "@/components/utils/optimiserRanking";
+import { calculateHouseCurveEqCurve } from "@/components/utils/houseCurveFitter";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -189,6 +190,17 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     achievedP20VariationDb,
     worstP20SeatId,
     p20Available,
+    // House-curve specific fields (present for house_curve profile)
+    worstSeatP19Level: eq.worstSeatP19Level,
+    worstSeatMaxDeviationDb: eq.worstSeatMaxDeviationDb,
+    worstSeatId: eq.worstSeatId,
+    meanSeatMaxDeviationDb: eq.meanSeatMaxDeviationDb,
+    rmsSeatTargetErrorDb: eq.rmsSeatTargetErrorDb,
+    perSeatMetrics: eq.perSeatMetrics,
+    houseCurveStopReason: eq.stopReason,
+    houseCurveBankLimits: eq.bankLimits,
+    houseCurveLimitingReason: eq.limitingReason,
+    houseCurveBaselineWorstSeatDeviation: eq.baselineWorstSeatDeviationDb,
   };
 }
 
@@ -238,7 +250,8 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   let totalCompletedBankEvaluations = 0;
   let standardFitCount = 0;
   let accuracyFitCount = 0;
-  const totalTasks = requests.length * FIT_PROFILES_TO_GENERATE.length;
+  let houseCurveFitCount = 0;
+  const totalTasks = requests.length * (FIT_PROFILES_TO_GENERATE.length + 1);
   const report = (phase, completedTasks) => {
     if (onProgress) onProgress({
       phase, completedTasks, totalTasks,
@@ -313,6 +326,33 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     }
     report("Assessing RSP and real seats", taskIndex);
     candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: accuracyEq, perSeatRawCurves }));
+
+    // House-curve fit — seat-aware, optimised for worst-seat P19 deviation.
+    // Uses the same shared bank for RSP and every real seat. Seeded from the
+    // Standard filter bank but optimises for the worst seat, not the RSP.
+    taskIndex++;
+    report("Fitting house-curve EQ", taskIndex);
+    const houseCurveCacheKey = [
+      request.p14.p14TargetDb, assessmentStartHz, assessmentEndHz,
+      "house_curve", `seed:${seedSignature}`,
+    ].join(":");
+    let houseCurveEq = coreFitCache.get(houseCurveCacheKey);
+    if (!houseCurveEq) {
+      const fitStart = perf();
+      houseCurveEq = calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfHz, activeSubs, {
+        requestedSystemOutputDb: request.p14.p14TargetDb,
+        targetAnchorDb: request.p14.p14TargetDb,
+        targetToleranceDb: request.p19.p19ToleranceDb,
+        assessmentStartHz, assessmentEndHz, collectDiagnostics,
+        initialFilters: standardSeedFilters,
+      });
+      coreFitTimeMs += perf() - fitStart;
+      totalCompletedBankEvaluations += houseCurveEq.bankDiagnostics?.completedBankEvaluationCount || 0;
+      coreFitCache.set(houseCurveCacheKey, houseCurveEq);
+      houseCurveFitCount++;
+    }
+    report("Assessing RSP and real seats", taskIndex);
+    candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: houseCurveEq, perSeatRawCurves }));
   }
   report("Complete", totalTasks);
   const selectablePool = candidates.filter(isPhysicallyCredible);
@@ -330,6 +370,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       uniqueCoreFitCount: coreFitCache.size,
       standardFitCount,
       accuracyFitCount,
+      houseCurveFitCount,
       coreFitTimeMs,
       completedBankEvaluationCount: totalCompletedBankEvaluations,
     },
@@ -339,6 +380,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     requestedEnvelopeValidCount,
     standardFitCount,
     accuracyFitCount,
+    houseCurveFitCount,
     warningMessage: null,
   };
 }
@@ -421,6 +463,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
     requestedEnvelopeValidCount: pool.requestedEnvelopeValidCount,
     standardFitCount: pool.standardFitCount || 0,
     accuracyFitCount: pool.accuracyFitCount || 0,
+    houseCurveFitCount: pool.houseCurveFitCount || 0,
   };
 }
 

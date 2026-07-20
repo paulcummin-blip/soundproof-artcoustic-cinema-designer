@@ -133,7 +133,32 @@ function compareForBalanced(a, b) {
   return filterCount(a) - filterCount(b);
 }
 
-const COMPARATORS = { spl: compareForSpl, extension: compareForExtension, accuracy: compareForAccuracy, balanced: compareForBalanced };
+// House-curve priority: rank by worst-seat P19 level, then worst-seat deviation,
+// then mean seat deviation, then RMS target error, then RSP P19, then P14, P18,
+// then fewest filters. Uses worstSeatP19Level/worstSeatMaxDeviationDb from the
+// house-curve fitter, falling back to worstRealSeatHouseCurveLevel/worstRealSeatHouseCurveVariationDb
+// for Standard/Accuracy candidates.
+function compareForHouseCurve(a, b) {
+  const aWorstLevel = levelValue(a.worstSeatP19Level ?? a.worstRealSeatHouseCurveLevel);
+  const bWorstLevel = levelValue(b.worstSeatP19Level ?? b.worstRealSeatHouseCurveLevel);
+  if (aWorstLevel !== bWorstLevel) return bWorstLevel - aWorstLevel;
+  const aWorstDev = variationOr(a.worstSeatMaxDeviationDb ?? a.worstRealSeatHouseCurveVariationDb);
+  const bWorstDev = variationOr(b.worstSeatMaxDeviationDb ?? b.worstRealSeatHouseCurveVariationDb);
+  if (aWorstDev !== bWorstDev) return aWorstDev - bWorstDev;
+  const d3 = variationOr(a.meanSeatMaxDeviationDb) - variationOr(b.meanSeatMaxDeviationDb);
+  if (d3 !== 0) return d3;
+  const d4 = variationOr(a.rmsSeatTargetErrorDb) - variationOr(b.rmsSeatTargetErrorDb);
+  if (d4 !== 0) return d4;
+  const d5 = variationOr(a.achievedP19VariationDb) - variationOr(b.achievedP19VariationDb);
+  if (d5 !== 0) return d5;
+  const d6 = levelValue(b.achievedP14Level) - levelValue(a.achievedP14Level);
+  if (d6 !== 0) return d6;
+  const d7 = levelValue(b.achievedP18Level) - levelValue(a.achievedP18Level);
+  if (d7 !== 0) return d7;
+  return filterCount(a) - filterCount(b);
+}
+
+const COMPARATORS = { spl: compareForSpl, extension: compareForExtension, accuracy: compareForHouseCurve, balanced: compareForBalanced };
 
 // Part F: Profile-aware eligibility filtering applied before the comparator.
 // SPL and Extension modes select from Standard candidates only. Accuracy mode
@@ -152,9 +177,16 @@ function filterByProfileEligibility(pool, mode) {
   // For Accuracy mode, the comparator determines the winner — a profile label
   // must never force selection of a worse calibration.
   if (mode === "accuracy") {
-    return { eligiblePool: pool, eligibilityNote: "All Standard and Accuracy candidates" };
+    const houseCurve = pool.filter((c) => profileOf(c) === "house_curve");
+    const standard = pool.filter((c) => profileOf(c) === "standard" || profileOf(c) === "accuracy");
+    const eligible = [...houseCurve, ...standard];
+    if (eligible.length === 0) return { eligiblePool: pool, eligibilityNote: "Full pool (no house-curve or Standard candidates)" };
+    return { eligiblePool: eligible, eligibilityNote: "House-curve and Standard baseline candidates" };
   }
-  return { eligiblePool: pool, eligibilityNote: "Both Standard and Accuracy candidates" };
+  // Balanced mode excludes house-curve candidates to preserve existing behaviour.
+  const nonHouseCurve = pool.filter((c) => profileOf(c) !== "house_curve");
+  if (nonHouseCurve.length === 0) return { eligiblePool: pool, eligibilityNote: "Full pool (no Standard or Accuracy candidates)" };
+  return { eligiblePool: nonHouseCurve, eligibilityNote: "Standard and Accuracy candidates" };
 }
 
 // Non-mutating single-pass best-candidate selection from a pool.
@@ -211,31 +243,31 @@ export function runRankingFixtures() {
     mkProfile("standard", 4, 3, 4, 4, 4, true),
   ], "extension").selected?.designEqFitProfile === "standard";
 
-  // Part B: Accuracy mode must compare ALL credible candidates and let the
-  // comparator decide — a profile label must never force selection of a
-  // worse calibration.
+  // House-curve priority fixtures: the "accuracy" mode now uses compareForHouseCurve
+  // and selects from house_curve + standard candidates.
   // Standard: P19 ±4.6 dB (level 1), worst-seat ±8.6 dB (level 1).
-  // Accuracy: P19 ±10.8 dB (level 0/FAIL), worst-seat ±8.6 dB (level 1).
-  // Standard must win Accuracy mode because it has better P19 level.
+  // House-curve: P19 ±10.8 dB (level 0/FAIL), worst-seat ±8.6 dB (level 1).
+  // Standard must win because both have the same worst-seat level but Standard
+  // has lower RSP P19 deviation.
   results.standardWinsAccuracyMode = selectBestCandidate([
     mkProfile("standard", 2, 2, 1, 1, 1, true),
-    mkProfile("accuracy", 1, 1, 0, 1, 1, true),
+    mkProfile("house_curve", 1, 1, 0, 1, 1, true),
   ], "accuracy").selected?.designEqFitProfile === "standard";
-  // Accuracy wins when it genuinely has the better accuracy metrics.
+  // House-curve wins when it genuinely has better worst-seat accuracy.
   results.accuracyWinsOnMerit = selectBestCandidate([
     mkProfile("standard", 4, 4, 1, 1, 1, true),
-    mkProfile("accuracy", 2, 2, 3, 3, 3, true),
-  ], "accuracy").selected?.designEqFitProfile === "accuracy";
-  // Accuracy must never rank worse than the best available Standard candidate.
+    mkProfile("house_curve", 2, 2, 3, 3, 3, true),
+  ], "accuracy").selected?.designEqFitProfile === "house_curve";
+  // House-curve must never rank worse than the best available Standard candidate.
   {
     const pool = [
       mkProfile("standard", 2, 2, 2, 1, 1, true),
-      mkProfile("accuracy", 1, 1, 0, 1, 1, true),
+      mkProfile("house_curve", 1, 1, 0, 1, 1, true),
     ];
     const accResult = selectBestCandidate(pool, "accuracy");
     const stdResult = selectBestCandidate(pool.filter((c) => (c.designEqFitProfile || "standard") === "standard"), "accuracy");
     results.accuracyNeverWorseThanBestStandard = accResult.selected && stdResult.selected
-      && compareForAccuracy(accResult.selected, stdResult.selected) <= 0;
+      && compareForHouseCurve(accResult.selected, stdResult.selected) <= 0;
   }
   // Regression: Accuracy mode chooses lower P19 variation when both candidates
   // have no real-seat accuracy metric. Previously, Infinity - Infinity produced
@@ -252,10 +284,57 @@ export function runRankingFixtures() {
       designEqFitProfile: profile,
     });
     const noSeatA = mkNoSeat("standard", 5.0);
-    const noSeatB = mkNoSeat("accuracy", 6.0);
+    const noSeatB = mkNoSeat("house_curve", 6.0);
     results.accuracyChoosesLowerP19WithNoSeat =
       selectBestCandidate([noSeatB, noSeatA], "accuracy").selected === noSeatA
       && selectBestCandidate([noSeatA, noSeatB], "accuracy").selected === noSeatA;
+  }
+  // House-curve specific fixtures:
+  // 1. A candidate that improves worst-seat from ±8.6 to ±4.8 must beat one
+  //    that preserves more P14 but leaves the seat at ±8.6.
+  {
+    const mkHC = (p14, p19, worstSeatLevel, worstSeatDev, meanSeatDev, rmsSeatErr) => ({
+      achievedP14Level: p14, achievedP18Level: 2, achievedP19Level: p19,
+      achievedP14Db: 100 + p14 * 3, achievedP18FrequencyHz: 30,
+      achievedP19VariationDb: 6 - p19,
+      worstSeatP19Level: worstSeatLevel, worstSeatMaxDeviationDb: worstSeatDev,
+      meanSeatMaxDeviationDb: meanSeatDev, rmsSeatTargetErrorDb: rmsSeatErr,
+      worstRealSeatHouseCurveLevel: worstSeatLevel,
+      worstRealSeatHouseCurveVariationDb: worstSeatDev,
+      generatedFilterBank: [{ enabled: true }],
+      designEqFitProfile: "house_curve",
+    });
+    const improves = mkHC(1, 1, 2, 4.8, 4.0, 3.5);
+    const preservesP14 = mkHC(3, 1, 1, 8.6, 7.0, 6.5);
+    results.houseCurvePrefersLowerWorstSeat = selectBestCandidate([preservesP14, improves], "accuracy").selected === improves;
+  }
+  // 2. A house-curve candidate with worse worst-seat than Standard must not win.
+  {
+    const mkStd = (worstSeatLevel, worstSeatDev) => ({
+      achievedP14Level: 3, achievedP18Level: 3, achievedP19Level: 2,
+      achievedP14Db: 109, achievedP18FrequencyHz: 25,
+      achievedP19VariationDb: 4.0,
+      worstRealSeatHouseCurveLevel: worstSeatLevel,
+      worstRealSeatHouseCurveVariationDb: worstSeatDev,
+      worstSeatP19Level: worstSeatLevel, worstSeatMaxDeviationDb: worstSeatDev,
+      meanSeatMaxDeviationDb: worstSeatDev, rmsSeatTargetErrorDb: worstSeatDev,
+      generatedFilterBank: [{ enabled: true }],
+      designEqFitProfile: "standard",
+    });
+    const mkWorse = (worstSeatLevel, worstSeatDev) => ({
+      achievedP14Level: 1, achievedP18Level: 1, achievedP19Level: 1,
+      achievedP14Db: 103, achievedP18FrequencyHz: 35,
+      achievedP19VariationDb: 5.0,
+      worstSeatP19Level: worstSeatLevel, worstSeatMaxDeviationDb: worstSeatDev,
+      meanSeatMaxDeviationDb: worstSeatDev, rmsSeatTargetErrorDb: worstSeatDev,
+      worstRealSeatHouseCurveLevel: worstSeatLevel,
+      worstRealSeatHouseCurveVariationDb: worstSeatDev,
+      generatedFilterBank: [{ enabled: true }, { enabled: true }],
+      designEqFitProfile: "house_curve",
+    });
+    results.houseCurveStandardBaselineNeverWorse = selectBestCandidate([
+      mkStd(2, 4.0), mkWorse(1, 8.6),
+    ], "accuracy").selected?.designEqFitProfile === "standard";
   }
 
   // Balanced can select either profile according to its max-min result.

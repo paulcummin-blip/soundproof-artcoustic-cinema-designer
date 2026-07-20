@@ -1052,3 +1052,17 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 export function applyDesignEqCurve(curveData, usableLfHz, activeSubs = []) {
   return calculateDesignEqCurve(curveData, usableLfHz, activeSubs).curve;
 }
+
+// Shared utilities for the seat-aware house-curve fitter (houseCurveFitter.js).
+export {
+  normaliseCurve,
+  findRegions,
+  qForRegion,
+  limitBoostForCapability,
+  evaluateProvisionalBankLimits,
+  scaleCandidateForBankLimits,
+  isNearDuplicate,
+  countSameSignFiltersInRegion,
+  buildCurveFromBank,
+  emptyFilters,
+};
