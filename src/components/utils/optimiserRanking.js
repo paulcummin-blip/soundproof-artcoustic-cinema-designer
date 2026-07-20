@@ -10,7 +10,10 @@ const levelValue = (level) => {
 };
 
 const numOr = (v, fallback) => Number.isFinite(v) ? v : fallback;
-const variationOr = (v) => Number.isFinite(v) ? v : Infinity;
+// Use a large finite value instead of Infinity so that (unavailable - unavailable)
+// yields 0 (equal) rather than NaN. Infinity - Infinity produced NaN, which
+// silently left the first candidate selected when both had no real-seat metric.
+const variationOr = (v) => Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
 const filterCount = (candidate) => {
   const bank = candidate?.generatedFilterBank;
   return Array.isArray(bank) ? bank.filter(f => f?.enabled).length : 0;
@@ -234,6 +237,27 @@ export function runRankingFixtures() {
     results.accuracyNeverWorseThanBestStandard = accResult.selected && stdResult.selected
       && compareForAccuracy(accResult.selected, stdResult.selected) <= 0;
   }
+  // Regression: Accuracy mode chooses lower P19 variation when both candidates
+  // have no real-seat accuracy metric. Previously, Infinity - Infinity produced
+  // NaN, silently leaving the first candidate selected.
+  {
+    const mkNoSeat = (profile, p19Var) => ({
+      achievedP14Level: 2, achievedP18Level: 2,
+      achievedP19Level: p19Var <= 2 ? 4 : p19Var <= 3 ? 3 : p19Var <= 4 ? 2 : p19Var <= 6 ? 1 : 0,
+      worstRealSeatHouseCurveLevel: 0, worstRealSeatHouseCurveVariationDb: null,
+      achievedP20Level: 0, p20Available: false,
+      achievedP14Db: 106, achievedP18FrequencyHz: 30,
+      achievedP19VariationDb: p19Var, achievedP20VariationDb: null,
+      generatedFilterBank: [{ enabled: true }, { enabled: true }],
+      designEqFitProfile: profile,
+    });
+    const noSeatA = mkNoSeat("standard", 5.0);
+    const noSeatB = mkNoSeat("accuracy", 6.0);
+    results.accuracyChoosesLowerP19WithNoSeat =
+      selectBestCandidate([noSeatB, noSeatA], "accuracy").selected === noSeatA
+      && selectBestCandidate([noSeatA, noSeatB], "accuracy").selected === noSeatA;
+  }
+
   // Balanced can select either profile according to its max-min result.
   const balancedStandardWins = selectBestCandidate([
     mkProfile("standard", 4, 4, 4, 4, 4, true),

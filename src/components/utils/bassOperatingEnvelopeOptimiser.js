@@ -253,46 +253,66 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   for (const request of requests) {
     const assessmentStartHz = request.p18.p18LimitHz;
     const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
-    for (const profile of FIT_PROFILES_TO_GENERATE) {
-      taskIndex++;
-      report("Fitting Design EQ", taskIndex);
-      // Cache key includes every value capable of changing the FIT: P14 target,
-      // assessment band, profile ID, fitting tolerance, max cut, max aggregate
-      // boost, and the preserve-P14 policy. Requested P19 tolerance is NOT
-      // included — it does not affect filter discovery, frequency, gain, Q,
-      // checkpoint selection, or the correction curve. It only affects later
-      // P19 scoring and residual diagnostic classification, which are derived
-      // per-candidate from the shared cached fit.
-      const cacheKey = [
-        request.p14.p14TargetDb,
-        assessmentStartHz,
-        assessmentEndHz,
-        profile.id,
-        profile.fittingToleranceDb,
-        profile.maximumCutDb,
-        profile.maximumAggregateBoostDb,
-        profile.preserveP14,
-      ].join(":");
-      let eq = coreFitCache.get(cacheKey);
-      if (!eq) {
-        const fitStart = perf();
-        eq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-          requestedSystemOutputDb: request.p14.p14TargetDb,
-          targetAnchorDb: request.p14.p14TargetDb,
-          targetToleranceDb: request.p19.p19ToleranceDb,
-          fitProfile: profile.id,
-          assessmentStartHz,
-          assessmentEndHz,
-          collectDiagnostics,
-        });
-        coreFitTimeMs += perf() - fitStart;
-        totalCompletedBankEvaluations += eq.bankDiagnostics?.completedBankEvaluationCount || 0;
-        coreFitCache.set(cacheKey, eq);
-        if (profile.id === "accuracy") accuracyFitCount++; else standardFitCount++;
-      }
-      report("Assessing RSP and real seats", taskIndex);
-      candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: eq, perSeatRawCurves }));
+    // Standard fit — generated first so its enabled filter bank can seed the
+    // Accuracy fit. The seed guarantees the Accuracy result retains or improves
+    // the Standard checkpoint's maximum house-curve deviation.
+    taskIndex++;
+    report("Fitting Design EQ", taskIndex);
+    const standardCacheKey = [
+      request.p14.p14TargetDb, assessmentStartHz, assessmentEndHz,
+      "standard", DESIGN_EQ_FIT_PROFILES.standard.fittingToleranceDb,
+      DESIGN_EQ_FIT_PROFILES.standard.maximumCutDb,
+      DESIGN_EQ_FIT_PROFILES.standard.maximumAggregateBoostDb,
+      DESIGN_EQ_FIT_PROFILES.standard.preserveP14, "noseed",
+    ].join(":");
+    let standardEq = coreFitCache.get(standardCacheKey);
+    if (!standardEq) {
+      const fitStart = perf();
+      standardEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
+        requestedSystemOutputDb: request.p14.p14TargetDb,
+        targetAnchorDb: request.p14.p14TargetDb,
+        targetToleranceDb: request.p19.p19ToleranceDb,
+        fitProfile: "standard", assessmentStartHz, assessmentEndHz, collectDiagnostics,
+      });
+      coreFitTimeMs += perf() - fitStart;
+      totalCompletedBankEvaluations += standardEq.bankDiagnostics?.completedBankEvaluationCount || 0;
+      coreFitCache.set(standardCacheKey, standardEq);
+      standardFitCount++;
     }
+    report("Assessing RSP and real seats", taskIndex);
+    candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: standardEq, perSeatRawCurves }));
+
+    // Accuracy fit — seeded with the Standard fit's enabled filter bank.
+    // The seed signature is included in the cache key so a seeded Accuracy fit
+    // cannot reuse an unrelated cached result.
+    taskIndex++;
+    report("Fitting Design EQ", taskIndex);
+    const standardSeedFilters = (standardEq.filters || []).filter((f) => f && f.enabled);
+    const seedSignature = standardSeedFilters.map((f) => `${f.frequencyHz}:${f.gainDb}:${f.Q}`).join(",");
+    const accuracyCacheKey = [
+      request.p14.p14TargetDb, assessmentStartHz, assessmentEndHz,
+      "accuracy", DESIGN_EQ_FIT_PROFILES.accuracy.fittingToleranceDb,
+      DESIGN_EQ_FIT_PROFILES.accuracy.maximumCutDb,
+      DESIGN_EQ_FIT_PROFILES.accuracy.maximumAggregateBoostDb,
+      DESIGN_EQ_FIT_PROFILES.accuracy.preserveP14, `seed:${seedSignature}`,
+    ].join(":");
+    let accuracyEq = coreFitCache.get(accuracyCacheKey);
+    if (!accuracyEq) {
+      const fitStart = perf();
+      accuracyEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
+        requestedSystemOutputDb: request.p14.p14TargetDb,
+        targetAnchorDb: request.p14.p14TargetDb,
+        targetToleranceDb: request.p19.p19ToleranceDb,
+        fitProfile: "accuracy", assessmentStartHz, assessmentEndHz, collectDiagnostics,
+        initialFilters: standardSeedFilters,
+      });
+      coreFitTimeMs += perf() - fitStart;
+      totalCompletedBankEvaluations += accuracyEq.bankDiagnostics?.completedBankEvaluationCount || 0;
+      coreFitCache.set(accuracyCacheKey, accuracyEq);
+      accuracyFitCount++;
+    }
+    report("Assessing RSP and real seats", taskIndex);
+    candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: accuracyEq, perSeatRawCurves }));
   }
   report("Complete", totalTasks);
   const selectablePool = candidates.filter(isPhysicallyCredible);

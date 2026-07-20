@@ -488,9 +488,22 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   const fittingToleranceDb = Math.max(1, Math.min(5, requestedFittingToleranceDb));
   const requestedSystemOutputDb = Number(options.requestedSystemOutputDb);
   const collectDiagnostics = options.collectDiagnostics !== false;
+  // Accept initialFilters for seeded fits (Accuracy profile seeded from Standard).
+  // Keep only valid, enabled filters. Limit to 10 filters.
+  const initialFilters = Array.isArray(options.initialFilters)
+    ? options.initialFilters
+        .filter((f) => f && f.enabled && Number.isFinite(f.frequencyHz) && f.frequencyHz > 0
+          && Number.isFinite(f.gainDb) && Number.isFinite(f.Q) && f.Q > 0)
+        .slice(0, 10)
+        .map((f) => ({ ...f }))
+    : [];
+  const hasInitialFilters = initialFilters.length > 0;
   __bankEvaluationCounter = 0;
-  const filters = [];
-  let curve = raw;
+  // Seed the filter bank from the Standard fit when provided (Accuracy profile).
+  // The seeded state is the first checkpoint — it guarantees the Accuracy result
+  // retains or improves the Standard checkpoint's maximum house-curve deviation.
+  const filters = hasInitialFilters ? initialFilters.map((f) => ({ ...f })) : [];
+  let curve = hasInitialFilters ? buildCurveFromBank(raw, filters) : raw;
   let stopReason = "no safe improvement remained";
   const checkpoints = [buildCheckpoint({
     filters,
@@ -576,6 +589,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
       // Phase 1: Generate and evaluate every append gain/Q variant first.
       // A near-duplicate Q variant does not mean the entire region is append-blocked.
+      // Skip append when the filter bank is already at the 10-filter ceiling —
+      // only gain revisions to existing filters are tested.
+      if (filters.length < 10) {
       for (const gainScale of gainScales) {
         for (const qMultiplier of qMultipliers) {
           const scaledCandidate = {
@@ -623,6 +639,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
             regionSameSignCount,
           });
         }
+      }
       }
 
       // Phase 2: Generate gain-revision candidates only when no append variant
