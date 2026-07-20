@@ -3,6 +3,7 @@
 // Existing candidate fields already contain numeric levels 1–4 (or 0 for fail); these are preserved.
 
 import { getDesignEqValleyThresholdValidation } from "@/components/utils/designEqCalibration";
+import { houseCurveP19Level, runHouseCurveFitterFixtures } from "@/components/utils/houseCurveFitter";
 
 const levelValue = (level) => {
   const n = Number(level);
@@ -290,23 +291,28 @@ export function runRankingFixtures() {
       && selectBestCandidate([noSeatA, noSeatB], "accuracy").selected === noSeatA;
   }
   // House-curve specific fixtures:
-  // 1. A candidate that improves worst-seat from ±8.6 to ±4.8 must beat one
-  //    that preserves more P14 but leaves the seat at ±8.6.
+  // 1. A candidate that improves worst-seat from ±8.6 (FAIL) to ±4.8 (L1) must
+  //    beat one that preserves more P14 but leaves the seat at ±8.6 (FAIL).
+  //    Levels are derived from the production houseCurveP19Level function — never
+  //    invented independently of deviation.
   {
-    const mkHC = (p14, p19, worstSeatLevel, worstSeatDev, meanSeatDev, rmsSeatErr) => ({
-      achievedP14Level: p14, achievedP18Level: 2, achievedP19Level: p19,
+    const mkHC = (profile, p14, p18, worstSeatDev) => ({
+      achievedP14Level: p14, achievedP18Level: p18, achievedP19Level: 1,
       achievedP14Db: 100 + p14 * 3, achievedP18FrequencyHz: 30,
-      achievedP19VariationDb: 6 - p19,
-      worstSeatP19Level: worstSeatLevel, worstSeatMaxDeviationDb: worstSeatDev,
-      meanSeatMaxDeviationDb: meanSeatDev, rmsSeatTargetErrorDb: rmsSeatErr,
-      worstRealSeatHouseCurveLevel: worstSeatLevel,
+      achievedP19VariationDb: 5.0,
+      worstSeatP19Level: houseCurveP19Level(worstSeatDev),
+      worstSeatMaxDeviationDb: worstSeatDev,
+      meanSeatMaxDeviationDb: worstSeatDev, rmsSeatTargetErrorDb: worstSeatDev,
+      worstRealSeatHouseCurveLevel: houseCurveP19Level(worstSeatDev),
       worstRealSeatHouseCurveVariationDb: worstSeatDev,
       generatedFilterBank: [{ enabled: true }],
-      designEqFitProfile: "house_curve",
+      designEqFitProfile: profile,
     });
-    const improves = mkHC(1, 1, 2, 4.8, 4.0, 3.5);
-    const preservesP14 = mkHC(3, 1, 1, 8.6, 7.0, 6.5);
-    results.houseCurvePrefersLowerWorstSeat = selectBestCandidate([preservesP14, improves], "accuracy").selected === improves;
+    // Standard: worst seat ±8.6 dB → FAIL (level 0). House curve: worst seat ±4.8 dB → L1.
+    // House curve must win even though it has lower P14/P18.
+    const standard = mkHC("standard", 3, 3, 8.6);
+    const houseCurve = mkHC("house_curve", 1, 1, 4.8);
+    results.houseCurvePrefersLowerWorstSeat = selectBestCandidate([standard, houseCurve], "accuracy").selected === houseCurve;
   }
   // 2. A house-curve candidate with worse worst-seat than Standard must not win.
   {
@@ -355,6 +361,14 @@ export function runRankingFixtures() {
   results.valleyMinusOneDbIsValley = valleyChecks.minusOneDbIsValley;
   results.valleyPlusOneDbIsPeak = valleyChecks.plusOneDbIsPeak;
   results.valleyPlusHalfDbIsNotPeak = valleyChecks.plusHalfDbIsNotPeak;
+
+  // House-curve fitter fixtures: the fitter must skip an uncorrectable null,
+  // correct a legal peak, record the blocked null, and pass bank validation.
+  const fitterFixtures = runHouseCurveFitterFixtures();
+  results.fitterCorrectedPeak = fitterFixtures.correctedPeak;
+  results.fitterDidNotStopAtNull = fitterFixtures.didNotStopAtNull;
+  results.fitterRecordedBlockedNull = fitterFixtures.recordedBlockedNull;
+  results.fitterBankValidationPassed = fitterFixtures.bankValidationPassed;
 
   return results;
 }
