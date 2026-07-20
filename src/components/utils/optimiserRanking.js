@@ -2,6 +2,8 @@
 // Level mapping: FAIL=0, L1=1, L2=2, L3=3, L4=4. Higher numeric values = higher achieved performance.
 // Existing candidate fields already contain numeric levels 1–4 (or 0 for fail); these are preserved.
 
+import { getDesignEqValleyThresholdValidation } from "@/components/utils/designEqCalibration";
+
 const levelValue = (level) => {
   const n = Number(level);
   return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.round(n))) : 0;
@@ -180,6 +182,11 @@ export function runRankingFixtures() {
     achievedP20VariationDb: p20Avail ? 6 - p20 : null,
     generatedFilterBank: Array.from({ length: p14 }, () => ({ enabled: true })),
   });
+  // mkProfile adds the designEqFitProfile field needed by filterByProfileEligibility.
+  const mkProfile = (profile, p14, p18, p19, seat, p20, p20Avail) => ({
+    ...mk(p14, p18, p19, seat, p20, p20Avail),
+    designEqFitProfile: profile,
+  });
   results.l4AboveL3 = compareForBalanced(mk(4,4,4,4,4,true), mk(3,3,3,3,3,true)) < 0;
   results.l3AboveL2 = compareForBalanced(mk(3,3,3,3,3,true), mk(2,2,2,2,2,true)) < 0;
   results.l2AboveL1 = compareForBalanced(mk(2,2,2,2,2,true), mk(1,1,1,1,1,true)) < 0;
@@ -188,5 +195,45 @@ export function runRankingFixtures() {
   results.accuracyL2L2L2BeatsL4L1L1 = compareForAccuracy(mk(2,2,2,2,2,true), mk(1,1,4,1,1,true)) < 0;
   results.splSelectsHighestP14 = compareForSpl(mk(4,1,1,1,1,true), mk(3,4,4,4,4,true)) < 0;
   results.extensionSelectsBestP18 = compareForExtension(mk(1,4,1,1,1,true), mk(4,3,4,4,4,true)) < 0;
+
+  // Profile-selection fixtures: prove each mode respects profile eligibility.
+  // SPL must select a Standard candidate even when an Accuracy candidate has higher P14.
+  results.splSelectsStandard = selectBestCandidate([
+    mkProfile("accuracy", 4, 1, 1, 1, 1, true),
+    mkProfile("standard", 3, 4, 4, 4, 4, true),
+  ], "spl").selected?.designEqFitProfile === "standard";
+  // Extension must select a Standard candidate even when an Accuracy candidate has better P18.
+  results.extensionSelectsStandard = selectBestCandidate([
+    mkProfile("accuracy", 4, 4, 1, 1, 1, true),
+    mkProfile("standard", 4, 3, 4, 4, 4, true),
+  ], "extension").selected?.designEqFitProfile === "standard";
+  // Accuracy must select an Accuracy candidate when one is credible.
+  results.accuracySelectsAccuracy = selectBestCandidate([
+    mkProfile("standard", 4, 4, 1, 1, 1, true),
+    mkProfile("accuracy", 2, 2, 2, 2, 2, true),
+  ], "accuracy").selected?.designEqFitProfile === "accuracy";
+  // Accuracy must fall back to Standard when no credible Accuracy candidate exists.
+  results.accuracyFallsBackToStandard = selectBestCandidate([
+    mkProfile("standard", 4, 4, 4, 4, 4, true),
+  ], "accuracy").selected?.designEqFitProfile === "standard";
+  // Balanced can select either profile according to its max-min result.
+  const balancedStandardWins = selectBestCandidate([
+    mkProfile("standard", 4, 4, 4, 4, 4, true),
+    mkProfile("accuracy", 2, 2, 2, 2, 2, true),
+  ], "balanced").selected?.designEqFitProfile === "standard";
+  const balancedAccuracyWins = selectBestCandidate([
+    mkProfile("standard", 2, 2, 2, 2, 2, true),
+    mkProfile("accuracy", 4, 4, 4, 4, 4, true),
+  ], "balanced").selected?.designEqFitProfile === "accuracy";
+  results.balancedCanSelectEitherProfile = balancedStandardWins && balancedAccuracyWins;
+
+  // Valley threshold sign validation — all must return true.
+  const valleyChecks = getDesignEqValleyThresholdValidation();
+  results.valleyPlusHalfDbIsNotValley = valleyChecks.plusHalfDbIsNotValley;
+  results.valleyMinusZeroNineDbIsNotValley = valleyChecks.minusZeroNineDbIsNotValley;
+  results.valleyMinusOneDbIsValley = valleyChecks.minusOneDbIsValley;
+  results.valleyPlusOneDbIsPeak = valleyChecks.plusOneDbIsPeak;
+  results.valleyPlusHalfDbIsNotPeak = valleyChecks.plusHalfDbIsNotPeak;
+
   return results;
 }

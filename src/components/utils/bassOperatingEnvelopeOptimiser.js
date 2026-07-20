@@ -47,6 +47,27 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
   const finalPostEqCurve = eq.curve;
   const combinedEqCurve = eq.combinedEqCurve || [];
   const capabilityLimitedFrequencies = eq.filters.filter((filter) => filter.enabled && filter.gainDb > 0 && filter.gainDb < 6).map((filter) => filter.frequencyHz);
+
+  // Candidate-specific P19 residual diagnostics — derived from the cached EQ
+  // result without re-running the fitter. The cached worstResidualDiagnostics
+  // were computed with whatever P19 tolerance the first request for this cache
+  // entry happened to carry. Each candidate recomputes requiredBoostToP19ToleranceDb
+  // and p19ToleranceCapabilityLimited from its own request.p19.p19ToleranceDb
+  // using the signedResidualDb and remainingPointBoostDb already stored in
+  // each diagnostic. The cached EQ result is never mutated.
+  const candidateRequestedP19ToleranceDb = request.p19.p19ToleranceDb;
+  const candidateWorstResidualDiagnostics = Array.isArray(eq.worstResidualDiagnostics)
+    ? eq.worstResidualDiagnostics.map((diag) => {
+        const signedResidualDb = diag.signedResidualDb;
+        const remainingPointBoostDb = diag.remainingPointBoostDb;
+        const requiredBoostToP19ToleranceDb = signedResidualDb < 0
+          ? Math.max(0, Math.abs(signedResidualDb) - candidateRequestedP19ToleranceDb)
+          : 0;
+        const p19ToleranceCapabilityLimited = signedResidualDb < 0
+          && requiredBoostToP19ToleranceDb > remainingPointBoostDb;
+        return { ...diag, requiredBoostToP19ToleranceDb, p19ToleranceCapabilityLimited };
+      })
+    : eq.worstResidualDiagnostics;
   const p14 = computeParam14LfeCapability(finalPostEqCurve, false, [assessmentStartHz, assessmentEndHz]);
   const p18 = computeParam18BassExtension(finalPostEqCurve);
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third");
@@ -153,7 +174,7 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     designEqSelectedCheckpoint: eq.selectedCheckpoint,
     designEqBankDiagnostics: eq.bankDiagnostics,
     designEqCheckpointSummaries: eq.checkpointSummaries,
-    designEqWorstResidualDiagnostics: eq.worstResidualDiagnostics,
+    designEqWorstResidualDiagnostics: candidateWorstResidualDiagnostics,
     designEqSelectionReason: eq.selectionReason,
     designEqRevisionDiagnostics: eq.revisionDiagnostics,
     p14CheckpointDeltaDb,
@@ -235,15 +256,17 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     for (const profile of FIT_PROFILES_TO_GENERATE) {
       taskIndex++;
       report("Fitting Design EQ", taskIndex);
-      // Part E: Cache key includes every value capable of changing the fit or
-      // its diagnostics: P14 target, assessment band, requested P19 tolerance,
-      // profile ID, fitting tolerance, max cut, max aggregate boost, and the
-      // preserve-P14 policy. Standard and Accuracy can never share an entry.
+      // Cache key includes every value capable of changing the FIT: P14 target,
+      // assessment band, profile ID, fitting tolerance, max cut, max aggregate
+      // boost, and the preserve-P14 policy. Requested P19 tolerance is NOT
+      // included — it does not affect filter discovery, frequency, gain, Q,
+      // checkpoint selection, or the correction curve. It only affects later
+      // P19 scoring and residual diagnostic classification, which are derived
+      // per-candidate from the shared cached fit.
       const cacheKey = [
         request.p14.p14TargetDb,
         assessmentStartHz,
         assessmentEndHz,
-        request.p19.p19ToleranceDb,
         profile.id,
         profile.fittingToleranceDb,
         profile.maximumCutDb,
