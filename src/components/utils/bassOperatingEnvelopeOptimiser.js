@@ -74,6 +74,11 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     schroederHz: assessmentEndHz,
   });
   const achievedP14Db = p14?.value ?? null;
+  const p14CheckpointDeltaDb =
+    Number.isFinite(achievedP14Db) &&
+    Number.isFinite(Number(eq.selectedCheckpoint?.p14MinimumSpl))
+      ? achievedP14Db - Number(eq.selectedCheckpoint.p14MinimumSpl)
+      : null;
   const achievedP14Level = levelFromValue(achievedP14Db, definitions, "p14TargetDb");
   const achievedP18FrequencyHz = p18?.value ?? null;
   const achievedP18Level = Number(String(p18?.level || "").replace("L", "")) || 0;
@@ -103,6 +108,7 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     designEqIterationTrace: eq.iterationTrace,
     designEqStopReason: eq.stopReason,
     designEqSelectedCheckpoint: eq.selectedCheckpoint,
+    p14CheckpointDeltaDb,
     capabilityLimitedFrequencies,
     meetsRequestedEnvelope,
     allAtLeastL1: achievedP14Level >= 1 && achievedP18Level >= 1 && achievedP19Level >= 1,

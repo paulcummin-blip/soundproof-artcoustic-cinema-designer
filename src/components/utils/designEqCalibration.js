@@ -220,13 +220,14 @@ function minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz) {
 function buildCheckpoint({ filters, curve, originalTrend, assessmentStartHz, assessmentEndHz, anchorDb, fittingToleranceDb, requestedSystemOutputDb }) {
   const trend = applyBassSmoothing(curve, "third");
   const metrics = completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, anchorDb);
-  const minimumSpl = minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz);
+  const rawMinimumSpl = minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz);
+  const p14MinimumSpl = minimumSplAcrossBand(trend, assessmentStartHz, assessmentEndHz);
   const broadBelowTargetWorsening = filters.length > 0 && metrics
     ? createsBroadBelowTargetWorsening(originalTrend, metrics, anchorDb, fittingToleranceDb)
     : false;
   const p14Safe = Number.isFinite(requestedSystemOutputDb)
-    ? Number.isFinite(minimumSpl) && minimumSpl >= requestedSystemOutputDb - 0.05
-    : Number.isFinite(minimumSpl);
+    ? Number.isFinite(p14MinimumSpl) && p14MinimumSpl >= requestedSystemOutputDb - 0.05
+    : Number.isFinite(p14MinimumSpl);
   return {
     filters: filters.map((filter) => ({ ...filter })),
     curve: curve.map((point) => ({ ...point })),
@@ -234,7 +235,9 @@ function buildCheckpoint({ filters, curve, originalTrend, assessmentStartHz, ass
     maximumAbsoluteDeviationDb: metrics?.maximumAbsoluteDeviationDb ?? Infinity,
     rmsDeviationDb: metrics?.rmsDeviationDb ?? Infinity,
     worstResidualFrequencyHz: metrics?.worstResidualFrequencyHz ?? null,
-    minimumSpl,
+    rawMinimumSpl,
+    p14MinimumSpl,
+    minimumSpl: p14MinimumSpl, // compatibility alias for p14MinimumSpl
     broadBelowTargetWorsening,
     p14Safe,
   };
@@ -295,6 +298,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     if (!regions.length) break;
 
     const currentMinimumSpl = minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz);
+    const currentP14MinimumSpl = minimumSplAcrossBand(trend, assessmentStartHz, assessmentEndHz);
     if (!Number.isFinite(currentMinimumSpl)) break;
     const acceptableCandidates = [];
     const gainScales = [1, 0.75, 0.5];
@@ -387,8 +391,12 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       maximumDeviationAfterDb: checkpoint.maximumAbsoluteDeviationDb,
       rmsBeforeDb: currentMetrics.rmsDeviationDb,
       rmsAfterDb: checkpoint.rmsDeviationDb,
-      minimumSplBeforeDb: currentMinimumSpl,
-      minimumSplAfterDb: checkpoint.minimumSpl,
+      rawMinimumSplBeforeDb: currentMinimumSpl,
+      rawMinimumSplAfterDb: checkpoint.rawMinimumSpl,
+      p14MinimumSplBeforeDb: currentP14MinimumSpl,
+      p14MinimumSplAfterDb: checkpoint.p14MinimumSpl,
+      minimumSplBeforeDb: currentP14MinimumSpl,
+      minimumSplAfterDb: checkpoint.p14MinimumSpl,
       p14Safe: checkpoint.p14Safe,
       broadBelowTargetWorsening: checkpoint.broadBelowTargetWorsening,
     });
@@ -402,7 +410,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       || a.rmsDeviationDb - b.rmsDeviationDb
       || a.filters.length - b.filters.length)
     : [...checkpoints].sort((a, b) =>
-      b.minimumSpl - a.minimumSpl
+      b.p14MinimumSpl - a.p14MinimumSpl
       || a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
       || a.rmsDeviationDb - b.rmsDeviationDb
       || a.filters.length - b.filters.length);
@@ -429,7 +437,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       maximumAbsoluteDeviationDb: selectedCheckpoint.maximumAbsoluteDeviationDb,
       rmsDeviationDb: selectedCheckpoint.rmsDeviationDb,
       worstResidualFrequencyHz: selectedCheckpoint.worstResidualFrequencyHz,
-      minimumSpl: selectedCheckpoint.minimumSpl,
+      rawMinimumSpl: selectedCheckpoint.rawMinimumSpl,
+      p14MinimumSpl: selectedCheckpoint.p14MinimumSpl,
+      minimumSpl: selectedCheckpoint.p14MinimumSpl,
       p14Safe: selectedCheckpoint.p14Safe,
       broadBelowTargetWorsening: selectedCheckpoint.broadBelowTargetWorsening,
     },

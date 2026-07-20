@@ -41,15 +41,18 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
             <span>Max abs deviation: <strong className="text-slate-900">{fmt(checkpoint.maximumAbsoluteDeviationDb, " dB")}</strong></span>
             <span>RMS deviation: <strong className="text-slate-900">{fmt(checkpoint.rmsDeviationDb, " dB")}</strong></span>
             <span>Worst residual: <strong className="text-slate-900">{fmt(checkpoint.worstResidualFrequencyHz, " Hz")}</strong></span>
-            <span>Minimum SPL: <strong className="text-slate-900">{fmt(checkpoint.minimumSpl, " dB")}</strong></span>
+            <span>Raw minimum SPL: <strong className="text-slate-900">{fmt(checkpoint.rawMinimumSpl, " dB")}</strong></span>
+            <span>P14 assessment minimum (1/3 octave): <strong className="text-slate-900">{fmt(checkpoint.p14MinimumSpl, " dB")}</strong></span>
+            <span>Official P14: <strong className="text-slate-900">{fmt(candidate.achievedP14Db, " dB")}</strong></span>
+            <span>Checkpoint/P14 delta: <strong className={Math.abs(candidate.p14CheckpointDeltaDb ?? 999) <= 0.05 ? "text-emerald-700" : "text-amber-700"}>{fmt(candidate.p14CheckpointDeltaDb, " dB")}</strong></span>
             <span>P14-safe: <strong className={checkpoint.p14Safe ? "text-emerald-700" : "text-rose-700"}>{checkpoint.p14Safe ? "Yes" : "No"}</strong></span>
             <span>Broad below-target worsening: <strong className={checkpoint.broadBelowTargetWorsening ? "text-rose-700" : "text-emerald-700"}>{checkpoint.broadBelowTargetWorsening ? "Yes" : "No"}</strong></span>
           </div>
           {trace.length > 0 && (
             <div className="mt-2 overflow-x-auto">
-              <table className="min-w-[1100px] text-right font-mono text-[10px] text-slate-700">
+              <table className="min-w-[1300px] text-right font-mono text-[10px] text-slate-700">
                 <thead className="border-b border-slate-300 text-slate-500">
-                  <tr>{["Iter", "Freq", "Gain", "Q", "Max before", "Max after", "RMS before", "RMS after", "Min SPL before", "Min SPL after", "P14-safe", "Broad worse"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
+                  <tr>{["Iter", "Freq", "Gain", "Q", "Max before", "Max after", "RMS before", "RMS after", "Raw min before", "Raw min after", "P14 min before", "P14 min after", "P14-safe", "Broad worse"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
                 </thead>
                 <tbody>
                   {trace.map((row) => (
@@ -62,8 +65,10 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                       <td className="px-2 py-1">{fmt(row.maximumDeviationAfterDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.rmsBeforeDb, " dB")}</td>
                       <td className="px-2 py-1">{fmt(row.rmsAfterDb, " dB")}</td>
-                      <td className="px-2 py-1">{fmt(row.minimumSplBeforeDb, " dB")}</td>
-                      <td className="px-2 py-1">{fmt(row.minimumSplAfterDb, " dB")}</td>
+                      <td className="px-2 py-1">{fmt(row.rawMinimumSplBeforeDb, " dB")}</td>
+                      <td className="px-2 py-1">{fmt(row.rawMinimumSplAfterDb, " dB")}</td>
+                      <td className="px-2 py-1">{fmt(row.p14MinimumSplBeforeDb, " dB")}</td>
+                      <td className="px-2 py-1">{fmt(row.p14MinimumSplAfterDb, " dB")}</td>
                       <td className="px-2 py-1"><strong className={row.p14Safe ? "text-emerald-700" : "text-rose-700"}>{row.p14Safe ? "Yes" : "No"}</strong></td>
                       <td className="px-2 py-1"><strong className={row.broadBelowTargetWorsening ? "text-rose-700" : "text-emerald-700"}>{row.broadBelowTargetWorsening ? "Yes" : "No"}</strong></td>
                     </tr>
