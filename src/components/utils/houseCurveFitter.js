@@ -12,7 +12,7 @@ import {
 } from "@/components/utils/designEqCalibration";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { houseCurveP19Level, calculateAllSeatMetrics, runSingleStart } from "@/components/utils/houseCurveFitterCore";
+import { houseCurveP19Level, calculateAllSeatMetrics, runSingleStart, compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
 
 export { houseCurveP19Level };
 
@@ -41,7 +41,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const anchorDb = Number.isFinite(Number(options.targetAnchorDb)) ? Number(options.targetAnchorDb) : 0;
   if (!isNumber(anchorDb)) return { filters: emptyFilters([]), curve: [], combinedEqCurve: [], designEqFitProfile: "house_curve", perSeatMetrics: [] };
 
-  const requestedSystemOutputDb = Number(options.requestedSystemOutputDb);
+  const requestedSystemOutputDb = Number.isFinite(Number(options.requestedSystemOutputDb)) ? Number(options.requestedSystemOutputDb) : undefined;
   const profile = DESIGN_EQ_FIT_PROFILES.accuracy;
   const bankRaw = rspRaw;
 
@@ -63,14 +63,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   let selected = startA;
   let selectedStartLabel = "empty";
   if (startB !== startA && startB.metrics && startA.metrics) {
-    const aLevel = startA.metrics.worstSeatP19Level;
-    const bLevel = startB.metrics.worstSeatP19Level;
-    const aDev = startA.metrics.worstSeatMaxDeviationDb;
-    const bDev = startB.metrics.worstSeatMaxDeviationDb;
-    const bBetter = bLevel > aLevel
-      || (bLevel === aLevel && bDev < aDev - 0.05)
-      || (bLevel === aLevel && Math.abs(bDev - aDev) <= 0.05 && startB.metrics.meanSeatMaxDeviationDb < startA.metrics.meanSeatMaxDeviationDb - 0.05);
-    if (bBetter) { selected = startB; selectedStartLabel = "standard-seeded"; }
+    if (compareHouseCurveMetrics(startB.metrics, startA.metrics) < 0) {
+      selected = startB;
+      selectedStartLabel = "standard-seeded";
+    }
   }
 
   let filters = selected.filters.map((f) => ({ ...f }));
@@ -82,14 +78,20 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
 
   // Final bank validation — must pass all hard limits. If it fails (safety net),
   // revert to the Standard seed (or empty) and recalculate metrics.
-  const finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  let finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   bankEvalCount++;
   let bankValidationPassed = finalBankLimits.allOk;
+  let fallbackOccurred = false;
   if (!bankValidationPassed) {
+    fallbackOccurred = true;
     filters = standardSeedFilters.length > 0 ? standardSeedFilters.map((f) => ({ ...f })) : [];
     finalMetrics = calculateAllSeatMetrics(objectiveSeats, filters, assessmentStartHz, assessmentEndHz, anchorDb);
     stopReason = "final bank validation failed — reverted to baseline";
     blockedResiduals = [];
+    // Re-run complete-bank validation against the actual fallback bank.
+    finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+    bankEvalCount++;
+    bankValidationPassed = finalBankLimits.allOk;
   }
 
   // Official RSP P19 (always calculated from RSP, separate from the worst-seat objective).
@@ -166,6 +168,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
         maxAggregateCutHz: finalBankLimits.maxAggregateCutHz,
       },
       finalBankValidationPassed: bankValidationPassed,
+      fallbackOccurred,
     },
     checkpointSummaries: [],
     worstResidualDiagnostics: [],
@@ -198,13 +201,92 @@ export function runHouseCurveFitterFixtures() {
   });
   const enabledFilters = result.filters.filter((f) => f.enabled);
   const cutFilters = enabledFilters.filter((f) => f.gainDb < -0.5);
-  // The fitter must have corrected the 50 Hz peak (cut filter near 50 Hz).
-  results.correctedPeak = cutFilters.some((f) => Math.abs(f.frequencyHz - 50) < 10);
+  const cutNear50 = cutFilters.filter((f) => Math.abs(f.frequencyHz - 50) < 10);
+
+  // Baseline metrics (empty bank) for comparison.
+  const rspRaw = normaliseCurve(rawCurve);
+  const baselineSeats = [{ seatId: "rsp", isPrimary: true, raw: rspRaw }];
+  const baselineMetrics = calculateAllSeatMetrics(baselineSeats, [], 20, 200, anchorDb);
+
+  // 1. At least one enabled cut filter exists near 50 Hz.
+  results.correctedPeak = cutNear50.length > 0;
+  // 2. Its Q is high enough to protect the 30 Hz null (Q >= 8).
+  results.cutFilterQHighEnough = cutNear50.some((f) => f.Q >= 8);
+  // 3. RMS target error improves by more than 0.05 dB.
+  results.rmsImproves = (baselineMetrics?.rmsSeatTargetErrorDb ?? Infinity) - (result.rmsSeatTargetErrorDb ?? -Infinity) > 0.05;
+  // 4. Worst deviation does not worsen by more than 0.05 dB.
+  results.worstDoesNotWorsen = (result.worstSeatMaxDeviationDb ?? Infinity) <= (baselineMetrics?.worstSeatMaxDeviationDb ?? Infinity) + 0.05;
+  // 5. The 30 Hz null is recorded as product-limited.
+  results.recordedBlockedNull = Array.isArray(result.blockedResiduals) && result.blockedResiduals.some((b) => Math.abs(b.frequency - 30) < 5 && b.blockingReason === "product-limited");
+  // 6. Final complete-bank validation passes.
+  results.bankValidationPassed = result.bankValidationPassed !== false;
   // The fitter must not have stopped at the null.
   results.didNotStopAtNull = result.stopReason !== "no capable correction for worst residual";
-  // The null should be recorded as blocked (product-limited).
-  results.recordedBlockedNull = Array.isArray(result.blockedResiduals) && result.blockedResiduals.some((b) => Math.abs(b.frequency - 30) < 5 && b.blockingReason === "product-limited");
-  // The final bank must pass validation.
-  results.bankValidationPassed = result.bankValidationPassed !== false;
+  // Raw metrics for the comparator fixture in runRankingFixtures.
+  results.baselineWorstSeatDeviationDb = baselineMetrics?.worstSeatMaxDeviationDb ?? null;
+  results.baselineMeanSeatMaxDeviationDb = baselineMetrics?.meanSeatMaxDeviationDb ?? null;
+  results.baselineRmsSeatTargetErrorDb = baselineMetrics?.rmsSeatTargetErrorDb ?? null;
+  results.finalWorstSeatDeviationDb = result.worstSeatMaxDeviationDb ?? null;
+  results.finalMeanSeatMaxDeviationDb = result.meanSeatMaxDeviationDb ?? null;
+  results.finalRmsSeatTargetErrorDb = result.rmsSeatTargetErrorDb ?? null;
+  results.enabledFilterCount = enabledFilters.length;
+  results.enabledFilters = enabledFilters;
+  results.selectedStart = result.selectedStart;
+  results.objectiveLabel = result.objectiveLabel;
+  results.blockedResiduals = result.blockedResiduals;
+  results.bankLimits = result.bankLimits;
+  results.fallbackOccurred = result.bankDiagnostics?.fallbackOccurred ?? false;
+
+  // --- Two-real-seat fixture ---
+  // RSP is separate; real seats are optimised; neither worsens; RSP P19 is reported.
+  const rspCurve2 = rawCurve.map((p) => ({ ...p }));
+  const seat1Curve = freqs.map((f) => {
+    let dev = 0;
+    dev -= 12 * Math.exp(-(((f - 30) / 5) ** 2));
+    dev += 5 * Math.exp(-(((f - 50) / 10) ** 2));
+    return { frequency: f, spl: anchorDb + artcousticHouseCurveOffsetAt(f) + dev };
+  });
+  const seat2Curve = freqs.map((f) => {
+    let dev = 0;
+    dev -= 10 * Math.exp(-(((f - 30) / 5) ** 2));
+    dev += 4 * Math.exp(-(((f - 50) / 10) ** 2));
+    return { frequency: f, spl: anchorDb + artcousticHouseCurveOffsetAt(f) + dev };
+  });
+  const perSeatRawCurves = [
+    { seatId: "rsp", isPrimary: true, responseData: rspCurve2, __isSyntheticRsp: true },
+    { seatId: "seat1", isPrimary: false, responseData: seat1Curve },
+    { seatId: "seat2", isPrimary: false, responseData: seat2Curve },
+  ];
+  const result2 = calculateHouseCurveEqCurve(rspCurve2, perSeatRawCurves, 35, [], {
+    targetAnchorDb: anchorDb,
+    assessmentStartHz: 20,
+    assessmentEndHz: 200,
+  });
+  const enabledFilters2 = result2.filters.filter((f) => f.enabled);
+  const cutFilters2 = enabledFilters2.filter((f) => f.gainDb < -0.5);
+  // Baseline per-seat metrics for the two-seat case.
+  const realSeats2 = [
+    { seatId: "seat1", isPrimary: false, raw: normaliseCurve(seat1Curve) },
+    { seatId: "seat2", isPrimary: false, raw: normaliseCurve(seat2Curve) },
+  ];
+  const baselineMetrics2 = calculateAllSeatMetrics(realSeats2, [], 20, 200, anchorDb);
+  const finalMetrics2 = calculateAllSeatMetrics(realSeats2, enabledFilters2, 20, 200, anchorDb);
+  // RSP is not included in the real-seat objective.
+  results.twoSeatObjectiveExcludesRsp = result2.objectiveLabel === "Worst real seat";
+  // One shared bank improves the safely correctable peak.
+  results.twoSeatCorrectedPeak = cutFilters2.some((f) => Math.abs(f.frequencyHz - 50) < 10);
+  // Neither real seat's maximum deviation worsens by more than 0.05 dB.
+  const seat1Baseline = baselineMetrics2?.seatMetrics?.find((m) => m.seatId === "seat1");
+  const seat2Baseline = baselineMetrics2?.seatMetrics?.find((m) => m.seatId === "seat2");
+  const seat1Final = finalMetrics2?.seatMetrics?.find((m) => m.seatId === "seat1");
+  const seat2Final = finalMetrics2?.seatMetrics?.find((m) => m.seatId === "seat2");
+  const seat1Worsened = (seat1Final?.maxAbsDeviationDb ?? Infinity) > (seat1Baseline?.maxAbsDeviationDb ?? Infinity) + 0.05;
+  const seat2Worsened = (seat2Final?.maxAbsDeviationDb ?? Infinity) > (seat2Baseline?.maxAbsDeviationDb ?? Infinity) + 0.05;
+  results.twoSeatNeitherWorsened = !seat1Worsened && !seat2Worsened;
+  // Official RSP P19 remains separately reported.
+  results.twoSeatRspP19Reported = result2.rspP19Level !== undefined && result2.rspP19Level !== null;
+  // The per-seat metric is clearly labelled as a worst-seat P19-equivalent objective.
+  results.twoSeatObjectiveIsWorstSeat = result2.objectiveLabel === "Worst real seat";
+
   return results;
 }

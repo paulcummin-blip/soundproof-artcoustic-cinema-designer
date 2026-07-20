@@ -15,6 +15,62 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 
 const isNumber = (v) => Number.isFinite(Number(v));
 
+const levelValue = (level) => {
+  const n = Number(level);
+  return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.round(n))) : 0;
+};
+const variationOr = (v) => Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
+const filterCount = (obj) => {
+  const bank = obj?.generatedFilterBank;
+  return Array.isArray(bank) ? bank.filter((f) => f?.enabled).length : 0;
+};
+
+// Shared house-curve metric comparator. Used consistently for trial admissibility,
+// best-trial selection, multi-start selection, and final candidate ranking.
+// Comparison order: worst-seat P19 level, worst-seat max deviation, mean seat max
+// deviation, RMS target error, RSP P19, P14, P18, fewest filters.
+// Worst-seat and mean deviations within WORST_EQUIV_DB are treated as equivalent;
+// when equivalent, RMS decides with RMS_EPSILON_DB epsilon.
+// A candidate that worsens worst-seat by more than WORST_EQUIV_DB is always worse.
+const WORST_EQUIV_DB = 0.05;
+const MEAN_EQUIV_DB = 0.05;
+const RMS_EPSILON_DB = 0.01;
+
+export function compareHouseCurveMetrics(a, b) {
+  if (!a) return b ? 1 : 0;
+  if (!b) return -1;
+  // 1. Worst-seat P19 level (higher is better)
+  const aWorstLevel = levelValue(a.worstSeatP19Level ?? a.worstRealSeatHouseCurveLevel);
+  const bWorstLevel = levelValue(b.worstSeatP19Level ?? b.worstRealSeatHouseCurveLevel);
+  if (aWorstLevel !== bWorstLevel) return bWorstLevel - aWorstLevel;
+  // 2. Worst-seat maximum deviation (lower is better, within WORST_EQUIV_DB is equivalent)
+  const aWorstDev = variationOr(a.worstSeatMaxDeviationDb ?? a.worstRealSeatHouseCurveVariationDb);
+  const bWorstDev = variationOr(b.worstSeatMaxDeviationDb ?? b.worstRealSeatHouseCurveVariationDb);
+  if (Math.abs(aWorstDev - bWorstDev) > WORST_EQUIV_DB) return aWorstDev - bWorstDev;
+  // 3. Mean seat maximum deviation (lower is better, within MEAN_EQUIV_DB is equivalent)
+  const aMean = variationOr(a.meanSeatMaxDeviationDb);
+  const bMean = variationOr(b.meanSeatMaxDeviationDb);
+  if (Math.abs(aMean - bMean) > MEAN_EQUIV_DB) return aMean - bMean;
+  // 4. RMS target error (lower is better, RMS_EPSILON_DB epsilon)
+  const aRms = variationOr(a.rmsSeatTargetErrorDb);
+  const bRms = variationOr(b.rmsSeatTargetErrorDb);
+  if (Math.abs(aRms - bRms) > RMS_EPSILON_DB) return aRms - bRms;
+  // 5. RSP P19 deviation (lower is better)
+  const aRspDev = variationOr(a.rspMaxDeviationDb ?? a.achievedP19VariationDb);
+  const bRspDev = variationOr(b.rspMaxDeviationDb ?? b.achievedP19VariationDb);
+  if (Math.abs(aRspDev - bRspDev) > RMS_EPSILON_DB) return aRspDev - bRspDev;
+  // 6. P14 level (higher is better)
+  const aP14 = levelValue(a.achievedP14Level);
+  const bP14 = levelValue(b.achievedP14Level);
+  if (aP14 !== bP14) return bP14 - aP14;
+  // 7. P18 level (higher is better)
+  const aP18 = levelValue(a.achievedP18Level);
+  const bP18 = levelValue(b.achievedP18Level);
+  if (aP18 !== bP18) return bP18 - aP18;
+  // 8. Fewest filters
+  return filterCount(a) - filterCount(b);
+}
+
 // P19 level from max abs deviation: L4 <=2, L3 <=3, L2 <=4, L1 <=5, else FAIL (0).
 export function houseCurveP19Level(deviationDb) {
   if (!isNumber(deviationDb)) return 0;
@@ -143,14 +199,22 @@ function generateTrialsForRegion(region, filters, profile, activeSubs, usableLfH
 
   const productLimited = Math.abs(baseCandidate.gainDb) <= 0.1;
   const gainScales = [1, 0.75, 0.5];
-  const qMultipliers = [1, 1.5, 2, 3];
+  // Adaptive high-Q values: existing Q, Q×1.5, Q×2, Q×3, Q8, Q10 (clamped 0.5–10, deduplicated).
+  const rawQValues = [baseCandidate.Q, baseCandidate.Q * 1.5, baseCandidate.Q * 2, baseCandidate.Q * 3, 8, 10];
+  const qValues = [];
+  const seenQ = new Set();
+  for (const q of rawQValues) {
+    const clamped = Math.max(0.5, Math.min(10, q));
+    const key = clamped.toFixed(4);
+    if (!seenQ.has(key)) { seenQ.add(key); qValues.push(clamped); }
+  }
   const seenVariants = new Set();
 
   // Append candidates (if < 10 filters and not product-limited)
   if (!productLimited && filters.length < 10) {
     for (const gainScale of gainScales) {
-      for (const qMultiplier of qMultipliers) {
-        const scaled = { ...baseCandidate, gainDb: baseCandidate.gainDb * gainScale, Q: Math.max(0.5, Math.min(10, baseCandidate.Q * qMultiplier)) };
+      for (const q of qValues) {
+        const scaled = { ...baseCandidate, gainDb: baseCandidate.gainDb * gainScale, Q: q };
         const candidate = scaled.gainDb > 0 ? limitBoostForCapability(scaled, activeSubs, usableLfHz, requestedSystemOutputDb) : scaled;
         const key = `${candidate.gainDb.toFixed(4)}:${candidate.Q.toFixed(4)}`;
         if (seenVariants.has(key) || Math.abs(candidate.gainDb) <= 0.1) continue;
@@ -211,6 +275,14 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   if (!currentMetrics) return { filters, metrics: null, baselineWorstSeatDeviation: null, blockedResiduals: [], stopReason: "no seat metrics", bankEvalCount: 0, operations: 0 };
 
   const baselineWorstSeatDeviation = currentMetrics.worstSeatMaxDeviationDb;
+  // Baseline per-seat max deviations — no seat may drift more than WORST_EQUIV_DB
+  // from its baseline, preventing cumulative regression across iterations.
+  const baselineSeatMaxDeviations = new Map();
+  if (currentMetrics.seatMetrics) {
+    for (const m of currentMetrics.seatMetrics) {
+      baselineSeatMaxDeviations.set(m.seatId, m.maxAbsDeviationDb);
+    }
+  }
   let blockedResiduals = [];
   let operations = 0;
   let stopReason = "no safe improvement remained";
@@ -238,13 +310,26 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         regionAdmissible = true;
         const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb);
         if (!trialMetrics) continue;
-        const worstSeatImproves = trialMetrics.worstSeatMaxDeviationDb < currentMetrics.worstSeatMaxDeviationDb - 0.05;
-        const worstSeatUnchanged = Math.abs(trialMetrics.worstSeatMaxDeviationDb - currentMetrics.worstSeatMaxDeviationDb) <= 0.05;
-        const meanImproves = trialMetrics.meanSeatMaxDeviationDb < currentMetrics.meanSeatMaxDeviationDb - 0.05;
-        const rmsImproves = trialMetrics.rmsSeatTargetErrorDb < currentMetrics.rmsSeatTargetErrorDb - 0.05;
-        if (!worstSeatImproves && !(worstSeatUnchanged && (meanImproves || rmsImproves))) continue;
-        if (!bestTrial || trialMetrics.worstSeatMaxDeviationDb < bestTrialMetrics.worstSeatMaxDeviationDb - 0.05 ||
-            (Math.abs(trialMetrics.worstSeatMaxDeviationDb - bestTrialMetrics.worstSeatMaxDeviationDb) <= 0.05 && trialMetrics.meanSeatMaxDeviationDb < bestTrialMetrics.meanSeatMaxDeviationDb - 0.05)) {
+        // Admissibility: reject if the trial is not strictly better than current
+        // according to the shared comparator. The comparator's worst-seat equivalence
+        // (0.05 dB) enforces the hard rejection — a trial that worsens worst-seat by
+        // more than 0.05 dB is always worse and is rejected.
+        if (compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) continue;
+        // Hard cap: no seat's max deviation may exceed its baseline by more than 0.05 dB.
+        // The comparator only guards against the current state; this prevents cumulative
+        // drift across iterations from exceeding the baseline tolerance.
+        if (trialMetrics.seatMetrics) {
+          let seatWorsened = false;
+          for (const m of trialMetrics.seatMetrics) {
+            const baselineDev = baselineSeatMaxDeviations.get(m.seatId);
+            if (baselineDev !== undefined && m.maxAbsDeviationDb > baselineDev + WORST_EQUIV_DB) {
+              seatWorsened = true;
+              break;
+            }
+          }
+          if (seatWorsened) continue;
+        }
+        if (!bestTrial || compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) < 0) {
           bestTrial = trial;
           bestTrialMetrics = trialMetrics;
           bestTrialFilters = validation.filters;

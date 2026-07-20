@@ -4,6 +4,7 @@
 
 import { getDesignEqValleyThresholdValidation } from "@/components/utils/designEqCalibration";
 import { houseCurveP19Level, runHouseCurveFitterFixtures } from "@/components/utils/houseCurveFitter";
+import { compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
 
 const levelValue = (level) => {
   const n = Number(level);
@@ -139,24 +140,12 @@ function compareForBalanced(a, b) {
 // then fewest filters. Uses worstSeatP19Level/worstSeatMaxDeviationDb from the
 // house-curve fitter, falling back to worstRealSeatHouseCurveLevel/worstRealSeatHouseCurveVariationDb
 // for Standard/Accuracy candidates.
+// House-curve priority: delegates to the shared compareHouseCurveMetrics comparator
+// from houseCurveFitterCore. This ensures trial admissibility, best-trial selection,
+// multi-start selection, and final candidate ranking all use the same equivalence
+// rules (worst/mean within 0.05 dB, RMS epsilon 0.01 dB).
 function compareForHouseCurve(a, b) {
-  const aWorstLevel = levelValue(a.worstSeatP19Level ?? a.worstRealSeatHouseCurveLevel);
-  const bWorstLevel = levelValue(b.worstSeatP19Level ?? b.worstRealSeatHouseCurveLevel);
-  if (aWorstLevel !== bWorstLevel) return bWorstLevel - aWorstLevel;
-  const aWorstDev = variationOr(a.worstSeatMaxDeviationDb ?? a.worstRealSeatHouseCurveVariationDb);
-  const bWorstDev = variationOr(b.worstSeatMaxDeviationDb ?? b.worstRealSeatHouseCurveVariationDb);
-  if (aWorstDev !== bWorstDev) return aWorstDev - bWorstDev;
-  const d3 = variationOr(a.meanSeatMaxDeviationDb) - variationOr(b.meanSeatMaxDeviationDb);
-  if (d3 !== 0) return d3;
-  const d4 = variationOr(a.rmsSeatTargetErrorDb) - variationOr(b.rmsSeatTargetErrorDb);
-  if (d4 !== 0) return d4;
-  const d5 = variationOr(a.achievedP19VariationDb) - variationOr(b.achievedP19VariationDb);
-  if (d5 !== 0) return d5;
-  const d6 = levelValue(b.achievedP14Level) - levelValue(a.achievedP14Level);
-  if (d6 !== 0) return d6;
-  const d7 = levelValue(b.achievedP18Level) - levelValue(a.achievedP18Level);
-  if (d7 !== 0) return d7;
-  return filterCount(a) - filterCount(b);
+  return compareHouseCurveMetrics(a, b);
 }
 
 const COMPARATORS = { spl: compareForSpl, extension: compareForExtension, accuracy: compareForHouseCurve, balanced: compareForBalanced };
@@ -363,12 +352,46 @@ export function runRankingFixtures() {
   results.valleyPlusHalfDbIsNotPeak = valleyChecks.plusHalfDbIsNotPeak;
 
   // House-curve fitter fixtures: the fitter must skip an uncorrectable null,
-  // correct a legal peak, record the blocked null, and pass bank validation.
+  // correct a legal peak with a high-Q cut, record the blocked null, pass bank
+  // validation, and the comparator must select the house-curve candidate over
+  // Standard when worst and mean are equivalent.
   const fitterFixtures = runHouseCurveFitterFixtures();
   results.fitterCorrectedPeak = fitterFixtures.correctedPeak;
+  results.fitterCutFilterQHighEnough = fitterFixtures.cutFilterQHighEnough;
+  results.fitterRmsImproves = fitterFixtures.rmsImproves;
+  results.fitterWorstDoesNotWorsen = fitterFixtures.worstDoesNotWorsen;
   results.fitterDidNotStopAtNull = fitterFixtures.didNotStopAtNull;
   results.fitterRecordedBlockedNull = fitterFixtures.recordedBlockedNull;
   results.fitterBankValidationPassed = fitterFixtures.bankValidationPassed;
+  // The comparator must select the house-curve candidate over Standard when
+  // worst and mean are equivalent within tolerance (RMS decides).
+  {
+    const standardCandidate = {
+      worstSeatP19Level: houseCurveP19Level(fitterFixtures.baselineWorstSeatDeviationDb),
+      worstSeatMaxDeviationDb: fitterFixtures.baselineWorstSeatDeviationDb,
+      meanSeatMaxDeviationDb: fitterFixtures.baselineMeanSeatMaxDeviationDb,
+      rmsSeatTargetErrorDb: fitterFixtures.baselineRmsSeatTargetErrorDb,
+      achievedP14Level: 2, achievedP18Level: 2, achievedP19Level: 2,
+      generatedFilterBank: [],
+      designEqFitProfile: "standard",
+    };
+    const houseCurveCandidate = {
+      worstSeatP19Level: houseCurveP19Level(fitterFixtures.finalWorstSeatDeviationDb),
+      worstSeatMaxDeviationDb: fitterFixtures.finalWorstSeatDeviationDb,
+      meanSeatMaxDeviationDb: fitterFixtures.finalMeanSeatMaxDeviationDb,
+      rmsSeatTargetErrorDb: fitterFixtures.finalRmsSeatTargetErrorDb,
+      achievedP14Level: 1, achievedP18Level: 1, achievedP19Level: 1,
+      generatedFilterBank: fitterFixtures.enabledFilters || [],
+      designEqFitProfile: "house_curve",
+    };
+    results.fitterHouseCurveSelectedOverStandard = compareForHouseCurve(houseCurveCandidate, standardCandidate) < 0;
+  }
+  // Two-real-seat fixtures: RSP excluded, shared bank corrects peak, neither worsens.
+  results.twoSeatObjectiveExcludesRsp = fitterFixtures.twoSeatObjectiveExcludesRsp;
+  results.twoSeatCorrectedPeak = fitterFixtures.twoSeatCorrectedPeak;
+  results.twoSeatNeitherWorsened = fitterFixtures.twoSeatNeitherWorsened;
+  results.twoSeatRspP19Reported = fitterFixtures.twoSeatRspP19Reported;
+  results.twoSeatObjectiveIsWorstSeat = fitterFixtures.twoSeatObjectiveIsWorstSeat;
 
   return results;
 }
