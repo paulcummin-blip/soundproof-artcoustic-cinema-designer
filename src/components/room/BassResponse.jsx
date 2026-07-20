@@ -87,10 +87,26 @@ const REW_SOURCE_CURVES = {
 };
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
-  const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave, designEqEnabled, setDesignEqEnabled } = useAppState();
+  const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave, designEqEnabled, setDesignEqEnabled, mlpY_m } = useAppState();
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
+
+  // Canonical RSP (Reference Seat Position) — the green-dot assessment position.
+  // P14/P18/P19 and Design EQ must always derive from this position, never from
+  // a selected graph seat. Real seats are display overlays only.
+  const rspPosition = useMemo(() => {
+    const widthM = Number(roomDims?.widthM);
+    const y = Number(mlpY_m);
+    if (!Number.isFinite(widthM) || !Number.isFinite(y) || widthM <= 0 || y <= 0) return null;
+    return {
+      id: "rsp",
+      x: widthM / 2,
+      y,
+      z: 1.2,
+      __isSyntheticRsp: true,
+    };
+  }, [roomDims?.widthM, mlpY_m]);
 
   // Safe number conversion and formatting
   const toNum = (v) => {
@@ -244,6 +260,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [rewModalBandwidthScale, setRewModalBandwidthScale] = useState(0.55);
   // Temporary comparison toggle for the REW-style Absorption Authority candidate — see graph controls below.
   const [overlayProduction, setOverlayProduction] = useState(false);
+  // RSP graph visibility — defaults to true (RSP is the default visible series).
+  // Toggling this only affects graph display, never the optimiser or P14/P18/P19.
+  const [showRsp, setShowRsp] = useState(true);
 
   // Modal Resonance Line Toggles — display-only, session-only state. Does not affect
   // bass calculation, SPL response, or mode generation; only filters which resonance
@@ -500,7 +519,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // can be re-run with a different Q strategy for the temporary overlay comparison below,
   // without any duplicated simulation or plotting logic (one engine, one renderer).
   const runSimulation = useCallback((qStrategyOverride) => {
-    if (hasNoSeats || hasNoSubs || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
+    if (hasNoSubs || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
       return { seatResponses: {}, metrics: null, audit: null };
     }
 
@@ -532,10 +551,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     let __b44WholeCurveDebugCapture = null;
     let __b44ActiveModalVectorPath = null;
     const __b44RuntimeCaptureByHz = new Map();
-    const debugSeatId = selectedSeatIds[0] || null;
+    const debugSeatId = "rsp";
     const debugSubForCapture = subsForSimulation[0] || null;
 
-    seatingPositions.forEach((seat) => {
+    // Build the listener list: canonical RSP first, then real seats.
+    // RSP receives exactly the same simulation path (subs, product curves, room
+    // dimensions, absorption, modal/reflection settings, tuning) as real seats.
+    const listeners = [];
+    if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) {
+      listeners.push(rspPosition);
+    }
+    if (Array.isArray(seatingPositions)) {
+      seatingPositions.forEach((seat) => listeners.push(seat));
+    }
+
+    listeners.forEach((seat) => {
       const seatId = seat.id || `${seat.x}-${seat.y}`;
       let sumRe = null;
       let sumIm = null;
@@ -760,9 +790,32 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       activeModalVectorPath: __b44ActiveModalVectorPath,
       runtimeVectorCapture: { rows: runtimeVectorCapture },
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale, designEqEnabled, bassSmoothingMode]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, rspPosition, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale, designEqEnabled, bassSmoothingMode]);
 
   const simulationResults = useMemo(() => runSimulation(qStrategy), [runSimulation, qStrategy]);
+
+  // RSP raw curve — the authoritative assessment curve fed to the optimiser.
+  // Built from seatResponses.rsp (the synthetic RSP listener position), never from
+  // a selected graph seat. Real-seat curves are display overlays only.
+  const rspRawCurve = useMemo(() => {
+    const response = simulationResults.seatResponses?.rsp;
+    if (!response?.freqsHz || !response?.splDb) return [];
+    const raw = response.freqsHz
+      .map((frequency, i) => ({
+        frequency,
+        spl: Number.isFinite(response.splDb[i]) ? response.splDb[i] : null,
+      }))
+      .filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
+    const sorted = [...raw].sort((a, b) => a.frequency - b.frequency);
+    const deduped = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const curr = sorted[i];
+      const next = sorted[i + 1];
+      if (next && Math.abs(curr.frequency - next.frequency) < 1e-9) continue;
+      deduped.push(curr);
+    }
+    return deduped;
+  }, [simulationResults.seatResponses]);
   // Temporary overlay: re-runs the identical engine with qStrategy forced to 'production',
   // for the "Overlay Production" comparison toggle only. No second engine, no duplicated logic.
   const overlayProductionResults = useMemo(
@@ -770,14 +823,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     [runSimulation, overlayProduction]
   );
 
-  // Build one clean series per selected seat
+  // Build graph series: RSP is always the first (authoritative) series, followed by
+  // selected real-seat display overlays. The optimiser never reads from this list —
+  // it reads rspRawCurve directly. Graph visibility never affects P14/P18/P19.
   const multiSeries = useMemo(() => {
     const responses = simulationResults.seatResponses;
-    const activeIds = selectedSeatIds.filter(id => responses[id]);
+    const series = [];
 
-    const series = activeIds.map(sid => {
+    // RSP — always first, green, labelled
+    if (showRsp && rspRawCurve.length > 0) {
+      series.push({ id: "rsp", color: "#16A34A", data: rspRawCurve, kind: "rsp", label: "RSP" });
+    }
+
+    // Real-seat display overlays
+    const activeIds = selectedSeatIds.filter(id => id !== "rsp" && responses[id]);
+    activeIds.forEach(sid => {
       const response = responses[sid];
-      if (!response?.freqsHz || !response?.splDb) return null;
+      if (!response?.freqsHz || !response?.splDb) return;
 
       const raw = response.freqsHz
         .map((frequency, i) => ({
@@ -795,15 +857,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         deduped.push(curr);
       }
 
-      return { id: sid, color: getSeatColor(sid), data: deduped };
-    }).filter(Boolean);
+      series.push({ id: sid, color: getSeatColor(sid), data: deduped });
+    });
 
     if (!isDraggingSub && series.length > 0 && series[0].data.length > 0) {
       lastStablePlotRef.current = series[0].data;
     }
 
     return series;
-  }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub, subTuningSignature]);
+  }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub, subTuningSignature, showRsp, rspRawCurve]);
 
   // Parse pasted REW CSV into a series object
   const rewOverlaySeries = useMemo(() => {
@@ -836,7 +898,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // currently-selected Q strategy curve. No second engine or plotting path is introduced.
   const overlayProductionSeries = useMemo(() => {
     if (!overlayProduction || !overlayProductionResults) return null;
-    const sid = selectedSeatIds[0];
+    const sid = "rsp";
     const response = overlayProductionResults.seatResponses?.[sid];
     if (!response?.freqsHz || !response?.splDb) return null;
     const data = response.freqsHz
@@ -852,12 +914,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
   const optimisationResult = useMemo(() => optimiseBassSystem({
-    rawCurve: multiSeries[0]?.data || [],
+    rawCurve: rspRawCurve,
     activeSubs: designEqSystemLimits.activeSubs,
     usableLfHz: designEqSystemLimits.usableLfHz,
     transitionHz: optimisationTransitionHz,
     priorityMode: optimiserPriorityMode,
-  }), [multiSeries, designEqSystemLimits, optimisationTransitionHz, optimiserPriorityMode]);
+  }), [rspRawCurve, designEqSystemLimits, optimisationTransitionHz, optimiserPriorityMode]);
 
   const houseCurveSeries = useMemo(() => {
     const candidate = optimisationResult.selectedCandidate;
@@ -883,21 +945,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       ? multiSeries.map((s, i) => (i === 0 ? { ...s, color: '#16a34a' } : s))
       : multiSeries;
     if (overlayProductionSeries) out = [...out, overlayProductionSeries];
-    // Apply the selected display smoothing to calculated curves only (not the pasted REW overlay).
-    // When Design EQ is ON, the graph shows the same post-EQ curve used for P14 scoring
-    // (1/3-octave basis, cut -10dB / boost +6dB) instead of the plain display smoothing.
-    if (designEqEnabled && optimisationResult.finalPostEqCurve.length) {
-      out = [
-        { ...out[0], id: `${out[0].id}-raw`, kind: "raw", label: "Raw", color: "#94A3B8", strokeDasharray: "4 4", data: applyBassSmoothing(out[0].data, bassSmoothingMode) },
-        { ...out[0], id: `${out[0].id}-eq`, kind: "post-eq", label: "Post-EQ", color: "#16A34A", data: applyBassSmoothing(optimisationResult.finalPostEqCurve, bassSmoothingMode) },
-      ];
+    // When Design EQ is ON, the Raw + Post-EQ pair must represent RSP (the authoritative
+    // assessment position). Real-seat curves remain visible as labelled display overlays.
+    if (designEqEnabled && optimisationResult.finalPostEqCurve.length && rspRawCurve.length) {
+      const rawSeries = {
+        id: "rsp-raw",
+        kind: "raw",
+        label: "Raw (RSP)",
+        color: "#94A3B8",
+        strokeDasharray: "4 4",
+        data: applyBassSmoothing(rspRawCurve, bassSmoothingMode),
+      };
+      const postEqSeries = {
+        id: "rsp-eq",
+        kind: "post-eq",
+        label: "Post-EQ (RSP)",
+        color: "#16A34A",
+        data: applyBassSmoothing(optimisationResult.finalPostEqCurve, bassSmoothingMode),
+      };
+      const seatOverlays = out
+        .filter((s) => s.id !== "rsp")
+        .map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
+      out = [rawSeries, postEqSeries, ...seatOverlays];
     } else {
       out = out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
     }
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     if (houseCurveSeries) out = [...out, houseCurveSeries];
     return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult, houseCurveSeries]);
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult, houseCurveSeries, rspRawCurve]);
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -915,9 +991,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { roomDims, seat, subs, surfaceAbsorption, sourceCurve, qStrategy, graphData, rawSeatResponse };
   }, [qStrategy, selectedSeatIds, seatingPositions, subsForSimulation, rewSourceCurveMode, roomDims, surfaceAbsorption, simulationResults, multiSeriesForGraph]);
 
-  // Keep a single-seat "selectedSeat" reference for the graph title + per-seat detail cards
+  // Keep a single-seat "selectedSeat" reference for the graph title + per-seat detail cards.
+  // Prefers RSP (the authoritative assessment position) when available.
   const primarySelectedSeat = useMemo(() => {
     const responses = simulationResults.seatResponses;
+    if (responses.rsp) {
+      return { id: "rsp", isPrimary: true, isRsp: true };
+    }
     const sid = selectedSeatIds[0];
     if (sid && responses[sid]) {
       const seatMeta = seatingPositions?.find(s => (s.id || `${s.x}-${s.y}`) === sid);
@@ -1101,14 +1181,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   return (
     <div className="space-y-4" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
 
-      {(hasNoSeats || hasNoSubs) && (
+      {(!rspPosition || hasNoSubs) && (
         <Alert className="border border-[#DCDBD6] bg-[#F8F8F7] text-[#3E4349]">
           <AlertDescription className="text-sm">
-            {hasNoSeats && <>No seating found. Go to <strong>Layout → Seating</strong> and generate at least one row.</>}
-            {hasNoSeats && hasNoSubs && <><br/></>}
+            {!rspPosition && <>No RSP (green dot) position available. Bass assessment is unavailable until the MLP is set.</>}
+            {!rspPosition && hasNoSubs && <><br/></>}
             {hasNoSubs && <>No subwoofers found. Add one in <strong>Speakers</strong> (front corner is fine to start).</>}
           </AlertDescription>
         </Alert>
+      )}
+      {hasNoSeats && rspPosition && !hasNoSubs && (
+        <div style={{ fontSize: 11, color: "#8B7F76", fontFamily: "monospace", marginBottom: 8 }}>
+          No real seats — P14/P18/P19 assessed at RSP. P20 requires at least 2 real seats.
+        </div>
       )}
 
       {/* Fairness Summary */}
@@ -1258,6 +1343,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         </div>
 
+        {/* RSP measurement pill — authoritative assessment position */}
+        {rspPosition && (
+          <div style={{ display: "flex", gap: 5, marginBottom: 6, alignItems: "center" }}>
+            <button
+              onClick={() => setShowRsp(prev => !prev)}
+              title={`RSP — Reference Seat Position (x=${rspPosition.x.toFixed(2)} m, y=${rspPosition.y.toFixed(2)} m, z=${rspPosition.z.toFixed(2)} m)`}
+              style={{
+                width: 52, height: 26,
+                border: showRsp ? "2px solid #16A34A" : "1px solid #DCDBD6",
+                borderRadius: 9999, fontSize: 11, fontWeight: showRsp ? 700 : 500,
+                background: showRsp ? "#16A34A" : "#F6F3EE",
+                color: showRsp ? "#fff" : "#625143",
+                cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                outline: "none", flexShrink: 0, transition: "background 0.12s, border-color 0.12s",
+              }}
+            >
+              RSP
+            </button>
+            <span style={{ fontSize: 10, color: "#8B7F76", fontFamily: "monospace" }}>
+              Assessment position
+            </span>
+          </div>
+        )}
+
         {/* Seat selector pills */}
         {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
           const rowMap = new Map();
@@ -1346,6 +1455,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {designEqEnabled ? (optimisationResult.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate') : 'Showing raw simulated curve'}
         </div>
         {designEqEnabled && <>
+          {/* Source diagnostics — assessment position provenance */}
+          <div style={{ fontSize: 10, fontFamily: "monospace", color: "#625143", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
+            <strong>Assessment position:</strong> RSP &nbsp;|&nbsp;
+            <strong>Response ID:</strong> rsp &nbsp;|&nbsp;
+            <strong>RSP coordinates:</strong> {rspPosition ? `x=${rspPosition.x.toFixed(3)} / y=${rspPosition.y.toFixed(3)} / z=${rspPosition.z.toFixed(3)} m` : "unavailable"} &nbsp;|&nbsp;
+            <strong>Real seats:</strong> {seatingPositions?.length ?? 0}
+          </div>
           <BassOptimiserValidationPanel
             result={optimisationResult}
             priorityMode={optimiserPriorityMode}
@@ -1353,14 +1469,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           />
           <DesignEqFilterBankDiagnostic
             filters={optimisationResult.selectedFilters}
-            combinedEqCurve={(multiSeries[0]?.data || []).map((point) => {
+            combinedEqCurve={(rspRawCurve.length ? rspRawCurve : (multiSeries[0]?.data || [])).map((point) => {
               const finalPoint = optimisationResult.finalPostEqCurve.find((candidate) => candidate.frequency === point.frequency);
               return { frequency: point.frequency, spl: (finalPoint?.spl ?? point.spl) - point.spl };
             })}
           />
           <SourceDomainCapabilityDiagnostic
             activeSubs={designEqSystemLimits.activeSubs}
-            rawCurve={multiSeries[0]?.data}
+            rawCurve={rspRawCurve.length ? rspRawCurve : multiSeries[0]?.data}
             postEqCurve={optimisationResult.finalPostEqCurve}
             usableLfHz={designEqSystemLimits.usableLfHz}
             optimisationResult={optimisationResult}
