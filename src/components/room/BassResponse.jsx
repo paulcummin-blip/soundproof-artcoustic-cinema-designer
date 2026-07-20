@@ -17,7 +17,7 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
-import { optimiseBassSystem } from "@/components/utils/bassOperatingEnvelopeOptimiser";
+import { generateCandidatePool, selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
 import DesignEqFilterBankDiagnostic from "@/components/room/bass/DesignEqFilterBankDiagnostic";
 import BassOptimiserValidationPanel from "@/components/room/bass/BassOptimiserValidationPanel";
@@ -913,13 +913,39 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return volume > 0 ? 2000 * Math.sqrt(0.4 / volume) : 120;
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
-  const optimisationResult = useMemo(() => optimiseBassSystem({
+  // Per-seat raw curves for seat-aware optimiser metrics (worst-seat accuracy + P20).
+  // Excludes the synthetic "rsp" listener — only real seats are passed.
+  const perSeatRawCurves = useMemo(() => {
+    const responses = simulationResults?.seatResponses;
+    if (!responses) return [];
+    return Object.entries(responses)
+      .filter(([seatId]) => seatId !== "rsp")
+      .map(([seatId, response]) => ({
+        seatId,
+        isPrimary: seatingPositions?.find(s => (s.id || `${s.x}-${s.y}`) === seatId)?.isPrimary || false,
+        responseData: (response.freqsHz || [])
+          .map((frequency, i) => ({
+            frequency,
+            spl: Number.isFinite(response.splDb?.[i]) ? response.splDb[i] : null,
+          }))
+          .filter(p => Number.isFinite(p.frequency) && p.frequency > 0 && Number.isFinite(p.spl)),
+      }))
+      .filter(seat => seat.responseData.length > 0);
+  }, [simulationResults?.seatResponses, seatingPositions]);
+
+  // Heavy candidate pool generation — does NOT depend on priorityMode.
+  // Reuses the pool when only the priority mode changes.
+  const candidatePool = useMemo(() => generateCandidatePool({
     rawCurve: rspRawCurve,
     activeSubs: designEqSystemLimits.activeSubs,
     usableLfHz: designEqSystemLimits.usableLfHz,
     transitionHz: optimisationTransitionHz,
-    priorityMode: optimiserPriorityMode,
-  }), [rspRawCurve, designEqSystemLimits, optimisationTransitionHz, optimiserPriorityMode]);
+    perSeatRawCurves,
+  }), [rspRawCurve, designEqSystemLimits, optimisationTransitionHz, perSeatRawCurves]);
+
+  // Lightweight priority selection — reuses the stored candidate pool.
+  // Changing priorityMode only triggers this memo, not the heavy generation.
+  const optimisationResult = useMemo(() => selectCandidateFromPool(candidatePool, optimiserPriorityMode), [candidatePool, optimiserPriorityMode]);
 
   const houseCurveSeries = useMemo(() => {
     const candidate = optimisationResult.selectedCandidate;

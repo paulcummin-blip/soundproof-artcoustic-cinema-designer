@@ -1,7 +1,8 @@
 import { calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
-import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
+import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, computeParam20SeatConsistency, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
+import { selectBestCandidate } from "@/components/utils/optimiserRanking";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -12,32 +13,21 @@ function levelFromValue(value, definitions, key, lowerIsBetter = false) {
   return eligible.length ? Math.max(...eligible.map((definition) => definition.value)) : 0;
 }
 
-function compareCandidates(a, b, mode) {
-  const rank = (candidate) => {
-    if (mode === "spl") return [candidate.achievedP14Level, candidate.achievedP14Db, -candidate.achievedP19VariationDb];
-    if (mode === "extension") return [candidate.achievedP18Level, -candidate.achievedP18FrequencyHz, -candidate.achievedP19VariationDb];
-    if (mode === "accuracy") return [candidate.achievedP19Level, -candidate.achievedP19VariationDb, candidate.achievedP14Level];
-
-    const orderedLevels = [
-      Number(candidate.achievedP14Level) || 0,
-      Number(candidate.achievedP18Level) || 0,
-      Number(candidate.achievedP19Level) || 0,
-    ].sort((a, b) => a - b);
-    const p19Variation = Number.isFinite(candidate.achievedP19VariationDb)
-      ? candidate.achievedP19VariationDb
-      : Infinity;
-    const p14Db = Number.isFinite(candidate.achievedP14Db)
-      ? candidate.achievedP14Db
-      : -Infinity;
-    const p18Hz = Number.isFinite(candidate.achievedP18FrequencyHz)
-      ? candidate.achievedP18FrequencyHz
-      : Infinity;
-
-    return [orderedLevels[0], orderedLevels[1], orderedLevels[2], -p19Variation, p14Db, -p18Hz];
-  };
-  const aRank = rank(a);
-  const bRank = rank(b);
-  for (let index = 0; index < aRank.length; index += 1) if (aRank[index] !== bRank[index]) return bRank[index] - aRank[index];
+// Interpolate the combined EQ correction curve at an arbitrary frequency.
+// Used to apply the RSP-calibrated EQ bank to each real seat's raw response
+// without re-running the Design EQ fitter.
+function interpolateCorrection(combinedEqCurve, frequency) {
+  if (!Array.isArray(combinedEqCurve) || combinedEqCurve.length === 0 || !Number.isFinite(frequency)) return 0;
+  if (frequency <= combinedEqCurve[0].frequency) return combinedEqCurve[0].spl;
+  if (frequency >= combinedEqCurve[combinedEqCurve.length - 1].frequency) return combinedEqCurve[combinedEqCurve.length - 1].spl;
+  for (let i = 0; i < combinedEqCurve.length - 1; i++) {
+    if (frequency >= combinedEqCurve[i].frequency && frequency <= combinedEqCurve[i + 1].frequency) {
+      const span = combinedEqCurve[i + 1].frequency - combinedEqCurve[i].frequency;
+      if (span === 0) return combinedEqCurve[i].spl;
+      const ratio = (frequency - combinedEqCurve[i].frequency) / span;
+      return combinedEqCurve[i].spl + (combinedEqCurve[i + 1].spl - combinedEqCurve[i].spl) * ratio;
+    }
+  }
   return 0;
 }
 
@@ -50,11 +40,12 @@ function makeRequests(definitions) {
   return requests;
 }
 
-function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult }) {
+function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult, perSeatRawCurves }) {
   const assessmentStartHz = request.p18.p18LimitHz;
   const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
   const eq = eqResult;
   const finalPostEqCurve = eq.curve;
+  const combinedEqCurve = eq.combinedEqCurve || [];
   const capabilityLimitedFrequencies = eq.filters.filter((filter) => filter.enabled && filter.gainDb > 0 && filter.gainDb < 6).map((filter) => filter.frequencyHz);
   const p14 = computeParam14LfeCapability(finalPostEqCurve, false, [assessmentStartHz, assessmentEndHz]);
   const p18 = computeParam18BassExtension(finalPostEqCurve);
@@ -83,6 +74,58 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     achievedP18Level < request.p18.value && `P18 extension does not reach the requested ${request.p18.p18LimitHz} Hz boundary`,
     achievedP19Level < request.p19.value && `P19 variation exceeds ±${request.p19.p19ToleranceDb} dB between ${assessmentStartHz}–${assessmentEndHz} Hz`,
   ].filter(Boolean).join("; ");
+
+  // Seat-aware metrics: apply the candidate's exact EQ bank to each real seat's raw response.
+  // The EQ bank is the RSP-calibrated combinedEqCurve; it is applied identically to every seat.
+  // No per-seat EQ re-fitting is performed — Design EQ remains an RSP calibration engine.
+  const targetAnchorDb = request.p14.p14TargetDb;
+  let worstRealSeatHouseCurveVariationDb = null;
+  let worstRealSeatHouseCurveLevel = 0;
+  let worstRealSeatHouseCurveSeatId = null;
+  const perSeatPostEqCurves = [];
+  for (const seat of perSeatRawCurves || []) {
+    if (!seat?.seatId || !Array.isArray(seat?.responseData) || seat.responseData.length === 0) continue;
+    if (seat.seatId === "rsp" || seat.__isSyntheticRsp) continue;
+    const postEqSeatCurve = seat.responseData.map((point) => ({
+      frequency: point.frequency,
+      spl: point.spl + interpolateCorrection(combinedEqCurve, point.frequency),
+    }));
+    perSeatPostEqCurves.push({ seatId: seat.seatId, responseData: postEqSeatCurve, isPrimary: !!seat.isPrimary });
+    const seatSmoothed = applyBassSmoothing(postEqSeatCurve, "third");
+    const seatAssessed = seatSmoothed.filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz);
+    const seatP19 = computeP19DeviationBelowSchroeder({
+      freqsHz: seatAssessed.map((p) => p.frequency),
+      splDb: seatAssessed.map((p) => p.spl),
+      targetDb: seatAssessed.map((p) => targetAnchorDb + artcousticHouseCurveOffsetAt(p.frequency)),
+      schroederHz: assessmentEndHz,
+    });
+    const seatVariation = seatP19?.resultDb ?? null;
+    if (Number.isFinite(seatVariation) && (worstRealSeatHouseCurveVariationDb === null || seatVariation > worstRealSeatHouseCurveVariationDb)) {
+      worstRealSeatHouseCurveVariationDb = seatVariation;
+      worstRealSeatHouseCurveSeatId = seat.seatId;
+    }
+  }
+  worstRealSeatHouseCurveLevel = levelFromValue(worstRealSeatHouseCurveVariationDb, definitions, "p19ToleranceDb", true);
+
+  // P20 seat consistency (reuse existing helper — do not implement a second version).
+  // P20 is N/A when fewer than 2 real seats; FAIL/0 when 2+ seats but outside all tolerances.
+  let achievedP20Level = 0;
+  let achievedP20VariationDb = null;
+  let worstP20SeatId = null;
+  let p20Available = false;
+  const p20 = computeParam20SeatConsistency({
+    rspResponse: finalPostEqCurve,
+    perSeatResponses: perSeatPostEqCurves,
+    transitionHz: assessmentEndHz,
+    rspSeatId: "rsp",
+  });
+  if (p20) {
+    p20Available = true;
+    achievedP20VariationDb = p20.worstSeatDeviationDb ?? null;
+    worstP20SeatId = p20.worstSeatId ?? null;
+    achievedP20Level = p20.worstSeatLevel ?? 0; // null → 0 (FAIL), never N/A→0
+  }
+
   return {
     requestedP14Level: request.p14.level,
     requestedP18Level: request.p18.level,
@@ -98,6 +141,7 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     achievedP19Level,
     generatedFilterBank: eq.filters,
     finalPostEqCurve,
+    combinedEqCurve,
     designEqIterationTrace: eq.iterationTrace,
     designEqStopReason: eq.stopReason,
     designEqSelectedCheckpoint: eq.selectedCheckpoint,
@@ -111,6 +155,13 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     meetsRequestedEnvelope,
     allAtLeastL1: achievedP14Level >= 1 && achievedP18Level >= 1 && achievedP19Level >= 1,
     rejectionReason,
+    worstRealSeatHouseCurveVariationDb,
+    worstRealSeatHouseCurveLevel,
+    worstRealSeatHouseCurveSeatId,
+    achievedP20Level,
+    achievedP20VariationDb,
+    worstP20SeatId,
+    p20Available,
   };
 }
 
@@ -121,22 +172,34 @@ function displayCandidates(candidates, selected) {
   return [...new Set([baseline, ...valid, ...rejected.slice(0, 3), selected].filter(Boolean))];
 }
 
-export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, priorityMode = "balanced" }) {
-  const mode = ["balanced", "spl", "extension", "accuracy"].includes(priorityMode) ? priorityMode : "balanced";
-  if (!rawCurve.length || !activeSubs.length) return { selectedMode: mode, selectedFilters: [], finalPostEqCurve: [], candidates: [], displayCandidates: [], warningMessage: "A raw response curve and active subwoofer system are required.", performanceSummary: null };
+// A selectable candidate must have a finite post-EQ response, a valid filter bank,
+// and finite P14/P18/P19 results. Bank limits and broad-worsening guards are
+// already enforced by the Design EQ fitter.
+function isPhysicallyCredible(candidate) {
+  if (!candidate) return false;
+  if (!Array.isArray(candidate.finalPostEqCurve) || candidate.finalPostEqCurve.length === 0) return false;
+  if (!Array.isArray(candidate.generatedFilterBank)) return false;
+  if (!Number.isFinite(candidate.achievedP14Db)) return false;
+  if (!Number.isFinite(candidate.achievedP18FrequencyHz)) return false;
+  if (!Number.isFinite(candidate.achievedP19VariationDb)) return false;
+  return true;
+}
+
+// Heavy candidate generation — does NOT depend on priorityMode.
+// Generates all candidates with EQ fits, P14/P18/P19, seat-aware metrics, and P20.
+export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [] }) {
+  if (!rawCurve.length || !activeSubs.length) return {
+    candidates: [], selectablePool: [], definitions: null, performanceSummary: null, poolId: null,
+    generatedCandidateCount: 0, physicallyCredibleCount: 0, requestedEnvelopeValidCount: 0,
+    warningMessage: "A raw response curve and active subwoofer system are required.",
+  };
   const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
   const t0 = perf();
   const definitions = getRp22BassOperatingDefinitions();
   const requests = makeRequests(definitions);
-
-  // Part B: Cache heavy EQ fits by physical fitting contract within this invocation.
-  // targetToleranceDb (P19) only affects worstResidualDiagnostics reporting, not
-  // filter generation, bank limiting, acceptance, or checkpoint selection.
-  // Cache key: (P14 target dB, assessment start Hz, assessment end Hz, fitting tolerance).
   const coreFitCache = new Map();
   let coreFitTimeMs = 0;
   let totalCompletedBankEvaluations = 0;
-
   const candidates = requests.map((request) => {
     const assessmentStartHz = request.p18.p18LimitHz;
     const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
@@ -151,52 +214,68 @@ export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz 
         fittingToleranceDb: 2,
         assessmentStartHz,
         assessmentEndHz,
-        collectDiagnostics: false,
+        collectDiagnostics: true,
       });
       coreFitTimeMs += perf() - fitStart;
       totalCompletedBankEvaluations += eq.bankDiagnostics?.completedBankEvaluationCount || 0;
       coreFitCache.set(cacheKey, eq);
     }
-    return buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: eq });
+    return buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: eq, perSeatRawCurves });
   });
-
-  const validCandidates = candidates.filter((candidate) => candidate.meetsRequestedEnvelope);
-  const selectedByMode = Object.fromEntries(["balanced", "spl", "extension", "accuracy"].map((candidateMode) => [candidateMode, [...validCandidates].sort((a, b) => compareCandidates(a, b, candidateMode))[0] || null]));
-  const selected = selectedByMode[mode] || candidates[0];
-  const isBestCalibratedAttempt = !selectedByMode[mode];
-
-  // Part C: Run full diagnostics only for the selected candidate.
-  // The diagnostic run uses collectDiagnostics: true and returns exactly the same
-  // filter bank and scores as its lightweight equivalent.
-  let selectedDiagnosticFitTimeMs = 0;
-  let selectedRevisionCandidateCount = 0;
-  if (selected) {
-    const selectedP19Def = definitions.find((d) => d.level === selected.requestedP19Level);
-    const diagStart = perf();
-    const diagEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-      requestedSystemOutputDb: selected.requestedTargetSpl,
-      targetAnchorDb: selected.requestedTargetSpl,
-      targetToleranceDb: selectedP19Def?.p19ToleranceDb ?? 0,
-      fittingToleranceDb: 2,
-      assessmentStartHz: selected.assessmentStartHz,
-      assessmentEndHz: selected.assessmentEndHz,
-      collectDiagnostics: true,
-    });
-    selectedDiagnosticFitTimeMs = perf() - diagStart;
-    totalCompletedBankEvaluations += diagEq.bankDiagnostics?.completedBankEvaluationCount || 0;
-    selectedRevisionCandidateCount = diagEq.revisionDiagnostics?.revisionAttemptCount ?? 0;
-    selected.designEqIterationTrace = diagEq.iterationTrace;
-    selected.designEqStopReason = diagEq.stopReason;
-    selected.designEqSelectedCheckpoint = diagEq.selectedCheckpoint;
-    selected.designEqBankDiagnostics = diagEq.bankDiagnostics;
-    selected.designEqCheckpointSummaries = diagEq.checkpointSummaries;
-    selected.designEqWorstResidualDiagnostics = diagEq.worstResidualDiagnostics;
-    selected.designEqSelectionReason = diagEq.selectionReason;
-    selected.designEqRevisionDiagnostics = diagEq.revisionDiagnostics;
-  }
-
+  const selectablePool = candidates.filter(isPhysicallyCredible);
+  const requestedEnvelopeValidCount = candidates.filter((c) => c.meetsRequestedEnvelope).length;
   const t1 = perf();
+  const poolId = `${rawCurve.length}:${activeSubs.length}:${usableLfHz}:${transitionHz}:${perSeatRawCurves.length}:${t0}`;
+  return {
+    candidates,
+    selectablePool,
+    definitions,
+    performanceSummary: {
+      totalOptimiserTimeMs: t1 - t0,
+      requestCount: requests.length,
+      uniqueCoreFitCount: coreFitCache.size,
+      coreFitTimeMs,
+      completedBankEvaluationCount: totalCompletedBankEvaluations,
+    },
+    poolId,
+    generatedCandidateCount: candidates.length,
+    physicallyCredibleCount: selectablePool.length,
+    requestedEnvelopeValidCount,
+    warningMessage: null,
+  };
+}
 
+// Lightweight priority selection — reuses the stored candidate pool.
+// Does NOT re-run any core fit, Design EQ fitting, or bank evaluation.
+export function selectCandidateFromPool(pool, priorityMode) {
+  const mode = ["balanced", "spl", "extension", "accuracy"].includes(priorityMode) ? priorityMode : "balanced";
+  const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
+  const t0 = perf();
+  if (!pool || !pool.candidates || pool.candidates.length === 0) {
+    return {
+      selectedMode: mode, selectedCandidate: null, selectedFilters: [], finalPostEqCurve: [],
+      selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null,
+      achievedP18Level: "FAIL", achievedP18FrequencyHz: null,
+      achievedP19Level: "FAIL", achievedP19VariationDb: null,
+      candidates: [], displayCandidates: [], rejectedCandidates: [], selectedByMode: {},
+      isBestCalibratedAttempt: true,
+      warningMessage: pool?.warningMessage || "A raw response curve and active subwoofer system are required.",
+      performanceSummary: pool?.performanceSummary || null,
+      selectionReason: "No selectable candidates", priorityRerankTimeMs: 0, heavyPoolReused: true,
+      poolId: pool?.poolId || null,
+      generatedCandidateCount: pool?.generatedCandidateCount || 0,
+      physicallyCredibleCount: pool?.physicallyCredibleCount || 0,
+      requestedEnvelopeValidCount: pool?.requestedEnvelopeValidCount || 0,
+    };
+  }
+  const selectablePool = pool.selectablePool.length > 0 ? pool.selectablePool : pool.candidates;
+  const selectedByMode = Object.fromEntries(["balanced", "spl", "extension", "accuracy"].map((candidateMode) => {
+    const { selected } = selectBestCandidate(selectablePool, candidateMode);
+    return [candidateMode, selected];
+  }));
+  const selected = selectedByMode[mode] || selectablePool[0] || pool.candidates[0];
+  const isBestCalibratedAttempt = !selected?.meetsRequestedEnvelope;
+  const t1 = perf();
   return {
     selectedMode: mode,
     selectedP14TargetDb: selected.requestedTargetSpl,
@@ -209,20 +288,25 @@ export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz 
     achievedP18FrequencyHz: selected.achievedP18FrequencyHz,
     achievedP19Level: levelText(selected.achievedP19Level),
     achievedP19VariationDb: selected.achievedP19VariationDb,
-    candidates,
-    displayCandidates: displayCandidates(candidates, selected),
-    rejectedCandidates: candidates.filter((candidate) => !candidate.meetsRequestedEnvelope),
+    candidates: pool.candidates,
+    displayCandidates: displayCandidates(pool.candidates, selected),
+    rejectedCandidates: pool.candidates.filter((c) => !c.meetsRequestedEnvelope),
     selectedByMode,
     isBestCalibratedAttempt,
     warningMessage: isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : null,
-    performanceSummary: {
-      totalOptimiserTimeMs: t1 - t0,
-      requestCount: requests.length,
-      uniqueCoreFitCount: coreFitCache.size,
-      coreFitTimeMs,
-      selectedDiagnosticFitTimeMs,
-      selectedRevisionCandidateCount,
-      completedBankEvaluationCount: totalCompletedBankEvaluations,
-    },
+    performanceSummary: pool.performanceSummary,
+    selectionReason: `Selected by ${mode} comparator from ${selectablePool.length} physically credible candidates`,
+    priorityRerankTimeMs: t1 - t0,
+    heavyPoolReused: true,
+    poolId: pool.poolId,
+    generatedCandidateCount: pool.generatedCandidateCount,
+    physicallyCredibleCount: pool.physicallyCredibleCount,
+    requestedEnvelopeValidCount: pool.requestedEnvelopeValidCount,
   };
+}
+
+// Backward-compatible wrapper — calls both stages.
+export function optimiseBassSystem(options) {
+  const pool = generateCandidatePool(options);
+  return selectCandidateFromPool(pool, options.priorityMode);
 }

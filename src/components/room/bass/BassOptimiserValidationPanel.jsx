@@ -17,6 +17,18 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-emerald-950">
       <span>P14 {result.achievedP14Level} ({fmt(result.achievedP14Db, " dB")})</span><span>P18 {result.achievedP18Level} ({fmt(result.achievedP18FrequencyHz, " Hz")})</span><span>P19 {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
     </div>
+    {result.selectedCandidate && (() => {
+      const c = result.selectedCandidate;
+      const seatLevel = c.worstRealSeatHouseCurveLevel > 0 ? `L${c.worstRealSeatHouseCurveLevel}` : "FAIL";
+      const p20Text = c.p20Available ? (c.achievedP20Level > 0 ? `L${c.achievedP20Level}` : "FAIL") : "N/A";
+      return <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
+        <span>Official P19 (RSP): {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
+        <span>Worst-seat accuracy: {seatLevel} (±{fmt(c.worstRealSeatHouseCurveVariationDb, " dB")}) @ {c.worstRealSeatHouseCurveSeatId || "—"}</span>
+        <span>P20: {p20Text}{c.p20Available ? ` (±${fmt(c.achievedP20VariationDb, " dB")}) @ ${c.worstP20SeatId || "—"}` : ""}</span>
+      </div>;
+    })()}
+    {result.selectionReason && <div className="mt-1 font-mono text-[10px] text-slate-600">Selection: {result.selectionReason}</div>}
+    {result.priorityRerankTimeMs != null && <div className="mt-1 font-mono text-[10px] text-slate-600">Priority rerank: {result.priorityRerankTimeMs.toFixed(1)} ms | Heavy pool reused: {result.heavyPoolReused ? "Yes" : "No"} | Pool: {result.physicallyCredibleCount || 0} credible / {result.requestedEnvelopeValidCount || 0} valid / {result.generatedCandidateCount || 0} generated</div>}
     {result.performanceSummary && (
       <div className="mt-1 font-mono text-[10px] text-slate-500">
         Optimiser: {result.performanceSummary.totalOptimiserTimeMs.toFixed(0)} ms | Requests: {result.performanceSummary.requestCount} | Core fits: {result.performanceSummary.uniqueCoreFitCount} | Core time: {result.performanceSummary.coreFitTimeMs.toFixed(0)} ms | Diagnostic fit: {result.performanceSummary.selectedDiagnosticFitTimeMs.toFixed(0)} ms | Revisions: {result.performanceSummary.selectedRevisionCandidateCount} | Bank evals: {result.performanceSummary.completedBankEvaluationCount}
