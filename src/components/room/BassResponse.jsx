@@ -24,6 +24,7 @@ import BassCalculationStatus from "@/components/room/bass/BassCalculationStatus"
 import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
 import DesignEqFilterBankDiagnostic from "@/components/room/bass/DesignEqFilterBankDiagnostic";
 import BassOptimiserValidationPanel from "@/components/room/bass/BassOptimiserValidationPanel";
+import { buildCandidateSignature, signatureToString } from "@/components/room/bass/candidateConsistency";
 import P14LevelPill from "@/components/room/P14LevelPill";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1614,6 +1615,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
           Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
         </div>
+        {designEqEnabled && optimisationResult?.selectedCandidate && (() => {
+          const sig = buildCandidateSignature({ result: optimisationResult, rspRawCurve });
+          if (!sig) return null;
+          return (
+            <div style={{ fontSize: 9, color: '#625143', fontFamily: 'monospace', marginTop: 4, background: '#F8F8F7', border: '1px solid #DCDBD6', borderRadius: 4, padding: '4px 8px' }}>
+              <strong>Candidate signature:</strong> {signatureToString(sig)}
+            </div>
+          );
+        })()}
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {designEqEnabled ? (optimisationResult?.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : optimisationResult ? 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate' : 'Detailed result not calculated — click Calculate to run optimisation') : 'Showing raw simulated curve'}
         </div>

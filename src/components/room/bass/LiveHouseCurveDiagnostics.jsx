@@ -2,7 +2,7 @@
 // loaded project and currently selected candidate. Copies a structured report to
 // clipboard. Does NOT change selection, ranking, filters, or production behaviour.
 // All data comes from the real optimisation run — no synthetic curves, no
-// substituted data, no assumed subwoofer model.
+// substituted data, no assumed subwoofer model, no historic expected values.
 
 import React, { useState } from "react";
 import { peakingEqResponseDb, evaluateProvisionalBankLimits, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
@@ -10,25 +10,14 @@ import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getSourceDomainBoostAllowance, getSystemSourceCapability, getCurrentSystemSourceOutput } from "@/components/utils/subwooferCapability";
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
-
-const PROBE_FREQS = [29.75, 39.14, 77.16, 101.52];
-const EXPECTED_EQ = { 29.75: -5.3, 39.14: 0.8, 77.16: -1.5, 101.52: -2.1 };
-const EQ_TOLERANCE_DB = 1.0;
-
-function interpolate(curve, frequency) {
-  if (!Array.isArray(curve) || curve.length === 0 || !Number.isFinite(frequency)) return null;
-  if (frequency <= curve[0].frequency) return curve[0].spl;
-  if (frequency >= curve[curve.length - 1].frequency) return curve[curve.length - 1].spl;
-  for (let i = 0; i < curve.length - 1; i++) {
-    if (frequency >= curve[i].frequency && frequency <= curve[i + 1].frequency) {
-      const span = curve[i + 1].frequency - curve[i].frequency;
-      if (span === 0) return curve[i].spl;
-      const ratio = (frequency - curve[i].frequency) / span;
-      return curve[i].spl + (curve[i + 1].spl - curve[i].spl) * ratio;
-    }
-  }
-  return null;
-}
+import {
+  PROBE_FREQS,
+  buildCandidateSignature,
+  signatureToString,
+  runConsistencyTest,
+  buildVisibleConditionReport,
+  interpolateCurve,
+} from "@/components/room/bass/candidateConsistency";
 
 function fmt(v, digits = 2, unit = "") {
   return Number.isFinite(v) ? `${v.toFixed(digits)}${unit}` : "—";
@@ -70,14 +59,13 @@ function buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawC
   // Probe frequency data
   const probeData = PROBE_FREQS.map((freq) => {
     const target = Number.isFinite(anchorDb) ? anchorDb + artcousticHouseCurveOffsetAt(freq) : null;
-    const rawBefore = interpolate(rawCurve, freq);
-    const rawAfter = interpolate(postEqCurve, freq);
+    const rawBefore = interpolateCurve(rawCurve, freq);
+    const rawAfter = interpolateCurve(postEqCurve, freq);
     const rawResidual = (Number.isFinite(rawAfter) && Number.isFinite(target)) ? rawAfter - target : null;
-    const smoothedBefore = interpolate(smoothedRaw, freq);
-    const smoothedAfter = interpolate(smoothedPostEq, freq);
+    const smoothedBefore = interpolateCurve(smoothedRaw, freq);
+    const smoothedAfter = interpolateCurve(smoothedPostEq, freq);
     const smoothedResidual = (Number.isFinite(smoothedAfter) && Number.isFinite(target)) ? smoothedAfter - target : null;
-    const combinedEq = interpolate(combinedEqCurve, freq);
-    // Direct computation: sum of individual filter responses
+    const combinedEq = interpolateCurve(combinedEqCurve, freq);
     const individualContribs = filters.map((f) => ({ band: f.band, freq: f.frequencyHz, gain: f.gainDb, Q: f.Q, contrib: peakingEqResponseDb(freq, f) }));
     const totalEqDirect = individualContribs.reduce((sum, ic) => sum + ic.contrib, 0);
     return { freq, target, rawBefore, rawAfter, rawResidual, smoothedBefore, smoothedAfter, smoothedResidual, combinedEq, totalEqDirect, individualContribs };
@@ -101,11 +89,8 @@ function buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawC
 
   // Bank limits
   const bankLimits = c.houseCurveBankLimits || c.aggregateBankLimits || {};
-  const bankValidation = c.designEqFitProfile === "house_curve"
-    ? { allOk: bankLimits.allOk, boostLimitOk: bankLimits.boostLimitOk, cutLimitOk: bankLimits.cutLimitOk, sourceDomainHeadroomOk: bankLimits.sourceDomainHeadroomOk }
-    : { allOk: bankLimits.allOk, boostLimitOk: bankLimits.boostLimitOk, cutLimitOk: bankLimits.cutLimitOk, sourceDomainHeadroomOk: bankLimits.sourceDomainHeadroomOk };
+  const bankValidation = { allOk: bankLimits.allOk, boostLimitOk: bankLimits.boostLimitOk, cutLimitOk: bankLimits.cutLimitOk, sourceDomainHeadroomOk: bankLimits.sourceDomainHeadroomOk };
 
-  // Determine exact binding limit
   let bindingLimit = "none";
   if (bankValidation.allOk === false) {
     if (bankValidation.boostLimitOk === false) bindingLimit = "aggregate boost exceeded +6.05 dB";
@@ -119,20 +104,24 @@ function buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawC
   // Iteration trace
   const trace = Array.isArray(c.designEqIterationTrace) ? c.designEqIterationTrace : [];
 
-  // --- Verification ---
-  const verification = PROBE_FREQS.map((freq) => {
-    const actual = probeData.find((p) => p.freq === freq)?.totalEqDirect ?? null;
-    const expected = EXPECTED_EQ[freq];
-    const delta = Number.isFinite(actual) ? actual - expected : null;
-    const match = Number.isFinite(delta) && Math.abs(delta) <= EQ_TOLERANCE_DB;
-    return { freq, expected, actual, delta, match };
-  });
-  const allMatch = verification.every((v) => v.match);
+  // --- Candidate signature ---
+  const signature = buildCandidateSignature({ result, rspRawCurve });
+  const signatureStr = signatureToString(signature);
+
+  // --- A/B/C/D consistency test ---
+  const consistency = runConsistencyTest({ result, rspRawCurve });
+
+  // --- Visible condition report ---
+  const visibleCondition = buildVisibleConditionReport({ result, rspRawCurve });
 
   // --- Assemble report ---
   const lines = [];
   lines.push("========== LIVE HOUSE-CURVE DIAGNOSTIC REPORT ==========");
   lines.push("");
+  lines.push("========== CANDIDATE SIGNATURE ==========");
+  lines.push(`  ${signatureStr}`);
+  lines.push("");
+
   lines.push("========== 1. ACTUAL PROJECT INPUTS ==========");
   lines.push(`  Selected subwoofer product(s): ${subProductSummary}`);
   lines.push(`  Subwoofer quantity: ${subCount}`);
@@ -142,7 +131,7 @@ function buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawC
   lines.push(`  Actual P19 assessment band: ${fmt(assessmentStartHz, 0, " Hz")} – ${fmt(assessmentEndHz, 0, " Hz")}`);
   lines.push(`  Real-seat count: ${seatCount}`);
   lines.push(`  Real-seat IDs: ${seatIds.length > 0 ? seatIds.join(", ") : "none"}`);
-  lines.push(`  Selected optimiser start: ${c.designEqFitProfile === "house_curve" ? (result?.selectedCandidate?.houseCurveBaselineWorstSeatDeviation != null ? "multi-start (empty + standard-seeded)" : "—") : "—"}`);
+  lines.push(`  Selected optimiser start: ${c.designEqFitProfile === "house_curve" ? (c.houseCurveBaselineWorstSeatDeviation != null ? "multi-start (empty + standard-seeded)" : "—") : "—"}`);
   lines.push(`  Selected optimiser profile: ${c.designEqFitProfile || "—"}`);
   lines.push(`  Selected optimiser priority: ${result?.selectedMode || "—"}`);
   lines.push("");
@@ -199,7 +188,6 @@ function buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawC
     iter.regions.forEach((r) => {
       lines.push(`      ${r.kind.toUpperCase()} ${fmt(r.startHz, 1, " Hz")}–${fmt(r.endHz, 1, " Hz")}, centre ${fmt(r.centreFrequencyHz, 2, " Hz")}, severity ${fmt(r.severityDb, 2, " dB")}, seat ${r.seatId}`);
     });
-    // Filter trials near 25-45, 70-85, 95-110 Hz
     const nearTrials = (iter.trials || []).filter((t) => {
       const f = t.frequencyHz;
       return Number.isFinite(f) && ((f >= 25 && f <= 45) || (f >= 70 && f <= 85) || (f >= 95 && f <= 110));
@@ -226,28 +214,63 @@ function buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawC
     lines.push("");
   });
 
-  lines.push("========== VERIFICATION: EQ VALUES VS LIVE GRAPH ==========");
-  verification.forEach((v) => {
-    lines.push(`  ${v.freq.toFixed(2)} Hz: expected ${fmt(v.expected, 1, " dB")}, actual ${fmt(v.actual, 2, " dB")}, delta ${fmt(v.delta, 2, " dB")} — ${v.match ? "MATCH" : "MISMATCH"}`);
-  });
-  lines.push(`  Overall: ${allMatch ? "ALL MATCH — diagnostic is inspecting the correct candidate" : "MISMATCH — diagnostic may be inspecting a different candidate or response"}`);
+  lines.push("========== LIVE CANDIDATE CONSISTENCY TEST (A/B/C/D) ==========");
+  lines.push(`  A = direct sum of peakingEqResponseDb() for enabled filters`);
+  lines.push(`  B = interpolated selectedCandidate.combinedEqCurve`);
+  lines.push(`  C = selectedCandidate.finalPostEqCurve − rspRawCurve`);
+  lines.push(`  D = result.finalPostEqCurve − rspRawCurve`);
+  lines.push(`  Tolerance: ±0.05 dB`);
   lines.push("");
+  consistency.rows.forEach((r) => {
+    if (r.missing) {
+      lines.push(`  ${r.freq.toFixed(2)} Hz: A=${fmt(r.A, 3)} B=${fmt(r.B, 3)} C=${fmt(r.C, 3)} D=${fmt(r.D, 3)} — MISSING DATA`);
+    } else {
+      lines.push(`  ${r.freq.toFixed(2)} Hz: A=${fmt(r.A, 3, " dB")} B=${fmt(r.B, 3, " dB")} C=${fmt(r.C, 3, " dB")} D=${fmt(r.D, 3, " dB")} | spread=${fmt(r.spread, 3, " dB")} — ${r.pass ? "PASS" : "FAIL"}`);
+    }
+  });
+  lines.push("");
+  if (consistency.allPass) {
+    lines.push("  LIVE CANDIDATE CONSISTENCY: PASS");
+  } else {
+    lines.push("  LIVE CANDIDATE CONSISTENCY: FAIL — representations diverge");
+    const fails = consistency.rows.filter((r) => !r.pass);
+    fails.forEach((r) => {
+      const vals = { A: r.A, B: r.B, C: r.C, D: r.D };
+      const finite = Object.entries(vals).filter(([, v]) => Number.isFinite(v));
+      const min = Math.min(...finite.map(([, v]) => v));
+      const max = Math.max(...finite.map(([, v]) => v));
+      const diverging = finite.filter(([, v]) => Math.abs(v - (min + max) / 2) > 0.025).map(([k]) => k);
+      lines.push(`    ${r.freq.toFixed(2)} Hz: diverging representation(s): ${diverging.join(", ")} | A=${fmt(r.A, 3)} B=${fmt(r.B, 3)} C=${fmt(r.C, 3)} D=${fmt(r.D, 3)}`);
+      lines.push(`      Candidate signature: ${signatureStr}`);
+    });
+  }
+  lines.push("");
+
+  lines.push("========== VISIBLE CONDITION REPORT (observation only — not fixed) ==========");
+  lines.push("  TEST | EXPECTED | ACTUAL | DELTA | SEVERITY | NEXT TEST");
+  visibleCondition.forEach((row) => {
+    lines.push(`  ${row.test} | ${row.expected} | ${row.actual} | ${row.delta} | ${row.severity.toUpperCase()} | ${row.nextTest}`);
+  });
+  lines.push("");
+
   lines.push("========== END OF REPORT ==========");
 
-  return { report: lines.join("\n"), allMatch, verification };
+  return { report: lines.join("\n"), consistency, signature, signatureStr, visibleCondition };
 }
 
 export default function LiveHouseCurveDiagnostics({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve }) {
-  const [status, setStatus] = useState(null); // null | "copied" | "error" | "mismatch"
-  const [verification, setVerification] = useState(null);
+  const [status, setStatus] = useState(null); // null | "copied" | "error" | "fail"
+  const [consistency, setConsistency] = useState(null);
+  const [signatureStr, setSignatureStr] = useState(null);
 
   const handleCopy = async () => {
     try {
-      const { report, allMatch, verification: ver } = buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve });
-      if (!report) { setStatus("error"); return; }
-      await navigator.clipboard.writeText(report);
-      setVerification(ver);
-      setStatus(allMatch ? "copied" : "mismatch");
+      const out = buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve });
+      if (!out) { setStatus("error"); return; }
+      await navigator.clipboard.writeText(out.report);
+      setConsistency(out.consistency);
+      setSignatureStr(out.signatureStr);
+      setStatus(out.consistency.allPass ? "copied" : "fail");
     } catch (err) {
       setStatus("error");
     }
@@ -264,14 +287,21 @@ export default function LiveHouseCurveDiagnostics({ result, activeSubs, usableLf
         >
           Copy live house-curve diagnostics
         </button>
-        {status === "copied" && <span className="font-mono text-[10px] text-emerald-700">Copied — all EQ values match graph</span>}
-        {status === "mismatch" && <span className="font-mono text-[10px] text-rose-700">Copied — WARNING: EQ values do not match graph</span>}
+        {status === "copied" && <span className="font-mono text-[10px] text-emerald-700">Copied — LIVE CANDIDATE CONSISTENCY: PASS</span>}
+        {status === "fail" && <span className="font-mono text-[10px] text-rose-700">Copied — LIVE CANDIDATE CONSISTENCY: FAIL</span>}
         {status === "error" && <span className="font-mono text-[10px] text-rose-700">Error — could not copy</span>}
       </div>
-      {status === "mismatch" && verification && (
+      {status === "fail" && consistency && (
         <div className="mt-1 font-mono text-[10px] text-rose-700">
-          {verification.filter((v) => !v.match).map((v) => `${v.freq.toFixed(2)} Hz: expected ${v.expected.toFixed(1)} dB, got ${v.actual?.toFixed(2) ?? "—"} dB`).join(" | ")}
-          <div className="mt-1 text-amber-800">Diagnostic may be inspecting a different candidate or response. Do not interpret results until they match.</div>
+          {consistency.rows.filter((r) => !r.pass).map((r) => {
+            const vals = { A: r.A, B: r.B, C: r.C, D: r.D };
+            const finite = Object.entries(vals).filter(([, v]) => Number.isFinite(v));
+            const min = Math.min(...finite.map(([, v]) => v));
+            const max = Math.max(...finite.map(([, v]) => v));
+            const diverging = finite.filter(([, v]) => Math.abs(v - (min + max) / 2) > 0.025).map(([k]) => k);
+            return `${r.freq.toFixed(2)} Hz: ${diverging.join(", ")} diverge (A=${fmt(r.A, 3)} B=${fmt(r.B, 3)} C=${fmt(r.C, 3)} D=${fmt(r.D, 3)})`;
+          }).join(" | ")}
+          {signatureStr && <div className="mt-1 text-amber-800">Signature: {signatureStr}</div>}
         </div>
       )}
     </div>
