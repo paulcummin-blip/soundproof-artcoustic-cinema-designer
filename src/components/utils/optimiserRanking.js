@@ -134,8 +134,9 @@ const COMPARATORS = { spl: compareForSpl, extension: compareForExtension, accura
 
 // Part F: Profile-aware eligibility filtering applied before the comparator.
 // SPL and Extension modes select from Standard candidates only. Accuracy mode
-// selects from Accuracy candidates first, falling back to Standard only if no
-// credible Accuracy candidate exists. Balanced mode considers both families.
+// compares ALL physically credible Standard and Accuracy candidates — the
+// accuracy comparator determines the winner. A profile label must never force
+// selection of a worse calibration. Balanced mode considers both families.
 function filterByProfileEligibility(pool, mode) {
   if (!Array.isArray(pool) || pool.length === 0) return { eligiblePool: pool, eligibilityNote: "Empty pool" };
   const profileOf = (c) => c?.designEqFitProfile || "standard";
@@ -144,12 +145,11 @@ function filterByProfileEligibility(pool, mode) {
     if (standard.length === 0) return { eligiblePool: pool, eligibilityNote: "Full pool (no Standard candidates)" };
     return { eligiblePool: standard, eligibilityNote: "Standard candidates only" };
   }
+  // Accuracy and Balanced modes consider all physically credible candidates.
+  // For Accuracy mode, the comparator determines the winner — a profile label
+  // must never force selection of a worse calibration.
   if (mode === "accuracy") {
-    const accuracy = pool.filter((c) => profileOf(c) === "accuracy");
-    if (accuracy.length > 0) return { eligiblePool: accuracy, eligibilityNote: "Accuracy candidates" };
-    const standard = pool.filter((c) => profileOf(c) === "standard");
-    if (standard.length > 0) return { eligiblePool: standard, eligibilityNote: "Standard fallback (no credible Accuracy candidate)" };
-    return { eligiblePool: pool, eligibilityNote: "Full pool (no Accuracy or Standard candidates)" };
+    return { eligiblePool: pool, eligibilityNote: "All Standard and Accuracy candidates" };
   }
   return { eligiblePool: pool, eligibilityNote: "Both Standard and Accuracy candidates" };
 }
@@ -207,15 +207,33 @@ export function runRankingFixtures() {
     mkProfile("accuracy", 4, 4, 1, 1, 1, true),
     mkProfile("standard", 4, 3, 4, 4, 4, true),
   ], "extension").selected?.designEqFitProfile === "standard";
-  // Accuracy must select an Accuracy candidate when one is credible.
-  results.accuracySelectsAccuracy = selectBestCandidate([
-    mkProfile("standard", 4, 4, 1, 1, 1, true),
-    mkProfile("accuracy", 2, 2, 2, 2, 2, true),
-  ], "accuracy").selected?.designEqFitProfile === "accuracy";
-  // Accuracy must fall back to Standard when no credible Accuracy candidate exists.
-  results.accuracyFallsBackToStandard = selectBestCandidate([
-    mkProfile("standard", 4, 4, 4, 4, 4, true),
+
+  // Part B: Accuracy mode must compare ALL credible candidates and let the
+  // comparator decide — a profile label must never force selection of a
+  // worse calibration.
+  // Standard: P19 ±4.6 dB (level 1), worst-seat ±8.6 dB (level 1).
+  // Accuracy: P19 ±10.8 dB (level 0/FAIL), worst-seat ±8.6 dB (level 1).
+  // Standard must win Accuracy mode because it has better P19 level.
+  results.standardWinsAccuracyMode = selectBestCandidate([
+    mkProfile("standard", 2, 2, 1, 1, 1, true),
+    mkProfile("accuracy", 1, 1, 0, 1, 1, true),
   ], "accuracy").selected?.designEqFitProfile === "standard";
+  // Accuracy wins when it genuinely has the better accuracy metrics.
+  results.accuracyWinsOnMerit = selectBestCandidate([
+    mkProfile("standard", 4, 4, 1, 1, 1, true),
+    mkProfile("accuracy", 2, 2, 3, 3, 3, true),
+  ], "accuracy").selected?.designEqFitProfile === "accuracy";
+  // Accuracy must never rank worse than the best available Standard candidate.
+  {
+    const pool = [
+      mkProfile("standard", 2, 2, 2, 1, 1, true),
+      mkProfile("accuracy", 1, 1, 0, 1, 1, true),
+    ];
+    const accResult = selectBestCandidate(pool, "accuracy");
+    const stdResult = selectBestCandidate(pool.filter((c) => (c.designEqFitProfile || "standard") === "standard"), "accuracy");
+    results.accuracyNeverWorseThanBestStandard = accResult.selected && stdResult.selected
+      && compareForAccuracy(accResult.selected, stdResult.selected) <= 0;
+  }
   // Balanced can select either profile according to its max-min result.
   const balancedStandardWins = selectBestCandidate([
     mkProfile("standard", 4, 4, 4, 4, 4, true),

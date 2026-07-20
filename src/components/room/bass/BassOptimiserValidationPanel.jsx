@@ -49,6 +49,18 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       </div>;
     })()}
     {result.selectionReason && <div className="mt-1 font-mono text-[10px] text-slate-600">Selection: {result.selectionReason}</div>}
+    {(() => {
+      const allCandidates = Array.isArray(result.candidates) ? result.candidates : [];
+      const credible = allCandidates.filter((c) => Number.isFinite(c.achievedP19VariationDb));
+      const bestStd = credible.filter((c) => (c.designEqFitProfile || "standard") === "standard").sort((a, b) => a.achievedP19VariationDb - b.achievedP19VariationDb)[0];
+      const bestAcc = credible.filter((c) => c.designEqFitProfile === "accuracy").sort((a, b) => a.achievedP19VariationDb - b.achievedP19VariationDb)[0];
+      const sel = result.selectedCandidate;
+      const selProfile = sel ? (sel.designEqFitProfile || "standard") : "—";
+      const selP19 = sel && Number.isFinite(sel.achievedP19VariationDb) ? `±${sel.achievedP19VariationDb.toFixed(1)} dB` : "—";
+      return <div className="mt-1 font-mono text-[10px] text-slate-600">
+        Best Standard accuracy: {bestStd ? `±${bestStd.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Best Accuracy-profile accuracy: {bestAcc ? `±${bestAcc.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Selected: {selProfile} {selP19}
+      </div>;
+    })()}
     {result.priorityRerankTimeMs != null && <div className="mt-1 font-mono text-[10px] text-slate-600">Priority rerank: {fmtMs(result.priorityRerankTimeMs)} ms | Heavy pool reused: {result.heavyPoolReused ? "Yes" : "No"} | Pool: {result.physicallyCredibleCount ?? 0} credible / {result.requestedEnvelopeValidCount ?? 0} valid / {result.generatedCandidateCount ?? 0} generated</div>}
     {result.performanceSummary && (
       <div className="mt-1 font-mono text-[10px] text-slate-500">
@@ -81,6 +93,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
             <span>Stop reason: <strong className="text-slate-900">{candidate.designEqStopReason || "—"}</strong></span>
             <span>Generated iterations: <strong className="text-slate-900">{trace.length}</strong></span>
             <span>Returned filters: <strong className="text-slate-900">{checkpoint.enabledFilterCount}</strong></span>
+            <span>Selected checkpoint: <strong className="text-slate-900">{(() => { const summaries = Array.isArray(candidate?.designEqCheckpointSummaries) ? candidate.designEqCheckpointSummaries : []; const idx = summaries.findIndex((r) => r.selected); return idx >= 0 ? `#${idx}` : "—"; })()}</strong></span>
             <span>Max abs deviation: <strong className="text-slate-900">{fmt(checkpoint.maximumAbsoluteDeviationDb, " dB")}</strong></span>
             <span>RMS deviation: <strong className="text-slate-900">{fmt(checkpoint.rmsDeviationDb, " dB")}</strong></span>
             <span>Worst residual: <strong className="text-slate-900">{fmt(checkpoint.worstResidualFrequencyHz, " Hz")}</strong></span>

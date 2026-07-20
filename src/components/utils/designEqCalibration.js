@@ -808,17 +808,27 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     }
   } else {
     // Accuracy path — no P14 preservation, no 0.25 dB band.
+    // broadBelowTargetWorsening is retained as diagnostic information only,
+    // not a hard checkpoint exclusion. Every checkpoint with finite
+    // maximum-deviation and RMS metrics is considered. The zero-filter
+    // baseline is included but selected only if it genuinely wins.
+    // This is safe because every accepted filter operation has already
+    // passed complete-band max-deviation protection, RMS or max-deviation
+    // improvement, local residual improvement, aggregate boost and cut
+    // limits, product capability limits, and duplicate/same-region guards.
     accuracyPathTaken = true;
-    if (nonBroadWorsening.length > 0) {
-      const rankedAccuracy = [...nonBroadWorsening].sort((a, b) =>
+    const finiteCheckpoints = checkpoints.filter((cp) =>
+      Number.isFinite(cp.maximumAbsoluteDeviationDb) && Number.isFinite(cp.rmsDeviationDb));
+    if (finiteCheckpoints.length > 0) {
+      const rankedAccuracy = [...finiteCheckpoints].sort((a, b) =>
         a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
         || a.rmsDeviationDb - b.rmsDeviationDb
         || a.filters.length - b.filters.length);
       selectedCheckpoint = rankedAccuracy[0];
-      if (collectDiagnostics) selectionReason = `Accuracy checkpoint selected (P14 preservation disabled): lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}). P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB (may reduce — P14/P18 still reported).`;
+      if (collectDiagnostics) selectionReason = `Accuracy checkpoint selected (P14 preservation disabled): lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}). Broad-worsening diagnostic: ${selectedCheckpoint.broadBelowTargetWorsening ? "Yes" : "No"} (retained as diagnostic, not a hard exclusion). P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB (may reduce — P14/P18 still reported).`;
     } else {
       selectedCheckpoint = baselineCheckpoint;
-      if (collectDiagnostics) selectionReason = `No credible Accuracy checkpoint (all create broad below-target worsening); returning zero-filter checkpoint. P14 FAIL retained.`;
+      if (collectDiagnostics) selectionReason = `No checkpoint with finite metrics; returning zero-filter checkpoint. P14 FAIL retained.`;
     }
   }
 
@@ -830,12 +840,15 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     if (isSelected) {
       selectionEligibility = "selected";
     } else if (accuracyPathTaken) {
-      if (!checkpoint.broadBelowTargetWorsening) {
-        selectionEligibility = "accuracy-eligible";
-        reasonExcluded = "Higher maximum absolute deviation, RMS, or filter count than the selected Accuracy checkpoint.";
+      const hasFiniteMetrics = Number.isFinite(checkpoint.maximumAbsoluteDeviationDb) && Number.isFinite(checkpoint.rmsDeviationDb);
+      if (!hasFiniteMetrics) {
+        selectionEligibility = "non-finite-metrics";
+        reasonExcluded = "Non-finite maximum-deviation or RMS — excluded from the Accuracy path.";
       } else {
-        selectionEligibility = "broad-worsening";
-        reasonExcluded = "Broad below-target worsening — excluded from the Accuracy path.";
+        selectionEligibility = "accuracy-eligible";
+        reasonExcluded = checkpoint.broadBelowTargetWorsening
+          ? "Higher maximum absolute deviation, RMS, or filter count than the selected Accuracy checkpoint. (Broad-worsening diagnostic: Yes — retained as diagnostic, not a hard exclusion.)"
+          : "Higher maximum absolute deviation, RMS, or filter count than the selected Accuracy checkpoint.";
       }
     } else if (safePathTaken) {
       if (checkpoint.p14Safe && !checkpoint.broadBelowTargetWorsening) {
