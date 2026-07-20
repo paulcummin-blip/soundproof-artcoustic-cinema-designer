@@ -886,12 +886,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Apply the selected display smoothing to calculated curves only (not the pasted REW overlay).
     // When Design EQ is ON, the graph shows the same post-EQ curve used for P14 scoring
     // (1/3-octave basis, cut -10dB / boost +6dB) instead of the plain display smoothing.
-    out = designEqEnabled && optimisationResult.finalPostEqCurve.length
-      ? [
-        { ...out[0], id: `${out[0].id}-raw`, kind: "raw", label: "Raw", color: "#94A3B8", strokeDasharray: "4 4", data: out[0].data },
-        { ...out[0], id: `${out[0].id}-eq`, kind: "post-eq", label: "Post-EQ", color: "#16A34A", data: optimisationResult.finalPostEqCurve },
-      ]
-      : out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
+    if (designEqEnabled && optimisationResult.finalPostEqCurve.length) {
+      out = [
+        { ...out[0], id: `${out[0].id}-raw`, kind: "raw", label: "Raw", color: "#94A3B8", strokeDasharray: "4 4", data: applyBassSmoothing(out[0].data, bassSmoothingMode) },
+        { ...out[0], id: `${out[0].id}-eq`, kind: "post-eq", label: "Post-EQ", color: "#16A34A", data: applyBassSmoothing(optimisationResult.finalPostEqCurve, bassSmoothingMode) },
+      ];
+    } else {
+      out = out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
+    }
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     if (houseCurveSeries) out = [...out, houseCurveSeries];
     return out;
