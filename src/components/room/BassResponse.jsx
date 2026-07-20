@@ -148,8 +148,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // --- Multi-seat selection state ---
   const resolveFallbackIds = (seats) => {
-    const primary = seats?.find(s => s.isPrimary);
-    if (primary) return [primary.id || `${primary.x}-${primary.y}`];
     const first = seats?.[0];
     if (first) return [first.id || `${first.x}-${first.y}`];
     return [];
@@ -370,10 +368,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Derive auto-alignment delays from geometry — runtime only, never written to config
   const autoAlignDelays = useMemo(() => {
     if (!autoAlignEnabled) return {};
-    const mlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    if (!mlpSeat) return {};
+    if (!rspPosition) return {};
 
-    const mlpPoint = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
+    const mlpPoint = { x: rspPosition.x, y: rspPosition.y, z: rspPosition.z };
     const SPEED_OF_SOUND = 343;
     const POSITION_LABELS = ['left', 'right'];
     const allSubData = [];
@@ -422,7 +419,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       delays[subId] = Math.max(0, maxArrivalMs - arrivalMs);
     });
     return delays;
-  }, [autoAlignEnabled, seatingPositions, frontSubsLive, rearSubsLive, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, roomDims?.widthM, roomDims?.lengthM]);
+  }, [autoAlignEnabled, rspPosition, frontSubsLive, rearSubsLive, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions]);
 
   // Helper: resolve auto-align delay for a sub regardless of ID naming convention.
   // autoAlignDelays is keyed by canonical IDs (front-sub-left, rear-sub-left, etc.)
@@ -922,7 +919,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .filter(([seatId]) => seatId !== "rsp")
       .map(([seatId, response]) => ({
         seatId,
-        isPrimary: seatingPositions?.find(s => (s.id || `${s.x}-${s.y}`) === seatId)?.isPrimary || false,
         responseData: (response.freqsHz || [])
           .map((frequency, i) => ({
             frequency,
@@ -931,7 +927,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           .filter(p => Number.isFinite(p.frequency) && p.frequency > 0 && Number.isFinite(p.spl)),
       }))
       .filter(seat => seat.responseData.length > 0);
-  }, [simulationResults?.seatResponses, seatingPositions]);
+  }, [simulationResults?.seatResponses]);
 
   // Heavy candidate pool generation — does NOT depend on priorityMode.
   // Reuses the pool when only the priority mode changes.
@@ -1022,15 +1018,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const primarySelectedSeat = useMemo(() => {
     const responses = simulationResults.seatResponses;
     if (responses.rsp) {
-      return { id: "rsp", isPrimary: true, isRsp: true };
+      return { id: "rsp", isRsp: true };
     }
     const sid = selectedSeatIds[0];
     if (sid && responses[sid]) {
-      const seatMeta = seatingPositions?.find(s => (s.id || `${s.x}-${s.y}`) === sid);
-      return { id: sid, isPrimary: !!seatMeta?.isPrimary };
+      return { id: sid };
     }
     return null;
-  }, [selectedSeatIds, seatingPositions, simulationResults.seatResponses]);
+  }, [selectedSeatIds, simulationResults.seatResponses]);
 
   // Modal Resonance Line Toggles — display-only mode frequency generation for the graph's
   // vertical resonance ReferenceLines. Uses the same pure computeRoomModesLocal used by the
@@ -1074,10 +1069,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // Compute geometric distances
   const subDistances = useMemo(() => {
-    const mlpSeat = seatingPositions?.find(s => s.isPrimary);
-    if (!mlpSeat) return {};
+    if (!rspPosition) return {};
     
-    const mlpPoint = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
+    const mlpPoint = { x: rspPosition.x, y: rspPosition.y, z: rspPosition.z };
     const SPEED_OF_SOUND = 343;
     const distances = {};
     
@@ -1127,20 +1121,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
     
     return distances;
-  }, [seatingPositions, frontSubsCfg, rearSubsCfg, roomDims]);
+  }, [rspPosition, frontSubsCfg, rearSubsCfg, roomDims]);
 
   // Auto-align function — operates across ALL active subs (front + rear) globally
   const autoAlignSubs = React.useCallback(() => {
     if (!autoAlignEnabled) return;
 
-    const seatingPositionsNow = seatingRef.current;
     const roomDimsNow = roomDimsRef.current;
     const frontCfg = frontCfgRef.current;
     const rearCfg = rearCfgRef.current;
-    const mlpSeat = seatingPositionsNow?.find(s => s.isPrimary) || seatingPositionsNow?.[0];
-    if (!mlpSeat) return;
+    if (!rspPosition) return;
 
-    const mlpPoint = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
+    const mlpPoint = { x: rspPosition.x, y: rspPosition.y, z: rspPosition.z };
     const SPEED_OF_SOUND = 343;
     const roomWidth = Number(roomDimsNow?.widthM) || 4.5;
     const roomLength = Number(roomDimsNow?.lengthM) || 6.0;
@@ -1185,7 +1177,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // Auto-align is now runtime-only — no writes to settingsById.
     // Delays are derived in autoAlignDelays useMemo and injected into subsForSimulation at engine call time.
-  }, [autoAlignEnabled]);
+  }, [autoAlignEnabled, rspPosition]);
 
   // Auto-align effects — re-run whenever MLP seat, room dims, or any sub positions change
   useEffect(() => {
@@ -1195,7 +1187,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (frontCount > 0) setHasAutoAlignedFront(true); else setHasAutoAlignedFront(false);
     if (rearCount  > 0) setHasAutoAlignedRear(true);  else setHasAutoAlignedRear(false);
     autoAlignSubs();
-  }, [autoAlignEnabled, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, seatingPositions, roomDims?.widthM, roomDims?.lengthM, autoAlignSubs]);
+  }, [autoAlignEnabled, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, roomDims?.widthM, roomDims?.lengthM, autoAlignSubs]);
 
   // Expose drag state
   useEffect(() => {
@@ -1411,7 +1403,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     {rowSeats.map(seat => {
                       const sid = seat.id || `${seat.x}-${seat.y}`;
                       const isOn = selectedSeatIds.includes(sid);
-                      const isPrimary = !!seat.isPrimary;
                       const color = getSeatColor(sid);
                       const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
                       const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
@@ -1421,13 +1412,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                         <button
                           key={sid}
                           onClick={() => toggleSeat(sid)}
-                          title={`${label}${isPrimary ? " — MLP" : ""}`}
+                          title={label}
                           style={{
                             width: 52, height: 26,
-                            border: isOn ? `2px solid ${color}` : isPrimary ? "1px solid #A09386" : "1px solid #DCDBD6",
+                            border: isOn ? `2px solid ${color}` : "1px solid #DCDBD6",
                             borderRadius: 9999, fontSize: 11, fontWeight: isOn ? 700 : 500,
                             background: isOn ? color : "#F6F3EE",
-                            color: isOn ? "#fff" : isPrimary ? "#3E4349" : "#625143",
+                            color: isOn ? "#fff" : "#625143",
                             cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
                             outline: "none", flexShrink: 0, transition: "background 0.12s, border-color 0.12s",
                           }}
@@ -1766,15 +1757,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {!useRewCoreTestMode && Object.keys(simulationResults.seatResponses).length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {Object.entries(simulationResults.seatResponses).map(([seatId, response]) => {
-            const seat = seatingPositions.find(s => (s.id || `${s.x}-${s.y}`) === seatId);
-            const isPrimary = seat?.isPrimary || false;
             const nullInfo = response.nulls || { count: 0, worstDb: 0 };
             
             return (
               <div key={seatId} className="rounded-lg border border-[#DCDBD6] bg-white p-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="font-medium text-[#1B1A1A]">Seat {seatId}</div>
-                  {isPrimary && <Badge className="bg-[#213428] text-white border-[#213428]">MLP</Badge>}
                 </div>
                 <div className="space-y-1 text-xs">
                   {nullInfo.count > 0 && (
