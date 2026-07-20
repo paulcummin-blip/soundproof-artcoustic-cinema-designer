@@ -260,7 +260,12 @@ export function selectCandidateFromPool(pool, priorityMode) {
       candidates: [], displayCandidates: [], rejectedCandidates: [], selectedByMode: {},
       isBestCalibratedAttempt: true,
       warningMessage: pool?.warningMessage || "A raw response curve and active subwoofer system are required.",
-      performanceSummary: pool?.performanceSummary || null,
+      performanceSummary: {
+        ...pool?.performanceSummary,
+        selectedDiagnosticFitTimeMs: 0,
+        diagnosticsIncludedInCoreFits: true,
+        selectedRevisionCandidateCount: 0,
+      },
       selectionReason: "No selectable candidates", priorityRerankTimeMs: 0, heavyPoolReused: true,
       poolId: pool?.poolId || null,
       generatedCandidateCount: pool?.generatedCandidateCount || 0,
@@ -294,7 +299,14 @@ export function selectCandidateFromPool(pool, priorityMode) {
     selectedByMode,
     isBestCalibratedAttempt,
     warningMessage: isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : null,
-    performanceSummary: pool.performanceSummary,
+    performanceSummary: {
+      ...pool.performanceSummary,
+      selectedDiagnosticFitTimeMs: 0,
+      diagnosticsIncludedInCoreFits: true,
+      selectedRevisionCandidateCount: Array.isArray(selected?.designEqRevisionDiagnostics?.attempts)
+        ? selected.designEqRevisionDiagnostics.attempts.length
+        : 0,
+    },
     selectionReason: `Selected by ${mode} comparator from ${selectablePool.length} physically credible candidates`,
     priorityRerankTimeMs: t1 - t0,
     heavyPoolReused: true,

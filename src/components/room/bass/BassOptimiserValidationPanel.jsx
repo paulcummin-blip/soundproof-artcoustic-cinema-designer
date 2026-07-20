@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
+const fmtMs = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
 
 export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange }) {
   const [fitterDiagnosticsOpen, setFitterDiagnosticsOpen] = useState(false);
@@ -28,10 +29,10 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       </div>;
     })()}
     {result.selectionReason && <div className="mt-1 font-mono text-[10px] text-slate-600">Selection: {result.selectionReason}</div>}
-    {result.priorityRerankTimeMs != null && <div className="mt-1 font-mono text-[10px] text-slate-600">Priority rerank: {result.priorityRerankTimeMs.toFixed(1)} ms | Heavy pool reused: {result.heavyPoolReused ? "Yes" : "No"} | Pool: {result.physicallyCredibleCount || 0} credible / {result.requestedEnvelopeValidCount || 0} valid / {result.generatedCandidateCount || 0} generated</div>}
+    {result.priorityRerankTimeMs != null && <div className="mt-1 font-mono text-[10px] text-slate-600">Priority rerank: {fmtMs(result.priorityRerankTimeMs)} ms | Heavy pool reused: {result.heavyPoolReused ? "Yes" : "No"} | Pool: {result.physicallyCredibleCount ?? 0} credible / {result.requestedEnvelopeValidCount ?? 0} valid / {result.generatedCandidateCount ?? 0} generated</div>}
     {result.performanceSummary && (
       <div className="mt-1 font-mono text-[10px] text-slate-500">
-        Optimiser: {result.performanceSummary.totalOptimiserTimeMs.toFixed(0)} ms | Requests: {result.performanceSummary.requestCount} | Core fits: {result.performanceSummary.uniqueCoreFitCount} | Core time: {result.performanceSummary.coreFitTimeMs.toFixed(0)} ms | Diagnostic fit: {result.performanceSummary.selectedDiagnosticFitTimeMs.toFixed(0)} ms | Revisions: {result.performanceSummary.selectedRevisionCandidateCount} | Bank evals: {result.performanceSummary.completedBankEvaluationCount}
+        Optimiser: {fmtMs(result.performanceSummary.totalOptimiserTimeMs)} ms | Requests: {result.performanceSummary.requestCount ?? 0} | Core fits: {result.performanceSummary.uniqueCoreFitCount ?? 0} | Core time: {fmtMs(result.performanceSummary.coreFitTimeMs)} ms | Diagnostic refit: {fmtMs(result.performanceSummary.selectedDiagnosticFitTimeMs)} ms (included in core fits) | Revisions: {result.performanceSummary.selectedRevisionCandidateCount ?? 0} | Bank evals: {result.performanceSummary.completedBankEvaluationCount ?? 0}
       </div>
     )}
     <div className="mt-2 overflow-x-auto">
