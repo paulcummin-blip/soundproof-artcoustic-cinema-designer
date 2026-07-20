@@ -6,6 +6,35 @@ const isNumber = (value) => Number.isFinite(Number(value));
 const DESIGN_EQ_SAMPLE_RATE = 48000;
 let __bankEvaluationCounter = 0;
 
+// Part A: Explicit fitting profiles. Standard preserves current behaviour (P14-safe
+// checkpoint selection, ±2 dB discovery, −10 dB cut ceiling). Accuracy trades P14/P18
+// preservation for closer house-curve alignment (±1 dB discovery, −15 dB cut ceiling).
+// Positive magnitudes configure boost; cuts are applied as negative gain.
+export const DESIGN_EQ_FIT_PROFILES = {
+  standard: {
+    id: "standard",
+    preserveP14: true,
+    fittingToleranceDb: 2,
+    maximumCutDb: 10,
+    maximumAggregateBoostDb: 6,
+    peakDiscoveryThresholdDb: 2,
+    valleyDiscoveryThresholdDb: 2,
+  },
+  accuracy: {
+    id: "accuracy",
+    preserveP14: false,
+    fittingToleranceDb: 1,
+    maximumCutDb: 15,
+    maximumAggregateBoostDb: 6,
+    peakDiscoveryThresholdDb: 1,
+    valleyDiscoveryThresholdDb: 1,
+  },
+};
+
+export function getDesignEqFitProfile(profileId) {
+  return DESIGN_EQ_FIT_PROFILES[profileId] || DESIGN_EQ_FIT_PROFILES.standard;
+}
+
 function normaliseCurve(curveData) {
   return (Array.isArray(curveData) ? curveData : [])
     .map((point) => ({ frequency: Number(point?.frequency), spl: Number(point?.spl) }))
@@ -41,9 +70,12 @@ function octaveWidth(startHz, endHz) {
   return startHz > 0 && endHz > startHz ? Math.log2(endHz / startHz) : 0;
 }
 
-function findRegions(points, kind, peakThresholdDb = 3) {
-  const threshold = kind === "peak" ? peakThresholdDb : -2;
-  const matches = (point) => kind === "peak" ? point.deviationDb >= threshold : point.deviationDb <= threshold;
+// Part D: Peak and valley discovery thresholds are now profile-driven. Standard
+// preserves the original ±2 dB behaviour; Accuracy uses ±1 dB so a ±1 dB target
+// can discover materially correctable residuals.
+function findRegions(points, kind, peakThresholdDb = 2, valleyThresholdDb = 2) {
+  const threshold = kind === "peak" ? peakThresholdDb : -valleyThresholdDb;
+  const matches = (point) => kind === "peak" ? point.deviationDb >= threshold : point.deviationDb <= -threshold;
   const minimumWidth = kind === "peak" ? 1 / 6 : 1 / 3;
   const regions = [];
   let current = [];
@@ -157,11 +189,15 @@ function aggregateResponseDbAt(frequency, filters) {
   return filters.reduce((sum, filter) => sum + peakingEqResponseDb(frequency, filter), 0);
 }
 
-// Evaluate the completed provisional bank across all raw-curve frequencies (20–200 Hz).
-// Checks: aggregate boost ≤ +6.05 dB, aggregate boost ≤ source-domain headroom + 0.05 dB,
-// and aggregate cut ≥ −10.05 dB. These limits apply to the completed bank, not per filter.
-function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, requestedSystemOutputDb) {
+// Part B: Evaluate the completed provisional bank across all raw-curve frequencies
+// (20–200 Hz). Checks: aggregate boost ≤ +6.05 dB, aggregate boost ≤ source-domain
+// headroom + 0.05 dB, and aggregate cut ≥ profile cut floor. The cut floor is
+// profile-driven (−10.05 dB standard, −15.05 dB accuracy). These limits apply to
+// the completed bank, not per filter. Cuts do not require product headroom.
+function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
   __bankEvaluationCounter++;
+  const maximumAggregateBoostDb = (profile?.maximumAggregateBoostDb ?? 6) + 0.05;
+  const aggregateCutFloorDb = -((profile?.maximumCutDb ?? 10) + 0.05);
   const bandPoints = raw.filter((p) => p.frequency >= 20 && p.frequency <= 200);
   let maxAggregateBoostDb = 0;
   let maxAggregateBoostHz = null;
@@ -175,8 +211,8 @@ function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, req
     const aggregateDb = aggregateResponseDbAt(point.frequency, filters);
     if (aggregateDb > maxAggregateBoostDb) { maxAggregateBoostDb = aggregateDb; maxAggregateBoostHz = point.frequency; }
     if (aggregateDb < maxAggregateCutDb) { maxAggregateCutDb = aggregateDb; maxAggregateCutHz = point.frequency; }
-    if (aggregateDb > 6.05) boostLimitOk = false;
-    if (aggregateDb < -10.05) cutLimitOk = false;
+    if (aggregateDb > maximumAggregateBoostDb) boostLimitOk = false;
+    if (aggregateDb < aggregateCutFloorDb) cutLimitOk = false;
     if (aggregateDb > 0) {
       const allowed = getSourceDomainBoostAllowance({ frequency: point.frequency, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb });
       const permitted = Number.isFinite(allowed?.allowedBoostDb) ? allowed.allowedBoostDb : 6;
@@ -192,9 +228,9 @@ function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, req
 
 // Scale a candidate's gain via binary search so the completed bank (existing + candidate)
 // satisfies all aggregate limits. Returns null filter if the scaled gain is ≤ 0.1 dB.
-function scaleCandidateForBankLimits(candidate, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb) {
+function scaleCandidateForBankLimits(candidate, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
   const proposedGainDb = candidate.gainDb;
-  const initial = evaluateProvisionalBankLimits([...existingFilters, candidate], raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+  const initial = evaluateProvisionalBankLimits([...existingFilters, candidate], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   if (initial.allOk) return { filter: candidate, scaled: false, limits: initial };
   const isBoost = proposedGainDb > 0;
   let lo = 0;
@@ -202,13 +238,13 @@ function scaleCandidateForBankLimits(candidate, existingFilters, raw, activeSubs
   for (let i = 0; i < 14; i++) {
     const mid = (lo + hi) / 2;
     const scaledGain = isBoost ? mid : -mid;
-    const scaledLimits = evaluateProvisionalBankLimits([...existingFilters, { ...candidate, gainDb: scaledGain }], raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+    const scaledLimits = evaluateProvisionalBankLimits([...existingFilters, { ...candidate, gainDb: scaledGain }], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
     if (scaledLimits.allOk) lo = mid; else hi = mid;
   }
   const scaledGainDb = isBoost ? lo : -lo;
   if (Math.abs(scaledGainDb) <= 0.1) return { filter: null, scaled: true, limits: initial };
   const scaledFilter = { ...candidate, gainDb: scaledGainDb };
-  const scaledLimits = evaluateProvisionalBankLimits([...existingFilters, scaledFilter], raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+  const scaledLimits = evaluateProvisionalBankLimits([...existingFilters, scaledFilter], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   return { filter: scaledFilter, scaled: true, limits: scaledLimits };
 }
 
@@ -271,20 +307,24 @@ function buildCurveFromBank(raw, filters) {
   }));
 }
 
-// Part A: Scale a revision's gain delta via binary search so the completed bank
+// Part B: Scale a revision's gain delta via binary search so the completed bank
 // (with the revised filter replacing the existing one) satisfies all aggregate
 // limits. The existing gain is the known-safe lower bound; the proposed revised
-// gain is the upper bound. Returns null filter if the accepted delta is ≤ 0.1 dB.
-function scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb) {
+// gain is the upper bound. The per-filter cut clamp and aggregate cut floor are
+// profile-driven (−10 dB / −15 dB). Returns null filter if the accepted delta is
+// ≤ 0.1 dB.
+function scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
+  const maximumCutDb = profile?.maximumCutDb ?? 10;
+  const maximumAggregateBoostDb = profile?.maximumAggregateBoostDb ?? 6;
   const proposedGain = existingFilter.gainDb + proposedGainDelta;
   const clampedGain = existingFilter.gainDb > 0
-    ? Math.min(6, proposedGain)
-    : Math.max(-10, proposedGain);
+    ? Math.min(maximumAggregateBoostDb, proposedGain)
+    : Math.max(-maximumCutDb, proposedGain);
   const clampedDelta = clampedGain - existingFilter.gainDb;
   if (Math.abs(clampedDelta) <= 0.1) return { filter: null, scaled: false, limits: null, acceptedDelta: 0 };
   const revisedFilter = { ...existingFilter, gainDb: clampedGain };
   const provisionalFilters = existingFilters.map((f, i) => i === filterIndex ? revisedFilter : f);
-  const initial = evaluateProvisionalBankLimits(provisionalFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+  const initial = evaluateProvisionalBankLimits(provisionalFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   if (initial.allOk) return { filter: revisedFilter, scaled: false, limits: initial, acceptedDelta: clampedDelta };
   const isBoost = clampedDelta > 0;
   let lo = 0;
@@ -294,14 +334,14 @@ function scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterInd
     const scaledDelta = isBoost ? mid : -mid;
     const scaledFilter = { ...existingFilter, gainDb: existingFilter.gainDb + scaledDelta };
     const scaledFilters = existingFilters.map((f, i) => i === filterIndex ? scaledFilter : f);
-    const scaledLimits = evaluateProvisionalBankLimits(scaledFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+    const scaledLimits = evaluateProvisionalBankLimits(scaledFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
     if (scaledLimits.allOk) lo = mid; else hi = mid;
   }
   const acceptedDelta = isBoost ? lo : -lo;
   if (Math.abs(acceptedDelta) <= 0.1) return { filter: null, scaled: true, limits: initial, acceptedDelta: 0 };
   const acceptedFilter = { ...existingFilter, gainDb: existingFilter.gainDb + acceptedDelta };
   const acceptedFilters = existingFilters.map((f, i) => i === filterIndex ? acceptedFilter : f);
-  const acceptedLimits = evaluateProvisionalBankLimits(acceptedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+  const acceptedLimits = evaluateProvisionalBankLimits(acceptedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   return { filter: acceptedFilter, scaled: true, limits: acceptedLimits, acceptedDelta };
 }
 
@@ -400,19 +440,23 @@ function buildCheckpoint({ filters, curve, originalTrend, assessmentStartHz, ass
 
 export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], options = {}) {
   const raw = normaliseCurve(curveData);
-  if (!raw.length) return { curve: curveData || [], diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
+  if (!raw.length) return { curve: curveData || [], diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [], designEqFitProfile: "standard" };
 
   const thirdOctave = applyBassSmoothing(raw, "third");
   const referenceBand = thirdOctave.filter((point) => point.frequency >= 150 && point.frequency <= 200);
   const rawAnchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
   const anchorDb = isNumber(options.targetAnchorDb) ? Number(options.targetAnchorDb) : rawAnchorDb;
-  if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [] };
+  if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [], designEqFitProfile: "standard" };
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
+  // Part A: Resolve the fitting profile. Standard preserves current behaviour;
+  // Accuracy trades P14/P18 preservation for closer target alignment.
+  const profile = getDesignEqFitProfile(options.fitProfile);
+  const profileFittingToleranceDb = Number.isFinite(Number(profile.fittingToleranceDb)) ? Number(profile.fittingToleranceDb) : 2;
   const requestedFittingToleranceDb = Number.isFinite(Number(options.fittingToleranceDb))
     ? Number(options.fittingToleranceDb)
-    : 2;
+    : profileFittingToleranceDb;
   const fittingToleranceDb = Math.max(1, Math.min(5, requestedFittingToleranceDb));
   const requestedSystemOutputDb = Number(options.requestedSystemOutputDb);
   const collectDiagnostics = options.collectDiagnostics !== false;
@@ -459,10 +503,14 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       break;
     }
 
-    const peakDiscoveryThresholdDb = Math.max(1, Math.min(3, fittingToleranceDb));
+    // Part D: Peak and valley discovery thresholds are profile-driven. Standard
+    // preserves ±2 dB; Accuracy uses ±1 dB so a ±1 dB target can discover
+    // materially correctable residuals.
+    const peakDiscoveryThresholdDb = Math.max(0.5, Math.min(3, profile.peakDiscoveryThresholdDb ?? fittingToleranceDb));
+    const valleyDiscoveryThresholdDb = Math.max(0.5, Math.min(3, profile.valleyDiscoveryThresholdDb ?? fittingToleranceDb));
     const regions = [
-      ...findRegions(trendPoints, "peak", peakDiscoveryThresholdDb),
-      ...findRegions(trendPoints, "valley"),
+      ...findRegions(trendPoints, "peak", peakDiscoveryThresholdDb, valleyDiscoveryThresholdDb),
+      ...findRegions(trendPoints, "valley", peakDiscoveryThresholdDb, valleyDiscoveryThresholdDb),
     ].sort((a, b) => b.severityDb - a.severityDb);
     if (!regions.length) break;
 
@@ -474,9 +522,12 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const qMultipliers = [1, 1.5, 2, 3];
     for (const region of regions) {
       const isPeak = region.kind === "peak";
+      // Part B: Per-filter cut clamp is profile-driven (−10 dB standard, −15 dB accuracy).
+      const maximumCutDb = profile.maximumCutDb ?? 10;
+      const maximumAggregateBoostDb = profile.maximumAggregateBoostDb ?? 6;
       const requestedGainDb = isPeak
-        ? -Math.min(10, region.severityDb * 0.85)
-        : Math.min(6, region.severityDb * 0.75);
+        ? -Math.min(maximumCutDb, region.severityDb * 0.85)
+        : Math.min(maximumAggregateBoostDb, region.severityDb * 0.75);
       const baseCandidate = limitBoostForCapability({
         band: filters.length + 1,
         enabled: true,
