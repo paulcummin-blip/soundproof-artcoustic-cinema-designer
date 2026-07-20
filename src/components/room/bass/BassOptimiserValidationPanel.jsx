@@ -18,6 +18,26 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-emerald-950">
       <span>P14 {result.achievedP14Level} ({fmt(result.achievedP14Db, " dB")})</span><span>P18 {result.achievedP18Level} ({fmt(result.achievedP18FrequencyHz, " Hz")})</span><span>P19 {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
     </div>
+    {(() => {
+      // Part G: Profile contract diagnostics — safe optional access so stale or
+      // incomplete results cannot crash the panel.
+      const profileId = result.selectedFitProfile || result.selectedCandidate?.designEqFitProfile || "standard";
+      const cfg = result.selectedFitProfileConfig || result.selectedCandidate?.designEqFitProfileConfig || null;
+      const preserveP14 = cfg?.preserveP14 ?? (profileId !== "accuracy");
+      const fittingTol = cfg?.fittingToleranceDb ?? (profileId === "accuracy" ? 1 : 2);
+      const maxCut = cfg?.maximumCutDb ?? (profileId === "accuracy" ? 15 : 10);
+      const maxBoost = cfg?.maximumAggregateBoostDb ?? 6;
+      const reqP19Tol = result.requestedP19ToleranceDb ?? result.selectedCandidate?.requestedP19ToleranceDb ?? null;
+      const profileLabel = profileId === "accuracy" ? "Accuracy" : "Standard";
+      return <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
+        <span>Selected fit profile: <strong className="text-slate-900">{profileLabel}</strong></span>
+        <span>P14 preservation: <strong className={preserveP14 ? "text-emerald-700" : "text-amber-700"}>{preserveP14 ? "Yes" : "No"}</strong></span>
+        <span>Profile fitting tolerance: <strong className="text-slate-900">±{fmt(fittingTol, " dB")}</strong></span>
+        <span>Requested P19 tolerance: <strong className="text-slate-900">{Number.isFinite(reqP19Tol) ? `±${reqP19Tol.toFixed(1)} dB` : "—"}</strong></span>
+        <span>Max permitted cut: <strong className="text-slate-900">−{fmt(maxCut, " dB")}</strong></span>
+        <span>Max permitted boost: <strong className="text-slate-900">+{fmt(maxBoost, " dB")}</strong></span>
+      </div>;
+    })()}
     {result.selectedCandidate && (() => {
       const c = result.selectedCandidate;
       const seatLevel = c.worstRealSeatHouseCurveLevel > 0 ? `L${c.worstRealSeatHouseCurveLevel}` : "FAIL";
@@ -32,15 +52,16 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
     {result.priorityRerankTimeMs != null && <div className="mt-1 font-mono text-[10px] text-slate-600">Priority rerank: {fmtMs(result.priorityRerankTimeMs)} ms | Heavy pool reused: {result.heavyPoolReused ? "Yes" : "No"} | Pool: {result.physicallyCredibleCount ?? 0} credible / {result.requestedEnvelopeValidCount ?? 0} valid / {result.generatedCandidateCount ?? 0} generated</div>}
     {result.performanceSummary && (
       <div className="mt-1 font-mono text-[10px] text-slate-500">
-        Optimiser: {fmtMs(result.performanceSummary.totalOptimiserTimeMs)} ms | Requests: {result.performanceSummary.requestCount ?? 0} | Core fits: {result.performanceSummary.uniqueCoreFitCount ?? 0} | Core time: {fmtMs(result.performanceSummary.coreFitTimeMs)} ms | Diagnostic refit: {fmtMs(result.performanceSummary.selectedDiagnosticFitTimeMs)} ms (included in core fits) | Revisions: {result.performanceSummary.selectedRevisionCandidateCount ?? 0} | Bank evals: {result.performanceSummary.completedBankEvaluationCount ?? 0}
+        Optimiser: {fmtMs(result.performanceSummary.totalOptimiserTimeMs)} ms | Requests: {result.performanceSummary.requestCount ?? 0} × {result.performanceSummary.profileCount ?? 2} profiles | Core fits: {result.performanceSummary.uniqueCoreFitCount ?? 0} (Standard: {result.performanceSummary.standardFitCount ?? 0}, Accuracy: {result.performanceSummary.accuracyFitCount ?? 0}) | Core time: {fmtMs(result.performanceSummary.coreFitTimeMs)} ms | Diagnostic refit: {fmtMs(result.performanceSummary.selectedDiagnosticFitTimeMs)} ms (included in core fits) | Revisions: {result.performanceSummary.selectedRevisionCandidateCount ?? 0} | Bank evals: {result.performanceSummary.completedBankEvaluationCount ?? 0}
       </div>
     )}
     <div className="mt-2 overflow-x-auto">
       <table className="min-w-[900px] text-right font-mono text-[10px] text-slate-700">
-        <thead className="border-b border-slate-300 text-slate-500"><tr>{["Requested P14", "Requested P18", "Requested P19", "Achieved P14", "Achieved P18", "Achieved P19", "Valid band", "Valid", "Selected"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr></thead>
+        <thead className="border-b border-slate-300 text-slate-500"><tr>{["Requested P14", "Requested P18", "Requested P19", "Profile", "Achieved P14", "Achieved P18", "Achieved P19", "Valid band", "Valid", "Selected"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr></thead>
         <tbody>{(Array.isArray(result.displayCandidates) ? result.displayCandidates : []).map((candidate) => {
           const selected = candidate === result.selectedCandidate;
-          return <tr className="border-b border-slate-200" key={`${candidate.requestedP14Level}-${candidate.requestedP18Level}-${candidate.requestedP19Level}`}><td className="px-2 py-1 font-semibold">{candidate.requestedP14Level}</td><td className="px-2 py-1">{candidate.requestedP18Level}</td><td className="px-2 py-1">{candidate.requestedP19Level}</td><td className="px-2 py-1">{level(candidate.achievedP14Level)} · {fmt(candidate.achievedP14Db, " dB")}</td><td className="px-2 py-1">{level(candidate.achievedP18Level)} · {fmt(candidate.achievedP18FrequencyHz, " Hz")}</td><td className="px-2 py-1">{level(candidate.achievedP19Level)} · ±{fmt(candidate.achievedP19VariationDb, " dB")}</td><td className="px-2 py-1">{fmt(candidate.assessmentStartHz, " Hz")}–{fmt(candidate.assessmentEndHz, " Hz")}</td><td className="px-2 py-1">{candidate.meetsRequestedEnvelope ? "Yes" : "No"}</td><td className="px-2 py-1">{selected ? "Yes" : "—"}</td></tr>;
+          const profileLabel = (candidate.designEqFitProfile || "standard") === "accuracy" ? "Acc" : "Std";
+          return <tr className="border-b border-slate-200" key={`${candidate.requestedP14Level}-${candidate.requestedP18Level}-${candidate.requestedP19Level}-${candidate.designEqFitProfile || "standard"}`}><td className="px-2 py-1 font-semibold">{candidate.requestedP14Level}</td><td className="px-2 py-1">{candidate.requestedP18Level}</td><td className="px-2 py-1">{candidate.requestedP19Level}</td><td className="px-2 py-1"><strong className={profileLabel === "Acc" ? "text-indigo-700" : "text-slate-600"}>{profileLabel}</strong></td><td className="px-2 py-1">{level(candidate.achievedP14Level)} · {fmt(candidate.achievedP14Db, " dB")}</td><td className="px-2 py-1">{level(candidate.achievedP18Level)} · {fmt(candidate.achievedP18FrequencyHz, " Hz")}</td><td className="px-2 py-1">{level(candidate.achievedP19Level)} · ±{fmt(candidate.achievedP19VariationDb, " dB")}</td><td className="px-2 py-1">{fmt(candidate.assessmentStartHz, " Hz")}–{fmt(candidate.assessmentEndHz, " Hz")}</td><td className="px-2 py-1">{candidate.meetsRequestedEnvelope ? "Yes" : "No"}</td><td className="px-2 py-1">{selected ? "Yes" : "—"}</td></tr>;
         })}</tbody>
       </table>
     </div>

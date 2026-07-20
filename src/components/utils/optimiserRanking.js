@@ -130,16 +130,43 @@ function compareForBalanced(a, b) {
 
 const COMPARATORS = { spl: compareForSpl, extension: compareForExtension, accuracy: compareForAccuracy, balanced: compareForBalanced };
 
+// Part F: Profile-aware eligibility filtering applied before the comparator.
+// SPL and Extension modes select from Standard candidates only. Accuracy mode
+// selects from Accuracy candidates first, falling back to Standard only if no
+// credible Accuracy candidate exists. Balanced mode considers both families.
+function filterByProfileEligibility(pool, mode) {
+  if (!Array.isArray(pool) || pool.length === 0) return { eligiblePool: pool, eligibilityNote: "Empty pool" };
+  const profileOf = (c) => c?.designEqFitProfile || "standard";
+  if (mode === "spl" || mode === "extension") {
+    const standard = pool.filter((c) => profileOf(c) === "standard");
+    if (standard.length === 0) return { eligiblePool: pool, eligibilityNote: "Full pool (no Standard candidates)" };
+    return { eligiblePool: standard, eligibilityNote: "Standard candidates only" };
+  }
+  if (mode === "accuracy") {
+    const accuracy = pool.filter((c) => profileOf(c) === "accuracy");
+    if (accuracy.length > 0) return { eligiblePool: accuracy, eligibilityNote: "Accuracy candidates" };
+    const standard = pool.filter((c) => profileOf(c) === "standard");
+    if (standard.length > 0) return { eligiblePool: standard, eligibilityNote: "Standard fallback (no credible Accuracy candidate)" };
+    return { eligiblePool: pool, eligibilityNote: "Full pool (no Accuracy or Standard candidates)" };
+  }
+  return { eligiblePool: pool, eligibilityNote: "Both Standard and Accuracy candidates" };
+}
+
 // Non-mutating single-pass best-candidate selection from a pool.
 export function selectBestCandidate(pool, priorityMode) {
   const mode = ["balanced", "spl", "extension", "accuracy"].includes(priorityMode) ? priorityMode : "balanced";
   const compare = COMPARATORS[mode];
   if (!Array.isArray(pool) || pool.length === 0) return { selected: null, selectionReason: "Empty pool" };
-  let best = pool[0];
-  for (let i = 1; i < pool.length; i++) {
-    if (compare(pool[i], best) < 0) best = pool[i];
+  const { eligiblePool, eligibilityNote } = filterByProfileEligibility(pool, mode);
+  let best = eligiblePool[0];
+  for (let i = 1; i < eligiblePool.length; i++) {
+    if (compare(eligiblePool[i], best) < 0) best = eligiblePool[i];
   }
-  return { selected: best, selectionReason: `Selected by ${mode} comparator` };
+  const selectedProfile = best?.designEqFitProfile || "standard";
+  return {
+    selected: best,
+    selectionReason: `Selected by ${mode} comparator from ${eligibilityNote} (${eligiblePool.length} of ${pool.length} candidates). Selected profile: ${selectedProfile}.`,
+  };
 }
 
 // Deterministic fixture tests proving each priority mode behaves differently.

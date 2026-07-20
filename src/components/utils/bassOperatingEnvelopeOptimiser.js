@@ -1,4 +1,4 @@
-import { calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
+import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
 import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, computeParam20SeatConsistency, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
@@ -131,8 +131,14 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     requestedP18Level: request.p18.level,
     requestedP19Level: request.p19.level,
     requestedTargetSpl: request.p14.p14TargetDb,
+    requestedP19ToleranceDb: request.p19.p19ToleranceDb,
     assessmentStartHz,
     assessmentEndHz,
+    // Part E: Carry the effective profile contract from the Design EQ fit so
+    // the priority selector and validation panel can distinguish Standard from
+    // Accuracy candidates.
+    designEqFitProfile: eq.designEqFitProfile || "standard",
+    designEqFitProfileConfig: eq.designEqFitProfileConfig || null,
     achievedP14Db,
     achievedP14Level,
     achievedP18FrequencyHz,
@@ -185,13 +191,22 @@ function isPhysicallyCredible(candidate) {
   return true;
 }
 
+// Part E: The two profile families generated for every RP22 request. Standard
+// preserves P14 with −10 dB cuts; Accuracy trades P14 for closer house-curve
+// alignment with −15 dB cuts. Both retain the +6 dB aggregate boost cap.
+const FIT_PROFILES_TO_GENERATE = [
+  DESIGN_EQ_FIT_PROFILES.standard,
+  DESIGN_EQ_FIT_PROFILES.accuracy,
+];
+
 // Heavy candidate generation — does NOT depend on priorityMode.
-// Generates all candidates with EQ fits, P14/P18/P19, seat-aware metrics, and P20.
+// Generates both Standard and Accuracy candidates for every RP22 request,
+// each with EQ fits, P14/P18/P19, seat-aware metrics, and P20.
 export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null }) {
   if (!rawCurve.length || !activeSubs.length) return {
     candidates: [], selectablePool: [], definitions: null, performanceSummary: null, poolId: null,
     generatedCandidateCount: 0, physicallyCredibleCount: 0, requestedEnvelopeValidCount: 0,
-    warningMessage: "A raw response curve and active subwoofer system are required.",
+    standardFitCount: 0, accuracyFitCount: 0, warningMessage: "A raw response curve and active subwoofer system are required.",
   };
   const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
   const t0 = perf();
@@ -200,35 +215,63 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   const coreFitCache = new Map();
   let coreFitTimeMs = 0;
   let totalCompletedBankEvaluations = 0;
-  const report = (phase, completedRequests) => {
-    if (onProgress) onProgress({ phase, completedRequests, totalRequests: requests.length, uniqueCoreFits: coreFitCache.size, bankEvaluations: totalCompletedBankEvaluations });
+  let standardFitCount = 0;
+  let accuracyFitCount = 0;
+  const totalTasks = requests.length * FIT_PROFILES_TO_GENERATE.length;
+  const report = (phase, completedTasks) => {
+    if (onProgress) onProgress({
+      phase, completedTasks, totalTasks,
+      completedRequests: completedTasks, totalRequests: totalTasks, // backward compat for BassCalculationStatus
+      uniqueCoreFits: coreFitCache.size, bankEvaluations: totalCompletedBankEvaluations,
+      standardFitCount, accuracyFitCount,
+    });
   };
   report("Preparing response curves", 0);
-  const candidates = requests.map((request, i) => {
+  let taskIndex = 0;
+  const candidates = [];
+  for (const request of requests) {
     const assessmentStartHz = request.p18.p18LimitHz;
     const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
-    const cacheKey = `${request.p14.p14TargetDb}:${assessmentStartHz}:${assessmentEndHz}:2`;
-    report("Fitting Design EQ", i);
-    let eq = coreFitCache.get(cacheKey);
-    if (!eq) {
-      const fitStart = perf();
-      eq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: request.p14.p14TargetDb,
-        targetAnchorDb: request.p14.p14TargetDb,
-        targetToleranceDb: request.p19.p19ToleranceDb,
-        fittingToleranceDb: 2,
+    for (const profile of FIT_PROFILES_TO_GENERATE) {
+      taskIndex++;
+      report("Fitting Design EQ", taskIndex);
+      // Part E: Cache key includes every value capable of changing the fit or
+      // its diagnostics: P14 target, assessment band, requested P19 tolerance,
+      // profile ID, fitting tolerance, max cut, max aggregate boost, and the
+      // preserve-P14 policy. Standard and Accuracy can never share an entry.
+      const cacheKey = [
+        request.p14.p14TargetDb,
         assessmentStartHz,
         assessmentEndHz,
-        collectDiagnostics,
-      });
-      coreFitTimeMs += perf() - fitStart;
-      totalCompletedBankEvaluations += eq.bankDiagnostics?.completedBankEvaluationCount || 0;
-      coreFitCache.set(cacheKey, eq);
+        request.p19.p19ToleranceDb,
+        profile.id,
+        profile.fittingToleranceDb,
+        profile.maximumCutDb,
+        profile.maximumAggregateBoostDb,
+        profile.preserveP14,
+      ].join(":");
+      let eq = coreFitCache.get(cacheKey);
+      if (!eq) {
+        const fitStart = perf();
+        eq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
+          requestedSystemOutputDb: request.p14.p14TargetDb,
+          targetAnchorDb: request.p14.p14TargetDb,
+          targetToleranceDb: request.p19.p19ToleranceDb,
+          fitProfile: profile.id,
+          assessmentStartHz,
+          assessmentEndHz,
+          collectDiagnostics,
+        });
+        coreFitTimeMs += perf() - fitStart;
+        totalCompletedBankEvaluations += eq.bankDiagnostics?.completedBankEvaluationCount || 0;
+        coreFitCache.set(cacheKey, eq);
+        if (profile.id === "accuracy") accuracyFitCount++; else standardFitCount++;
+      }
+      report("Assessing RSP and real seats", taskIndex);
+      candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: eq, perSeatRawCurves }));
     }
-    report("Assessing RSP and real seats", i);
-    return buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: eq, perSeatRawCurves });
-  });
-  report("Complete", requests.length);
+  }
+  report("Complete", totalTasks);
   const selectablePool = candidates.filter(isPhysicallyCredible);
   const requestedEnvelopeValidCount = candidates.filter((c) => c.meetsRequestedEnvelope).length;
   const t1 = perf();
@@ -240,7 +283,10 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     performanceSummary: {
       totalOptimiserTimeMs: t1 - t0,
       requestCount: requests.length,
+      profileCount: FIT_PROFILES_TO_GENERATE.length,
       uniqueCoreFitCount: coreFitCache.size,
+      standardFitCount,
+      accuracyFitCount,
       coreFitTimeMs,
       completedBankEvaluationCount: totalCompletedBankEvaluations,
     },
@@ -248,6 +294,8 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     generatedCandidateCount: candidates.length,
     physicallyCredibleCount: selectablePool.length,
     requestedEnvelopeValidCount,
+    standardFitCount,
+    accuracyFitCount,
     warningMessage: null,
   };
 }
@@ -264,7 +312,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
       selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null,
       achievedP18Level: "FAIL", achievedP18FrequencyHz: null,
       achievedP19Level: "FAIL", achievedP19VariationDb: null,
-      candidates: [], displayCandidates: [], rejectedCandidates: [], selectedByMode: {},
+      selectedFitProfile: null, candidates: [], displayCandidates: [], rejectedCandidates: [], selectedByMode: {},
       isBestCalibratedAttempt: true,
       warningMessage: pool?.warningMessage || "A raw response curve and active subwoofer system are required.",
       performanceSummary: {
@@ -278,15 +326,18 @@ export function selectCandidateFromPool(pool, priorityMode) {
       generatedCandidateCount: pool?.generatedCandidateCount || 0,
       physicallyCredibleCount: pool?.physicallyCredibleCount || 0,
       requestedEnvelopeValidCount: pool?.requestedEnvelopeValidCount || 0,
+      standardFitCount: pool?.standardFitCount || 0,
+      accuracyFitCount: pool?.accuracyFitCount || 0,
     };
   }
   const selectablePool = pool.selectablePool.length > 0 ? pool.selectablePool : pool.candidates;
   const selectedByMode = Object.fromEntries(["balanced", "spl", "extension", "accuracy"].map((candidateMode) => {
-    const { selected } = selectBestCandidate(selectablePool, candidateMode);
+    const { selected, selectionReason } = selectBestCandidate(selectablePool, candidateMode);
     return [candidateMode, selected];
   }));
   const selected = selectedByMode[mode] || selectablePool[0] || pool.candidates[0];
   const isBestCalibratedAttempt = !selected?.meetsRequestedEnvelope;
+  const { selectionReason: modeSelectionReason } = selectBestCandidate(selectablePool, mode);
   const t1 = perf();
   return {
     selectedMode: mode,
@@ -300,6 +351,10 @@ export function selectCandidateFromPool(pool, priorityMode) {
     achievedP18FrequencyHz: selected.achievedP18FrequencyHz,
     achievedP19Level: levelText(selected.achievedP19Level),
     achievedP19VariationDb: selected.achievedP19VariationDb,
+    // Part F: Surface the selected candidate's fit profile for the validation panel.
+    selectedFitProfile: selected.designEqFitProfile || "standard",
+    selectedFitProfileConfig: selected.designEqFitProfileConfig || null,
+    requestedP19ToleranceDb: selected.requestedP19ToleranceDb ?? null,
     candidates: pool.candidates,
     displayCandidates: displayCandidates(pool.candidates, selected),
     rejectedCandidates: pool.candidates.filter((c) => !c.meetsRequestedEnvelope),
@@ -314,13 +369,15 @@ export function selectCandidateFromPool(pool, priorityMode) {
         ? selected.designEqRevisionDiagnostics.attempts.length
         : 0,
     },
-    selectionReason: `Selected by ${mode} comparator from ${selectablePool.length} physically credible candidates`,
+    selectionReason: modeSelectionReason || `Selected by ${mode} comparator from ${selectablePool.length} physically credible candidates`,
     priorityRerankTimeMs: t1 - t0,
     heavyPoolReused: true,
     poolId: pool.poolId,
     generatedCandidateCount: pool.generatedCandidateCount,
     physicallyCredibleCount: pool.physicallyCredibleCount,
     requestedEnvelopeValidCount: pool.requestedEnvelopeValidCount,
+    standardFitCount: pool.standardFitCount || 0,
+    accuracyFitCount: pool.accuracyFitCount || 0,
   };
 }
 

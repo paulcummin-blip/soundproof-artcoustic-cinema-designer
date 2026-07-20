@@ -74,8 +74,13 @@ function octaveWidth(startHz, endHz) {
 // preserves the original ±2 dB behaviour; Accuracy uses ±1 dB so a ±1 dB target
 // can discover materially correctable residuals.
 function findRegions(points, kind, peakThresholdDb = 2, valleyThresholdDb = 2) {
-  const threshold = kind === "peak" ? peakThresholdDb : -valleyThresholdDb;
-  const matches = (point) => kind === "peak" ? point.deviationDb >= threshold : point.deviationDb <= -threshold;
+  // Part A: Peak deviations >= +peakThresholdDb; valley deviations <= -valleyThresholdDb.
+  // The previous implementation used `-threshold` for valleys, which became positive
+  // and accepted deviations up to +valleyThresholdDb as valleys. This is now corrected.
+  const matches = (point) =>
+    kind === "peak"
+      ? point.deviationDb >= peakThresholdDb
+      : point.deviationDb <= -valleyThresholdDb;
   const minimumWidth = kind === "peak" ? 1 / 6 : 1 / 3;
   const regions = [];
   let current = [];
@@ -98,6 +103,29 @@ function findRegions(points, kind, peakThresholdDb = 2, valleyThresholdDb = 2) {
   });
   finish();
   return regions;
+}
+
+// Part A: Deterministic checks proving the valley threshold sign is correct.
+// A +0.5 dB point must NOT be an Accuracy valley; a −0.9 dB point must NOT be
+// an Accuracy valley; a −1.0 dB point MUST be an Accuracy valley. Uses a band
+// of points spanning > 1/3 octave so the minimum-width requirement is met.
+export function getDesignEqValleyThresholdValidation() {
+  const peakThresholdDb = 1;
+  const valleyThresholdDb = 1;
+  // 40–63 Hz ≈ 0.66 octaves — exceeds the 1/3-octave valley minimum width.
+  const bandFreqs = [40, 45, 50, 56, 63];
+  const bandPoints = (deviationDb) => bandFreqs.map((f) => ({ frequency: f, deviationDb }));
+  const isValley = (deviationDb) =>
+    findRegions(bandPoints(deviationDb), "valley", peakThresholdDb, valleyThresholdDb).length > 0;
+  const isPeak = (deviationDb) =>
+    findRegions(bandPoints(deviationDb), "peak", peakThresholdDb, valleyThresholdDb).length > 0;
+  return {
+    plusHalfDbIsNotValley: !isValley(0.5),
+    minusZeroNineDbIsNotValley: !isValley(-0.9),
+    minusOneDbIsValley: isValley(-1.0),
+    plusOneDbIsPeak: isPeak(1.0),
+    plusHalfDbIsNotPeak: !isPeak(0.5),
+  };
 }
 
 function qForRegion(region) {
@@ -569,7 +597,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
           if (isDuplicate || sameRegionCount >= 2) continue;
 
           const gainBeforeBankLimiting = candidate.gainDb;
-          const bankResult = scaleCandidateForBankLimits(candidate, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
+          const bankResult = scaleCandidateForBankLimits(candidate, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile);
           if (!bankResult.filter) { bankLimitRejectedCount++; continue; }
           if (bankResult.scaled) bankLimitScaledCount++;
           const finalCandidate = bankResult.filter;
@@ -619,7 +647,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
               if (seenRevisionsRegion.has(revisionKey)) continue;
               seenRevisionsRegion.add(revisionKey);
               const proposedGainDb = existingFilter.gainDb + proposedGainDelta;
-              const revisionResult = scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
+              const revisionResult = scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile);
               revisionAttemptCount++;
               const attempt = {
                 filterIndex, oldGainDb: existingFilter.gainDb, proposedGainDb,
@@ -734,38 +762,64 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   }
   if (operations >= maxOperations && stopReason === "no safe improvement remained") stopReason = "operation ceiling reached";
 
-  // Part A: Safe-checkpoint path — preserve existing ranking when one or more
-  // checkpoints satisfy p14Safe && !broadBelowTargetWorsening.
-  const safeCheckpoints = checkpoints.filter((checkpoint) => checkpoint.p14Safe && !checkpoint.broadBelowTargetWorsening);
+  // Part C: Profile-aware checkpoint selection. Standard (preserveP14 === true)
+  // preserves the existing P14-safe / 0.25 dB preservation-band path exactly.
+  // Accuracy (preserveP14 === false) does not require p14Safe and does not
+  // impose the 0.25 dB band; it selects from non-broad-worsening checkpoints
+  // ranked by lowest max abs deviation, then RMS, then fewest filters. The
+  // zero-filter checkpoint is used only if no credible Accuracy checkpoint
+  // remains. P14 and P18 are still calculated and reported after selection.
   const baselineCheckpoint = checkpoints[0];
   const baselineP14MinimumSpl = baselineCheckpoint?.p14MinimumSpl;
   const nonBroadWorsening = checkpoints.filter((cp) => !cp.broadBelowTargetWorsening);
-  const fallbackPool = nonBroadWorsening.length ? nonBroadWorsening : checkpoints;
-  const preservationBand = Number.isFinite(baselineP14MinimumSpl)
-    ? fallbackPool.filter((cp) => Number.isFinite(cp.p14MinimumSpl) && cp.p14MinimumSpl >= baselineP14MinimumSpl - 0.25)
-    : fallbackPool;
-  const safePathTaken = safeCheckpoints.length > 0;
+  const preserveP14 = profile.preserveP14 !== false;
 
   let selectedCheckpoint;
   let selectionReason = null;
-  if (safePathTaken) {
-    const rankedSafe = [...safeCheckpoints].sort((a, b) =>
-      a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
-      || a.rmsDeviationDb - b.rmsDeviationDb
-      || a.filters.length - b.filters.length);
-    selectedCheckpoint = rankedSafe[0];
-    if (collectDiagnostics) selectionReason = `P14-safe checkpoint selected: lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}).`;
-  } else if (preservationBand.length) {
-    const rankedFallback = [...preservationBand].sort((a, b) =>
-      a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
-      || a.rmsDeviationDb - b.rmsDeviationDb
-      || b.p14MinimumSpl - a.p14MinimumSpl
-      || a.filters.length - b.filters.length);
-    selectedCheckpoint = rankedFallback[0];
-    if (collectDiagnostics) selectionReason = `Best credible calibrated attempt (P14 FAIL retained): selected for lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB) and RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB) within the 0.25 dB preservation band of the zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB). Selected P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB, ${selectedCheckpoint.filters.length} filters.`;
+  let safePathTaken = false;
+  let accuracyPathTaken = false;
+
+  if (preserveP14) {
+    // Standard path — existing logic unchanged.
+    const safeCheckpoints = nonBroadWorsening.filter((cp) => cp.p14Safe);
+    const fallbackPool = nonBroadWorsening.length ? nonBroadWorsening : checkpoints;
+    const preservationBand = Number.isFinite(baselineP14MinimumSpl)
+      ? fallbackPool.filter((cp) => Number.isFinite(cp.p14MinimumSpl) && cp.p14MinimumSpl >= baselineP14MinimumSpl - 0.25)
+      : fallbackPool;
+    safePathTaken = safeCheckpoints.length > 0;
+    if (safePathTaken) {
+      const rankedSafe = [...safeCheckpoints].sort((a, b) =>
+        a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+        || a.rmsDeviationDb - b.rmsDeviationDb
+        || a.filters.length - b.filters.length);
+      selectedCheckpoint = rankedSafe[0];
+      if (collectDiagnostics) selectionReason = `P14-safe checkpoint selected: lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}).`;
+    } else if (preservationBand.length) {
+      const rankedFallback = [...preservationBand].sort((a, b) =>
+        a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+        || a.rmsDeviationDb - b.rmsDeviationDb
+        || b.p14MinimumSpl - a.p14MinimumSpl
+        || a.filters.length - b.filters.length);
+      selectedCheckpoint = rankedFallback[0];
+      if (collectDiagnostics) selectionReason = `Best credible calibrated attempt (P14 FAIL retained): selected for lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB) and RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB) within the 0.25 dB preservation band of the zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB). Selected P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB, ${selectedCheckpoint.filters.length} filters.`;
+    } else {
+      selectedCheckpoint = baselineCheckpoint;
+      if (collectDiagnostics) selectionReason = `No checkpoint within 0.25 dB of zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB); returning zero-filter checkpoint to avoid worsening product capability. P14 FAIL retained.`;
+    }
   } else {
-    selectedCheckpoint = baselineCheckpoint;
-    if (collectDiagnostics) selectionReason = `No checkpoint within 0.25 dB of zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB); returning zero-filter checkpoint to avoid worsening product capability. P14 FAIL retained.`;
+    // Accuracy path — no P14 preservation, no 0.25 dB band.
+    accuracyPathTaken = true;
+    if (nonBroadWorsening.length > 0) {
+      const rankedAccuracy = [...nonBroadWorsening].sort((a, b) =>
+        a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+        || a.rmsDeviationDb - b.rmsDeviationDb
+        || a.filters.length - b.filters.length);
+      selectedCheckpoint = rankedAccuracy[0];
+      if (collectDiagnostics) selectionReason = `Accuracy checkpoint selected (P14 preservation disabled): lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}). P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB (may reduce — P14/P18 still reported).`;
+    } else {
+      selectedCheckpoint = baselineCheckpoint;
+      if (collectDiagnostics) selectionReason = `No credible Accuracy checkpoint (all create broad below-target worsening); returning zero-filter checkpoint. P14 FAIL retained.`;
+    }
   }
 
   // Part C: Checkpoint summaries for every generated checkpoint.
@@ -775,6 +829,14 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     let reasonExcluded = null;
     if (isSelected) {
       selectionEligibility = "selected";
+    } else if (accuracyPathTaken) {
+      if (!checkpoint.broadBelowTargetWorsening) {
+        selectionEligibility = "accuracy-eligible";
+        reasonExcluded = "Higher maximum absolute deviation, RMS, or filter count than the selected Accuracy checkpoint.";
+      } else {
+        selectionEligibility = "broad-worsening";
+        reasonExcluded = "Broad below-target worsening — excluded from the Accuracy path.";
+      }
     } else if (safePathTaken) {
       if (checkpoint.p14Safe && !checkpoint.broadBelowTargetWorsening) {
         selectionEligibility = "safe";
@@ -890,7 +952,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     };
   }) : [];
 
-  const finalBankLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
+  const finalBankLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile);
   const sameRegionFilterCount = maxSameRegionFilterCount(selectedFilters);
 
   return {
@@ -899,6 +961,20 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     combinedEqCurve,
     iterationTrace,
     stopReason,
+    // Part D: Effective profile contract — identifies the selected profile and
+    // its configuration so callers can distinguish it from the requested P19
+    // tolerance. Requested P19 tolerance is separate from the profile fitting
+    // tolerance.
+    designEqFitProfile: profile.id,
+    designEqFitProfileConfig: {
+      preserveP14: profile.preserveP14,
+      fittingToleranceDb,
+      maximumCutDb: profile.maximumCutDb,
+      maximumAggregateBoostDb: profile.maximumAggregateBoostDb,
+      peakDiscoveryThresholdDb: profile.peakDiscoveryThresholdDb,
+      valleyDiscoveryThresholdDb: profile.valleyDiscoveryThresholdDb,
+    },
+    requestedP19ToleranceDb,
     selectedCheckpoint: {
       enabledFilterCount: selectedFilters.length,
       maximumAbsoluteDeviationDb: selectedCheckpoint.maximumAbsoluteDeviationDb,
