@@ -432,7 +432,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   let nearDuplicateRejectedCount = 0;
   let sameRegionRejectedCount = 0;
   let revisionAttemptCount = 0;
-  let revisionAcceptedCount = 0;
+  let revisionPassedAcceptanceCount = 0;
+  let selectedRevisionOperationCount = 0;
   const revisionAttempts = [];
   let operations = 0;
   const maxOperations = 30;
@@ -467,7 +468,6 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const acceptableCandidates = [];
     const gainScales = [1, 0.75, 0.5];
     const qMultipliers = [1, 1.5, 2, 3];
-    const seenRevisions = new Set();
     for (const region of regions) {
       const isPeak = region.kind === "peak";
       const requestedGainDb = isPeak
@@ -487,7 +487,12 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       }, activeSubs, usableLfHz, options.requestedSystemOutputDb);
       if (Math.abs(baseCandidate.gainDb) <= 0.1) continue;
 
+      const regionSameSignCount = countSameSignFiltersInRegion(baseCandidate, filters);
+      const regionAppendCandidates = [];
       const seenVariants = new Set();
+
+      // Phase 1: Generate and evaluate every append gain/Q variant first.
+      // A near-duplicate Q variant does not mean the entire region is append-blocked.
       for (const gainScale of gainScales) {
         for (const qMultiplier of qMultipliers) {
           const scaledCandidate = {
@@ -506,80 +511,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
           const sameRegionCount = countSameSignFiltersInRegion(candidate, filters);
           if (isDuplicate) nearDuplicateRejectedCount++;
           if (sameRegionCount >= 2) sameRegionRejectedCount++;
-          const blockedByGuards = isDuplicate || sameRegionCount >= 2;
+          if (isDuplicate || sameRegionCount >= 2) continue;
 
-          if (blockedByGuards) {
-            // Part A: Generate gain-revision candidates for existing same-sign filters in region
-            const correctionDelta = candidate.gainDb;
-            for (let filterIndex = 0; filterIndex < filters.length; filterIndex++) {
-              const existingFilter = filters[filterIndex];
-              if (!existingFilter.enabled) continue;
-              const existingSign = existingFilter.gainDb > 0 ? 1 : -1;
-              const correctionSign = correctionDelta > 0 ? 1 : -1;
-              if (existingSign !== correctionSign) continue;
-              const freqRatio = Math.log2(Math.max(candidate.frequencyHz, existingFilter.frequencyHz) / Math.min(candidate.frequencyHz, existingFilter.frequencyHz));
-              if (freqRatio > 1 / 12) continue;
-              for (const revisionScale of revisionScales) {
-                const proposedGainDelta = correctionDelta * revisionScale;
-                const revisionKey = `${filterIndex}:${proposedGainDelta.toFixed(4)}`;
-                if (seenRevisions.has(revisionKey)) continue;
-                seenRevisions.add(revisionKey);
-                const proposedGainDb = existingFilter.gainDb + proposedGainDelta;
-                const revisionResult = scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
-                revisionAttemptCount++;
-                const attempt = {
-                  filterIndex, oldGainDb: existingFilter.gainDb, proposedGainDb,
-                  acceptedGainDb: revisionResult.filter ? revisionResult.filter.gainDb : existingFilter.gainDb,
-                  bankMaxBoostDb: revisionResult.limits?.maxAggregateBoostDb ?? null,
-                  bankMaxBoostHz: revisionResult.limits?.maxAggregateBoostHz ?? null,
-                  bankMaxCutDb: revisionResult.limits?.maxAggregateCutDb ?? null,
-                  bankMaxCutHz: revisionResult.limits?.maxAggregateCutHz ?? null,
-                  maximumDeviationBeforeDb: currentMetrics.maximumAbsoluteDeviationDb,
-                  maximumDeviationAfterDb: null, rmsBeforeDb: currentMetrics.rmsDeviationDb, rmsAfterDb: null,
-                  accepted: false, rejectionReason: null,
-                };
-                if (!revisionResult.filter) {
-                  attempt.rejectionReason = "Gain change below 0.1 dB after bank limiting";
-                  revisionAttempts.push(attempt);
-                  continue;
-                }
-                const revisedFilter = revisionResult.filter;
-                const revisedFilters = filters.map((f, i) => i === filterIndex ? revisedFilter : f);
-                const revisedCurve = buildCurveFromBank(raw, revisedFilters);
-                const revisedTrend = applyBassSmoothing(revisedCurve, "third");
-                const revisedMetrics = completeBandResidualMetrics(revisedTrend, assessmentStartHz, assessmentEndHz, anchorDb);
-                if (!revisedMetrics) {
-                  attempt.rejectionReason = "Could not compute revised metrics";
-                  revisionAttempts.push(attempt);
-                  continue;
-                }
-                attempt.maximumDeviationAfterDb = revisedMetrics.maximumAbsoluteDeviationDb;
-                attempt.rmsAfterDb = revisedMetrics.rmsDeviationDb;
-                const before = Math.abs(region.centrePoint.deviationDb);
-                const after = Math.abs(deviationAt(revisedTrend, region.centrePoint.frequency, anchorDb));
-                const localImprovementDb = before - after;
-                const maximumDeviationReductionDb = currentMetrics.maximumAbsoluteDeviationDb - revisedMetrics.maximumAbsoluteDeviationDb;
-                const rmsReductionDb = currentMetrics.rmsDeviationDb - revisedMetrics.rmsDeviationDb;
-                const acceptable = localImprovementDb >= 0.05
-                  && revisedMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
-                  && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
-                attempt.accepted = acceptable;
-                if (!acceptable) attempt.rejectionReason = "Did not meet complete-band acceptance rules";
-                revisionAttempts.push(attempt);
-                if (acceptable) acceptableCandidates.push({
-                  action: "revise", filter: revisedFilter, replacedFilterIndex: filterIndex,
-                  oldGainDb: existingFilter.gainDb, newGainDb: revisedFilter.gainDb,
-                  gainDeltaDb: revisedFilter.gainDb - existingFilter.gainDb,
-                  oldQ: existingFilter.Q, newQ: existingFilter.Q, curve: revisedCurve,
-                  maximumDeviationReductionDb, rmsReductionDb, localImprovementDb,
-                  bankLimits: revisionResult.limits,
-                });
-              }
-            }
-            continue;
-          }
-
-          // Not blocked — proceed with append candidate
           const gainBeforeBankLimiting = candidate.gainDb;
           const bankResult = scaleCandidateForBankLimits(candidate, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
           if (!bankResult.filter) { bankLimitRejectedCount++; continue; }
@@ -598,23 +531,114 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
           const acceptable = localImprovementDb >= 0.05
             && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
             && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
-          if (acceptable) acceptableCandidates.push({
+          if (acceptable) regionAppendCandidates.push({
             action: "append", filter: finalCandidate, replacedFilterIndex: null,
             oldGainDb: null, newGainDb: finalCandidate.gainDb, gainDeltaDb: finalCandidate.gainDb,
             oldQ: null, newQ: finalCandidate.Q, curve: nextCurve,
             maximumDeviationReductionDb, rmsReductionDb, localImprovementDb,
             gainBeforeBankLimiting, gainAfterBankLimiting, bankLimits: bankResult.limits,
+            regionSameSignCount,
           });
         }
       }
+
+      // Phase 2: Generate gain-revision candidates only when no append variant
+      // passes all guards and acceptance rules, or the region already contains
+      // two same-sign filters and cannot legally accept another filter.
+      if (regionAppendCandidates.length === 0 || regionSameSignCount >= 2) {
+        const seenRevisionsRegion = new Set();
+        for (const gainScale of gainScales) {
+          const correctionDelta = baseCandidate.gainDb * gainScale;
+          if (Math.abs(correctionDelta) <= 0.1) continue;
+          for (let filterIndex = 0; filterIndex < filters.length; filterIndex++) {
+            const existingFilter = filters[filterIndex];
+            if (!existingFilter.enabled) continue;
+            const existingSign = existingFilter.gainDb > 0 ? 1 : -1;
+            const correctionSign = correctionDelta > 0 ? 1 : -1;
+            if (existingSign !== correctionSign) continue;
+            const freqRatio = Math.log2(Math.max(baseCandidate.frequencyHz, existingFilter.frequencyHz) / Math.min(baseCandidate.frequencyHz, existingFilter.frequencyHz));
+            if (freqRatio > 1 / 12) continue;
+            for (const revisionScale of revisionScales) {
+              const proposedGainDelta = correctionDelta * revisionScale;
+              const revisionKey = `${region.centrePoint.frequency.toFixed(2)}:${filterIndex}:${proposedGainDelta.toFixed(4)}`;
+              if (seenRevisionsRegion.has(revisionKey)) continue;
+              seenRevisionsRegion.add(revisionKey);
+              const proposedGainDb = existingFilter.gainDb + proposedGainDelta;
+              const revisionResult = scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
+              revisionAttemptCount++;
+              const attempt = {
+                filterIndex, oldGainDb: existingFilter.gainDb, proposedGainDb,
+                acceptedGainDb: revisionResult.filter ? revisionResult.filter.gainDb : existingFilter.gainDb,
+                bankMaxBoostDb: revisionResult.limits?.maxAggregateBoostDb ?? null,
+                bankMaxBoostHz: revisionResult.limits?.maxAggregateBoostHz ?? null,
+                bankMaxCutDb: revisionResult.limits?.maxAggregateCutDb ?? null,
+                bankMaxCutHz: revisionResult.limits?.maxAggregateCutHz ?? null,
+                maximumDeviationBeforeDb: currentMetrics.maximumAbsoluteDeviationDb,
+                maximumDeviationAfterDb: null, rmsBeforeDb: currentMetrics.rmsDeviationDb, rmsAfterDb: null,
+                passedRules: false, rejectionReason: null,
+              };
+              if (!revisionResult.filter) {
+                attempt.rejectionReason = "Gain change below 0.1 dB after bank limiting";
+                revisionAttempts.push(attempt);
+                continue;
+              }
+              const revisedFilter = revisionResult.filter;
+              const revisedFilters = filters.map((f, i) => i === filterIndex ? revisedFilter : f);
+              const revisedCurve = buildCurveFromBank(raw, revisedFilters);
+              const revisedTrend = applyBassSmoothing(revisedCurve, "third");
+              const revisedMetrics = completeBandResidualMetrics(revisedTrend, assessmentStartHz, assessmentEndHz, anchorDb);
+              if (!revisedMetrics) {
+                attempt.rejectionReason = "Could not compute revised metrics";
+                revisionAttempts.push(attempt);
+                continue;
+              }
+              attempt.maximumDeviationAfterDb = revisedMetrics.maximumAbsoluteDeviationDb;
+              attempt.rmsAfterDb = revisedMetrics.rmsDeviationDb;
+              const before = Math.abs(region.centrePoint.deviationDb);
+              const after = Math.abs(deviationAt(revisedTrend, region.centrePoint.frequency, anchorDb));
+              const localImprovementDb = before - after;
+              const maximumDeviationReductionDb = currentMetrics.maximumAbsoluteDeviationDb - revisedMetrics.maximumAbsoluteDeviationDb;
+              const rmsReductionDb = currentMetrics.rmsDeviationDb - revisedMetrics.rmsDeviationDb;
+              const acceptable = localImprovementDb >= 0.05
+                && revisedMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
+                && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
+              attempt.passedRules = acceptable;
+              if (!acceptable) attempt.rejectionReason = "Did not meet complete-band acceptance rules";
+              revisionAttempts.push(attempt);
+              if (acceptable) {
+                revisionPassedAcceptanceCount++;
+                acceptableCandidates.push({
+                  action: "revise", filter: revisedFilter, replacedFilterIndex: filterIndex,
+                  oldGainDb: existingFilter.gainDb, newGainDb: revisedFilter.gainDb,
+                  gainDeltaDb: revisedFilter.gainDb - existingFilter.gainDb,
+                  oldQ: existingFilter.Q, newQ: existingFilter.Q, curve: revisedCurve,
+                  maximumDeviationReductionDb, rmsReductionDb, localImprovementDb,
+                  bankLimits: revisionResult.limits, regionSameSignCount,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      acceptableCandidates.push(...regionAppendCandidates);
     }
 
-    acceptableCandidates.sort((a, b) =>
-      b.maximumDeviationReductionDb - a.maximumDeviationReductionDb
-      || b.rmsReductionDb - a.rmsReductionDb
-      || b.localImprovementDb - a.localImprovementDb
-      || Math.abs(a.gainDeltaDb) - Math.abs(b.gainDeltaDb)
-      || a.filter.Q - b.filter.Q);
+    // Part C: Candidate ranking — quantize max-deviation to 0.05 dB steps so
+    // insignificant floating-point differences don't select a revision with
+    // materially worse RMS. After max-deviation, RMS and local improvement,
+    // prefer a legal append (preserves filter-shape flexibility), then lower
+    // gain cost, then lower Q.
+    acceptableCandidates.sort((a, b) => {
+      const aMaxDev = Math.round(a.maximumDeviationReductionDb / 0.05);
+      const bMaxDev = Math.round(b.maximumDeviationReductionDb / 0.05);
+      if (bMaxDev !== aMaxDev) return bMaxDev - aMaxDev;
+      if (Math.abs(b.rmsReductionDb - a.rmsReductionDb) > 0.05) return b.rmsReductionDb - a.rmsReductionDb;
+      if (Math.abs(b.localImprovementDb - a.localImprovementDb) > 0.05) return b.localImprovementDb - a.localImprovementDb;
+      if (a.action !== b.action) return a.action === "append" ? -1 : 1;
+      if (Math.abs(Math.abs(a.gainDeltaDb) - Math.abs(b.gainDeltaDb)) > 0.05) return Math.abs(a.gainDeltaDb) - Math.abs(b.gainDeltaDb);
+      return a.filter.Q - b.filter.Q;
+    });
     const chosen = acceptableCandidates[0];
     if (!chosen) break;
     if (chosen.action === "append" && filters.length >= 10) {
@@ -625,7 +649,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       filters.push(chosen.filter);
     } else {
       filters[chosen.replacedFilterIndex] = chosen.filter;
-      revisionAcceptedCount++;
+      selectedRevisionOperationCount++;
     }
     curve = buildCurveFromBank(raw, filters);
     const checkpoint = buildCheckpoint({
@@ -849,8 +873,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       },
     },
     revisionDiagnostics: {
-      attemptCount: revisionAttemptCount,
-      acceptedCount: revisionAcceptedCount,
+      revisionAttemptCount,
+      revisionPassedAcceptanceCount,
+      selectedRevisionOperationCount,
       attempts: revisionAttempts,
     },
     diagnostics: curve.map((point, index) => ({

@@ -135,10 +135,10 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                 )}
                 {revisionAttempts.length > 0 && (
                   <div className="mt-2 overflow-x-auto">
-                    <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Revision attempts ({revDiag?.attemptCount ?? 0} total, {revDiag?.acceptedCount ?? 0} accepted)</div>
+                    <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Revision candidates evaluated: {revDiag?.revisionAttemptCount ?? 0} | Passing acceptance: {revDiag?.revisionPassedAcceptanceCount ?? 0} | Selected: {revDiag?.selectedRevisionOperationCount ?? 0}</div>
                     <table className="min-w-[1500px] text-right font-mono text-[10px] text-slate-700">
                       <thead className="border-b border-slate-300 text-slate-500">
-                        <tr>{["Filter idx", "Old gain", "Proposed gain", "Accepted gain", "Bank max boost", "Bank max cut", "Max dev before", "Max dev after", "RMS before", "RMS after", "Accepted", "Rejection reason"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
+                        <tr>{["Filter idx", "Old gain", "Proposed gain", "Accepted gain", "Bank max boost", "Bank max cut", "Max dev before", "Max dev after", "RMS before", "RMS after", "Passed rules", "Rejection reason"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
                       </thead>
                       <tbody>
                         {revisionAttempts.map((row, i) => (
@@ -153,7 +153,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                             <td className="px-2 py-1">{fmt(row.maximumDeviationAfterDb, " dB")}</td>
                             <td className="px-2 py-1">{fmt(row.rmsBeforeDb, " dB")}</td>
                             <td className="px-2 py-1">{fmt(row.rmsAfterDb, " dB")}</td>
-                            <td className="px-2 py-1"><strong className={row.accepted ? "text-emerald-700" : "text-rose-700"}>{row.accepted ? "Yes" : "No"}</strong></td>
+                            <td className="px-2 py-1"><strong className={row.passedRules ? "text-emerald-700" : "text-rose-700"}>{row.passedRules ? "Yes" : "No"}</strong></td>
                             <td className="px-2 py-1 text-left">{row.rejectionReason || "—"}</td>
                           </tr>
                         ))}
