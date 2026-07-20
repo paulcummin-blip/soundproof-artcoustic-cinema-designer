@@ -4,6 +4,7 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const DESIGN_EQ_SAMPLE_RATE = 48000;
+let __bankEvaluationCounter = 0;
 
 function normaliseCurve(curveData) {
   return (Array.isArray(curveData) ? curveData : [])
@@ -160,6 +161,7 @@ function aggregateResponseDbAt(frequency, filters) {
 // Checks: aggregate boost ≤ +6.05 dB, aggregate boost ≤ source-domain headroom + 0.05 dB,
 // and aggregate cut ≥ −10.05 dB. These limits apply to the completed bank, not per filter.
 function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, requestedSystemOutputDb) {
+  __bankEvaluationCounter++;
   const bandPoints = raw.filter((p) => p.frequency >= 20 && p.frequency <= 200);
   let maxAggregateBoostDb = 0;
   let maxAggregateBoostHz = null;
@@ -413,6 +415,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     : 2;
   const fittingToleranceDb = Math.max(1, Math.min(5, requestedFittingToleranceDb));
   const requestedSystemOutputDb = Number(options.requestedSystemOutputDb);
+  const collectDiagnostics = options.collectDiagnostics !== false;
+  __bankEvaluationCounter = 0;
   const filters = [];
   let curve = raw;
   let stopReason = "no safe improvement remained";
@@ -579,7 +583,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
               };
               if (!revisionResult.filter) {
                 attempt.rejectionReason = "Gain change below 0.1 dB after bank limiting";
-                revisionAttempts.push(attempt);
+                if (collectDiagnostics) revisionAttempts.push(attempt);
                 continue;
               }
               const revisedFilter = revisionResult.filter;
@@ -589,7 +593,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
               const revisedMetrics = completeBandResidualMetrics(revisedTrend, assessmentStartHz, assessmentEndHz, anchorDb);
               if (!revisedMetrics) {
                 attempt.rejectionReason = "Could not compute revised metrics";
-                revisionAttempts.push(attempt);
+                if (collectDiagnostics) revisionAttempts.push(attempt);
                 continue;
               }
               attempt.maximumDeviationAfterDb = revisedMetrics.maximumAbsoluteDeviationDb;
@@ -604,7 +608,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
                 && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
               attempt.passedRules = acceptable;
               if (!acceptable) attempt.rejectionReason = "Did not meet complete-band acceptance rules";
-              revisionAttempts.push(attempt);
+              if (collectDiagnostics) revisionAttempts.push(attempt);
               if (acceptable) {
                 revisionPassedAcceptanceCount++;
                 acceptableCandidates.push({
@@ -657,7 +661,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       assessmentStartHz, assessmentEndHz, anchorDb, fittingToleranceDb, requestedSystemOutputDb,
     });
     checkpoints.push(checkpoint);
-    iterationTrace.push({
+    if (collectDiagnostics) iterationTrace.push({
       iteration: operations + 1, action: chosen.action, replacedFilterIndex: chosen.replacedFilterIndex,
       selectedFrequencyHz: chosen.filter.frequencyHz, gainDb: chosen.filter.gainDb, Q: chosen.filter.Q,
       oldGainDb: chosen.oldGainDb, newGainDb: chosen.newGainDb, gainDeltaDb: chosen.gainDeltaDb,
@@ -692,14 +696,14 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   const safePathTaken = safeCheckpoints.length > 0;
 
   let selectedCheckpoint;
-  let selectionReason;
+  let selectionReason = null;
   if (safePathTaken) {
     const rankedSafe = [...safeCheckpoints].sort((a, b) =>
       a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
       || a.rmsDeviationDb - b.rmsDeviationDb
       || a.filters.length - b.filters.length);
     selectedCheckpoint = rankedSafe[0];
-    selectionReason = `P14-safe checkpoint selected: lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}).`;
+    if (collectDiagnostics) selectionReason = `P14-safe checkpoint selected: lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}).`;
   } else if (preservationBand.length) {
     const rankedFallback = [...preservationBand].sort((a, b) =>
       a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
@@ -707,14 +711,14 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       || b.p14MinimumSpl - a.p14MinimumSpl
       || a.filters.length - b.filters.length);
     selectedCheckpoint = rankedFallback[0];
-    selectionReason = `Best credible calibrated attempt (P14 FAIL retained): selected for lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB) and RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB) within the 0.25 dB preservation band of the zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB). Selected P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB, ${selectedCheckpoint.filters.length} filters.`;
+    if (collectDiagnostics) selectionReason = `Best credible calibrated attempt (P14 FAIL retained): selected for lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB) and RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB) within the 0.25 dB preservation band of the zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB). Selected P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB, ${selectedCheckpoint.filters.length} filters.`;
   } else {
     selectedCheckpoint = baselineCheckpoint;
-    selectionReason = `No checkpoint within 0.25 dB of zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB); returning zero-filter checkpoint to avoid worsening product capability. P14 FAIL retained.`;
+    if (collectDiagnostics) selectionReason = `No checkpoint within 0.25 dB of zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB); returning zero-filter checkpoint to avoid worsening product capability. P14 FAIL retained.`;
   }
 
   // Part C: Checkpoint summaries for every generated checkpoint.
-  const checkpointSummaries = checkpoints.map((checkpoint, index) => {
+  const checkpointSummaries = collectDiagnostics ? checkpoints.map((checkpoint, index) => {
     const isSelected = checkpoint === selectedCheckpoint;
     let selectionEligibility;
     let reasonExcluded = null;
@@ -759,7 +763,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       selectionEligibility,
       reasonExcluded,
     };
-  });
+  }) : [];
 
   const selectedFilters = selectedCheckpoint.filters;
   const filterBank = emptyFilters(selectedFilters);
@@ -800,7 +804,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     if (isDistinct) distinctResidualPoints.push(point);
     if (distinctResidualPoints.length >= 8) break;
   }
-  const worstResidualDiagnostics = distinctResidualPoints.map((point) => {
+  const worstResidualDiagnostics = collectDiagnostics ? distinctResidualPoints.map((point) => {
     const aggregateEqDb = aggregateResponseDbAt(point.frequency, selectedFilters);
     const allowance = getSourceDomainBoostAllowance({
       frequency: point.frequency,
@@ -833,7 +837,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       p19ToleranceCapabilityLimited,
       usableLfRampFraction: lfRampFraction,
     };
-  });
+  }) : [];
 
   const finalBankLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
   const sameRegionFilterCount = maxSameRegionFilterCount(selectedFilters);
@@ -863,6 +867,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       evaluatedVariantsRejectedByBankLimit: bankLimitRejectedCount,
       evaluatedVariantsRejectedAsNearDuplicates: nearDuplicateRejectedCount,
       evaluatedVariantsRejectedBySameRegionGuard: sameRegionRejectedCount,
+      completedBankEvaluationCount: __bankEvaluationCounter,
       selectedBankLimits: {
         maxAggregateBoostDb: finalBankLimits.maxAggregateBoostDb,
         maxAggregateBoostHz: finalBankLimits.maxAggregateBoostHz,
@@ -878,12 +883,12 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       selectedRevisionOperationCount,
       attempts: revisionAttempts,
     },
-    diagnostics: curve.map((point, index) => ({
+    diagnostics: collectDiagnostics ? curve.map((point, index) => ({
       frequency: point.frequency,
       targetDb: anchorDb + artcousticHouseCurveOffsetAt(point.frequency),
       trendDb: interpolate(thirdOctave, point.frequency),
       appliedCorrectionDb: combinedEqCurve[index].spl,
-    })),
+    })) : [],
   };
 }
 

@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 
 const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
 
 export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange }) {
+  const [fitterDiagnosticsOpen, setFitterDiagnosticsOpen] = useState(false);
+  const [showAllRevisions, setShowAllRevisions] = useState(false);
   if (!result) return null;
   return <details className="mt-3 rounded border border-emerald-300 bg-emerald-50 p-3 text-xs" open>
     <summary className="cursor-pointer font-semibold text-emerald-900">{result.isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : "BASS OPTIMISER VALIDATION ACTIVE"}</summary>
@@ -15,6 +17,11 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-emerald-950">
       <span>P14 {result.achievedP14Level} ({fmt(result.achievedP14Db, " dB")})</span><span>P18 {result.achievedP18Level} ({fmt(result.achievedP18FrequencyHz, " Hz")})</span><span>P19 {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
     </div>
+    {result.performanceSummary && (
+      <div className="mt-1 font-mono text-[10px] text-slate-500">
+        Optimiser: {result.performanceSummary.totalOptimiserTimeMs.toFixed(0)} ms | Requests: {result.performanceSummary.requestCount} | Core fits: {result.performanceSummary.uniqueCoreFitCount} | Core time: {result.performanceSummary.coreFitTimeMs.toFixed(0)} ms | Diagnostic fit: {result.performanceSummary.selectedDiagnosticFitTimeMs.toFixed(0)} ms | Revisions: {result.performanceSummary.selectedRevisionCandidateCount} | Bank evals: {result.performanceSummary.completedBankEvaluationCount}
+      </div>
+    )}
     <div className="mt-2 overflow-x-auto">
       <table className="min-w-[900px] text-right font-mono text-[10px] text-slate-700">
         <thead className="border-b border-slate-300 text-slate-500"><tr>{["Requested P14", "Requested P18", "Requested P19", "Achieved P14", "Achieved P18", "Achieved P19", "Valid band", "Valid", "Selected"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr></thead>
@@ -32,8 +39,10 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       const trace = Array.isArray(candidate?.designEqIterationTrace) ? candidate.designEqIterationTrace : [];
       if (!checkpoint) return null;
       return (
-        <details className="mt-2 rounded border border-slate-300 bg-slate-50 p-2 text-[10px]">
+        <details className="mt-2 rounded border border-slate-300 bg-slate-50 p-2 text-[10px]" open={fitterDiagnosticsOpen} onToggle={(e) => setFitterDiagnosticsOpen(e.currentTarget.open)}>
           <summary className="cursor-pointer font-mono font-semibold text-slate-700">Design EQ fitter diagnostics (selected candidate)</summary>
+          {fitterDiagnosticsOpen && (
+          <>
           <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
             <span>Stop reason: <strong className="text-slate-900">{candidate.designEqStopReason || "—"}</strong></span>
             <span>Generated iterations: <strong className="text-slate-900">{trace.length}</strong></span>
@@ -56,6 +65,8 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
             const sbl = bd?.selectedBankLimits;
             const revDiag = candidate?.designEqRevisionDiagnostics;
             const revisionAttempts = Array.isArray(revDiag?.attempts) ? revDiag.attempts : [];
+            const REVISION_ROW_LIMIT = 25;
+            const visibleRevisions = showAllRevisions ? revisionAttempts : revisionAttempts.slice(0, REVISION_ROW_LIMIT);
             return (
               <div className="mt-2 border-t border-slate-300 pt-2">
                 {reason && <div className="mb-2 font-mono text-[10px] text-slate-800"><strong>Selection reason:</strong> {reason}</div>}
@@ -141,8 +152,8 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                         <tr>{["Filter idx", "Old gain", "Proposed gain", "Accepted gain", "Bank max boost", "Bank max cut", "Max dev before", "Max dev after", "RMS before", "RMS after", "Passed rules", "Rejection reason"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
                       </thead>
                       <tbody>
-                        {revisionAttempts.map((row, i) => (
-                          <tr className={`border-b border-slate-200 ${row.accepted ? "bg-emerald-50" : ""}`} key={i}>
+                        {visibleRevisions.map((row, i) => (
+                          <tr className={`border-b border-slate-200 ${row.passedRules ? "bg-emerald-50" : ""}`} key={i}>
                             <td className="px-2 py-1 font-semibold">{row.filterIndex}</td>
                             <td className="px-2 py-1">{fmt(row.oldGainDb, " dB")}</td>
                             <td className="px-2 py-1">{fmt(row.proposedGainDb, " dB")}</td>
@@ -159,6 +170,11 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                         ))}
                       </tbody>
                     </table>
+                    {revisionAttempts.length > REVISION_ROW_LIMIT && (
+                      <button onClick={() => setShowAllRevisions(v => !v)} className="mt-1 font-mono text-[10px] text-blue-700 underline">
+                        {showAllRevisions ? "Show first 25" : `Show all (${revisionAttempts.length})`}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -196,6 +212,8 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                 </tbody>
               </table>
             </div>
+          )}
+          </>
           )}
         </details>
       );

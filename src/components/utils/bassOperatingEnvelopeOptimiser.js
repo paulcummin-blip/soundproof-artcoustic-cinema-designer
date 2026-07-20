@@ -50,17 +50,10 @@ function makeRequests(definitions) {
   return requests;
 }
 
-function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions }) {
+function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult }) {
   const assessmentStartHz = request.p18.p18LimitHz;
   const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
-  const eq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-    requestedSystemOutputDb: request.p14.p14TargetDb,
-    targetAnchorDb: request.p14.p14TargetDb,
-    targetToleranceDb: request.p19.p19ToleranceDb,
-    fittingToleranceDb: 2,
-    assessmentStartHz,
-    assessmentEndHz,
-  });
+  const eq = eqResult;
   const finalPostEqCurve = eq.curve;
   const capabilityLimitedFrequencies = eq.filters.filter((filter) => filter.enabled && filter.gainDb > 0 && filter.gainDb < 6).map((filter) => filter.frequencyHz);
   const p14 = computeParam14LfeCapability(finalPostEqCurve, false, [assessmentStartHz, assessmentEndHz]);
@@ -130,13 +123,80 @@ function displayCandidates(candidates, selected) {
 
 export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, priorityMode = "balanced" }) {
   const mode = ["balanced", "spl", "extension", "accuracy"].includes(priorityMode) ? priorityMode : "balanced";
-  if (!rawCurve.length || !activeSubs.length) return { selectedMode: mode, selectedFilters: [], finalPostEqCurve: [], candidates: [], displayCandidates: [], warningMessage: "A raw response curve and active subwoofer system are required." };
+  if (!rawCurve.length || !activeSubs.length) return { selectedMode: mode, selectedFilters: [], finalPostEqCurve: [], candidates: [], displayCandidates: [], warningMessage: "A raw response curve and active subwoofer system are required.", performanceSummary: null };
+  const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
+  const t0 = perf();
   const definitions = getRp22BassOperatingDefinitions();
-  const candidates = makeRequests(definitions).map((request) => buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions }));
+  const requests = makeRequests(definitions);
+
+  // Part B: Cache heavy EQ fits by physical fitting contract within this invocation.
+  // targetToleranceDb (P19) only affects worstResidualDiagnostics reporting, not
+  // filter generation, bank limiting, acceptance, or checkpoint selection.
+  // Cache key: (P14 target dB, assessment start Hz, assessment end Hz, fitting tolerance).
+  const coreFitCache = new Map();
+  let coreFitTimeMs = 0;
+  let totalCompletedBankEvaluations = 0;
+
+  const candidates = requests.map((request) => {
+    const assessmentStartHz = request.p18.p18LimitHz;
+    const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
+    const cacheKey = `${request.p14.p14TargetDb}:${assessmentStartHz}:${assessmentEndHz}:2`;
+    let eq = coreFitCache.get(cacheKey);
+    if (!eq) {
+      const fitStart = perf();
+      eq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
+        requestedSystemOutputDb: request.p14.p14TargetDb,
+        targetAnchorDb: request.p14.p14TargetDb,
+        targetToleranceDb: request.p19.p19ToleranceDb,
+        fittingToleranceDb: 2,
+        assessmentStartHz,
+        assessmentEndHz,
+        collectDiagnostics: false,
+      });
+      coreFitTimeMs += perf() - fitStart;
+      totalCompletedBankEvaluations += eq.bankDiagnostics?.completedBankEvaluationCount || 0;
+      coreFitCache.set(cacheKey, eq);
+    }
+    return buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: eq });
+  });
+
   const validCandidates = candidates.filter((candidate) => candidate.meetsRequestedEnvelope);
   const selectedByMode = Object.fromEntries(["balanced", "spl", "extension", "accuracy"].map((candidateMode) => [candidateMode, [...validCandidates].sort((a, b) => compareCandidates(a, b, candidateMode))[0] || null]));
   const selected = selectedByMode[mode] || candidates[0];
   const isBestCalibratedAttempt = !selectedByMode[mode];
+
+  // Part C: Run full diagnostics only for the selected candidate.
+  // The diagnostic run uses collectDiagnostics: true and returns exactly the same
+  // filter bank and scores as its lightweight equivalent.
+  let selectedDiagnosticFitTimeMs = 0;
+  let selectedRevisionCandidateCount = 0;
+  if (selected) {
+    const selectedP19Def = definitions.find((d) => d.level === selected.requestedP19Level);
+    const diagStart = perf();
+    const diagEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
+      requestedSystemOutputDb: selected.requestedTargetSpl,
+      targetAnchorDb: selected.requestedTargetSpl,
+      targetToleranceDb: selectedP19Def?.p19ToleranceDb ?? 0,
+      fittingToleranceDb: 2,
+      assessmentStartHz: selected.assessmentStartHz,
+      assessmentEndHz: selected.assessmentEndHz,
+      collectDiagnostics: true,
+    });
+    selectedDiagnosticFitTimeMs = perf() - diagStart;
+    totalCompletedBankEvaluations += diagEq.bankDiagnostics?.completedBankEvaluationCount || 0;
+    selectedRevisionCandidateCount = diagEq.revisionDiagnostics?.revisionAttemptCount ?? 0;
+    selected.designEqIterationTrace = diagEq.iterationTrace;
+    selected.designEqStopReason = diagEq.stopReason;
+    selected.designEqSelectedCheckpoint = diagEq.selectedCheckpoint;
+    selected.designEqBankDiagnostics = diagEq.bankDiagnostics;
+    selected.designEqCheckpointSummaries = diagEq.checkpointSummaries;
+    selected.designEqWorstResidualDiagnostics = diagEq.worstResidualDiagnostics;
+    selected.designEqSelectionReason = diagEq.selectionReason;
+    selected.designEqRevisionDiagnostics = diagEq.revisionDiagnostics;
+  }
+
+  const t1 = perf();
+
   return {
     selectedMode: mode,
     selectedP14TargetDb: selected.requestedTargetSpl,
@@ -155,5 +215,14 @@ export function optimiseBassSystem({ rawCurve = [], activeSubs = [], usableLfHz 
     selectedByMode,
     isBestCalibratedAttempt,
     warningMessage: isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : null,
+    performanceSummary: {
+      totalOptimiserTimeMs: t1 - t0,
+      requestCount: requests.length,
+      uniqueCoreFitCount: coreFitCache.size,
+      coreFitTimeMs,
+      selectedDiagnosticFitTimeMs,
+      selectedRevisionCandidateCount,
+      completedBankEvaluationCount: totalCompletedBankEvaluations,
+    },
   };
 }
