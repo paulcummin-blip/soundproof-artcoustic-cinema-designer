@@ -50,17 +50,84 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
           </div>
           {(() => {
             const bd = candidate?.designEqBankDiagnostics;
-            if (!bd) return null;
+            const summaries = Array.isArray(candidate?.designEqCheckpointSummaries) ? candidate.designEqCheckpointSummaries : [];
+            const worstResiduals = Array.isArray(candidate?.designEqWorstResidualDiagnostics) ? candidate.designEqWorstResidualDiagnostics : [];
+            const reason = candidate?.designEqSelectionReason;
+            const sbl = bd?.selectedBankLimits;
             return (
-              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700 border-t border-slate-300 pt-2">
-                <span>Max aggregate boost: <strong className="text-slate-900">{fmt(bd.maxAggregateBoostDb, " dB")} @ {fmt(bd.maxAggregateBoostHz, " Hz")}</strong></span>
-                <span>Max aggregate cut: <strong className="text-slate-900">{fmt(bd.maxAggregateCutDb, " dB")} @ {fmt(bd.maxAggregateCutHz, " Hz")}</strong></span>
-                <span>Max permitted bank boost: <strong className="text-slate-900">{fmt(bd.limitingPermittedBoostDb, " dB")}</strong></span>
-                <span>Same-region filter count: <strong className={bd.sameRegionFilterCount <= 2 ? "text-emerald-700" : "text-rose-700"}>{bd.sameRegionFilterCount}</strong></span>
-                <span>Bank-limit scaled candidates: <strong className="text-slate-900">{bd.bankLimitScaledCount}</strong></span>
-                <span>Bank-limit rejected candidates: <strong className="text-slate-900">{bd.bankLimitRejectedCount}</strong></span>
-                <span>Near-duplicate rejected: <strong className="text-slate-900">{bd.nearDuplicateRejectedCount}</strong></span>
-                <span>Same-region rejected: <strong className="text-slate-900">{bd.sameRegionRejectedCount}</strong></span>
+              <div className="mt-2 border-t border-slate-300 pt-2">
+                {reason && <div className="mb-2 font-mono text-[10px] text-slate-800"><strong>Selection reason:</strong> {reason}</div>}
+                {sbl && (
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
+                    <span>Selected bank max boost: <strong className="text-slate-900">{fmt(sbl.maxAggregateBoostDb, " dB")} @ {fmt(sbl.maxAggregateBoostHz, " Hz")}</strong></span>
+                    <span>Selected bank max cut: <strong className="text-slate-900">{fmt(sbl.maxAggregateCutDb, " dB")} @ {fmt(sbl.maxAggregateCutHz, " Hz")}</strong></span>
+                    <span>Selected bank permitted boost: <strong className="text-slate-900">{fmt(sbl.limitingPermittedBoostDb, " dB")}</strong></span>
+                    <span>Selected same-region count: <strong className={sbl.sameRegionFilterCount <= 2 ? "text-emerald-700" : "text-rose-700"}>{sbl.sameRegionFilterCount}</strong></span>
+                  </div>
+                )}
+                {bd && (
+                  <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-500">
+                    <span>Evaluated variants scaled by bank limit: <strong className="text-slate-700">{bd.evaluatedVariantsScaledByBankLimit}</strong></span>
+                    <span>Evaluated variants rejected by bank limit: <strong className="text-slate-700">{bd.evaluatedVariantsRejectedByBankLimit}</strong></span>
+                    <span>Evaluated variants rejected as near duplicates: <strong className="text-slate-700">{bd.evaluatedVariantsRejectedAsNearDuplicates}</strong></span>
+                    <span>Evaluated variants rejected by same-region guard: <strong className="text-slate-700">{bd.evaluatedVariantsRejectedBySameRegionGuard}</strong></span>
+                  </div>
+                )}
+                {summaries.length > 0 && (
+                  <div className="mt-2 overflow-x-auto">
+                    <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Checkpoint summaries (every generated checkpoint)</div>
+                    <table className="min-w-[1100px] text-right font-mono text-[10px] text-slate-700">
+                      <thead className="border-b border-slate-300 text-slate-500">
+                        <tr>{["Idx", "Filters", "P14 min", "P14-safe", "Max dev", "RMS dev", "Worst Hz", "Broad worse", "Eligibility", "Sel"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {summaries.map((row) => (
+                          <tr className={`border-b border-slate-200 ${row.selected ? "bg-emerald-100" : ""}`} key={row.index}>
+                            <td className="px-2 py-1 font-semibold">{row.index}</td>
+                            <td className="px-2 py-1">{row.enabledFilterCount}</td>
+                            <td className="px-2 py-1">{fmt(row.p14MinimumSpl, " dB")}</td>
+                            <td className="px-2 py-1"><strong className={row.p14Safe ? "text-emerald-700" : "text-rose-700"}>{row.p14Safe ? "Yes" : "No"}</strong></td>
+                            <td className="px-2 py-1">{fmt(row.maximumAbsoluteDeviationDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.rmsDeviationDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.worstResidualFrequencyHz, " Hz")}</td>
+                            <td className="px-2 py-1"><strong className={row.broadBelowTargetWorsening ? "text-rose-700" : "text-emerald-700"}>{row.broadBelowTargetWorsening ? "Yes" : "No"}</strong></td>
+                            <td className="px-2 py-1 text-left">{row.selectionEligibility}</td>
+                            <td className="px-2 py-1">{row.selected ? "✓" : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {summaries.filter((row) => !row.selected && row.reasonExcluded).map((row) => (
+                      <div key={`reason-${row.index}`} className="mt-1 font-mono text-[10px] text-slate-500">CP{row.index}: {row.reasonExcluded}</div>
+                    ))}
+                  </div>
+                )}
+                {worstResiduals.length > 0 && (
+                  <div className="mt-2 overflow-x-auto">
+                    <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Worst-residual capability diagnostics (8 largest, 1/3-octave smoothed)</div>
+                    <table className="min-w-[1400px] text-right font-mono text-[10px] text-slate-700">
+                      <thead className="border-b border-slate-300 text-slate-500">
+                        <tr>{["Freq", "Target", "Post-EQ", "Signed res", "Abs res", "Agg EQ", "Permitted boost", "Remaining boost", "LF ramp", "Cap-limited"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {worstResiduals.map((row) => (
+                          <tr className="border-b border-slate-200" key={row.frequency}>
+                            <td className="px-2 py-1 font-semibold">{fmt(row.frequency, " Hz")}</td>
+                            <td className="px-2 py-1">{fmt(row.targetSpl, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.postEqSmoothedSpl, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.signedResidualDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.absoluteResidualDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.aggregateEqContributionDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.sourceDomainPermittedTotalBoostDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.remainingPermittedAggregateBoostDb, " dB")}</td>
+                            <td className="px-2 py-1">{fmt(row.usableLfRampFraction)}</td>
+                            <td className="px-2 py-1"><strong className={row.capabilityLimited ? "text-amber-700" : "text-slate-500"}>{row.capabilityLimited ? "Yes" : "No"}</strong></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             );
           })()}

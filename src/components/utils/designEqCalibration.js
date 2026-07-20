@@ -538,18 +538,88 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   }
   if (filters.length >= 10) stopReason = "ten-band ceiling reached";
 
+  // Part A: Safe-checkpoint path — preserve existing ranking when one or more
+  // checkpoints satisfy p14Safe && !broadBelowTargetWorsening.
   const safeCheckpoints = checkpoints.filter((checkpoint) => checkpoint.p14Safe && !checkpoint.broadBelowTargetWorsening);
-  const rankedCheckpoints = safeCheckpoints.length
-    ? [...safeCheckpoints].sort((a, b) =>
+  const baselineCheckpoint = checkpoints[0];
+  const baselineP14MinimumSpl = baselineCheckpoint?.p14MinimumSpl;
+  const nonBroadWorsening = checkpoints.filter((cp) => !cp.broadBelowTargetWorsening);
+  const fallbackPool = nonBroadWorsening.length ? nonBroadWorsening : checkpoints;
+  const preservationBand = Number.isFinite(baselineP14MinimumSpl)
+    ? fallbackPool.filter((cp) => Number.isFinite(cp.p14MinimumSpl) && cp.p14MinimumSpl >= baselineP14MinimumSpl - 0.25)
+    : fallbackPool;
+  const safePathTaken = safeCheckpoints.length > 0;
+
+  let selectedCheckpoint;
+  let selectionReason;
+  if (safePathTaken) {
+    const rankedSafe = [...safeCheckpoints].sort((a, b) =>
       a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
       || a.rmsDeviationDb - b.rmsDeviationDb
-      || a.filters.length - b.filters.length)
-    : [...checkpoints].sort((a, b) =>
-      b.p14MinimumSpl - a.p14MinimumSpl
-      || a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
-      || a.rmsDeviationDb - b.rmsDeviationDb
       || a.filters.length - b.filters.length);
-  const selectedCheckpoint = rankedCheckpoints[0];
+    selectedCheckpoint = rankedSafe[0];
+    selectionReason = `P14-safe checkpoint selected: lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}).`;
+  } else if (preservationBand.length) {
+    const rankedFallback = [...preservationBand].sort((a, b) =>
+      a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+      || a.rmsDeviationDb - b.rmsDeviationDb
+      || b.p14MinimumSpl - a.p14MinimumSpl
+      || a.filters.length - b.filters.length);
+    selectedCheckpoint = rankedFallback[0];
+    selectionReason = `Best credible calibrated attempt (P14 FAIL retained): selected for lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB) and RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB) within the 0.25 dB preservation band of the zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB). Selected P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB, ${selectedCheckpoint.filters.length} filters.`;
+  } else {
+    selectedCheckpoint = baselineCheckpoint;
+    selectionReason = `No checkpoint within 0.25 dB of zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB); returning zero-filter checkpoint to avoid worsening product capability. P14 FAIL retained.`;
+  }
+
+  // Part C: Checkpoint summaries for every generated checkpoint.
+  const checkpointSummaries = checkpoints.map((checkpoint, index) => {
+    const isSelected = checkpoint === selectedCheckpoint;
+    let selectionEligibility;
+    let reasonExcluded = null;
+    if (isSelected) {
+      selectionEligibility = "selected";
+    } else if (safePathTaken) {
+      if (checkpoint.p14Safe && !checkpoint.broadBelowTargetWorsening) {
+        selectionEligibility = "safe";
+        reasonExcluded = "Higher maximum absolute deviation, RMS, or filter count than the selected safe checkpoint.";
+      } else if (!checkpoint.p14Safe) {
+        selectionEligibility = "not-p14-safe";
+        reasonExcluded = "P14 FAIL — not eligible for the safe path.";
+      } else {
+        selectionEligibility = "broad-worsening";
+        reasonExcluded = "Broad below-target worsening — excluded from the safe path.";
+      }
+    } else {
+      if (checkpoint.broadBelowTargetWorsening && nonBroadWorsening.length) {
+        selectionEligibility = "excluded-broad-worsening";
+        reasonExcluded = "Broad below-target worsening excluded from fallback (non-broad-worsening checkpoints available).";
+      } else if (Number.isFinite(baselineP14MinimumSpl) && (!Number.isFinite(checkpoint.p14MinimumSpl) || checkpoint.p14MinimumSpl < baselineP14MinimumSpl - 0.25)) {
+        selectionEligibility = "exceeded-preservation-band";
+        reasonExcluded = `P14 minimum more than 0.25 dB below zero-filter baseline (${baselineP14MinimumSpl?.toFixed(2)} dB).`;
+      } else if (checkpoint === baselineCheckpoint) {
+        selectionEligibility = "zero-filter-baseline";
+        reasonExcluded = "Zero-filter baseline — retained as ultimate fallback only if no checkpoint remains in the 0.25 dB band.";
+      } else {
+        selectionEligibility = "fallback-eligible";
+        reasonExcluded = "Higher maximum absolute deviation, RMS, lower P14 minimum, or more filters than the selected fallback checkpoint.";
+      }
+    }
+    return {
+      index,
+      enabledFilterCount: checkpoint.filters.length,
+      p14MinimumSpl: checkpoint.p14MinimumSpl,
+      p14Safe: checkpoint.p14Safe,
+      maximumAbsoluteDeviationDb: checkpoint.maximumAbsoluteDeviationDb,
+      rmsDeviationDb: checkpoint.rmsDeviationDb,
+      worstResidualFrequencyHz: checkpoint.worstResidualFrequencyHz,
+      broadBelowTargetWorsening: checkpoint.broadBelowTargetWorsening,
+      selected: isSelected,
+      selectionEligibility,
+      reasonExcluded,
+    };
+  });
+
   const selectedFilters = selectedCheckpoint.filters;
   const filterBank = emptyFilters(selectedFilters);
   const combinedEqCurve = raw.map((point) => ({
@@ -560,6 +630,53 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     frequency: point.frequency,
     spl: point.spl + combinedEqCurve[index].spl,
   }));
+
+  // Part D: Worst-residual capability diagnostics for the selected checkpoint.
+  const selectedTrend = selectedCheckpoint.trend;
+  const worstResidualPoints = (Array.isArray(selectedTrend) ? selectedTrend : [])
+    .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
+    .map((point) => {
+      const targetDb = anchorDb + artcousticHouseCurveOffsetAt(point.frequency);
+      const signedResidualDb = point.spl - targetDb;
+      return {
+        frequency: point.frequency,
+        targetDb,
+        postEqSmoothedSpl: point.spl,
+        signedResidualDb,
+        absoluteResidualDb: Math.abs(signedResidualDb),
+      };
+    })
+    .sort((a, b) => b.absoluteResidualDb - a.absoluteResidualDb)
+    .slice(0, 8);
+  const worstResidualDiagnostics = worstResidualPoints.map((point) => {
+    const aggregateEqDb = aggregateResponseDbAt(point.frequency, selectedFilters);
+    const allowance = getSourceDomainBoostAllowance({
+      frequency: point.frequency,
+      requestedBoostDb: 6,
+      activeSubs,
+      usableLfHz,
+      maxBoostDb: 6,
+      requestedSystemOutputDb,
+    });
+    const sourceDomainAllowedBoostDb = Number.isFinite(allowance?.allowedBoostDb) ? allowance.allowedBoostDb : 6;
+    const lfRampFraction = Number.isFinite(allowance?.lfRampFraction) ? allowance.lfRampFraction : 1;
+    const remainingPermittedAggregateBoostDb = Math.max(0, Math.min(6, sourceDomainAllowedBoostDb) - Math.max(0, aggregateEqDb));
+    const isBelowTarget = point.signedResidualDb < 0;
+    const requiredPositiveCorrectionDb = isBelowTarget ? Math.abs(point.signedResidualDb) : 0;
+    const capabilityLimited = isBelowTarget && requiredPositiveCorrectionDb > remainingPermittedAggregateBoostDb;
+    return {
+      frequency: point.frequency,
+      targetSpl: point.targetDb,
+      postEqSmoothedSpl: point.postEqSmoothedSpl,
+      signedResidualDb: point.signedResidualDb,
+      absoluteResidualDb: point.absoluteResidualDb,
+      aggregateEqContributionDb: aggregateEqDb,
+      sourceDomainPermittedTotalBoostDb: sourceDomainAllowedBoostDb,
+      remainingPermittedAggregateBoostDb,
+      usableLfRampFraction: lfRampFraction,
+      capabilityLimited,
+    };
+  });
 
   const finalBankLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
   const sameRegionFilterCount = maxSameRegionFilterCount(selectedFilters);
@@ -581,17 +698,22 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       p14Safe: selectedCheckpoint.p14Safe,
       broadBelowTargetWorsening: selectedCheckpoint.broadBelowTargetWorsening,
     },
+    checkpointSummaries,
+    worstResidualDiagnostics,
+    selectionReason,
     bankDiagnostics: {
-      maxAggregateBoostDb: finalBankLimits.maxAggregateBoostDb,
-      maxAggregateBoostHz: finalBankLimits.maxAggregateBoostHz,
-      maxAggregateCutDb: finalBankLimits.maxAggregateCutDb,
-      maxAggregateCutHz: finalBankLimits.maxAggregateCutHz,
-      limitingPermittedBoostDb: finalBankLimits.limitingPermittedBoostDb,
-      bankLimitScaledCount,
-      bankLimitRejectedCount,
-      nearDuplicateRejectedCount,
-      sameRegionRejectedCount,
-      sameRegionFilterCount,
+      evaluatedVariantsScaledByBankLimit: bankLimitScaledCount,
+      evaluatedVariantsRejectedByBankLimit: bankLimitRejectedCount,
+      evaluatedVariantsRejectedAsNearDuplicates: nearDuplicateRejectedCount,
+      evaluatedVariantsRejectedBySameRegionGuard: sameRegionRejectedCount,
+      selectedBankLimits: {
+        maxAggregateBoostDb: finalBankLimits.maxAggregateBoostDb,
+        maxAggregateBoostHz: finalBankLimits.maxAggregateBoostHz,
+        maxAggregateCutDb: finalBankLimits.maxAggregateCutDb,
+        maxAggregateCutHz: finalBankLimits.maxAggregateCutHz,
+        limitingPermittedBoostDb: finalBankLimits.limitingPermittedBoostDb,
+        sameRegionFilterCount,
+      },
     },
     diagnostics: curve.map((point, index) => ({
       frequency: point.frequency,
