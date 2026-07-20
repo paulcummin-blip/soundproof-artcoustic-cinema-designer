@@ -143,14 +143,18 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
 
   // Normalised aggregate bank limits — comparable across all profiles.
   // For house-curve, use eq.bankLimits. For Standard/Accuracy, derive from
-  // eq.bankDiagnostics.selectedBankLimits. Standard/Accuracy fitters enforce
-  // limits during construction, so allOk is always true.
+  // eq.bankDiagnostics.selectedBankLimits — including the real validation
+  // fields (boostLimitOk, cutLimitOk, sourceDomainHeadroomOk, allOk) from
+  // finalBankLimits. Never hardcode validation success.
   const aggregateBankLimits = eq.designEqFitProfile === "house_curve"
     ? {
         maxAggregateBoostDb: eq.bankLimits?.maxAggregateBoostDb ?? null,
         maxAggregateBoostHz: eq.bankLimits?.maxAggregateBoostHz ?? null,
         maxAggregateCutDb: eq.bankLimits?.maxAggregateCutDb ?? null,
         maxAggregateCutHz: eq.bankLimits?.maxAggregateCutHz ?? null,
+        boostLimitOk: eq.bankLimits?.boostLimitOk ?? null,
+        cutLimitOk: eq.bankLimits?.cutLimitOk ?? null,
+        sourceDomainHeadroomOk: eq.bankLimits?.sourceDomainHeadroomOk ?? null,
         allOk: eq.bankLimits?.allOk ?? null,
       }
     : {
@@ -158,7 +162,10 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
         maxAggregateBoostHz: eq.bankDiagnostics?.selectedBankLimits?.maxAggregateBoostHz ?? null,
         maxAggregateCutDb: eq.bankDiagnostics?.selectedBankLimits?.maxAggregateCutDb ?? null,
         maxAggregateCutHz: eq.bankDiagnostics?.selectedBankLimits?.maxAggregateCutHz ?? null,
-        allOk: true,
+        boostLimitOk: eq.bankDiagnostics?.selectedBankLimits?.boostLimitOk ?? null,
+        cutLimitOk: eq.bankDiagnostics?.selectedBankLimits?.cutLimitOk ?? null,
+        sourceDomainHeadroomOk: eq.bankDiagnostics?.selectedBankLimits?.sourceDomainHeadroomOk ?? null,
+        allOk: eq.bankDiagnostics?.selectedBankLimits?.allOk ?? null,
       };
 
   // P20 seat consistency (reuse existing helper — do not implement a second version).

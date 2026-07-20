@@ -179,6 +179,42 @@ function filterByProfileEligibility(pool, mode) {
   return { eligiblePool: nonHouseCurve, eligibilityNote: "Standard and Accuracy candidates" };
 }
 
+// Build a specific selection reason for house-curve priority (accuracy mode).
+// Compares the selected candidate against the best candidate from the other
+// profile family using worst-seat, mean, and RMS metrics. States explicitly
+// when worst and mean are equivalent within tolerance and RMS decides.
+const TOL_DB = 0.05;
+const fmtDb2 = (v) => Number.isFinite(v) ? v.toFixed(2) : "—";
+function buildAccuracySelectionReason(best, eligiblePool, compare) {
+  if (!best) return null;
+  const bestProfile = best.designEqFitProfile || "standard";
+  const isHouseCurve = bestProfile === "house_curve";
+  const selectedLabel = isHouseCurve ? "House curve" : "Standard";
+  const otherFilter = isHouseCurve
+    ? (c) => (c.designEqFitProfile || "standard") !== "house_curve"
+    : (c) => c.designEqFitProfile === "house_curve";
+  const otherCandidates = eligiblePool.filter(otherFilter);
+  if (otherCandidates.length === 0) {
+    return `${selectedLabel} selected: no alternative profile candidates in the eligible pool.`;
+  }
+  let bestOther = otherCandidates[0];
+  for (let i = 1; i < otherCandidates.length; i++) {
+    if (compare(otherCandidates[i], bestOther) < 0) bestOther = otherCandidates[i];
+  }
+  const worstA = best.worstSeatMaxDeviationDb ?? best.worstRealSeatHouseCurveVariationDb;
+  const worstB = bestOther.worstSeatMaxDeviationDb ?? bestOther.worstRealSeatHouseCurveVariationDb;
+  const meanA = best.meanSeatMaxDeviationDb;
+  const meanB = bestOther.meanSeatMaxDeviationDb;
+  const rmsA = best.rmsSeatTargetErrorDb;
+  const rmsB = bestOther.rmsSeatTargetErrorDb;
+  const worstEq = Number.isFinite(worstA) && Number.isFinite(worstB) && Math.abs(worstA - worstB) <= TOL_DB;
+  const meanEq = Number.isFinite(meanA) && Number.isFinite(meanB) && Math.abs(meanA - meanB) <= TOL_DB;
+  if (worstEq && meanEq && Number.isFinite(rmsA) && Number.isFinite(rmsB)) {
+    return `${selectedLabel} selected: worst-seat and mean equivalent within ${TOL_DB} dB tolerance; RMS decided (${fmtDb2(rmsB)} → ${fmtDb2(rmsA)} dB).`;
+  }
+  return `${selectedLabel} selected: worst-seat deviation ${fmtDb2(worstB)} → ${fmtDb2(worstA)} dB; mean ${fmtDb2(meanB)} → ${fmtDb2(meanA)} dB; RMS ${fmtDb2(rmsB)} → ${fmtDb2(rmsA)} dB.`;
+}
+
 // Non-mutating single-pass best-candidate selection from a pool.
 export function selectBestCandidate(pool, priorityMode) {
   const mode = ["balanced", "spl", "extension", "accuracy"].includes(priorityMode) ? priorityMode : "balanced";
@@ -190,9 +226,13 @@ export function selectBestCandidate(pool, priorityMode) {
     if (compare(eligiblePool[i], best) < 0) best = eligiblePool[i];
   }
   const selectedProfile = best?.designEqFitProfile || "standard";
+  const accuracyReason = mode === "accuracy"
+    ? buildAccuracySelectionReason(best, eligiblePool, compare)
+    : null;
   return {
     selected: best,
-    selectionReason: `Selected by ${mode} comparator from ${eligibilityNote} (${eligiblePool.length} of ${pool.length} candidates). Selected profile: ${selectedProfile}.`,
+    selectionReason: accuracyReason
+      || `Selected by ${mode} comparator from ${eligibilityNote} (${eligiblePool.length} of ${pool.length} candidates). Selected profile: ${selectedProfile}.`,
   };
 }
 

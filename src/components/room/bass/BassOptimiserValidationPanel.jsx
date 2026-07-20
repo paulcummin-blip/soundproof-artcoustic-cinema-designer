@@ -44,7 +44,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       const p20Text = c.p20Available ? (c.achievedP20Level > 0 ? `L${c.achievedP20Level}` : "FAIL") : "N/A";
       return <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
         <span>Official P19 (RSP): {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
-        <span>Worst-seat accuracy: {seatLevel} (±{fmt(c.worstRealSeatHouseCurveVariationDb, " dB")}) @ {c.worstRealSeatHouseCurveSeatId || "—"}</span>
+        <span>Worst-seat house-curve deviation (P19-equivalent): {seatLevel} (±{fmt(c.worstRealSeatHouseCurveVariationDb, " dB")}) @ {c.worstRealSeatHouseCurveSeatId || "—"}</span>
         <span>P20: {p20Text}{c.p20Available ? ` (±${fmt(c.achievedP20VariationDb, " dB")}) @ ${c.worstP20SeatId || "—"}` : ""}</span>
       </div>;
     })()}
@@ -80,7 +80,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
           <span>Objective: <strong className="text-slate-900">Worst-seat house-curve accuracy</strong></span>
           <span>Official RSP P19: <strong className="text-slate-900">{result.achievedP19Level} (±{fmt(c.achievedP19VariationDb, " dB")})</strong></span>
-          <span>Worst-seat P19: <strong className="text-slate-900">L{c.worstSeatP19Level || 0} (±{fmt(c.worstSeatMaxDeviationDb, " dB")}) @ {c.worstSeatId || "—"}</strong></span>
+          <span>Worst-seat house-curve deviation (P19-equivalent): <strong className="text-slate-900">{level(c.worstSeatP19Level || 0)} (±{fmt(c.worstSeatMaxDeviationDb, " dB")}) @ {c.worstSeatId || "—"}</strong></span>
           <span>Mean seat max dev: <strong className="text-slate-900">{fmt(c.meanSeatMaxDeviationDb, " dB")}</strong></span>
           <span>RMS seat target error: <strong className="text-slate-900">{fmt(c.rmsSeatTargetErrorDb, " dB")}</strong></span>
           <span>Selected filters: <strong className="text-slate-900">{c.designEqSelectedCheckpoint?.enabledFilterCount ?? "—"}</strong></span>
@@ -97,7 +97,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
               <thead className="border-b border-slate-300 text-slate-500"><tr>{["Seat", "Max dev", "RMS dev", "Worst Hz", "Level"].map((l) => <th className="px-2 py-1" key={l}>{l}</th>)}</tr></thead>
               <tbody>{psm.map((s) => {
                 const lvl = s.maxAbsDeviationDb <= 2 ? 4 : s.maxAbsDeviationDb <= 3 ? 3 : s.maxAbsDeviationDb <= 4 ? 2 : s.maxAbsDeviationDb <= 5 ? 1 : 0;
-                return <tr className="border-b border-slate-200" key={s.seatId}><td className="px-2 py-1 font-semibold text-left">{s.seatId}{s.isPrimary ? " (RSP)" : ""}</td><td className="px-2 py-1">±{fmt(s.maxAbsDeviationDb, " dB")}</td><td className="px-2 py-1">{fmt(s.rmsDeviationDb, " dB")}</td><td className="px-2 py-1">{fmt(s.worstFrequencyHz, " Hz")}</td><td className="px-2 py-1"><strong className={lvl > 0 ? "text-emerald-700" : "text-rose-700"}>L{lvl}</strong></td></tr>;
+                return <tr className="border-b border-slate-200" key={s.seatId}><td className="px-2 py-1 font-semibold text-left">{s.seatId}{s.isPrimary ? " (RSP)" : ""}</td><td className="px-2 py-1">±{fmt(s.maxAbsDeviationDb, " dB")}</td><td className="px-2 py-1">{fmt(s.rmsDeviationDb, " dB")}</td><td className="px-2 py-1">{fmt(s.worstFrequencyHz, " Hz")}</td><td className="px-2 py-1"><strong className={lvl > 0 ? "text-emerald-700" : "text-rose-700"}>{level(lvl)}</strong></td></tr>;
               })}</tbody>
             </table>
           </div>
