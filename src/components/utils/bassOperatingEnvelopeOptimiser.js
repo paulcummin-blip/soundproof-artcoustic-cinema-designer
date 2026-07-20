@@ -187,7 +187,7 @@ function isPhysicallyCredible(candidate) {
 
 // Heavy candidate generation — does NOT depend on priorityMode.
 // Generates all candidates with EQ fits, P14/P18/P19, seat-aware metrics, and P20.
-export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [] }) {
+export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null }) {
   if (!rawCurve.length || !activeSubs.length) return {
     candidates: [], selectablePool: [], definitions: null, performanceSummary: null, poolId: null,
     generatedCandidateCount: 0, physicallyCredibleCount: 0, requestedEnvelopeValidCount: 0,
@@ -200,10 +200,15 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   const coreFitCache = new Map();
   let coreFitTimeMs = 0;
   let totalCompletedBankEvaluations = 0;
-  const candidates = requests.map((request) => {
+  const report = (phase, completedRequests) => {
+    if (onProgress) onProgress({ phase, completedRequests, totalRequests: requests.length, uniqueCoreFits: coreFitCache.size, bankEvaluations: totalCompletedBankEvaluations });
+  };
+  report("Preparing response curves", 0);
+  const candidates = requests.map((request, i) => {
     const assessmentStartHz = request.p18.p18LimitHz;
     const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
     const cacheKey = `${request.p14.p14TargetDb}:${assessmentStartHz}:${assessmentEndHz}:2`;
+    report("Fitting Design EQ", i);
     let eq = coreFitCache.get(cacheKey);
     if (!eq) {
       const fitStart = perf();
@@ -214,14 +219,16 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
         fittingToleranceDb: 2,
         assessmentStartHz,
         assessmentEndHz,
-        collectDiagnostics: true,
+        collectDiagnostics,
       });
       coreFitTimeMs += perf() - fitStart;
       totalCompletedBankEvaluations += eq.bankDiagnostics?.completedBankEvaluationCount || 0;
       coreFitCache.set(cacheKey, eq);
     }
+    report("Assessing RSP and real seats", i);
     return buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: eq, perSeatRawCurves });
   });
+  report("Complete", requests.length);
   const selectablePool = candidates.filter(isPhysicallyCredible);
   const requestedEnvelopeValidCount = candidates.filter((c) => c.meetsRequestedEnvelope).length;
   const t1 = perf();

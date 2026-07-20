@@ -17,7 +17,10 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
-import { generateCandidatePool, selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
+import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
+import { computeBassFingerprint } from "@/components/utils/bassFingerprint";
+import { useBassDetailedCalculation } from "@/components/room/bass/useBassDetailedCalculation";
+import BassCalculationStatus from "@/components/room/bass/BassCalculationStatus";
 import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
 import DesignEqFilterBankDiagnostic from "@/components/room/bass/DesignEqFilterBankDiagnostic";
 import BassOptimiserValidationPanel from "@/components/room/bass/BassOptimiserValidationPanel";
@@ -265,6 +268,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // real-seat curves are hidden by default and shown only when this toggle is on.
   // Never affects candidate generation, P19, P20, or the selected EQ bank.
   const [showRealSeatOverlays, setShowRealSeatOverlays] = useState(false);
+  // Engineering diagnostics toggle — default off. When off, the detailed calculation
+  // skips collecting per-variant revision tables and checkpoint summaries.
+  const [includeDiagnostics, setIncludeDiagnostics] = useState(false);
+  // Refs for presentation-only values read inside runSimulation's runtimeVectorCapture
+  // gate. Using refs avoids adding these to the simulation dependency array.
+  const designEqEnabledRef = useRef(designEqEnabled);
+  const bassSmoothingModeRef = useRef(bassSmoothingMode);
 
   // Modal Resonance Line Toggles — display-only, session-only state. Does not affect
   // bass calculation, SPL response, or mode generation; only filters which resonance
@@ -368,6 +378,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   React.useEffect(() => { rearCfgRef.current = rearSubsCfg; }, [rearSubsCfg]);
   React.useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
   React.useEffect(() => { seatingRef.current = seatingPositions; }, [seatingPositions]);
+  React.useEffect(() => { designEqEnabledRef.current = designEqEnabled; }, [designEqEnabled]);
+  React.useEffect(() => { bassSmoothingModeRef.current = bassSmoothingMode; }, [bassSmoothingMode]);
 
   // Derive auto-alignment delays from geometry — runtime only, never written to config
   const autoAlignDelays = useMemo(() => {
@@ -707,7 +719,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
             qStrategy: qStrategyOverride, // __CANDIDATE_FREQ_DEP_Q__
             rewModalBandwidthScale, // __CANDIDATE_REW_MODAL_BANDWIDTH__
-            runtimeVectorCapture: !designEqEnabled && bassSmoothingMode === 'none',
+            runtimeVectorCapture: !designEqEnabledRef.current && bassSmoothingModeRef.current === 'none',
             }
         );
 
@@ -791,7 +803,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       activeModalVectorPath: __b44ActiveModalVectorPath,
       runtimeVectorCapture: { rows: runtimeVectorCapture },
     };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, rspPosition, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, selectedSeatIds, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale, designEqEnabled, bassSmoothingMode]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, rspPosition, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale]);
 
   const simulationResults = useMemo(() => runSimulation(qStrategy), [runSimulation, qStrategy]);
 
@@ -933,9 +945,38 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .filter(seat => seat.responseData.length > 0);
   }, [simulationResults?.seatResponses]);
 
-  // Heavy candidate pool generation — does NOT depend on priorityMode.
-  // Reuses the pool when only the priority mode changes.
-  const candidatePool = useMemo(() => generateCandidatePool({
+  // Physical-input fingerprint — deterministic hash of all inputs that affect the
+  // detailed optimisation. Excludes presentation-only state (graph curves, smoothing,
+  // scale, house-curve visibility, Design EQ visibility, priority mode, panel state).
+  // A fingerprint change marks the stored detailed result out of date.
+  const detailedFingerprint = useMemo(() => computeBassFingerprint({
+    roomDims, subsForSimulation, rspPosition, seatingPositions,
+    surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode,
+    modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
+    enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale,
+    disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField,
+    disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution,
+    rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ,
+    debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale,
+    debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
+    splConfig, optimisationTransitionHz,
+  }), [roomDims, subsForSimulation, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale, enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, splConfig, optimisationTransitionHz]);
+
+  // Detailed calculation hook — manages Web Worker lifecycle, race protection,
+  // cancellation, elapsed timer, and out-of-date detection.
+  const {
+    status: detailedStatus, detailedResult, progress: detailedProgress,
+    error: detailedError, elapsedMs: detailedElapsedMs,
+    calculate: calculateDetailed, cancel: cancelDetailed, handleFingerprintChange,
+  } = useBassDetailedCalculation();
+
+  // Watch fingerprint changes — marks stored result out of date, cancels active worker.
+  useEffect(() => {
+    handleFingerprintChange(detailedFingerprint);
+  }, [detailedFingerprint, handleFingerprintChange]);
+
+  // Worker payload — structured-clone-safe data for the detailed calculation.
+  const detailedPayload = useMemo(() => ({
     rawCurve: rspRawCurve,
     activeSubs: designEqSystemLimits.activeSubs,
     usableLfHz: designEqSystemLimits.usableLfHz,
@@ -943,13 +984,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     perSeatRawCurves,
   }), [rspRawCurve, designEqSystemLimits, optimisationTransitionHz, perSeatRawCurves]);
 
-  // Lightweight priority selection — reuses the stored candidate pool.
-  // Changing priorityMode only triggers this memo, not the heavy generation.
-  const optimisationResult = useMemo(() => selectCandidateFromPool(candidatePool, optimiserPriorityMode), [candidatePool, optimiserPriorityMode]);
+  // Lightweight priority selection — reuses the stored candidate pool from the
+  // completed detailed calculation. Changing priorityMode only triggers this
+  // memo (reranking), not the worker. Returns null when no current result exists.
+  const optimisationResult = useMemo(() => {
+    if (detailedStatus !== "COMPLETE" || !detailedResult?.pool) return null;
+    return selectCandidateFromPool(detailedResult.pool, optimiserPriorityMode);
+  }, [detailedStatus, detailedResult, optimiserPriorityMode]);
 
   const houseCurveSeries = useMemo(() => {
-    const candidate = optimisationResult.selectedCandidate;
-    const anchorDb = optimisationResult.selectedP14TargetDb;
+    const candidate = optimisationResult?.selectedCandidate;
+    const anchorDb = optimisationResult?.selectedP14TargetDb;
     const displayStartHz = 20;
     if (!showHouseCurve || !candidate || !Number.isFinite(anchorDb)) return null;
     const assessmentEndHz = candidate.assessmentEndHz;
@@ -976,7 +1021,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (overlayProductionSeries) out = [...out, overlayProductionSeries];
     // When Design EQ is ON, the Raw + Post-EQ pair must represent RSP (the authoritative
     // assessment position). Real-seat curves remain visible as labelled display overlays.
-    if (designEqEnabled && optimisationResult.finalPostEqCurve.length && rspRawCurve.length) {
+    if (designEqEnabled && optimisationResult?.finalPostEqCurve?.length && rspRawCurve.length) {
       const rawSeries = {
         id: "rsp-raw",
         kind: "raw",
@@ -1385,8 +1430,55 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <option value="third">1/3 octave</option>
               </select>
             </div>
+            {designEqEnabled && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => calculateDetailed(detailedFingerprint, detailedPayload, includeDiagnostics)}
+                  disabled={detailedStatus === "CALCULATING" || !detailedFingerprint}
+                  style={{
+                    height: 28, padding: '0 14px', borderRadius: 6,
+                    border: detailedStatus === "OUT_OF_DATE" ? '1px solid #b45309' : '1px solid #213428',
+                    background: detailedStatus === "OUT_OF_DATE" ? '#fffbeb' : '#213428',
+                    color: detailedStatus === "OUT_OF_DATE" ? '#92400e' : '#fff',
+                    fontSize: 11, fontFamily: 'monospace', cursor: 'pointer', fontWeight: 600,
+                    opacity: detailedStatus === "CALCULATING" ? 0.6 : 1,
+                  }}
+                >
+                  {detailedStatus === "CALCULATING" ? "Calculating…" : "Calculate detailed EQ & RP22"}
+                </button>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeDiagnostics}
+                    onChange={e => setIncludeDiagnostics(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  Include engineering diagnostics
+                </label>
+              </div>
+            )}
           </div>
         </div>
+
+        {designEqEnabled && (
+          <BassCalculationStatus
+            status={detailedStatus}
+            progress={detailedProgress}
+            elapsedMs={detailedElapsedMs}
+            error={detailedError}
+            detailedResult={detailedResult}
+            onCancel={cancelDetailed}
+          />
+        )}
+
+        {designEqEnabled && !optimisationResult && (
+          <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, background: '#F8F8F7', padding: '10px 14px', marginBottom: 8, fontSize: 11, fontFamily: 'monospace', color: '#625143' }}>
+            {detailedStatus === "IDLE" && "Detailed result not calculated. Click 'Calculate detailed EQ & RP22' to run the full optimisation."}
+            {detailedStatus === "OUT_OF_DATE" && "Detailed result out of date — physical inputs have changed. Click 'Calculate detailed EQ & RP22' to recalculate."}
+            {detailedStatus === "CANCELLED" && "Detailed calculation was cancelled. Click 'Calculate detailed EQ & RP22' to retry."}
+            {detailedStatus === "ERROR" && `Detailed calculation failed: ${detailedError || 'unknown error'}. Click 'Calculate detailed EQ & RP22' to retry.`}
+          </div>
+        )}
 
         {/* RSP measurement pill — authoritative assessment position */}
         {rspPosition && (
@@ -1523,9 +1615,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
         </div>
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
-          {designEqEnabled ? (optimisationResult.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate') : 'Showing raw simulated curve'}
+          {designEqEnabled ? (optimisationResult?.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : optimisationResult ? 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate' : 'Detailed result not calculated — click Calculate to run optimisation') : 'Showing raw simulated curve'}
         </div>
-        {designEqEnabled && <>
+        {designEqEnabled && optimisationResult && <>
           {/* Source diagnostics — assessment position provenance */}
           <div style={{ fontSize: 10, fontFamily: "monospace", color: "#625143", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
             <strong>Assessment position:</strong> RSP &nbsp;|&nbsp;
