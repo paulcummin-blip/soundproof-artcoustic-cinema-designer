@@ -208,7 +208,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       rawMinimumSpl: null, p14MinimumSpl: null, p14Safe: false,
       broadBelowTargetWorsening: false,
     },
-    iterationTrace: [],
+    iterationTrace: selected.trace || [],
     bankDiagnostics: {
       completedBankEvaluationCount: bankEvalCount,
       selectedBankLimits: {

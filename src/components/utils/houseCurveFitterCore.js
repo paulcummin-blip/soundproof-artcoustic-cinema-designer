@@ -323,15 +323,27 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   let operations = 0;
   let stopReason = "no safe improvement remained";
   let bankEvalCount = 0;
+  // Diagnostic trace — records every iteration's discovered regions and every
+  // trial evaluated. Purely observational; does not influence selection, ranking,
+  // or any control flow. Returned for read-only diagnostic inspection.
+  const trace = [];
 
   while (operations < maxOperations) {
     const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb);
     if (!regions.length) { stopReason = "no residual regions found"; break; }
 
+    const iterationEntry = {
+      iteration: operations,
+      regions: regions.map((r) => ({ seatId: r.seatId, kind: r.kind, startHz: r.startHz, endHz: r.endHz, centreFrequencyHz: r.centrePoint.frequency, severityDb: r.severityDb })),
+      trials: [],
+      bestTrialIndex: null,
+    };
+
     blockedResiduals = []; // reset for this iteration — only the last iteration's blocked residuals are kept
     let bestTrial = null;
     let bestTrialMetrics = null;
     let bestTrialFilters = null;
+    let bestTrialTraceIndex = null;
 
     for (const region of regions) {
       const { trials, productLimited } = generateTrialsForRegion(region, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
@@ -342,33 +354,95 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         const proposedFilters = buildProposedBank(trial, filters);
         const validation = validateAndScaleTrial(proposedFilters, trial.scalableIndex, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
         bankEvalCount++;
-        if (!validation.filters) { regionBlockReason = regionBlockReason || "bank-limited"; continue; }
+
+        const trialEntry = {
+          regionSeatId: region.seatId,
+          regionKind: region.kind,
+          regionCentreHz: region.centrePoint.frequency,
+          regionSeverityDb: region.severityDb,
+          action: trial.action,
+          frequencyHz: trial.filter?.frequencyHz ?? null,
+          gainDb: trial.filter?.gainDb ?? null,
+          Q: trial.filter?.Q ?? null,
+          scaled: validation.scaled,
+          bankValidation: {
+            allOk: validation.limits?.allOk ?? false,
+            boostLimitOk: validation.limits?.boostLimitOk ?? null,
+            cutLimitOk: validation.limits?.cutLimitOk ?? null,
+            sourceDomainHeadroomOk: validation.limits?.sourceDomainHeadroomOk ?? null,
+            maxAggregateBoostDb: validation.limits?.maxAggregateBoostDb ?? null,
+            maxAggregateBoostHz: validation.limits?.maxAggregateBoostHz ?? null,
+            maxAggregateCutDb: validation.limits?.maxAggregateCutDb ?? null,
+            maxAggregateCutHz: validation.limits?.maxAggregateCutHz ?? null,
+          },
+          metricsBefore: {
+            worstSeatMaxDeviationDb: currentMetrics?.worstSeatMaxDeviationDb ?? null,
+            meanSeatMaxDeviationDb: currentMetrics?.meanSeatMaxDeviationDb ?? null,
+            rmsSeatTargetErrorDb: currentMetrics?.rmsSeatTargetErrorDb ?? null,
+          },
+          metricsAfter: null,
+          accepted: false,
+          rejectionReason: null,
+        };
+
+        if (!validation.filters) {
+          const failed = [];
+          if (validation.limits?.boostLimitOk === false) failed.push("aggregate boost exceeded");
+          if (validation.limits?.cutLimitOk === false) failed.push("aggregate cut exceeded");
+          if (validation.limits?.sourceDomainHeadroomOk === false) failed.push("source-domain headroom exceeded");
+          trialEntry.rejectionReason = `bank-limited: ${failed.join(", ") || "unknown limit"}`;
+          regionBlockReason = regionBlockReason || "bank-limited";
+          iterationEntry.trials.push(trialEntry);
+          continue;
+        }
         regionAdmissible = true;
         const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb);
-        if (!trialMetrics) continue;
+        if (!trialMetrics) {
+          trialEntry.rejectionReason = "no metrics computed";
+          iterationEntry.trials.push(trialEntry);
+          continue;
+        }
+        trialEntry.metricsAfter = {
+          worstSeatMaxDeviationDb: trialMetrics.worstSeatMaxDeviationDb ?? null,
+          meanSeatMaxDeviationDb: trialMetrics.meanSeatMaxDeviationDb ?? null,
+          rmsSeatTargetErrorDb: trialMetrics.rmsSeatTargetErrorDb ?? null,
+        };
         // Admissibility: reject if the trial is not strictly better than current
         // according to the shared comparator. The comparator's worst-seat equivalence
         // (0.05 dB) enforces the hard rejection — a trial that worsens worst-seat by
         // more than 0.05 dB is always worse and is rejected.
-        if (compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) continue;
+        if (compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
+          trialEntry.rejectionReason = "not strictly better than current (comparator rejected)";
+          iterationEntry.trials.push(trialEntry);
+          continue;
+        }
         // Hard cap: no seat's max deviation may exceed its baseline by more than 0.05 dB.
         // The comparator only guards against the current state; this prevents cumulative
         // drift across iterations from exceeding the baseline tolerance.
         if (trialMetrics.seatMetrics) {
           let seatWorsened = false;
+          let worsenedSeatId = null;
           for (const m of trialMetrics.seatMetrics) {
             const baselineDev = baselineSeatMaxDeviations.get(m.seatId);
             if (baselineDev !== undefined && m.maxAbsDeviationDb > baselineDev + WORST_EQUIV_DB) {
               seatWorsened = true;
+              worsenedSeatId = m.seatId;
               break;
             }
           }
-          if (seatWorsened) continue;
+          if (seatWorsened) {
+            trialEntry.rejectionReason = `seat ${worsenedSeatId} worsened beyond baseline tolerance`;
+            iterationEntry.trials.push(trialEntry);
+            continue;
+          }
         }
+        trialEntry.accepted = true;
+        iterationEntry.trials.push(trialEntry);
         if (!bestTrial || compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) < 0) {
           bestTrial = trial;
           bestTrialMetrics = trialMetrics;
           bestTrialFilters = validation.filters;
+          bestTrialTraceIndex = iterationEntry.trials.length - 1;
         }
       }
 
@@ -388,6 +462,9 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
       }
     }
 
+    iterationEntry.bestTrialIndex = bestTrialTraceIndex;
+    trace.push(iterationEntry);
+
     if (!bestTrial) { stopReason = "no admissible improvement from any region"; break; }
     filters = bestTrialFilters;
     currentMetrics = bestTrialMetrics;
@@ -396,5 +473,5 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
 
   if (operations >= maxOperations && stopReason === "no safe improvement remained") stopReason = "operation ceiling reached";
 
-  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, blockedResiduals, stopReason, bankEvalCount, operations };
+  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, blockedResiduals, stopReason, bankEvalCount, operations, trace };
 }

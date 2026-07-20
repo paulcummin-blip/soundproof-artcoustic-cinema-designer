@@ -1629,6 +1629,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             result={optimisationResult}
             priorityMode={optimiserPriorityMode}
             onPriorityModeChange={setOptimiserPriorityMode}
+            activeSubs={designEqSystemLimits.activeSubs}
+            usableLfHz={designEqSystemLimits.usableLfHz}
+            perSeatRawCurves={perSeatRawCurves}
+            rspRawCurve={rspRawCurve}
           />
           <DesignEqFilterBankDiagnostic
             filters={optimisationResult.selectedFilters}

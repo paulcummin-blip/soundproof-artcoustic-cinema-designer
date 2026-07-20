@@ -1,15 +1,23 @@
 import React, { useState } from "react";
+import LiveHouseCurveDiagnostics from "@/components/room/bass/LiveHouseCurveDiagnostics";
 
 const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
 const fmtMs = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
 
-export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange }) {
+export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve }) {
   const [fitterDiagnosticsOpen, setFitterDiagnosticsOpen] = useState(false);
   const [showAllRevisions, setShowAllRevisions] = useState(false);
   if (!result) return null;
   return <details className="mt-3 rounded border border-emerald-300 bg-emerald-50 p-3 text-xs" open>
     <summary className="cursor-pointer font-semibold text-emerald-900">{result.isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : "BASS OPTIMISER VALIDATION ACTIVE"}</summary>
+    <LiveHouseCurveDiagnostics
+      result={result}
+      activeSubs={activeSubs}
+      usableLfHz={usableLfHz}
+      perSeatRawCurves={perSeatRawCurves}
+      rspRawCurve={rspRawCurve}
+    />
     <label className="mt-2 flex w-fit items-center gap-2 font-mono text-[10px] text-emerald-950">Priority mode
       <select value={priorityMode} onChange={(event) => onPriorityModeChange(event.target.value)} className="rounded border border-emerald-300 bg-white px-2 py-1">
         <option value="balanced">Balanced</option><option value="spl">Prioritise SPL</option><option value="extension">Prioritise extension</option><option value="accuracy">Prioritise house-curve accuracy</option>
