@@ -150,6 +150,115 @@ function limitBoostForCapability(filter, activeSubs, usableLfHz, requestedSystem
   return { ...filter, gainDb };
 }
 
+// Aggregate filter-bank response at a single frequency — sums RBJ peaking responses
+// for every enabled filter. Used to enforce completed-bank capability limits.
+function aggregateResponseDbAt(frequency, filters) {
+  return filters.reduce((sum, filter) => sum + peakingEqResponseDb(frequency, filter), 0);
+}
+
+// Evaluate the completed provisional bank across all raw-curve frequencies (20–200 Hz).
+// Checks: aggregate boost ≤ +6.05 dB, aggregate boost ≤ source-domain headroom + 0.05 dB,
+// and aggregate cut ≥ −10.05 dB. These limits apply to the completed bank, not per filter.
+function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, requestedSystemOutputDb) {
+  const bandPoints = raw.filter((p) => p.frequency >= 20 && p.frequency <= 200);
+  let maxAggregateBoostDb = 0;
+  let maxAggregateBoostHz = null;
+  let maxAggregateCutDb = 0;
+  let maxAggregateCutHz = null;
+  let limitingPermittedBoostDb = 6;
+  let boostLimitOk = true;
+  let cutLimitOk = true;
+  let sourceDomainHeadroomOk = true;
+  for (const point of bandPoints) {
+    const aggregateDb = aggregateResponseDbAt(point.frequency, filters);
+    if (aggregateDb > maxAggregateBoostDb) { maxAggregateBoostDb = aggregateDb; maxAggregateBoostHz = point.frequency; }
+    if (aggregateDb < maxAggregateCutDb) { maxAggregateCutDb = aggregateDb; maxAggregateCutHz = point.frequency; }
+    if (aggregateDb > 6.05) boostLimitOk = false;
+    if (aggregateDb < -10.05) cutLimitOk = false;
+    if (aggregateDb > 0) {
+      const allowed = getSourceDomainBoostAllowance({ frequency: point.frequency, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb });
+      const permitted = Number.isFinite(allowed?.allowedBoostDb) ? allowed.allowedBoostDb : 6;
+      if (aggregateDb > permitted + 0.05) sourceDomainHeadroomOk = false;
+    }
+  }
+  if (maxAggregateBoostHz !== null && maxAggregateBoostDb > 0) {
+    const allowed = getSourceDomainBoostAllowance({ frequency: maxAggregateBoostHz, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb });
+    limitingPermittedBoostDb = Number.isFinite(allowed?.allowedBoostDb) ? allowed.allowedBoostDb : 6;
+  }
+  return { maxAggregateBoostDb, maxAggregateBoostHz, maxAggregateCutDb, maxAggregateCutHz, limitingPermittedBoostDb, boostLimitOk, cutLimitOk, sourceDomainHeadroomOk, allOk: boostLimitOk && cutLimitOk && sourceDomainHeadroomOk };
+}
+
+// Scale a candidate's gain via binary search so the completed bank (existing + candidate)
+// satisfies all aggregate limits. Returns null filter if the scaled gain is ≤ 0.1 dB.
+function scaleCandidateForBankLimits(candidate, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb) {
+  const proposedGainDb = candidate.gainDb;
+  const initial = evaluateProvisionalBankLimits([...existingFilters, candidate], raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+  if (initial.allOk) return { filter: candidate, scaled: false, limits: initial };
+  const isBoost = proposedGainDb > 0;
+  let lo = 0;
+  let hi = Math.abs(proposedGainDb);
+  for (let i = 0; i < 14; i++) {
+    const mid = (lo + hi) / 2;
+    const scaledGain = isBoost ? mid : -mid;
+    const scaledLimits = evaluateProvisionalBankLimits([...existingFilters, { ...candidate, gainDb: scaledGain }], raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+    if (scaledLimits.allOk) lo = mid; else hi = mid;
+  }
+  const scaledGainDb = isBoost ? lo : -lo;
+  if (Math.abs(scaledGainDb) <= 0.1) return { filter: null, scaled: true, limits: initial };
+  const scaledFilter = { ...candidate, gainDb: scaledGainDb };
+  const scaledLimits = evaluateProvisionalBankLimits([...existingFilters, scaledFilter], raw, activeSubs, usableLfHz, requestedSystemOutputDb);
+  return { filter: scaledFilter, scaled: true, limits: scaledLimits };
+}
+
+// Near-duplicate guard: reject if centre-frequency separation ≤ 1/24 octave AND
+// Q ratio ≤ 1.25 vs any existing same-sign filter.
+function isNearDuplicate(candidate, existingFilters) {
+  const candidateSign = candidate.gainDb > 0 ? 1 : -1;
+  for (const filter of existingFilters) {
+    if (!filter.enabled) continue;
+    const filterSign = filter.gainDb > 0 ? 1 : -1;
+    if (filterSign !== candidateSign) continue;
+    const freqRatio = Math.log2(Math.max(candidate.frequencyHz, filter.frequencyHz) / Math.min(candidate.frequencyHz, filter.frequencyHz));
+    const qRatio = Math.max(candidate.Q, filter.Q) / Math.min(candidate.Q, filter.Q);
+    if (freqRatio <= 1 / 24 && qRatio <= 1.25) return true;
+  }
+  return false;
+}
+
+// Count same-sign filters within 1/12 octave of the candidate. No more than 2 total
+// (including the candidate) are permitted.
+function countSameSignFiltersInRegion(candidate, existingFilters) {
+  const candidateSign = candidate.gainDb > 0 ? 1 : -1;
+  let count = 0;
+  for (const filter of existingFilters) {
+    if (!filter.enabled) continue;
+    const filterSign = filter.gainDb > 0 ? 1 : -1;
+    if (filterSign !== candidateSign) continue;
+    const freqRatio = Math.log2(Math.max(candidate.frequencyHz, filter.frequencyHz) / Math.min(candidate.frequencyHz, filter.frequencyHz));
+    if (freqRatio <= 1 / 12) count++;
+  }
+  return count;
+}
+
+// Maximum same-sign filter count within any 1/12-octave region (for diagnostics).
+function maxSameRegionFilterCount(filters) {
+  let maxCount = 0;
+  for (let i = 0; i < filters.length; i++) {
+    if (!filters[i].enabled) continue;
+    const sign = filters[i].gainDb > 0 ? 1 : -1;
+    let count = 1;
+    for (let j = 0; j < filters.length; j++) {
+      if (i === j || !filters[j].enabled) continue;
+      const signJ = filters[j].gainDb > 0 ? 1 : -1;
+      if (signJ !== sign) continue;
+      const ratio = Math.log2(Math.max(filters[i].frequencyHz, filters[j].frequencyHz) / Math.min(filters[i].frequencyHz, filters[j].frequencyHz));
+      if (ratio <= 1 / 12) count++;
+    }
+    if (count > maxCount) maxCount = count;
+  }
+  return maxCount;
+}
+
 function emptyFilters(filters) {
   return [...filters, ...Array.from({ length: Math.max(0, 10 - filters.length) }, (_, index) => ({
     band: filters.length + index + 1,
@@ -274,6 +383,10 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     requestedSystemOutputDb,
   })];
   const iterationTrace = [];
+  let bankLimitScaledCount = 0;
+  let bankLimitRejectedCount = 0;
+  let nearDuplicateRejectedCount = 0;
+  let sameRegionRejectedCount = 0;
 
   // Fit one broad residual at a time. Each pass re-smooths the cumulative curve,
   // allowing a severe modal peak to receive a complementary filter when its first
@@ -337,7 +450,20 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
           if (seenVariants.has(variantKey) || Math.abs(candidate.gainDb) <= 0.1) continue;
           seenVariants.add(variantKey);
 
-          const nextCurve = curve.map((point) => ({ ...point, spl: point.spl + peakingEqResponseDb(point.frequency, candidate) }));
+          // Near-duplicate guard: reject if too close to an existing same-sign filter
+          if (isNearDuplicate(candidate, filters)) { nearDuplicateRejectedCount++; continue; }
+          // Same-region guard: no more than 2 same-sign filters within 1/12 octave
+          if (countSameSignFiltersInRegion(candidate, filters) >= 2) { sameRegionRejectedCount++; continue; }
+
+          // Completed-bank capability guard: scale gain to satisfy aggregate limits
+          const gainBeforeBankLimiting = candidate.gainDb;
+          const bankResult = scaleCandidateForBankLimits(candidate, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
+          if (!bankResult.filter) { bankLimitRejectedCount++; continue; }
+          if (bankResult.scaled) bankLimitScaledCount++;
+          const finalCandidate = bankResult.filter;
+          const gainAfterBankLimiting = finalCandidate.gainDb;
+
+          const nextCurve = curve.map((point) => ({ ...point, spl: point.spl + peakingEqResponseDb(point.frequency, finalCandidate) }));
           const nextTrend = applyBassSmoothing(nextCurve, "third");
           const nextMetrics = completeBandResidualMetrics(nextTrend, assessmentStartHz, assessmentEndHz, anchorDb);
           if (!nextMetrics) continue;
@@ -351,11 +477,14 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
             && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
             && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
           if (acceptable) acceptableCandidates.push({
-            filter: candidate,
+            filter: finalCandidate,
             curve: nextCurve,
             maximumDeviationReductionDb,
             rmsReductionDb,
             localImprovementDb,
+            gainBeforeBankLimiting,
+            gainAfterBankLimiting,
+            bankLimits: bankResult.limits,
           });
         }
       }
@@ -399,6 +528,12 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       minimumSplAfterDb: checkpoint.p14MinimumSpl,
       p14Safe: checkpoint.p14Safe,
       broadBelowTargetWorsening: checkpoint.broadBelowTargetWorsening,
+      gainBeforeBankLimiting: chosen.gainBeforeBankLimiting,
+      gainAfterBankLimiting: chosen.gainAfterBankLimiting,
+      aggregateMaxBoostAfterDb: chosen.bankLimits?.maxAggregateBoostDb ?? 0,
+      aggregateMaxBoostAfterHz: chosen.bankLimits?.maxAggregateBoostHz ?? null,
+      aggregateMaxCutAfterDb: chosen.bankLimits?.maxAggregateCutDb ?? 0,
+      aggregateMaxCutAfterHz: chosen.bankLimits?.maxAggregateCutHz ?? null,
     });
   }
   if (filters.length >= 10) stopReason = "ten-band ceiling reached";
@@ -426,6 +561,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     spl: point.spl + combinedEqCurve[index].spl,
   }));
 
+  const finalBankLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb);
+  const sameRegionFilterCount = maxSameRegionFilterCount(selectedFilters);
+
   return {
     curve,
     filters: filterBank,
@@ -442,6 +580,18 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       minimumSpl: selectedCheckpoint.p14MinimumSpl,
       p14Safe: selectedCheckpoint.p14Safe,
       broadBelowTargetWorsening: selectedCheckpoint.broadBelowTargetWorsening,
+    },
+    bankDiagnostics: {
+      maxAggregateBoostDb: finalBankLimits.maxAggregateBoostDb,
+      maxAggregateBoostHz: finalBankLimits.maxAggregateBoostHz,
+      maxAggregateCutDb: finalBankLimits.maxAggregateCutDb,
+      maxAggregateCutHz: finalBankLimits.maxAggregateCutHz,
+      limitingPermittedBoostDb: finalBankLimits.limitingPermittedBoostDb,
+      bankLimitScaledCount,
+      bankLimitRejectedCount,
+      nearDuplicateRejectedCount,
+      sameRegionRejectedCount,
+      sameRegionFilterCount,
     },
     diagnostics: curve.map((point, index) => ({
       frequency: point.frequency,

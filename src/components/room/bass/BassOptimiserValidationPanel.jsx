@@ -48,11 +48,27 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
             <span>P14-safe: <strong className={checkpoint.p14Safe ? "text-emerald-700" : "text-rose-700"}>{checkpoint.p14Safe ? "Yes" : "No"}</strong></span>
             <span>Broad below-target worsening: <strong className={checkpoint.broadBelowTargetWorsening ? "text-rose-700" : "text-emerald-700"}>{checkpoint.broadBelowTargetWorsening ? "Yes" : "No"}</strong></span>
           </div>
+          {(() => {
+            const bd = candidate?.designEqBankDiagnostics;
+            if (!bd) return null;
+            return (
+              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700 border-t border-slate-300 pt-2">
+                <span>Max aggregate boost: <strong className="text-slate-900">{fmt(bd.maxAggregateBoostDb, " dB")} @ {fmt(bd.maxAggregateBoostHz, " Hz")}</strong></span>
+                <span>Max aggregate cut: <strong className="text-slate-900">{fmt(bd.maxAggregateCutDb, " dB")} @ {fmt(bd.maxAggregateCutHz, " Hz")}</strong></span>
+                <span>Max permitted bank boost: <strong className="text-slate-900">{fmt(bd.limitingPermittedBoostDb, " dB")}</strong></span>
+                <span>Same-region filter count: <strong className={bd.sameRegionFilterCount <= 2 ? "text-emerald-700" : "text-rose-700"}>{bd.sameRegionFilterCount}</strong></span>
+                <span>Bank-limit scaled candidates: <strong className="text-slate-900">{bd.bankLimitScaledCount}</strong></span>
+                <span>Bank-limit rejected candidates: <strong className="text-slate-900">{bd.bankLimitRejectedCount}</strong></span>
+                <span>Near-duplicate rejected: <strong className="text-slate-900">{bd.nearDuplicateRejectedCount}</strong></span>
+                <span>Same-region rejected: <strong className="text-slate-900">{bd.sameRegionRejectedCount}</strong></span>
+              </div>
+            );
+          })()}
           {trace.length > 0 && (
             <div className="mt-2 overflow-x-auto">
-              <table className="min-w-[1300px] text-right font-mono text-[10px] text-slate-700">
+              <table className="min-w-[1700px] text-right font-mono text-[10px] text-slate-700">
                 <thead className="border-b border-slate-300 text-slate-500">
-                  <tr>{["Iter", "Freq", "Gain", "Q", "Max before", "Max after", "RMS before", "RMS after", "Raw min before", "Raw min after", "P14 min before", "P14 min after", "P14-safe", "Broad worse"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
+                  <tr>{["Iter", "Freq", "Gain", "Q", "Max before", "Max after", "RMS before", "RMS after", "Raw min before", "Raw min after", "P14 min before", "P14 min after", "P14-safe", "Broad worse", "Gain pre-bank", "Gain post-bank", "Agg boost after", "Agg cut after"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr>
                 </thead>
                 <tbody>
                   {trace.map((row) => (
@@ -71,6 +87,10 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
                       <td className="px-2 py-1">{fmt(row.p14MinimumSplAfterDb, " dB")}</td>
                       <td className="px-2 py-1"><strong className={row.p14Safe ? "text-emerald-700" : "text-rose-700"}>{row.p14Safe ? "Yes" : "No"}</strong></td>
                       <td className="px-2 py-1"><strong className={row.broadBelowTargetWorsening ? "text-rose-700" : "text-emerald-700"}>{row.broadBelowTargetWorsening ? "Yes" : "No"}</strong></td>
+                      <td className="px-2 py-1">{fmt(row.gainBeforeBankLimiting, " dB")}</td>
+                      <td className="px-2 py-1">{fmt(row.gainAfterBankLimiting, " dB")}</td>
+                      <td className="px-2 py-1">{fmt(row.aggregateMaxBoostAfterDb, " dB")} @ {fmt(row.aggregateMaxBoostAfterHz, " Hz")}</td>
+                      <td className="px-2 py-1">{fmt(row.aggregateMaxCutAfterDb, " dB")} @ {fmt(row.aggregateMaxCutAfterHz, " Hz")}</td>
                     </tr>
                   ))}
                 </tbody>

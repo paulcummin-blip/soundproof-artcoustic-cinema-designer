@@ -108,6 +108,7 @@ function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionH
     designEqIterationTrace: eq.iterationTrace,
     designEqStopReason: eq.stopReason,
     designEqSelectedCheckpoint: eq.selectedCheckpoint,
+    designEqBankDiagnostics: eq.bankDiagnostics,
     p14CheckpointDeltaDb,
     capabilityLimitedFrequencies,
     meetsRequestedEnvelope,
