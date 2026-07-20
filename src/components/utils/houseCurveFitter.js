@@ -18,6 +18,53 @@ export { houseCurveP19Level };
 
 const isNumber = (v) => Number.isFinite(Number(v));
 
+// Fallback resolver — exported for deterministic testing of both fallback routes.
+// Never converts a validator failure into success. If the empty bank fails
+// validation, reports an invariant violation and leaves bankValidationPassed: false.
+export function resolveFallback({ selectedFilters, standardSeedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, objectiveSeats, assessmentStartHz, assessmentEndHz, anchorDb, bankEvalCount = 0 }) {
+  let filters = (Array.isArray(selectedFilters) ? selectedFilters : []).map((f) => ({ ...f }));
+  let finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  bankEvalCount++;
+  let bankValidationPassed = finalBankLimits.allOk;
+  let fallbackOccurred = false;
+  let fallbackType = null;
+  let finalMetrics = null;
+  let stopReason = null;
+  let blockedResiduals = [];
+  let invariantViolation = false;
+
+  if (!bankValidationPassed) {
+    fallbackOccurred = true;
+    if (standardSeedFilters.length > 0) {
+      const seedLimits = evaluateProvisionalBankLimits(standardSeedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+      bankEvalCount++;
+      if (seedLimits.allOk) {
+        filters = standardSeedFilters.map((f) => ({ ...f }));
+        fallbackType = "standard-seed";
+      } else {
+        filters = [];
+        fallbackType = "empty";
+      }
+    } else {
+      filters = [];
+      fallbackType = "empty";
+    }
+    finalMetrics = calculateAllSeatMetrics(objectiveSeats, filters, assessmentStartHz, assessmentEndHz, anchorDb);
+    stopReason = `final bank validation failed — reverted to ${fallbackType}`;
+    blockedResiduals = [];
+    finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+    bankEvalCount++;
+    bankValidationPassed = finalBankLimits.allOk;
+    // Invariant: empty bank must always pass validation. If it does not, report
+    // the failure — never convert a validator failure into success.
+    if (fallbackType === "empty" && !bankValidationPassed) {
+      invariantViolation = true;
+    }
+  }
+
+  return { filters, fallbackOccurred, fallbackType, bankValidationPassed, finalBankLimits, finalMetrics, stopReason, blockedResiduals, bankEvalCount, invariantViolation };
+}
+
 // Seat-aware house-curve EQ fitter. Optimises a shared filter bank for the worst
 // real-seat house-curve deviation. RSP is kept separate for official RP22 P19.
 // When no real seats exist, falls back to RSP and labels the objective accordingly.
@@ -78,37 +125,23 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
 
   // Final bank validation — must pass all hard limits. If it fails (safety net),
   // revert to the Standard seed (or empty) and recalculate metrics.
-  let finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-  bankEvalCount++;
-  let bankValidationPassed = finalBankLimits.allOk;
-  let fallbackOccurred = false;
-  let fallbackType = null;
-  if (!bankValidationPassed) {
-    fallbackOccurred = true;
-    // Try Standard seed first — validate it before using.
-    if (standardSeedFilters.length > 0) {
-      const seedLimits = evaluateProvisionalBankLimits(standardSeedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-      bankEvalCount++;
-      if (seedLimits.allOk) {
-        filters = standardSeedFilters.map((f) => ({ ...f }));
-        fallbackType = "standard-seed";
-      } else {
-        filters = [];
-        fallbackType = "empty";
-      }
-    } else {
-      filters = [];
-      fallbackType = "empty";
-    }
-    finalMetrics = calculateAllSeatMetrics(objectiveSeats, filters, assessmentStartHz, assessmentEndHz, anchorDb);
-    stopReason = `final bank validation failed — reverted to ${fallbackType}`;
-    blockedResiduals = [];
-    // Re-run complete-bank validation against the actual fallback bank.
-    finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-    bankEvalCount++;
-    bankValidationPassed = finalBankLimits.allOk;
-    // The empty bank has no filters — it must always pass validation.
-    if (fallbackType === "empty" && !bankValidationPassed) bankValidationPassed = true;
+  // Never converts a validator failure into success — see resolveFallback.
+  const fallback = resolveFallback({
+    selectedFilters: filters, standardSeedFilters, bankRaw, activeSubs,
+    usableLfHz, requestedSystemOutputDb, profile, objectiveSeats,
+    assessmentStartHz, assessmentEndHz, anchorDb, bankEvalCount,
+  });
+  filters = fallback.filters;
+  let finalBankLimits = fallback.finalBankLimits;
+  let bankValidationPassed = fallback.bankValidationPassed;
+  const fallbackOccurred = fallback.fallbackOccurred;
+  const fallbackType = fallback.fallbackType;
+  const invariantViolation = fallback.invariantViolation;
+  bankEvalCount = fallback.bankEvalCount;
+  if (fallback.fallbackOccurred) {
+    finalMetrics = fallback.finalMetrics;
+    stopReason = fallback.stopReason;
+    blockedResiduals = fallback.blockedResiduals;
   }
 
   // Official RSP P19 (always calculated from RSP, separate from the worst-seat objective).
@@ -187,6 +220,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       finalBankValidationPassed: bankValidationPassed,
       fallbackOccurred,
       fallbackType,
+      invariantViolation,
     },
     checkpointSummaries: [],
     worstResidualDiagnostics: [],

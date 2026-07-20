@@ -61,6 +61,13 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
         Best Standard accuracy: {bestStd ? `±${bestStd.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Best house-curve accuracy: {bestHc ? `±${bestHc.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Selected: {selProfile} {selP19}
       </div>;
     })()}
+    {result.selectedCandidate && (() => {
+      const c = result.selectedCandidate;
+      const abl = c.aggregateBankLimits || {};
+      return <div className="mt-1 font-mono text-[10px] text-slate-600">
+        Bank limits — Max boost: <strong className="text-slate-900">{fmt(abl.maxAggregateBoostDb, " dB")} @ {fmt(abl.maxAggregateBoostHz, " Hz")}</strong> | Max cut: <strong className="text-slate-900">{fmt(abl.maxAggregateCutDb, " dB")} @ {fmt(abl.maxAggregateCutHz, " Hz")}</strong> | Validation: <strong className={abl.allOk === true ? "text-emerald-700" : abl.allOk === false ? "text-rose-700" : "text-slate-500"}>{abl.allOk === true ? "PASS" : abl.allOk === false ? "FAIL" : "—"}</strong>
+      </div>;
+    })()}
     {result.selectedCandidate?.designEqFitProfile === "house_curve" && (() => {
       const c = result.selectedCandidate;
       const hbl = c.houseCurveBankLimits || {};

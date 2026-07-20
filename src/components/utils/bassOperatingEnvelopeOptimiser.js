@@ -141,6 +141,26 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     seatsForUniformMetrics, assessmentStartHz, assessmentEndHz, targetAnchorDb
   );
 
+  // Normalised aggregate bank limits — comparable across all profiles.
+  // For house-curve, use eq.bankLimits. For Standard/Accuracy, derive from
+  // eq.bankDiagnostics.selectedBankLimits. Standard/Accuracy fitters enforce
+  // limits during construction, so allOk is always true.
+  const aggregateBankLimits = eq.designEqFitProfile === "house_curve"
+    ? {
+        maxAggregateBoostDb: eq.bankLimits?.maxAggregateBoostDb ?? null,
+        maxAggregateBoostHz: eq.bankLimits?.maxAggregateBoostHz ?? null,
+        maxAggregateCutDb: eq.bankLimits?.maxAggregateCutDb ?? null,
+        maxAggregateCutHz: eq.bankLimits?.maxAggregateCutHz ?? null,
+        allOk: eq.bankLimits?.allOk ?? null,
+      }
+    : {
+        maxAggregateBoostDb: eq.bankDiagnostics?.selectedBankLimits?.maxAggregateBoostDb ?? null,
+        maxAggregateBoostHz: eq.bankDiagnostics?.selectedBankLimits?.maxAggregateBoostHz ?? null,
+        maxAggregateCutDb: eq.bankDiagnostics?.selectedBankLimits?.maxAggregateCutDb ?? null,
+        maxAggregateCutHz: eq.bankDiagnostics?.selectedBankLimits?.maxAggregateCutHz ?? null,
+        allOk: true,
+      };
+
   // P20 seat consistency (reuse existing helper — do not implement a second version).
   // P20 is N/A when fewer than 2 real seats; FAIL/0 when 2+ seats but outside all tolerances.
   let achievedP20Level = 0;
@@ -216,6 +236,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     houseCurveBankLimits: eq.bankLimits,
     houseCurveLimitingReason: eq.limitingReason,
     houseCurveBaselineWorstSeatDeviation: eq.baselineWorstSeatDeviationDb,
+    // Normalised aggregate bank limits — comparable across all profiles.
+    aggregateBankLimits,
   };
 }
 
