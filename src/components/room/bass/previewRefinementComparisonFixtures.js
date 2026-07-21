@@ -1,6 +1,6 @@
 import { computeNormalizedRoomTransfer } from "./normalizedRoomTransferEngine";
 import { buildNormalizedPhysicsOptions, buildPreviewPhysicsOptions } from "./normalizedPhysicsOptionsBuilder";
-import { buildPreviewRefinementDeltaTable } from "./previewRefinementComparison";
+import { alignPreviewAndRefinement, buildPreviewRefinementDeltaTable } from "./previewRefinementComparison";
 import { buildNormalizedSeries } from "./normalizedSeriesBuilder";
 
 const roomDims = { widthM: 6, lengthM: 8, heightM: 2.8 };
@@ -19,11 +19,16 @@ export function runPreviewRefinementComparisonFixtures() {
   const common = { roomDims, rspPosition, seatingPositions, subsForSimulation };
   const preview = computeNormalizedRoomTransfer({ ...common, physicsOptions: buildPreviewPhysicsOptions(physics), pointsPerOctave: 8 });
   const refined = computeNormalizedRoomTransfer({ ...common, physicsOptions: physics });
+  const aligned = alignPreviewAndRefinement(preview.rspCurve, refined.rspCurve);
   const rows = buildPreviewRefinementDeltaTable(preview.rspCurve, refined.rspCurve);
   const labels = ["none", "sixth", "third"];
   const checks = [
     { name: "All display smoothing modes compared", passed: rows.length === 3 && rows.every((row, index) => row.smoothingMode === labels[index]) },
+    { name: "Preview and refinement use an identical aligned frequency grid", passed: aligned.preview.length > 0 && JSON.stringify(aligned.preview.map((point) => point.frequency)) === JSON.stringify(aligned.refined.map((point) => point.frequency)) },
     { name: "Every comparison reports a deterministic maximum", passed: rows.every((row) => Number.isFinite(row.maximumDeltaDb) && Number.isFinite(row.frequencyHz)) },
+    { name: "Every comparison reports movement width", passed: rows.every((row) => Number.isFinite(row.halfMaximumWidthOctaves)) },
+    { name: "1/6-octave maximum does not exceed unsmoothed maximum", passed: rows[1].maximumDeltaDb <= rows[0].maximumDeltaDb },
+    { name: "1/3-octave maximum does not exceed unsmoothed maximum", passed: rows[2].maximumDeltaDb <= rows[0].maximumDeltaDb },
     { name: "Every comparison classifies transition shape", passed: rows.every((row) => ["narrow null", "broad response movement"].includes(row.movement)) },
     { name: "Preview graph state label restored", passed: buildNormalizedSeries(preview.rspCurve, "preview", false).label === "Preview" },
     { name: "Refining graph state label restored", passed: buildNormalizedSeries(preview.rspCurve, "preview", true).label === "Refining…" },

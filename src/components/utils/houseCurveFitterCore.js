@@ -12,6 +12,9 @@ import {
 } from "@/components/utils/designEqCalibration";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
+import { bankResponseSignature, createHouseCurveEvaluationMemo, readExactMemo, writeExactMemo } from "@/components/utils/houseCurveEvaluationMemo";
+import { calculatePreparedBassCurveMetrics, prepareBassCurveMetricGrid } from "@/components/utils/preparedBassCurveMetrics";
+import { evaluatePreparedBankLimits, prepareBankValidation } from "@/components/utils/preparedBankValidation";
 
 const isNumber = (v) => Number.isFinite(Number(v));
 
@@ -88,7 +91,8 @@ export function houseCurveP19Level(deviationDb) {
 // Calculate per-seat house-curve deviation metrics from an already-corrected curve.
 // Uses the identical 1/3-octave smoothing, assessment band, and target curve as the
 // house-curve fitter. Shared between the fitter and the production optimiser.
-function calculateSeatMetricsFromCorrected(correctedCurve, assessmentStartHz, assessmentEndHz, anchorDb) {
+function calculateSeatMetricsFromCorrected(correctedCurve, assessmentStartHz, assessmentEndHz, anchorDb, prepared = null) {
+  if (prepared) return calculatePreparedBassCurveMetrics(correctedCurve, prepared);
   const smoothed = applyBassSmoothing(correctedCurve, "third");
   const assessedPoints = smoothed
     .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
@@ -108,12 +112,19 @@ function calculateSeatMetricsFromCorrected(correctedCurve, assessmentStartHz, as
 
 // Apply shared filter bank to a seat's raw response, smooth, and calculate per-seat
 // house-curve deviation metrics in the assessment band.
-function correctedCurvesForSharedBank(seats, filters, operationCounts) {
+function correctedCurvesForSharedBank(seats, filters, operationCounts, memo = null) {
+  const bankKey = bankResponseSignature(filters);
+  if (operationCounts) operationCounts.curveEvaluationRequests += seats.length;
+  const cached = memo?.enabled ? readExactMemo(memo.correctedCurves, bankKey) : null;
+  if (cached) {
+    if (operationCounts) operationCounts.reusedCurveEvaluationRequests += seats.length;
+    return cached;
+  }
+
   const correctionsByFrequencyGrid = new Map();
-  return seats.map((seat) => {
+  const corrected = seats.map((seat) => {
     const raw = seat.raw;
     const gridKey = raw.map((point) => point.frequency).join("|");
-    operationCounts && (operationCounts.curveEvaluationRequests += 1);
     let correction = correctionsByFrequencyGrid.get(gridKey);
     if (!correction) {
       correction = raw.map((point) => filters.reduce((sum, filter) => sum + peakingEqResponseDb(point.frequency, filter), 0));
@@ -128,6 +139,7 @@ function correctedCurvesForSharedBank(seats, filters, operationCounts) {
       corrected: raw.map((point, index) => ({ frequency: point.frequency, spl: point.spl + correction[index] })),
     };
   });
+  return writeExactMemo(memo?.correctedCurves, bankKey, corrected, memo?.enabled);
 }
 
 // Calculate metrics across a set of already-corrected seat curves. Used by the
@@ -156,38 +168,54 @@ export function calculateAllSeatMetricsFromCorrected(correctedCurves, assessment
 }
 
 // Calculate metrics across a set of seats for a given filter bank.
-export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts = null) {
+export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts = null, memo = null) {
   const startedAt = operationCounts ? performance.now() : 0;
+  const correctedSeats = correctedCurvesForSharedBank(seats, filters, operationCounts, memo);
+  if (operationCounts) operationCounts.perSeatMetricEvaluations += correctedSeats.length;
+  const metricsKey = bankResponseSignature(filters);
+  const cached = memo?.enabled ? readExactMemo(memo.metrics, metricsKey) : null;
+  if (cached) {
+    if (operationCounts) operationCounts.reusedPerSeatMetricEvaluations += correctedSeats.length;
+    return cached;
+  }
+
   const seatMetrics = [];
-  const correctedSeats = correctedCurvesForSharedBank(seats, filters, operationCounts);
   for (const { seat, corrected } of correctedSeats) {
-    const metrics = calculateSeatMetricsFromCorrected(corrected, assessmentStartHz, assessmentEndHz, anchorDb);
+    if (operationCounts) operationCounts.metricGridPreparationRequests += 1;
+    const gridKey = seat.gridKey || corrected.map((point) => point.frequency).join("|");
+    let prepared = memo?.enabled ? memo.metricGrids.get(gridKey) : null;
+    if (!prepared && memo?.enabled) {
+      prepared = prepareBassCurveMetricGrid(corrected, assessmentStartHz, assessmentEndHz, anchorDb);
+      memo.metricGrids.set(gridKey, prepared);
+      if (operationCounts) operationCounts.uniqueMetricGridPreparations += 1;
+    }
+    const metrics = calculateSeatMetricsFromCorrected(corrected, assessmentStartHz, assessmentEndHz, anchorDb, prepared);
     if (metrics) seatMetrics.push({ seatId: seat.seatId, isPrimary: seat.isPrimary, ...metrics });
   }
   if (operationCounts) {
-    operationCounts.perSeatMetricEvaluations += correctedSeats.length;
+    operationCounts.uniquePerSeatMetricEvaluations += correctedSeats.length;
     operationCounts.perSeatEvaluationTimeMs += performance.now() - startedAt;
   }
   if (!seatMetrics.length) return null;
   const worstSeat = seatMetrics.reduce((worst, m) => m.maxAbsDeviationDb > worst.maxAbsDeviationDb ? m : worst);
   const meanMaxDev = seatMetrics.reduce((sum, m) => sum + m.maxAbsDeviationDb, 0) / seatMetrics.length;
   const rmsTargetError = Math.sqrt(seatMetrics.reduce((sum, m) => sum + m.rmsDeviationDb ** 2, 0) / seatMetrics.length);
-  return {
+  return writeExactMemo(memo?.metrics, metricsKey, {
     seatMetrics,
     worstSeatId: worstSeat.seatId,
     worstSeatMaxDeviationDb: worstSeat.maxAbsDeviationDb,
     worstSeatP19Level: houseCurveP19Level(worstSeat.maxAbsDeviationDb),
     meanSeatMaxDeviationDb: meanMaxDev,
     rmsSeatTargetErrorDb: rmsTargetError,
-  };
+  }, memo?.enabled);
 }
 
 // Find ALL broad residual regions across all seats, sorted by severity (descending).
 // Each region is seat-specific so trials can be generated per-seat while the shared
 // bank is evaluated across all seats.
-function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts) {
+function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo) {
   const allRegions = [];
-  for (const { seat, corrected } of correctedCurvesForSharedBank(seats, filters, operationCounts)) {
+  for (const { seat, corrected } of correctedCurvesForSharedBank(seats, filters, operationCounts, memo)) {
     const smoothed = applyBassSmoothing(corrected, "third");
     const trendPoints = smoothed
       .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
@@ -212,29 +240,51 @@ function buildProposedBank(trial, filters) {
 // Validate a proposed bank against complete-bank limits. If the bank fails and a
 // single filter's gain can be scaled, binary-search the gain to find the largest
 // admissible value. Returns { filters, limits, scaled } or { filters: null, limits, scaled }.
-function validateAndScaleTrial(proposedFilters, scalableFilterIndex, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
-  const limits = evaluateProvisionalBankLimits(proposedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-  if (limits.allOk) return { filters: proposedFilters, limits, scaled: false };
-  if (scalableFilterIndex === null || scalableFilterIndex < 0 || scalableFilterIndex >= proposedFilters.length)
-    return { filters: null, limits, scaled: false };
-  const scalable = proposedFilters[scalableFilterIndex];
-  if (!scalable?.enabled || !Number.isFinite(scalable.gainDb) || Math.abs(scalable.gainDb) <= 0.1)
-    return { filters: null, limits, scaled: false };
-  const isBoost = scalable.gainDb > 0;
-  let lo = 0;
-  let hi = Math.abs(scalable.gainDb);
-  for (let i = 0; i < 14; i++) {
-    const mid = (lo + hi) / 2;
-    const scaledGain = isBoost ? mid : -mid;
-    const scaledFilters = proposedFilters.map((f, i) => i === scalableFilterIndex ? { ...f, gainDb: scaledGain } : f);
-    const scaledLimits = evaluateProvisionalBankLimits(scaledFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-    if (scaledLimits.allOk) lo = mid; else hi = mid;
+function validateAndScaleTrial(proposedFilters, scalableFilterIndex, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, operationCounts, preparedBankValidation) {
+  if (operationCounts) operationCounts.bankValidationRequests += 1;
+  const startedAt = operationCounts ? performance.now() : 0;
+  const limits = preparedBankValidation
+    ? evaluatePreparedBankLimits(preparedBankValidation, proposedFilters, profile, operationCounts)
+    : evaluateProvisionalBankLimits(proposedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  let result;
+  if (limits.allOk) {
+    result = { filters: proposedFilters, limits, scaled: false };
+  } else if (scalableFilterIndex === null || scalableFilterIndex < 0 || scalableFilterIndex >= proposedFilters.length) {
+    result = { filters: null, limits, scaled: false };
+  } else {
+    const scalable = proposedFilters[scalableFilterIndex];
+    if (!scalable?.enabled || !Number.isFinite(scalable.gainDb) || Math.abs(scalable.gainDb) <= 0.1) {
+      result = { filters: null, limits, scaled: false };
+    } else {
+      const isBoost = scalable.gainDb > 0;
+      let lo = 0;
+      let hi = Math.abs(scalable.gainDb);
+      for (let i = 0; i < 14; i++) {
+        const mid = (lo + hi) / 2;
+        const scaledGain = isBoost ? mid : -mid;
+        const scaledFilters = proposedFilters.map((f, i) => i === scalableFilterIndex ? { ...f, gainDb: scaledGain } : f);
+        const scaledLimits = preparedBankValidation
+          ? evaluatePreparedBankLimits(preparedBankValidation, scaledFilters, profile, operationCounts)
+          : evaluateProvisionalBankLimits(scaledFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+        if (scaledLimits.allOk) lo = mid; else hi = mid;
+      }
+      const scaledGainDb = isBoost ? lo : -lo;
+      if (Math.abs(scaledGainDb) <= 0.1) {
+        result = { filters: null, limits, scaled: true };
+      } else {
+        const scaledFilters = proposedFilters.map((f, i) => i === scalableFilterIndex ? { ...f, gainDb: scaledGainDb } : f);
+        const finalLimits = preparedBankValidation
+          ? evaluatePreparedBankLimits(preparedBankValidation, scaledFilters, profile, operationCounts)
+          : evaluateProvisionalBankLimits(scaledFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+        result = { filters: finalLimits.allOk ? scaledFilters : null, limits: finalLimits, scaled: true };
+      }
+    }
   }
-  const scaledGainDb = isBoost ? lo : -lo;
-  if (Math.abs(scaledGainDb) <= 0.1) return { filters: null, limits, scaled: true };
-  const scaledFilters = proposedFilters.map((f, i) => i === scalableFilterIndex ? { ...f, gainDb: scaledGainDb } : f);
-  const finalLimits = evaluateProvisionalBankLimits(scaledFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-  return { filters: finalLimits.allOk ? scaledFilters : null, limits: finalLimits, scaled: true };
+  if (operationCounts) {
+    operationCounts.uniqueBankValidations += 1;
+    operationCounts.candidateBankValidationTimeMs += performance.now() - startedAt;
+  }
+  return result;
 }
 
 // Generate trials for a single residual region. Returns { trials, productLimited }.
@@ -323,7 +373,7 @@ function generateTrialsForRegion(region, filters, profile, activeSubs, usableLfH
 
 // Run a single-start optimisation loop. Returns { filters, metrics, baselineWorstSeatDeviation,
 // blockedResiduals, stopReason, bankEvalCount, operations }.
-export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
+export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, options = {}) {
   const peakThresholdDb = profile.peakDiscoveryThresholdDb || 1;
   const valleyThresholdDb = profile.valleyDiscoveryThresholdDb || 1;
   const maxOperations = 30;
@@ -331,13 +381,28 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const operationCounts = {
     curveEvaluationRequests: 0,
     uniqueCurveFilterEvaluations: 0,
+    reusedCurveEvaluationRequests: 0,
     filterPointEvaluations: 0,
+    metricGridPreparationRequests: 0,
+    uniqueMetricGridPreparations: 0,
     perSeatMetricEvaluations: 0,
+    uniquePerSeatMetricEvaluations: 0,
+    reusedPerSeatMetricEvaluations: 0,
     perSeatEvaluationTimeMs: 0,
+    bankValidationRequests: 0,
+    uniqueBankValidations: 0,
+    reusedBankValidations: 0,
+    filterResponseRequests: 0,
+    uniqueFilterResponses: 0,
+    bankFilterPointEvaluations: 0,
     candidateBankValidationTimeMs: 0,
   };
+  const memo = options.memo || createHouseCurveEvaluationMemo(options.reuseExactEvaluations !== false);
+  const preparedBankValidation = options.preparedBankValidation || (options.reuseExactEvaluations !== false
+    ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
+    : null);
   let filters = initialFilters.map((f) => ({ ...f }));
-  let currentMetrics = calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts);
+  let currentMetrics = calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo);
   if (!currentMetrics) return { filters, metrics: null, baselineWorstSeatDeviation: null, blockedResiduals: [], stopReason: "no seat metrics", bankEvalCount: 0, operations: 0, operationCounts };
 
   const baselineWorstSeatDeviation = currentMetrics.worstSeatMaxDeviationDb;
@@ -359,7 +424,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const trace = [];
 
   while (operations < maxOperations) {
-    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts);
+    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo);
     if (!regions.length) { stopReason = "no residual regions found"; break; }
 
     const iterationEntry = {
@@ -382,9 +447,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
 
       for (const trial of trials) {
         const proposedFilters = buildProposedBank(trial, filters);
-        const validationStart = performance.now();
-        const validation = validateAndScaleTrial(proposedFilters, trial.scalableIndex, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-        operationCounts.candidateBankValidationTimeMs += performance.now() - validationStart;
+        const validation = validateAndScaleTrial(proposedFilters, trial.scalableIndex, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, operationCounts, preparedBankValidation);
         bankEvalCount++;
 
         const trialEntry = {
@@ -428,7 +491,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           continue;
         }
         regionAdmissible = true;
-        const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts);
+        const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo);
         if (!trialMetrics) {
           trialEntry.rejectionReason = "no metrics computed";
           iterationEntry.trials.push(trialEntry);

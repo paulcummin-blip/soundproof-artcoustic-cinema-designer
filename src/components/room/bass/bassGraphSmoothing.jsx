@@ -31,10 +31,18 @@ function fractionalWindowBounds(sorted, width) {
   return bounds;
 }
 
+export function prepareBassSmoothingGrid(data, mode) {
+  if (!Array.isArray(data) || data.length < 3 || mode === "none") return { sorted: data, bounds: null };
+  const width = mode === "sixth" ? 6 : mode === "third" ? 3 : mode === "octave" ? 1 : null;
+  if (!width) return { sorted: data, bounds: null };
+  const sorted = [...data].sort((a, b) => a.frequency - b.frequency);
+  return { sorted, bounds: fractionalWindowBounds(sorted, width) };
+}
+
 function smoothFractionalOctave(data, width) {
   if (!Array.isArray(data) || data.length < 3) return data;
-  const sorted = [...data].sort((a, b) => a.frequency - b.frequency);
-  const bounds = fractionalWindowBounds(sorted, width);
+  const mode = width === 6 ? "sixth" : width === 3 ? "third" : "octave";
+  const { sorted, bounds } = prepareBassSmoothingGrid(data, mode);
   return sorted.map(({ frequency }, pointIndex) => {
     const [start, end] = bounds[pointIndex];
     let sum = 0;

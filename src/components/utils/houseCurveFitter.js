@@ -13,6 +13,8 @@ import {
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { houseCurveP19Level, calculateAllSeatMetrics, runSingleStart, compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
+import { createHouseCurveEvaluationMemo } from "@/components/utils/houseCurveEvaluationMemo";
+import { prepareBankValidation } from "@/components/utils/preparedBankValidation";
 
 export { houseCurveP19Level };
 
@@ -76,11 +78,14 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   // The worst-seat objective uses real seats exclusively.
   const realSeatCurves = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
     .filter((s) => s?.seatId && s.seatId !== "rsp" && !s.__isSyntheticRsp && Array.isArray(s?.responseData) && s.responseData.length > 0)
-    .map((s) => ({ seatId: s.seatId, isPrimary: !!s.isPrimary, raw: normaliseCurve(s.responseData) }))
+    .map((s) => {
+      const raw = normaliseCurve(s.responseData);
+      return { seatId: s.seatId, isPrimary: !!s.isPrimary, raw, gridKey: raw.map((point) => point.frequency).join("|") };
+    })
     .filter((s) => s.raw.length > 0);
 
   const hasRealSeats = realSeatCurves.length > 0;
-  const objectiveSeats = hasRealSeats ? realSeatCurves : [{ seatId: "rsp", isPrimary: true, raw: rspRaw }];
+  const objectiveSeats = hasRealSeats ? realSeatCurves : [{ seatId: "rsp", isPrimary: true, raw: rspRaw, gridKey: rspRaw.map((point) => point.frequency).join("|") }];
   const objectiveLabel = hasRealSeats ? "Worst real seat" : "RSP fallback — no real seats";
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
@@ -100,10 +105,16 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     : [];
 
   // Multi-start: Start A (empty bank), Start B (Standard-seeded bank).
-  const startA = runSingleStart([], objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  const reuseExactEvaluations = options.reuseExactEvaluations !== false;
+  const evaluationMemo = createHouseCurveEvaluationMemo(reuseExactEvaluations);
+  const preparedBankValidation = reuseExactEvaluations
+    ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
+    : null;
+  const evaluationOptions = { reuseExactEvaluations, memo: evaluationMemo, preparedBankValidation };
+  const startA = runSingleStart([], objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
   let startB = startA;
   if (standardSeedFilters.length > 0) {
-    startB = runSingleStart(standardSeedFilters, objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+    startB = runSingleStart(standardSeedFilters, objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
   }
 
   // Select the start with the best worst-real-seat score.

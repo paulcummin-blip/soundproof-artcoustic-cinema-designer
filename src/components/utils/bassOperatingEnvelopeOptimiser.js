@@ -6,6 +6,7 @@ import { CANONICAL_BASS_PRIORITY_MODES, normalizeBassPriorityMode, rankBassCandi
 import { calculateHouseCurveEqCurve } from "@/components/utils/houseCurveFitter";
 import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCurveFitterCore";
 import { retargetCandidateForRequest } from "@/components/utils/bassCandidateRequestRetargeting";
+import { summarizeCoreOperations } from "@/components/utils/bassOptimiserPerformance";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -233,6 +234,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     achievedP20VariationDb,
     worstP20SeatId,
     p20Available,
+    perSeatPostEqCurves,
     // Uniform seat metrics — calculated identically for every profile (Standard,
     // Accuracy, house-curve) from perSeatPostEqCurves using the same 1/3-octave
     // smoothing, assessment band, and target curve as houseCurveFitterCore.js.
@@ -285,7 +287,7 @@ const FIT_PROFILES_TO_GENERATE = [
 // Heavy candidate generation — does NOT depend on priorityMode.
 // Generates both Standard and Accuracy candidates for every RP22 request,
 // each with EQ fits, P14/P18/P19, seat-aware metrics, and P20.
-export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true }) {
+export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
   if (!rawCurve.length || !activeSubs.length) return {
     candidates: [], selectablePool: [], definitions: null, performanceSummary: null, poolId: null,
     generatedCandidateCount: 0, physicallyCredibleCount: 0, requestedEnvelopeValidCount: 0,
@@ -418,6 +420,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
         targetToleranceDb: request.p19.p19ToleranceDb,
         assessmentStartHz, assessmentEndHz, collectDiagnostics,
         initialFilters: standardSeedFilters,
+        reuseExactEvaluations: reuseExactHouseCurveEvaluations,
       });
       coreFitTimeMs += perf() - fitStart;
       perSeatEvaluationTimeMs += houseCurveEq.operationCounts?.perSeatEvaluationTimeMs || 0;
@@ -456,9 +459,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       candidateEvaluationCount,
       reusedCandidateEvaluationCount,
       curveFilterEvaluationCount,
-      sharedCurveEvaluationRequests: Array.from(coreFitCache.values()).reduce((sum, eq) => sum + (eq.operationCounts?.curveEvaluationRequests || 0), 0),
-      uniqueSharedCurveFilterEvaluations: Array.from(coreFitCache.values()).reduce((sum, eq) => sum + (eq.operationCounts?.uniqueCurveFilterEvaluations || 0), 0),
-      filterPointEvaluations: Array.from(coreFitCache.values()).reduce((sum, eq) => sum + (eq.operationCounts?.filterPointEvaluations || 0), 0),
+      ...summarizeCoreOperations(coreFitCache.values()),
     },
     poolId,
     generatedCandidateCount: candidates.length,

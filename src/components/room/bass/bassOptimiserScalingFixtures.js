@@ -1,5 +1,6 @@
 import { generateCandidatePool, selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
+import { stableCandidateSignature } from "@/components/utils/bassPriorityPolicies";
 
 const rawCurve = Array.from({ length: 37 }, (_, index) => {
   const frequency = 20 + index * 5;
@@ -10,44 +11,68 @@ const makeSeats = (count) => Array.from({ length: count }, (_, seatIndex) => ({
   seatId: `seat-${seatIndex + 1}`,
   responseData: rawCurve.map((point) => ({ ...point, spl: point.spl + Math.sin(point.frequency / (11 + seatIndex)) * 0.4 })),
 }));
-const snapshot = (selection) => ({
-  candidate: selection.selectedCandidate,
-  filters: selection.selectedFilters,
-  curve: selection.finalPostEqCurve,
-  p14: [selection.selectedCandidate?.achievedP14Level, selection.selectedCandidate?.achievedP14Db],
-  p18: [selection.selectedCandidate?.achievedP18Level, selection.selectedCandidate?.achievedP18FrequencyHz],
-  p19: [selection.selectedCandidate?.achievedP19Level, selection.selectedCandidate?.achievedP19VariationDb],
-  p20: [selection.selectedCandidate?.achievedP20Level, selection.selectedCandidate?.achievedP20VariationDb],
-});
-const run = (seatCount, reuseCandidateEvaluations) => {
-  const pool = generateCandidatePool({ rawCurve, activeSubs, usableLfHz: 20, transitionHz: 100, perSeatRawCurves: makeSeats(seatCount), reuseCandidateEvaluations });
+
+function run(seatCount, reuseExactHouseCurveEvaluations) {
+  const pool = generateCandidatePool({
+    rawCurve, activeSubs, usableLfHz: 20, transitionHz: 100,
+    perSeatRawCurves: makeSeats(seatCount), reuseCandidateEvaluations: true,
+    reuseExactHouseCurveEvaluations,
+  });
   return { pool, selection: selectCandidateFromPool(pool, "balanced") };
-};
+}
+
+function paritySnapshot(runResult) {
+  const { pool, selection } = runResult;
+  const selected = selection.selectedCandidate;
+  return {
+    candidateOrdering: pool.candidates.map(stableCandidateSignature),
+    selectedCandidate: stableCandidateSignature(selected),
+    filterBank: selected?.generatedFilterBank,
+    postEqRspCurve: selected?.finalPostEqCurve,
+    postEqSeatCurves: selected?.perSeatPostEqCurves,
+    parameters: {
+      p14: [selected?.achievedP14Level, selected?.achievedP14Db],
+      p18: [selected?.achievedP18Level, selected?.achievedP18FrequencyHz],
+      p19: [selected?.achievedP19Level, selected?.achievedP19VariationDb],
+      p20: [selected?.achievedP20Level, selected?.achievedP20VariationDb],
+    },
+    rejectionReasons: pool.candidates.map((candidate) => candidate.rejectionReason),
+    bankValidationResult: selected?.bankValidationResult,
+  };
+}
+
+function exactChecks(label, before, after) {
+  const beforeSnapshot = paritySnapshot(before);
+  const afterSnapshot = paritySnapshot(after);
+  return Object.keys(beforeSnapshot).map((field) => ({
+    name: `${label} ${field} exact`,
+    passed: JSON.stringify(beforeSnapshot[field]) === JSON.stringify(afterSnapshot[field]),
+  }));
+}
 
 export function runBassOptimiserScalingFixtures() {
   const beforeOne = run(1, false);
   const afterOne = run(1, true);
   const beforeEight = run(8, false);
   const afterEight = run(8, true);
-  const oneParity = JSON.stringify(snapshot(beforeOne.selection)) === JSON.stringify(snapshot(afterOne.selection));
-  const eightParity = JSON.stringify(snapshot(beforeEight.selection)) === JSON.stringify(snapshot(afterEight.selection));
-  const countsOne = afterOne.pool.performanceSummary;
-  const countsEight = afterEight.pool.performanceSummary;
   const checks = [
-    { name: "One-seat selected candidate, filters, curve and P14-P20 are exact", passed: oneParity },
-    { name: "Eight-seat selected candidate, filters, curve and P14-P20 are exact", passed: eightParity },
-    { name: "Unique core-fit count does not multiply by seats", passed: countsOne.uniqueCoreFitCount === countsEight.uniqueCoreFitCount },
-    { name: "Completed candidate evaluations are reused", passed: countsOne.reusedCandidateEvaluationCount > 0 && countsEight.reusedCandidateEvaluationCount > 0 },
-    { name: "Only per-seat metric work scales with seat count", passed: countsEight.seatCount === 8 && countsOne.seatCount === 1 },
+    ...exactChecks("One-seat", beforeOne, afterOne),
+    ...exactChecks("Eight-seat", beforeEight, afterEight),
+    { name: "One-seat prepares smoothing grids once per exact job context", passed: afterOne.pool.performanceSummary.uniqueMetricGridPreparations < afterOne.pool.performanceSummary.metricGridPreparationRequests },
+    { name: "Eight-seat prepares smoothing grids once per exact job context", passed: afterEight.pool.performanceSummary.uniqueMetricGridPreparations < afterEight.pool.performanceSummary.metricGridPreparationRequests },
+    { name: "Eight-seat reuses exact aggregate responses", passed: afterEight.pool.performanceSummary.reusedCurveEvaluationRequests > 0 },
+    { name: "One-seat reuses exact filter response arrays", passed: afterOne.pool.performanceSummary.uniqueFilterResponses < afterOne.pool.performanceSummary.filterResponseRequests },
+    { name: "Eight-seat reuses exact filter response arrays", passed: afterEight.pool.performanceSummary.uniqueFilterResponses < afterEight.pool.performanceSummary.filterResponseRequests },
+    { name: "Eight-seat retains every seat metric request", passed: afterEight.pool.performanceSummary.perSeatMetricEvaluations === beforeEight.pool.performanceSummary.perSeatMetricEvaluations },
   ];
   return {
     beforeOne: beforeOne.pool.performanceSummary,
-    afterOne: countsOne,
+    afterOne: afterOne.pool.performanceSummary,
     beforeEight: beforeEight.pool.performanceSummary,
-    afterEight: countsEight,
+    afterEight: afterEight.pool.performanceSummary,
     parity: {
-      oneSeat: { selectedCandidate: oneParity, filters: oneParity, postEqCurves: oneParity, p14ToP20: oneParity },
-      eightSeats: { selectedCandidate: eightParity, filters: eightParity, postEqCurves: eightParity, p14ToP20: eightParity },
+      oneSeat: exactChecks("One-seat", beforeOne, afterOne),
+      eightSeats: exactChecks("Eight-seat", beforeEight, afterEight),
     },
     results: checks,
     passed: checks.filter((check) => check.passed).length,

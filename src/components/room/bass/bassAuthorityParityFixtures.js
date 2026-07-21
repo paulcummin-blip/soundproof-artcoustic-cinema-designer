@@ -15,7 +15,7 @@ const EXPECTED = {
     product: "prod:v1:977ef67df51e68bf",
     calibration: "cal:v1:78a112f01d23d1e2",
   },
-  selectedCandidate: "f221c026",
+  selectedCandidate: "5ac5cac6",
   filterBank: "493ca3ff",
   postEqCurve: "6bb500ca",
   parameters: "cf53ad37",
