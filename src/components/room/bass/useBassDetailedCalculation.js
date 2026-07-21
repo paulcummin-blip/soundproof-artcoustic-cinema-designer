@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { bassBackgroundAnalysisStore } from "@/components/room/bass/bassBackgroundAnalysisStore";
+import { useBassBackgroundInputPublisher } from "@/components/room/bass/BassBackgroundAnalysisOwner";
 
 const LEGACY_STATUS = {
   idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING",
@@ -7,6 +8,7 @@ const LEGACY_STATUS = {
 };
 
 export function useBassDetailedCalculation({ fingerprint, payload, valid, collectDiagnostics = false } = {}) {
+  const publishInputs = useBassBackgroundInputPublisher();
   const lifecycle = useSyncExternalStore(
     bassBackgroundAnalysisStore.subscribe,
     bassBackgroundAnalysisStore.getSnapshot,
@@ -14,16 +16,14 @@ export function useBassDetailedCalculation({ fingerprint, payload, valid, collec
   );
 
   useEffect(() => {
-    bassBackgroundAnalysisStore.updateInputs({ valid, fingerprint, payload, collectDiagnostics });
-  }, [valid, fingerprint, payload, collectDiagnostics]);
-
-  useEffect(() => () => bassBackgroundAnalysisStore.dispose(), []);
+    publishInputs({ valid, fingerprint, payload, collectDiagnostics });
+  }, [publishInputs, valid, fingerprint, payload, collectDiagnostics]);
 
   const calculate = useCallback((nextFingerprint = fingerprint, nextPayload = payload, diagnostics = collectDiagnostics) => (
     bassBackgroundAnalysisStore.requestManual({ fingerprint: nextFingerprint, payload: nextPayload, collectDiagnostics: diagnostics, force: true })
   ), [fingerprint, payload, collectDiagnostics]);
 
-  const cancel = useCallback(() => bassBackgroundAnalysisStore.dispose(), []);
+  const cancel = useCallback(() => bassBackgroundAnalysisStore.cancelActive(), []);
 
   return {
     lifecycle,

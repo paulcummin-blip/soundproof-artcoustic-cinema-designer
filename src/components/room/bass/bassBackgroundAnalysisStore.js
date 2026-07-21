@@ -8,6 +8,8 @@ export const BASS_BACKGROUND_DEBOUNCE_MS = 1000;
 export const BASS_BACKGROUND_CACHE_LIMIT = 3;
 
 const nowDefault = () => Date.now();
+export const defaultSetTimer = (callback, delay) => globalThis.setTimeout(callback, delay);
+export const defaultClearTimer = (timerId) => globalThis.clearTimeout(timerId);
 
 export function createBackgroundState() {
   return {
@@ -54,7 +56,7 @@ export class BassAnalysisLruCache {
 }
 
 export class BassBackgroundAnalysisController {
-  constructor({ workerFactory, debounceMs = BASS_BACKGROUND_DEBOUNCE_MS, now = nowDefault, setTimer = setTimeout, clearTimer = clearTimeout, cache } = {}) {
+  constructor({ workerFactory, debounceMs = BASS_BACKGROUND_DEBOUNCE_MS, now = nowDefault, setTimer = defaultSetTimer, clearTimer = defaultClearTimer, cache } = {}) {
     this.workerFactory = workerFactory;
     this.debounceMs = debounceMs;
     this.now = now;

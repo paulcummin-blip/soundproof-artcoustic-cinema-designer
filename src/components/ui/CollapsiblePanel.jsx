@@ -20,6 +20,7 @@ export function CollapsiblePanel({
   defaultOpen = false, 
   className,
   headerBg,
+  keepMounted = false,
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [hovered, setHovered] = useState(false);
@@ -50,8 +51,8 @@ export function CollapsiblePanel({
         />
       </button>
       
-      {isOpen && (
-        <div className="px-4 pb-4">
+      {(isOpen || keepMounted) && (
+        <div className="px-4 pb-4" style={isOpen ? undefined : { display: "none" }}>
           {children}
         </div>
       )}

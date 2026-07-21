@@ -1,4 +1,9 @@
-import { BassAnalysisLruCache, BassBackgroundAnalysisController } from "./bassBackgroundAnalysisStore.js";
+import {
+  BassAnalysisLruCache,
+  BassBackgroundAnalysisController,
+  defaultClearTimer,
+  defaultSetTimer,
+} from "./bassBackgroundAnalysisStore.js";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import {
   BASS_OPTIMISER_POOL_PROPERTY,
@@ -97,6 +102,43 @@ export function runBassBackgroundAnalysisFixtures() {
   {
     const message = createErrorMessage("request-3", "fingerprint-3", "failed");
     check("29. Real worker error protocol preserves envelope", message.type === "error" && message.requestId === "request-3" && message.fingerprint === "fingerprint-3" && message.error === "failed");
+  }
+  {
+    let timerId = null;
+    let compatible = true;
+    try { timerId = defaultSetTimer(() => {}, 1000); defaultClearTimer(timerId); } catch { compatible = false; }
+    check("30. Default timer wrappers schedule and clear safely", compatible && timerId != null);
+  }
+  {
+    const h = harness();
+    h.controller.updateInputs(validInput());
+    h.clock.tick(999);
+    check("31. Injected fake timers remain deterministic", h.workers.length === 0 && h.controller.getSnapshot().status === "queued");
+  }
+  {
+    const h = harness();
+    h.controller.updateInputs(validInput());
+    h.clock.tick(1000);
+    const unsubscribe = h.controller.subscribe(() => {});
+    unsubscribe();
+    check("32. Visible panel unmount cannot cancel shared work", h.workers.length === 1 && !h.workers[0].terminated && h.controller.getSnapshot().status === "calculating");
+  }
+  {
+    const h = harness();
+    h.controller.updateInputs(validInput());
+    h.clock.tick(1000);
+    h.controller.dispose();
+    check("33. Room-level owner disposal terminates shared work", h.workers[0].terminated && h.controller.getSnapshot().status === "calculating");
+  }
+  {
+    const h = harness();
+    h.controller.updateInputs(validInput());
+    h.clock.tick(1000);
+    const before = h.controller.getSnapshot();
+    const unsubscribe = h.controller.subscribe(() => {});
+    const observed = h.controller.getSnapshot();
+    unsubscribe();
+    check("34. Reopened panel observes existing job without duplication", observed === before && observed.status === "calculating" && h.workers.length === 1);
   }
 
   const passed = checks.filter((item) => item.passed).length;
