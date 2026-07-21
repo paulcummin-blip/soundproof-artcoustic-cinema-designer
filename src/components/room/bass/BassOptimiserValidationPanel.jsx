@@ -6,7 +6,7 @@ const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
 const fmtMs = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
 
-export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve }) {
+export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve, includeDiagnostics = false }) {
   const [fitterDiagnosticsOpen, setFitterDiagnosticsOpen] = useState(false);
   const [showAllRevisions, setShowAllRevisions] = useState(false);
   if (!result) return null;
@@ -30,7 +30,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
     })()}
     <label className="mt-2 flex w-fit items-center gap-2 font-mono text-[10px] text-emerald-950">Priority mode
       <select value={priorityMode} onChange={(event) => onPriorityModeChange(event.target.value)} className="rounded border border-emerald-300 bg-white px-2 py-1">
-        <option value="balanced">Balanced</option><option value="spl">Prioritise SPL</option><option value="extension">Prioritise extension</option><option value="accuracy">Prioritise house-curve accuracy</option>
+        <option value="balanced">Balanced</option><option value="house_curve_accuracy">House-curve accuracy</option><option value="depth">Depth priority</option><option value="spl">SPL priority</option>
       </select>
     </label>
     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-emerald-950">
@@ -67,6 +67,11 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       </div>;
     })()}
     {result.selectionReason && <div className="mt-1 font-mono text-[10px] text-slate-600">Selection: {result.selectionReason}</div>}
+    {includeDiagnostics && result.selectionDiagnostics && (
+      <div className="mt-1 font-mono text-[10px] text-slate-600">
+        Eligibility: {result.selectionDiagnostics.eligibilityGroup} | Tuple: [{result.selectionDiagnostics.rankingTuple.join(", ")}] | Signature: {result.selectionDiagnostics.selectedCandidateSignature} | Heavy pool reused: {result.selectionDiagnostics.heavyPoolReused ? "Yes" : "No"} | Worker started: {result.selectionDiagnostics.workerStarted ? "Yes" : "No"}
+      </div>
+    )}
     {(() => {
       const allCandidates = Array.isArray(result.candidates) ? result.candidates : [];
       const credible = allCandidates.filter((c) => Number.isFinite(c.achievedP19VariationDb));

@@ -2,7 +2,7 @@ import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES } from "@/components/uti
 import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, computeParam20SeatConsistency, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
-import { selectBestCandidate } from "@/components/utils/optimiserRanking";
+import { CANONICAL_BASS_PRIORITY_MODES, normalizeBassPriorityMode, rankBassCandidates } from "@/components/utils/bassPriorityPolicies";
 import { calculateHouseCurveEqCurve } from "@/components/utils/houseCurveFitter";
 import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCurveFitterCore";
 
@@ -432,10 +432,11 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
 // Lightweight priority selection — reuses the stored candidate pool.
 // Does NOT re-run any core fit, Design EQ fitting, or bank evaluation.
 export function selectCandidateFromPool(pool, priorityMode) {
-  const mode = ["balanced", "spl", "extension", "accuracy"].includes(priorityMode) ? priorityMode : "balanced";
+  const mode = normalizeBassPriorityMode(priorityMode);
   const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
   const t0 = perf();
   if (!pool || !pool.candidates || pool.candidates.length === 0) {
+    const emptySelection = rankBassCandidates([], mode);
     return {
       selectedMode: mode, selectedCandidate: null, selectedFilters: [], finalPostEqCurve: [],
       selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null,
@@ -450,7 +451,9 @@ export function selectCandidateFromPool(pool, priorityMode) {
         diagnosticsIncludedInCoreFits: true,
         selectedRevisionCandidateCount: 0,
       },
-      selectionReason: "No selectable candidates", priorityRerankTimeMs: 0, heavyPoolReused: true,
+      selectionReason: emptySelection.diagnostics.selectionReason,
+      selectionDiagnostics: emptySelection.diagnostics,
+      priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
       poolId: pool?.poolId || null,
       generatedCandidateCount: pool?.generatedCandidateCount || 0,
       physicallyCredibleCount: pool?.physicallyCredibleCount || 0,
@@ -460,13 +463,31 @@ export function selectCandidateFromPool(pool, priorityMode) {
     };
   }
   const selectablePool = pool.selectablePool.length > 0 ? pool.selectablePool : pool.candidates;
-  const selectedByMode = Object.fromEntries(["balanced", "spl", "extension", "accuracy"].map((candidateMode) => {
-    const { selected, selectionReason } = selectBestCandidate(selectablePool, candidateMode);
-    return [candidateMode, selected];
-  }));
-  const selected = selectedByMode[mode] || selectablePool[0] || pool.candidates[0];
-  const isBestCalibratedAttempt = !selected?.meetsRequestedEnvelope;
-  const { selectionReason: modeSelectionReason } = selectBestCandidate(selectablePool, mode);
+  const selectionsByMode = Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((candidateMode) => (
+    [candidateMode, rankBassCandidates(selectablePool, candidateMode)]
+  )));
+  const selectedByMode = Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((candidateMode) => (
+    [candidateMode, selectionsByMode[candidateMode].selected]
+  )));
+  const activeSelection = selectionsByMode[mode];
+  const selected = activeSelection.selected;
+  if (!selected) {
+    return {
+      selectedMode: mode, selectedCandidate: null, selectedFilters: [], finalPostEqCurve: [],
+      selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null,
+      achievedP18Level: "FAIL", achievedP18FrequencyHz: null,
+      achievedP19Level: "FAIL", achievedP19VariationDb: null,
+      selectedFitProfile: null, candidates: pool.candidates, displayCandidates: [],
+      rejectedCandidates: pool.candidates, selectedByMode, isBestCalibratedAttempt: true,
+      warningMessage: activeSelection.diagnostics.selectionReason,
+      selectionReason: activeSelection.diagnostics.selectionReason,
+      selectionDiagnostics: activeSelection.diagnostics,
+      priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
+      poolId: pool.poolId,
+    };
+  }
+  const isBestCalibratedAttempt = activeSelection.diagnostics.eligibilityGroup !== "bank_valid_all_p14_p18_p19_l1";
+  const modeSelectionReason = activeSelection.diagnostics.selectionReason;
   const t1 = perf();
   return {
     selectedMode: mode,
@@ -498,9 +519,11 @@ export function selectCandidateFromPool(pool, priorityMode) {
         ? selected.designEqRevisionDiagnostics.attempts.length
         : 0,
     },
-    selectionReason: modeSelectionReason || `Selected by ${mode} comparator from ${selectablePool.length} physically credible candidates`,
+    selectionReason: modeSelectionReason,
+    selectionDiagnostics: activeSelection.diagnostics,
     priorityRerankTimeMs: t1 - t0,
     heavyPoolReused: true,
+    workerStarted: false,
     poolId: pool.poolId,
     generatedCandidateCount: pool.generatedCandidateCount,
     physicallyCredibleCount: pool.physicallyCredibleCount,
