@@ -233,7 +233,10 @@ export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, asses
 // bank is evaluated across all seats.
 function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions = []) {
   const allRegions = [];
-  for (const { seat, corrected } of correctedCurvesForSharedBank(seats, filters, operationCounts, memo)) {
+  const correctedSeats = correctedCurvesForSharedBank(seats, filters, operationCounts, memo);
+  const rspDiscoverySeats = correctedSeats.filter(({ seat }) => seat.seatId === "rsp");
+  const discoverySeats = rspDiscoverySeats.length ? rspDiscoverySeats : correctedSeats;
+  for (const { seat, corrected } of discoverySeats) {
     const smoothed = applyBassSmoothing(corrected, "third");
     const trendPoints = smoothed
       .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
@@ -475,25 +478,12 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           iterationEntry.trials.push(trialEntry);
           continue;
         }
-        const protectedNullWorsened = protectedNullRegions.some((region) => {
-          const baselinePoint = baselineRspPoints.reduce((best, point) => !best || Math.abs(point.frequency - region.centreFrequencyHz) < Math.abs(best.frequency - region.centreFrequencyHz) ? point : best, null);
-          const trialPoint = trialMetrics.rspResidualPoints.reduce((best, point) => !best || Math.abs(point.frequency - region.centreFrequencyHz) < Math.abs(best.frequency - region.centreFrequencyHz) ? point : best, null);
-          return baselinePoint && trialPoint && trialPoint.deviationDb < baselinePoint.deviationDb - 0.5;
-        });
-        if (protectedNullWorsened) {
-          operationCounts.protectedNullWorseningRejections++;
-          trialEntry.rejectionReason = "protected cancellation null worsened by more than 0.5 dB";
-          iterationEntry.trials.push(trialEntry);
-          continue;
-        }
-        const requiredP14Floor = Number.isFinite(requestedSystemOutputDb) && baselineRspMinimumSplDb >= requestedSystemOutputDb - 0.05
-          ? requestedSystemOutputDb - 0.05 : baselineRspMinimumSplDb - 0.05;
-        if (Number.isFinite(requiredP14Floor) && trialMetrics.rspMinimumSmoothedSplDb < requiredP14Floor) {
-          operationCounts.p14SafetyRejections++;
-          trialEntry.rejectionReason = "P14 minimum would be reduced below the preserved capability floor";
-          iterationEntry.trials.push(trialEntry);
-          continue;
-        }
+        // Protected cancellation regions are excluded from scoring and never receive
+        // corrective boost. Incidental overlap from a credible neighbouring peak cut
+        // is retained in the final physical response rather than blocking that cut.
+        // P14/P18 are calculated from the final post-EQ response. Product capability
+        // remains a hard aggregate-bank constraint for boosts; cuts are not rejected
+        // merely because they lower a room-response minimum.
         // Real seats constrain the RSP fit without becoming its primary objective.
         if (trialMetrics.seatMetrics) {
           let seatWorsened = false;

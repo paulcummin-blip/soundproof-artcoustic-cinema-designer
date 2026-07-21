@@ -15,10 +15,10 @@ const EXPECTED = {
     product: "prod:v1:977ef67df51e68bf",
     calibration: "cal:v1:78a112f01d23d1e2",
   },
-  selectedCandidate: "5ac5cac6",
-  filterBank: "493ca3ff",
-  postEqCurve: "6bb500ca",
-  parameters: "cf53ad37",
+  selectedCandidate: "b6c39088",
+  filterBank: "2fc9b742",
+  postEqCurve: "2b52e9f6",
+  parameters: "60b0cc0d",
 };
 
 function stable(value) {

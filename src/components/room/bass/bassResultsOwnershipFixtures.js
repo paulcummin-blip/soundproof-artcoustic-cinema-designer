@@ -22,7 +22,7 @@ export function runBassResultsOwnershipFixtures() {
   const scope = createBassResultsScope("room-a");
   const contractA = readyContract(FP_A, 115.2);
   scope.replace({ contract: contractA, lifecycle: { status: "ready" }, selectedPriorityMode: "balanced" });
-  check("1. Never-opened simulation publishes product pills", formatBassResults(scope.getSnapshot().contract).pills.p14.text.includes("115.2 dB"));
+  check("1. Never-opened simulation publishes product pills", formatBassResults(scope.getSnapshot().contract).pills.p14.text === "P14 L2 · 116 dB");
 
   let now = 1000;
   let worker = null;

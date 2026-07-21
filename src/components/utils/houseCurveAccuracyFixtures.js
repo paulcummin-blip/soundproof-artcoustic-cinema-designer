@@ -31,6 +31,23 @@ function residualAt(curve, frequency) {
   return point.spl - (ANCHOR_DB + artcousticHouseCurveOffsetAt(point.frequency));
 }
 
+export function runCredibleValleyFixture() {
+  const rawCurve = frequencies.map((frequency) => ({
+    frequency,
+    spl: 100 + artcousticHouseCurveOffsetAt(frequency) + gaussian(frequency, 80, 15, -7),
+  }));
+  const result = calculateHouseCurveEqCurve(rawCurve, [], 35, [{ modelKey: "SUB2-12" }], {
+    targetAnchorDb: 100, requestedSystemOutputDb: 100,
+    assessmentStartHz: 20, assessmentEndHz: 120,
+  });
+  return {
+    filters: result.filters.filter((filter) => filter.enabled),
+    bankLimits: result.bankLimits,
+    pre: result.houseCurveDiagnostics.preRsp,
+    post: result.houseCurveDiagnostics.postRsp,
+  };
+}
+
 export function runHouseCurveAccuracyFixtures() {
   const { rawCurve, perSeatRawCurves } = buildHouseCurveAccuracyReference();
   const startedAt = performance.now();
@@ -52,27 +69,32 @@ export function runHouseCurveAccuracyFixtures() {
   }, [
     { band: 1, enabled: true, type: "Peak", frequencyHz: 77, gainDb: -2, Q: 8 },
     { band: 2, enabled: true, type: "Peak", frequencyHz: 81, gainDb: -2.5, Q: 10 },
-  ], { maximumCutDb: 10, maximumAggregateBoostDb: 6 }, [], 20, 100);
+  ], { maximumCutDb: 15, maximumAggregateBoostDb: 6 }, [], 20, 100);
   const mergeTrials = trials.trials.filter((trial) => trial.action === "merge");
   const refitTrials = trials.trials.filter((trial) => trial.action === "refit");
+  const valley = runCredibleValleyFixture();
 
   const checks = [
     ["34 Hz peak materially closer", Math.abs(point(34.37).beforeResidualDb) - Math.abs(point(34.37).afterResidualDb) >= 3],
     ["69.74 Hz near-target point protected", Math.abs(point(69.74).afterResidualDb) <= 1.5],
     ["107.56 Hz near-target point protected", Math.abs(point(107.56).afterResidualDb) <= 1.5],
     ["39–40 Hz null identified as protected", diagnostics.protectedNullRegions.some((region) => region.centreFrequencyHz >= 39 && region.centreFrequencyHz <= 43)],
-    ["Protected null is not worsened materially", point(39.6).afterResidualDb >= point(39.6).beforeResidualDb - 0.55],
+    ["Protected null receives no aggressive boost", !enabledFilters.some((filter) => filter.gainDb > 0 && filter.frequencyHz >= 35 && filter.frequencyHz <= 47)],
     ["Protected null remains capability limited", diagnostics.protectedNullRegions.some((region) => region.capabilityLimited && region.permittedBoostDb < region.requiredBoostDb)],
     ["Maximum residual excluding nulls improves", diagnostics.postRsp.maximumAbsoluteResidualDb < diagnostics.preRsp.maximumAbsoluteResidualDb - 0.1],
     ["RMS residual excluding nulls improves", diagnostics.postRsp.rmsResidualDb < diagnostics.preRsp.rmsResidualDb - 0.1],
     ["Curve shape improves rather than simple offset", diagnostics.postRsp.shapeRmsResidualDb < diagnostics.preRsp.shapeRmsResidualDb - 0.1 && Math.max(...correctionValues) - Math.min(...correctionValues) > 2],
-    ["Aggregate cut remains within -10 dB", result.bankLimits.cutLimitOk && result.bankLimits.maxAggregateCutDb >= -10.05],
+    ["Aggregate cut remains within -15 dB", result.bankLimits.cutLimitOk && result.bankLimits.maxAggregateCutDb >= -15.05],
     ["Product headroom validation passes", result.bankLimits.sourceDomainHeadroomOk && result.bankLimits.boostLimitOk],
     ["Final complete-bank validation passes", result.bankValidationPassed && result.bankLimits.allOk],
     ["Near-target protection rejects unsafe overlaps", diagnostics.nearTargetProtectionRejectionCount > 0],
     ["Broad cut trials are available", mergeTrials.some((trial) => trial.filter.Q < 4 && trial.filter.gainDb <= -6)],
     ["Overlapping filters can be merged", mergeTrials.length > 0 && mergeTrials.every((trial) => trial.mergedFilterIndices.length === 2)],
     ["Occupied regions can be jointly refit", refitTrials.some((trial) => trial.filter.reason.includes("Joint centre/gain/Q refit"))],
+    ["Credible broad valley uses available boost", valley.bankLimits.maxAggregateBoostDb >= 3 && valley.bankLimits.maxAggregateBoostDb <= 6.05],
+    ["Valley correction respects product headroom", valley.bankLimits.sourceDomainHeadroomOk && valley.bankLimits.allOk],
+    ["Valley maximum and RMS residual improve", valley.post.maximumAbsoluteResidualDb < valley.pre.maximumAbsoluteResidualDb && valley.post.rmsResidualDb < valley.pre.rmsResidualDb],
+    ["Overlapping valley filters are consolidated", valley.filters.length <= 2],
   ].map(([name, passed]) => ({ name, passed: !!passed }));
   return {
     checks, passed: checks.filter((check) => check.passed).length, total: checks.length,

@@ -19,13 +19,16 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
   }, activeSubs, usableLfHz, requestedSystemOutputDb);
   const productLimited = Math.abs(baseCandidate.gainDb) <= 0.1;
   const gainScales = [1, 0.75, 0.5];
-  const rawQValues = [baseCandidate.Q * 0.65, baseCandidate.Q, baseCandidate.Q * 1.5, baseCandidate.Q * 2, 4, 8];
+  const rawQValues = [baseCandidate.Q * 0.65, baseCandidate.Q, 4, 8, 10];
   const qValues = [...new Map(rawQValues.map((q) => {
     const value = Math.max(0.5, Math.min(10, q));
     return [value.toFixed(4), value];
   })).values()];
 
-  if (!productLimited && filters.length < 10) {
+  const overlappingSameSignCount = filters.filter((filter) => filter?.enabled
+    && Math.sign(filter.gainDb) === correctionSign
+    && Math.log2(Math.max(baseCandidate.frequencyHz, filter.frequencyHz) / Math.min(baseCandidate.frequencyHz, filter.frequencyHz)) <= 1 / 2).length;
+  if (!productLimited && filters.length < 10 && overlappingSameSignCount < 2) {
     const seenVariants = new Set();
     for (const gainScale of gainScales) {
       for (const q of qValues) {
@@ -69,7 +72,7 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
 
   const mergeIndices = filters.map((filter, index) => ({ filter, index })).filter(({ filter }) => {
     if (!filter?.enabled || Math.sign(filter.gainDb) !== correctionSign) return false;
-    return Math.log2(Math.max(baseCandidate.frequencyHz, filter.frequencyHz) / Math.min(baseCandidate.frequencyHz, filter.frequencyHz)) <= 1 / 6;
+    return Math.log2(Math.max(baseCandidate.frequencyHz, filter.frequencyHz) / Math.min(baseCandidate.frequencyHz, filter.frequencyHz)) <= 1 / 2;
   }).map(({ index }) => index);
   if (!productLimited && mergeIndices.length >= 2) {
     for (const qScale of [0.75, 1, 1.5]) {

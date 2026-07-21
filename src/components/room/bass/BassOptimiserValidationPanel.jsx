@@ -54,8 +54,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
         <span>P14 preservation: <strong className={preserveP14 ? "text-emerald-700" : "text-amber-700"}>{preserveP14 ? "Yes" : "No"}</strong></span>
         <span>Profile fitting tolerance: <strong className="text-slate-900">±{fmt(fittingTol, " dB")}</strong></span>
         <span>Requested P19 tolerance: <strong className="text-slate-900">{Number.isFinite(reqP19Tol) ? `±${reqP19Tol.toFixed(1)} dB` : "—"}</strong></span>
-        <span>Max permitted cut: <strong className="text-slate-900">−{fmt(maxCut, " dB")}</strong></span>
-        <span>Max permitted boost: <strong className="text-slate-900">+{fmt(maxBoost, " dB")}</strong></span>
+        <span>Constraint: <strong className="text-slate-900">cut up to −{fmt(maxCut, " dB")} / boost up to +{fmt(maxBoost, " dB")}, capability-limited</strong></span>
       </div>;
     })()}
     {result.selectedCandidate && (() => {
@@ -99,13 +98,16 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       const c = result.selectedCandidate;
       const hbl = c.houseCurveBankLimits || {};
       const psm = Array.isArray(c.perSeatMetrics) ? c.perSeatMetrics : [];
+      const diagnostics = c.houseCurveDiagnostics || {};
+      const protectedNulls = Array.isArray(diagnostics.protectedNullRegions) ? diagnostics.protectedNullRegions : [];
+      const headroomLimits = Array.isArray(c.capabilityLimitedFrequencies) ? c.capabilityLimitedFrequencies : [];
       const baselineDev = c.houseCurveBaselineWorstSeatDeviation;
       const worstDev = c.worstSeatMaxDeviationDb;
       const diff = (Number.isFinite(baselineDev) && Number.isFinite(worstDev)) ? (worstDev - baselineDev).toFixed(1) : "—";
       return <details className="mt-2 rounded border border-indigo-300 bg-indigo-50 p-2 text-[10px]" open>
         <summary className="cursor-pointer font-mono font-semibold text-indigo-900">House-curve seat-aware diagnostics</summary>
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
-          <span>Objective: <strong className="text-slate-900">Worst-seat house-curve accuracy</strong></span>
+          <span>Objective: <strong className="text-slate-900">RSP maximum residual, then RSP RMS; real seats constrained</strong></span>
           <span>Official RSP P19: <strong className="text-slate-900">{result.achievedP19Level} (±{fmt(c.achievedP19VariationDb, " dB")})</strong></span>
           <span>Worst-seat house-curve deviation (P19-equivalent): <strong className="text-slate-900">{level(c.worstSeatP19Level || 0)} (±{fmt(c.worstSeatMaxDeviationDb, " dB")}) @ {c.worstSeatId || "—"}</strong></span>
           <span>Mean seat max dev: <strong className="text-slate-900">{fmt(c.meanSeatMaxDeviationDb, " dB")}</strong></span>
@@ -116,7 +118,13 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
           <span>Diff from Standard baseline: <strong className={Number.isFinite(diff) && Number(diff) <= 0 ? "text-emerald-700" : "text-amber-700"}>{diff} dB</strong></span>
           <span>Limiting reason: <strong className="text-slate-900">{c.houseCurveLimitingReason || "—"}</strong></span>
           <span>Stop reason: <strong className="text-slate-900">{c.houseCurveStopReason || "—"}</strong></span>
+          <span>Pre/post max residual: <strong className="text-slate-900">{fmt(diagnostics.preRsp?.maximumAbsoluteResidualDb, " dB")} → {fmt(diagnostics.postRsp?.maximumAbsoluteResidualDb, " dB")}</strong></span>
+          <span>Pre/post RMS residual: <strong className="text-slate-900">{fmt(diagnostics.preRsp?.rmsResidualDb, " dB")} → {fmt(diagnostics.postRsp?.rmsResidualDb, " dB")}</strong></span>
+          <span>Pre/post mean signed residual: <strong className="text-slate-900">{fmt(diagnostics.preRsp?.meanSignedResidualDb, " dB")} → {fmt(diagnostics.postRsp?.meanSignedResidualDb, " dB")}</strong></span>
+          <span>Merge/replacement decisions: <strong className="text-slate-900">{diagnostics.mergedFilterOperationCount ?? 0} / {diagnostics.replacedFilterOperationCount ?? 0}</strong></span>
+          <span>Product-headroom-limited frequencies: <strong className="text-slate-900">{headroomLimits.length ? headroomLimits.map((frequency) => fmt(frequency, " Hz")).join(", ") : "None"}</strong></span>
         </div>
+        {protectedNulls.length > 0 && <div className="mt-2 font-mono text-[10px] text-slate-700">{protectedNulls.map((region) => <div key={region.centreFrequencyHz}><strong>Protected null {fmt(region.centreFrequencyHz, " Hz")}:</strong> width {fmt(region.widthHz, " Hz")}, target depth {fmt(region.depthRelativeToTargetDb, " dB")}, shoulder depth {fmt(region.depthRelativeToShouldersDb, " dB")}, boost rejected {fmt(region.boostRejectedDb, " dB")} — {region.rejectionReason}</div>)}</div>}
         {psm.length > 0 && (
           <div className="mt-2 overflow-x-auto">
             <div className="font-mono text-[10px] font-semibold text-slate-700 mb-1">Per-seat house-curve deviation</div>

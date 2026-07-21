@@ -21,16 +21,28 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
       maxBoostDb: 6, requestedSystemOutputDb,
     });
     const permittedBoostDb = Number.isFinite(allowance?.allowedBoostDb) ? allowance.allowedBoostDb : 6;
-    const narrowCancellation = octaveWidth(startHz, endHz) < 1 / 3;
+    const widthOctaves = octaveWidth(startHz, endHz);
+    const narrowCancellation = widthOctaves < 1 / 3;
     const capabilityLimited = permittedBoostDb + 0.05 < Math.min(6, requiredBoostDb);
-    if (requiredBoostDb >= 8 || narrowCancellation || capabilityLimited) {
+    const leftShoulder = points.filter((point) => point.frequency < startHz && point.frequency >= startHz / 2 ** (1 / 3)).at(-1);
+    const rightShoulder = points.find((point) => point.frequency > endHz && point.frequency <= endHz * 2 ** (1 / 3));
+    const shoulderResiduals = [leftShoulder?.residualDb, rightShoulder?.residualDb].filter(Number.isFinite);
+    const neighbouringShoulderResidualDb = shoulderResiduals.length
+      ? shoulderResiduals.reduce((sum, value) => sum + value, 0) / shoulderResiduals.length
+      : 0;
+    const depthRelativeToShouldersDb = neighbouringShoulderResidualDb - worst.residualDb;
+    if (requiredBoostDb >= 8 || (narrowCancellation && depthRelativeToShouldersDb >= 4) || capabilityLimited) {
+      const reason = capabilityLimited
+        ? "Significant cancellation null; required boost exceeds selected-product headroom"
+        : "Significant narrow cancellation null with elevated neighbouring shoulders";
       regions.push({
         startHz: startHz / 2 ** (1 / 24), endHz: endHz * 2 ** (1 / 24),
+        widthHz: endHz - startHz, widthOctaves,
         centreFrequencyHz: worst.frequency, signedResidualDb: worst.residualDb,
-        requiredBoostDb, permittedBoostDb, narrowCancellation, capabilityLimited,
-        reason: capabilityLimited
-          ? "Significant cancellation null; required boost exceeds selected-product headroom"
-          : "Significant narrow cancellation null; excluded from target-error objective",
+        depthRelativeToTargetDb: requiredBoostDb, neighbouringShoulderResidualDb,
+        depthRelativeToShouldersDb, requiredBoostDb, permittedBoostDb,
+        boostRejectedDb: requiredBoostDb, narrowCancellation, capabilityLimited,
+        rejectionReason: reason, reason,
       });
     }
     current = [];
@@ -55,8 +67,7 @@ export function evaluateNearTargetProtection(baselinePoints, candidatePoints, ma
     if (!after) continue;
     const afterAbs = Math.abs(after.deviationDb);
     let reason = null;
-    if (afterAbs > 2 + 1e-9) reason = "near-target point exceeded ±2 dB";
-    else if (afterAbs > 1.5 + 1e-9 && maximumResidualImprovementDb < 0.5) reason = "near-target point exceeded ±1.5 dB without larger worst-residual benefit";
+    if (afterAbs > 1.5 + 1e-9) reason = `near-target point exceeded ±1.5 dB while maximum residual improved ${maximumResidualImprovementDb.toFixed(2)} dB`;
     else if (Math.sign(before.deviationDb) !== 0 && Math.sign(after.deviationDb) !== Math.sign(before.deviationDb)
       && afterAbs > Math.abs(before.deviationDb) + 0.5 + 1e-9) reason = "filter crossed target and worsened opposite-side residual";
     if (reason) violations.push({ frequency: before.frequency, beforeResidualDb: before.deviationDb, afterResidualDb: after.deviationDb, reason });
