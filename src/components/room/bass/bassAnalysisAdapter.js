@@ -276,6 +276,10 @@ export function adaptCurrentBassOptimisationResult({
     contract.job.errorMessage = backgroundLifecycle.errorMessage || null;
     contract.job.previousResultStale = !!backgroundLifecycle.previousResultStale;
     contract.job.phase = backgroundLifecycle.progressStage || contract.job.phase;
+    contract.job.lastHeartbeatAtMs = Number.isFinite(backgroundLifecycle.lastHeartbeatAtMs) ? backgroundLifecycle.lastHeartbeatAtMs : null;
+    contract.job.lastHeartbeatAgeMs = Number.isFinite(backgroundLifecycle.lastHeartbeatAgeMs) ? backgroundLifecycle.lastHeartbeatAgeMs : null;
+    contract.job.stalled = !!backgroundLifecycle.stalled;
+    contract.job.terminalOutcome = backgroundLifecycle.terminalOutcome || null;
   }
 
   // --- Selected mode (normalize both internal and canonical inputs) ---

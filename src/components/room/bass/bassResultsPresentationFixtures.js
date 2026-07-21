@@ -61,6 +61,7 @@ export function runBassResultsPresentationFixtures() {
   check("29. Per-seat P19 uses shared magnitude flooring", formatBassResults(ready(), Date.now(), "s1").pills.p19.text === "Target · ±4 dB");
   check("30. P20 formatting uses shared flooring", formatBassParameterValue("p20", 3.8) === "±3 dB");
   { const r = ready(); Object.assign(r.job, { status: "error", resultFingerprint: null }); check("31. P20 job error remains explicit", formatBassResults(r).pills.p20.text === "P20 error"); }
+  { const r = ready(); r.fingerprints.calibration = FP; r.job.currentJobFingerprint = `${FP}|engine:current`; r.job.resultFingerprint = `${FP}|engine:current`; check("32. Versioned cache-key completion is visible", formatBassResults(r).isReady && !formatBassResults(r).isUpdating); }
   const passed = checks.filter((item) => item.passed).length;
   return { results: checks, passed, total: checks.length, allPassed: passed === checks.length };
 }

@@ -8,9 +8,9 @@ const secondsSince = (startedAtMs, nowMs) => Number.isFinite(startedAtMs)
   : 0;
 
 function readyMatchesCurrent(result) {
-  const current = result?.fingerprints?.calibration;
+  const requested = result?.job?.currentJobFingerprint;
   const completed = result?.job?.resultFingerprint;
-  return !!current && completed === current && !!result?.selectedCandidate;
+  return !!requested && completed === requested && !!result?.selectedCandidate;
 }
 
 const normalizeIntegerNoise = (value) => {
@@ -51,7 +51,7 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
   const pills = Object.fromEntries(PARAM_KEYS.map((key) => {
     if (isQueued) return [key, { text: `${key.toUpperCase()} Queued`, level: "—" }];
     if (isUpdating) return [key, { text: `${key.toUpperCase()} Updating · ${elapsedSeconds} s`, level: "—" }];
-    if (status === "error" && key === "p20") return [key, { text: "P20 error", level: "—" }];
+    if (status === "error") return [key, { text: `${key.toUpperCase()} error`, level: "—" }];
     if (!isReady) return [key, { text: `${key.toUpperCase()} —`, level: "—" }];
     return [key, readyPill(key, parameters[key])];
   }));
@@ -69,7 +69,7 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
   if (isQueued) statusText = "Analysis queued";
   if (isUpdating) statusText = `Updating bass analysis · ${elapsedSeconds} s`;
   if (isReady) statusText = result?.job?.cacheStatus === "hit" ? "Restored from cache" : "Analysis ready";
-  if (status === "error") statusText = "Analysis failed · Retry";
+  if (status === "error") statusText = result?.job?.errorMessage || "Analysis failed · Retry";
 
   return { pills, statusText, isReady, isUpdating, elapsedSeconds, selectedMode: result?.selectedMode || "balanced" };
 }

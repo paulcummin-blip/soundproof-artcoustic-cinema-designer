@@ -201,6 +201,10 @@ export function createBassAnalysisResult() {
       errorMessage: null,
       isRefreshingPreviousResult: false,
       previousResultStale: false,
+      lastHeartbeatAtMs: null,
+      lastHeartbeatAgeMs: null,
+      stalled: false,
+      terminalOutcome: null,
     },
 
     roomResponse: {

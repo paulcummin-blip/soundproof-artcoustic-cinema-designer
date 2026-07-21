@@ -17,11 +17,11 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
   }) : [];
   return <>
     {signature && <div style={{ fontSize: 9, color: "#625143", fontFamily: "monospace", marginTop: 4, background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 4, padding: "4px 8px" }}><strong>Candidate signature:</strong> {signatureToString(signature)}</div>}
+    {designEqEnabled && <LiveResultAuthorityDiagnostic result={result} contract={contract} graphCandidateId={graphCandidateId} lifecycle={lifecycle} />}
     {designEqEnabled && result && <>
       <div style={{ fontSize: 10, fontFamily: "monospace", color: "#625143", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
         <strong>Assessment position:</strong> RSP &nbsp;|&nbsp; <strong>Response ID:</strong> rsp &nbsp;|&nbsp; <strong>RSP coordinates:</strong> {rspPosition ? `x=${rspPosition.x.toFixed(3)} / y=${rspPosition.y.toFixed(3)} / z=${rspPosition.z.toFixed(3)} m` : "unavailable"} &nbsp;|&nbsp; <strong>Real seats:</strong> {seatingPositions?.length ?? 0}
       </div>
-      <LiveResultAuthorityDiagnostic result={result} contract={contract} graphCandidateId={graphCandidateId} lifecycle={lifecycle} />
       <BassContractParityAudit contract={contract} optimisationResult={result} detailedStatus={detailedStatus} rspRawCurve={rspRawCurve} perSeatRawCurves={perSeatRawCurves} canonicalPriorityMode={priorityMode} graphCandidateId={graphCandidateId} />
       <BassOptimiserValidationPanel result={result} priorityMode={priorityMode} onPriorityModeChange={onPriorityChange} activeSubs={systemLimits.activeSubs} usableLfHz={systemLimits.usableLfHz} perSeatRawCurves={perSeatRawCurves} rspRawCurve={rspRawCurve} includeDiagnostics />
       <DesignEqFilterBankDiagnostic filters={result.selectedFilters} combinedEqCurve={correction} profile={result.selectedCandidate?.designEqFitProfile} profileConfig={result.selectedCandidate?.designEqFitProfileConfig} />

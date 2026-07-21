@@ -25,11 +25,21 @@ class FakeWorker {
   constructor(registry) { this.registry = registry; this.terminated = false; registry.push(this); }
   postMessage(message) { this.message = message; }
   terminate() { this.terminated = true; }
-  send(type, data = {}) { this.onmessage?.({ data: { type, requestId: this.message.requestId, fingerprint: this.message.fingerprint, ...data } }); }
+  send(type, data = {}) { this.onmessage?.({ data: { type, requestId: this.message.requestId, fingerprint: this.message.fingerprint, identity: this.message.identity || null, ...data } }); }
+  fail(message = "Worker exception") { this.onerror?.({ message }); }
+  messageFail() { this.onmessageerror?.({}); }
 }
 
 function validInput(fingerprint = "cal:v1:0000000000000001") {
-  return { valid: true, fingerprint, payload: { rawCurve: [{ frequency: 20, spl: 100 }], activeSubs: [{ modelKey: "sub2-12" }] } };
+  return {
+    valid: true, fingerprint,
+    identity: {
+      fingerprint, geometryFingerprint: "geo:v1:0000000000000001", productFingerprint: "prod:v1:0000000000000001",
+      calibrationFingerprint: fingerprint, engineVersion: "house-curve-rsp-v2-minus15-plus6",
+      resultSchemaVersion: 2, canonicalPriorityMode: "all-canonical-priorities", poolId: null,
+    },
+    payload: { rawCurve: [{ frequency: 20, spl: 100 }], activeSubs: [{ modelKey: "sub2-12" }] },
+  };
 }
 
 function harness() {
@@ -139,7 +149,7 @@ export function runBassBackgroundAnalysisFixtures() {
     h.controller.updateInputs(validInput());
     h.clock.tick(1000);
     h.controller.dispose();
-    check("33. Room-level owner disposal terminates shared work", h.workers[0].terminated && h.controller.getSnapshot().status === "calculating");
+    check("33. Room-level owner disposal terminates shared work", h.workers[0].terminated && h.controller.getSnapshot().status === "idle" && h.controller.getSnapshot().terminalOutcome === "cancelled");
   }
   {
     const h = harness();
@@ -164,7 +174,19 @@ export function runBassBackgroundAnalysisFixtures() {
       h.controller.getSnapshot().status === "queued"
       && h.controller.getSnapshot().cacheStatus === "rejected-stale"
       && h.controller.getSnapshot().cacheRejectionReason === "engine-version-mismatch");
+    h.clock.tick(1000);
+    completeCurrent(h);
+    h.controller.updateInputs({ ...validInput(fingerprint), legacyFingerprint });
+    check("36. One stale cache causes one fresh completion and zero reruns", h.workers.length === 1 && h.controller.getSnapshot().status === "ready" && h.controller.getSnapshot().terminalOutcome === "complete");
   }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.workers[0].fail("worker boom"); check("37. Worker exception terminates as error", h.controller.getSnapshot().status === "error" && h.controller.getSnapshot().terminalOutcome === "error"); }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.workers[0].messageFail(); check("38. Worker message error terminates as error", h.controller.getSnapshot().status === "error" && /decoded/.test(h.controller.getSnapshot().errorMessage)); }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.workers[0].send("complete", { identity: { ...h.workers[0].message.identity, engineVersion: "wrong" }, pool: {} }); check("39. Identity mismatch starts at most one replacement", h.workers.length === 2 && h.controller.getSnapshot().replacementRunCount === 1); }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.controller.dispose(); check("40. Owner unmount terminates as cancelled", h.controller.getSnapshot().terminalOutcome === "cancelled" && h.controller.getSnapshot().status === "idle"); }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); completeCurrent(h, { candidates: [], selectablePool: [] }); check("41. Empty eligible override still reaches terminal state", ["ready", "error"].includes(h.controller.getSnapshot().status)); }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.controller.reportMainThreadError(new Error("ranking boom"), "Priority selections"); check("42. Ranking exception reaches terminal error", h.controller.getSnapshot().status === "error" && /ranking boom/.test(h.controller.getSnapshot().errorMessage)); }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.clock.tick(15000); check("43. Missing heartbeat exposes stalled stage", h.controller.getSnapshot().stalled && h.controller.getSnapshot().status === "calculating"); }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.clock.tick(180000); check("44. Terminal watchdog ends running job", h.controller.getSnapshot().status === "error" && /watchdog/.test(h.controller.getSnapshot().errorMessage)); }
 
   const passed = checks.filter((item) => item.passed).length;
   return { results: checks, passed, total: checks.length, allPassed: passed === checks.length };

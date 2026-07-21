@@ -289,9 +289,6 @@ const FIT_PROFILES_TO_GENERATE = [
   DESIGN_EQ_FIT_PROFILES.accuracy,
 ];
 
-// Heavy candidate generation — does NOT depend on priorityMode.
-// Generates both Standard and Accuracy candidates for every RP22 request,
-// each with EQ fits, P14/P18/P19, seat-aware metrics, and P20.
 export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
   if (!rawCurve.length || !activeSubs.length) return {
     candidates: [], selectablePool: [], definitions: null, performanceSummary: null, poolId: null,
@@ -325,7 +322,8 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       standardFitCount, accuracyFitCount, houseCurveFitCount,
     });
   };
-  report("Source/seat response preparation", 0);
+  report("Normalised curves prepared", 0);
+  report("Candidate definitions generated", 0);
   let taskIndex = 0;
   const candidates = [];
   const appendCandidate = (evaluationKey, request, eqResult) => {
@@ -411,7 +409,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     // Uses the same shared bank for RSP and every real seat. Seeded from the
     // Standard filter bank but optimises for the worst seat, not the RSP.
     taskIndex++;
-    report("Core EQ fitting", taskIndex);
+    report("House-curve multi-start fits", taskIndex);
     const houseCurveCacheKey = [
       request.p14.p14TargetDb, assessmentStartHz, assessmentEndHz,
       "house_curve", `seed:${seedSignature}`,
@@ -436,9 +434,11 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     report("Per-seat evaluation", taskIndex);
     appendCandidate(houseCurveCacheKey, request, houseCurveEq);
   }
-  report("Candidate-bank validation", totalTasks);
+  report("Candidate bank built", totalTasks);
   const rankedCandidates = annotateCandidatePoolForHouseCurveRanking(candidates);
+  report("rankedCandidates created", totalTasks);
   const rankedSelectablePool = rankedCandidates.filter(isPhysicallyCredibleBassCandidate);
+  report("rankedSelectablePool created", totalTasks);
   const requestedEnvelopeValidCount = rankedCandidates.filter((c) => c.meetsRequestedEnvelope).length;
   const t1 = perf();
   const poolId = `${rawCurve.length}:${activeSubs.length}:${usableLfHz}:${transitionHz}:${perSeatRawCurves.length}:${t0}`;
@@ -511,7 +511,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
       accuracyFitCount: pool?.accuracyFitCount || 0,
     };
   }
-  const selectablePool = pool.selectablePool.length > 0 ? pool.selectablePool : pool.candidates;
+  const selectablePool = Array.isArray(pool.selectablePool) && pool.selectablePool.length > 0 ? pool.selectablePool : pool.candidates;
   const selectionsByMode = Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((candidateMode) => (
     [candidateMode, rankBassCandidates(selectablePool, candidateMode)]
   )));
