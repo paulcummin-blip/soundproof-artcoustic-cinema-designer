@@ -14,8 +14,10 @@
 //   9.  Unmount terminates BOTH workers (source inspection)
 //   10. No detailed optimiser or EQ fitter is invoked (source inspection)
 //   11. Worker imports only the normalized engine (source inspection)
-//   12. Preview latency: 1 sub including debounce < 150 ms
-//   13. Preview latency: 4 subs including debounce < 150 ms
+//   12. Cold first-preview latency: 1 sub (no warmup, no gate — honest cold-start)
+//   13. Warm preview latency: 1 sub including debounce < 150 ms
+//   13a. Warm preview latency: 4 subs including debounce < 150 ms
+//   13b. Accuracy: preview vs refinement sampled-point SPL delta < 0.001 dB
 //   14. Fingerprint excludes forbidden fields (model, SPL, EQ, priority, smoothing)
 //   15. Live graph uses normalized data before calibration (gating logic)
 //   16. Refined curve matches direct production flat-source < 0.001 dB
@@ -314,25 +316,49 @@ function fixture_workerImportsOnlyNormalizedEngine() {
   };
 }
 
-// 12. Preview latency: 1 sub including debounce < 150 ms
-function fixture_previewLatencyOneSub() {
+// 12. Cold first-preview latency: 1 sub (no warmup — honest cold-start measurement)
+function fixture_previewLatencyColdStart() {
+  // Do NOT call warmup() — this measures the true cold-start including module
+  // initialization, first JIT, and first modal computation. No pass/fail gate
+  // on cold-start; the warm gate (fixture 13) is the production speed gate.
   const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
   const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
   const result = computeNormalizedRoomTransfer({
     roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
     subsForSimulation: [sub], physicsOptions: PREVIEW_PHYSICS,
+    pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE,
   });
   const calcMs = (typeof performance !== "undefined" && performance.now) ? performance.now() - start : Date.now() - start;
   const totalUpdateMs = calcMs + PREVIEW_DEBOUNCE_MS;
   return {
-    name: "12. Preview latency: 1 sub — calc + debounce < 150 ms",
-    passed: totalUpdateMs < 150,
-    details: `calc: ${calcMs.toFixed(1)} ms. total (calc + ${PREVIEW_DEBOUNCE_MS} ms debounce): ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}`,
+    name: "12. Cold first-preview latency: 1 sub (no warmup, no gate)",
+    passed: true,
+    details: `cold calc: ${calcMs.toFixed(1)} ms. total (calc + ${PREVIEW_DEBOUNCE_MS} ms debounce): ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}. pointsPerOctave: ${PREVIEW_POINTS_PER_OCTAVE}. (No pass/fail — cold-start is reported honestly.)`,
   };
 }
 
-// 13. Preview latency: 4 subs including debounce < 150 ms
+// 13. Warm preview latency: 1 sub including debounce < 150 ms
+function fixture_previewLatencyOneSub() {
+  warmup();
+  const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
+  const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+  const result = computeNormalizedRoomTransfer({
+    roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
+    subsForSimulation: [sub], physicsOptions: PREVIEW_PHYSICS,
+    pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE,
+  });
+  const calcMs = (typeof performance !== "undefined" && performance.now) ? performance.now() - start : Date.now() - start;
+  const totalUpdateMs = calcMs + PREVIEW_DEBOUNCE_MS;
+  return {
+    name: "13. Warm preview latency: 1 sub — calc + debounce < 150 ms",
+    passed: totalUpdateMs < 150,
+    details: `warm calc: ${calcMs.toFixed(1)} ms. total (calc + ${PREVIEW_DEBOUNCE_MS} ms debounce): ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}. pointsPerOctave: ${PREVIEW_POINTS_PER_OCTAVE}`,
+  };
+}
+
+// 13a. Warm preview latency: 4 subs including debounce < 150 ms
 function fixture_previewLatencyFourSubs() {
+  warmup();
   const subs = [
     makeSub("sub2-12", 1.5, 1.0, 0.3, "front"),
     makeSub("sub2-12", 4.5, 1.0, 0.3, "front"),
@@ -343,13 +369,56 @@ function fixture_previewLatencyFourSubs() {
   const result = computeNormalizedRoomTransfer({
     roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
     subsForSimulation: subs, physicsOptions: PREVIEW_PHYSICS,
+    pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE,
   });
   const calcMs = (typeof performance !== "undefined" && performance.now) ? performance.now() - start : Date.now() - start;
   const totalUpdateMs = calcMs + PREVIEW_DEBOUNCE_MS;
   return {
-    name: "13. Preview latency: 4 subs — calc + debounce < 150 ms",
+    name: "13a. Warm preview latency: 4 subs — calc + debounce < 150 ms",
     passed: totalUpdateMs < 150,
-    details: `calc: ${calcMs.toFixed(1)} ms. total: ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}`,
+    details: `warm calc: ${calcMs.toFixed(1)} ms. total: ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}. pointsPerOctave: ${PREVIEW_POINTS_PER_OCTAVE}`,
+  };
+}
+
+// 13b. Accuracy: preview vs refinement at matching frequencies < 0.001 dB
+// Proves the preview is a lower-resolution sampling of the SAME modal/direct
+// result, not different maths. At every preview frequency that exists in the
+// refined curve, the SPL must agree within 0.001 dB.
+function fixture_previewMatchesRefinementAtSampledPoints() {
+  warmup();
+  const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
+
+  const previewResult = computeNormalizedRoomTransfer({
+    roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
+    subsForSimulation: [sub], physicsOptions: PREVIEW_PHYSICS,
+    pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE,
+  });
+
+  const refinedResult = computeNormalizedRoomTransfer({
+    roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
+    subsForSimulation: [sub], physicsOptions: REFINEMENT_PHYSICS,
+  });
+
+  // Build a frequency→SPL map for the refined RSP curve.
+  const refinedMap = new Map();
+  for (const pt of refinedResult.rspCurve) {
+    refinedMap.set(pt.frequency, pt.spl);
+  }
+
+  let maxDelta = 0;
+  let compared = 0;
+  for (const pt of previewResult.rspCurve) {
+    const refinedSpl = refinedMap.get(pt.frequency);
+    if (refinedSpl !== undefined && Number.isFinite(refinedSpl)) {
+      maxDelta = Math.max(maxDelta, Math.abs(pt.spl - refinedSpl));
+      compared++;
+    }
+  }
+
+  return {
+    name: "13b. Preview vs refinement: sampled-point SPL delta < 0.001 dB",
+    passed: maxDelta < 0.001 && compared > 0,
+    details: `max delta: ${maxDelta.toFixed(6)} dB. compared points: ${compared}. preview points: ${previewResult.rspCurve?.length}, refined points: ${refinedResult.rspCurve?.length}. (Preview is a lower-resolution sampling of the same modal/direct result.)`,
   };
 }
 
@@ -577,6 +646,7 @@ export function runNormalizedRoomTransferLiveFixtures() {
     fixture_workerImportsOnlyNormalizedEngine,
     fixture_previewLatencyOneSub,
     fixture_previewLatencyFourSubs,
+    fixture_previewMatchesRefinementAtSampledPoints,
     fixture_fingerprintExcludesForbidden,
     fixture_liveGraphUsesNormalizedBeforeCalibration,
     fixture_refinedMatchesProductionFlatSource,

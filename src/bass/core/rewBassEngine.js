@@ -648,6 +648,54 @@ function legacyModalTransferLocal(frequencyHz, modes, source, seat, roomDims, wi
   };
 }
 
+// Compute room modes with Q values. Extracted from simulateBassResponseRewCore so
+// callers that invoke the engine many times for the same room (e.g.
+// computeNormalizedRoomTransfer: N subs × M listeners) can compute modes once
+// and pass them via options.precomputedModes, avoiding redundant work.
+// Backward-compatible: if precomputedModes is not provided, the engine calls
+// this internally exactly as before.
+export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, axialQ, surfaceAbsorption, enableModes, options = {} }) {
+  if (!enableModes) return [];
+  return computeRoomModesLocal({
+    widthM,
+    lengthM,
+    heightM,
+    fMax: modeGenerationFMaxHz,
+    c: SPEED_OF_SOUND_MPS,
+  }).map((mode) => {
+    const baseQ = estimateModeQByType(mode, axialQ);
+    const absorptionQ = estimateModeQLocal({
+      roomDims: { widthM, lengthM, heightM },
+      surfaceAbsorption,
+      f0: mode.freq,
+      mode,
+    });
+    const isAxialOverride = options?.overrideConstantAxialQ === true && mode.type === 'axial';
+    const isAbsorptionAxialOverride = options?.overrideAbsorptionAxialQ === true && mode.type === 'axial';
+    const qStrategy = options?.qStrategy || 'production';
+    let finalQValue;
+    if (isAxialOverride) {
+      finalQValue = baseQ;
+    } else if (isAbsorptionAxialOverride) {
+      finalQValue = absorptionQ;
+    } else if (qStrategy === 'freq_dependent_cap') {
+      const fdCap = freqDependentQCap(mode.freq);
+      finalQValue = Math.max(1, Math.min(absorptionQ, fdCap));
+    } else if (qStrategy === 'smooth_soft_cap') {
+      const softCap = smoothSoftQCap(mode.freq);
+      finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
+    } else if (qStrategy === 'rew_absorption_authority') {
+      finalQValue = rewAbsorptionAuthorityQ(mode.freq, absorptionQ, surfaceAbsorption);
+    } else if (qStrategy === 'rew_modal_bandwidth') {
+      finalQValue = rewModalBandwidthQ(mode.freq, absorptionQ, options?.rewModalBandwidthScale);
+    } else {
+      const softCap = smoothSoftQCap(mode.freq);
+      finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
+    }
+    return { ...mode, qValue: finalQValue };
+  });
+}
+
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);
@@ -872,65 +920,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     ? Number(options.modeGenerationFMaxHz)
     : freqMaxHz;
 
-  const modes = enableModes
-    ? computeRoomModesLocal({
-        widthM,
-        lengthM,
-        heightM,
-        fMax: modeGenerationFMaxHz,
-        c: SPEED_OF_SOUND_MPS,
-      }).map((mode) => {
-        const baseQ = estimateModeQByType(mode, axialQ);
-        const absorptionQ = estimateModeQLocal({
-          roomDims: { widthM, lengthM, heightM },
-          surfaceAbsorption,
-          f0: mode.freq,
-          mode,  // pass mode indices for topology-aware absorption weighting
-        });
-        // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
-        const isAxialOverride = options?.overrideConstantAxialQ === true && mode.type === 'axial';
-        // __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__
-        const isAbsorptionAxialOverride = options?.overrideAbsorptionAxialQ === true && mode.type === 'axial';
-        // __CANDIDATE_FREQ_DEP_Q__
-        // When qStrategy === 'freq_dependent_cap', replace the static baseQ ceiling with a
-        // frequency-dependent cap. Raw Sabine Q is used (absorptionQ), clamped per band.
-        // Production path (default) is unchanged.
-        const qStrategy = options?.qStrategy || 'production';
-        let finalQValue;
-        if (isAxialOverride) {
-          finalQValue = baseQ;
-        } else if (isAbsorptionAxialOverride) {
-          finalQValue = absorptionQ;
-        } else if (qStrategy === 'freq_dependent_cap') {
-          const fdCap = freqDependentQCap(mode.freq);
-          finalQValue = Math.max(1, Math.min(absorptionQ, fdCap));
-        } else if (qStrategy === 'smooth_soft_cap') {
-          // __CANDIDATE_SMOOTH_SOFT_CAP__ — smooth power-law Q ceiling, no hard band steps.
-          const softCap = smoothSoftQCap(mode.freq);
-          finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
-        } else if (qStrategy === 'rew_absorption_authority') {
-          // __CANDIDATE_REW_ABSORPTION_AUTHORITY__ — new selectable strategy, gives surface
-          // absorption strong, visible authority over modal Q/SPL. See function doc above.
-          finalQValue = rewAbsorptionAuthorityQ(mode.freq, absorptionQ, surfaceAbsorption);
-        } else if (qStrategy === 'rew_modal_bandwidth') {
-          // __CANDIDATE_REW_MODAL_BANDWIDTH__ — broadens modal skirts only. See function doc above.
-          finalQValue = rewModalBandwidthQ(mode.freq, absorptionQ, options?.rewModalBandwidthScale);
-        } else {
-          // __PRODUCTION_SOFT_Q_CAP__ (2026-06-29)
-          // Replaced hard baseQ ceiling (4.0 axial / 3.9 tangential / 2.5 oblique) with a smooth
-          // power-law soft clamp. This allows natural Sabine Q values through for normal rooms while
-          // only compressing extreme Q in rigid edge-cases. The old hard min(baseQ, absorptionQ) was
-          // capping Q at 4.0 for all axial modes regardless of actual room absorption — the primary
-          // cause of excessive response smoothing vs REW.
-          const softCap = smoothSoftQCap(mode.freq);
-          finalQValue = Math.max(1, Math.min(absorptionQ, softCap));
-        }
-        return {
-          ...mode,
-          qValue: finalQValue,
-        };
-      })
-    : [];
+  const modes = Array.isArray(options?.precomputedModes)
+    ? options.precomputedModes
+    : computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, axialQ, surfaceAbsorption, enableModes, options });
 
   const stepDebugRows = [];
   const wholeCurveDebugCandidates = new Map();
