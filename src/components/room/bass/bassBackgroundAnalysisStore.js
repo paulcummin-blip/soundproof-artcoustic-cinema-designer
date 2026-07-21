@@ -1,6 +1,8 @@
 // Shared Phase 4 lifecycle for the existing detailed product-aware optimiser worker.
 // The controller owns scheduling, race rejection and the bounded memory cache;
 // acoustic calculation and candidate selection remain in their existing modules.
+import { BASS_OPTIMISER_POOL_PROPERTY } from "./bassOptimiserWorkerProtocol";
+
 export const BASS_BACKGROUND_SCHEMA_VERSION = 1;
 export const BASS_BACKGROUND_DEBOUNCE_MS = 1000;
 export const BASS_BACKGROUND_CACHE_LIMIT = 3;
@@ -190,7 +192,7 @@ export class BassBackgroundAnalysisController {
     if (active.fingerprint !== this.state.currentCalibrationFingerprint) return false;
     const completedAtMs = this.now();
     const result = {
-      pool: message.pool,
+      pool: message[BASS_OPTIMISER_POOL_PROPERTY],
       calibrationFingerprint: active.fingerprint,
       calculationTimeMs: completedAtMs - active.startedAtMs,
       completedAtMs,

@@ -1,5 +1,11 @@
 import { BassAnalysisLruCache, BassBackgroundAnalysisController } from "./bassBackgroundAnalysisStore.js";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
+import {
+  BASS_OPTIMISER_POOL_PROPERTY,
+  createCompleteMessage,
+  createErrorMessage,
+  createProgressMessage,
+} from "./bassOptimiserWorkerProtocol";
 
 class FakeClock {
   constructor() { this.time = 0; this.jobs = []; }
@@ -79,6 +85,19 @@ export function runBassBackgroundAnalysisFixtures() {
     check("25. Priority reranking reuses compatible pool", balanced.heavyPoolReused && accuracy.heavyPoolReused && balanced.poolId === accuracy.poolId && pool.candidates === candidates);
   }
   { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.controller.dispose(); check("26. Worker terminates on unmount", h.workers[0].terminated); }
+  {
+    const message = createProgressMessage("request-1", "fingerprint-1", { phase: "Optimising" });
+    check("27. Real worker progress protocol preserves envelope", message.type === "progress" && message.requestId === "request-1" && message.fingerprint === "fingerprint-1");
+  }
+  {
+    const pool = { poolId: "protocol-pool", candidates: [] };
+    const message = createCompleteMessage("request-2", "fingerprint-2", pool);
+    check("28. Real worker complete protocol exposes controller pool property", message.type === "complete" && message.requestId === "request-2" && message.fingerprint === "fingerprint-2" && message[BASS_OPTIMISER_POOL_PROPERTY] === pool);
+  }
+  {
+    const message = createErrorMessage("request-3", "fingerprint-3", "failed");
+    check("29. Real worker error protocol preserves envelope", message.type === "error" && message.requestId === "request-3" && message.fingerprint === "fingerprint-3" && message.error === "failed");
+  }
 
   const passed = checks.filter((item) => item.passed).length;
   return { results: checks, passed, total: checks.length, allPassed: passed === checks.length };

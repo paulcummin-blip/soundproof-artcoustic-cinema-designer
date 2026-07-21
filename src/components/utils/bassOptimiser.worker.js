@@ -6,17 +6,21 @@
 // Instantiate via: new Worker(new URL("../../utils/bassOptimiser.worker.js", import.meta.url), { type: "module" })
 
 import { generateCandidatePool } from "./bassOperatingEnvelopeOptimiser";
+import {
+  createCompleteMessage,
+  createErrorMessage,
+  createProgressMessage,
+} from "../room/bass/bassOptimiserWorkerProtocol";
 
 self.onmessage = (e) => {
   const { requestId, fingerprint, payload, collectDiagnostics } = e.data || {};
 
   if (!requestId || !fingerprint) {
-    self.postMessage({
-      type: "error",
-      requestId: requestId || null,
-      fingerprint: fingerprint || null,
-      error: "Missing requestId or fingerprint in worker request",
-    });
+    self.postMessage(createErrorMessage(
+      requestId || null,
+      fingerprint || null,
+      "Missing requestId or fingerprint in worker request",
+    ));
     return;
   }
 
@@ -29,16 +33,15 @@ self.onmessage = (e) => {
       perSeatRawCurves: payload?.perSeatRawCurves || [],
       collectDiagnostics: !!collectDiagnostics,
       onProgress: (progress) => {
-        self.postMessage({ type: "progress", requestId, fingerprint, progress });
+        self.postMessage(createProgressMessage(requestId, fingerprint, progress));
       },
     });
-    self.postMessage({ type: "complete", requestId, fingerprint, pool });
+    self.postMessage(createCompleteMessage(requestId, fingerprint, pool));
   } catch (err) {
-    self.postMessage({
-      type: "error",
+    self.postMessage(createErrorMessage(
       requestId,
       fingerprint,
-      error: err?.message || String(err) || "Unknown worker calculation error",
-    });
+      err?.message || String(err) || "Unknown worker calculation error",
+    ));
   }
 };
