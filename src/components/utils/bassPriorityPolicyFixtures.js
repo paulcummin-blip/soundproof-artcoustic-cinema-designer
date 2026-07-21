@@ -12,7 +12,7 @@ const candidate = (id, p14, p18, p19, options = {}) => ({
   meanSeatMaxDeviationDb: options.mean ?? options.worst ?? options.p19Dev ?? 6 - p19,
   rmsSeatTargetErrorDb: options.rms ?? options.p19Dev ?? 6 - p19,
   allAtLeastL1: p14 >= 1 && p18 >= 1 && p19 >= 1,
-  aggregateBankLimits: { allOk: options.bankValid !== false, maxAggregateBoostDb: 4, maxAggregateCutDb: -8 },
+  bankValidationResult: { allOk: options.bankValid !== false, maxAggregateBoostDb: 4, maxAggregateCutDb: -8 },
   assessmentStartHz: 20, assessmentEndHz: 120,
   generatedFilterBank: options.filters || [{ enabled: true, frequencyHz: 40, gainDb: -2, Q: 4 }],
   finalPostEqCurve: [{ frequency: 40, spl: 100 }],
@@ -68,6 +68,12 @@ export function runBassPriorityPolicyFixtures() {
   const preserved = candidate("preserved", 3, 2, 1, { p14Db: 109.25, p18Hz: 27, p19Dev: 4.75, filters });
   const selected = selectCandidateFromPool(poolOf([preserved]), "spl");
   results.p13SelectedValuesRemainExact = selected.selectedFilters === filters && selected.selectedCandidate === preserved && selected.achievedP14Db === 109.25 && selected.achievedP18FrequencyHz === 27 && selected.achievedP19VariationDb === 4.75 && stableCandidateSignature(selected.selectedCandidate) === "preserved";
+
+  const legacyAccuracy = selectCandidateFromPool(pool, "accuracy");
+  const legacyExtension = selectCandidateFromPool(pool, "extension");
+  results.p14LegacyPriorityValuesRerank = legacyAccuracy.selectedMode === "house_curve_accuracy" && legacyExtension.selectedMode === "depth";
+  results.p15LegacySelectedByModeAliases = legacyAccuracy.selectedByMode.accuracy === legacyAccuracy.selectedByMode.house_curve_accuracy && legacyAccuracy.selectedByMode.extension === legacyAccuracy.selectedByMode.depth;
+  results.p16InvalidBankRejected = rankBassCandidates([candidate("invalid-bank", 4, 4, 4, { bankValid: false })], "balanced").selected === null;
 
   return results;
 }

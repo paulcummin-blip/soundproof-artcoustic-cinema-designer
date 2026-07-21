@@ -3,9 +3,10 @@
 // optimiserRanking (selectBestCandidate) without creating a circular dependency.
 // optimiserRanking.js remains limited to ranking logic and pure ranking fixtures.
 
-import { buildCandidate } from "@/components/utils/bassOperatingEnvelopeOptimiser";
+import { buildCandidate, selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import { selectBestCandidate } from "@/components/utils/optimiserRanking";
-import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
+import { isBankAndBandValid } from "@/components/utils/bassPriorityPolicies";
+import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES, evaluateProvisionalBankLimits } from "@/components/utils/designEqCalibration";
 import { calculateHouseCurveEqCurve, resolveFallback } from "@/components/utils/houseCurveFitter";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
@@ -62,6 +63,30 @@ export function runProductionPathFixtures() {
     && Number.isFinite(houseCurveCand.aggregateBankLimits.maxAggregateBoostDb)
     && Number.isFinite(houseCurveCand.aggregateBankLimits.maxAggregateCutDb)
     && houseCurveCand.aggregateBankLimits.allOk === true;
+
+  const productionPool = {
+    candidates: [standardCand], selectablePool: [standardCand], poolId: "production-path",
+    generatedCandidateCount: 1, physicallyCredibleCount: 1,
+    requestedEnvelopeValidCount: standardCand.meetsRequestedEnvelope ? 1 : 0,
+    performanceSummary: {},
+  };
+  const productionSelection = selectCandidateFromPool(productionPool, "balanced");
+  results.phase5ProductionCandidateEligibleAndSelected = standardCand.bankValidationResult === standardCand.designEqBankDiagnostics.selectedBankLimits
+    && isBankAndBandValid(standardCand)
+    && productionSelection.selectedCandidate === standardCand;
+  results.phase5ProductionOutputsUnchanged = productionSelection.selectedFilters === standardCand.generatedFilterBank
+    && productionSelection.finalPostEqCurve === standardCand.finalPostEqCurve
+    && productionSelection.achievedP14Db === standardCand.achievedP14Db
+    && productionSelection.achievedP18FrequencyHz === standardCand.achievedP18FrequencyHz
+    && productionSelection.achievedP19VariationDb === standardCand.achievedP19VariationDb;
+  const invalidBankValidation = evaluateProvisionalBankLimits(
+    [{ frequencyHz: 100, gainDb: -100, Q: 1, enabled: true }], rawCurve, activeSubs, 35,
+    base.p14TargetDb, DESIGN_EQ_FIT_PROFILES.standard,
+  );
+  const invalidProductionCandidate = { ...standardCand, bankValidationResult: invalidBankValidation };
+  results.phase5InvalidProductionBankRejected = invalidBankValidation.allOk === false
+    && !isBankAndBandValid(invalidProductionCandidate)
+    && selectCandidateFromPool({ ...productionPool, candidates: [invalidProductionCandidate], selectablePool: [invalidProductionCandidate] }, "balanced").selectedCandidate === null;
 
   // --- Fallback fixtures: test resolveFallback directly to force both routes ---
   const rspRaw = freqs.map((f) => ({ frequency: f, spl: artcousticHouseCurveOffsetAt(f) }));

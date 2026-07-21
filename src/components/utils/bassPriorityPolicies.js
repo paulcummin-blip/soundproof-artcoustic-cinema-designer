@@ -50,7 +50,7 @@ export function stableCandidateSignature(candidate) {
 export function isBankAndBandValid(candidate) {
   const start = candidate?.assessmentStartHz;
   const end = candidate?.assessmentEndHz;
-  return candidate?.aggregateBankLimits?.allOk === true &&
+  return candidate?.bankValidationResult?.allOk === true &&
     Number.isFinite(start) && Number.isFinite(end) && end > start;
 }
 

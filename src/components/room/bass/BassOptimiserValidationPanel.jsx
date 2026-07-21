@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import LiveHouseCurveDiagnostics from "@/components/room/bass/LiveHouseCurveDiagnostics";
 import { buildCandidateSignature, signatureToString } from "@/components/room/bass/candidateConsistency";
+import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
 
 const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
@@ -29,7 +30,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       );
     })()}
     <label className="mt-2 flex w-fit items-center gap-2 font-mono text-[10px] text-emerald-950">Priority mode
-      <select value={priorityMode} onChange={(event) => onPriorityModeChange(event.target.value)} className="rounded border border-emerald-300 bg-white px-2 py-1">
+      <select value={normalizeBassPriorityMode(priorityMode)} onChange={(event) => onPriorityModeChange(event.target.value)} className="rounded border border-emerald-300 bg-white px-2 py-1">
         <option value="balanced">Balanced</option><option value="house_curve_accuracy">House-curve accuracy</option><option value="depth">Depth priority</option><option value="spl">SPL priority</option>
       </select>
     </label>

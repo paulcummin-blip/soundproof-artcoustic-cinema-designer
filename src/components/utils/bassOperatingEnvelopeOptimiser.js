@@ -146,6 +146,9 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
   // eq.bankDiagnostics.selectedBankLimits — including the real validation
   // fields (boostLimitOk, cutLimitOk, sourceDomainHeadroomOk, allOk) from
   // finalBankLimits. Never hardcode validation success.
+  const bankValidationResult = eq.designEqFitProfile === "house_curve"
+    ? eq.bankLimits
+    : eq.bankDiagnostics?.selectedBankLimits;
   const aggregateBankLimits = eq.designEqFitProfile === "house_curve"
     ? {
         maxAggregateBoostDb: eq.bankLimits?.maxAggregateBoostDb ?? null,
@@ -243,7 +246,9 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     houseCurveBankLimits: eq.bankLimits,
     houseCurveLimitingReason: eq.limitingReason,
     houseCurveBaselineWorstSeatDeviation: eq.baselineWorstSeatDeviationDb,
-    // Normalised aggregate bank limits — comparable across all profiles.
+    // Exact final result from the existing Design EQ bank validator.
+    bankValidationResult,
+    // Normalised aggregate bank limits — retained for diagnostics compatibility.
     aggregateBankLimits,
   };
 }
@@ -466,9 +471,13 @@ export function selectCandidateFromPool(pool, priorityMode) {
   const selectionsByMode = Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((candidateMode) => (
     [candidateMode, rankBassCandidates(selectablePool, candidateMode)]
   )));
-  const selectedByMode = Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((candidateMode) => (
-    [candidateMode, selectionsByMode[candidateMode].selected]
-  )));
+  const selectedByMode = {
+    ...Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((candidateMode) => (
+      [candidateMode, selectionsByMode[candidateMode].selected]
+    ))),
+    accuracy: selectionsByMode.house_curve_accuracy.selected,
+    extension: selectionsByMode.depth.selected,
+  };
   const activeSelection = selectionsByMode[mode];
   const selected = activeSelection.selected;
   if (!selected) {
