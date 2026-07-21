@@ -742,6 +742,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           smoothingMode={bassSmoothingMode}
           lifecycle={detailedLifecycle}
           graphCandidateId={graphCandidateId}
+          transitionFrequencyHz={optimisationTransitionHz}
         />
 
         {/* Allen & Berkley model attribution — presentation only, no simulation/scaling logic */}
