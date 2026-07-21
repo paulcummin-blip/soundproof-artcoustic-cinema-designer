@@ -27,10 +27,10 @@ export function runBassResultsPresentationFixtures() {
   check("1. Idle produces four dashes", Object.values(idle.pills).every((pill) => pill.text.endsWith("—")));
   for (const status of ["queued", "calculating"]) { const r = ready(); Object.assign(r.job, { status, startedAtMs: 1000, resultFingerprint: null }); const f = formatBassResults(r, 13000); check(`2. ${status} hides stale levels`, Object.values(f.pills).every((pill) => !pill.text.includes("L1") && !pill.text.includes("114.1"))); }
   { const r = ready(); Object.assign(r.job, { status: "calculating", startedAtMs: 1000, resultFingerprint: null }); check("3. Genuine elapsed time updates", formatBassResults(r, 13000).pills.p14.text === "P14 Updating · 12 s"); }
-  { const f = formatBassResults(ready());   check("4. Ready values format correctly", f.pills.p14.text === "P14 L1 · 115 dB" && f.pills.p18.text === "P18 L2 · 23 Hz" && f.pills.p19.text === "P19 L1 · ±4 dB" && f.pills.p20.text === "P20 L3 · 3 dB"); }
+  { const f = formatBassResults(ready());   check("4. Ready values format correctly", f.pills.p14.text === "P14 L1 · 115 dB" && f.pills.p18.text === "P18 L2 · 23 Hz" && f.pills.p19.text === "P19 L1 · ±4 dB" && f.pills.p20.text === "P20 L3 · ±3 dB"); }
   check("5. FAIL retains value", formatBassResults(ready({ level: 0 })).pills.p14.text === "P14 FAIL · 115 dB");
   check("6. Single-seat P20 is N/A", formatBassResults(ready({ seats: 1 })).pills.p20.text === "P20 N/A");
-  check("7. Multi-seat P20 floors display only", formatBassResults(ready()).pills.p20.text === "P20 L3 · 3 dB");
+  check("7. Multi-seat P20 floors display only", formatBassResults(ready()).pills.p20.text === "P20 L3 · ±3 dB");
   { const candidates = [candidate("a", 1), candidate("b", 2)]; const pool = { candidates, selectablePool: candidates, poolId: "pool", performanceSummary: {} }; const a = selectCandidateFromPool(pool, "balanced"); const b = selectCandidateFromPool(pool, "spl"); check("8. Priority switch reuses pool with zero workers", a.poolId === b.poolId && b.workerStarted === false && b.heavyPoolReused === true); }
   { const same = candidate("same", 2); const pool = { candidates: [same], selectablePool: [same], poolId: "pool", performanceSummary: {} }; check("9. Identical achievements stay identical", selectCandidateFromPool(pool, "balanced").achievedP14Db === selectCandidateFromPool(pool, "spl").achievedP14Db); }
   { const r = ready(); Object.assign(r.job, { status: "stale", queuedAtMs: 1000, resultFingerprint: null }); check("10. Changed inputs immediately update", formatBassResults(r, 2000).pills.p14.text.startsWith("P14 Updating")); }
@@ -59,7 +59,7 @@ export function runBassResultsPresentationFixtures() {
     check(`${15 + index}. ${name}`, formatBassParameterValue(key, value) === expected);
   });
   check("29. Per-seat P19 uses shared magnitude flooring", formatBassResults(ready(), Date.now(), "s1").pills.p19.text === "Target · ±4 dB");
-  check("30. P20 formatting uses shared flooring", formatBassParameterValue("p20", 3.8) === "3 dB");
+  check("30. P20 formatting uses shared flooring", formatBassParameterValue("p20", 3.8) === "±3 dB");
   { const r = ready(); Object.assign(r.job, { status: "error", resultFingerprint: null }); check("31. P20 job error remains explicit", formatBassResults(r).pills.p20.text === "P20 error"); }
   const passed = checks.filter((item) => item.passed).length;
   return { results: checks, passed, total: checks.length, allPassed: passed === checks.length };

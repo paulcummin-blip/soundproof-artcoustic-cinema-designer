@@ -32,7 +32,7 @@ export function runRp22GradingBoundaryFixtures() {
   ];
   p20Cases.forEach(([value, floored, level]) => {
     expect(`P20 ${value} grades from floor`, levelP20_lfConsistency, value, level);
-    check(`P20 ${value} displays ${floored} dB`, floorP20Deviation(value) === floored && formatP20Deviation(value) === `${floored} dB`);
+    check(`P20 ${value} displays ±${floored} dB`, floorP20Deviation(value) === floored && formatP20Deviation(value) === `±${floored} dB`);
   });
   const singleSeat = adaptCurrentBassOptimisationResult({
     optimisationResult: { selectedCandidate: { p20Available: true, achievedP20Level: 1, achievedP20VariationDb: 11.3, generatedFilterBank: [] }, poolId: "single-seat" },

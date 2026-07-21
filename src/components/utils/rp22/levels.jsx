@@ -67,7 +67,7 @@ export function floorP20Deviation(dB) {
 
 export function formatP20Deviation(dB) {
   const floored = floorP20Deviation(dB);
-  return floored == null ? '—' : `${floored} dB`;
+  return floored == null ? '—' : `±${floored} dB`;
 }
 
 export function levelP20_lfConsistency(dB) {
