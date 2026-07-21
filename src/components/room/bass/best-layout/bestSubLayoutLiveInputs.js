@@ -1,12 +1,11 @@
 import { useSyncExternalStore } from "react";
-import { buildNormalizedPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
-import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "@/components/room/bass/bassPhysicsDefaults";
+import { createBestSubLayoutPhysicsSnapshot } from "@/components/room/bass/best-layout/bestSubLayoutPhysicsSnapshot";
 
-let snapshot = { physicsOptions: buildNormalizedPhysicsOptions(BASS_NORMALIZED_PHYSICS_DEFAULTS), sourceHeights: null };
+let snapshot = null;
 const listeners = new Set();
 
 export function publishBestSubLayoutLiveInputs(next) {
-  snapshot = next;
+  snapshot = createBestSubLayoutPhysicsSnapshot(next);
   listeners.forEach((listener) => listener());
 }
 

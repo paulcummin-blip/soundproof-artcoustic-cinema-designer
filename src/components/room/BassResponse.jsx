@@ -38,6 +38,8 @@ import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalize
 import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS as PHYSICS_DEFAULTS } from "@/components/room/bass/bassPhysicsDefaults";
+import { useActiveProjectId } from "@/components/state/project-session";
+import { resolveBestSubLayoutContextId } from "@/components/room/bass/best-layout/bestSubLayoutContext";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code.
@@ -48,6 +50,8 @@ const IS_DEVELOPMENT_MODE = false;
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
   const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave, designEqEnabled, setDesignEqEnabled, mlpY_m } = useAppState();
+  const activeProjectId = useActiveProjectId();
+  const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims });
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
@@ -930,11 +934,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     reflectionGainScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale,
   });
 
-  usePublishBestSubLayoutInputs({
-    roomDims, seatingPositions, rspPosition, physicsOptions: normalizedPhysicsOptions,
-    frontSourceHeightM: frontSubsCfg?.bottomHeightM,
-    rearSourceHeightM: rearSubsCfg?.bottomHeightM,
-  });
+  usePublishBestSubLayoutInputs({ contextId: layoutContextId, physicsOptions: normalizedPhysicsOptions });
 
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims, rspPosition, seatingPositions, subsForSimulation,

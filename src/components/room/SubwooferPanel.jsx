@@ -9,6 +9,8 @@ import P14LevelPill from '@/components/room/P14LevelPill';
 import BestSubLayoutGuide from '@/components/room/bass/best-layout/BestSubLayoutGuide';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
+import { useActiveProjectId } from '@/components/state/project-session';
+import { resolveBestSubLayoutContextId } from '@/components/room/bass/best-layout/bestSubLayoutContext';
 
 function rectsOverlap(a, b) {
   return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
@@ -55,6 +57,8 @@ function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
+  const activeProjectId = useActiveProjectId();
+  const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims: roomDimensions });
   const hasLcrSubClash = useMemo(() => hasFrontLcrSubClash({
     speakers: appState?.speakerSystem?.placedSpeakers,
     frontSubs: appState?.subwoofers,
@@ -350,6 +354,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               seatingPositions={seats}
               rspPosition={rspPosition}
               sourceHeights={{ front: frontSubsCfg?.bottomHeightM, rear: rearSubsCfg?.bottomHeightM }}
+              contextId={layoutContextId}
             />
           </div>
         </div>
