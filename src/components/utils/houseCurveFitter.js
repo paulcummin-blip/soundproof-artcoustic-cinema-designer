@@ -122,6 +122,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   let blockedResiduals = selected.blockedResiduals;
   let bankEvalCount = selected.bankEvalCount;
   let operations = selected.operations;
+  const operationCounts = [startA, startB === startA ? null : startB].filter(Boolean).reduce((totals, start) => {
+    Object.entries(start.operationCounts || {}).forEach(([key, value]) => { totals[key] = (totals[key] || 0) + value; });
+    return totals;
+  }, {});
 
   // Final bank validation — must pass all hard limits. If it fails (safety net),
   // revert to the Standard seed (or empty) and recalculate metrics.
@@ -227,6 +231,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     selectionReason: `House-curve fitter (${selectedStartLabel} start, ${objectiveLabel}): ${operations} operations, worst-seat ${finalMetrics?.worstSeatId ?? "—"} at ±${(finalMetrics?.worstSeatMaxDeviationDb ?? 0).toFixed(1)} dB. ${stopReason}.`,
     revisionDiagnostics: { attempts: [] },
     requestedP19ToleranceDb: Number.isFinite(Number(options.targetToleranceDb)) ? Number(options.targetToleranceDb) : 0,
+    operationCounts,
   };
 }
 

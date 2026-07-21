@@ -14,11 +14,11 @@ export function buildNormalizedSeries(rspCurve, quality, isRefining) {
 
   let label;
   if (quality === "refined") {
-    label = "Live normalized room response — refined";
+    label = "Refined";
   } else if (quality === "preview" && isRefining) {
-    label = "Live normalized room response — refining";
+    label = "Refining…";
   } else {
-    label = "Live normalized room response — preview";
+    label = "Preview";
   }
 
   return {

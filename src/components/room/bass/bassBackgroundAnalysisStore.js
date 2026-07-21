@@ -175,7 +175,7 @@ export class BassBackgroundAnalysisController {
     this.emit({ status: "calculating", startedAtMs, elapsedMs: 0, progressStage: null });
     worker.onmessage = (event) => this.handleWorkerMessage(event?.data || {});
     worker.onerror = (event) => this.handleWorkerError(event?.message || "Worker error", requestId, pending.fingerprint);
-    worker.postMessage({ requestId, fingerprint: pending.fingerprint, payload: pending.payload, collectDiagnostics: !!pending.collectDiagnostics });
+    worker.postMessage({ requestId, fingerprint: pending.fingerprint, payload: pending.payload, collectDiagnostics: !!pending.collectDiagnostics, dispatchedAtMs: this.now() });
   }
 
   handleWorkerMessage(message) {

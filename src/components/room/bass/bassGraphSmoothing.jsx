@@ -9,16 +9,42 @@ const SMOOTHING_LABELS = {
   octave: '1 octave',
 };
 
+const WINDOW_CACHE_LIMIT = 8;
+const windowBoundsCache = new Map();
+
+function fractionalWindowBounds(sorted, width) {
+  const key = `${width}:${sorted.map((point) => point.frequency).join(",")}`;
+  const cached = windowBoundsCache.get(key);
+  if (cached) return cached;
+  let lowIndex = 0;
+  let highIndex = 0;
+  const bounds = sorted.map(({ frequency }) => {
+    const fLow = frequency * Math.pow(2, -0.5 / width);
+    const fHigh = frequency * Math.pow(2, 0.5 / width);
+    while (lowIndex < sorted.length && sorted[lowIndex].frequency < fLow) lowIndex++;
+    if (highIndex < lowIndex) highIndex = lowIndex;
+    while (highIndex < sorted.length && sorted[highIndex].frequency <= fHigh) highIndex++;
+    return [lowIndex, highIndex];
+  });
+  windowBoundsCache.set(key, bounds);
+  while (windowBoundsCache.size > WINDOW_CACHE_LIMIT) windowBoundsCache.delete(windowBoundsCache.keys().next().value);
+  return bounds;
+}
+
 function smoothFractionalOctave(data, width) {
   if (!Array.isArray(data) || data.length < 3) return data;
   const sorted = [...data].sort((a, b) => a.frequency - b.frequency);
-  return sorted.map(({ frequency }) => {
-    const fLow = frequency * Math.pow(2, -0.5 / width);
-    const fHigh = frequency * Math.pow(2, 0.5 / width);
-    const pts = sorted.filter((p) => p.frequency >= fLow && p.frequency <= fHigh && Number.isFinite(p.spl));
-    if (pts.length === 0) return { frequency, spl: null };
-    const avg = pts.reduce((s, p) => s + p.spl, 0) / pts.length;
-    return { frequency, spl: avg };
+  const bounds = fractionalWindowBounds(sorted, width);
+  return sorted.map(({ frequency }, pointIndex) => {
+    const [start, end] = bounds[pointIndex];
+    let sum = 0;
+    let count = 0;
+    for (let index = start; index < end; index++) {
+      if (!Number.isFinite(sorted[index].spl)) continue;
+      sum += sorted[index].spl;
+      count++;
+    }
+    return { frequency, spl: count === 0 ? null : sum / count };
   });
 }
 

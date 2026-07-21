@@ -8,7 +8,7 @@
 import {
   evaluateProvisionalBankLimits, limitBoostForCapability,
   isNearDuplicate, countSameSignFiltersInRegion,
-  buildCurveFromBank, findRegions, qForRegion,
+  buildCurveFromBank, findRegions, qForRegion, peakingEqResponseDb,
 } from "@/components/utils/designEqCalibration";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
@@ -108,9 +108,26 @@ function calculateSeatMetricsFromCorrected(correctedCurve, assessmentStartHz, as
 
 // Apply shared filter bank to a seat's raw response, smooth, and calculate per-seat
 // house-curve deviation metrics in the assessment band.
-function calculateSeatMetrics(seatRaw, filters, assessmentStartHz, assessmentEndHz, anchorDb) {
-  const corrected = buildCurveFromBank(seatRaw, filters);
-  return calculateSeatMetricsFromCorrected(corrected, assessmentStartHz, assessmentEndHz, anchorDb);
+function correctedCurvesForSharedBank(seats, filters, operationCounts) {
+  const correctionsByFrequencyGrid = new Map();
+  return seats.map((seat) => {
+    const raw = seat.raw;
+    const gridKey = raw.map((point) => point.frequency).join("|");
+    operationCounts && (operationCounts.curveEvaluationRequests += 1);
+    let correction = correctionsByFrequencyGrid.get(gridKey);
+    if (!correction) {
+      correction = raw.map((point) => filters.reduce((sum, filter) => sum + peakingEqResponseDb(point.frequency, filter), 0));
+      correctionsByFrequencyGrid.set(gridKey, correction);
+      if (operationCounts) {
+        operationCounts.uniqueCurveFilterEvaluations += 1;
+        operationCounts.filterPointEvaluations += raw.length * filters.length;
+      }
+    }
+    return {
+      seat,
+      corrected: raw.map((point, index) => ({ frequency: point.frequency, spl: point.spl + correction[index] })),
+    };
+  });
 }
 
 // Calculate metrics across a set of already-corrected seat curves. Used by the
@@ -139,11 +156,17 @@ export function calculateAllSeatMetricsFromCorrected(correctedCurves, assessment
 }
 
 // Calculate metrics across a set of seats for a given filter bank.
-export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb) {
+export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts = null) {
+  const startedAt = operationCounts ? performance.now() : 0;
   const seatMetrics = [];
-  for (const seat of seats) {
-    const metrics = calculateSeatMetrics(seat.raw, filters, assessmentStartHz, assessmentEndHz, anchorDb);
+  const correctedSeats = correctedCurvesForSharedBank(seats, filters, operationCounts);
+  for (const { seat, corrected } of correctedSeats) {
+    const metrics = calculateSeatMetricsFromCorrected(corrected, assessmentStartHz, assessmentEndHz, anchorDb);
     if (metrics) seatMetrics.push({ seatId: seat.seatId, isPrimary: seat.isPrimary, ...metrics });
+  }
+  if (operationCounts) {
+    operationCounts.perSeatMetricEvaluations += correctedSeats.length;
+    operationCounts.perSeatEvaluationTimeMs += performance.now() - startedAt;
   }
   if (!seatMetrics.length) return null;
   const worstSeat = seatMetrics.reduce((worst, m) => m.maxAbsDeviationDb > worst.maxAbsDeviationDb ? m : worst);
@@ -162,10 +185,9 @@ export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, asses
 // Find ALL broad residual regions across all seats, sorted by severity (descending).
 // Each region is seat-specific so trials can be generated per-seat while the shared
 // bank is evaluated across all seats.
-function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb) {
+function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts) {
   const allRegions = [];
-  for (const seat of seats) {
-    const corrected = buildCurveFromBank(seat.raw, filters);
+  for (const { seat, corrected } of correctedCurvesForSharedBank(seats, filters, operationCounts)) {
     const smoothed = applyBassSmoothing(corrected, "third");
     const trendPoints = smoothed
       .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
@@ -306,9 +328,17 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const valleyThresholdDb = profile.valleyDiscoveryThresholdDb || 1;
   const maxOperations = 30;
 
+  const operationCounts = {
+    curveEvaluationRequests: 0,
+    uniqueCurveFilterEvaluations: 0,
+    filterPointEvaluations: 0,
+    perSeatMetricEvaluations: 0,
+    perSeatEvaluationTimeMs: 0,
+    candidateBankValidationTimeMs: 0,
+  };
   let filters = initialFilters.map((f) => ({ ...f }));
-  let currentMetrics = calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb);
-  if (!currentMetrics) return { filters, metrics: null, baselineWorstSeatDeviation: null, blockedResiduals: [], stopReason: "no seat metrics", bankEvalCount: 0, operations: 0 };
+  let currentMetrics = calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts);
+  if (!currentMetrics) return { filters, metrics: null, baselineWorstSeatDeviation: null, blockedResiduals: [], stopReason: "no seat metrics", bankEvalCount: 0, operations: 0, operationCounts };
 
   const baselineWorstSeatDeviation = currentMetrics.worstSeatMaxDeviationDb;
   // Baseline per-seat max deviations — no seat may drift more than WORST_EQUIV_DB
@@ -329,7 +359,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const trace = [];
 
   while (operations < maxOperations) {
-    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb);
+    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts);
     if (!regions.length) { stopReason = "no residual regions found"; break; }
 
     const iterationEntry = {
@@ -352,7 +382,9 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
 
       for (const trial of trials) {
         const proposedFilters = buildProposedBank(trial, filters);
+        const validationStart = performance.now();
         const validation = validateAndScaleTrial(proposedFilters, trial.scalableIndex, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+        operationCounts.candidateBankValidationTimeMs += performance.now() - validationStart;
         bankEvalCount++;
 
         const trialEntry = {
@@ -396,7 +428,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           continue;
         }
         regionAdmissible = true;
-        const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb);
+        const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts);
         if (!trialMetrics) {
           trialEntry.rejectionReason = "no metrics computed";
           iterationEntry.trials.push(trialEntry);
@@ -473,5 +505,5 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
 
   if (operations >= maxOperations && stopReason === "no safe improvement remained") stopReason = "operation ceiling reached";
 
-  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, blockedResiduals, stopReason, bankEvalCount, operations, trace };
+  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace };
 }

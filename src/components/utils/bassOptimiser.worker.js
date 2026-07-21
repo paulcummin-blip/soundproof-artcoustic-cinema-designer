@@ -13,7 +13,8 @@ import {
 } from "../room/bass/bassOptimiserWorkerProtocol";
 
 self.onmessage = (e) => {
-  const { requestId, fingerprint, payload, collectDiagnostics } = e.data || {};
+  const { requestId, fingerprint, payload, collectDiagnostics, dispatchedAtMs } = e.data || {};
+  const workerStartupTimeMs = Number.isFinite(dispatchedAtMs) ? Math.max(0, Date.now() - dispatchedAtMs) : 0;
 
   if (!requestId || !fingerprint) {
     self.postMessage(createErrorMessage(
@@ -36,6 +37,7 @@ self.onmessage = (e) => {
         self.postMessage(createProgressMessage(requestId, fingerprint, progress));
       },
     });
+    pool.performanceSummary = { ...pool.performanceSummary, workerStartupTimeMs };
     self.postMessage(createCompleteMessage(requestId, fingerprint, pool));
   } catch (err) {
     self.postMessage(createErrorMessage(

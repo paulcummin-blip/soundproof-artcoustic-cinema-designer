@@ -5,6 +5,7 @@ import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { CANONICAL_BASS_PRIORITY_MODES, normalizeBassPriorityMode, rankBassCandidates } from "@/components/utils/bassPriorityPolicies";
 import { calculateHouseCurveEqCurve } from "@/components/utils/houseCurveFitter";
 import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCurveFitterCore";
+import { retargetCandidateForRequest } from "@/components/utils/bassCandidateRequestRetargeting";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -284,7 +285,7 @@ const FIT_PROFILES_TO_GENERATE = [
 // Heavy candidate generation — does NOT depend on priorityMode.
 // Generates both Standard and Accuracy candidates for every RP22 request,
 // each with EQ fits, P14/P18/P19, seat-aware metrics, and P20.
-export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null }) {
+export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true }) {
   if (!rawCurve.length || !activeSubs.length) return {
     candidates: [], selectablePool: [], definitions: null, performanceSummary: null, poolId: null,
     generatedCandidateCount: 0, physicallyCredibleCount: 0, requestedEnvelopeValidCount: 0,
@@ -292,11 +293,19 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   };
   const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
   const t0 = perf();
+  const preparationStart = perf();
   const definitions = getRp22BassOperatingDefinitions();
   const requests = makeRequests(definitions);
+  const preparedSeatCurves = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : []).filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length > 0);
+  const responsePreparationTimeMs = perf() - preparationStart;
   const coreFitCache = new Map();
+  const candidateEvaluationCache = new Map();
   let coreFitTimeMs = 0;
+  let perSeatEvaluationTimeMs = 0;
   let totalCompletedBankEvaluations = 0;
+  let candidateEvaluationCount = 0;
+  let reusedCandidateEvaluationCount = 0;
+  let curveFilterEvaluationCount = 0;
   let standardFitCount = 0;
   let accuracyFitCount = 0;
   let houseCurveFitCount = 0;
@@ -309,9 +318,24 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       standardFitCount, accuracyFitCount, houseCurveFitCount,
     });
   };
-  report("Preparing response curves", 0);
+  report("Source/seat response preparation", 0);
   let taskIndex = 0;
   const candidates = [];
+  const appendCandidate = (evaluationKey, request, eqResult) => {
+    const cached = reuseCandidateEvaluations ? candidateEvaluationCache.get(evaluationKey) : null;
+    if (cached) {
+      reusedCandidateEvaluationCount++;
+      candidates.push(retargetCandidateForRequest(cached, request));
+      return;
+    }
+    const seatStart = perf();
+    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves });
+    perSeatEvaluationTimeMs += perf() - seatStart;
+    candidateEvaluationCount++;
+    curveFilterEvaluationCount += preparedSeatCurves.reduce((count, seat) => count + seat.responseData.length, 0);
+    if (reuseCandidateEvaluations) candidateEvaluationCache.set(evaluationKey, candidate);
+    candidates.push(candidate);
+  };
   for (const request of requests) {
     const assessmentStartHz = request.p18.p18LimitHz;
     const assessmentEndHz = Math.min(request.p14.p14UpperHz, transitionHz);
@@ -319,7 +343,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     // Accuracy fit. The seed guarantees the Accuracy result retains or improves
     // the Standard checkpoint's maximum house-curve deviation.
     taskIndex++;
-    report("Fitting Design EQ", taskIndex);
+    report("Core EQ fitting", taskIndex);
     const standardCacheKey = [
       request.p14.p14TargetDb, assessmentStartHz, assessmentEndHz,
       "standard", DESIGN_EQ_FIT_PROFILES.standard.fittingToleranceDb,
@@ -341,14 +365,14 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       coreFitCache.set(standardCacheKey, standardEq);
       standardFitCount++;
     }
-    report("Assessing RSP and real seats", taskIndex);
-    candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: standardEq, perSeatRawCurves }));
+    report("Per-seat evaluation", taskIndex);
+    appendCandidate(standardCacheKey, request, standardEq);
 
     // Accuracy fit — seeded with the Standard fit's enabled filter bank.
     // The seed signature is included in the cache key so a seeded Accuracy fit
     // cannot reuse an unrelated cached result.
     taskIndex++;
-    report("Fitting Design EQ", taskIndex);
+    report("Core EQ fitting", taskIndex);
     const standardSeedFilters = (standardEq.filters || []).filter((f) => f && f.enabled);
     const seedSignature = standardSeedFilters.map((f) => `${f.frequencyHz}:${f.gainDb}:${f.Q}`).join(",");
     const accuracyCacheKey = [
@@ -373,14 +397,14 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       coreFitCache.set(accuracyCacheKey, accuracyEq);
       accuracyFitCount++;
     }
-    report("Assessing RSP and real seats", taskIndex);
-    candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: accuracyEq, perSeatRawCurves }));
+    report("Per-seat evaluation", taskIndex);
+    appendCandidate(accuracyCacheKey, request, accuracyEq);
 
     // House-curve fit — seat-aware, optimised for worst-seat P19 deviation.
     // Uses the same shared bank for RSP and every real seat. Seeded from the
     // Standard filter bank but optimises for the worst seat, not the RSP.
     taskIndex++;
-    report("Fitting house-curve EQ", taskIndex);
+    report("Core EQ fitting", taskIndex);
     const houseCurveCacheKey = [
       request.p14.p14TargetDb, assessmentStartHz, assessmentEndHz,
       "house_curve", `seed:${seedSignature}`,
@@ -388,7 +412,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     let houseCurveEq = coreFitCache.get(houseCurveCacheKey);
     if (!houseCurveEq) {
       const fitStart = perf();
-      houseCurveEq = calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfHz, activeSubs, {
+      houseCurveEq = calculateHouseCurveEqCurve(rawCurve, preparedSeatCurves, usableLfHz, activeSubs, {
         requestedSystemOutputDb: request.p14.p14TargetDb,
         targetAnchorDb: request.p14.p14TargetDb,
         targetToleranceDb: request.p19.p19ToleranceDb,
@@ -396,14 +420,15 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
         initialFilters: standardSeedFilters,
       });
       coreFitTimeMs += perf() - fitStart;
+      perSeatEvaluationTimeMs += houseCurveEq.operationCounts?.perSeatEvaluationTimeMs || 0;
       totalCompletedBankEvaluations += houseCurveEq.bankDiagnostics?.completedBankEvaluationCount || 0;
       coreFitCache.set(houseCurveCacheKey, houseCurveEq);
       houseCurveFitCount++;
     }
-    report("Assessing RSP and real seats", taskIndex);
-    candidates.push(buildCandidate({ request, rawCurve, activeSubs, usableLfHz, transitionHz, definitions, eqResult: houseCurveEq, perSeatRawCurves }));
+    report("Per-seat evaluation", taskIndex);
+    appendCandidate(houseCurveCacheKey, request, houseCurveEq);
   }
-  report("Complete", totalTasks);
+  report("Candidate-bank validation", totalTasks);
   const selectablePool = candidates.filter(isPhysicallyCredible);
   const requestedEnvelopeValidCount = candidates.filter((c) => c.meetsRequestedEnvelope).length;
   const t1 = perf();
@@ -420,8 +445,20 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       standardFitCount,
       accuracyFitCount,
       houseCurveFitCount,
+      sourceSeatResponsePreparationTimeMs: responsePreparationTimeMs,
       coreFitTimeMs,
+      perSeatEvaluationTimeMs,
+      candidateBankValidationTimeMs: Array.from(coreFitCache.values()).reduce((sum, eq) => sum + (eq.operationCounts?.candidateBankValidationTimeMs || 0), 0),
+      contractAdaptationTimeMs: 0,
       completedBankEvaluationCount: totalCompletedBankEvaluations,
+      seatCount: preparedSeatCurves.length,
+      candidateBankCount: candidates.length,
+      candidateEvaluationCount,
+      reusedCandidateEvaluationCount,
+      curveFilterEvaluationCount,
+      sharedCurveEvaluationRequests: Array.from(coreFitCache.values()).reduce((sum, eq) => sum + (eq.operationCounts?.curveEvaluationRequests || 0), 0),
+      uniqueSharedCurveFilterEvaluations: Array.from(coreFitCache.values()).reduce((sum, eq) => sum + (eq.operationCounts?.uniqueCurveFilterEvaluations || 0), 0),
+      filterPointEvaluations: Array.from(coreFitCache.values()).reduce((sum, eq) => sum + (eq.operationCounts?.filterPointEvaluations || 0), 0),
     },
     poolId,
     generatedCandidateCount: candidates.length,
@@ -522,6 +559,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
     warningMessage: isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : null,
     performanceSummary: {
       ...pool.performanceSummary,
+      contractAdaptationTimeMs: t1 - t0,
       selectedDiagnosticFitTimeMs: 0,
       diagnosticsIncludedInCoreFits: true,
       selectedRevisionCandidateCount: Array.isArray(selected?.designEqRevisionDiagnostics?.attempts)
