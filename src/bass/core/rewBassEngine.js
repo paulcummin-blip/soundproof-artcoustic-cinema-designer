@@ -696,6 +696,30 @@ export function computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMax
   });
 }
 
+// Core-owned preparation helper. Derives surface-absorption normalization,
+// mode-generation frequency, Q strategy and overrides EXACTLY as
+// simulateBassResponseRewCore derives them, then returns the mode bank.
+// Callers that invoke the engine many times for the same room (e.g.
+// computeNormalizedRoomTransfer: N subs × M listeners) call this once and
+// pass the result via options.precomputedModes, avoiding redundant mode
+// computation while guaranteeing identical preprocessing.
+export function prepareModeBank(roomDims, options = {}) {
+  const widthM = Number(roomDims?.widthM);
+  const lengthM = Number(roomDims?.lengthM);
+  const heightM = Number(roomDims?.heightM);
+
+  const enableModes = options?.enableModes === true;
+  const axialQOption = Number(options?.axialQ);
+  const axialQ = Number.isFinite(axialQOption) ? axialQOption : 8.0;
+  const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
+  const freqMaxHz = options?.freqMaxHz;
+  const modeGenerationFMaxHz = Number.isFinite(Number(options?.modeGenerationFMaxHz))
+    ? Number(options.modeGenerationFMaxHz)
+    : freqMaxHz;
+
+  return computeModesWithQ({ widthM, lengthM, heightM, modeGenerationFMaxHz, axialQ, surfaceAbsorption, enableModes, options });
+}
+
 export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCurve, options = {}) {
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);

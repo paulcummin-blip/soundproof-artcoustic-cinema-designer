@@ -32,7 +32,7 @@
 //     Original seat IDs are preserved separately in the output. Duplicate
 //     or missing seat IDs cannot overwrite responses.
 
-import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
+import { simulateBassResponseRewCore, prepareModeBank } from "@/bass/core/rewBassEngine";
 import { computeGeometryFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 
@@ -218,6 +218,23 @@ export function computeNormalizedRoomTransfer({
   // Run the engine for each listener, summing complex pressure across all subs.
   // This mirrors the production path in BassResponse.jsx exactly, using the
   // same production flat 94 dB source curve (REW_SOURCE_CURVES.flat_rew_reference).
+  //
+  // Mode-bank reuse: the room-mode bank depends only on room dimensions,
+  // surface absorption, Q strategy and frequency range — never on the source
+  // or listener position. Compute it once via the core-owned prepareModeBank
+  // helper (which derives preprocessing identically to simulateBassResponseRewCore)
+  // and pass it to every engine call via options.precomputedModes. This avoids
+  // redundant mode computation across N subs × M listeners with zero behaviour
+  // change — the engine uses the precomputed bank exactly as if it computed it.
+  const engineOptions = {
+    ...physicsOptions,
+    freqMinHz: 20,
+    freqMaxHz: 200,
+    smoothing: "none",
+    ...(Number.isFinite(pointsPerOctave) ? { pointsPerOctave } : {}),
+  };
+  const precomputedModes = prepareModeBank(roomDims, engineOptions);
+
   const seatResponses = {};
   let frequencies = [];
 
@@ -246,11 +263,8 @@ export function computeNormalizedRoomTransfer({
         sub,
         FLAT_SOURCE_CURVE,
         {
-          ...physicsOptions,
-          freqMinHz: 20,
-          freqMaxHz: 200,
-          smoothing: "none",
-          ...(Number.isFinite(pointsPerOctave) ? { pointsPerOctave } : {}),
+          ...engineOptions,
+          precomputedModes,
         }
       );
 

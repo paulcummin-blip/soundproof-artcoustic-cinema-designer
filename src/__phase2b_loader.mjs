@@ -1,7 +1,7 @@
 // Temporary loader — resolves @/ alias to src/ for Node.js ESM execution.
 // Adds .js/.jsx extension resolution. Deleted after verification.
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, readFileSync } from "node:fs";
 import { dirname, join, extname } from "node:path";
 
 function tryResolveFile(resolvedPath) {
@@ -29,4 +29,17 @@ export async function resolve(specifier, context, nextResolve) {
     }
   }
   return nextResolve(specifier, context);
+}
+
+// Handle .jsx extensions — Node.js doesn't know how to load them by default.
+export async function load(url, context, nextLoad) {
+  if (url.endsWith('.jsx')) {
+    const filePath = fileURLToPath(url);
+    return {
+      format: 'module',
+      source: readFileSync(filePath, 'utf8'),
+      shortCircuit: true,
+    };
+  }
+  return nextLoad(url, context);
 }
