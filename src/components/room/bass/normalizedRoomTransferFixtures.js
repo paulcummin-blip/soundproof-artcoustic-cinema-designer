@@ -318,9 +318,14 @@ function fixture_calculationTime4Subs() {
 }
 
 // Fixture 11: Moving a subwoofer changes the normalized response
+// Uses asymmetric positions (x=1.5 vs x=3.5) about the RSP (x=3.0) so the
+// modal coupling and direct-path distance genuinely differ. Symmetric
+// positions (e.g. x=1.5 vs x=4.5 about a centred RSP) produce identical
+// responses by physical symmetry, which is correct but not what this
+// fixture verifies.
 function fixture_movingSubChangesResponse() {
   const subA = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
-  const subB = makeSub("sub2-12", 4.5, 1.0, 0.3, "front");
+  const subB = makeSub("sub2-12", 3.5, 1.0, 0.3, "front");
 
   const resultA = computeNormalizedRoomTransfer({
     roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
@@ -341,7 +346,7 @@ function fixture_movingSubChangesResponse() {
   return {
     name: "11. Moving a subwoofer changes the normalized response",
     passed: maxDiff > 0.1,
-    details: `Max RSP difference after moving sub from x=1.5 to x=4.5: ${maxDiff.toFixed(3)} dB. ` +
+    details: `Max RSP difference after moving sub from x=1.5 to x=3.5: ${maxDiff.toFixed(3)} dB. ` +
       `Points compared: ${minLen}`,
   };
 }
@@ -420,10 +425,14 @@ function fixture_oneToTwoSourcesChanges() {
 }
 
 // Fixture 14: Identical geometry: SUB2-12 vs SUB3-12 gives identical normalized
-// curves AND identical geometry fingerprint
+// curves AND identical geometry fingerprint.
+// Uses a fixed source ID (not derived from the model key) so the geometry
+// fingerprint — which includes source IDs to identify physical items — is
+// identical. The normalized curves are identical because the engine uses a
+// flat source, making it product-independent.
 function fixture_identicalGeometryFingerprint() {
-  const sub2 = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
-  const sub3 = makeSub("sub3-12", 1.5, 1.0, 0.3, "front");
+  const sub2 = { id: "sub-1", modelKey: "sub2-12", x: 1.5, y: 1.0, z: 0.3, placement: "front", tuning: { gainDb: 0, delayMs: 0, polarity: 0 } };
+  const sub3 = { id: "sub-1", modelKey: "sub3-12", x: 1.5, y: 1.0, z: 0.3, placement: "front", tuning: { gainDb: 0, delayMs: 0, polarity: 0 } };
 
   const result2 = computeNormalizedRoomTransfer({
     roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,

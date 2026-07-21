@@ -47,6 +47,11 @@ export function useBassAnalysisContract({
   requestedAssessmentStartHz, requestedAssessmentEndHz,
   requestedTargetAnchorDb, requestedFitProfile,
   requestedOutputDb, requestedUsableLfHz,
+  // Phase 2A: The sorted set of fit profiles the optimiser actually
+  // evaluates, with their real named constraints. Derived from
+  // DESIGN_EQ_FIT_PROFILES by the caller. Included in the calibration
+  // fingerprint so profile-definition changes invalidate cached results.
+  evaluatedProfiles,
 }) {
   // --- Phase 2A: Live calibration values from the selected candidate ---
   // Prefer values from the selected candidate when one exists. Otherwise use
@@ -109,6 +114,7 @@ export function useBassAnalysisContract({
     targetAnchorDb: liveTargetAnchorDb,
     activeFitProfile: liveFitProfile,
     usableLfHz: liveUsableLfHz,
+    evaluatedProfiles,
   }), [roomDims, rspPosition, seatingPositions, subsForSimulation, surfaceAbsorption,
     roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend,
     modalStorageMode, propagationPhaseScale, enableRewCoreReflections, rewSourceCurveMode,
@@ -122,7 +128,7 @@ export function useBassAnalysisContract({
     liveAssessmentStartHz, liveAssessmentEndHz, liveTargetAnchorDb, liveFitProfile,
     liveRequestedOutputDb, liveUsableLfHz,
     requestedAssessmentStartHz, requestedAssessmentEndHz, requestedTargetAnchorDb,
-    requestedFitProfile, requestedOutputDb, requestedUsableLfHz]);
+    requestedFitProfile, requestedOutputDb, requestedUsableLfHz, evaluatedProfiles]);
 
   const contractGeometryFp = useMemo(() => computeGeometryFingerprint(contractFingerprintInputs), [contractFingerprintInputs]);
   const contractProductFp = useMemo(() => computeProductFingerprint(contractFingerprintInputs), [contractFingerprintInputs]);

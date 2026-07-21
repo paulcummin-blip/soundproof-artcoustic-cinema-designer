@@ -266,6 +266,23 @@ export function computeCalibrationFingerprint(inputs) {
     activeFitProfile: i.activeFitProfile || null,
     requestedOutputDb: num(i.requestedOutputDb, 2),
     usableLfHz: num(i.usableLfHz, 3),
+    // Phase 2A: The sorted set of fit profiles the optimiser actually
+    // evaluates, with their real named constraints (id, max aggregate boost,
+    // max cut) derived from DESIGN_EQ_FIT_PROFILES. A change to any profile
+    // definition invalidates the calibration fingerprint.
+    evaluatedProfiles: Array.isArray(i.evaluatedProfiles)
+      ? i.evaluatedProfiles.map((p) => ({
+          id: p?.id || null,
+          maximumAggregateBoostDb: num(p?.maximumAggregateBoostDb, 2),
+          maximumCutDb: num(p?.maximumCutDb, 2),
+        })).sort((a, b) => {
+          const aId = a.id || "";
+          const bId = b.id || "";
+          if (aId < bId) return -1;
+          if (aId > bId) return 1;
+          return 0;
+        })
+      : null,
   };
 
   return fingerprint(canonical, "cal");

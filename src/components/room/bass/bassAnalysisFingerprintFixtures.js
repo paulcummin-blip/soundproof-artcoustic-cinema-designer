@@ -199,11 +199,14 @@ export function runFingerprintFixtures() {
     results.outputDoesNotChangeGeometry = computeGeometryFingerprint(a) === computeGeometryFingerprint(b);
   }
 
-  // 14. House curve version changes calibration but NOT product or geometry.
+  // 14. House curve fingerprint changes calibration but NOT product or geometry.
+  // The calibration fingerprint hashes houseCurveFingerprint (the hash of the
+  // actual curve points), not a version label — a version label alone does
+  // not guarantee the points haven't changed.
   {
     const a = baseInputs();
     const b = baseInputs();
-    b.houseCurveVersion = "artcoustic-v2";
+    b.houseCurveFingerprint = "hcurve:v1:abcdef1234567890";
     results.houseCurveChangesCalibration = computeCalibrationFingerprint(a) !== computeCalibrationFingerprint(b);
     results.houseCurveDoesNotChangeProduct = computeProductFingerprint(a) === computeProductFingerprint(b);
     results.houseCurveDoesNotChangeGeometry = computeGeometryFingerprint(a) === computeGeometryFingerprint(b);
@@ -389,6 +392,50 @@ export function runFingerprintFixtures() {
     const b = baseInputs();
     b.qStrategy = "standard";
     results.qStrategyChangesGeometry = computeGeometryFingerprint(a) !== computeGeometryFingerprint(b);
+  }
+
+  // 31. Evaluated profiles are included in the calibration fingerprint.
+  // The sorted set of optimiser-evaluated fit profiles (with their named
+  // constraints) must be part of the calibration canonical form.
+  {
+    const a = baseInputs();
+    a.evaluatedProfiles = [
+      { id: "accuracy", maximumAggregateBoostDb: 6, maximumCutDb: 15 },
+      { id: "standard", maximumAggregateBoostDb: 6, maximumCutDb: 10 },
+    ];
+    const b = baseInputs();
+    // No evaluatedProfiles — must differ from a.
+    results.evaluatedProfilesIncluded = computeCalibrationFingerprint(a) !== computeCalibrationFingerprint(b);
+  }
+
+  // 32. Evaluated-profile order does not matter (sorted before hashing).
+  {
+    const a = baseInputs();
+    a.evaluatedProfiles = [
+      { id: "accuracy", maximumAggregateBoostDb: 6, maximumCutDb: 15 },
+      { id: "standard", maximumAggregateBoostDb: 6, maximumCutDb: 10 },
+    ];
+    const b = baseInputs();
+    b.evaluatedProfiles = [
+      { id: "standard", maximumAggregateBoostDb: 6, maximumCutDb: 10 },
+      { id: "accuracy", maximumAggregateBoostDb: 6, maximumCutDb: 15 },
+    ];
+    results.evaluatedProfilesOrderInvariant = computeCalibrationFingerprint(a) === computeCalibrationFingerprint(b);
+  }
+
+  // 33. Evaluated-profile constraint change changes calibration fingerprint.
+  {
+    const a = baseInputs();
+    a.evaluatedProfiles = [
+      { id: "standard", maximumAggregateBoostDb: 6, maximumCutDb: 10 },
+      { id: "accuracy", maximumAggregateBoostDb: 6, maximumCutDb: 15 },
+    ];
+    const b = baseInputs();
+    b.evaluatedProfiles = [
+      { id: "standard", maximumAggregateBoostDb: 6, maximumCutDb: 10 },
+      { id: "accuracy", maximumAggregateBoostDb: 6, maximumCutDb: 20 }, // cut ceiling raised
+    ];
+    results.evaluatedProfilesConstraintChange = computeCalibrationFingerprint(a) !== computeCalibrationFingerprint(b);
   }
 
   return results;

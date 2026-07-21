@@ -21,6 +21,27 @@
 //
 // This is more truthful than inventing L1 or Standard.
 
+import { DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
+
+// The sorted set of fit profiles actually evaluated by the optimiser.
+// Derived from the same exported DESIGN_EQ_FIT_PROFILES used by
+// generateCandidatePool (FIT_PROFILES_TO_GENERATE iterates these entries).
+// Values are NOT duplicated manually — id, maximumAggregateBoostDb, and
+// maximumCutDb are read directly from the profile definitions so any future
+// change to the exported constants is reflected here automatically.
+export function deriveEvaluatedProfiles() {
+  return Object.keys(DESIGN_EQ_FIT_PROFILES)
+    .sort()
+    .map((id) => {
+      const p = DESIGN_EQ_FIT_PROFILES[id];
+      return {
+        id: p.id,
+        maximumAggregateBoostDb: p.maximumAggregateBoostDb,
+        maximumCutDb: p.maximumCutDb,
+      };
+    });
+}
+
 export function deriveRequestedCalibrationConfig({
   splConfig,
   optimisationTransitionHz,
@@ -45,5 +66,11 @@ export function deriveRequestedCalibrationConfig({
     requestedOutputDb: targetSpl,
     // Usable LF limit — real input to generateCandidatePool.
     requestedUsableLfHz: usableLfHz,
+    // Evaluated profiles — the sorted set of fit profiles the optimiser
+    // actually evaluates, with their real named constraints (id, max aggregate
+    // boost, max cut) derived from DESIGN_EQ_FIT_PROFILES. Included in the
+    // calibration fingerprint so a change to the profile definitions (e.g.
+    // raising the cut ceiling) invalidates cached results.
+    evaluatedProfiles: deriveEvaluatedProfiles(),
   };
 }
