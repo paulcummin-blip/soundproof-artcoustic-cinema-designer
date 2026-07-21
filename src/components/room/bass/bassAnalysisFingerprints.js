@@ -315,6 +315,8 @@ export function computeProductFingerprint(inputs) {
       radiationMode: i.splConfig?.radiationMode || "half_space",
     },
     requestedOutputDb: num(i.requestedOutputDb, 2),
+    productDataVersion: i.productDataVersion ?? null,
+    productCapabilities: i.productCapabilities ?? null,
   };
 
   return fingerprint(canonical, "prod");

@@ -177,16 +177,22 @@ export function createBassAnalysisResult() {
     },
 
     job: {
-      status: "uncalculated",
+      status: "idle",
+      lifecycleStatus: "idle",
       calculationId: null,
+      currentJobFingerprint: null,
+      resultFingerprint: null,
+      queuedAtMs: null,
       startedAtMs: null,
       completedAtMs: null,
       elapsedMs: null,
+      cacheStatus: "none",
       progress: null, // number 0–1 or null — never an object
-      phase: null, // current phase text string
+      phase: null, // genuine worker phase text only
       message: null,
       errorMessage: null,
       isRefreshingPreviousResult: false,
+      previousResultStale: false,
     },
 
     roomResponse: {

@@ -24,7 +24,7 @@ import {
   PARAM_P14, PARAM_P18, PARAM_P19, PARAM_P20,
   PARAM_STATUS_UNCALCULATED, PARAM_STATUS_CALCULATING, PARAM_STATUS_UPDATING,
   PARAM_STATUS_COMPLETE, PARAM_STATUS_NOT_APPLICABLE,
-  PRODUCT_STATUS_RUNNING, PRODUCT_STATUS_COMPLETE, PRODUCT_STATUS_STALE,
+  PRODUCT_STATUS_QUEUED, PRODUCT_STATUS_RUNNING, PRODUCT_STATUS_COMPLETE, PRODUCT_STATUS_STALE,
   PRODUCT_STATUS_UNCALCULATED, PRODUCT_STATUS_ERROR,
   BASS_MODE_BALANCED, BASS_MODE_HOUSE_CURVE_ACCURACY, BASS_MODE_DEPTH, BASS_MODE_SPL,
 } from "@/components/room/bass/bassAnalysisContract";
@@ -63,6 +63,7 @@ function countRealSeats(perSeatRawCurves) {
 // Map the detailed-calculation hook status to contract job status.
 function mapJobStatus(detailedStatus, hasResult) {
   switch (detailedStatus) {
+    case "QUEUED": return "queued";
     case "CALCULATING": return "running";
     case "COMPLETE": return "complete";
     case "OUT_OF_DATE": return "stale";
@@ -77,6 +78,7 @@ function mapJobStatus(detailedStatus, hasResult) {
 // Uses ONLY valid product statuses — never "calculating".
 function mapProductAnalysisStatus(detailedStatus, hasResult) {
   switch (detailedStatus) {
+    case "QUEUED": return PRODUCT_STATUS_QUEUED;
     case "CALCULATING": return PRODUCT_STATUS_RUNNING;
     case "COMPLETE": return PRODUCT_STATUS_COMPLETE;
     case "OUT_OF_DATE": return hasResult ? PRODUCT_STATUS_STALE : PRODUCT_STATUS_UNCALCULATED;
@@ -212,6 +214,7 @@ export function adaptCurrentBassOptimisationResult({
   canonicalPriorityMode = null,
   fingerprints = null,
   responseDomain = null,
+  backgroundLifecycle = null,
 } = {}) {
   const contract = createBassAnalysisResult();
 
@@ -243,6 +246,20 @@ export function adaptCurrentBassOptimisationResult({
   contract.job.message = optimisationResult?.warningMessage || null;
   contract.job.errorMessage = null;
   contract.job.isRefreshingPreviousResult = detailedStatus === "CALCULATING" && hasResult;
+  if (backgroundLifecycle) {
+    contract.job.status = backgroundLifecycle.status || "idle";
+    contract.job.lifecycleStatus = contract.job.status;
+    contract.job.currentJobFingerprint = backgroundLifecycle.currentJobFingerprint || null;
+    contract.job.resultFingerprint = backgroundLifecycle.resultFingerprint || null;
+    contract.job.queuedAtMs = Number.isFinite(backgroundLifecycle.queuedAtMs) ? backgroundLifecycle.queuedAtMs : null;
+    contract.job.startedAtMs = Number.isFinite(backgroundLifecycle.startedAtMs) ? backgroundLifecycle.startedAtMs : null;
+    contract.job.completedAtMs = Number.isFinite(backgroundLifecycle.completedAtMs) ? backgroundLifecycle.completedAtMs : null;
+    contract.job.elapsedMs = Number.isFinite(backgroundLifecycle.elapsedMs) ? backgroundLifecycle.elapsedMs : contract.job.elapsedMs;
+    contract.job.cacheStatus = backgroundLifecycle.cacheStatus || "none";
+    contract.job.errorMessage = backgroundLifecycle.errorMessage || null;
+    contract.job.previousResultStale = !!backgroundLifecycle.previousResultStale;
+    contract.job.phase = backgroundLifecycle.progressStage || contract.job.phase;
+  }
 
   // --- Selected mode (normalize both internal and canonical inputs) ---
   const rawMode = canonicalPriorityMode || optimisationResult?.selectedMode || null;

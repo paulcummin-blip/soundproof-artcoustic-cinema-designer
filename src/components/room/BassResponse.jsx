@@ -18,9 +18,9 @@ import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
-import { computeBassFingerprint } from "@/components/utils/bassFingerprint";
+import { computeGeometryFingerprint, computeProductFingerprint, computeCalibrationFingerprint, computeHouseCurveFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { useBassDetailedCalculation } from "@/components/room/bass/useBassDetailedCalculation";
-import BassCalculationStatus from "@/components/room/bass/BassCalculationStatus";
+import BackgroundAnalysisControls from "@/components/room/bass/BackgroundAnalysisControls";
 import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
 import DesignEqFilterBankDiagnostic from "@/components/room/bass/DesignEqFilterBankDiagnostic";
 import BassOptimiserValidationPanel from "@/components/room/bass/BassOptimiserValidationPanel";
@@ -32,6 +32,7 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 import { useBassAnalysisContract } from "@/components/room/bass/useBassAnalysisContract";
 import BassContractParityAudit from "@/components/room/bass/BassContractParityAudit";
 import { deriveRequestedCalibrationConfig } from "@/components/room/bass/requestedCalibrationConfig";
+import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 import { useNormalizedRoomTransferLive } from "@/components/room/bass/useNormalizedRoomTransferLive";
 import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalizedPhysicsOptions";
@@ -890,12 +891,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .filter(seat => seat.responseData.length > 0);
   }, [simulationResults?.seatResponses]);
 
-  // Physical-input fingerprint — deterministic hash of all inputs that affect the
-  // detailed optimisation. Excludes presentation-only state (graph curves, smoothing,
-  // scale, house-curve visibility, Design EQ visibility, priority mode, panel state).
-  // A fingerprint change marks the stored detailed result out of date.
-  const detailedFingerprint = useMemo(() => computeBassFingerprint({
-    roomDims, subsForSimulation, rspPosition, seatingPositions,
+  const requestedCalibrationConfig = useMemo(() => deriveRequestedCalibrationConfig({
+    splConfig, optimisationTransitionHz, designEqSystemLimits,
+  }), [splConfig, optimisationTransitionHz, designEqSystemLimits]);
+  const productCapabilities = useMemo(() => designEqSystemLimits.activeSubs.map((sub) => {
+    const model = MODELS.find((item) => item.key === normaliseModelKey(sub.modelKey));
+    return model ? {
+      modelKey: model.key, response: model.frequency_response_curve,
+      usableLfHz: model.approvedUsableLfHzMinus6dB,
+      continuousSplDb: model.approvedContinuousSplAt1mDb,
+      continuousSpl30HzDb: model.approvedContinuousSplAt30HzDb,
+      peakSplDb: model.approvedPeakSplDb,
+    } : { modelKey: sub.modelKey };
+  }), [designEqSystemLimits.activeSubs]);
+  const detailedFingerprintInputs = useMemo(() => ({
+    roomDims, sources: subsForSimulation, rspPosition, seatingPositions,
     surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode,
     modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
     enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale,
@@ -905,20 +915,48 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale,
     debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
     splConfig, optimisationTransitionHz,
-  }), [roomDims, subsForSimulation, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale, enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, splConfig, optimisationTransitionHz]);
+    requestedOutputDb: requestedCalibrationConfig.requestedOutputDb,
+    houseCurveFingerprint: computeHouseCurveFingerprint(ARTCOUSTIC_HOUSE_CURVE),
+    assessmentStartHz: requestedCalibrationConfig.requestedAssessmentStartHz,
+    assessmentEndHz: requestedCalibrationConfig.requestedAssessmentEndHz,
+    targetAnchorDb: requestedCalibrationConfig.requestedTargetAnchorDb,
+    activeFitProfile: requestedCalibrationConfig.requestedFitProfile,
+    usableLfHz: requestedCalibrationConfig.requestedUsableLfHz,
+    evaluatedProfiles: requestedCalibrationConfig.evaluatedProfiles,
+    productDataVersion: 1, productCapabilities,
+  }), [roomDims, subsForSimulation, rspPosition, seatingPositions, surfaceAbsorption,
+    roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend,
+    modalStorageMode, propagationPhaseScale, enableRewCoreReflections, rewSourceCurveMode,
+    qStrategy, rewModalBandwidthScale, disableReflectionPhaseJitter,
+    disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase,
+    mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode,
+    overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier,
+    debugModalPhaseConvention, reflectionGainScale, debugModalHSign,
+    rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
+    splConfig, optimisationTransitionHz, requestedCalibrationConfig, productCapabilities]);
+  const detailedFingerprints = useMemo(() => ({
+    geometry: computeGeometryFingerprint(detailedFingerprintInputs),
+    product: computeProductFingerprint(detailedFingerprintInputs),
+    calibration: computeCalibrationFingerprint(detailedFingerprintInputs),
+  }), [detailedFingerprintInputs]);
+  const detailedFingerprint = detailedFingerprints.calibration;
 
-  // Detailed calculation hook — manages Web Worker lifecycle, race protection,
-  // cancellation, elapsed timer, and out-of-date detection.
+  const detailedPayload = useMemo(() => ({
+    rawCurve: rspRawCurve, activeSubs: designEqSystemLimits.activeSubs,
+    usableLfHz: designEqSystemLimits.usableLfHz,
+    transitionHz: optimisationTransitionHz, perSeatRawCurves,
+  }), [rspRawCurve, designEqSystemLimits, optimisationTransitionHz, perSeatRawCurves]);
+  const detailedInputsValid = !!rspPosition && Array.isArray(seatingPositions) && seatingPositions.length > 0 &&
+    rspRawCurve.length > 0 && designEqSystemLimits.activeSubs.length > 0 &&
+    [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
   const {
-    status: detailedStatus, detailedResult, progress: detailedProgress,
-    error: detailedError, elapsedMs: detailedElapsedMs,
-    calculate: calculateDetailed, cancel: cancelDetailed, handleFingerprintChange,
-  } = useBassDetailedCalculation();
-
-  // Watch fingerprint changes — marks stored result out of date, cancels active worker.
-  useEffect(() => {
-    handleFingerprintChange(detailedFingerprint);
-  }, [detailedFingerprint, handleFingerprintChange]);
+    lifecycle: detailedLifecycle, status: detailedStatus, detailedResult,
+    progress: detailedProgress, error: detailedError, elapsedMs: detailedElapsedMs,
+    calculate: calculateDetailed,
+  } = useBassDetailedCalculation({
+    fingerprint: detailedFingerprint, payload: detailedPayload,
+    valid: detailedInputsValid, collectDiagnostics: includeDiagnostics,
+  });
 
   // --- Phase 2B: Normalized room-transfer live wiring ---
   // Product-independent physics options for the normalized engine. Built by
@@ -953,17 +991,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // OUT_OF_DATE and this flag is false — the stale result is NOT presented
   // as current; the normalized curve is shown instead.
   const hasValidDetailedResult = designEqEnabled && detailedStatus === "COMPLETE" &&
-    detailedResult?.fingerprint === detailedFingerprint &&
+    detailedResult?.calibrationFingerprint === detailedFingerprint &&
     optimisationResult?.finalPostEqCurve?.length > 0 && rspRawCurve.length > 0;
-
-  // Worker payload — structured-clone-safe data for the detailed calculation.
-  const detailedPayload = useMemo(() => ({
-    rawCurve: rspRawCurve,
-    activeSubs: designEqSystemLimits.activeSubs,
-    usableLfHz: designEqSystemLimits.usableLfHz,
-    transitionHz: optimisationTransitionHz,
-    perSeatRawCurves,
-  }), [rspRawCurve, designEqSystemLimits, optimisationTransitionHz, perSeatRawCurves]);
 
   // Lightweight priority selection — reuses the stored candidate pool from the
   // completed detailed calculation. Changing priorityMode only triggers this
@@ -983,10 +1012,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // targetSpl). P14 target, P18 boundary, and fit profile are null because
   // the optimiser searches all RP22 level combinations and both profiles —
   // no single requested value exists before a candidate is created.
-  const requestedCalibrationConfig = useMemo(() => deriveRequestedCalibrationConfig({
-    splConfig, optimisationTransitionHz, designEqSystemLimits,
-  }), [splConfig, optimisationTransitionHz, designEqSystemLimits]);
-
   const bassAnalysisContract = useBassAnalysisContract({
     roomDims, rspPosition, seatingPositions, subsForSimulation,
     surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode,
@@ -1001,6 +1026,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
     rspRawCurve, perSeatRawCurves, optimiserPriorityMode,
     ...requestedCalibrationConfig,
+    fingerprintsOverride: detailedFingerprints,
+    backgroundLifecycle: detailedLifecycle,
   });
 
   const houseCurveSeries = useMemo(() => {
@@ -1454,54 +1481,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </select>
             </div>
             {designEqEnabled && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => calculateDetailed(detailedFingerprint, detailedPayload, includeDiagnostics)}
-                  disabled={detailedStatus === "CALCULATING" || !detailedFingerprint}
-                  style={{
-                    height: 28, padding: '0 14px', borderRadius: 6,
-                    border: detailedStatus === "OUT_OF_DATE" ? '1px solid #b45309' : '1px solid #213428',
-                    background: detailedStatus === "OUT_OF_DATE" ? '#fffbeb' : '#213428',
-                    color: detailedStatus === "OUT_OF_DATE" ? '#92400e' : '#fff',
-                    fontSize: 11, fontFamily: 'monospace', cursor: 'pointer', fontWeight: 600,
-                    opacity: detailedStatus === "CALCULATING" ? 0.6 : 1,
-                  }}
-                >
-                  {detailedStatus === "CALCULATING" ? "Calculating…" : "Calculate detailed EQ & RP22"}
-                </button>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={includeDiagnostics}
-                    onChange={e => setIncludeDiagnostics(e.target.checked)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  Include engineering diagnostics
-                </label>
-              </div>
+              <BackgroundAnalysisControls
+                lifecycle={detailedLifecycle}
+                onRecalculate={() => calculateDetailed(detailedFingerprint, detailedPayload, includeDiagnostics)}
+                disabled={!detailedInputsValid || detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"}
+                includeDiagnostics={includeDiagnostics}
+                onDiagnosticsChange={setIncludeDiagnostics}
+              />
             )}
           </div>
         </div>
 
-        {designEqEnabled && (
-          <BassCalculationStatus
-            status={detailedStatus}
-            progress={detailedProgress}
-            elapsedMs={detailedElapsedMs}
-            error={detailedError}
-            detailedResult={detailedResult}
-            onCancel={cancelDetailed}
-          />
-        )}
 
-        {designEqEnabled && !optimisationResult && (
-          <div style={{ border: '1px solid #C1B6AD', borderRadius: 8, background: '#F8F8F7', padding: '10px 14px', marginBottom: 8, fontSize: 11, fontFamily: 'monospace', color: '#625143' }}>
-            {detailedStatus === "IDLE" && "Detailed result not calculated. Click 'Calculate detailed EQ & RP22' to run the full optimisation."}
-            {detailedStatus === "OUT_OF_DATE" && "Detailed result out of date — physical inputs have changed. Click 'Calculate detailed EQ & RP22' to recalculate."}
-            {detailedStatus === "CANCELLED" && "Detailed calculation was cancelled. Click 'Calculate detailed EQ & RP22' to retry."}
-            {detailedStatus === "ERROR" && `Detailed calculation failed: ${detailedError || 'unknown error'}. Click 'Calculate detailed EQ & RP22' to retry.`}
-          </div>
-        )}
 
         {/* RSP measurement pill — authoritative assessment position */}
         {rspPosition && (
@@ -1651,8 +1642,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             ? (optimisationResult?.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate')
             : designEqEnabled
               ? (detailedStatus === 'OUT_OF_DATE'
-                  ? 'Showing product-independent normalized room response — detailed result out of date, click Calculate to recalculate'
-                  : 'Showing product-independent normalized room response — detailed result not calculated, click Calculate to run optimisation')
+                  ? 'Showing product-independent normalized room response — detailed analysis updating after design changes'
+                  : 'Showing product-independent normalized room response — detailed analysis is queued automatically')
               : 'Showing product-independent normalized room response (94 dB flat reference) — not predicted product SPL'}
         </div>
         {designEqEnabled && optimisationResult && <>

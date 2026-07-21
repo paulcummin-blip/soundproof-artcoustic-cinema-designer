@@ -1,64 +1,22 @@
-// BassCalculationStatus.jsx — Status, timer, and progress display for the
-// detailed bass calculation. Shows elapsed time, phase, progress, and Cancel
-// control while calculating. Shows completion summary when done.
+import React, { useEffect, useState } from "react";
 
-import React from "react";
+export default function BassCalculationStatus({ lifecycle }) {
+  const state = lifecycle || {};
+  const [clock, setClock] = useState(Date.now());
+  useEffect(() => {
+    if (state.status !== "calculating") return undefined;
+    const timer = setInterval(() => setClock(Date.now()), 200);
+    return () => clearInterval(timer);
+  }, [state.status, state.startedAtMs]);
 
-function formatElapsed(ms) {
-  const totalSec = Math.floor((ms || 0) / 1000);
-  const mins = Math.floor(totalSec / 60);
-  const secs = totalSec % 60;
-  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-}
-
-export default function BassCalculationStatus({ status, progress, elapsedMs, error, detailedResult, onCancel }) {
-  if (status === "CALCULATING") {
-    const p = progress || {};
-    return (
-      <div style={{ border: "1px solid #93c5fd", borderRadius: 8, background: "#eff6ff", padding: "10px 14px", marginBottom: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 4 }}>
-          Calculating detailed EQ &amp; RP22…
-        </div>
-        <div style={{ fontSize: 11, fontFamily: "monospace", color: "#1e3a8a", display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
-          <span>Elapsed: {formatElapsed(elapsedMs)}</span>
-          <span>Phase: {p.phase || "Preparing"}</span>
-          <span>Progress: {p.completedRequests ?? 0} / {p.totalRequests ?? 0} candidate requests</span>
-          {(p.uniqueCoreFits != null || p.bankEvaluations != null) && (
-            <span>{p.uniqueCoreFits ?? 0} core fits / {p.bankEvaluations ?? 0} bank evals</span>
-          )}
-        </div>
-        <button
-          onClick={onCancel}
-          style={{ marginTop: 6, height: 28, padding: "0 14px", borderRadius: 6, border: "1px solid #dc2626", background: "#fff", color: "#b91c1c", fontSize: 11, fontFamily: "monospace", cursor: "pointer", fontWeight: 600 }}
-        >
-          Cancel
-        </button>
-      </div>
-    );
-  }
-
-  if (status === "COMPLETE" && detailedResult) {
-    const p = progress || {};
-    const secs = ((detailedResult.calculationTimeMs || 0) / 1000).toFixed(1);
-    return (
-      <div style={{ border: "1px solid #86efac", borderRadius: 8, background: "#f0fdf4", padding: "10px 14px", marginBottom: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 4 }}>
-          Detailed calculation complete
-        </div>
-        <div style={{ fontSize: 11, fontFamily: "monospace", color: "#14532d" }}>
-          Completed in: {secs} seconds
-        </div>
-        <div style={{ fontSize: 11, fontFamily: "monospace", color: "#15803d" }}>
-          {p.totalRequests ?? 0} candidates / {p.uniqueCoreFits ?? 0} unique core fits / {p.bankEvaluations ?? 0} bank evaluations
-        </div>
-        {Number.isFinite(detailedResult.transferTimeMs) && detailedResult.transferTimeMs > 0 && (
-          <div style={{ fontSize: 10, fontFamily: "monospace", color: "#16a34a" }}>
-            Worker→main transfer: {detailedResult.transferTimeMs.toFixed(1)} ms
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return null;
+  const runningMs = state.status === "calculating" && Number.isFinite(state.startedAtMs)
+    ? Math.max(0, clock - state.startedAtMs)
+    : (state.elapsedMs || 0);
+  let text = "Waiting for a complete room and subwoofer selection";
+  if (state.status === "queued") text = "Detailed bass analysis queued";
+  if (state.status === "stale") text = "Updating after design changes";
+  if (state.status === "calculating") text = `Detailed bass analysis running — ${(runningMs / 1000).toFixed(1)} s`;
+  if (state.status === "ready") text = state.cacheStatus === "hit" ? "Using cached detailed analysis" : "Detailed bass analysis ready";
+  if (state.status === "error") text = "Detailed bass analysis failed — Retry";
+  return <span style={{ fontSize: 10, color: state.status === "error" ? "#b91c1c" : "#625143", fontFamily: "monospace" }}>{text}</span>;
 }

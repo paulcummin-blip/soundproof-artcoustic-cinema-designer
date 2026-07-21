@@ -52,6 +52,8 @@ export function useBassAnalysisContract({
   // DESIGN_EQ_FIT_PROFILES by the caller. Included in the calibration
   // fingerprint so profile-definition changes invalidate cached results.
   evaluatedProfiles,
+  fingerprintsOverride,
+  backgroundLifecycle,
 }) {
   // --- Phase 2A: Live calibration values from the selected candidate ---
   // Prefer values from the selected candidate when one exists. Otherwise use
@@ -149,14 +151,15 @@ export function useBassAnalysisContract({
     usableLfHz: designEqSystemLimits?.usableLfHz,
     sourceLayout: subsForSimulation,
     canonicalPriorityMode: optimiserPriorityMode,
-    fingerprints: {
+    fingerprints: fingerprintsOverride || {
       geometry: contractGeometryFp, product: contractProductFp, calibration: contractCalibrationFp,
     },
     responseDomain: contractResponseDomain,
+    backgroundLifecycle,
   }), [optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
     rspRawCurve, perSeatRawCurves, designEqSystemLimits, subsForSimulation,
     optimiserPriorityMode, contractGeometryFp, contractProductFp, contractCalibrationFp,
-    contractResponseDomain]);
+    contractResponseDomain, fingerprintsOverride, backgroundLifecycle]);
 
   return bassAnalysisContract;
 }
