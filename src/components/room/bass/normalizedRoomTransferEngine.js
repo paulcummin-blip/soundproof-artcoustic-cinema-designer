@@ -2,20 +2,21 @@
 // normalized room-transfer calculation path.
 //
 // Reuses the existing room-response physics engine (simulateBassResponseRewCore)
-// with a flat 0 dB source curve, producing a relative room-transfer response
+// with the PRODUCTION flat-source definition (REW_SOURCE_CURVES.flat_rew_reference,
+// flat 94 dB across 20–200 Hz), producing a relative room-transfer response
 // that excludes all product-specific shaping (model response, sensitivity,
 // max output, low-frequency capability, requested SPL, EQ fitting, RP22
 // parameter grading).
 //
-// The output is a RELATIVE room-transfer response, not an absolute product
-// SPL prediction. The normalization reference is documented in the returned
-// result: a flat 0 dB source (unity gain) across 20–200 Hz. The resulting
-// dB values represent the room transfer function (direct + modal + reflection
-// summation) at each listener position, independent of which subwoofer
-// model is placed at the source positions.
+// The output is a RELATIVE room-transfer response referenced to the same
+// 94 dB flat source used by the production REW parity path. The normalization
+// reference is documented in the returned result.
 //
 // Design rules:
-//   - Reuses the existing acoustic maths. No copied or rewritten physics.
+//   - Reuses the EXISTING production flat-source definition (rewSourceCurves.js).
+//     No second hand-written flat curve.
+//   - Reuses the existing acoustic maths (simulateBassResponseRewCore). No
+//     copied or rewritten physics.
 //   - Same room dimensions, seat/RSP positions, source positions, source
 //     quantity, front/rear placement, relative gain/delay/polarity, boundary
 //     behaviour, modal behaviour, and summation behaviour as the production
@@ -27,36 +28,27 @@
 //     callbacks, no circular references.
 //   - Does NOT invoke the EQ fitter, RP22 candidate search, or product
 //     capability calculation.
+//   - Collision-safe listener keys: __rsp__, __seat_0__, __seat_1__, …
+//     Original seat IDs are preserved separately in the output. Duplicate
+//     or missing seat IDs cannot overwrite responses.
 
 import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
 import { computeGeometryFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
+import { REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 
-// Flat 0 dB source curve — unity gain across the bass band. This is the
-// normalization reference: the output represents the pure room transfer
-// function with no product-specific frequency shaping.
-const FLAT_NORMALIZED_SOURCE_CURVE = [
-  { hz: 15, db: 0 },
-  { hz: 20, db: 0 },
-  { hz: 30, db: 0 },
-  { hz: 40, db: 0 },
-  { hz: 50, db: 0 },
-  { hz: 63, db: 0 },
-  { hz: 80, db: 0 },
-  { hz: 100, db: 0 },
-  { hz: 120, db: 0 },
-  { hz: 160, db: 0 },
-  { hz: 200, db: 0 },
-];
+// Reuse the EXACT production flat-source definition — no second curve.
+const FLAT_SOURCE_CURVE = REW_SOURCE_CURVES.flat_rew_reference;
 
 const NORMALIZATION_REFERENCE = {
-  sourceCurveDb: 0,
-  description: "Flat 0 dB source (unity gain) across 20–200 Hz. Output is relative room transfer, not absolute SPL.",
+  sourceCurveDb: 94,
+  sourceCurveId: "flat_rew_reference",
+  description: "Production flat 94 dB source (REW_SOURCE_CURVES.flat_rew_reference) across 20–200 Hz. Output is relative room transfer referenced to this flat source, not absolute product SPL.",
   frequencyRangeHz: [20, 200],
 };
 
-// Private fixed RSP key. Never depends on rspPosition.id being absent or
-// equal to "rsp" — the caller's id is ignored for the RSP listener.
+// Private fixed listener keys — never derived from caller IDs.
 const RSP_KEY = "__rsp__";
+const seatKey = (index) => `__seat_${index}__`;
 
 // Convert complex pressure sum to dB magnitude.
 function complexToDb(re, im) {
@@ -64,17 +56,28 @@ function complexToDb(re, im) {
   return 20 * Math.log10(Math.max(magnitude, 1e-10));
 }
 
-// Build the listener list: RSP first (with private key), then real seats.
+// Build the listener list: RSP first (with private key), then real seats
+// with index-based keys. Original seat IDs are preserved separately.
 function buildListeners(rspPosition, seatingPositions) {
   const listeners = [];
   if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) {
-    listeners.push({ ...rspPosition, __listenerKey: RSP_KEY, __isRsp: true });
+    listeners.push({
+      ...rspPosition,
+      __listenerKey: RSP_KEY,
+      __isRsp: true,
+      __originalId: rspPosition.id || null,
+    });
   }
   if (Array.isArray(seatingPositions)) {
-    seatingPositions.forEach((seat) => {
+    seatingPositions.forEach((seat, index) => {
       if (seat && Number.isFinite(seat.x) && Number.isFinite(seat.y)) {
-        const seatKey = seat.id || `seat_${seat.x}_${seat.y}`;
-        listeners.push({ ...seat, __listenerKey: seatKey, __isRsp: false });
+        listeners.push({
+          ...seat,
+          __listenerKey: seatKey(index),
+          __isRsp: false,
+          __originalId: seat.id || null,
+          __seatIndex: index,
+        });
       }
     });
   }
@@ -104,8 +107,9 @@ function buildSourceLayout(subs) {
 /**
  * Compute the normalized room-transfer response for all listener positions.
  *
- * Reuses simulateBassResponseRewCore with a flat 0 dB source curve. Sums
- * complex pressure across all subs for each listener, then converts to dB.
+ * Reuses simulateBassResponseRewCore with the production flat 94 dB source
+ * curve. Sums complex pressure across all subs for each listener, then
+ * converts to dB.
  *
  * @param {Object} params
  * @param {Object} params.roomDims — { widthM, lengthM, heightM }
@@ -211,8 +215,8 @@ export function computeNormalizedRoomTransfer({
   });
 
   // Run the engine for each listener, summing complex pressure across all subs.
-  // This mirrors the production path in BassResponse.jsx exactly, except the
-  // source curve is always the flat normalized reference (0 dB).
+  // This mirrors the production path in BassResponse.jsx exactly, using the
+  // same production flat 94 dB source curve (REW_SOURCE_CURVES.flat_rew_reference).
   const seatResponses = {};
   let frequencies = [];
 
@@ -239,7 +243,7 @@ export function computeNormalizedRoomTransfer({
           z: listenerZ,
         },
         sub,
-        FLAT_NORMALIZED_SOURCE_CURVE,
+        FLAT_SOURCE_CURVE,
         {
           ...physicsOptions,
           freqMinHz: 20,
@@ -267,6 +271,8 @@ export function computeNormalizedRoomTransfer({
         freqsHz,
         splDb: sumRe.map((re, index) => complexToDb(re, sumIm[index])),
         isRsp: listener.__isRsp,
+        originalId: listener.__originalId,
+        seatIndex: Number.isFinite(listener.__seatIndex) ? listener.__seatIndex : null,
       };
     }
   });
@@ -288,11 +294,13 @@ export function computeNormalizedRoomTransfer({
         .filter((p) => Number.isFinite(p.frequency) && p.frequency > 0 && Number.isFinite(p.spl))
     : [];
 
-  // Build per-seat curves (exclude RSP via private key)
+  // Build per-seat curves (exclude RSP via private key; preserve original IDs)
   const seatCurves = Object.entries(seatResponses)
     .filter(([key]) => key !== RSP_KEY)
     .map(([key, response]) => ({
-      seatId: key,
+      seatKey: key,
+      originalSeatId: response.originalId,
+      seatIndex: response.seatIndex,
       responseData: response.freqsHz
         .map((frequency, i) => ({
           frequency,

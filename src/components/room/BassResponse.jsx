@@ -31,67 +31,15 @@ import { Switch } from "@/components/ui/switch";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { useBassAnalysisContract } from "@/components/room/bass/useBassAnalysisContract";
 import BassContractParityAudit from "@/components/room/bass/BassContractParityAudit";
-import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
+import { deriveRequestedCalibrationConfig } from "@/components/room/bass/requestedCalibrationConfig";
+import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code.
 const IS_DEVELOPMENT_MODE = false;
 
-// Agreed REW parity comparison state — do not change without a new sweep.
-// propagationPhaseScale 0.10 was chosen by sweep on 2026-06-13 (null centre 40.4 Hz vs REW 40.6 Hz).
-const REW_PARITY_PRESET = {
-  rewSourceCurveMode: 'flat_rew_reference',
-  modalSourceReferenceMode: 'distance_normalized',
-  modalDistanceBlend: 0.55,
-  modalGainScalar: 1.0,
-  axialQ: 4.0,
-  propagationPhaseScale: 0,
-  debugMode200Multiplier: 1.00,
-  enableRewCoreReflections: true,
-  rewParityFieldMode: 'full_field',
-};
-
-const REW_SOURCE_CURVES = {
-  product: null,
-  // Flat 94 dB source from 20–200 Hz — matches REW Room Simulator flat reference for like-for-like parity.
-  flat_rew_reference: [
-    { hz: 20,  db: 94 },
-    { hz: 50,  db: 94 },
-    { hz: 100, db: 94 },
-    { hz: 200, db: 94 },
-  ],
-  flat90: [
-    { hz: 15, db: 90 },
-    { hz: 200, db: 90 },
-  ],
-  rew20HzPorted: [
-    { hz: 15, db: 78 },
-    { hz: 18, db: 84 },
-    { hz: 20, db: 87 },
-    { hz: 25, db: 90 },
-    { hz: 40, db: 90 },
-    { hz: 80, db: 90 },
-    { hz: 100, db: 89 },
-    { hz: 200, db: 89 },
-  ],
-  // __TEMP_REW_PARITY__ truly flat source across full bass range — tests room model only, no product roll-off
-  flat_0_500hz_rew_parity: [
-    { hz: 0,   db: 94 },
-    { hz: 10,  db: 94 },
-    { hz: 20,  db: 94 },
-    { hz: 30,  db: 94 },
-    { hz: 40,  db: 94 },
-    { hz: 50,  db: 94 },
-    { hz: 63,  db: 94 },
-    { hz: 80,  db: 94 },
-    { hz: 100, db: 94 },
-    { hz: 120, db: 94 },
-    { hz: 160, db: 94 },
-    { hz: 200, db: 94 },
-    { hz: 300, db: 94 },
-    { hz: 500, db: 94 },
-  ],
-};
+// REW_PARITY_PRESET and REW_SOURCE_CURVES are imported from @/components/room/bass/rewSourceCurves
+// (extracted in Phase 2A so the normalized room-transfer engine can reuse the exact production flat-source definition).
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
   const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave, designEqEnabled, setDesignEqEnabled, mlpY_m } = useAppState();
@@ -1002,29 +950,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // series, or change visible parameter values. Mode/display changes do not
   // affect any fingerprint.
   // Phase 2A: Requested configuration fallback for calibration fingerprint.
-  // When no selected candidate exists, these values identify the current
-  // requested configuration. Assessment band comes from the base RP22 level
-  // (L1) definitions; target anchor is the requested target SPL; fit profile
-  // defaults to "standard"; usable LF comes from the active subwoofer set.
-  const requestedCalibrationConfig = useMemo(() => {
-    const definitions = getRp22BassOperatingDefinitions();
-    const base = definitions.find((d) => d.value === 1) || definitions[0] || {};
-    const p14UpperHz = base.p14UpperHz || 120;
-    return {
-      requestedAssessmentStartHz: base.p18LimitHz || null,
-      requestedAssessmentEndHz: Number.isFinite(optimisationTransitionHz)
-        ? Math.min(p14UpperHz, optimisationTransitionHz)
-        : p14UpperHz,
-      requestedTargetAnchorDb: Number.isFinite(splConfig?.targetSpl)
-        ? splConfig.targetSpl
-        : (base.p14TargetDb || null),
-      requestedFitProfile: "standard",
-      requestedOutputDb: Number.isFinite(splConfig?.targetSpl)
-        ? splConfig.targetSpl
-        : null,
-      requestedUsableLfHz: designEqSystemLimits?.usableLfHz ?? null,
-    };
-  }, [optimisationTransitionHz, splConfig?.targetSpl, designEqSystemLimits?.usableLfHz]);
+  // Derives from the ACTUAL optimiser inputs (transitionHz, usableLfHz,
+  // targetSpl). P14 target, P18 boundary, and fit profile are null because
+  // the optimiser searches all RP22 level combinations and both profiles —
+  // no single requested value exists before a candidate is created.
+  const requestedCalibrationConfig = useMemo(() => deriveRequestedCalibrationConfig({
+    splConfig, optimisationTransitionHz, designEqSystemLimits,
+  }), [splConfig, optimisationTransitionHz, designEqSystemLimits]);
 
   const bassAnalysisContract = useBassAnalysisContract({
     roomDims, rspPosition, seatingPositions, subsForSimulation,
