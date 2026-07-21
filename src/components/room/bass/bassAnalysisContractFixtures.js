@@ -1,6 +1,6 @@
 // bassAnalysisContractFixtures.js — Deterministic Phase 1A contract + hardening fixtures.
 // Split from bassAnalysisContract.js to keep the contract module under 600 lines.
-// Pure, no side effects. Re-exported from bassAnalysisContract.js for API stability.
+// Pure, no side effects. One-way dependency: fixtures → contract (never the reverse).
 
 import {
   createBassAnalysisResult,
@@ -391,6 +391,99 @@ export function runContractFixtures() {
     const validation = validateStructuredCloneSafe(bad);
     results.hardeningNaNInfinityRejected = !validation.safe &&
       validation.issues.length === 3;
+  }
+
+  // ---- Phase 1B adapter fingerprint fixtures ----
+
+  // F1. Valid fingerprints are copied into the contract.
+  {
+    const adapted = adaptCurrentBassOptimisationResult({
+      fingerprints: {
+        geometry: "geo:v1:abcdef12",
+        product: "prod:v1:fedcba98",
+        calibration: "cal:v1:12345678",
+      },
+      perSeatRawCurves: [],
+    });
+    results.adapterCopiesValidFingerprints =
+      adapted.fingerprints.geometry === "geo:v1:abcdef12" &&
+      adapted.fingerprints.product === "prod:v1:fedcba98" &&
+      adapted.fingerprints.calibration === "cal:v1:12345678";
+  }
+
+  // F2. Missing fingerprints remain null.
+  {
+    const adapted = adaptCurrentBassOptimisationResult({
+      fingerprints: { geometry: "geo:v1:abcdef12" },
+      perSeatRawCurves: [],
+    });
+    results.adapterMissingFingerprintsNull =
+      adapted.fingerprints.geometry === "geo:v1:abcdef12" &&
+      adapted.fingerprints.product === null &&
+      adapted.fingerprints.calibration === null;
+  }
+
+  // F3. No fingerprints argument leaves all null.
+  {
+    const adapted = adaptCurrentBassOptimisationResult({ perSeatRawCurves: [] });
+    results.adapterNoFingerprintsAllNull =
+      adapted.fingerprints.geometry === null &&
+      adapted.fingerprints.product === null &&
+      adapted.fingerprints.calibration === null;
+  }
+
+  // F4. Invalid fingerprint strings are rejected (remain null).
+  {
+    const adapted = adaptCurrentBassOptimisationResult({
+      fingerprints: {
+        geometry: "not-a-fingerprint",
+        product: "prod:v1:NOTHEX",
+        calibration: "cal:x1:12345678",
+      },
+      perSeatRawCurves: [],
+    });
+    results.adapterRejectsInvalidFingerprints =
+      adapted.fingerprints.geometry === null &&
+      adapted.fingerprints.product === null &&
+      adapted.fingerprints.calibration === null;
+  }
+
+  // F5. Non-string fingerprints are rejected.
+  {
+    const adapted = adaptCurrentBassOptimisationResult({
+      fingerprints: { geometry: 123, product: {}, calibration: null },
+      perSeatRawCurves: [],
+    });
+    results.adapterRejectsNonStringFingerprints =
+      adapted.fingerprints.geometry === null &&
+      adapted.fingerprints.product === null &&
+      adapted.fingerprints.calibration === null;
+  }
+
+  // F6. Fingerprints survive structured clone.
+  {
+    const adapted = adaptCurrentBassOptimisationResult({
+      fingerprints: {
+        geometry: "geo:v1:abcdef12",
+        product: "prod:v1:fedcba98",
+        calibration: "cal:v1:12345678",
+      },
+      perSeatRawCurves: [],
+    });
+    const validation = validateStructuredCloneSafe(adapted);
+    let cloneOk = false;
+    try {
+      if (typeof structuredClone === "function") {
+        const cloned = structuredClone(adapted);
+        cloneOk = cloned.fingerprints.geometry === "geo:v1:abcdef12";
+      } else {
+        const json = JSON.stringify(adapted);
+        cloneOk = json != null && JSON.parse(json).fingerprints.geometry === "geo:v1:abcdef12";
+      }
+    } catch (e) {
+      cloneOk = false;
+    }
+    results.adapterFingerprintsStructuredCloneSafe = validation.safe && cloneOk;
   }
 
   return results;

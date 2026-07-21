@@ -361,8 +361,24 @@ export function adaptCurrentBassOptimisationResult({
   detailedElapsedMs = null,
   perSeatRawCurves = [],
   canonicalPriorityMode = null,
+  fingerprints = null,
 } = {}) {
   const contract = createBassAnalysisResult();
+
+  // --- Fingerprints (Phase 1B) ---
+  // Copy only valid string fingerprints supplied by the caller. Missing or
+  // invalid fingerprints remain null. The adapter never computes fingerprints.
+  if (fingerprints && typeof fingerprints === "object") {
+    if (isValidFingerprintString(fingerprints.geometry)) {
+      contract.fingerprints.geometry = fingerprints.geometry;
+    }
+    if (isValidFingerprintString(fingerprints.product)) {
+      contract.fingerprints.product = fingerprints.product;
+    }
+    if (isValidFingerprintString(fingerprints.calibration)) {
+      contract.fingerprints.calibration = fingerprints.calibration;
+    }
+  }
 
   const hasResult = !!optimisationResult && !!optimisationResult.selectedCandidate;
   const realSeatCount = countRealSeats(perSeatRawCurves);
@@ -559,7 +575,17 @@ export function validateStructuredCloneSafe(obj) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Phase 1A fixtures (re-exported from split module for API stability)
+// 6. Fingerprint validation (for adapter copy-in)
 // ---------------------------------------------------------------------------
 
-export { runContractFixtures } from "@/components/room/bass/bassAnalysisContractFixtures";
+// Returns true if a fingerprint string is well-formed: non-empty string with
+// a version prefix and hex hash suffix. Does not decode the hash.
+function isValidFingerprintString(fp) {
+  if (typeof fp !== "string" || fp.length === 0) return false;
+  const parts = fp.split(":");
+  if (parts.length < 3) return false;
+  if (!["geo", "prod", "cal"].includes(parts[0])) return false;
+  if (!parts[1].startsWith("v")) return false;
+  if (!/^[0-9a-f]+$/.test(parts[parts.length - 1])) return false;
+  return true;
+}
