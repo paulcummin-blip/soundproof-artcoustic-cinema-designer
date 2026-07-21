@@ -1,15 +1,13 @@
 // BassResponse.jsx - Simplified bass simulation UI
 
-import React, { useMemo, useEffect, useState, useRef, useCallback } from "react";
+import React, { useMemo, useEffect, useState, useRef } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "../AppStateProvider";
 import BassGraph from "@/components/room/bass/BassGraph";
-import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
-import { simulateBassResponseRewCore, simulateBassResponseRewParityField } from "@/bass/core/rewBassEngine";
 import { computeRoomModesLocal } from "@/bass/core/modalCalculations.js";
-import { getSubwooferCurve, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
+import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
@@ -28,7 +26,6 @@ import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalize
 import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
 import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/bass/bassGraphDomainBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
-import { BASS_NORMALIZED_PHYSICS_DEFAULTS as PHYSICS_DEFAULTS } from "@/components/room/bass/bassPhysicsDefaults";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveBestSubLayoutContextId } from "@/components/room/bass/best-layout/bestSubLayoutContext";
 
@@ -39,29 +36,41 @@ const IS_DEVELOPMENT_MODE = false;
 // REW_PARITY_PRESET and REW_SOURCE_CURVES are imported from @/components/room/bass/rewSourceCurves
 // (extracted in Phase 2A so the normalized room-transfer engine can reuse the exact production flat-source definition).
 
-export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
-  const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave, designEqEnabled, setDesignEqEnabled, mlpY_m } = useAppState();
+export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings }) {
+  const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = useAppState();
+  const sharedBassResults = useSharedBassResults();
+  const authoritative = sharedBassResults.authoritative;
+  const {
+    roomDims, seatingPositions, splConfig, rspPosition, subsForSimulation, simulationResults,
+    rspRawCurve, perSeatRawCurves, designEqSystemLimits, optimisationTransitionHz,
+    runSimulation, autoAlignEnabled, setAutoAlignEnabled, autoAlignDelays,
+    surfaceAbsorptionInputs, setSurfaceAbsorptionInputs, surfaceAbsorption, roomDamping,
+    frontSubsLive, rearSubsLive,
+    enableRewCoreReflections, setEnableRewCoreReflections, rewSourceCurveMode, setRewSourceCurveMode,
+    modalSourceReferenceMode, setModalSourceReferenceMode, modalGainScalar, setModalGainScalar,
+    axialQ, setAxialQ, modalStorageMode, propagationPhaseScale, setPropagationPhaseScale,
+    disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField,
+    disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution,
+    rewParityFieldMode, setRewParityFieldMode, modalDistanceBlend, setModalDistanceBlend,
+    overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, setDebugMode200Multiplier,
+    debugModalPhaseConvention, setDebugModalPhaseConvention, debugModalHSign, setDebugModalHSign,
+    reflectionGainScale, setReflectionGainScale, rewParityModalMagnitudeScale, setRewParityModalMagnitudeScale,
+    modalCoherenceMode, setModalCoherenceMode, highOrderAxialScale, setHighOrderAxialScale,
+    qStrategy, setQStrategy, rewModalBandwidthScale, setRewModalBandwidthScale,
+    bassSmoothingMode, setBassSmoothingMode, includeDiagnostics, setIncludeDiagnostics,
+  } = authoritative;
   const activeProjectId = useActiveProjectId();
   const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims });
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
-
-  // Canonical RSP (Reference Seat Position) — the green-dot assessment position.
-  // P14/P18/P19 and Design EQ must always derive from this position, never from
-  // a selected graph seat. Real seats are display overlays only.
-  const rspPosition = useMemo(() => {
-    const widthM = Number(roomDims?.widthM);
-    const y = Number(mlpY_m);
-    if (!Number.isFinite(widthM) || !Number.isFinite(y) || widthM <= 0 || y <= 0) return null;
-    return {
-      id: "rsp",
-      x: widthM / 2,
-      y,
-      z: 1.2,
-      __isSyntheticRsp: true,
-    };
-  }, [roomDims?.widthM, mlpY_m]);
+  const resolveAutoDelayForSub = (subId, group, index) => {
+    if (autoAlignDelays[subId] != null) return autoAlignDelays[subId];
+    const labels = ["left", "right"];
+    const canonicalId = `${group}-sub-${labels[index] ?? index}`;
+    if (autoAlignDelays[canonicalId] != null) return autoAlignDelays[canonicalId];
+    return autoAlignDelays[`sub-${group}-${index + 1}`] ?? 0;
+  };
 
   // Safe number conversion and formatting
   const toNum = (v) => {
@@ -132,84 +141,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     });
   };
 
-  // State declarations
-  const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
-  const [tryPolarity, setTryPolarity] = useState(false);
-  const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
-  const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
-  const [roomDamping, setRoomDamping] = useState(PHYSICS_DEFAULTS.roomDamping);
-  const [surfaceAbsorptionInputs, setSurfaceAbsorptionInputs] = useState(PHYSICS_DEFAULTS.surfaceAbsorption);
-  // Production core and product source mode are not user-controllable.
-  const useRewCoreTestMode = true;
-  const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(PHYSICS_DEFAULTS.enableRewCoreReflections);
-  const [rewSourceCurveMode, setRewSourceCurveMode] = useState('product');
-  const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState(PHYSICS_DEFAULTS.modalSourceReferenceMode);
-  const [modalGainScalar, setModalGainScalar] = useState(PHYSICS_DEFAULTS.modalGainScalar);
-  const [axialQ, setAxialQ] = useState(PHYSICS_DEFAULTS.axialQ);
-  const [modalStorageMode, setModalStorageMode] = useState(PHYSICS_DEFAULTS.modalStorageMode);
-  // Temporary REW parity experiment: default changed to 1.0 to test full acoustic propagation phase.
-  // Revert to 0.5 after experiment is concluded.
-  const [propagationPhaseScale, setPropagationPhaseScale] = useState(PHYSICS_DEFAULTS.propagationPhaseScale);
-  const [disableReflectionPhaseJitter, setDisableReflectionPhaseJitter] = useState(PHYSICS_DEFAULTS.disableReflectionPhaseJitter);
-  const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(PHYSICS_DEFAULTS.disableReflectionCoherenceWeight);
-  const [disableLateField, setDisableLateField] = useState(true);
-  const [disableModalPropagationPhase, setDisableModalPropagationPhase] = useState(true);
-  const [mute68HzAxialMode, setMute68HzAxialMode] = useState(PHYSICS_DEFAULTS.mute68HzAxialMode);
-  // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
-  const [debugDisableModalContribution, setDebugDisableModalContribution] = useState(PHYSICS_DEFAULTS.debugDisableModalContribution);
-  // __TEMP_REW_PARITY_ISOLATION__ field mode for layered comparison
-  const [rewParityFieldMode, setRewParityFieldMode] = useState(PHYSICS_DEFAULTS.rewParityFieldMode); // 'reflections_only' | 'modes_only' | 'full_field'
-  // __TEMP_REW_PARITY__ adjustable modal distance blend: 0.00 = existing 1m ref, 1.00 = full distance_normalized
-  const [modalDistanceBlend, setModalDistanceBlend] = useState(PHYSICS_DEFAULTS.modalDistanceBlend);
-  const [overrideConstantAxialQ, setOverrideConstantAxialQ] = useState(PHYSICS_DEFAULTS.overrideConstantAxialQ);
-  const [overrideAbsorptionAxialQ, setOverrideAbsorptionAxialQ] = useState(PHYSICS_DEFAULTS.overrideAbsorptionAxialQ);
-  // __TEMP_REW_PARITY_MODE_200_SCALE__
-  const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(PHYSICS_DEFAULTS.debugMode200Multiplier);
-  // __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__
-  const [debugModalPhaseConvention, setDebugModalPhaseConvention] = useState('normal');
-  // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
-  const [debugModalHSign, setDebugModalHSign] = useState('normal');
-  const [reflectionGainScale, setReflectionGainScale] = useState(PHYSICS_DEFAULTS.reflectionGainScale); // diagnostic: multiply imageAmplitude after reflectionCoefficient
-  // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
-  // Tests whether REW parity is a modal magnitude calibration issue rather than a phase issue.
-  // Applied only when rewSourceCurveMode === 'flat_rew_reference'.
-  const [rewParityModalMagnitudeScale, setRewParityModalMagnitudeScale] = useState(1.00);
-  // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
-  // Tests whether the 80–150 Hz over-prediction is caused by fully coherent modal summation.
-  const [modalCoherenceMode, setModalCoherenceMode] = useState(PHYSICS_DEFAULTS.modalCoherenceMode);
-  // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
-  // Diagnostic scale applied to axial modes with order >= 2. Default 1.00 = no change.
-  const [highOrderAxialScale, setHighOrderAxialScale] = useState(PHYSICS_DEFAULTS.highOrderAxialScale);
+  // Presentation-only state. Production response inputs and physics are owned by the room-scoped authority.
   const [isDraggingSub, setIsDraggingSub] = useState(false);
-  // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
   const [houseCurveOverride, setHouseCurveOverride] = useState(null);
   const showHouseCurve = houseCurveOverride ?? !!designEqEnabled;
-  // Bass Response Smoothing — display-only. Does not touch simulation, modal calculations,
-  // raw null-depth detection, or SPL normalisation. 'none' preserves prior graph behaviour
-  // (the graph previously plotted the raw unsmoothed curve).
-  const [bassSmoothingMode, setBassSmoothingMode] = useState('none');
-  // Q strategy selector. Default = approved Allen & Berkley corrected model.
-  const [qStrategy, setQStrategy] = useState(PHYSICS_DEFAULTS.qStrategy);
-  // __CANDIDATE_REW_MODAL_BANDWIDTH__ — bandwidth scale for the "REW-style Modal Bandwidth"
-  // experimental Q strategy. Only used when qStrategy === 'rew_modal_bandwidth'.
-  const [rewModalBandwidthScale, setRewModalBandwidthScale] = useState(PHYSICS_DEFAULTS.rewModalBandwidthScale);
-  // Temporary comparison toggle for the REW-style Absorption Authority candidate — see graph controls below.
   const [overlayProduction, setOverlayProduction] = useState(false);
-  // RSP graph visibility — defaults to true (RSP is the default visible series).
-  // Toggling this only affects graph display, never the optimiser or P14/P18/P19.
   const [showRsp, setShowRsp] = useState(true);
-  // Real-seat overlay visibility — presentation only. When Design EQ is enabled,
-  // real-seat curves are hidden by default and shown only when this toggle is on.
-  // Never affects candidate generation, P19, P20, or the selected EQ bank.
   const [showRealSeatOverlays, setShowRealSeatOverlays] = useState(false);
-  // Engineering diagnostics toggle — default off. When off, the detailed calculation
-  // skips collecting per-variant revision tables and checkpoint summaries.
-  const [includeDiagnostics, setIncludeDiagnostics] = useState(false);
-  // Refs for presentation-only values read inside runSimulation's runtimeVectorCapture
-  // gate. Using refs avoids adding these to the simulation dependency array.
-  const designEqEnabledRef = useRef(designEqEnabled);
-  const bassSmoothingModeRef = useRef(bassSmoothingMode);
 
   // Modal Resonance Line Toggles — display-only, session-only state. Does not affect
   // bass calculation, SPL response, or mode generation; only filters which resonance
@@ -259,512 +198,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     enableRewCoreReflections === REW_PARITY_PRESET.enableRewCoreReflections &&
     rewParityFieldMode === REW_PARITY_PRESET.rewParityFieldMode;
 
-  // Auto-align loop guards
-  const frontCfgRef = React.useRef(null);
-  const rearCfgRef = React.useRef(null);
-  const roomDimsRef = React.useRef(null);
-  const seatingRef = React.useRef(null);
-  const lastAutoAlignApplySigRef = React.useRef({ Front: null, Rear: null });
-  const lastAutoAlignTriggerSigRef = React.useRef(null);
-
-  const __b44SafeSig = (v) => {
-    try { return JSON.stringify(v); } catch (e) { return String(v); }
-  };
-
-  const __b44SettingsSig = (settingsById, ids) => {
-    const obj = {};
-    (ids || []).forEach((id) => {
-      const s = settingsById?.[id] || {};
-      obj[id] = {
-        gainDb: Number.isFinite(s.gainDb) ? Math.round(s.gainDb * 10) / 10 : 0,
-        delayMs: Number.isFinite(s.delayMs) ? Math.round(s.delayMs * 1000) / 1000 : 0,
-        polarity: s.polarity || "normal",
-      };
-    });
-    return __b44SafeSig(obj);
-  };
-
-  // __TEMP_DIAGNOSTIC__ tuning signature — force memo invalidation on any gain/polarity/delay change
-  const subTuningSignature = useMemo(() => {
-    const buildSig = (settingsById) => {
-      if (!settingsById) return '{}';
-      return JSON.stringify(
-        Object.keys(settingsById).sort().map(id => {
-          const s = settingsById[id];
-          return `${id}:g${Number.isFinite(s.gainDb) ? s.gainDb.toFixed(1) : 0}:p${s.polarity || 'normal'}:d${Number.isFinite(s.delayMs) ? s.delayMs.toFixed(3) : 0}`;
-        })
-      );
-    };
-    return `F[${buildSig(frontSubsCfg?.settingsById)}]R[${buildSig(rearSubsCfg?.settingsById)}]`;
-  }, [frontSubsCfg?.settingsById, rearSubsCfg?.settingsById]);
-
-  // Six-surface absorption object fed directly to the REW Core engine
-  const surfaceAbsorption = {
-    front:   Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.front)   || 0.30)),
-    back:    Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.back)    || 0.30)),
-    left:    Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.left)    || 0.30)),
-    right:   Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.right)   || 0.30)),
-    ceiling: Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.ceiling) || 0.30)),
-    floor:   Math.max(0, Math.min(0.95, Number(surfaceAbsorptionInputs.floor)   || 0.30)),
-  };
-
-  // Keep refs current
-  React.useEffect(() => { frontCfgRef.current = frontSubsCfg; }, [frontSubsCfg]);
-  React.useEffect(() => { rearCfgRef.current = rearSubsCfg; }, [rearSubsCfg]);
-  React.useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
-  React.useEffect(() => { seatingRef.current = seatingPositions; }, [seatingPositions]);
-  React.useEffect(() => { designEqEnabledRef.current = designEqEnabled; }, [designEqEnabled]);
-  React.useEffect(() => { bassSmoothingModeRef.current = bassSmoothingMode; }, [bassSmoothingMode]);
-
-  // Derive auto-alignment delays from geometry — runtime only, never written to config
-  const autoAlignDelays = useMemo(() => {
-    if (!autoAlignEnabled) return {};
-    if (!rspPosition) return {};
-
-    const mlpPoint = { x: rspPosition.x, y: rspPosition.y, z: rspPosition.z };
-    const SPEED_OF_SOUND = 343;
-    const POSITION_LABELS = ['left', 'right'];
-    const allSubData = [];
-
-    const processGroup = (cfg, liveSubs, group) => {
-      // Primary source: live sub positions from the visualiser (same as subsForSimulation uses)
-      const live = Array.isArray(liveSubs) ? liveSubs : [];
-      // Fallback: cfg positions if live array is empty
-      const cfgPositions = Array.isArray(cfg?.positions) ? cfg.positions : [];
-      const count = live.length > 0 ? live.length : (cfg?.count || cfgPositions.length || 0);
-      if (count === 0) return;
-
-      for (let i = 0; i < count; i++) {
-        // Use the canonical sub ID — matching exactly what subsForSimulation produces
-        const subId = `${group}-sub-${POSITION_LABELS[i] ?? i}`;
-
-        // Position: live first, then cfg fallback
-        const liveEntry = live[i];
-        const livePos = liveEntry?.position ?? liveEntry;
-        const cfgPos = cfgPositions[i];
-        const pos = (liveEntry && Number.isFinite(Number(livePos?.x))) ? livePos : cfgPos;
-        if (!pos) continue;
-
-        const x = Number(pos.x);
-        const y = Number(pos.y);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-
-        const z = Number.isFinite(Number(pos.z)) ? Number(pos.z) : 0.35;
-        const dx = x - mlpPoint.x;
-        const dy = y - mlpPoint.y;
-        const dz = z - mlpPoint.z;
-        const distanceM = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        const arrivalMs = (distanceM / SPEED_OF_SOUND) * 1000;
-        allSubData.push({ subId, arrivalMs });
-      }
-    };
-
-    processGroup(frontSubsCfg, frontSubsLive, 'front');
-    processGroup(rearSubsCfg, rearSubsLive, 'rear');
-
-    if (allSubData.length === 0) return {};
-
-    const maxArrivalMs = Math.max(...allSubData.map(s => s.arrivalMs));
-    const delays = {};
-    allSubData.forEach(({ subId, arrivalMs }) => {
-      delays[subId] = Math.max(0, maxArrivalMs - arrivalMs);
-    });
-    return delays;
-  }, [autoAlignEnabled, rspPosition, frontSubsLive, rearSubsLive, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions]);
-
-  // Helper: resolve auto-align delay for a sub regardless of ID naming convention.
-  // autoAlignDelays is keyed by canonical IDs (front-sub-left, rear-sub-left, etc.)
-  // but live sub objects may carry alternate IDs (sub-front-1, sub-rear-1, etc.).
-  const resolveAutoDelayForSub = (subId, group, index) => {
-    const POSITION_LABELS = ['left', 'right'];
-    // 1. Direct lookup
-    if (autoAlignDelays[subId] != null) return autoAlignDelays[subId];
-    // 2. Canonical form: front-sub-left / rear-sub-right
-    const canonicalId = `${group}-sub-${POSITION_LABELS[index] ?? index}`;
-    if (autoAlignDelays[canonicalId] != null) return autoAlignDelays[canonicalId];
-    // 3. Alternate live naming: sub-front-1 / sub-rear-2
-    const altId = `sub-${group}-${index + 1}`;
-    if (autoAlignDelays[altId] != null) return autoAlignDelays[altId];
-    return 0;
-  };
-
-  // Build subs array for simulation
-  const subsForSimulation = useMemo(() => {
-    const liveFront = Array.isArray(frontSubsLive) ? frontSubsLive : [];
-    const liveRear = Array.isArray(rearSubsLive) ? rearSubsLive : [];
-
-    const getTuning = (subId, cfg) => {
-      // __TEMP_DIAGNOSTIC__ fallback: if exact subId key not found, use the only key present
-      const settingsById = cfg?.settingsById || {};
-      let settings = settingsById[subId];
-      let lookupKeyUsed = subId;
-      if (!settings) {
-        const keys = Object.keys(settingsById);
-        if (keys.length === 1) {
-          settings = settingsById[keys[0]];
-          lookupKeyUsed = keys[0];
-        }
-      }
-      settings = settings || {};
-      // Expose lookup key for debug readout
-      getTuning.__lastLookup = getTuning.__lastLookup || {};
-      getTuning.__lastLookup[subId] = { keyUsed: lookupKeyUsed, gainDb: settings.gainDb ?? 0 };
-
-      const manualDelayMs = Number.isFinite(settings.delayMs) ? settings.delayMs : 0;
-      // Use helper to resolve auto delay across both canonical and alternate ID formats
-      const group = subId?.includes('front') || subId?.includes('sub-front') ? 'front' : 'rear';
-      const index = subId?.includes('-right') || subId?.includes('-2') ? 1 : 0;
-      const autoDelayMs = resolveAutoDelayForSub(subId, group, index);
-      return {
-        gainDb: Number.isFinite(settings.gainDb) ? settings.gainDb : 0,
-        delayMs: manualDelayMs + autoDelayMs,
-        polarity: settings.polarity === 'invert' ? 180 : 0,
-      };
-    };
-    getTuning.__lastLookup = {};
-
-    const toSource = (s, group, idx, cfg) => {
-      const p = s?.position ?? s;
-      const x = Number(p?.x);
-      const y = Number(p?.y);
-      const z = p?.z;
-
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-
-      const POSITION_LABELS = ['left', 'right'];
-      const subId = s?.id ?? `${group}-sub-${POSITION_LABELS[idx] ?? idx}`;
-      const tuning = getTuning(subId, cfg);
-
-      return {
-        id: subId,
-        modelKey: s?.model ?? "SUB2-12",
-        x, y,
-        z: Number.isFinite(Number(z)) ? Number(z) : 0.35,
-        tuning,
-      };
-    };
-
-    const sources = [
-      ...liveFront.map((s, i) => toSource(s, "front", i, frontSubsCfg)),
-      ...liveRear.map((s, i) => toSource(s, "rear", i, rearSubsCfg)),
-    ].filter(Boolean);
-
-    return sources;
-  }, [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById, autoAlignDelays, subTuningSignature]);
-
-  const designEqSystemLimits = useMemo(() => {
-    const activeSubs = subsForSimulation.filter((sub) => sub?.modelKey);
-    const usableLfValues = activeSubs
-      .map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.modelKey))?.approvedUsableLfHzMinus6dB)
-      .filter(Number.isFinite);
-    return {
-      activeSubs,
-      usableLfHz: usableLfValues.length > 0 ? Math.max(...usableLfValues) : null,
-    };
-  }, [subsForSimulation]);
-
-  // Run bass simulation engine — parameterized by qStrategy so the exact same engine call
-  // can be re-run with a different Q strategy for the temporary overlay comparison below,
-  // without any duplicated simulation or plotting logic (one engine, one renderer).
-  const runSimulation = useCallback((qStrategyOverride) => {
-    if (hasNoSubs || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-      return { seatResponses: {}, metrics: null, audit: null };
-    }
-
-    if (!useRewCoreTestMode) {
-      return simulateBassAtSeats({
-        roomDims: {
-          widthM: roomDims.widthM,
-          lengthM: roomDims.lengthM,
-          heightM: roomDims.heightM
-        },
-        seats: seatingPositions,
-        subs: subsForSimulation,
-        splConfig: {
-          globalPowerW: splConfig?.globalPowerW ?? 100,
-          globalEqHeadroomDb: splConfig?.globalEqHeadroomDb ?? 0,
-          radiationMode: splConfig?.radiationMode ?? 'half-space',
-          modesEnabled: true,
-          roomDamping,
-          sbirEnabled: true
-        },
-        options: {}
-      });
-    }
-
-    const seatResponses = {};
-    // Step debug: follow the first selected seat + first sub (matches the visible graph).
-    // Use ID-based matching (not reference equality) so it is robust to seat list re-creation.
-    let __b44StepDebugCapture = null;
-    let __b44WholeCurveDebugCapture = null;
-    let __b44ActiveModalVectorPath = null;
-    const __b44RuntimeCaptureByHz = new Map();
-    const debugSeatId = "rsp";
-    const debugSubForCapture = subsForSimulation[0] || null;
-
-    // Build the listener list: canonical RSP first, then real seats.
-    // RSP receives exactly the same simulation path (subs, product curves, room
-    // dimensions, absorption, modal/reflection settings, tuning) as real seats.
-    const listeners = [];
-    if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) {
-      listeners.push(rspPosition);
-    }
-    if (Array.isArray(seatingPositions)) {
-      seatingPositions.forEach((seat) => listeners.push(seat));
-    }
-
-    listeners.forEach((seat) => {
-      const seatId = seat.id || `${seat.x}-${seat.y}`;
-      let sumRe = null;
-      let sumIm = null;
-      let freqsHz = null;
-
-      subsForSimulation.forEach((sub) => {
-        const subCurve = getSubwooferCurve(sub.modelKey);
-        if (!subCurve || subCurve.length === 0) return;
-        const diagnosticSourceCurve = REW_SOURCE_CURVES[rewSourceCurveMode] || subCurve;
-
-        // __TEMP_REW_PARITY_ISOLATION__ resolve per-field-mode overrides
-        // When source = flat_rew_reference AND field mode = full_field, force direct + modal only
-        // (no image-source reflections, no late field) to match REW Room Simulator parity test.
-        const _isParityFullField =
-          rewSourceCurveMode === 'flat_rew_reference' && rewParityFieldMode === 'full_field';
-        const _effectiveFieldMode = rewParityFieldMode;
-
-        // REW parity isolation: flat_rew_reference + full_field → direct + modes only, no reflections, no late field
-        // __CANDIDATE_AB_CORRECTED_MODAL__ — the A&B strategy must match Case 071's validated
-        // engine options (enableReflections: true), bypassing this legacy parity-isolation gate.
-        const _fieldReflections = qStrategyOverride === 'ab_corrected' ? true
-          : _isParityFullField ? false
-          : _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes' ? false
-          : _effectiveFieldMode === 'reflections_only' ? true
-          : enableRewCoreReflections;
-        const _fieldModes = _isParityFullField ? true
-          : _effectiveFieldMode === 'reflections_only' ? false
-          : _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes' ? true
-          : true;
-        const _fieldLateField = _isParityFullField ? true // disableLateField=true
-          : (_effectiveFieldMode === 'reflections_only' || _effectiveFieldMode === 'modes_only' || _effectiveFieldMode === 'direct_plus_modes')
-          ? true
-          : disableLateField;
-
-        // __TEMP_REW_PARITY__ adjustable modal distance blend
-        // blend=0.00 → existing 1m reference (no attenuation applied)
-        // blend=1.00 → full distance-normalized (pass through to engine as distance_normalized)
-        // blend=0.xx → fractional dB attenuation applied in BassResponse, engine receives 'existing'
-        const _seatZ = Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2;
-        let _engineModalRefMode = modalSourceReferenceMode;
-        let _engineModalGainScalar = modalGainScalar;
-        if (modalSourceReferenceMode === 'distance_blend') {
-          const _blend = Math.max(0, Math.min(1, modalDistanceBlend));
-          if (_blend >= 1.0) {
-            // Full distance_normalized — let the engine handle it
-            _engineModalRefMode = 'distance_normalized';
-          } else if (_blend <= 0.0) {
-            // No attenuation — existing 1m reference
-            _engineModalRefMode = 'existing';
-          } else {
-            // Partial: apply blend fraction of the full distance dB loss as a gain scalar
-            const _dx = sub.x - seat.x;
-            const _dy = sub.y - seat.y;
-            const _dz = sub.z - _seatZ;
-            const _distM = Math.max(0.01, Math.sqrt(_dx * _dx + _dy * _dy + _dz * _dz));
-            // Full distance loss in dB: -20*log10(d/1m). Apply blend fraction.
-            const _fullDistanceLossDb = -20 * Math.log10(_distM / 1);
-            const _blendedLossDb = _fullDistanceLossDb * _blend;
-            _engineModalGainScalar = modalGainScalar * Math.pow(10, _blendedLossDb / 20);
-            _engineModalRefMode = 'existing';
-          }
-        }
-
-        // __TEMP_DIAGNOSTIC_REW_PARITY_FIELD__
-        // Route to the dedicated REW-style modal-only Green's function solver when the
-        // parity preset is fully active (flat_rew_reference source). This bypasses the
-        // legacy decomposed superposition path entirely for direct comparison.
-        // Production/product mode is unaffected — this only fires for the REW parity preset.
-        const _useParityFieldSolver = false;
-
-        // Pass the user-selected modal source reference mode through directly.
-        // No forced override for flat_rew_reference — allows proper comparison of all modes.
-        const _finalModalRefMode = _engineModalRefMode;
-
-        const rewResult = _useParityFieldSolver
-          ? simulateBassResponseRewParityField(
-              {
-                widthM: roomDims.widthM,
-                lengthM: roomDims.lengthM,
-                heightM: roomDims.heightM,
-              },
-              {
-                x: seat.x,
-                y: seat.y,
-                z: _seatZ,
-              },
-              sub,
-              diagnosticSourceCurve,
-              {
-                surfaceAbsorption,
-                freqMinHz: 20,
-                freqMaxHz: 200,
-                axialQ,
-              }
-            )
-          : simulateBassResponseRewCore(
-          {
-            widthM: roomDims.widthM,
-            lengthM: roomDims.lengthM,
-            heightM: roomDims.heightM,
-          },
-          {
-            x: seat.x,
-            y: seat.y,
-            z: _seatZ,
-          },
-          sub,
-          diagnosticSourceCurve,
-          {
-            enableReflections: _fieldReflections,
-            enableModes: _fieldModes,
-            surfaceAbsorption,
-            freqMinHz: 20,
-            freqMaxHz: 200,
-            smoothing: 'none',
-            modalSourceReferenceMode: _finalModalRefMode,
-            modalGainScalar: _engineModalGainScalar,
-            axialQ,
-            modalStorageMode,
-            propagationPhaseScale, // Uses state value (default 0.10 for REW parity)
-            pureDeterministicModalSum: rewSourceCurveMode === 'flat_rew_reference', // forced true for REW parity preset only
-            disableReflectionPhaseJitter,
-            disableReflectionCoherenceWeight,
-            disableLateField: _fieldLateField,
-            disableModalPropagationPhase: rewSourceCurveMode === 'flat_rew_reference' ? true : disableModalPropagationPhase,
-            debugInvertModalVector: false, // __TEMP_DIAGNOSTIC_INVERT_MODAL_VECTOR__ (legacy — use debugModalPhaseConvention)
-            debugModalPhaseConvention: 'normal', // __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__
-            mute68HzAxialMode,
-            debugDisableModalContribution, // __TEMP_DIAGNOSTIC__ — remove after polarity masking diagnosis
-            overrideConstantAxialQ, // __TEMP_REW_PARITY_CONSTANT_AXIAL_Q__
-            overrideAbsorptionAxialQ, // __TEMP_REW_PARITY_ABSORPTION_AXIAL_Q__
-            debugMode200Multiplier, // __TEMP_REW_PARITY_MODE_200_SCALE__
-            debugReflectionOrder: (rewSourceCurveMode === 'flat_rew_reference' || qStrategyOverride === 'ab_corrected') ? 1 : 3, // __TEMP_DIAGNOSTIC_REFLECTION_ORDER__ force order-1 for REW parity preset and ab_corrected
-            reflectionGainScale, // diagnostic: scale imageAmplitude after reflectionCoefficient
-            debugModalHSign: 'normal', // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
-            rewParityModalMagnitudeScale: rewSourceCurveMode === 'flat_rew_reference' ? rewParityModalMagnitudeScale : 1.0, // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
-            modalCoherenceMode, // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
-            highOrderAxialScale, // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
-            qStrategy: qStrategyOverride, // __CANDIDATE_FREQ_DEP_Q__
-            rewModalBandwidthScale, // __CANDIDATE_REW_MODAL_BANDWIDTH__
-            runtimeVectorCapture: !designEqEnabledRef.current && bassSmoothingModeRef.current === 'none',
-            }
-        );
-
-        // Capture step debug for the first selected seat (by ID) + first sub only.
-        // ID-based match ensures we always capture the currently selected pill's seat.
-        if (
-          __b44StepDebugCapture === null &&
-          debugSeatId && seatId === debugSeatId &&
-          sub === debugSubForCapture &&
-          rewResult.stepDebug?.length > 0
-        ) {
-          __b44StepDebugCapture = rewResult.stepDebug;
-          __b44WholeCurveDebugCapture = rewResult.wholeCurveDebugRows;
-          __b44ActiveModalVectorPath = rewResult.activeModalVectorPath ?? null;
-          if (__b44WholeCurveDebugCapture) {
-            __b44WholeCurveDebugCapture.preModalSeries = rewResult.preModalSeries;
-            __b44WholeCurveDebugCapture.modalOnlySeries = rewResult.modalOnlySeries;
-            __b44WholeCurveDebugCapture.postModalSeries = rewResult.postModalSeries;
-          }
-        }
-
-        if (seatId === debugSeatId && Array.isArray(rewResult.runtimeVectorCapture)) {
-          rewResult.runtimeVectorCapture.forEach((row) => {
-            const existing = __b44RuntimeCaptureByHz.get(row.frequencyHz) || { frequencyHz: row.frequencyHz, subs: [] };
-            existing.subs.push({ subId: sub.id, ...row });
-            __b44RuntimeCaptureByHz.set(row.frequencyHz, existing);
-          });
-        }
-
-        if (!freqsHz) {
-          freqsHz = rewResult.freqsHz;
-          sumRe = rewResult.complexPressure.map(cp => cp.re);
-          sumIm = rewResult.complexPressure.map(cp => cp.im);
-        } else {
-          rewResult.complexPressure.forEach((cp, index) => {
-            if (Number.isFinite(cp.re) && Number.isFinite(cp.im)) {
-              sumRe[index] += cp.re;
-              sumIm[index] += cp.im;
-            }
-          });
-        }
-      });
-
-      if (freqsHz && sumRe && sumIm) {
-        seatResponses[seatId] = {
-          freqsHz,
-          splDb: sumRe.map((re, index) => {
-            const im = sumIm[index];
-            const magnitude = Math.sqrt(re * re + im * im);
-            return 20 * Math.log10(Math.max(magnitude, 1e-10));
-          }),
-          _sumRe: sumRe,
-          _sumIm: sumIm,
-          nulls: { count: 0, worstDb: 0, nulls: [] },
-        };
-      }
-    });
-
-    const runtimeVectorCapture = Array.from(__b44RuntimeCaptureByHz.values()).map((row) => {
-      const response = seatResponses[debugSeatId];
-      const index = response?.freqsHz?.findIndex((hz) => hz === row.frequencyHz) ?? -1;
-      const finalRe = index >= 0 ? response._sumRe?.[index] : null;
-      const finalIm = index >= 0 ? response._sumIm?.[index] : null;
-      const directRe = row.subs.reduce((sum, item) => sum + item.direct.directRe, 0);
-      const directIm = row.subs.reduce((sum, item) => sum + item.direct.directIm, 0);
-      const modalRe = row.subs.reduce((sum, item) => sum + item.modalRe, 0);
-      const modalIm = row.subs.reduce((sum, item) => sum + item.modalIm, 0);
-      const preModalRe = row.subs.reduce((sum, item) => sum + item.preModalRe, 0);
-      const preModalIm = row.subs.reduce((sum, item) => sum + item.preModalIm, 0);
-      const directPlusReflectionRe = row.subs.reduce((sum, item) => sum + item.directPlusReflectionRe, 0);
-      const directPlusReflectionIm = row.subs.reduce((sum, item) => sum + item.directPlusReflectionIm, 0);
-      const magnitude = Math.hypot(finalRe, finalIm);
-      return { ...row, directRe, directIm, modalRe, modalIm, preModalRe, preModalIm, preModalMagnitude: Math.hypot(preModalRe, preModalIm), preModalSplDb: 20 * Math.log10(Math.max(Math.hypot(preModalRe, preModalIm), 1e-10)), directPlusReflectionRe, directPlusReflectionIm, directPlusReflectionSplDb: 20 * Math.log10(Math.max(Math.hypot(directPlusReflectionRe, directPlusReflectionIm), 1e-10)), finalRe, finalIm, finalMagnitude: magnitude, finalSplDb: 20 * Math.log10(Math.max(magnitude, 1e-10)), plottedGraphValueDb: 20 * Math.log10(Math.max(magnitude, 1e-10)) };
-    });
-    return {
-      seatResponses,
-      metrics: null,
-      audit: null,
-      stepDebug: __b44StepDebugCapture, // __B44_STEP_DEBUG__ temporary — remove after diagnosis
-      wholeCurveDebugRows: __b44WholeCurveDebugCapture,
-      activeModalVectorPath: __b44ActiveModalVectorPath,
-      runtimeVectorCapture: { rows: runtimeVectorCapture },
-    };
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, rspPosition, hasNoSubs, useRewCoreTestMode, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase, mute68HzAxialMode, surfaceAbsorptionInputs, debugDisableModalContribution, subTuningSignature, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale]);
-
-  const simulationResults = useMemo(() => runSimulation(qStrategy), [runSimulation, qStrategy]);
-
-  // RSP raw curve — the authoritative assessment curve fed to the optimiser.
-  // Built from seatResponses.rsp (the synthetic RSP listener position), never from
-  // a selected graph seat. Real-seat curves are display overlays only.
-  const rspRawCurve = useMemo(() => {
-    const response = simulationResults.seatResponses?.rsp;
-    if (!response?.freqsHz || !response?.splDb) return [];
-    const raw = response.freqsHz
-      .map((frequency, i) => ({
-        frequency,
-        spl: Number.isFinite(response.splDb[i]) ? response.splDb[i] : null,
-      }))
-      .filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
-    const sorted = [...raw].sort((a, b) => a.frequency - b.frequency);
-    const deduped = [];
-    for (let i = 0; i < sorted.length; i++) {
-      const curr = sorted[i];
-      const next = sorted[i + 1];
-      if (next && Math.abs(curr.frequency - next.frequency) < 1e-9) continue;
-      deduped.push(curr);
-    }
-    return deduped;
-  }, [simulationResults.seatResponses]);
-  // Temporary overlay: re-runs the identical engine with qStrategy forced to 'production',
+  // Temporary overlay: re-runs the identical authoritative engine with qStrategy forced to 'production',
   // for the "Overlay Production" comparison toggle only. No second engine, no duplicated logic.
   const overlayProductionResults = useMemo(
     () => (overlayProduction ? runSimulation('production') : null),
@@ -813,7 +247,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
 
     return series;
-  }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub, subTuningSignature, showRsp, rspRawCurve]);
+  }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub, showRsp, rspRawCurve]);
 
   // Parse pasted REW CSV into a series object
   const rewOverlaySeries = useMemo(() => {
@@ -856,31 +290,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [overlayProduction, overlayProductionResults, selectedSeatIds]);
 
 
-  const optimisationTransitionHz = useMemo(() => {
-    const volume = (roomDims?.widthM || 0) * (roomDims?.lengthM || 0) * (roomDims?.heightM || 0);
-    return volume > 0 ? 2000 * Math.sqrt(0.4 / volume) : 120;
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
-
-  // Per-seat raw curves for seat-aware optimiser metrics (worst-seat accuracy + P20).
-  // Excludes the synthetic "rsp" listener — only real seats are passed.
-  const perSeatRawCurves = useMemo(() => {
-    const responses = simulationResults?.seatResponses;
-    if (!responses) return [];
-    return Object.entries(responses)
-      .filter(([seatId]) => seatId !== "rsp")
-      .map(([seatId, response]) => ({
-        seatId,
-        responseData: (response.freqsHz || [])
-          .map((frequency, i) => ({
-            frequency,
-            spl: Number.isFinite(response.splDb?.[i]) ? response.splDb[i] : null,
-          }))
-          .filter(p => Number.isFinite(p.frequency) && p.frequency > 0 && Number.isFinite(p.spl)),
-      }))
-      .filter(seat => seat.responseData.length > 0);
-  }, [simulationResults?.seatResponses]);
-
-  const sharedBassResults = useSharedBassResults();
   const detailedLifecycle = sharedBassResults.lifecycle;
   const detailedStatus = sharedBassResults.detailedStatus;
   const detailedError = sharedBassResults.detailedError;
@@ -1004,128 +413,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     { level: "L3", spl: 120, color: "#625143" },
     { level: "L4", spl: 123, color: "#213428" },
   ]), []);
-
-  // Compute geometric distances
-  const subDistances = useMemo(() => {
-    if (!rspPosition) return {};
-    
-    const mlpPoint = { x: rspPosition.x, y: rspPosition.y, z: rspPosition.z };
-    const SPEED_OF_SOUND = 343;
-    const distances = {};
-    
-    const frontCount = frontSubsCfg?.count || 0;
-    const frontPositions = frontSubsCfg?.positions || [];
-    if (frontCount > 0) {
-      const roomWidth = roomDims?.widthM || 4.5;
-      const defaultFrontPos = [
-        { x: roomWidth * 0.33, y: 0.15 },
-        { x: roomWidth * 0.67, y: 0.15 }
-      ];
-      const frontIds = frontCount === 1 ? ['front-sub-left'] : ['front-sub-left', 'front-sub-right'];
-      frontIds.forEach((id, i) => {
-        const pos = frontPositions[i] || defaultFrontPos[i];
-        const dx = pos.x - mlpPoint.x;
-        const dy = pos.y - mlpPoint.y;
-        const dz = 0.35 - mlpPoint.z;
-        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        distances[id] = {
-          distanceM: distance,
-          timeMs: (distance / SPEED_OF_SOUND) * 1000
-        };
-      });
-    }
-    
-    const rearCount = rearSubsCfg?.count || 0;
-    const rearPositions = rearSubsCfg?.positions || [];
-    if (rearCount > 0) {
-      const roomWidth = roomDims?.widthM || 4.5;
-      const roomLength = roomDims?.lengthM || 6.0;
-      const defaultRearPos = [
-        { x: roomWidth * 0.33, y: roomLength - 0.15 },
-        { x: roomWidth * 0.67, y: roomLength - 0.15 }
-      ];
-      const rearIds = rearCount === 1 ? ['rear-sub-left'] : ['rear-sub-left', 'rear-sub-right'];
-      rearIds.forEach((id, i) => {
-        const pos = rearPositions[i] || defaultRearPos[i];
-        const dx = pos.x - mlpPoint.x;
-        const dy = pos.y - mlpPoint.y;
-        const dz = 0.35 - mlpPoint.z;
-        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        distances[id] = {
-          distanceM: distance,
-          timeMs: (distance / SPEED_OF_SOUND) * 1000
-        };
-      });
-    }
-    
-    return distances;
-  }, [rspPosition, frontSubsCfg, rearSubsCfg, roomDims]);
-
-  // Auto-align function — operates across ALL active subs (front + rear) globally
-  const autoAlignSubs = React.useCallback(() => {
-    if (!autoAlignEnabled) return;
-
-    const roomDimsNow = roomDimsRef.current;
-    const frontCfg = frontCfgRef.current;
-    const rearCfg = rearCfgRef.current;
-    if (!rspPosition) return;
-
-    const mlpPoint = { x: rspPosition.x, y: rspPosition.y, z: rspPosition.z };
-    const SPEED_OF_SOUND = 343;
-    const roomWidth = Number(roomDimsNow?.widthM) || 4.5;
-    const roomLength = Number(roomDimsNow?.lengthM) || 6.0;
-
-    // Build combined list of all active subs across both groups
-    const allSubData = [];
-
-    const processGroup = (cfg, group) => {
-      const count = cfg?.count || 0;
-      if (count === 0) return;
-      const positions = Array.isArray(cfg?.positions) ? cfg.positions : [];
-      const POSITION_LABELS = ['left', 'right'];
-      const isRear = group === 'rear';
-      const defaultPositions = isRear
-        ? [{ x: roomWidth * 0.33, y: roomLength - 0.15 }, { x: roomWidth * 0.67, y: roomLength - 0.15 }]
-        : [{ x: roomWidth * 0.33, y: 0.15 }, { x: roomWidth * 0.67, y: 0.15 }];
-      for (let i = 0; i < count; i++) {
-        const subId = `${group}-sub-${POSITION_LABELS[i] ?? i}`;
-        const pos = positions[i] || defaultPositions[i] || { x: roomWidth / 2, y: isRear ? roomLength - 0.15 : 0.15 };
-        const dx = pos.x - mlpPoint.x;
-        const dy = pos.y - mlpPoint.y;
-        const dz = 0.35 - mlpPoint.z;
-        const distanceM = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        const arrivalTime = distanceM / SPEED_OF_SOUND;
-        allSubData.push({ subId, group, arrivalTime, distanceM });
-      }
-    };
-
-    processGroup(frontCfg, 'front');
-    processGroup(rearCfg, 'rear');
-
-    if (allSubData.length === 0) return;
-
-    // Single global maxArrival across all subs
-    const maxArrival = Math.max(...allSubData.map(s => s.arrivalTime));
-
-    // Diagnostic log
-    allSubData.forEach(({ subId, distanceM, arrivalTime }) => {
-      const delayMs = Math.max(0, (maxArrival - arrivalTime) * 1000);
-      console.log(`[AutoAlign] ${subId}: ${distanceM.toFixed(3)}m → ${(arrivalTime * 1000).toFixed(2)}ms arrival → ${delayMs.toFixed(2)}ms applied delay`);
-    });
-
-    // Auto-align is now runtime-only — no writes to settingsById.
-    // Delays are derived in autoAlignDelays useMemo and injected into subsForSimulation at engine call time.
-  }, [autoAlignEnabled, rspPosition]);
-
-  // Auto-align effects — re-run whenever MLP seat, room dims, or any sub positions change
-  useEffect(() => {
-    const frontCount = frontSubsCfg?.count || 0;
-    const rearCount  = rearSubsCfg?.count  || 0;
-    if (!autoAlignEnabled) return;
-    if (frontCount > 0) setHasAutoAlignedFront(true); else setHasAutoAlignedFront(false);
-    if (rearCount  > 0) setHasAutoAlignedRear(true);  else setHasAutoAlignedRear(false);
-    autoAlignSubs();
-  }, [autoAlignEnabled, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions, roomDims?.widthM, roomDims?.lengthM, autoAlignSubs]);
 
   // Expose drag state
   useEffect(() => {
@@ -1717,37 +1004,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         )}
       </div>
 
-      {/* Per-seat detail cards */}
-      {!useRewCoreTestMode && Object.keys(simulationResults.seatResponses).length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {Object.entries(simulationResults.seatResponses).map(([seatId, response]) => {
-            const nullInfo = response.nulls || { count: 0, worstDb: 0 };
-            
-            return (
-              <div key={seatId} className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium text-[#1B1A1A]">Seat {seatId}</div>
-                </div>
-                <div className="space-y-1 text-xs">
-                  {nullInfo.count > 0 && (
-                    <>
-                      <div className="text-[#3E4349]">
-                        <span className="font-medium">Nulls:</span> {nullInfo.count}
-                      </div>
-                      <div className="text-[#3E4349]">
-                        <span className="font-medium">Worst:</span> {fmtFixed(nullInfo.worstDb, 1)} dB
-                      </div>
-                    </>
-                  )}
-                  {nullInfo.count === 0 && (
-                    <div className="text-[#3E4349]">No significant nulls</div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

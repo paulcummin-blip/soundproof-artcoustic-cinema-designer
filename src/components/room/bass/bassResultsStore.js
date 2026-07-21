@@ -14,6 +14,7 @@ export const emptyBassResults = () => ({
   detailedError: null,
   onPriorityChange: null,
   onRetry: null,
+  authoritative: null,
 });
 
 export function createBassResultsScope(scopeId) {
