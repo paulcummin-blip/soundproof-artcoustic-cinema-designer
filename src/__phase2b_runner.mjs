@@ -9,21 +9,36 @@ import { runIntegrationFixtures } from "@/components/room/bass/bassAnalysisInteg
 import { runNormalizedRoomTransferFixtures } from "@/components/room/bass/normalizedRoomTransferFixtures";
 import { runNormalizedRoomTransferLiveFixtures } from "@/components/room/bass/normalizedRoomTransferLiveFixtures";
 
+// Normalize a fixture result to { results, passed, total, allPassed }.
+// Existing suites (fingerprints, contract, integration, normalizedRoomTransfer)
+// return a flat object of booleans. The live suite returns
+// { results, passed, total, allPassed }.
+function normalizeResult(raw) {
+  if (raw && Array.isArray(raw.results)) {
+    return raw;
+  }
+  const entries = Object.entries(raw || {});
+  const results = entries.map(([name, passed]) => ({ name, passed: !!passed, details: "" }));
+  const passed = results.filter((r) => r.passed).length;
+  const total = results.length;
+  return { results, passed, total, allPassed: passed === total };
+}
+
 function printSuite(name, result) {
   console.log(`\n=== ${name} ===`);
   console.log(`  Passed: ${result.passed}/${result.total} ${result.allPassed ? "ALL PASSED" : "FAILURES"}`);
   for (const r of result.results) {
     console.log(`  ${r.passed ? "PASS" : "FAIL"} ${r.name}`);
-    if (!r.passed) console.log(`    ${r.details}`);
+    if (!r.passed && r.details) console.log(`    ${r.details}`);
   }
 }
 
 const suites = [
-  ["fingerprints", runFingerprintFixtures()],
-  ["contract", runContractFixtures()],
-  ["integration", runIntegrationFixtures()],
-  ["normalizedRoomTransfer", runNormalizedRoomTransferFixtures()],
-  ["normalizedRoomTransferLive", runNormalizedRoomTransferLiveFixtures()],
+  ["fingerprints", normalizeResult(runFingerprintFixtures())],
+  ["contract", normalizeResult(runContractFixtures())],
+  ["integration", normalizeResult(runIntegrationFixtures())],
+  ["normalizedRoomTransfer", normalizeResult(runNormalizedRoomTransferFixtures())],
+  ["normalizedRoomTransferLive", normalizeResult(runNormalizedRoomTransferLiveFixtures())],
 ];
 
 let allPassed = true;

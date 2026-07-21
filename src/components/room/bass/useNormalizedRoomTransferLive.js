@@ -4,10 +4,12 @@
 // Returns the product-independent room response, updated asynchronously via
 // a dedicated Web Worker when geometry changes. A short trailing debounce
 // (~60 ms) coalesces rapid dragging or editing. Race protection uses a
-// monotonically increasing request ID — stale worker responses are discarded.
-// The last valid result remains visible while a newer result is calculating.
-// Worker failures produce a recoverable error state, not a page crash. The
-// worker is terminated on unmount.
+// monotonically increasing request ID AND a fingerprint ref that is updated
+// immediately when the fingerprint changes — stale worker responses are
+// discarded even if they complete during the debounce window. The last valid
+// result remains visible while a newer result is calculating. Worker failures
+// produce a recoverable error state, not a page crash. The worker is
+// terminated on unmount.
 //
 // The fingerprint is truly product-independent: it excludes model key,
 // product curve, product capability, product-derived source IDs, requested
@@ -59,7 +61,13 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
 
   const workerRef = useRef(null);
   const requestIdRef = useRef(0);
-  const activeRequestRef = useRef(null); // { requestId, fingerprint }
+  // The latest requested fingerprint — updated IMMEDIATELY when the fingerprint
+  // changes, before the debounce. An in-flight worker response must match this
+  // to be accepted.
+  const currentFingerprintRef = useRef(null);
+  // The active posted request { requestId, fingerprint }. Set when the worker
+  // is posted, cleared immediately when a newer fingerprint supersedes it.
+  const activeRequestRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const lastValidResultRef = useRef(null);
   const lastValidFingerprintRef = useRef(null);
@@ -118,8 +126,14 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       workerRef.current.onmessage = (e) => {
         const msg = e.data || {};
         const active = activeRequestRef.current;
-        // Race protection: discard responses from superseded requests.
-        if (!active || msg.requestId !== active.requestId) return;
+        // Race protection: accept a response only when BOTH its request ID
+        // AND fingerprint match the latest active request, AND the active
+        // request is still the current fingerprint. This prevents an old
+        // request completing during the debounce from becoming "ready".
+        if (!active) return;
+        if (msg.requestId !== active.requestId) return;
+        if (msg.fingerprint !== active.fingerprint) return;
+        if (active.fingerprint !== currentFingerprintRef.current) return;
 
         if (msg.type === "complete") {
           lastValidResultRef.current = msg.result;
@@ -135,6 +149,9 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
         }
       };
       workerRef.current.onerror = (e) => {
+        // Only surface the error if it belongs to the current request.
+        const active = activeRequestRef.current;
+        if (!active || active.fingerprint !== currentFingerprintRef.current) return;
         setErrorMessage(e?.message || "Worker error");
         setStatus("error");
       };
@@ -142,14 +159,23 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     return workerRef.current;
   }, []);
 
-  // Debounced effect: when the fingerprint changes, start a worker after a
-  // short trailing debounce. The last valid result remains visible while
-  // the newer result is calculating (status "calculating", result unchanged).
+  // Debounced effect: when the fingerprint changes, invalidate any in-flight
+  // request IMMEDIATELY (before the debounce), then start a worker after a
+  // short trailing debounce. The last valid result remains visible while the
+  // newer result is calculating (status "calculating", result unchanged).
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
     }
+
+    // IMMEDIATELY invalidate any in-flight worker response by incrementing the
+    // request token and storing the new fingerprint. An old request completing
+    // during the 60 ms debounce will fail the requestId/fingerprint match in
+    // onmessage and be discarded — it must never become "ready".
+    const newRequestId = ++requestIdRef.current;
+    currentFingerprintRef.current = geometryFingerprint;
+    activeRequestRef.current = null;
 
     if (!geometryFingerprint) {
       setStatus("idle");
@@ -172,10 +198,12 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     debounceTimerRef.current = setTimeout(() => {
       const worker = ensureWorker();
       if (!worker) return;
-      const requestId = ++requestIdRef.current;
-      activeRequestRef.current = { requestId, fingerprint: fp };
+      // Guard: a newer fingerprint may have superseded us during the debounce.
+      if (currentFingerprintRef.current !== fp) return;
+
+      activeRequestRef.current = { requestId: newRequestId, fingerprint: fp };
       setRequestedAt(Date.now());
-      worker.postMessage({ requestId, fingerprint: fp, payload });
+      worker.postMessage({ requestId: newRequestId, fingerprint: fp, payload });
     }, DEBOUNCE_MS);
 
     return () => {

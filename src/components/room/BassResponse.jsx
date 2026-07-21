@@ -34,6 +34,8 @@ import BassContractParityAudit from "@/components/room/bass/BassContractParityAu
 import { deriveRequestedCalibrationConfig } from "@/components/room/bass/requestedCalibrationConfig";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 import { useNormalizedRoomTransferLive } from "@/components/room/bass/useNormalizedRoomTransferLive";
+import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalizedPhysicsOptions";
+import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code.
@@ -929,42 +931,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [detailedFingerprint, handleFingerprintChange]);
 
   // --- Phase 2B: Normalized room-transfer live wiring ---
-  // Product-independent physics options for the normalized engine. Uses the
-  // flat 94 dB source (pureDeterministicModalSum, debugReflectionOrder 1,
-  // disableModalPropagationPhase true) matching the production flat-source path.
-  // Excludes model key, product curve, requested SPL, EQ, priority, smoothing.
-  const normalizedPhysicsOptions = useMemo(() => ({
-    surfaceAbsorption,
-    enableReflections: qStrategy === 'ab_corrected' ? true : enableRewCoreReflections,
-    enableModes: true,
-    roomDamping,
-    axialQ,
-    modalSourceReferenceMode,
-    modalGainScalar,
-    modalDistanceBlend,
-    modalStorageMode,
-    propagationPhaseScale,
-    pureDeterministicModalSum: true,
-    disableReflectionPhaseJitter,
-    disableReflectionCoherenceWeight,
-    disableLateField: true,
-    disableModalPropagationPhase: true,
-    mute68HzAxialMode,
-    debugDisableModalContribution,
-    rewParityFieldMode,
-    overrideConstantAxialQ,
-    overrideAbsorptionAxialQ,
-    debugMode200Multiplier,
-    debugModalPhaseConvention: 'normal',
-    debugReflectionOrder: 1,
-    reflectionGainScale,
-    debugModalHSign: 'normal',
-    rewParityModalMagnitudeScale: 1.0,
-    modalCoherenceMode,
-    highOrderAxialScale,
-    qStrategy,
-    rewModalBandwidthScale,
-  }), [surfaceAbsorption, qStrategy, enableRewCoreReflections, roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, reflectionGainScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale]);
+  // Product-independent physics options for the normalized engine. Built by
+  // the shared builder (normalizedPhysicsOptionsBuilder.js) which mirrors the
+  // production flat-source path. Excludes model key, product curve, requested
+  // SPL, EQ, priority, smoothing.
+  const normalizedPhysicsOptions = useNormalizedPhysicsOptions({
+    surfaceAbsorption, qStrategy, enableRewCoreReflections, roomDamping, axialQ,
+    modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode,
+    propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight,
+    mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode,
+    overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier,
+    reflectionGainScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale,
+  });
 
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims, rspPosition, seatingPositions, subsForSimulation,
@@ -972,25 +950,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   });
 
   // Normalized RSP series for the live, pre-calibration room-response display.
-  // Labelled as product-independent; its 94 dB reference is NOT predicted product SPL.
-  const normalizedSeries = useMemo(() => {
-    if (!normalizedLive.result?.rspCurve?.length) return null;
-    return {
-      id: "normalized-rsp",
-      kind: "normalized",
-      label: "Normalized room response (RSP)",
-      tooltipLabel: "Product-independent normalized room response (94 dB flat reference) — not predicted product SPL",
-      color: "#16A34A",
-      strokeWidth: 2,
-      data: normalizedLive.result.rspCurve,
-    };
-  }, [normalizedLive.result]);
+  const normalizedSeries = useMemo(
+    () => buildNormalizedSeries(normalizedLive.result?.rspCurve),
+    [normalizedLive.result]
+  );
 
   // A valid detailed result is one that is COMPLETE and matches the current
   // physical fingerprint. When geometry changes, detailedStatus becomes
   // OUT_OF_DATE and this flag is false — the stale result is NOT presented
   // as current; the normalized curve is shown instead.
   const hasValidDetailedResult = designEqEnabled && detailedStatus === "COMPLETE" &&
+    detailedResult?.fingerprint === detailedFingerprint &&
     optimisationResult?.finalPostEqCurve?.length > 0 && rspRawCurve.length > 0;
 
   // Worker payload — structured-clone-safe data for the detailed calculation.

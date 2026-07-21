@@ -26,6 +26,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { computeNormalizedTransferFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { computeNormalizedRoomTransfer } from "@/components/room/bass/normalizedRoomTransferEngine";
+import { buildNormalizedPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
+import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
+import { REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -185,7 +188,7 @@ function fixture_workerErrorRecoverable() {
   let engineError = null;
   try {
     const result = computeNormalizedRoomTransfer({
-      roomDims: { widthM: 0, lengthM: 0, heightM: 0 },
+      roomDims: { widthM: NaN, lengthM: NaN, heightM: NaN },
       rspPosition: TEST_RSP,
       seatingPositions: TEST_SEATS,
       subsForSimulation: [makeSub("sub2-12", 1.5, 1.0, 0.3, "front")],
@@ -214,7 +217,7 @@ function fixture_workerErrorRecoverable() {
 
   return {
     name: "8. Worker errors are recoverable (engine returns error, not crash)",
-    passed: !errorCaught && !!engineError && !noSourceError,
+    passed: !errorCaught && !!engineError && !!noSourceError,
     details: `Invalid room: error="${engineError}" (caught=${errorCaught}). No sources: error="${noSourceError}"`,
   };
 }
@@ -367,6 +370,81 @@ function fixture_liveGraphUsesNormalizedBeforeCalibration() {
   };
 }
 
+// 16. Live worker path and direct production flat-source path match within 0.001 dB
+function fixture_liveWorkerMatchesProductionFlatSource() {
+  // The normalized engine (what the worker calls) must produce the same RSP
+  // curve as a direct production flat-source call to simulateBassResponseRewCore
+  // with REW_SOURCE_CURVES.flat_rew_reference and the same physics options.
+  const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
+
+  const physicsParams = {
+    surfaceAbsorption: { front: 0.3, back: 0.3, left: 0.3, right: 0.3, ceiling: 0.3, floor: 0.3 },
+    qStrategy: "ab_corrected",
+    enableRewCoreReflections: false,
+    roomDamping: 20,
+    axialQ: 4.0,
+    modalSourceReferenceMode: "existing",
+    modalGainScalar: 1.0,
+    modalDistanceBlend: 0.0,
+    modalStorageMode: "constant",
+    propagationPhaseScale: 0,
+    disableReflectionPhaseJitter: false,
+    disableReflectionCoherenceWeight: false,
+    mute68HzAxialMode: false,
+    debugDisableModalContribution: false,
+    rewParityFieldMode: "full_field",
+    overrideConstantAxialQ: null,
+    overrideAbsorptionAxialQ: null,
+    debugMode200Multiplier: 1.0,
+    reflectionGainScale: 1.0,
+    modalCoherenceMode: "standard",
+    highOrderAxialScale: 1.0,
+    rewModalBandwidthScale: 1.0,
+  };
+  const physicsOptions = buildNormalizedPhysicsOptions(physicsParams);
+
+  // Path A: Normalized engine (what the worker calls)
+  const normalizedResult = computeNormalizedRoomTransfer({
+    roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
+    subsForSimulation: [sub], physicsOptions,
+  });
+
+  // Path B: Direct production flat-source call — same engine, same flat curve,
+  // same physics options, same listener (RSP), same single sub.
+  const flatCurve = REW_SOURCE_CURVES.flat_rew_reference;
+  const rewResult = simulateBassResponseRewCore(
+    { widthM: TEST_ROOM.widthM, lengthM: TEST_ROOM.lengthM, heightM: TEST_ROOM.heightM },
+    { x: TEST_RSP.x, y: TEST_RSP.y, z: TEST_RSP.z },
+    sub,
+    flatCurve,
+    { ...physicsOptions, freqMinHz: 20, freqMaxHz: 200, smoothing: "none" }
+  );
+
+  // Build the direct RSP curve from complex pressure (same as the engine does)
+  const directRsp = rewResult.freqsHz.map((freq, i) => {
+    const cp = rewResult.complexPressure[i];
+    const mag = Math.sqrt(cp.re * cp.re + cp.im * cp.im);
+    return { frequency: freq, spl: 20 * Math.log10(Math.max(mag, 1e-10)) };
+  });
+
+  // Compare point-by-point at matching frequencies
+  let maxDelta = 0;
+  let compared = 0;
+  const normalizedRsp = normalizedResult.rspCurve;
+  for (let i = 0; i < normalizedRsp.length && i < directRsp.length; i++) {
+    if (normalizedRsp[i].frequency === directRsp[i].frequency) {
+      maxDelta = Math.max(maxDelta, Math.abs(normalizedRsp[i].spl - directRsp[i].spl));
+      compared++;
+    }
+  }
+
+  return {
+    name: "16. Live worker path matches direct production flat-source path within 0.001 dB",
+    passed: maxDelta < 0.001 && compared > 0,
+    details: `max delta: ${maxDelta.toFixed(6)} dB. Compared points: ${compared}. Normalized: ${normalizedRsp.length}, direct: ${directRsp.length}`,
+  };
+}
+
 // --- Runner ---
 
 export function runNormalizedRoomTransferLiveFixtures() {
@@ -386,6 +464,7 @@ export function runNormalizedRoomTransferLiveFixtures() {
     fixture_latencyFourSubs,
     fixture_fingerprintExcludesForbidden,
     fixture_liveGraphUsesNormalizedBeforeCalibration,
+    fixture_liveWorkerMatchesProductionFlatSource,
   ];
 
   const results = fixtures.map(fn => {
