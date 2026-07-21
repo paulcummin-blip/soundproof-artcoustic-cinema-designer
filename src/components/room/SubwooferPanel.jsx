@@ -6,63 +6,9 @@ import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
 import P14LevelPill from '@/components/room/P14LevelPill';
-import optimiseSubwooferLayout from '@/components/room/bass/SubwooferOptimiser';
+import BestSubLayoutGuide from '@/components/room/bass/best-layout/BestSubLayoutGuide';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
-
-const placementModeLabels = {
-  quarter: '1/4 Points',
-  corners: 'Corners',
-  midpoint: 'Midpoint',
-  sixth: '1/6 – 5/6 Positions',
-  asymmetric: 'Asymmetric',
-};
-
-function getWallLayoutLabel(wallConfig) {
-  if (wallConfig === 'front+rear') return 'Front + Rear';
-  if (wallConfig === 'front') return 'Front only';
-  if (wallConfig === 'rear') return 'Rear only';
-  return '—';
-}
-
-function getQuantityLabel(quantity) {
-  const total = typeof quantity === 'object' && quantity
-    ? (Number(quantity.front) || 0) + (Number(quantity.rear) || 0)
-    : (Number(quantity) || 0);
-
-  return `${total} ${total === 1 ? 'sub' : 'subs'}`;
-}
-
-
-function getGrade(seatVariation, nullPenalty, modalRiskLabel) {
-  if (modalRiskLabel === 'Avoid' || seatVariation > 10 || nullPenalty >= 4) {
-    return { label: 'Not recommended', className: 'text-red-700' };
-  }
-  if (seatVariation < 3 && nullPenalty === 0) {
-    return { label: 'A+', className: 'text-[#213428]' };
-  }
-  if (seatVariation < 3) {
-    return { label: 'A', className: 'text-green-700' };
-  }
-  if (seatVariation < 6) {
-    return { label: 'B', className: 'text-amber-700' };
-  }
-  if (seatVariation <= 10) {
-    return { label: 'C', className: 'text-orange-700' };
-  }
-  return { label: 'Not recommended', className: 'text-red-700' };
-}
-
-function formatDestructiveNulls(destructiveNulls) {
-  if (!Array.isArray(destructiveNulls) || destructiveNulls.length === 0) {
-    return 'None ≥3 dB';
-  }
-
-  return destructiveNulls
-    .slice(0, 3)
-    .map((nullPoint) => `${nullPoint.frequency} Hz / ${nullPoint.depth} dB`)
-    .join(', ');
-}
 
 function rectsOverlap(a, b) {
   return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
@@ -106,83 +52,6 @@ function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
   return lcrRects.some((lcrRect) => frontSubRects.some((subRect) => rectsOverlap(lcrRect, subRect)));
 }
 
-function isSameLayout(result, frontSubsCfg, rearSubsCfg) {
-  if (!result) return false;
-  const wallConfig = result.wallConfig;
-  const placementMode = result.placementMode;
-  const quantity = result.quantity;
-
-  if (wallConfig === 'front') {
-    return (frontSubsCfg?.placementMode ?? 'default') === placementMode
-      && Number(frontSubsCfg?.count ?? 0) === Number(quantity)
-      && Number(rearSubsCfg?.count ?? 0) === 0;
-  }
-
-  if (wallConfig === 'rear') {
-    return (rearSubsCfg?.placementMode ?? 'default') === placementMode
-      && Number(rearSubsCfg?.count ?? 0) === Number(quantity)
-      && Number(frontSubsCfg?.count ?? 0) === 0;
-  }
-
-  if (wallConfig === 'front+rear') {
-    return (frontSubsCfg?.placementMode ?? 'default') === placementMode
-      && (rearSubsCfg?.placementMode ?? 'default') === placementMode
-      && Number(frontSubsCfg?.count ?? 0) === Number(quantity?.front)
-      && Number(rearSubsCfg?.count ?? 0) === Number(quantity?.rear);
-  }
-
-  return false;
-}
-
-function applyRecommendedLayout(result, appState) {
-  if (!result || !appState?.setFrontSubsCfg || !appState?.setRearSubsCfg) return;
-
-  if (result.wallConfig === 'front') {
-    appState.setFrontSubsCfg((prev) => ({
-      ...prev,
-      count: Number(result.quantity) || 0,
-      placementMode: result.placementMode,
-      positions: [],
-    }));
-    appState.setRearSubsCfg((prev) => ({
-      ...prev,
-      count: 0,
-      positions: [],
-    }));
-    return;
-  }
-
-  if (result.wallConfig === 'rear') {
-    appState.setRearSubsCfg((prev) => ({
-      ...prev,
-      count: Number(result.quantity) || 0,
-      placementMode: result.placementMode,
-      positions: [],
-    }));
-    appState.setFrontSubsCfg((prev) => ({
-      ...prev,
-      count: 0,
-      positions: [],
-    }));
-    return;
-  }
-
-  if (result.wallConfig === 'front+rear') {
-    appState.setFrontSubsCfg((prev) => ({
-      ...prev,
-      count: Number(result.quantity?.front) || 0,
-      placementMode: result.placementMode,
-      positions: [],
-    }));
-    appState.setRearSubsCfg((prev) => ({
-      ...prev,
-      count: Number(result.quantity?.rear) || 0,
-      placementMode: result.placementMode,
-      positions: [],
-    }));
-  }
-}
-
 export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings }) {
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
@@ -192,43 +61,13 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
     frontSubsCfg,
   }), [appState?.speakerSystem?.placedSpeakers, appState?.subwoofers, frontSubsCfg]);
 
-  const recommendationState = useMemo(() => {
-    const hasRoom = Number.isFinite(Number(roomDimensions?.widthM ?? roomDimensions?.width))
-      && Number.isFinite(Number(roomDimensions?.lengthM ?? roomDimensions?.length));
-    const hasSeats = Array.isArray(seats) && seats.length > 0;
-
-    if (!hasRoom || !hasSeats) {
-      return {
-        status: 'missing',
-        message: 'Add room dimensions and seating positions to generate a recommendation.'
-      };
-    }
-
-    try {
-      const primaryResult = optimiseSubwooferLayout({
-        roomDimensions,
-        seats,
-        frontSubsCfg,
-        rearSubsCfg
-      });
-
-      const rankedResults = Array.isArray(primaryResult?.rankedResults) ? primaryResult.rankedResults : [];
-      const currentMatchesAny = rankedResults.some((result) => isSameLayout(result, frontSubsCfg, rearSubsCfg));
-
-      return {
-        status: primaryResult?.bestLayout ? 'ready' : 'empty',
-        result: primaryResult,
-        rankedResults,
-        currentMatchesAny,
-      };
-    } catch (error) {
-      console.error('[SubwooferPanel] Recommendation failed', error);
-      return {
-        status: 'error',
-        message: 'Recommendation could not be calculated.'
-      };
-    }
-  }, [roomDimensions, seats, frontSubsCfg, rearSubsCfg]);
+  const rspPosition = useMemo(() => {
+    const appRsp = appState?.mlp;
+    if (Number.isFinite(appRsp?.x) && Number.isFinite(appRsp?.y)) return appRsp;
+    const widthM = Number(roomDimensions?.widthM ?? roomDimensions?.width);
+    const y = Number(appState?.mlpY_m);
+    return Number.isFinite(widthM) && Number.isFinite(y) ? { x: widthM / 2, y, z: 1.2 } : null;
+  }, [appState?.mlp, appState?.mlpY_m, roomDimensions]);
 
   return (
     <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
@@ -506,112 +345,11 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               </div>
             </div>
 
-            <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
-              <h5 className="text-[14px] font-semibold text-[#1B1A1A]">Best Sub Layout Shortcut</h5>
-              <p className="text-[11px] text-[#625143] leading-relaxed mt-1 mb-3">
-                This shortcut compares common subwoofer locations against the seating layout to find the least destructive modal result. It is a design guide, not the RP22 report.
-              </p>
-
-              {recommendationState.status === 'missing' && (
-                <p className="text-[12px] text-[#625143] leading-relaxed">
-                  {recommendationState.message}
-                </p>
-              )}
-
-              {recommendationState.status === 'error' && (
-                <p className="text-[12px] text-[#625143] leading-relaxed">
-                  Recommendation could not be calculated.
-                </p>
-              )}
-
-              {recommendationState.status === 'empty' && (
-                <p className="text-[12px] text-[#625143] leading-relaxed">
-                  Recommendation could not be calculated.
-                </p>
-              )}
-
-              {recommendationState.status === 'ready' && (
-                <div className="space-y-3">
-                  {(recommendationState.rankedResults || []).map((result, index) => {
-                    const seatVariance = Number(result.seatVariance ?? result.seatVariation ?? 0);
-                    const nullPenalty = Number(result.nullPenalty ?? 0);
-                    const modalRiskLabel = result.modalRiskLabel || 'Low';
-                    const destructiveNullsText = formatDestructiveNulls(result.destructiveNulls);
-                    const grade = getGrade(seatVariance, nullPenalty, modalRiskLabel);
-                    const isBest = index === 0;
-                    const isCurrent = isSameLayout(result, frontSubsCfg, rearSubsCfg);
-
-                    return (
-                      <button
-                        type="button"
-                        key={`${result.wallConfig}-${result.placementMode}-${JSON.stringify(result.quantity)}`}
-                        onClick={() => applyRecommendedLayout(result, appState)}
-                        className={`w-full rounded-lg px-4 py-3 text-left transition-colors cursor-pointer hover:bg-[#ECE8E0] ${isBest ? 'border-2 border-[#213428] bg-[#F3F1EC]' : 'border border-[#E7E4DF] bg-white'}`}
-                      >
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap items-start gap-3">
-                            <div className={`text-[24px] leading-none font-semibold ${grade.className}`}>{grade.label}</div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {isBest && (
-                                <span className="rounded-full bg-[#213428] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
-                                  Recommended
-                                </span>
-                              )}
-                              {isCurrent && (
-                                <span className="rounded-full border border-[#CFC8BE] bg-[#F7F4F0] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-[#625143]">
-                                  Current layout
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
-                            <div>
-                              <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Layout</div>
-                              <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{getWallLayoutLabel(result.wallConfig)}</div>
-                            </div>
-                            <div>
-                              <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Placement mode</div>
-                              <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{placementModeLabels[result.placementMode] || result.placementMode}</div>
-                            </div>
-                            <div>
-                              <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Quantity</div>
-                              <div className="text-[13px] font-medium text-[#1B1A1A] mt-1">{getQuantityLabel(result.quantity)}</div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 pt-1">
-                            <div>
-                              <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Seat variation</div>
-                              <div className="text-[12px] text-[#1B1A1A] mt-1">{seatVariance.toFixed(1)} dB</div>
-                            </div>
-                            <div>
-                              <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Major nulls</div>
-                              <div className="text-[12px] text-[#1B1A1A] mt-1">{nullPenalty}</div>
-                              <div className="text-[11px] text-[#625143] mt-1">Destructive nulls: {destructiveNullsText}</div>
-                            </div>
-                            <div>
-                              <div className="text-[11px] uppercase tracking-[0.04em] text-[#625143]">Modal risk</div>
-                              <div className="text-[12px] text-[#1B1A1A] mt-1">{modalRiskLabel}</div>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-
-                  {!recommendationState.currentMatchesAny && (
-                    <p className="text-[11px] text-[#625143] leading-relaxed">
-                      Current layout is predicted to perform worse than the recommended option.
-                    </p>
-                  )}
-
-                  <div className="rounded-md border border-[#E7E4DF] bg-[#F7F4F0] px-3 py-2 text-[11px] text-[#8A7B6A]">
-                    Click a layout above to apply it to the room.
-                  </div>
-                </div>
-              )}
-            </div>
+            <BestSubLayoutGuide
+              roomDims={roomDimensions}
+              seatingPositions={seats}
+              rspPosition={rspPosition}
+            />
           </div>
         </div>
       </div>

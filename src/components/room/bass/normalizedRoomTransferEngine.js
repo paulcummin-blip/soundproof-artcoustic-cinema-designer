@@ -127,6 +127,7 @@ export function computeNormalizedRoomTransfer({
   subsForSimulation,
   physicsOptions = {},
   pointsPerOctave,
+  preparedModes,
 }) {
   const startedAtMs = (typeof performance !== "undefined" && performance.now)
     ? performance.now()
@@ -233,7 +234,9 @@ export function computeNormalizedRoomTransfer({
     smoothing: "none",
     ...(Number.isFinite(pointsPerOctave) ? { pointsPerOctave } : {}),
   };
-  const precomputedModes = prepareModeBank(roomDims, engineOptions);
+  const precomputedModes = Array.isArray(preparedModes)
+    ? preparedModes
+    : prepareModeBank(roomDims, engineOptions);
 
   const seatResponses = {};
   let frequencies = [];
