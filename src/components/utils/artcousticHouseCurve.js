@@ -1,4 +1,4 @@
-const ARTCOUSTIC_HOUSE_CURVE = [
+export const ARTCOUSTIC_HOUSE_CURVE = [
   { frequency: 15, offsetDb: 6.0 },
   { frequency: 20, offsetDb: 6.0 },
   { frequency: 30, offsetDb: 6.0 },

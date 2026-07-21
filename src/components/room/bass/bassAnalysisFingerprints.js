@@ -219,20 +219,40 @@ export function computeProductFingerprint(inputs) {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Calibration fingerprint
+// 5. House-curve fingerprint
 // ---------------------------------------------------------------------------
 
-// Product fingerprint + house-curve definition/version, EQ cut/boost
-// constraints, assessment start/end frequencies, and relevant
-// fitting/calibration settings. Excludes selected priority mode, graph
-// smoothing/scale, and diagnostics visibility.
+// Hash the actual house-curve points (frequency + offsetDb pairs) so the
+// fingerprint truthfully identifies the live curve definition. A version
+// label alone does not guarantee the points haven't changed.
+export function computeHouseCurveFingerprint(houseCurvePoints) {
+  const points = Array.isArray(houseCurvePoints) ? houseCurvePoints : [];
+  const canonical = points.map((p) => ({
+    f: num(p?.frequency ?? p?.f, 3),
+    db: num(p?.offsetDb ?? p?.db ?? p?.spl, 4),
+  }));
+  return fingerprint({ points: canonical }, "hcurve");
+}
+
+// ---------------------------------------------------------------------------
+// 6. Calibration fingerprint
+// ---------------------------------------------------------------------------
+
+// Product fingerprint + house-curve fingerprint, EQ cut/boost constraints
+// (from the active fit profile config), assessment start/end frequencies,
+// target anchor/reference level, active fitting profile, requested output,
+// and usable LF limit. Excludes selected priority mode, graph smoothing/
+// scale, and diagnostics visibility.
+//
+// Phase 2A: Uses live values from the selected candidate when available.
+// Falls back to current requested configuration when no candidate exists.
 export function computeCalibrationFingerprint(inputs) {
   const i = inputs || {};
   const productFp = computeProductFingerprint(i);
 
   const canonical = {
     product: productFp,
-    houseCurveVersion: i.houseCurveVersion != null ? String(i.houseCurveVersion) : null,
+    houseCurveFingerprint: i.houseCurveFingerprint || null,
     eqConstraints: {
       maxBoostDb: num(i.eqConstraints?.maxBoostDb, 2),
       maxCutDb: num(i.eqConstraints?.maxCutDb, 2),
@@ -243,6 +263,8 @@ export function computeCalibrationFingerprint(inputs) {
     assessmentEndHz: num(i.assessmentEndHz, 3),
     optimisationTransitionHz: num(i.optimisationTransitionHz, 3),
     targetAnchorDb: num(i.targetAnchorDb, 2),
+    activeFitProfile: i.activeFitProfile || null,
+    requestedOutputDb: num(i.requestedOutputDb, 2),
     usableLfHz: num(i.usableLfHz, 3),
   };
 
@@ -250,7 +272,7 @@ export function computeCalibrationFingerprint(inputs) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Validation helper (for fixtures and future consumers)
+// 7. Validation helper (for fixtures and future consumers)
 // ---------------------------------------------------------------------------
 
 // Returns true if a fingerprint string is well-formed: non-empty string with
