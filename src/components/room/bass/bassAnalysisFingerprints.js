@@ -283,7 +283,7 @@ export function isValidFingerprint(fp) {
   if (typeof fp !== "string" || fp.length === 0) return false;
   const parts = fp.split(":");
   if (parts.length < 3) return false;
-  if (!["geo", "prod", "cal"].includes(parts[0])) return false;
+  if (!["geo", "prod", "cal", "hcurve"].includes(parts[0])) return false;
   if (!parts[1].startsWith("v")) return false;
   const hash = parts[parts.length - 1];
   if (!/^[0-9a-f]+$/.test(hash)) return false;

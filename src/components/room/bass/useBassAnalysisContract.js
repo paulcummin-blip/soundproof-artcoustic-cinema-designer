@@ -41,35 +41,50 @@ export function useBassAnalysisContract({
   splConfig, optimisationTransitionHz, designEqSystemLimits,
   optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
   rspRawCurve, perSeatRawCurves, optimiserPriorityMode,
+  // Phase 2A: Requested configuration fallback — used when no selected
+  // candidate exists. Caller must pass the current requested values; the hook
+  // does not invent defaults.
+  requestedAssessmentStartHz, requestedAssessmentEndHz,
+  requestedTargetAnchorDb, requestedFitProfile,
+  requestedOutputDb, requestedUsableLfHz,
 }) {
   // --- Phase 2A: Live calibration values from the selected candidate ---
   // Prefer values from the selected candidate when one exists. Otherwise use
-  // the current requested configuration. Never hardcode 20–200 Hz, -12 dB,
-  // 105 dB, zero target anchor, or a curve-version label that does not fully
-  // identify the live curve.
+  // the current requested configuration passed by the caller. Never hardcode
+  // 20–200 Hz, -12 dB, 105 dB, zero target anchor, or a curve-version label
+  // that does not fully identify the live curve.
   const selectedCandidate = optimisationResult?.selectedCandidate || null;
 
   const liveAssessmentStartHz = Number.isFinite(selectedCandidate?.assessmentStartHz)
     ? selectedCandidate.assessmentStartHz
-    : null;
+    : (Number.isFinite(requestedAssessmentStartHz) ? requestedAssessmentStartHz : null);
   const liveAssessmentEndHz = Number.isFinite(selectedCandidate?.assessmentEndHz)
     ? selectedCandidate.assessmentEndHz
-    : null;
+    : (Number.isFinite(requestedAssessmentEndHz) ? requestedAssessmentEndHz : null);
   const liveTargetAnchorDb = Number.isFinite(selectedCandidate?.requestedTargetSpl)
     ? selectedCandidate.requestedTargetSpl
-    : null;
-  const liveFitProfile = selectedCandidate?.designEqFitProfile || null;
+    : (Number.isFinite(requestedTargetAnchorDb) ? requestedTargetAnchorDb : null);
+  const liveFitProfile = selectedCandidate?.designEqFitProfile || requestedFitProfile || null;
   const liveRequestedOutputDb = Number.isFinite(selectedCandidate?.requestedTargetSpl)
     ? selectedCandidate.requestedTargetSpl
-    : (Number.isFinite(splConfig?.targetSpl) ? splConfig.targetSpl : null);
+    : (Number.isFinite(requestedOutputDb) ? requestedOutputDb
+      : (Number.isFinite(splConfig?.targetSpl) ? splConfig.targetSpl : null));
+  const liveUsableLfHz = Number.isFinite(designEqSystemLimits?.usableLfHz)
+    ? designEqSystemLimits.usableLfHz
+    : (Number.isFinite(requestedUsableLfHz) ? requestedUsableLfHz : null);
 
-  // Resolve EQ constraints from the active fit profile config.
+  // Resolve EQ constraints from the active fit profile config. Only aggregate
+  // boost/cut limits exist as named constraints in DESIGN_EQ_FIT_PROFILES.
+  // There is no independent per-filter limit — per-filter clamping is derived
+  // dynamically from the aggregate limit and source-domain headroom. Do not
+  // invent per-filter constants; store null so the fingerprint truthfully
+  // reflects that no independent per-filter constraint exists.
   const profileConfig = liveFitProfile ? getDesignEqFitProfile(liveFitProfile) : null;
   const liveEqConstraints = {
-    maxBoostDb: profileConfig?.maximumAggregateBoostDb ?? 6,
-    maxCutDb: profileConfig?.maximumCutDb ?? 10,
-    maxPerFilterBoostDb: 3,
-    maxPerFilterCutDb: 6,
+    maxBoostDb: profileConfig?.maximumAggregateBoostDb ?? null,
+    maxCutDb: profileConfig?.maximumCutDb ?? null,
+    maxPerFilterBoostDb: null,
+    maxPerFilterCutDb: null,
   };
 
   // Build fingerprint inputs from current physical state (excludes priority
@@ -93,7 +108,7 @@ export function useBassAnalysisContract({
     optimisationTransitionHz,
     targetAnchorDb: liveTargetAnchorDb,
     activeFitProfile: liveFitProfile,
-    usableLfHz: designEqSystemLimits?.usableLfHz,
+    usableLfHz: liveUsableLfHz,
   }), [roomDims, rspPosition, seatingPositions, subsForSimulation, surfaceAbsorption,
     roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend,
     modalStorageMode, propagationPhaseScale, enableRewCoreReflections, rewSourceCurveMode,
@@ -105,7 +120,9 @@ export function useBassAnalysisContract({
     rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
     splConfig, optimisationTransitionHz, designEqSystemLimits?.usableLfHz,
     liveAssessmentStartHz, liveAssessmentEndHz, liveTargetAnchorDb, liveFitProfile,
-    liveRequestedOutputDb]);
+    liveRequestedOutputDb, liveUsableLfHz,
+    requestedAssessmentStartHz, requestedAssessmentEndHz, requestedTargetAnchorDb,
+    requestedFitProfile, requestedOutputDb, requestedUsableLfHz]);
 
   const contractGeometryFp = useMemo(() => computeGeometryFingerprint(contractFingerprintInputs), [contractFingerprintInputs]);
   const contractProductFp = useMemo(() => computeProductFingerprint(contractFingerprintInputs), [contractFingerprintInputs]);

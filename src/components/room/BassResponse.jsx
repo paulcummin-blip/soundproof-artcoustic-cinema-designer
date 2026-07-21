@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { useBassAnalysisContract } from "@/components/room/bass/useBassAnalysisContract";
 import BassContractParityAudit from "@/components/room/bass/BassContractParityAudit";
+import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code.
@@ -1000,6 +1001,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // a worker, rerank candidates, change the selected candidate, change graph
   // series, or change visible parameter values. Mode/display changes do not
   // affect any fingerprint.
+  // Phase 2A: Requested configuration fallback for calibration fingerprint.
+  // When no selected candidate exists, these values identify the current
+  // requested configuration. Assessment band comes from the base RP22 level
+  // (L1) definitions; target anchor is the requested target SPL; fit profile
+  // defaults to "standard"; usable LF comes from the active subwoofer set.
+  const requestedCalibrationConfig = useMemo(() => {
+    const definitions = getRp22BassOperatingDefinitions();
+    const base = definitions.find((d) => d.value === 1) || definitions[0] || {};
+    const p14UpperHz = base.p14UpperHz || 120;
+    return {
+      requestedAssessmentStartHz: base.p18LimitHz || null,
+      requestedAssessmentEndHz: Number.isFinite(optimisationTransitionHz)
+        ? Math.min(p14UpperHz, optimisationTransitionHz)
+        : p14UpperHz,
+      requestedTargetAnchorDb: Number.isFinite(splConfig?.targetSpl)
+        ? splConfig.targetSpl
+        : (base.p14TargetDb || null),
+      requestedFitProfile: "standard",
+      requestedOutputDb: Number.isFinite(splConfig?.targetSpl)
+        ? splConfig.targetSpl
+        : null,
+      requestedUsableLfHz: designEqSystemLimits?.usableLfHz ?? null,
+    };
+  }, [optimisationTransitionHz, splConfig?.targetSpl, designEqSystemLimits?.usableLfHz]);
+
   const bassAnalysisContract = useBassAnalysisContract({
     roomDims, rspPosition, seatingPositions, subsForSimulation,
     surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode,
@@ -1013,6 +1039,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     splConfig, optimisationTransitionHz, designEqSystemLimits,
     optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
     rspRawCurve, perSeatRawCurves, optimiserPriorityMode,
+    ...requestedCalibrationConfig,
   });
 
   const houseCurveSeries = useMemo(() => {
