@@ -51,6 +51,14 @@ export function toInternalMode(canonicalMode) {
   return CANONICAL_TO_INTERNAL[canonicalMode] || "balanced";
 }
 
+// Unified normalizer: accepts EITHER a current internal mode OR a canonical
+// mode and always returns a valid canonical mode. Unknown/missing → balanced.
+export function normalizeMode(mode) {
+  if (!mode) return BASS_MODE_BALANCED;
+  if (CANONICAL_TO_INTERNAL[mode]) return mode; // already canonical
+  return INTERNAL_TO_CANONICAL[mode] || BASS_MODE_BALANCED;
+}
+
 // ---------------------------------------------------------------------------
 // 2. Bass parameter result
 // ---------------------------------------------------------------------------
@@ -66,6 +74,24 @@ export const PARAM_STATUS_UPDATING = "updating";
 export const PARAM_STATUS_COMPLETE = "complete";
 export const PARAM_STATUS_NOT_APPLICABLE = "not_applicable";
 export const PARAM_STATUS_ERROR = "error";
+
+// Product-analysis section statuses (distinct from per-parameter statuses).
+// productAnalysis.status must use ONLY these values — never "calculating".
+export const PRODUCT_STATUS_UNCALCULATED = "uncalculated";
+export const PRODUCT_STATUS_QUEUED = "queued";
+export const PRODUCT_STATUS_RUNNING = "running";
+export const PRODUCT_STATUS_COMPLETE = "complete";
+export const PRODUCT_STATUS_ERROR = "error";
+export const PRODUCT_STATUS_STALE = "stale";
+
+export const VALID_PRODUCT_STATUSES = [
+  PRODUCT_STATUS_UNCALCULATED,
+  PRODUCT_STATUS_QUEUED,
+  PRODUCT_STATUS_RUNNING,
+  PRODUCT_STATUS_COMPLETE,
+  PRODUCT_STATUS_ERROR,
+  PRODUCT_STATUS_STALE,
+];
 
 /**
  * Pure factory for a BassParameterResult.
@@ -102,21 +128,26 @@ export function formatParameterResult(result) {
   if (!result || typeof result !== "object") return { text: "—", isUpdating: false };
   const { parameter, status, level, isStale } = result;
   const label = parameter || "P";
-  const isUpdating = status === PARAM_STATUS_UPDATING || (isStale && status === PARAM_STATUS_CALCULATING);
+
+  // isUpdating is true ONLY when a calculation is actively running over a
+  // previous result. A stale result (OUT_OF_DATE / CANCELLED) is NOT updating.
+  const isUpdating = status === PARAM_STATUS_UPDATING;
 
   if (status === PARAM_STATUS_NOT_APPLICABLE) return { text: `${label} —`, isUpdating: false };
   if (status === PARAM_STATUS_UNCALCULATED) return { text: `${label} —`, isUpdating: false };
   if (status === PARAM_STATUS_ERROR) return { text: `${label} —`, isUpdating: false };
+
+  // Calculating with no previous level → ellipsis, not updating.
   if (status === PARAM_STATUS_CALCULATING && level == null) return { text: `${label} …`, isUpdating: false };
-  if (isUpdating && level != null) {
-    return { text: `${label} L${level}`, isUpdating: true };
+
+  // Updating / stale / complete with a level present — never display "L0".
+  if (level != null) {
+    const text = level === 0 ? `${label} FAIL` : `${label} L${level}`;
+    return { text, isUpdating };
   }
+
+  // Calculating with no level (defensive).
   if (status === PARAM_STATUS_CALCULATING) return { text: `${label} …`, isUpdating: false };
-  if (status === PARAM_STATUS_COMPLETE || (level != null && status !== PARAM_STATUS_UNCALCULATED)) {
-    if (level == null) return { text: `${label} —`, isUpdating: false };
-    if (level === 0) return { text: `${label} FAIL`, isUpdating: false };
-    return { text: `${label} L${level}`, isUpdating: false };
-  }
   return { text: `${label} —`, isUpdating: false };
 }
 
@@ -143,7 +174,8 @@ export function createBassAnalysisResult() {
       startedAtMs: null,
       completedAtMs: null,
       elapsedMs: null,
-      progress: null,
+      progress: null, // number 0–1 or null — never an object
+      phase: null, // current phase text string
       message: null,
       errorMessage: null,
       isRefreshingPreviousResult: false,
@@ -228,7 +260,7 @@ function countRealSeats(perSeatRawCurves) {
 function mapJobStatus(detailedStatus, hasResult) {
   switch (detailedStatus) {
     case "CALCULATING":
-      return hasResult ? "running" : "running";
+      return "running";
     case "COMPLETE":
       return "complete";
     case "OUT_OF_DATE":
@@ -241,6 +273,35 @@ function mapJobStatus(detailedStatus, hasResult) {
     default:
       return hasResult ? "complete" : "uncalculated";
   }
+}
+
+// Map the detailed-calculation hook status to productAnalysis section status.
+// Uses ONLY valid product statuses — never "calculating".
+function mapProductAnalysisStatus(detailedStatus, hasResult) {
+  switch (detailedStatus) {
+    case "CALCULATING":
+      return PRODUCT_STATUS_RUNNING;
+    case "COMPLETE":
+      return PRODUCT_STATUS_COMPLETE;
+    case "OUT_OF_DATE":
+      return hasResult ? PRODUCT_STATUS_STALE : PRODUCT_STATUS_UNCALCULATED;
+    case "CANCELLED":
+      return hasResult ? PRODUCT_STATUS_STALE : PRODUCT_STATUS_UNCALCULATED;
+    case "ERROR":
+      return PRODUCT_STATUS_ERROR;
+    case "IDLE":
+    default:
+      return hasResult ? PRODUCT_STATUS_COMPLETE : PRODUCT_STATUS_UNCALCULATED;
+  }
+}
+
+// Convert detailedProgress (object with completed/total) to a 0–1 number.
+function progressToNumber(detailedProgress) {
+  if (!detailedProgress || typeof detailedProgress !== "object") return null;
+  const completed = Number(detailedProgress.completedRequests ?? detailedProgress.completedTasks);
+  const total = Number(detailedProgress.totalRequests ?? detailedProgress.totalTasks);
+  if (!Number.isFinite(completed) || !Number.isFinite(total) || total <= 0) return null;
+  return Math.max(0, Math.min(1, completed / total));
 }
 
 // Build a compact candidate reference (no large curve arrays duplicated).
@@ -266,12 +327,25 @@ function buildCandidateRef(candidate) {
   };
 }
 
+// Coerce a possibly-missing/numeric-string value to a finite number for formatting.
+function toFiniteOrZero(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 // Build a candidate signature string for provenance (compact, no curves).
+// Hardened: never throws on partial/malformed filter data (numeric strings,
+// missing fields, nulls). All values are coerced to finite numbers first.
 function buildProvenanceSignature(candidate, poolId) {
   if (!candidate) return null;
   const filters = (Array.isArray(candidate.generatedFilterBank) ? candidate.generatedFilterBank : [])
     .filter((f) => f?.enabled)
-    .map((f) => `${(f.frequencyHz ?? 0).toFixed(2)}/${(f.gainDb ?? 0).toFixed(2)}/Q${(f.Q ?? 0).toFixed(2)}`)
+    .map((f) => {
+      const freq = toFiniteOrZero(f?.frequencyHz).toFixed(2);
+      const gain = toFiniteOrZero(f?.gainDb).toFixed(2);
+      const q = toFiniteOrZero(f?.Q).toFixed(2);
+      return `${freq}/${gain}/Q${q}`;
+    })
     .join("|");
   return `Pool:${poolId || "—"}|Profile:${candidate.designEqFitProfile || "standard"}|Filters:[${filters || "(none)"}]`;
 }
@@ -299,20 +373,15 @@ export function adaptCurrentBassOptimisationResult({
   const jobStatus = mapJobStatus(detailedStatus, hasResult);
   contract.job.status = jobStatus;
   contract.job.elapsedMs = Number.isFinite(detailedElapsedMs) ? detailedElapsedMs : (optimisationResult?.performanceSummary?.totalOptimiserTimeMs ?? null);
-  contract.job.progress = detailedProgress && typeof detailedProgress === "object"
-    ? {
-        phase: detailedProgress.phase || null,
-        completedRequests: detailedProgress.completedRequests ?? null,
-        totalRequests: detailedProgress.totalRequests ?? null,
-      }
-    : null;
+  contract.job.progress = progressToNumber(detailedProgress); // number 0–1 or null
+  contract.job.phase = (detailedProgress && typeof detailedProgress === "object" && typeof detailedProgress.phase === "string") ? detailedProgress.phase : null;
   contract.job.message = optimisationResult?.warningMessage || null;
   contract.job.errorMessage = null;
   contract.job.isRefreshingPreviousResult = detailedStatus === "CALCULATING" && hasResult;
 
-  // --- Selected mode ---
-  const internalMode = optimisationResult?.selectedMode || toInternalMode(canonicalPriorityMode);
-  contract.selectedMode = canonicalPriorityMode || toCanonicalMode(internalMode);
+  // --- Selected mode (normalize both internal and canonical inputs) ---
+  const rawMode = canonicalPriorityMode || optimisationResult?.selectedMode || null;
+  contract.selectedMode = normalizeMode(rawMode);
 
   // --- Selected candidate ---
   contract.selectedCandidate = buildCandidateRef(selectedCandidate);
@@ -331,17 +400,28 @@ export function adaptCurrentBassOptimisationResult({
   contract.modeCandidates[BASS_MODE_DEPTH] = buildCandidateRef(selectedByMode.extension || null);
   contract.modeCandidates[BASS_MODE_SPL] = buildCandidateRef(selectedByMode.spl || null);
 
-  // --- Product analysis status ---
-  if (hasResult) {
-    contract.productAnalysis.status = jobStatus === "stale" ? "stale" : "complete";
-  } else if (detailedStatus === "CALCULATING") {
-    contract.productAnalysis.status = "calculating";
-  } else if (detailedStatus === "ERROR") {
-    contract.productAnalysis.status = "error";
-  }
+  // --- Product analysis status (valid product statuses only — never "calculating") ---
+  contract.productAnalysis.status = mapProductAnalysisStatus(detailedStatus, hasResult);
 
   // --- Parameters (mapped from existing values, never recalculated) ---
-  const isStale = jobStatus === "stale" || contract.job.isRefreshingPreviousResult;
+  // isStale: OUT_OF_DATE / CANCELLED with a previous result. NOT updating.
+  // isUpdating: CALCULATING with a previous result (refresh in progress).
+  const isStale = (detailedStatus === "OUT_OF_DATE" || detailedStatus === "CANCELLED") && hasResult;
+  const isUpdating = contract.job.isRefreshingPreviousResult;
+
+  // Helper: choose parameter status from level + stale/updating state.
+  // - level present + updating → "updating" (isStale=false)
+  // - level present + stale    → "complete" with isStale=true (NOT updating)
+  // - level present + normal   → "complete"
+  // - level null + CALCULATING → "calculating"
+  // - level null otherwise      → "uncalculated"
+  function paramStatus(levelPresent) {
+    if (levelPresent) {
+      if (isUpdating) return PARAM_STATUS_UPDATING;
+      return PARAM_STATUS_COMPLETE;
+    }
+    return detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED;
+  }
 
   // P14
   const p14Level = selectedCandidate
@@ -350,7 +430,7 @@ export function adaptCurrentBassOptimisationResult({
   const p14Value = Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : (Number.isFinite(optimisationResult?.achievedP14Db) ? optimisationResult.achievedP14Db : null);
   contract.productAnalysis.parameters.p14 = createBassParameterResult({
     parameter: PARAM_P14,
-    status: p14Level != null ? (isStale ? PARAM_STATUS_UPDATING : PARAM_STATUS_COMPLETE) : (detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED),
+    status: paramStatus(p14Level != null),
     level: p14Level,
     value: p14Value,
     unit: "dB",
@@ -365,7 +445,7 @@ export function adaptCurrentBassOptimisationResult({
   const p18Value = Number.isFinite(selectedCandidate?.achievedP18FrequencyHz) ? selectedCandidate.achievedP18FrequencyHz : (Number.isFinite(optimisationResult?.achievedP18FrequencyHz) ? optimisationResult.achievedP18FrequencyHz : null);
   contract.productAnalysis.parameters.p18 = createBassParameterResult({
     parameter: PARAM_P18,
-    status: p18Level != null ? (isStale ? PARAM_STATUS_UPDATING : PARAM_STATUS_COMPLETE) : (detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED),
+    status: paramStatus(p18Level != null),
     level: p18Level,
     value: p18Value,
     unit: "Hz",
@@ -380,7 +460,7 @@ export function adaptCurrentBassOptimisationResult({
   const p19Value = Number.isFinite(selectedCandidate?.achievedP19VariationDb) ? selectedCandidate.achievedP19VariationDb : (Number.isFinite(optimisationResult?.achievedP19VariationDb) ? optimisationResult.achievedP19VariationDb : null);
   contract.productAnalysis.parameters.p19 = createBassParameterResult({
     parameter: PARAM_P19,
-    status: p19Level != null ? (isStale ? PARAM_STATUS_UPDATING : PARAM_STATUS_COMPLETE) : (detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED),
+    status: paramStatus(p19Level != null),
     level: p19Level,
     value: p19Value,
     unit: "dB",
@@ -405,7 +485,7 @@ export function adaptCurrentBassOptimisationResult({
     const p20Value = Number.isFinite(selectedCandidate.achievedP20VariationDb) ? selectedCandidate.achievedP20VariationDb : null;
     contract.productAnalysis.parameters.p20 = createBassParameterResult({
       parameter: PARAM_P20,
-      status: p20Level != null ? (isStale ? PARAM_STATUS_UPDATING : PARAM_STATUS_COMPLETE) : PARAM_STATUS_UNCALCULATED,
+      status: paramStatus(p20Level != null),
       level: p20Level,
       value: p20Value,
       unit: "dB",
@@ -424,11 +504,12 @@ export function adaptCurrentBassOptimisationResult({
     });
   }
 
-  // --- Room response (by reference — no duplication) ---
-  if (hasResult) {
-    contract.roomResponse.status = jobStatus === "stale" ? "stale" : "complete";
-  }
-  // rspCurve and seatCurves are left empty in Phase 1A — Phase 1B will populate them.
+  // --- Room response ---
+  // Phase 1A does not supply rspRawCurve to the adapter, so rspCurve and
+  // seatCurves remain empty. A section cannot be "complete" while its
+  // authoritative data is absent — leave status as "uncalculated" until
+  // Phase 1C maps real room-response data.
+  // (No status override here.)
 
   return contract;
 }
@@ -437,7 +518,11 @@ export function adaptCurrentBassOptimisationResult({
 // 5. Structured-clone safety validation
 // ---------------------------------------------------------------------------
 
-function findUnsafeValues(obj, path = "$root", seen = new WeakSet()) {
+// Detect values that break structured clone. Uses an active recursion stack
+// (not a global visited set) so that a shared reference visited from two
+// different parents is NOT reported as circular — only a genuine back-edge
+// to an ancestor currently on the stack is.
+function findUnsafeValues(obj, path = "$root", stack = new WeakSet()) {
   const issues = [];
   if (obj == null) return issues;
   if (typeof obj === "function") {
@@ -449,20 +534,22 @@ function findUnsafeValues(obj, path = "$root", seen = new WeakSet()) {
     return issues;
   }
   if (typeof obj !== "object") return issues;
-  if (seen.has(obj)) {
+  // Genuine circular: this object is an ancestor of itself on the current path.
+  if (stack.has(obj)) {
     issues.push({ path, type: "circular" });
     return issues;
   }
-  seen.add(obj);
+  stack.add(obj);
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
-      issues.push(...findUnsafeValues(obj[i], `${path}[${i}]`, seen));
+      issues.push(...findUnsafeValues(obj[i], `${path}[${i}]`, stack));
     }
   } else {
     for (const key of Object.keys(obj)) {
-      issues.push(...findUnsafeValues(obj[key], `${path}.${key}`, seen));
+      issues.push(...findUnsafeValues(obj[key], `${path}.${key}`, stack));
     }
   }
+  stack.delete(obj);
   return issues;
 }
 
@@ -472,177 +559,7 @@ export function validateStructuredCloneSafe(obj) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Phase 1A fixtures
+// 6. Phase 1A fixtures (re-exported from split module for API stability)
 // ---------------------------------------------------------------------------
 
-export function runContractFixtures() {
-  const results = {};
-
-  // 1. Empty contract produces four uncalculated parameters.
-  {
-    const c = createBassAnalysisResult();
-    const params = c.productAnalysis.parameters;
-    results.emptyContractUncalculated =
-      params.p14.status === PARAM_STATUS_UNCALCULATED &&
-      params.p18.status === PARAM_STATUS_UNCALCULATED &&
-      params.p19.status === PARAM_STATUS_UNCALCULATED &&
-      params.p20.status === PARAM_STATUS_UNCALCULATED &&
-      params.p14.level === null && params.p18.level === null &&
-      params.p19.level === null && params.p20.level === null;
-  }
-
-  // 2. Uncalculated formatter produces "—".
-  {
-    const f = formatParameterResult(createBassParameterResult({ parameter: PARAM_P14 }));
-    results.uncalculatedFormatterDash = f.text === "P14 —" && f.isUpdating === false;
-  }
-
-  // 3. Calculating formatter produces "…".
-  {
-    const f = formatParameterResult(createBassParameterResult({ parameter: PARAM_P14, status: PARAM_STATUS_CALCULATING }));
-    results.calculatingFormatterEllipsis = f.text === "P14 …" && f.isUpdating === false;
-  }
-
-  // 4. Level zero produces FAIL.
-  {
-    const f = formatParameterResult(createBassParameterResult({ parameter: PARAM_P14, status: PARAM_STATUS_COMPLETE, level: 0 }));
-    results.levelZeroFail = f.text === "P14 FAIL" && f.isUpdating === false;
-  }
-
-  // 5. Levels 1–4 format correctly.
-  {
-    let ok = true;
-    for (let lvl = 1; lvl <= 4; lvl++) {
-      const f = formatParameterResult(createBassParameterResult({ parameter: PARAM_P14, status: PARAM_STATUS_COMPLETE, level: lvl }));
-      if (f.text !== `P14 L${lvl}`) ok = false;
-    }
-    results.levelsOneToFour = ok;
-  }
-
-  // 6. One real seat makes P20 not applicable.
-  {
-    const adapted = adaptCurrentBassOptimisationResult({
-      optimisationResult: { selectedCandidate: { p20Available: true, achievedP20Level: 2, generatedFilterBank: [] }, poolId: "p1" },
-      perSeatRawCurves: [{ seatId: "seat-1" }],
-    });
-    results.oneSeatP20NotApplicable = adapted.productAnalysis.parameters.p20.status === PARAM_STATUS_NOT_APPLICABLE;
-  }
-
-  // 7. Two seats with P20 level zero produces FAIL.
-  {
-    const adapted = adaptCurrentBassOptimisationResult({
-      optimisationResult: { selectedCandidate: { p20Available: true, achievedP20Level: 0, achievedP20VariationDb: 9.5, generatedFilterBank: [] }, poolId: "p1" },
-      perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }],
-    });
-    const p20 = adapted.productAnalysis.parameters.p20;
-    results.twoSeatsP20LevelZeroFail = p20.status === PARAM_STATUS_COMPLETE && p20.level === 0 && formatParameterResult(p20).text === "P20 FAIL";
-  }
-
-  // 8. Canonical/internal mode mappings round-trip correctly.
-  {
-    let ok = true;
-    for (const canonical of CANONICAL_BASS_MODES) {
-      const internal = toInternalMode(canonical);
-      const back = toCanonicalMode(internal);
-      if (back !== canonical) ok = false;
-    }
-    // Specific mappings
-    if (toCanonicalMode("accuracy") !== BASS_MODE_HOUSE_CURVE_ACCURACY) ok = false;
-    if (toCanonicalMode("extension") !== BASS_MODE_DEPTH) ok = false;
-    if (toCanonicalMode("balanced") !== BASS_MODE_BALANCED) ok = false;
-    if (toCanonicalMode("spl") !== BASS_MODE_SPL) ok = false;
-    results.modeRoundTrip = ok;
-  }
-
-  // 9. Partial optimiser results do not throw.
-  {
-    let threw = false;
-    try {
-      adaptCurrentBassOptimisationResult({});
-      adaptCurrentBassOptimisationResult({ optimisationResult: {} });
-      adaptCurrentBassOptimisationResult({ optimisationResult: { selectedCandidate: null } });
-      adaptCurrentBassOptimisationResult({ perSeatRawCurves: null });
-    } catch (e) {
-      threw = true;
-    }
-    results.partialResultsNoThrow = !threw;
-  }
-
-  // 10. Adapter output contains no functions or circular references.
-  {
-    const adapted = adaptCurrentBassOptimisationResult({
-      optimisationResult: {
-        selectedCandidate: { achievedP14Level: 2, achievedP14Db: 105, achievedP18Level: 2, achievedP18FrequencyHz: 35, achievedP19Level: 1, achievedP19VariationDb: 5.2, p20Available: true, achievedP20Level: 1, achievedP20VariationDb: 4.5, generatedFilterBank: [{ enabled: true, frequencyHz: 40, gainDb: 3, Q: 5 }], designEqFitProfile: "standard" },
-        poolId: "test-pool",
-        selectedMode: "balanced",
-        selectedByMode: { balanced: { achievedP14Level: 2, generatedFilterBank: [] } },
-      },
-      perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }],
-    });
-    const validation = validateStructuredCloneSafe(adapted);
-    results.noFunctionsOrCircular = validation.safe;
-  }
-
-  // 11. Recursively reject NaN and Infinity.
-  {
-    const bad = { a: NaN, b: Infinity, c: [1, { d: -Infinity }] };
-    const validation = validateStructuredCloneSafe(bad);
-    results.rejectsNaNAndInfinity = !validation.safe && validation.issues.length === 3;
-  }
-
-  // 12. structuredClone succeeds where supported.
-  {
-    const adapted = adaptCurrentBassOptimisationResult({
-      optimisationResult: {
-        selectedCandidate: { achievedP14Level: 3, achievedP14Db: 108, achievedP18Level: 3, achievedP18FrequencyHz: 30, achievedP19Level: 2, achievedP19VariationDb: 4.0, p20Available: false, generatedFilterBank: [], designEqFitProfile: "house_curve" },
-        poolId: "clone-pool",
-        selectedMode: "accuracy",
-      },
-      perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }, { seatId: "seat-3" }],
-    });
-    let ok = false;
-    try {
-      if (typeof structuredClone === "function") {
-        const cloned = structuredClone(adapted);
-        ok = cloned.selectedMode === BASS_MODE_HOUSE_CURVE_ACCURACY && cloned.productAnalysis.parameters.p14.level === 3;
-      } else {
-        // Fallback: JSON round-trip
-        const json = JSON.stringify(adapted);
-        ok = json != null && JSON.parse(json).productAnalysis.parameters.p14.level === 3;
-      }
-    } catch (e) {
-      ok = false;
-    }
-    results.structuredCloneSucceeds = ok;
-  }
-
-  // 13. Existing P14/P18/P19/P20 fields map without changing their values or levels.
-  {
-    const adapted = adaptCurrentBassOptimisationResult({
-      optimisationResult: {
-        selectedCandidate: {
-          achievedP14Level: 3, achievedP14Db: 107.5,
-          achievedP18Level: 2, achievedP18FrequencyHz: 32,
-          achievedP19Level: 1, achievedP19VariationDb: 5.0,
-          p20Available: true, achievedP20Level: 2, achievedP20VariationDb: 3.5,
-          generatedFilterBank: [{ enabled: true, frequencyHz: 45, gainDb: -3, Q: 4 }],
-          designEqFitProfile: "standard",
-        },
-        achievedP14Level: "L3", achievedP14Db: 107.5,
-        achievedP18Level: "L2", achievedP18FrequencyHz: 32,
-        achievedP19Level: "L1", achievedP19VariationDb: 5.0,
-        poolId: "parity-pool",
-        selectedMode: "balanced",
-      },
-      perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }],
-    });
-    const p = adapted.productAnalysis.parameters;
-    results.parityP14 = p.p14.level === 3 && p.p14.value === 107.5;
-    results.parityP18 = p.p18.level === 2 && p.p18.value === 32;
-    results.parityP19 = p.p19.level === 1 && p.p19.value === 5.0;
-    results.parityP20 = p.p20.level === 2 && p.p20.value === 3.5;
-    results.parityAll = results.parityP14 && results.parityP18 && results.parityP19 && results.parityP20;
-  }
-
-  return results;
-}
+export { runContractFixtures } from "@/components/room/bass/bassAnalysisContractFixtures";
