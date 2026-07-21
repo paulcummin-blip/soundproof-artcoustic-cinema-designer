@@ -67,6 +67,7 @@ import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanT
 import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerControlsPanel";
+import BassBackgroundAnalysisOwner from "@/components/room/bass/BassBackgroundAnalysisOwner";
 import FrontElevation from "@/components/room/FrontElevation";
 import SideElevation from "@/components/room/SideElevation";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
@@ -1623,6 +1624,7 @@ function RoomDesignerWithState() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <BassBackgroundAnalysisOwner key={resolvedProjectId || "free"} scopeId={resolvedProjectId || "free"}>
       <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
         <style>{`
           .brand-btn{
@@ -1913,6 +1915,7 @@ function RoomDesignerWithState() {
         )}
       />
     </div>
+    </BassBackgroundAnalysisOwner>
     </>);
 
 }

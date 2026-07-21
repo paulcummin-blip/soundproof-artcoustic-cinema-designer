@@ -1,21 +1,35 @@
-import { useLayoutEffect, useSyncExternalStore } from "react";
-import { createBassAnalysisResult } from "@/components/room/bass/bassAnalysisContract";
+import { createContext, useContext } from "react";
+import { createBassAnalysisResult } from "./bassAnalysisContract";
 
-let snapshot = { contract: createBassAnalysisResult(), onPriorityChange: null, onRetry: null };
-const listeners = new Set();
+export const emptyBassResults = () => ({
+  scopeId: null,
+  contract: createBassAnalysisResult(),
+  lifecycle: null,
+  selectedPriorityMode: "balanced",
+  optimisationResult: null,
+  fingerprint: null,
+  payload: null,
+  inputsValid: false,
+  detailedStatus: "IDLE",
+  detailedError: null,
+  onPriorityChange: null,
+  onRetry: null,
+});
 
-const subscribe = (listener) => { listeners.add(listener); return () => listeners.delete(listener); };
-const getSnapshot = () => snapshot;
-
-export function publishBassResults(next) {
-  snapshot = next;
-  listeners.forEach((listener) => listener());
+export function createBassResultsScope(scopeId) {
+  let snapshot = { ...emptyBassResults(), scopeId };
+  return {
+    getSnapshot: () => snapshot,
+    replace: (next) => (snapshot = { ...next, scopeId }),
+    clear: () => (snapshot = { ...emptyBassResults(), scopeId: null }),
+  };
 }
 
-export function usePublishBassResults(next) {
-  useLayoutEffect(() => publishBassResults(next), [next]);
-}
+const BassResultsContext = createContext(null);
+export const BassResultsProvider = BassResultsContext.Provider;
 
 export function useSharedBassResults() {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const value = useContext(BassResultsContext);
+  if (!value) throw new Error("Bass results require the room-level analysis owner");
+  return value;
 }

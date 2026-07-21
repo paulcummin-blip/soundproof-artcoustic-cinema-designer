@@ -227,5 +227,8 @@ export class BassBackgroundAnalysisController {
   }
 }
 
-const createOptimiserWorker = () => new Worker(new URL("../../utils/bassOptimiser.worker.js", import.meta.url), { type: "module" });
-export const bassBackgroundAnalysisStore = new BassBackgroundAnalysisController({ workerFactory: createOptimiserWorker });
+export const createOptimiserWorker = () => new Worker(new URL("../../utils/bassOptimiser.worker.js", import.meta.url), { type: "module" });
+export function createBassBackgroundAnalysisStore() {
+  return new BassBackgroundAnalysisController({ workerFactory: createOptimiserWorker });
+}
+export const bassBackgroundAnalysisStore = createBassBackgroundAnalysisStore();

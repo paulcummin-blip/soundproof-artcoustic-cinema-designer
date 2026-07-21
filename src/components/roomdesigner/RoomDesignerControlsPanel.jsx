@@ -6,7 +6,6 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
-import BassBackgroundAnalysisOwner from "@/components/room/bass/BassBackgroundAnalysisOwner";
 
 const RoomDimensions = React.lazy(() =>
   import("@/components/room/RoomDimensions").then((m) => ({ default: m.default ?? m.RoomDimensions }))
@@ -153,7 +152,6 @@ export default function RoomDesignerControlsPanel({
   const [rightPanelView, setRightPanelView] = useState('controls');
 
   return (
-    <BassBackgroundAnalysisOwner>
     <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0 }}>
       {/* Right panel view selector bar */}
       <div style={{ display: 'flex', gap: 2, padding: '6px 10px', borderBottom: '1px solid #DCDBD6', background: '#fff' }}>
@@ -652,6 +650,5 @@ export default function RoomDesignerControlsPanel({
         </CollapsiblePanel>
       </div>
     </aside>
-    </BassBackgroundAnalysisOwner>
   );
 }

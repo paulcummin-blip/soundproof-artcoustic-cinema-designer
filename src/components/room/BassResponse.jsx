@@ -16,23 +16,17 @@ import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
 import { applyBassSmoothing, bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
-import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
-import { computeGeometryFingerprint, computeProductFingerprint, computeCalibrationFingerprint, computeHouseCurveFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
-import { useBassDetailedCalculation } from "@/components/room/bass/useBassDetailedCalculation";
 import BackgroundAnalysisControls from "@/components/room/bass/BackgroundAnalysisControls";
 import BassEngineeringDetails from "@/components/room/bass/BassEngineeringDetails";
 import BassResultsSummary from "@/components/room/bass/BassResultsSummary";
-import { usePublishBassResults } from "@/components/room/bass/bassResultsStore";
+import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useBassAnalysisContract } from "@/components/room/bass/useBassAnalysisContract";
-import { deriveRequestedCalibrationConfig } from "@/components/room/bass/requestedCalibrationConfig";
-import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 import { useNormalizedRoomTransferLive } from "@/components/room/bass/useNormalizedRoomTransferLive";
 import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalizedPhysicsOptions";
 import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
-import { buildBassGraphSeries, detailedEqStatusText, isMatchingDetailedResult } from "@/components/room/bass/bassGraphDomainBuilder";
+import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/bass/bassGraphDomainBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS as PHYSICS_DEFAULTS } from "@/components/room/bass/bassPhysicsDefaults";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -189,7 +183,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
-  const [optimiserPriorityMode, setOptimiserPriorityMode] = useState('balanced');
   const [houseCurveOverride, setHouseCurveOverride] = useState(null);
   const showHouseCurve = houseCurveOverride ?? !!designEqEnabled;
   // Bass Response Smoothing — display-only. Does not touch simulation, modal calculations,
@@ -887,72 +880,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .filter(seat => seat.responseData.length > 0);
   }, [simulationResults?.seatResponses]);
 
-  const requestedCalibrationConfig = useMemo(() => deriveRequestedCalibrationConfig({
-    splConfig, optimisationTransitionHz, designEqSystemLimits,
-  }), [splConfig, optimisationTransitionHz, designEqSystemLimits]);
-  const productCapabilities = useMemo(() => designEqSystemLimits.activeSubs.map((sub) => {
-    const model = MODELS.find((item) => item.key === normaliseModelKey(sub.modelKey));
-    return model ? {
-      modelKey: model.key, response: model.frequency_response_curve,
-      usableLfHz: model.approvedUsableLfHzMinus6dB,
-      continuousSplDb: model.approvedContinuousSplAt1mDb,
-      continuousSpl30HzDb: model.approvedContinuousSplAt30HzDb,
-      peakSplDb: model.approvedPeakSplDb,
-    } : { modelKey: sub.modelKey };
-  }), [designEqSystemLimits.activeSubs]);
-  const detailedFingerprintInputs = useMemo(() => ({
-    roomDims, sources: subsForSimulation, rspPosition, seatingPositions,
-    surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode,
-    modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
-    enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale,
-    disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField,
-    disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution,
-    rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ,
-    debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale,
-    debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
-    splConfig, optimisationTransitionHz,
-    requestedOutputDb: requestedCalibrationConfig.requestedOutputDb,
-    houseCurveFingerprint: computeHouseCurveFingerprint(ARTCOUSTIC_HOUSE_CURVE),
-    assessmentStartHz: requestedCalibrationConfig.requestedAssessmentStartHz,
-    assessmentEndHz: requestedCalibrationConfig.requestedAssessmentEndHz,
-    targetAnchorDb: requestedCalibrationConfig.requestedTargetAnchorDb,
-    activeFitProfile: requestedCalibrationConfig.requestedFitProfile,
-    usableLfHz: requestedCalibrationConfig.requestedUsableLfHz,
-    evaluatedProfiles: requestedCalibrationConfig.evaluatedProfiles,
-    productDataVersion: 1, productCapabilities,
-  }), [roomDims, subsForSimulation, rspPosition, seatingPositions, surfaceAbsorption,
-    roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend,
-    modalStorageMode, propagationPhaseScale, enableRewCoreReflections, rewSourceCurveMode,
-    qStrategy, rewModalBandwidthScale, disableReflectionPhaseJitter,
-    disableReflectionCoherenceWeight, disableLateField, disableModalPropagationPhase,
-    mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode,
-    overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier,
-    debugModalPhaseConvention, reflectionGainScale, debugModalHSign,
-    rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
-    splConfig, optimisationTransitionHz, requestedCalibrationConfig, productCapabilities]);
-  const detailedFingerprints = useMemo(() => ({
-    geometry: computeGeometryFingerprint(detailedFingerprintInputs),
-    product: computeProductFingerprint(detailedFingerprintInputs),
-    calibration: computeCalibrationFingerprint(detailedFingerprintInputs),
-  }), [detailedFingerprintInputs]);
-  const detailedFingerprint = detailedFingerprints.calibration;
-
-  const detailedPayload = useMemo(() => ({
-    rawCurve: rspRawCurve, activeSubs: designEqSystemLimits.activeSubs,
-    usableLfHz: designEqSystemLimits.usableLfHz,
-    transitionHz: optimisationTransitionHz, perSeatRawCurves,
-  }), [rspRawCurve, designEqSystemLimits, optimisationTransitionHz, perSeatRawCurves]);
-  const detailedInputsValid = !!rspPosition && Array.isArray(seatingPositions) && seatingPositions.length > 0 &&
-    rspRawCurve.length > 0 && designEqSystemLimits.activeSubs.length > 0 &&
-    [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
-  const {
-    lifecycle: detailedLifecycle, status: detailedStatus, detailedResult,
-    progress: detailedProgress, error: detailedError, elapsedMs: detailedElapsedMs,
-    calculate: calculateDetailed,
-  } = useBassDetailedCalculation({
-    fingerprint: detailedFingerprint, payload: detailedPayload,
-    valid: detailedInputsValid, collectDiagnostics: includeDiagnostics,
-  });
+  const sharedBassResults = useSharedBassResults();
+  const detailedLifecycle = sharedBassResults.lifecycle;
+  const detailedStatus = sharedBassResults.detailedStatus;
+  const detailedError = sharedBassResults.detailedError;
+  const detailedInputsValid = sharedBassResults.inputsValid;
+  const optimisationResult = sharedBassResults.optimisationResult;
+  const bassAnalysisContract = sharedBassResults.contract;
+  const optimiserPriorityMode = sharedBassResults.selectedPriorityMode;
+  const setOptimiserPriorityMode = sharedBassResults.onPriorityChange;
+  const calculateDetailed = sharedBassResults.onRetry;
 
   // --- Phase 2B: Normalized room-transfer live wiring ---
   // Product-independent physics options for the normalized engine. Built by
@@ -982,53 +919,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     [normalizedLive.result, normalizedLive.quality, normalizedLive.isRefining]
   );
 
-  // Select only from a completed result matching the current design. This declaration
-  // must precede every render-time reference to optimisationResult.
-  const matchingDetailedResult = isMatchingDetailedResult(detailedStatus, detailedResult, detailedFingerprint)
-    ? detailedResult
-    : null;
-  const optimisationResult = useMemo(() => {
-    if (!matchingDetailedResult?.pool) return null;
-    return selectCandidateFromPool(matchingDetailedResult.pool, optimiserPriorityMode);
-  }, [matchingDetailedResult, optimiserPriorityMode]);
-
   const hasValidDetailedResult = !!designEqEnabled &&
     optimisationResult?.finalPostEqCurve?.length > 0 && rspRawCurve.length > 0;
-
-  // --- Phase 1C: Live contract instantiation ---
-  // Memoized pure calls via custom hook. Does NOT start a calculation, restart
-  // a worker, rerank candidates, change the selected candidate, change graph
-  // series, or change visible parameter values. Mode/display changes do not
-  // affect any fingerprint.
-  // Phase 2A: Requested configuration fallback for calibration fingerprint.
-  // Derives from the ACTUAL optimiser inputs (transitionHz, usableLfHz,
-  // targetSpl). P14 target, P18 boundary, and fit profile are null because
-  // the optimiser searches all RP22 level combinations and both profiles —
-  // no single requested value exists before a candidate is created.
-  const bassAnalysisContract = useBassAnalysisContract({
-    roomDims, rspPosition, seatingPositions, subsForSimulation,
-    surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode,
-    modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
-    enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale,
-    disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField,
-    disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution,
-    rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ,
-    debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale,
-    debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
-    splConfig, optimisationTransitionHz, designEqSystemLimits,
-    optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
-    rspRawCurve, perSeatRawCurves, optimiserPriorityMode,
-    ...requestedCalibrationConfig,
-    fingerprintsOverride: detailedFingerprints,
-    backgroundLifecycle: detailedLifecycle,
-  });
-
-  const publishedBassResults = useMemo(() => ({
-    contract: bassAnalysisContract,
-    onPriorityChange: setOptimiserPriorityMode,
-    onRetry: () => calculateDetailed(detailedFingerprint, detailedPayload, includeDiagnostics),
-  }), [bassAnalysisContract, calculateDetailed, detailedFingerprint, detailedPayload, includeDiagnostics]);
-  usePublishBassResults(publishedBassResults);
 
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
     designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
@@ -1412,7 +1304,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             {designEqEnabled && (
               <BackgroundAnalysisControls
                 lifecycle={detailedLifecycle}
-                onRecalculate={() => calculateDetailed(detailedFingerprint, detailedPayload, includeDiagnostics)}
+                onRecalculate={() => calculateDetailed?.(includeDiagnostics)}
                 disabled={!detailedInputsValid || detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"}
                 includeDiagnostics={includeDiagnostics}
                 onDiagnosticsChange={setIncludeDiagnostics}
