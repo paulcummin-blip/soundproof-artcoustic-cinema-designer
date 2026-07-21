@@ -126,6 +126,7 @@ export function computeNormalizedRoomTransfer({
   seatingPositions,
   subsForSimulation,
   physicsOptions = {},
+  pointsPerOctave,
 }) {
   const startedAtMs = (typeof performance !== "undefined" && performance.now)
     ? performance.now()
@@ -249,6 +250,7 @@ export function computeNormalizedRoomTransfer({
           freqMinHz: 20,
           freqMaxHz: 200,
           smoothing: "none",
+          ...(Number.isFinite(pointsPerOctave) ? { pointsPerOctave } : {}),
         }
       );
 

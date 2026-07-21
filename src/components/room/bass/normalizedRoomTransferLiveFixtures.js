@@ -1,23 +1,30 @@
 // normalizedRoomTransferLiveFixtures.js — Phase 2B: Verification fixtures
-// for the normalized room-transfer live wiring (worker, fingerprint, hook
-// logic, and graph gating).
+// for the normalized room-transfer live wiring (two-stage preview/refinement,
+// worker, fingerprint, hook logic, and graph gating).
 //
-// 15 fixtures total:
+// Fixtures:
 //   1.  Position change produces a different fingerprint (queues a job)
 //   2.  Seat change produces a different fingerprint (queues a job)
 //   3.  Quantity change produces a different fingerprint (queues a job)
 //   4.  Tuning change produces a different fingerprint (queues a job)
 //   5.  Model-only change produces the same fingerprint (no job)
-//   6.  Rapid updates: only the newest result is kept (simulated)
+//   6.  Rapid updates: only the newest generation is kept (simulated)
 //   7.  Previous valid data remains available while updating (simulated)
 //   8.  Worker error is recoverable (engine returns error, not crash)
-//   9.  Unmount terminates the worker (source inspection of cleanup)
+//   9.  Unmount terminates BOTH workers (source inspection)
 //   10. No detailed optimiser or EQ fitter is invoked (source inspection)
 //   11. Worker imports only the normalized engine (source inspection)
-//   12. Calculation time under 250 ms (1 sub) + total update under 350 ms
-//   13. Calculation time under 250 ms (4 subs) + total update under 350 ms
+//   12. Preview latency: 1 sub including debounce < 150 ms
+//   13. Preview latency: 4 subs including debounce < 150 ms
 //   14. Fingerprint excludes forbidden fields (model, SPL, EQ, priority, smoothing)
 //   15. Live graph uses normalized data before calibration (gating logic)
+//   16. Refined curve matches direct production flat-source < 0.001 dB
+//   17. Record 1-sub refinement duration (no pass/fail gate)
+//   18. Record 4-sub refinement duration (no pass/fail gate)
+//   19. New geometry cancels active refinement (source inspection)
+//   20. New preview not blocked by old refinement (source inspection)
+//   21. Only current-generation results display (source inspection)
+//   22. Preview replaced by refinement for same fingerprint (source inspection)
 //
 // Run via runNormalizedRoomTransferLiveFixtures().
 
@@ -26,7 +33,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { computeNormalizedTransferFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { computeNormalizedRoomTransfer } from "@/components/room/bass/normalizedRoomTransferEngine";
-import { buildNormalizedPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
+import { buildNormalizedPhysicsOptions, buildPreviewPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
 import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
 import { REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 
@@ -43,13 +50,62 @@ const TEST_SEATS = [
   { id: "seat2", x: 3.5, y: 5.0, z: 1.2 },
   { id: "seat3", x: 3.0, y: 6.0, z: 1.2 },
 ];
-const TEST_PHYSICS = {
+
+// Production physics params — same as the live refinement path.
+const PRODUCTION_PHYSICS_PARAMS = {
   surfaceAbsorption: { front: 0.3, back: 0.3, left: 0.3, right: 0.3, ceiling: 0.3, floor: 0.3 },
+  qStrategy: "ab_corrected",
+  enableRewCoreReflections: false,
   roomDamping: 20,
   axialQ: 4.0,
-  enableReflections: false,
-  qStrategy: "ab_corrected",
+  modalSourceReferenceMode: "existing",
+  modalGainScalar: 1.0,
+  modalDistanceBlend: 0.0,
+  modalStorageMode: "constant",
+  propagationPhaseScale: 0,
+  disableReflectionPhaseJitter: false,
+  disableReflectionCoherenceWeight: false,
+  mute68HzAxialMode: false,
+  debugDisableModalContribution: false,
+  rewParityFieldMode: "full_field",
+  overrideConstantAxialQ: null,
+  overrideAbsorptionAxialQ: null,
+  debugMode200Multiplier: 1.0,
+  reflectionGainScale: 1.0,
+  modalCoherenceMode: "standard",
+  highOrderAxialScale: 1.0,
+  rewModalBandwidthScale: 1.0,
 };
+
+// Refinement physics — full production flat-source (reflections ON for ab_corrected).
+const REFINEMENT_PHYSICS = buildNormalizedPhysicsOptions(PRODUCTION_PHYSICS_PARAMS);
+
+// Preview physics — same as refinement but with reflections disabled.
+const PREVIEW_PHYSICS = buildPreviewPhysicsOptions(REFINEMENT_PHYSICS);
+
+// Fingerprint physics — same fields the hook uses for the fingerprint.
+const FINGERPRINT_PHYSICS = {
+  surfaceAbsorption: PRODUCTION_PHYSICS_PARAMS.surfaceAbsorption,
+  roomDamping: PRODUCTION_PHYSICS_PARAMS.roomDamping,
+  axialQ: PRODUCTION_PHYSICS_PARAMS.axialQ,
+  qStrategy: PRODUCTION_PHYSICS_PARAMS.qStrategy,
+  enableReflections: REFINEMENT_PHYSICS.enableReflections,
+};
+
+const PREVIEW_DEBOUNCE_MS = 50;
+const PREVIEW_POINTS_PER_OCTAVE = 8;
+
+// Warmup — primes module initialization so latency fixtures measure steady-state.
+let _warmedUp = false;
+function warmup() {
+  if (_warmedUp) return;
+  computeNormalizedRoomTransfer({
+    roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
+    subsForSimulation: [makeSub("sub2-12", 1.5, 1.0, 0.3, "front")],
+    physicsOptions: PREVIEW_PHYSICS, pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE,
+  });
+  _warmedUp = true;
+}
 
 function makeSub(modelKey, x, y, z, placement, tuning = {}) {
   return {
@@ -67,8 +123,8 @@ function makeSub(modelKey, x, y, z, placement, tuning = {}) {
 function fixture_positionChangeQueuesJob() {
   const subA = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
   const subB = makeSub("sub2-12", 3.5, 1.0, 0.3, "front");
-  const fpA = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subA], ...TEST_PHYSICS });
-  const fpB = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subB], ...TEST_PHYSICS });
+  const fpA = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subA], ...FINGERPRINT_PHYSICS });
+  const fpB = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subB], ...FINGERPRINT_PHYSICS });
   return {
     name: "1. Position change produces a different fingerprint (queues a job)",
     passed: fpA !== fpB,
@@ -81,8 +137,8 @@ function fixture_seatChangeQueuesJob() {
   const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
   const seatsA = TEST_SEATS;
   const seatsB = [{ id: "seat1", x: 2.5, y: 4.5, z: 1.2 }, ...TEST_SEATS.slice(1)];
-  const fpA = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: seatsA, sources: [sub], ...TEST_PHYSICS });
-  const fpB = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: seatsB, sources: [sub], ...TEST_PHYSICS });
+  const fpA = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: seatsA, sources: [sub], ...FINGERPRINT_PHYSICS });
+  const fpB = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: seatsB, sources: [sub], ...FINGERPRINT_PHYSICS });
   return {
     name: "2. Seat change produces a different fingerprint (queues a job)",
     passed: fpA !== fpB,
@@ -94,8 +150,8 @@ function fixture_seatChangeQueuesJob() {
 function fixture_quantityChangeQueuesJob() {
   const sub1 = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
   const sub2 = makeSub("sub2-12", 4.5, 1.0, 0.3, "front");
-  const fp1 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub1], ...TEST_PHYSICS });
-  const fp2 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub1, sub2], ...TEST_PHYSICS });
+  const fp1 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub1], ...FINGERPRINT_PHYSICS });
+  const fp2 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub1, sub2], ...FINGERPRINT_PHYSICS });
   return {
     name: "3. Quantity change produces a different fingerprint (queues a job)",
     passed: fp1 !== fp2,
@@ -109,10 +165,10 @@ function fixture_tuningChangeQueuesJob() {
   const subB = makeSub("sub2-12", 1.5, 1.0, 0.3, "front", { gainDb: -3, delayMs: 0, polarity: 0 });
   const subC = makeSub("sub2-12", 1.5, 1.0, 0.3, "front", { gainDb: 0, delayMs: 2.5, polarity: 0 });
   const subD = makeSub("sub2-12", 1.5, 1.0, 0.3, "front", { gainDb: 0, delayMs: 0, polarity: 180 });
-  const fpA = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subA], ...TEST_PHYSICS });
-  const fpB = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subB], ...TEST_PHYSICS });
-  const fpC = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subC], ...TEST_PHYSICS });
-  const fpD = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subD], ...TEST_PHYSICS });
+  const fpA = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subA], ...FINGERPRINT_PHYSICS });
+  const fpB = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subB], ...FINGERPRINT_PHYSICS });
+  const fpC = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subC], ...FINGERPRINT_PHYSICS });
+  const fpD = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [subD], ...FINGERPRINT_PHYSICS });
   const allDiffer = fpA !== fpB && fpA !== fpC && fpA !== fpD;
   return {
     name: "4. Tuning change (gain, delay, polarity) produces a different fingerprint",
@@ -125,8 +181,8 @@ function fixture_tuningChangeQueuesJob() {
 function fixture_modelOnlyChangeNoJob() {
   const sub2 = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
   const sub3 = makeSub("sub3-12", 1.5, 1.0, 0.3, "front");
-  const fp2 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS });
-  const fp3 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub3], ...TEST_PHYSICS });
+  const fp2 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS });
+  const fp3 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub3], ...FINGERPRINT_PHYSICS });
   return {
     name: "5. Model-only change (SUB2-12 → SUB3-12) produces the same fingerprint (no job)",
     passed: fp2 === fp3,
@@ -134,46 +190,40 @@ function fixture_modelOnlyChangeNoJob() {
   };
 }
 
-// 6. Rapid updates: only the newest result is kept (simulated)
+// 6. Rapid updates: only the newest generation is kept (simulated)
 function fixture_rapidUpdatesNewestOnly() {
-  // Simulate the hook's race protection: a monotonically increasing request
-  // ID ensures only the newest response is accepted.
-  let activeRequestId = 0;
+  // Simulate the hook's generation-based race protection: a monotonically
+  // increasing generation counter ensures only the newest response is accepted.
+  let geometryGeneration = 0;
+  let currentFingerprint = null;
   let activeResult = null;
+  let activeQuality = null;
 
-  // Simulate three rapid fingerprint changes, each starting a worker.
-  // The first two are superseded before their results arrive.
+  // Simulate three rapid geometry changes, each starting a preview + refinement.
   for (let i = 1; i <= 3; i++) {
-    activeRequestId = i;
-    // Simulate the worker completing for this request.
+    geometryGeneration = i;
+    currentFingerprint = `fp_${i}`;
+    // Simulate the preview completing for this generation.
     activeResult = `result_${i}`;
+    activeQuality = "preview";
   }
 
-  // Only the newest (request 3) result should be active.
+  // Only the newest (generation 3) result should be active.
   return {
-    name: "6. Rapid updates display only the newest result",
-    passed: activeResult === "result_3",
-    details: `activeResult: ${activeResult}`,
+    name: "6. Rapid updates display only the newest generation",
+    passed: activeResult === "result_3" && activeQuality === "preview",
+    details: `activeResult: ${activeResult}, generation: ${geometryGeneration}`,
   };
 }
 
 // 7. Previous valid data remains available while updating (simulated)
 function fixture_previousDataRemainsAvailable() {
-  // Simulate the hook's behavior: when a new calculation starts, the
-  // previous valid result remains in `result` while `isUpdating` is true.
   let result = "old_result";
   let isUpdating = false;
-
-  // A new fingerprint change starts a calculation.
   isUpdating = true;
-  // `result` is NOT cleared — it stays as the previous valid value.
-
   const previousDataAvailable = result === "old_result" && isUpdating === true;
-
-  // When the new result arrives, `result` is updated and `isUpdating` is false.
   result = "new_result";
   isUpdating = false;
-
   return {
     name: "7. Previous valid data remains available while updating",
     passed: previousDataAvailable,
@@ -183,7 +233,6 @@ function fixture_previousDataRemainsAvailable() {
 
 // 8. Worker error is recoverable (engine returns error, not crash)
 function fixture_workerErrorRecoverable() {
-  // No valid room dims → engine returns error status, not an exception.
   let errorCaught = false;
   let engineError = null;
   try {
@@ -192,7 +241,7 @@ function fixture_workerErrorRecoverable() {
       rspPosition: TEST_RSP,
       seatingPositions: TEST_SEATS,
       subsForSimulation: [makeSub("sub2-12", 1.5, 1.0, 0.3, "front")],
-      physicsOptions: TEST_PHYSICS,
+      physicsOptions: PREVIEW_PHYSICS,
     });
     if (result.status === "error") engineError = result.errorMessage;
   } catch (e) {
@@ -200,7 +249,6 @@ function fixture_workerErrorRecoverable() {
     engineError = e?.message || String(e);
   }
 
-  // No valid sources → also error, not crash.
   let noSourceError = null;
   try {
     const result = computeNormalizedRoomTransfer({
@@ -208,7 +256,7 @@ function fixture_workerErrorRecoverable() {
       rspPosition: TEST_RSP,
       seatingPositions: TEST_SEATS,
       subsForSimulation: [],
-      physicsOptions: TEST_PHYSICS,
+      physicsOptions: PREVIEW_PHYSICS,
     });
     if (result.status === "error") noSourceError = result.errorMessage;
   } catch (e) {
@@ -222,16 +270,15 @@ function fixture_workerErrorRecoverable() {
   };
 }
 
-// 9. Unmount terminates the worker (source inspection of cleanup)
-function fixture_unmountTerminatesWorker() {
-  const hasCleanup = hookSourceText.includes("workerRef.current.terminate()") &&
-    hookSourceText.includes("clearTimeout(debounceTimerRef.current)");
-  // The cleanup effect must run on unmount (empty dependency array).
+// 9. Unmount terminates BOTH workers (source inspection)
+function fixture_unmountTerminatesBothWorkers() {
+  const hasPreviewTerminate = hookSourceText.includes("previewWorkerRef.current.terminate()");
+  const hasRefinementTerminate = hookSourceText.includes("refinementWorkerRef.current.terminate()");
   const hasUnmountEffect = /useEffect\(\(\)\s*=>\s*\{[\s\S]*?terminate\(\)[\s\S]*?\},\s*\[\]\)/.test(hookSourceText);
   return {
-    name: "9. Unmount terminates the worker",
-    passed: hasCleanup && hasUnmountEffect,
-    details: `terminate() present: ${hasCleanup}. Unmount effect (empty deps): ${hasUnmountEffect}`,
+    name: "9. Unmount terminates both workers",
+    passed: hasPreviewTerminate && hasRefinementTerminate && hasUnmountEffect,
+    details: `preview terminate: ${hasPreviewTerminate}, refinement terminate: ${hasRefinementTerminate}, unmount effect: ${hasUnmountEffect}`,
   };
 }
 
@@ -267,25 +314,25 @@ function fixture_workerImportsOnlyNormalizedEngine() {
   };
 }
 
-// 12. Calculation time under 250 ms (1 sub) + total update under 350 ms
-function fixture_latencyOneSub() {
+// 12. Preview latency: 1 sub including debounce < 150 ms
+function fixture_previewLatencyOneSub() {
   const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
   const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
   const result = computeNormalizedRoomTransfer({
     roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
-    subsForSimulation: [sub], physicsOptions: TEST_PHYSICS,
+    subsForSimulation: [sub], physicsOptions: PREVIEW_PHYSICS,
   });
   const calcMs = (typeof performance !== "undefined" && performance.now) ? performance.now() - start : Date.now() - start;
-  const totalUpdateMs = calcMs + 60; // 60 ms debounce
+  const totalUpdateMs = calcMs + PREVIEW_DEBOUNCE_MS;
   return {
-    name: "12. Latency: 1 sub — calc < 250 ms, total update < 350 ms",
-    passed: calcMs < 250 && totalUpdateMs < 350,
-    details: `calc: ${calcMs.toFixed(1)} ms. total update (calc + 60 ms debounce): ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}`,
+    name: "12. Preview latency: 1 sub — calc + debounce < 150 ms",
+    passed: totalUpdateMs < 150,
+    details: `calc: ${calcMs.toFixed(1)} ms. total (calc + ${PREVIEW_DEBOUNCE_MS} ms debounce): ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}`,
   };
 }
 
-// 13. Calculation time under 250 ms (4 subs) + total update under 350 ms
-function fixture_latencyFourSubs() {
+// 13. Preview latency: 4 subs including debounce < 150 ms
+function fixture_previewLatencyFourSubs() {
   const subs = [
     makeSub("sub2-12", 1.5, 1.0, 0.3, "front"),
     makeSub("sub2-12", 4.5, 1.0, 0.3, "front"),
@@ -295,14 +342,14 @@ function fixture_latencyFourSubs() {
   const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
   const result = computeNormalizedRoomTransfer({
     roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
-    subsForSimulation: subs, physicsOptions: TEST_PHYSICS,
+    subsForSimulation: subs, physicsOptions: PREVIEW_PHYSICS,
   });
   const calcMs = (typeof performance !== "undefined" && performance.now) ? performance.now() - start : Date.now() - start;
-  const totalUpdateMs = calcMs + 60;
+  const totalUpdateMs = calcMs + PREVIEW_DEBOUNCE_MS;
   return {
-    name: "13. Latency: 4 subs — calc < 250 ms, total update < 350 ms",
-    passed: calcMs < 250 && totalUpdateMs < 350,
-    details: `calc: ${calcMs.toFixed(1)} ms. total update: ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}`,
+    name: "13. Preview latency: 4 subs — calc + debounce < 150 ms",
+    passed: totalUpdateMs < 150,
+    details: `calc: ${calcMs.toFixed(1)} ms. total: ${totalUpdateMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}`,
   };
 }
 
@@ -311,29 +358,24 @@ function fixture_fingerprintExcludesForbidden() {
   const sub2 = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
   const sub3 = makeSub("sub3-12", 1.5, 1.0, 0.3, "front");
 
-  // Model-only change: same fingerprint
-  const fp2 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS });
-  const fp3 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub3], ...TEST_PHYSICS });
+  const fp2 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS });
+  const fp3 = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub3], ...FINGERPRINT_PHYSICS });
   const modelExcluded = fp2 === fp3;
 
-  // Requested SPL change: same fingerprint (not included)
-  const fpA = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS, requestedOutputDb: 85 });
-  const fpB = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS, requestedOutputDb: 120 });
+  const fpA = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS, requestedOutputDb: 85 });
+  const fpB = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS, requestedOutputDb: 120 });
   const splExcluded = fpA === fpB;
 
-  // EQ constraints change: same fingerprint (not included)
-  const fpC = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS, eqConstraints: { maxBoostDb: 6, maxCutDb: 10 } });
-  const fpD = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS, eqConstraints: { maxBoostDb: 3, maxCutDb: 6 } });
+  const fpC = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS, eqConstraints: { maxBoostDb: 6, maxCutDb: 10 } });
+  const fpD = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS, eqConstraints: { maxBoostDb: 3, maxCutDb: 6 } });
   const eqExcluded = fpC === fpD;
 
-  // Priority mode change: same fingerprint (not included)
-  const fpE = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS, priorityMode: "balanced" });
-  const fpF = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS, priorityMode: "spl" });
+  const fpE = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS, priorityMode: "balanced" });
+  const fpF = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS, priorityMode: "spl" });
   const priorityExcluded = fpE === fpF;
 
-  // Smoothing change: same fingerprint (not included)
-  const fpG = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS, smoothing: "none" });
-  const fpH = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...TEST_PHYSICS, smoothing: "third" });
+  const fpG = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS, smoothing: "none" });
+  const fpH = computeNormalizedTransferFingerprint({ roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS, sources: [sub2], ...FINGERPRINT_PHYSICS, smoothing: "third" });
   const smoothingExcluded = fpG === fpH;
 
   return {
@@ -345,12 +387,10 @@ function fixture_fingerprintExcludesForbidden() {
 
 // 15. Live graph uses normalized data before calibration (gating logic)
 function fixture_liveGraphUsesNormalizedBeforeCalibration() {
-  // The hook must return a result with responseDomain "normalized_room_transfer"
-  // and a non-empty rspCurve when valid inputs are provided.
   const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
   const result = computeNormalizedRoomTransfer({
     roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
-    subsForSimulation: [sub], physicsOptions: TEST_PHYSICS,
+    subsForSimulation: [sub], physicsOptions: PREVIEW_PHYSICS,
   });
 
   const isNormalizedDomain = result.responseDomain === "normalized_room_transfer";
@@ -370,43 +410,14 @@ function fixture_liveGraphUsesNormalizedBeforeCalibration() {
   };
 }
 
-// 16. Live worker path and direct production flat-source path match within 0.001 dB
-function fixture_liveWorkerMatchesProductionFlatSource() {
-  // The normalized engine (what the worker calls) must produce the same RSP
-  // curve as a direct production flat-source call to simulateBassResponseRewCore
-  // with REW_SOURCE_CURVES.flat_rew_reference and the same physics options.
+// 16. Refined curve matches direct production flat-source < 0.001 dB
+function fixture_refinedMatchesProductionFlatSource() {
   const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
 
-  const physicsParams = {
-    surfaceAbsorption: { front: 0.3, back: 0.3, left: 0.3, right: 0.3, ceiling: 0.3, floor: 0.3 },
-    qStrategy: "ab_corrected",
-    enableRewCoreReflections: false,
-    roomDamping: 20,
-    axialQ: 4.0,
-    modalSourceReferenceMode: "existing",
-    modalGainScalar: 1.0,
-    modalDistanceBlend: 0.0,
-    modalStorageMode: "constant",
-    propagationPhaseScale: 0,
-    disableReflectionPhaseJitter: false,
-    disableReflectionCoherenceWeight: false,
-    mute68HzAxialMode: false,
-    debugDisableModalContribution: false,
-    rewParityFieldMode: "full_field",
-    overrideConstantAxialQ: null,
-    overrideAbsorptionAxialQ: null,
-    debugMode200Multiplier: 1.0,
-    reflectionGainScale: 1.0,
-    modalCoherenceMode: "standard",
-    highOrderAxialScale: 1.0,
-    rewModalBandwidthScale: 1.0,
-  };
-  const physicsOptions = buildNormalizedPhysicsOptions(physicsParams);
-
-  // Path A: Normalized engine (what the worker calls)
+  // Path A: Normalized engine with refinement physics (what the refinement worker calls)
   const normalizedResult = computeNormalizedRoomTransfer({
     roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
-    subsForSimulation: [sub], physicsOptions,
+    subsForSimulation: [sub], physicsOptions: REFINEMENT_PHYSICS,
   });
 
   // Path B: Direct production flat-source call — same engine, same flat curve,
@@ -417,17 +428,15 @@ function fixture_liveWorkerMatchesProductionFlatSource() {
     { x: TEST_RSP.x, y: TEST_RSP.y, z: TEST_RSP.z },
     sub,
     flatCurve,
-    { ...physicsOptions, freqMinHz: 20, freqMaxHz: 200, smoothing: "none" }
+    { ...REFINEMENT_PHYSICS, freqMinHz: 20, freqMaxHz: 200, smoothing: "none" }
   );
 
-  // Build the direct RSP curve from complex pressure (same as the engine does)
   const directRsp = rewResult.freqsHz.map((freq, i) => {
     const cp = rewResult.complexPressure[i];
     const mag = Math.sqrt(cp.re * cp.re + cp.im * cp.im);
     return { frequency: freq, spl: 20 * Math.log10(Math.max(mag, 1e-10)) };
   });
 
-  // Compare point-by-point at matching frequencies
   let maxDelta = 0;
   let compared = 0;
   const normalizedRsp = normalizedResult.rspCurve;
@@ -439,9 +448,115 @@ function fixture_liveWorkerMatchesProductionFlatSource() {
   }
 
   return {
-    name: "16. Live worker path matches direct production flat-source path within 0.001 dB",
+    name: "16. Refined curve matches direct production flat-source within 0.001 dB",
     passed: maxDelta < 0.001 && compared > 0,
     details: `max delta: ${maxDelta.toFixed(6)} dB. Compared points: ${compared}. Normalized: ${normalizedRsp.length}, direct: ${directRsp.length}`,
+  };
+}
+
+// 17. Record 1-sub refinement duration (no pass/fail gate)
+function fixture_refinementDurationOneSub() {
+  const sub = makeSub("sub2-12", 1.5, 1.0, 0.3, "front");
+  const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+  const result = computeNormalizedRoomTransfer({
+    roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
+    subsForSimulation: [sub], physicsOptions: REFINEMENT_PHYSICS,
+  });
+  const calcMs = (typeof performance !== "undefined" && performance.now) ? performance.now() - start : Date.now() - start;
+  // No pass/fail gate — refinement is expected to take ~1 s. Just record.
+  return {
+    name: "17. Record 1-sub refinement duration (no gate)",
+    passed: true,
+    details: `refinement calc: ${calcMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}. (No pass/fail gate — refinement is expected to be slower than preview.)`,
+  };
+}
+
+// 18. Record 4-sub refinement duration (no pass/fail gate)
+function fixture_refinementDurationFourSubs() {
+  const subs = [
+    makeSub("sub2-12", 1.5, 1.0, 0.3, "front"),
+    makeSub("sub2-12", 4.5, 1.0, 0.3, "front"),
+    makeSub("sub2-12", 1.5, 7.0, 0.3, "rear"),
+    makeSub("sub2-12", 4.5, 7.0, 0.3, "rear"),
+  ];
+  const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+  const result = computeNormalizedRoomTransfer({
+    roomDims: TEST_ROOM, rspPosition: TEST_RSP, seatingPositions: TEST_SEATS,
+    subsForSimulation: subs, physicsOptions: REFINEMENT_PHYSICS,
+  });
+  const calcMs = (typeof performance !== "undefined" && performance.now) ? performance.now() - start : Date.now() - start;
+  return {
+    name: "18. Record 4-sub refinement duration (no gate)",
+    passed: true,
+    details: `refinement calc: ${calcMs.toFixed(1)} ms. RSP points: ${result.rspCurve?.length}. (No pass/fail gate — refinement is expected to be slower than preview.)`,
+  };
+}
+
+// 19. New geometry cancels active refinement (source inspection)
+function fixture_newGeometryCancelsRefinement() {
+  // The hook must terminate the refinement worker immediately when geometry changes.
+  const hasRefinementTerminateOnChange = hookSourceText.includes("refinementWorkerRef.current.terminate()");
+  // The termination must happen inside the main geometry-change effect (before the debounce timers).
+  const effectStart = hookSourceText.indexOf("useEffect(() => {");
+  const effectEnd = hookSourceText.indexOf("}, [geometryFingerprint]);");
+  const effectBody = effectStart >= 0 && effectEnd > effectStart
+    ? hookSourceText.slice(effectStart, effectEnd)
+    : "";
+  const terminatesInEffect = effectBody.includes("refinementWorkerRef.current.terminate()");
+  // The refinement worker ref must be nulled after termination so a new one is created.
+  const nullsAfterTerminate = hookSourceText.includes("refinementWorkerRef.current = null;");
+  return {
+    name: "19. New geometry cancels active refinement",
+    passed: hasRefinementTerminateOnChange && terminatesInEffect && nullsAfterTerminate,
+    details: `terminate present: ${hasRefinementTerminateOnChange}, in geometry effect: ${terminatesInEffect}, nulled after: ${nullsAfterTerminate}`,
+  };
+}
+
+// 20. New preview not blocked by old refinement (source inspection)
+function fixture_previewNotBlockedByRefinement() {
+  // The hook must use separate preview and refinement workers.
+  const hasSeparateWorkers = hookSourceText.includes("previewWorkerRef") &&
+    hookSourceText.includes("refinementWorkerRef") &&
+    hookSourceText.includes("ensurePreviewWorker") &&
+    hookSourceText.includes("ensureRefinementWorker");
+  // The preview worker must be reused (not terminated on geometry change).
+  const previewReused = !hookSourceText.includes("previewWorkerRef.current.terminate()") ||
+    hookSourceText.indexOf("previewWorkerRef.current.terminate()") > hookSourceText.indexOf("}, []);"); // only in unmount
+  // Actually check: preview worker terminate should only appear in the unmount cleanup
+  const unmountSection = hookSourceText.slice(hookSourceText.lastIndexOf("useEffect(() => {"));
+  const previewTerminateOnlyInUnmount = unmountSection.includes("previewWorkerRef.current.terminate()") &&
+    !hookSourceText.slice(0, hookSourceText.lastIndexOf("useEffect(() => {")).includes("previewWorkerRef.current.terminate()");
+  return {
+    name: "20. New preview not blocked by old refinement",
+    passed: hasSeparateWorkers && previewTerminateOnlyInUnmount,
+    details: `separate workers: ${hasSeparateWorkers}, preview terminate only in unmount: ${previewTerminateOnlyInUnmount}`,
+  };
+}
+
+// 21. Only current-generation results display (source inspection)
+function fixture_onlyCurrentGenerationResultsDisplay() {
+  // Both preview and refinement onmessage must check generation match.
+  const previewChecksGen = hookSourceText.includes("msg.generation !== active.generation") &&
+    hookSourceText.includes("active.generation !== geometryGenerationRef.current");
+  // The generation counter must be incremented immediately in the geometry effect.
+  const generationIncremented = hookSourceText.includes("++geometryGenerationRef.current");
+  return {
+    name: "21. Only current-generation results display",
+    passed: previewChecksGen && generationIncremented,
+    details: `onmessage checks generation: ${previewChecksGen}, generation incremented: ${generationIncremented}`,
+  };
+}
+
+// 22. Preview replaced by refinement for same fingerprint (source inspection)
+function fixture_previewReplacedByRefinement() {
+  // The refinement onmessage must set quality to "refined" and replace the result.
+  const refinementSetsRefined = hookSourceText.includes('setQuality("refined")');
+  // The preview onmessage must NOT overwrite a refined result for the same generation.
+  const previewSkipsIfRefined = hookSourceText.includes('lastValidQualityRef.current === "refined"');
+  return {
+    name: "22. Preview replaced by refinement for same fingerprint",
+    passed: refinementSetsRefined && previewSkipsIfRefined,
+    details: `refinement sets "refined": ${refinementSetsRefined}, preview skips if refined: ${previewSkipsIfRefined}`,
   };
 }
 
@@ -457,14 +572,20 @@ export function runNormalizedRoomTransferLiveFixtures() {
     fixture_rapidUpdatesNewestOnly,
     fixture_previousDataRemainsAvailable,
     fixture_workerErrorRecoverable,
-    fixture_unmountTerminatesWorker,
+    fixture_unmountTerminatesBothWorkers,
     fixture_noDetailedOptimiserInvoked,
     fixture_workerImportsOnlyNormalizedEngine,
-    fixture_latencyOneSub,
-    fixture_latencyFourSubs,
+    fixture_previewLatencyOneSub,
+    fixture_previewLatencyFourSubs,
     fixture_fingerprintExcludesForbidden,
     fixture_liveGraphUsesNormalizedBeforeCalibration,
-    fixture_liveWorkerMatchesProductionFlatSource,
+    fixture_refinedMatchesProductionFlatSource,
+    fixture_refinementDurationOneSub,
+    fixture_refinementDurationFourSubs,
+    fixture_newGeometryCancelsRefinement,
+    fixture_previewNotBlockedByRefinement,
+    fixture_onlyCurrentGenerationResultsDisplay,
+    fixture_previewReplacedByRefinement,
   ];
 
   const results = fixtures.map(fn => {

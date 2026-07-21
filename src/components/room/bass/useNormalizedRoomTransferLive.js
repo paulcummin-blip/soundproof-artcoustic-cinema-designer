@@ -1,40 +1,70 @@
 // useNormalizedRoomTransferLive.js — Phase 2B: Live-result hook for the
-// normalized room-transfer engine.
+// normalized room-transfer engine, with a two-stage calculation.
 //
-// Returns the product-independent room response, updated asynchronously via
-// a dedicated Web Worker when geometry changes. A short trailing debounce
-// (~60 ms) coalesces rapid dragging or editing. Race protection uses a
-// monotonically increasing request ID AND a fingerprint ref that is updated
-// immediately when the fingerprint changes — stale worker responses are
-// discarded even if they complete during the debounce window. The last valid
-// result remains visible while a newer result is calculating. Worker failures
-// produce a recoverable error state, not a page crash. The worker is
-// terminated on unmount.
+// Stage 1 — Interactive preview:
+//   - Starts after ~50 ms debounce.
+//   - Uses the same modal/direct acoustic engine with reflections disabled
+//     (image-source refinement off). Modal frequencies, source summation,
+//     phase, seat handling and source-position physics are unchanged.
+//   - Target time-to-visible-curve: under 150 ms for four subs + RSP + 3 seats.
 //
-// The fingerprint is truly product-independent: it excludes model key,
-// product curve, product capability, product-derived source IDs, requested
-// SPL, EQ settings, priority mode, and graph smoothing/display controls.
-// Swapping SUB2-12 for SUB3-12 without moving anything produces the same
-// fingerprint, queues no worker job, and leaves the displayed curve unchanged.
+// Stage 2 — Full refinement:
+//   - Starts only after geometry has remained unchanged for ~280 ms.
+//   - Uses the complete production flat-source physics (including reflections).
+//   - Runs off the main thread in a separate worker.
+//   - Replaces the preview only when its fingerprint still matches the current
+//     geometry. It may take ~1 s at present.
+//
+// The fast preview is for interaction. The refined result is the authoritative
+// room-response curve. The previous valid curve stays visible while the next
+// preview or refinement runs.
+//
+// Race protection uses a single geometry generation counter shared across both
+// stages. The generation is incremented immediately when geometry changes.
+// Preview and refined results are accepted only when BOTH generation and
+// fingerprint match the current values. A refined result may replace a preview
+// only for the same fingerprint (same generation). Older refinement results
+// never overwrite a newer preview. Model-only changes (same fingerprint) queue
+// neither preview nor refinement.
+//
+// Worker blocking prevention: separate preview and refinement workers are used.
+// The refinement worker is terminated immediately when geometry changes, so a
+// long refinement never delays the next interactive preview. The preview worker
+// is reused across calculations. Both workers are terminated on unmount.
+//
+// The fingerprint is truly product-independent: it excludes model key, product
+// curve, product capability, product-derived source IDs, requested SPL, EQ
+// settings, priority mode, and graph smoothing/display controls.
 //
 // No valid room, listener or source returns status "idle" (not an exception).
 //
 // Returned shape:
 //   {
-//     status,             // "idle" | "calculating" | "ready" | "error"
-//     result,             // last valid normalized result (or null)
-//     geometryFingerprint,// product-independent fingerprint (or null)
-//     requestedAt,        // epoch ms of last worker post, or null
-//     completedAt,        // epoch ms of last worker completion, or null
-//     calculationDurationMs, // from the engine result, or null
-//     errorMessage,       // string or null
-//     isUpdating,         // true while a newer result is calculating
+//     status,                  // "idle" | "calculating" | "ready" | "error"
+//     result,                   // last valid normalized result (or null)
+//     geometryFingerprint,      // product-independent fingerprint (or null)
+//     requestedAt,              // epoch ms of last worker post, or null
+//     completedAt,               // epoch ms of last result acceptance, or null
+//     calculationDurationMs,     // from the last accepted result, or null
+//     errorMessage,              // string or null
+//     isUpdating,                 // true while a newer result is calculating
+//     quality,                    // null | "preview" | "refined"
+//     isRefining,                  // true while refinement is pending or in flight
+//     previewDurationMs,           // last preview calculation duration (ms), or null
+//     refinementDurationMs,        // last refinement calculation duration (ms), or null
 //   }
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { computeNormalizedTransferFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
+import { buildPreviewPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
 
-const DEBOUNCE_MS = 60;
+const PREVIEW_DEBOUNCE_MS = 50;
+const REFINEMENT_DEBOUNCE_MS = 280;
+// Preview uses reduced frequency resolution for interactive speed. The modal
+// frequencies, source summation, phase, seat handling and source-position
+// physics are unchanged — only the output frequency grid is coarser. The
+// refinement uses the full 96 points/octave (320 points for 20–200 Hz).
+const PREVIEW_POINTS_PER_OCTAVE = 8;
 
 function hasValidListener(rspPosition, seatingPositions) {
   if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) return true;
@@ -58,19 +88,39 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   const [requestedAt, setRequestedAt] = useState(null);
   const [completedAt, setCompletedAt] = useState(null);
   const [calculationDurationMs, setCalculationDurationMs] = useState(null);
+  const [quality, setQuality] = useState(null);
+  const [isRefining, setIsRefining] = useState(false);
+  const [previewDurationMs, setPreviewDurationMs] = useState(null);
+  const [refinementDurationMs, setRefinementDurationMs] = useState(null);
 
-  const workerRef = useRef(null);
-  const requestIdRef = useRef(0);
+  // Preview worker — reused across calculations (fast, short-lived jobs).
+  const previewWorkerRef = useRef(null);
+  // Refinement worker — terminated on geometry change, recreated on next refinement.
+  const refinementWorkerRef = useRef(null);
+
+  // Single geometry generation counter — shared across preview and refinement.
+  // Incremented IMMEDIATELY when geometry changes, before any debounce.
+  const geometryGenerationRef = useRef(0);
+
   // The latest requested fingerprint — updated IMMEDIATELY when the fingerprint
   // changes, before the debounce. An in-flight worker response must match this
   // to be accepted.
   const currentFingerprintRef = useRef(null);
-  // The active posted request { requestId, fingerprint }. Set when the worker
-  // is posted, cleared immediately when a newer fingerprint supersedes it.
-  const activeRequestRef = useRef(null);
-  const debounceTimerRef = useRef(null);
+
+  // Active posted requests { generation, fingerprint }. Set when a worker is
+  // posted, cleared immediately when a newer generation supersedes it.
+  const activePreviewRequestRef = useRef(null);
+  const activeRefinementRequestRef = useRef(null);
+
+  const previewTimerRef = useRef(null);
+  const refinementTimerRef = useRef(null);
+
+  // Last valid result cache — used to skip redundant recalculations and to
+  // keep the previous curve visible while a newer one is calculating.
   const lastValidResultRef = useRef(null);
   const lastValidFingerprintRef = useRef(null);
+  const lastValidQualityRef = useRef(null);
+  const lastValidGenerationRef = useRef(0);
 
   // Compute the product-independent fingerprint. Returns null for invalid
   // inputs (no valid room, listener, or source).
@@ -115,32 +165,48 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     });
   }, [roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions]);
 
-  // Lazily create the worker (reused across calculations). Terminated on
-  // unmount by the cleanup effect.
-  const ensureWorker = useCallback(() => {
-    if (!workerRef.current && typeof Worker !== "undefined") {
-      workerRef.current = new Worker(
+  // Preview physics: same as refinement physics but with reflections disabled.
+  const previewPhysicsOptions = useMemo(
+    () => buildPreviewPhysicsOptions(physicsOptions),
+    [physicsOptions]
+  );
+
+  // Lazily create the preview worker (reused across calculations).
+  const ensurePreviewWorker = useCallback(() => {
+    if (!previewWorkerRef.current && typeof Worker !== "undefined") {
+      previewWorkerRef.current = new Worker(
         new URL("./normalizedRoomTransfer.worker.js", import.meta.url),
         { type: "module" }
       );
-      workerRef.current.onmessage = (e) => {
+      previewWorkerRef.current.onmessage = (e) => {
         const msg = e.data || {};
-        const active = activeRequestRef.current;
-        // Race protection: accept a response only when BOTH its request ID
-        // AND fingerprint match the latest active request, AND the active
-        // request is still the current fingerprint. This prevents an old
-        // request completing during the debounce from becoming "ready".
+        const active = activePreviewRequestRef.current;
+        // Race protection: accept only when generation AND fingerprint match
+        // the current values. An old preview from a previous generation is
+        // discarded even if it completes during the debounce.
         if (!active) return;
-        if (msg.requestId !== active.requestId) return;
+        if (msg.generation !== active.generation) return;
         if (msg.fingerprint !== active.fingerprint) return;
         if (active.fingerprint !== currentFingerprintRef.current) return;
+        if (active.generation !== geometryGenerationRef.current) return;
 
         if (msg.type === "complete") {
+          // A preview is accepted only if no refined result for this generation
+          // has already been accepted (refined > preview). Since both share the
+          // same generation, if lastValidGenerationRef === active.generation and
+          // lastValidQualityRef === "refined", the refined result is newer — skip.
+          if (lastValidGenerationRef.current === active.generation &&
+              lastValidQualityRef.current === "refined") return;
+
           lastValidResultRef.current = msg.result;
           lastValidFingerprintRef.current = active.fingerprint;
+          lastValidQualityRef.current = "preview";
+          lastValidGenerationRef.current = active.generation;
           setResult(msg.result);
-          setCompletedAt(Date.now());
+          setQuality("preview");
+          setPreviewDurationMs(msg.result?.calculationDurationMs ?? null);
           setCalculationDurationMs(msg.result?.calculationDurationMs ?? null);
+          setCompletedAt(Date.now());
           setErrorMessage(null);
           setStatus("ready");
         } else if (msg.type === "error") {
@@ -148,34 +214,94 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
           setStatus("error");
         }
       };
-      workerRef.current.onerror = (e) => {
-        // Only surface the error if it belongs to the current request.
-        const active = activeRequestRef.current;
-        if (!active || active.fingerprint !== currentFingerprintRef.current) return;
-        setErrorMessage(e?.message || "Worker error");
+      previewWorkerRef.current.onerror = (e) => {
+        const active = activePreviewRequestRef.current;
+        if (!active || active.fingerprint !== currentFingerprintRef.current ||
+            active.generation !== geometryGenerationRef.current) return;
+        setErrorMessage(e?.message || "Preview worker error");
         setStatus("error");
       };
     }
-    return workerRef.current;
+    return previewWorkerRef.current;
   }, []);
 
-  // Debounced effect: when the fingerprint changes, invalidate any in-flight
-  // request IMMEDIATELY (before the debounce), then start a worker after a
-  // short trailing debounce. The last valid result remains visible while the
-  // newer result is calculating (status "calculating", result unchanged).
+  // Create a fresh refinement worker. The previous one is terminated on
+  // geometry change, so this always creates a new instance when needed.
+  const ensureRefinementWorker = useCallback(() => {
+    if (!refinementWorkerRef.current && typeof Worker !== "undefined") {
+      refinementWorkerRef.current = new Worker(
+        new URL("./normalizedRoomTransfer.worker.js", import.meta.url),
+        { type: "module" }
+      );
+      refinementWorkerRef.current.onmessage = (e) => {
+        const msg = e.data || {};
+        const active = activeRefinementRequestRef.current;
+        // Race protection: accept only when generation AND fingerprint match.
+        if (!active) return;
+        if (msg.generation !== active.generation) return;
+        if (msg.fingerprint !== active.fingerprint) return;
+        if (active.fingerprint !== currentFingerprintRef.current) return;
+        if (active.generation !== geometryGenerationRef.current) return;
+
+        if (msg.type === "complete") {
+          // Refined result replaces preview for the same fingerprint (same generation).
+          lastValidResultRef.current = msg.result;
+          lastValidFingerprintRef.current = active.fingerprint;
+          lastValidQualityRef.current = "refined";
+          lastValidGenerationRef.current = active.generation;
+          setResult(msg.result);
+          setQuality("refined");
+          setRefinementDurationMs(msg.result?.calculationDurationMs ?? null);
+          setCalculationDurationMs(msg.result?.calculationDurationMs ?? null);
+          setCompletedAt(Date.now());
+          setErrorMessage(null);
+          setStatus("ready");
+          setIsRefining(false);
+        } else if (msg.type === "error") {
+          // Refinement error — keep the preview visible, just clear isRefining.
+          setIsRefining(false);
+          setErrorMessage(msg.error || "Refinement error");
+        }
+      };
+      refinementWorkerRef.current.onerror = (e) => {
+        const active = activeRefinementRequestRef.current;
+        if (!active || active.fingerprint !== currentFingerprintRef.current ||
+            active.generation !== geometryGenerationRef.current) return;
+        setIsRefining(false);
+        setErrorMessage(e?.message || "Refinement worker error");
+      };
+    }
+    return refinementWorkerRef.current;
+  }, []);
+
+  // Main effect: when the fingerprint changes, increment the generation,
+  // cancel all in-flight work, then start preview and refinement timers.
   useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
+    // Clear both debounce timers.
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    if (refinementTimerRef.current) {
+      clearTimeout(refinementTimerRef.current);
+      refinementTimerRef.current = null;
     }
 
-    // IMMEDIATELY invalidate any in-flight worker response by incrementing the
-    // request token and storing the new fingerprint. An old request completing
-    // during the 60 ms debounce will fail the requestId/fingerprint match in
-    // onmessage and be discarded — it must never become "ready".
-    const newRequestId = ++requestIdRef.current;
+    // IMMEDIATELY increment the geometry generation and store the new fingerprint.
+    // This invalidates any in-flight preview or refinement response — they will
+    // fail the generation check in onmessage and be discarded.
+    const gen = ++geometryGenerationRef.current;
     currentFingerprintRef.current = geometryFingerprint;
-    activeRequestRef.current = null;
+
+    // Terminate the active refinement worker immediately so a long refinement
+    // never delays the next interactive preview. The preview worker is reused.
+    if (refinementWorkerRef.current) {
+      refinementWorkerRef.current.terminate();
+      refinementWorkerRef.current = null;
+    }
+    activePreviewRequestRef.current = null;
+    activeRefinementRequestRef.current = null;
+    setIsRefining(false);
 
     if (!geometryFingerprint) {
       setStatus("idle");
@@ -186,6 +312,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     if (lastValidFingerprintRef.current === geometryFingerprint && lastValidResultRef.current) {
       setStatus("ready");
       setResult(lastValidResultRef.current);
+      setQuality(lastValidQualityRef.current);
       return;
     }
 
@@ -193,38 +320,77 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     setStatus("calculating");
 
     const fp = geometryFingerprint;
-    const payload = { roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions };
+    const basePayload = { roomDims, rspPosition, seatingPositions, subsForSimulation };
 
-    debounceTimerRef.current = setTimeout(() => {
-      const worker = ensureWorker();
-      if (!worker) return;
+    // Stage 1: Preview timer (~50 ms debounce).
+    previewTimerRef.current = setTimeout(() => {
       // Guard: a newer fingerprint may have superseded us during the debounce.
       if (currentFingerprintRef.current !== fp) return;
+      if (geometryGenerationRef.current !== gen) return;
 
-      activeRequestRef.current = { requestId: newRequestId, fingerprint: fp };
+      const worker = ensurePreviewWorker();
+      if (!worker) return;
+
+      activePreviewRequestRef.current = { generation: gen, fingerprint: fp };
       setRequestedAt(Date.now());
-      worker.postMessage({ requestId: newRequestId, fingerprint: fp, payload });
-    }, DEBOUNCE_MS);
+      worker.postMessage({
+        generation: gen,
+        fingerprint: fp,
+        quality: "preview",
+        payload: { ...basePayload, physicsOptions: previewPhysicsOptions, pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE },
+      });
+    }, PREVIEW_DEBOUNCE_MS);
+
+    // Stage 2: Refinement timer (~280 ms debounce after geometry stabilises).
+    refinementTimerRef.current = setTimeout(() => {
+      if (currentFingerprintRef.current !== fp) return;
+      if (geometryGenerationRef.current !== gen) return;
+
+      const worker = ensureRefinementWorker();
+      if (!worker) return;
+
+      activeRefinementRequestRef.current = { generation: gen, fingerprint: fp };
+      setIsRefining(true);
+      setRequestedAt(Date.now());
+      worker.postMessage({
+        generation: gen,
+        fingerprint: fp,
+        quality: "refined",
+        payload: { ...basePayload, physicsOptions },
+      });
+    }, REFINEMENT_DEBOUNCE_MS);
 
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
+      if (previewTimerRef.current) {
+        clearTimeout(previewTimerRef.current);
+        previewTimerRef.current = null;
+      }
+      if (refinementTimerRef.current) {
+        clearTimeout(refinementTimerRef.current);
+        refinementTimerRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geometryFingerprint]);
 
-  // Cleanup on unmount — terminate worker and clear timer.
+  // Cleanup on unmount — terminate both workers and clear both timers.
   useEffect(() => {
     return () => {
-      if (workerRef.current) {
-        workerRef.current.terminate();
-        workerRef.current = null;
+      if (previewWorkerRef.current) {
+        previewWorkerRef.current.terminate();
+        previewWorkerRef.current = null;
       }
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
+      if (refinementWorkerRef.current) {
+        refinementWorkerRef.current.terminate();
+        refinementWorkerRef.current = null;
+      }
+      if (previewTimerRef.current) {
+        clearTimeout(previewTimerRef.current);
+        previewTimerRef.current = null;
+      }
+      if (refinementTimerRef.current) {
+        clearTimeout(refinementTimerRef.current);
+        refinementTimerRef.current = null;
       }
     };
   }, []);
@@ -238,5 +404,9 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     calculationDurationMs,
     errorMessage,
     isUpdating: status === "calculating",
+    quality,
+    isRefining,
+    previewDurationMs,
+    refinementDurationMs,
   };
 }

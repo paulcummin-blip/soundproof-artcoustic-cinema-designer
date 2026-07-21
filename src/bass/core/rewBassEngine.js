@@ -749,7 +749,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
 
   const freqMinHz = options?.freqMinHz;
   const freqMaxHz = options?.freqMaxHz;
-  const freqsHz = buildFrequencyAxis(freqMinHz, freqMaxHz);
+  const freqsHz = buildFrequencyAxis(freqMinHz, freqMaxHz, options?.pointsPerOctave);
   const captureFrequencies = options?.runtimeVectorCapture === true
     ? [20, freqsHz.reduce((best, hz) => Math.abs(hz - 34.3) < Math.abs(best - 34.3) ? hz : best, freqsHz[0])]
     : [];
@@ -1808,7 +1808,7 @@ export function simulateBassResponseRewParityField(roomDims, seatPos, sub, subPr
 
   const freqMinHz = options?.freqMinHz ?? 20;
   const freqMaxHz = options?.freqMaxHz ?? 200;
-  const freqsHz   = buildFrequencyAxis(freqMinHz, freqMaxHz);
+  const freqsHz   = buildFrequencyAxis(freqMinHz, freqMaxHz, options?.pointsPerOctave);
 
   const surfaceAbsorption = normalizeSurfaceAbsorption(options?.surfaceAbsorption);
   const axialQ = Number.isFinite(Number(options?.axialQ)) ? Number(options.axialQ) : 8.0;

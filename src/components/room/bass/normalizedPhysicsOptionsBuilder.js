@@ -12,6 +12,12 @@
 //   rewParityModalMagnitudeScale: 1.0.
 //
 // enableReflections follows the same ab_corrected override as the production path.
+//
+// Phase 2B two-stage: buildPreviewPhysicsOptions() produces the interactive-preview
+// physics — identical to the refinement physics except enableReflections is forced
+// off. This disables the expensive image-source refinement while keeping the same
+// modal/direct engine, modal frequencies, source summation, phase, seat handling
+// and source-position physics. Late-field is already disabled in the base builder.
 
 export function buildNormalizedPhysicsOptions(params) {
   const p = params || {};
@@ -46,5 +52,16 @@ export function buildNormalizedPhysicsOptions(params) {
     highOrderAxialScale: p.highOrderAxialScale,
     qStrategy: p.qStrategy,
     rewModalBandwidthScale: p.rewModalBandwidthScale,
+  };
+}
+
+// Preview physics: identical to refinement physics except reflections are disabled.
+// The modal/direct acoustic engine, modal frequencies, source summation, phase,
+// seat handling and source-position physics are unchanged. Only the expensive
+// image-source reflection refinement is turned off for interactive speed.
+export function buildPreviewPhysicsOptions(refinementPhysicsOptions) {
+  return {
+    ...refinementPhysicsOptions,
+    enableReflections: false,
   };
 }

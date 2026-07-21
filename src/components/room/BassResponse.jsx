@@ -950,9 +950,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   });
 
   // Normalized RSP series for the live, pre-calibration room-response display.
+  // Phase 2B: label reflects the two-stage quality (preview / refining / refined).
   const normalizedSeries = useMemo(
-    () => buildNormalizedSeries(normalizedLive.result?.rspCurve),
-    [normalizedLive.result]
+    () => buildNormalizedSeries(normalizedLive.result?.rspCurve, normalizedLive.quality, normalizedLive.isRefining),
+    [normalizedLive.result, normalizedLive.quality, normalizedLive.isRefining]
   );
 
   // A valid detailed result is one that is COMPLETE and matches the current

@@ -1,10 +1,13 @@
-export function buildFrequencyAxis(freqMinHz, freqMaxHz) {
+export function buildFrequencyAxis(freqMinHz, freqMaxHz, pointsPerOctave) {
+  const ppo = Number.isFinite(Number(pointsPerOctave)) && Number(pointsPerOctave) > 0
+    ? Math.round(Number(pointsPerOctave))
+    : 96;
   const minHz = Math.max(1, Number(freqMinHz) || 15);
   const maxHz = Math.max(minHz, Number(freqMaxHz) || 200);
   const freqsHz = [];
-  const totalPoints = Math.ceil(Math.log2(maxHz / minHz) * 96);
+  const totalPoints = Math.ceil(Math.log2(maxHz / minHz) * ppo);
   for (let index = 0; index <= totalPoints; index += 1) {
-    const hz = minHz * Math.pow(2, index / 96);
+    const hz = minHz * Math.pow(2, index / ppo);
     if (hz > maxHz) break;
     freqsHz.push(hz);
   }
