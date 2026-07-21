@@ -12,7 +12,7 @@ export default function BestSubLayoutCard({ recommendation, rank }) {
         <Metric label="Layout" value={m.placementFamily} /><Metric label="Placement mode" value={recommendation.placementMode} />
         <Metric label="Quantity" value={`${m.sourceCount} ${m.sourceCount === 1 ? "sub" : "subs"}`} /><Metric label="Seat variation" value={`${m.worstSeatVariationDb.toFixed(1)} dB`} />
         <Metric label="Major nulls" value={m.destructiveBroadNullCount} /><Metric label="Normalized depth" value={`${m.lowestReliableNormalizedFrequencyHz.toFixed(1)} Hz`} />
-        <Metric label="Transfer efficiency" value={m.transferEfficiency} /><Metric label="Seats assessed" value={m.rspOnly ? "RSP-only" : m.realSeatsAssessed} />
+        <Metric label="Transfer efficiency" value={m.transferEfficiencyClass} /><Metric label="Seats assessed" value={m.rspOnly ? "RSP-only" : m.realSeatsAssessed} />
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-[#625143]">{m.rankingReason}</p>
     </div>

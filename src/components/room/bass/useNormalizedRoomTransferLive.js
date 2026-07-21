@@ -57,6 +57,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { computeNormalizedTransferFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { buildPreviewPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
+import { canonicalizeNormalizedRoomInputs } from "@/components/room/bass/normalizedRoomInputAdapters";
 
 const PREVIEW_DEBOUNCE_MS = 50;
 const REFINEMENT_DEBOUNCE_MS = 280;
@@ -82,6 +83,10 @@ function hasValidRoom(roomDims) {
 }
 
 export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions }) {
+  const canonicalInputs = useMemo(
+    () => canonicalizeNormalizedRoomInputs({ roomDims, rspPosition, seatingPositions }),
+    [roomDims, rspPosition, seatingPositions]
+  );
   const [status, setStatus] = useState("idle");
   const [result, setResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -125,15 +130,15 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   // Compute the product-independent fingerprint. Returns null for invalid
   // inputs (no valid room, listener, or source).
   const geometryFingerprint = useMemo(() => {
-    if (!hasValidRoom(roomDims)) return null;
+    if (!hasValidRoom(canonicalInputs.roomDims)) return null;
     if (!hasValidSource(subsForSimulation)) return null;
-    if (!hasValidListener(rspPosition, seatingPositions)) return null;
+    if (!hasValidListener(canonicalInputs.rspPosition, canonicalInputs.seatingPositions)) return null;
 
     const po = physicsOptions || {};
     return computeNormalizedTransferFingerprint({
-      roomDims,
-      rspPosition,
-      seatingPositions,
+      roomDims: canonicalInputs.roomDims,
+      rspPosition: canonicalInputs.rspPosition,
+      seatingPositions: canonicalInputs.seatingPositions,
       sources: subsForSimulation,
       surfaceAbsorption: po.surfaceAbsorption,
       roomDamping: po.roomDamping,
@@ -163,7 +168,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       modalCoherenceMode: po.modalCoherenceMode,
       highOrderAxialScale: po.highOrderAxialScale,
     });
-  }, [roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions]);
+  }, [canonicalInputs, subsForSimulation, physicsOptions]);
 
   // Preview physics: same as refinement physics but with reflections disabled.
   const previewPhysicsOptions = useMemo(
@@ -320,7 +325,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     setStatus("calculating");
 
     const fp = geometryFingerprint;
-    const basePayload = { roomDims, rspPosition, seatingPositions, subsForSimulation };
+    const basePayload = { ...canonicalInputs, subsForSimulation };
 
     // Stage 1: Preview timer (~50 ms debounce).
     previewTimerRef.current = setTimeout(() => {

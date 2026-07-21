@@ -36,6 +36,8 @@ import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rew
 import { useNormalizedRoomTransferLive } from "@/components/room/bass/useNormalizedRoomTransferLive";
 import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalizedPhysicsOptions";
 import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
+import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
+import { BASS_NORMALIZED_PHYSICS_DEFAULTS as PHYSICS_DEFAULTS } from "@/components/room/bass/bassPhysicsDefaults";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code.
@@ -140,65 +142,49 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [tryPolarity, setTryPolarity] = useState(false);
   const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
   const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
-  const [roomDamping, setRoomDamping] = useState(20);
-  const [surfaceAbsorptionInputs, setSurfaceAbsorptionInputs] = useState({
-    front: 0.30,
-    back: 0.30,
-    left: 0.30,
-    right: 0.30,
-    ceiling: 0.30,
-    floor: 0.30,
-  });
-  // REW Core is the production engine — not user-controllable.
+  const [roomDamping, setRoomDamping] = useState(PHYSICS_DEFAULTS.roomDamping);
+  const [surfaceAbsorptionInputs, setSurfaceAbsorptionInputs] = useState(PHYSICS_DEFAULTS.surfaceAbsorption);
+  // Production core and product source mode are not user-controllable.
   const useRewCoreTestMode = true;
-  const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(false);
-  // Production default must be 'product' so each subwoofer's real registry curve reaches the
-  // engine. REW_PARITY_PRESET.rewSourceCurveMode ('flat_rew_reference') is a flat synthetic
-  // reference used only for the debug parity preset (via resetToParityPreset) — it must never
-  // be the default, since it replaces every product's curve with an identical flat curve.
+  const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(PHYSICS_DEFAULTS.enableRewCoreReflections);
   const [rewSourceCurveMode, setRewSourceCurveMode] = useState('product');
-  // Production default: 'existing' preserves the product curve's absolute SPL (pure 1m
-  // reference amplitude, no listener-distance normalisation of modal excitation). The REW
-  // parity preset's 'distance_normalized' value is for debug/parity comparison only — it
-  // must never be the product simulator's default, since it removes absolute SPL differences
-  // between subwoofer product curves.
-  const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState('existing');
-  const [modalGainScalar, setModalGainScalar] = useState(1.0);
-  const [axialQ, setAxialQ] = useState(4.0);
-  const [modalStorageMode, setModalStorageMode] = useState("none");
+  const [modalSourceReferenceMode, setModalSourceReferenceMode] = useState(PHYSICS_DEFAULTS.modalSourceReferenceMode);
+  const [modalGainScalar, setModalGainScalar] = useState(PHYSICS_DEFAULTS.modalGainScalar);
+  const [axialQ, setAxialQ] = useState(PHYSICS_DEFAULTS.axialQ);
+  const [modalStorageMode, setModalStorageMode] = useState(PHYSICS_DEFAULTS.modalStorageMode);
   // Temporary REW parity experiment: default changed to 1.0 to test full acoustic propagation phase.
   // Revert to 0.5 after experiment is concluded.
-  const [propagationPhaseScale, setPropagationPhaseScale] = useState(REW_PARITY_PRESET.propagationPhaseScale);
-  const [disableReflectionPhaseJitter, setDisableReflectionPhaseJitter] = useState(false);
-  const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(false);
+  const [propagationPhaseScale, setPropagationPhaseScale] = useState(PHYSICS_DEFAULTS.propagationPhaseScale);
+  const [disableReflectionPhaseJitter, setDisableReflectionPhaseJitter] = useState(PHYSICS_DEFAULTS.disableReflectionPhaseJitter);
+  const [disableReflectionCoherenceWeight, setDisableReflectionCoherenceWeight] = useState(PHYSICS_DEFAULTS.disableReflectionCoherenceWeight);
   const [disableLateField, setDisableLateField] = useState(true);
   const [disableModalPropagationPhase, setDisableModalPropagationPhase] = useState(true);
-  const [mute68HzAxialMode, setMute68HzAxialMode] = useState(false);
+  const [mute68HzAxialMode, setMute68HzAxialMode] = useState(PHYSICS_DEFAULTS.mute68HzAxialMode);
   // __TEMP_DIAGNOSTIC__ debugDisableModalContribution — remove after polarity masking diagnosis
-  const [debugDisableModalContribution, setDebugDisableModalContribution] = useState(false);
+  const [debugDisableModalContribution, setDebugDisableModalContribution] = useState(PHYSICS_DEFAULTS.debugDisableModalContribution);
   // __TEMP_REW_PARITY_ISOLATION__ field mode for layered comparison
-  const [rewParityFieldMode, setRewParityFieldMode] = useState('full_field'); // 'reflections_only' | 'modes_only' | 'full_field'
+  const [rewParityFieldMode, setRewParityFieldMode] = useState(PHYSICS_DEFAULTS.rewParityFieldMode); // 'reflections_only' | 'modes_only' | 'full_field'
   // __TEMP_REW_PARITY__ adjustable modal distance blend: 0.00 = existing 1m ref, 1.00 = full distance_normalized
-  const [modalDistanceBlend, setModalDistanceBlend] = useState(REW_PARITY_PRESET.modalDistanceBlend);
-  const [overrideConstantAxialQ, setOverrideConstantAxialQ] = useState(false);
-  const [overrideAbsorptionAxialQ, setOverrideAbsorptionAxialQ] = useState(false);
+  const [modalDistanceBlend, setModalDistanceBlend] = useState(PHYSICS_DEFAULTS.modalDistanceBlend);
+  const [overrideConstantAxialQ, setOverrideConstantAxialQ] = useState(PHYSICS_DEFAULTS.overrideConstantAxialQ);
+  const [overrideAbsorptionAxialQ, setOverrideAbsorptionAxialQ] = useState(PHYSICS_DEFAULTS.overrideAbsorptionAxialQ);
   // __TEMP_REW_PARITY_MODE_200_SCALE__
-  const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(1.0);
+  const [debugMode200Multiplier, setDebugMode200Multiplier] = useState(PHYSICS_DEFAULTS.debugMode200Multiplier);
   // __TEMP_DIAGNOSTIC_MODAL_PHASE_CONVENTION__
   const [debugModalPhaseConvention, setDebugModalPhaseConvention] = useState('normal');
   // __TEMP_DIAGNOSTIC_MODAL_H_SIGN__
   const [debugModalHSign, setDebugModalHSign] = useState('normal');
-  const [reflectionGainScale, setReflectionGainScale] = useState(1.0); // diagnostic: multiply imageAmplitude after reflectionCoefficient
+  const [reflectionGainScale, setReflectionGainScale] = useState(PHYSICS_DEFAULTS.reflectionGainScale); // diagnostic: multiply imageAmplitude after reflectionCoefficient
   // __TEMP_REW_PARITY_MODAL_MAGNITUDE_SCALE__
   // Tests whether REW parity is a modal magnitude calibration issue rather than a phase issue.
   // Applied only when rewSourceCurveMode === 'flat_rew_reference'.
   const [rewParityModalMagnitudeScale, setRewParityModalMagnitudeScale] = useState(1.00);
   // __TEMP_DIAGNOSTIC_MODAL_COHERENCE__
   // Tests whether the 80–150 Hz over-prediction is caused by fully coherent modal summation.
-  const [modalCoherenceMode, setModalCoherenceMode] = useState('coherent');
+  const [modalCoherenceMode, setModalCoherenceMode] = useState(PHYSICS_DEFAULTS.modalCoherenceMode);
   // __TEMP_REW_PARITY_HIGH_ORDER_AXIAL_SCALE__
   // Diagnostic scale applied to axial modes with order >= 2. Default 1.00 = no change.
-  const [highOrderAxialScale, setHighOrderAxialScale] = useState(1.0);
+  const [highOrderAxialScale, setHighOrderAxialScale] = useState(PHYSICS_DEFAULTS.highOrderAxialScale);
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   // Graph scale mode: 'rew_fixed' = locked 60–120 dB / 20–300 Hz, 'auto' = dynamic
   const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
@@ -210,10 +196,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // (the graph previously plotted the raw unsmoothed curve).
   const [bassSmoothingMode, setBassSmoothingMode] = useState('none');
   // Q strategy selector. Default = approved Allen & Berkley corrected model.
-  const [qStrategy, setQStrategy] = useState('ab_corrected');
+  const [qStrategy, setQStrategy] = useState(PHYSICS_DEFAULTS.qStrategy);
   // __CANDIDATE_REW_MODAL_BANDWIDTH__ — bandwidth scale for the "REW-style Modal Bandwidth"
   // experimental Q strategy. Only used when qStrategy === 'rew_modal_bandwidth'.
-  const [rewModalBandwidthScale, setRewModalBandwidthScale] = useState(0.55);
+  const [rewModalBandwidthScale, setRewModalBandwidthScale] = useState(PHYSICS_DEFAULTS.rewModalBandwidthScale);
   // Temporary comparison toggle for the REW-style Absorption Authority candidate — see graph controls below.
   const [overlayProduction, setOverlayProduction] = useState(false);
   // RSP graph visibility — defaults to true (RSP is the default visible series).
@@ -942,6 +928,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode,
     overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier,
     reflectionGainScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale,
+  });
+
+  usePublishBestSubLayoutInputs({
+    roomDims, seatingPositions, rspPosition, physicsOptions: normalizedPhysicsOptions,
+    frontSourceHeightM: frontSubsCfg?.bottomHeightM,
+    rearSourceHeightM: rearSubsCfg?.bottomHeightM,
   });
 
   const normalizedLive = useNormalizedRoomTransferLive({

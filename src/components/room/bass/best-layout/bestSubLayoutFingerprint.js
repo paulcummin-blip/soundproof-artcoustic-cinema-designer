@@ -1,4 +1,4 @@
-import { BEST_SUB_LAYOUT_CONSTANTS } from "@/components/room/bass/best-layout/bestSubLayoutConstants";
+import { BEST_SUB_LAYOUT_CONSTANTS as C } from "@/components/room/bass/best-layout/bestSubLayoutConstants";
 
 function stable(value) {
   if (value === null || value === undefined) return "null";
@@ -17,16 +17,18 @@ function hash64(text) {
   return hash(0x811c9dc5) + hash(0x40007a67);
 }
 
-export function computeBestSubLayoutFingerprint({ roomDims, seatingPositions, rspPosition, physicsOptions }) {
-  const seats = (Array.isArray(seatingPositions) ? seatingPositions : [])
-    .map((seat) => ({ x: seat?.x, y: seat?.y, z: seat?.z ?? 1.2 }))
-    .sort((a, b) => a.x - b.x || a.y - b.y || a.z - b.z);
+export function computeBestSubLayoutFingerprint({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights }) {
+  const seats = (Array.isArray(seatingPositions) ? seatingPositions : []).map((seat) => ({ x: seat?.x, y: seat?.y, z: seat?.z ?? 1.2 })).sort((a, b) => a.x - b.x || a.y - b.y || a.z - b.z);
   const canonical = {
-    version: BEST_SUB_LAYOUT_CONSTANTS.candidateDefinitionVersion,
+    version: C.candidateDefinitionVersion,
     room: { widthM: roomDims?.widthM, lengthM: roomDims?.lengthM, heightM: roomDims?.heightM },
     seats,
     rsp: seats.length ? null : { x: rspPosition?.x, y: rspPosition?.y, z: rspPosition?.z ?? 1.2 },
+    sourceHeights: {
+      front: Number.isFinite(Number(sourceHeights?.front)) ? Number(sourceHeights.front) : C.fallbackSourceHeightM,
+      rear: Number.isFinite(Number(sourceHeights?.rear)) ? Number(sourceHeights.rear) : C.fallbackSourceHeightM,
+    },
     physics: physicsOptions || {},
   };
-  return `layout:v1:${hash64(stable(canonical))}`;
+  return `layout:v2:${hash64(stable(canonical))}`;
 }
