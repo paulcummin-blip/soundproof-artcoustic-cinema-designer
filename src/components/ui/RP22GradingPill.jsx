@@ -1,6 +1,6 @@
 import { getLevelColors } from '@/components/utils/rp22Colors';
 
-export default function RP22GradingPill({ level = 4, count, children }) {
+export default function RP22GradingPill({ level = 4, count, children, compact = false, style }) {
   // Normalize level to safe value
   const normalizeLevel = (lvl) => {
     if (typeof lvl === 'number') {
@@ -38,8 +38,8 @@ export default function RP22GradingPill({ level = 4, count, children }) {
   const styleBase = {
     border: `1px solid ${safeColors.border}`,
     borderRadius: '6px',
-    padding: '6px 12px',
-    fontSize: '13px',
+    padding: compact ? '4px 7px' : '6px 12px',
+    fontSize: compact ? '10px' : '13px',
     fontWeight: 600,
     lineHeight: '1.2',
     display: 'inline-flex',
@@ -50,6 +50,7 @@ export default function RP22GradingPill({ level = 4, count, children }) {
     color: safeColors.text,
     whiteSpace: 'nowrap',
     minWidth: '40px',
+    ...style,
   };
 
   return <span style={styleBase}>{label}</span>;

@@ -1,5 +1,4 @@
 import React from "react";
-import BassCalculationStatus from "@/components/room/bass/BassCalculationStatus";
 
 export default function BackgroundAnalysisControls({ lifecycle, onRecalculate, disabled, includeDiagnostics, onDiagnosticsChange }) {
   return (
@@ -15,7 +14,6 @@ export default function BackgroundAnalysisControls({ lifecycle, onRecalculate, d
         <input type="checkbox" checked={includeDiagnostics} onChange={(event) => onDiagnosticsChange(event.target.checked)} />
         Include engineering diagnostics
       </label>
-      <BassCalculationStatus lifecycle={lifecycle} />
     </div>
   );
 }

@@ -12,7 +12,6 @@ import { computeRoomModesLocal } from "@/bass/core/modalCalculations.js";
 import { getSubwooferCurve, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLineToggles";
-import ProductionVectorCaptureTest10 from "@/components/room/bass/ProductionVectorCaptureTest10";
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
@@ -21,15 +20,12 @@ import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelop
 import { computeGeometryFingerprint, computeProductFingerprint, computeCalibrationFingerprint, computeHouseCurveFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { useBassDetailedCalculation } from "@/components/room/bass/useBassDetailedCalculation";
 import BackgroundAnalysisControls from "@/components/room/bass/BackgroundAnalysisControls";
-import SourceDomainCapabilityDiagnostic from "@/components/room/bass/SourceDomainCapabilityDiagnostic";
-import DesignEqFilterBankDiagnostic from "@/components/room/bass/DesignEqFilterBankDiagnostic";
-import BassOptimiserValidationPanel from "@/components/room/bass/BassOptimiserValidationPanel";
-import { buildCandidateSignature, signatureToString } from "@/components/room/bass/candidateConsistency";
-import P14LevelPill from "@/components/room/P14LevelPill";
+import BassEngineeringDetails from "@/components/room/bass/BassEngineeringDetails";
+import BassResultsSummary from "@/components/room/bass/BassResultsSummary";
+import { usePublishBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useBassAnalysisContract } from "@/components/room/bass/useBassAnalysisContract";
-import BassContractParityAudit from "@/components/room/bass/BassContractParityAudit";
 import { deriveRequestedCalibrationConfig } from "@/components/room/bass/requestedCalibrationConfig";
 import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
@@ -1027,6 +1023,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     backgroundLifecycle: detailedLifecycle,
   });
 
+  const publishedBassResults = useMemo(() => ({
+    contract: bassAnalysisContract,
+    onPriorityChange: setOptimiserPriorityMode,
+    onRetry: () => calculateDetailed(detailedFingerprint, detailedPayload, includeDiagnostics),
+  }), [bassAnalysisContract, calculateDetailed, detailedFingerprint, detailedPayload, includeDiagnostics]);
+  usePublishBassResults(publishedBassResults);
+
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
     designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
     hasMatchingDetailedResult: hasValidDetailedResult, multiSeries, showRealSeatOverlays,
@@ -1292,9 +1295,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Room: {dimsTxt}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Subs: {totalSubCount}</Badge>
         <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
-        <P14LevelPill optimiserResult={designEqEnabled ? optimisationResult : null} />
-
       </div>
+      <BassResultsSummary />
       
       {(subWarnings?.front?.length > 0 || subWarnings?.rear?.length > 0) && (
         <Alert className="border border-[#C1B6AD] bg-[#F8F8F7] text-[#3E4349]">
@@ -1306,7 +1308,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
 
       {/* ── Active Test Engine Banner ── */}
-      {activeTestEngine && (
+      {includeDiagnostics && activeTestEngine && (
         <div style={{ border: '2px solid #059669', borderRadius: 8, background: '#f0fdf4', padding: '8px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
           <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#065f46', fontWeight: 700 }}>
             🧪 Production Test Engine Active: {activeTestEngine.label}
@@ -1555,65 +1557,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
           Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
         </div>
-        {designEqEnabled && optimisationResult?.selectedCandidate && (() => {
-          const sig = buildCandidateSignature({ result: optimisationResult, rspRawCurve });
-          if (!sig) return null;
-          return (
-            <div style={{ fontSize: 9, color: '#625143', fontFamily: 'monospace', marginTop: 4, background: '#F8F8F7', border: '1px solid #DCDBD6', borderRadius: 4, padding: '4px 8px' }}>
-              <strong>Candidate signature:</strong> {signatureToString(sig)}
-            </div>
-          );
-        })()}
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {graphStatusText}
         </div>
-        {designEqEnabled && optimisationResult && <>
-          {/* Source diagnostics — assessment position provenance */}
-          <div style={{ fontSize: 10, fontFamily: "monospace", color: "#625143", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
-            <strong>Assessment position:</strong> RSP &nbsp;|&nbsp;
-            <strong>Response ID:</strong> rsp &nbsp;|&nbsp;
-            <strong>RSP coordinates:</strong> {rspPosition ? `x=${rspPosition.x.toFixed(3)} / y=${rspPosition.y.toFixed(3)} / z=${rspPosition.z.toFixed(3)} m` : "unavailable"} &nbsp;|&nbsp;
-            <strong>Real seats:</strong> {seatingPositions?.length ?? 0}
-          </div>
-          {includeDiagnostics && (
-            <BassContractParityAudit
-              contract={bassAnalysisContract}
-              optimisationResult={optimisationResult}
-              detailedStatus={detailedStatus}
-              rspRawCurve={rspRawCurve}
-              perSeatRawCurves={perSeatRawCurves}
-              canonicalPriorityMode={optimiserPriorityMode}
-            />
-          )}
-          <BassOptimiserValidationPanel
-            result={optimisationResult}
-            priorityMode={optimiserPriorityMode}
-            onPriorityModeChange={setOptimiserPriorityMode}
-            activeSubs={designEqSystemLimits.activeSubs}
-            usableLfHz={designEqSystemLimits.usableLfHz}
-            perSeatRawCurves={perSeatRawCurves}
-            rspRawCurve={rspRawCurve}
-            includeDiagnostics={includeDiagnostics}
-          />
-          <DesignEqFilterBankDiagnostic
-            filters={optimisationResult.selectedFilters}
-            combinedEqCurve={(rspRawCurve.length ? rspRawCurve : (multiSeries[0]?.data || [])).map((point) => {
-              const finalPoint = optimisationResult.finalPostEqCurve.find((candidate) => candidate.frequency === point.frequency);
-              return { frequency: point.frequency, spl: (finalPoint?.spl ?? point.spl) - point.spl };
-            })}
-          />
-          <SourceDomainCapabilityDiagnostic
-            activeSubs={designEqSystemLimits.activeSubs}
-            rawCurve={rspRawCurve.length ? rspRawCurve : multiSeries[0]?.data}
-            postEqCurve={optimisationResult.finalPostEqCurve}
-            usableLfHz={designEqSystemLimits.usableLfHz}
-            optimisationResult={optimisationResult}
-          />
-        </>}
-
-        <ProductionVectorCaptureTest10
-          capture={simulationResults.runtimeVectorCapture}
+        <BassEngineeringDetails
+          enabled={includeDiagnostics}
           designEqEnabled={designEqEnabled}
+          result={optimisationResult}
+          rspPosition={rspPosition}
+          seatingPositions={seatingPositions}
+          contract={bassAnalysisContract}
+          detailedStatus={detailedStatus}
+          rspRawCurve={rspRawCurve}
+          perSeatRawCurves={perSeatRawCurves}
+          priorityMode={optimiserPriorityMode}
+          onPriorityChange={setOptimiserPriorityMode}
+          systemLimits={designEqSystemLimits}
+          multiSeries={multiSeries}
+          runtimeCapture={simulationResults.runtimeVectorCapture}
           smoothingMode={bassSmoothingMode}
         />
 
@@ -1623,7 +1584,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </p>
 
         {/* ── Temporary overlay toggle for the REW-style Absorption Authority candidate ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+        {includeDiagnostics && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
           <input
             type="checkbox"
             id="overlay-production-toggle"
@@ -1634,13 +1595,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <label htmlFor="overlay-production-toggle" style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
             Overlay Production {overlayProduction && <span style={{ color: '#9CA3AF' }}>(grey = Production</span>}{overlayProduction && qStrategy === 'rew_absorption_authority' && <span style={{ color: '#16a34a' }}>, green = REW-style Absorption Authority)</span>}{overlayProduction && qStrategy !== 'rew_absorption_authority' && <span style={{ color: '#9CA3AF' }}>)</span>}
           </label>
-        </div>
+        </div>}
 
-        <ModalResonanceLineToggles
+        {includeDiagnostics && <ModalResonanceLineToggles
           toggles={modalLineToggles}
           onToggle={toggleModalLine}
           onSetAll={setAllModalLines}
-        />
+        />}
       </div>
 
       {/* ── Active Q Strategy Label (debug mode only) ── */}
@@ -1671,12 +1632,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
 
       {/* ── Null Depth Audit Badge ── */}
-      {multiSeries.length > 0 && multiSeries[0]?.data?.length > 0 && (
+      {includeDiagnostics && multiSeries.length > 0 && multiSeries[0]?.data?.length > 0 && (
         <NullDepthAuditBadge rawData={multiSeries[0].data} smoothingMode={bassSmoothingMode} />
       )}
 
       {/* ── Diagnostic panel wiring extracted to BassDiagnosticsPanel.jsx ── */}
-      <BassDiagnosticsPanel
+      {includeDiagnostics && <BassDiagnosticsPanel
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
@@ -1743,7 +1704,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         setNormalizeRewOverlay={setNormalizeRewOverlay}
         rewOverlaySeries={rewOverlaySeries}
         qStrategy={qStrategy}
-      />
+      />}
 
       {/* ── Deep null warning — always visible ── */}
       {multiSeries.length > 0 && (() => {

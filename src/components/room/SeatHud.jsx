@@ -5,6 +5,7 @@ import { getRP22Definition } from '@/components/data/rp22Definitions';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
+import BassResultsSummary from '@/components/room/bass/BassResultsSummary';
 
 export default function SeatHud({
   tooltipData,
@@ -223,6 +224,8 @@ export default function SeatHud({
           </button>
         )}
       </div>
+
+      <BassResultsSummary compact showPriority={false} seatId={tooltipData.seatId} />
 
       {/* RP23 – now directly under the header, slightly larger */}
       {tooltipData.rp23 && tooltipData.rp23.formatted !== '—' && (

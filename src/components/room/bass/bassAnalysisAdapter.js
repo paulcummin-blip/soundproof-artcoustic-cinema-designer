@@ -116,6 +116,12 @@ function buildCandidateRef(candidate) {
     achievedP20Level: typeof candidate.achievedP20Level === "number" ? candidate.achievedP20Level : parseLegacyLevel(candidate.achievedP20Level),
     achievedP20VariationDb: Number.isFinite(candidate.achievedP20VariationDb) ? candidate.achievedP20VariationDb : null,
     p20Available: !!candidate.p20Available,
+    perSeatDiagnostics: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
+      seatId: seat?.seatId ?? null,
+      maxAbsDeviationDb: Number.isFinite(seat?.maxAbsDeviationDb) ? seat.maxAbsDeviationDb : null,
+      rmsDeviationDb: Number.isFinite(seat?.rmsDeviationDb) ? seat.rmsDeviationDb : null,
+      worstFrequencyHz: Number.isFinite(seat?.worstFrequencyHz) ? seat.worstFrequencyHz : null,
+    })),
     meetsRequestedEnvelope: candidate.meetsRequestedEnvelope ?? null,
     filterCount: Array.isArray(candidate.generatedFilterBank) ? candidate.generatedFilterBank.filter((f) => f?.enabled).length : 0,
   };
