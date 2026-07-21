@@ -192,6 +192,9 @@ export function createBassAnalysisResult() {
       completedAtMs: null,
       elapsedMs: null,
       cacheStatus: "none",
+      cacheRejectionReason: null,
+      engineVersion: null,
+      resultSchemaVersion: null,
       progress: null, // number 0–1 or null — never an object
       phase: null, // genuine worker phase text only
       message: null,
@@ -244,6 +247,9 @@ export function createBassAnalysisResult() {
     provenance: {
       poolId: null,
       candidateSignature: null,
+      filterBankSignature: null,
+      postEqCurveSignature: null,
+      engineVersion: null,
       realSeatCount: 0,
       assessmentPosition: "rsp",
       createdAtMs: null,

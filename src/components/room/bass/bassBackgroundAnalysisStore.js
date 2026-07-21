@@ -2,8 +2,13 @@
 // The controller owns scheduling, race rejection and the bounded memory cache;
 // acoustic calculation and candidate selection remain in their existing modules.
 import { BASS_OPTIMISER_POOL_PROPERTY } from "./bassOptimiserWorkerProtocol";
+import {
+  BASS_RESULT_SCHEMA_VERSION,
+  HOUSE_CURVE_ENGINE_VERSION,
+  validateCachedBassResult,
+} from "./bassResultAuthority";
 
-export const BASS_BACKGROUND_SCHEMA_VERSION = 1;
+export const BASS_BACKGROUND_SCHEMA_VERSION = BASS_RESULT_SCHEMA_VERSION;
 export const BASS_BACKGROUND_DEBOUNCE_MS = 1000;
 export const BASS_BACKGROUND_CACHE_LIMIT = 3;
 
@@ -23,6 +28,7 @@ export function createBackgroundState() {
     completedAtMs: null,
     elapsedMs: null,
     cacheStatus: "none",
+    cacheRejectionReason: null,
     errorMessage: null,
     previousResultStale: false,
     progressStage: null,
@@ -38,12 +44,24 @@ export class BassAnalysisLruCache {
     this.schemaVersion = schemaVersion;
     this.entries = new Map();
   }
-  get(fingerprint) {
+  read(fingerprint, validator = validateCachedBassResult) {
     const entry = this.entries.get(fingerprint);
-    if (!entry || entry.schemaVersion !== this.schemaVersion) return null;
+    if (!entry) return { result: null, status: "miss", reason: null };
+    if (entry.schemaVersion !== this.schemaVersion) {
+      this.entries.delete(fingerprint);
+      return { result: null, status: "rejected-stale", reason: "cache-schema-version-mismatch" };
+    }
+    const validation = validator ? validator(entry.result) : { valid: true };
+    if (!validation.valid) {
+      this.entries.delete(fingerprint);
+      return { result: null, status: "rejected-stale", reason: validation.reason || "incompatible-result" };
+    }
     this.entries.delete(fingerprint);
     this.entries.set(fingerprint, entry);
-    return entry.result;
+    return { result: entry.result, status: "hit", reason: null };
+  }
+  get(fingerprint) {
+    return this.read(fingerprint, null).result;
   }
   set(fingerprint, result) {
     if (!fingerprint || !result) return;
@@ -92,7 +110,7 @@ export class BassBackgroundAnalysisController {
     this.terminateWorker();
   }
 
-  updateInputs({ valid, fingerprint, payload, collectDiagnostics = false }) {
+  updateInputs({ valid, fingerprint, legacyFingerprint = null, payload, collectDiagnostics = false }) {
     if (!valid || !fingerprint) {
       this.cancelActive();
       const staleResult = this.state.result || this.state.staleResult;
@@ -113,7 +131,15 @@ export class BassBackgroundAnalysisController {
 
     this.cancelActive();
     const staleResult = this.state.result || this.state.staleResult;
-    const cached = this.cache.get(fingerprint);
+    let cacheRead = this.cache.read(fingerprint);
+    if (!cacheRead.result && legacyFingerprint && legacyFingerprint !== fingerprint) {
+      const legacyRead = this.cache.read(legacyFingerprint);
+      if (legacyRead.result || legacyRead.status === "rejected-stale") {
+        this.cache.entries.delete(legacyFingerprint);
+        cacheRead = { result: null, status: "rejected-stale", reason: legacyRead.reason || "legacy-unversioned-cache-key" };
+      }
+    }
+    const cached = cacheRead.result;
     if (cached) {
       const completedAtMs = this.now();
       this.pending = null;
@@ -121,7 +147,7 @@ export class BassBackgroundAnalysisController {
         status: "ready", currentCalibrationFingerprint: fingerprint,
         currentJobFingerprint: fingerprint, resultFingerprint: fingerprint,
         queuedAtMs: completedAtMs, startedAtMs: completedAtMs, completedAtMs,
-        elapsedMs: 0, cacheStatus: "hit", errorMessage: null,
+        elapsedMs: 0, cacheStatus: "hit", cacheRejectionReason: null, errorMessage: null,
         previousResultStale: false, progress: null, progressStage: null,
         result: cached, staleResult: null,
       });
@@ -134,7 +160,7 @@ export class BassBackgroundAnalysisController {
       status: staleResult ? "stale" : "queued",
       currentCalibrationFingerprint: fingerprint, currentJobFingerprint: fingerprint,
       resultFingerprint: null, queuedAtMs, startedAtMs: null, completedAtMs: null,
-      elapsedMs: null, cacheStatus: "miss", errorMessage: null,
+      elapsedMs: null, cacheStatus: cacheRead.status, cacheRejectionReason: cacheRead.reason, errorMessage: null,
       previousResultStale: !!staleResult, progress: null, progressStage: null,
       result: null, staleResult,
     });
@@ -196,16 +222,23 @@ export class BassBackgroundAnalysisController {
     const result = {
       pool: message[BASS_OPTIMISER_POOL_PROPERTY],
       calibrationFingerprint: active.fingerprint,
+      engineVersion: HOUSE_CURVE_ENGINE_VERSION,
+      resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
       calculationTimeMs: completedAtMs - active.startedAtMs,
       completedAtMs,
     };
+    const validation = validateCachedBassResult(result);
+    if (!validation.valid) {
+      this.handleWorkerError(`Rejected incompatible optimiser result: ${validation.reason}`, active.requestId, active.fingerprint);
+      return true;
+    }
     this.cache.set(active.fingerprint, result);
     this.terminateWorker();
     this.pending = null;
     this.emit({
       status: "ready", result, staleResult: null,
       resultFingerprint: active.fingerprint, currentJobFingerprint: active.fingerprint,
-      completedAtMs, elapsedMs: result.calculationTimeMs, cacheStatus: "miss",
+      completedAtMs, elapsedMs: result.calculationTimeMs, cacheStatus: "fresh", cacheRejectionReason: this.state.cacheRejectionReason,
       errorMessage: null, previousResultStale: false, progressStage: "Complete",
     });
     return true;

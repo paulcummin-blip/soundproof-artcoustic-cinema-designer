@@ -10,6 +10,7 @@
 
 import React, { useMemo } from "react";
 import { signatureToString, buildCandidateSignature } from "@/components/room/bass/candidateConsistency";
+import { completedStatusesEquivalent } from "@/components/room/bass/bassResultAuthority";
 
 // Compare two values for parity. Returns true if they match.
 function valuesMatch(a, b) {
@@ -19,7 +20,7 @@ function valuesMatch(a, b) {
 }
 
 // Build a parity report comparing the contract against current production values.
-export function buildParityReport({ contract, optimisationResult, detailedStatus, rspRawCurve, perSeatRawCurves, canonicalPriorityMode }) {
+export function buildParityReport({ contract, optimisationResult, detailedStatus, rspRawCurve, perSeatRawCurves, canonicalPriorityMode, graphCandidateId }) {
   if (!contract) return { pass: false, rows: [], reason: "No contract" };
 
   const rows = [];
@@ -102,8 +103,8 @@ export function buildParityReport({ contract, optimisationResult, detailedStatus
   }
 
   // Candidate signature
-  let prodSig = null;
-  if (selectedCandidate && optimisationResult) {
+  let prodSig = optimisationResult?.productionCandidateId || selectedCandidate?.candidateId || null;
+  if (!prodSig && selectedCandidate && optimisationResult) {
     try {
       const sig = buildCandidateSignature({ result: optimisationResult, rspRawCurve });
       prodSig = sig ? signatureToString(sig) : null;
@@ -112,7 +113,23 @@ export function buildParityReport({ contract, optimisationResult, detailedStatus
     }
   }
   if (!valuesMatch(contract.selectedCandidateId, prodSig)) {
-    rows.push({ field: "Candidate signature", contract: contract.selectedCandidateId, production: prodSig });
+    rows.push({ field: "Candidate ID", contract: contract.selectedCandidateId, production: prodSig });
+    allPass = false;
+  }
+  if (!valuesMatch(graphCandidateId, prodSig)) {
+    rows.push({ field: "Graph candidate ID", contract: graphCandidateId, production: prodSig });
+    allPass = false;
+  }
+  if (!valuesMatch(contract.provenance.filterBankSignature, optimisationResult?.filterBankSignature || null)) {
+    rows.push({ field: "Filter-bank signature", contract: contract.provenance.filterBankSignature, production: optimisationResult?.filterBankSignature || null });
+    allPass = false;
+  }
+  if (!valuesMatch(contract.provenance.postEqCurveSignature, optimisationResult?.postEqCurveSignature || null)) {
+    rows.push({ field: "Post-EQ curve signature", contract: contract.provenance.postEqCurveSignature, production: optimisationResult?.postEqCurveSignature || null });
+    allPass = false;
+  }
+  if (!valuesMatch(contract.fingerprints.calibration, optimisationResult?.calibrationFingerprint || contract.fingerprints.calibration)) {
+    rows.push({ field: "Calibration fingerprint", contract: contract.fingerprints.calibration, production: optimisationResult?.calibrationFingerprint || null });
     allPass = false;
   }
 
@@ -132,7 +149,7 @@ export function buildParityReport({ contract, optimisationResult, detailedStatus
     : detailedStatus === "CANCELLED" ? "stale"
     : detailedStatus === "ERROR" ? "error"
     : selectedCandidate ? "complete" : "uncalculated";
-  if (!valuesMatch(contract.job.status, prodJobStatus)) {
+  if (!completedStatusesEquivalent(contract.job.status, prodJobStatus)) {
     rows.push({ field: "Job status", contract: contract.job.status, production: prodJobStatus });
     allPass = false;
   }
@@ -156,10 +173,10 @@ export function buildParityReport({ contract, optimisationResult, detailedStatus
   return { pass: allPass, rows };
 }
 
-export default function BassContractParityAudit({ contract, optimisationResult, detailedStatus, rspRawCurve, perSeatRawCurves, canonicalPriorityMode }) {
+export default function BassContractParityAudit({ contract, optimisationResult, detailedStatus, rspRawCurve, perSeatRawCurves, canonicalPriorityMode, graphCandidateId }) {
   const report = useMemo(
-    () => buildParityReport({ contract, optimisationResult, detailedStatus, rspRawCurve, perSeatRawCurves, canonicalPriorityMode }),
-    [contract, optimisationResult, detailedStatus, rspRawCurve, perSeatRawCurves, canonicalPriorityMode]
+    () => buildParityReport({ contract, optimisationResult, detailedStatus, rspRawCurve, perSeatRawCurves, canonicalPriorityMode, graphCandidateId }),
+    [contract, optimisationResult, detailedStatus, rspRawCurve, perSeatRawCurves, canonicalPriorityMode, graphCandidateId]
   );
 
   if (!contract) return null;

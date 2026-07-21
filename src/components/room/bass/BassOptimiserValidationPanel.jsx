@@ -44,11 +44,11 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       const profileId = result.selectedFitProfile || result.selectedCandidate?.designEqFitProfile || "standard";
       const cfg = result.selectedFitProfileConfig || result.selectedCandidate?.designEqFitProfileConfig || null;
       const preserveP14 = cfg?.preserveP14 ?? (profileId !== "accuracy");
-      const fittingTol = cfg?.fittingToleranceDb ?? (profileId === "accuracy" ? 1 : 2);
-      const maxCut = cfg?.maximumCutDb ?? (profileId === "accuracy" ? 15 : 10);
+      const fittingTol = cfg?.fittingToleranceDb ?? (["accuracy", "house_curve"].includes(profileId) ? 1 : 2);
+      const maxCut = cfg?.maximumCutDb ?? (["accuracy", "house_curve"].includes(profileId) ? 15 : 10);
       const maxBoost = cfg?.maximumAggregateBoostDb ?? 6;
       const reqP19Tol = result.requestedP19ToleranceDb ?? result.selectedCandidate?.requestedP19ToleranceDb ?? null;
-      const profileLabel = profileId === "accuracy" ? "Accuracy" : "Standard";
+      const profileLabel = profileId === "house_curve" ? "House curve" : profileId === "accuracy" ? "Accuracy" : "Standard";
       return <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
         <span>Selected fit profile: <strong className="text-slate-900">{profileLabel}</strong></span>
         <span>P14 preservation: <strong className={preserveP14 ? "text-emerald-700" : "text-amber-700"}>{preserveP14 ? "Yes" : "No"}</strong></span>
@@ -150,7 +150,8 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
         <thead className="border-b border-slate-300 text-slate-500"><tr>{["Requested P14", "Requested P18", "Requested P19", "Profile", "Achieved P14", "Achieved P18", "Achieved P19", "Valid band", "Valid", "Selected"].map((label) => <th className="px-2 py-1" key={label}>{label}</th>)}</tr></thead>
         <tbody>{(Array.isArray(result.displayCandidates) ? result.displayCandidates : []).map((candidate) => {
           const selected = candidate === result.selectedCandidate;
-          const profileLabel = (candidate.designEqFitProfile || "standard") === "accuracy" ? "Acc" : "Std";
+          const profileId = candidate.designEqFitProfile || "standard";
+          const profileLabel = profileId === "house_curve" ? "HC" : profileId === "accuracy" ? "Acc" : "Std";
           return <tr className="border-b border-slate-200" key={`${candidate.requestedP14Level}-${candidate.requestedP18Level}-${candidate.requestedP19Level}-${candidate.designEqFitProfile || "standard"}`}><td className="px-2 py-1 font-semibold">{candidate.requestedP14Level}</td><td className="px-2 py-1">{candidate.requestedP18Level}</td><td className="px-2 py-1">{candidate.requestedP19Level}</td><td className="px-2 py-1"><strong className={profileLabel === "Acc" ? "text-indigo-700" : "text-slate-600"}>{profileLabel}</strong></td><td className="px-2 py-1">{level(candidate.achievedP14Level)} · {fmt(candidate.achievedP14Db, " dB")}</td><td className="px-2 py-1">{level(candidate.achievedP18Level)} · {fmt(candidate.achievedP18FrequencyHz, " Hz")}</td><td className="px-2 py-1">{level(candidate.achievedP19Level)} · ±{fmt(candidate.achievedP19VariationDb, " dB")}</td><td className="px-2 py-1">{fmt(candidate.assessmentStartHz, " Hz")}–{fmt(candidate.assessmentEndHz, " Hz")}</td><td className="px-2 py-1">{candidate.meetsRequestedEnvelope ? "Yes" : "No"}</td><td className="px-2 py-1">{selected ? "Yes" : "—"}</td></tr>;
         })}</tbody>
       </table>

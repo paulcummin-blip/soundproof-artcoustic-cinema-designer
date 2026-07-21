@@ -8,11 +8,11 @@ function closestCorrection(curve, frequency) {
   return curve.reduce((best, point) => Math.abs(point.frequency - frequency) < Math.abs(best.frequency - frequency) ? point : best, curve[0])?.spl;
 }
 
-export default function DesignEqFilterBankDiagnostic({ filters = [], combinedEqCurve = [] }) {
+export default function DesignEqFilterBankDiagnostic({ filters = [], combinedEqCurve = [], profile = "standard", profileConfig = null }) {
   return (
     <details className="mt-3 rounded border border-slate-300 bg-slate-50 p-3 text-xs">
       <summary className="cursor-pointer font-semibold text-slate-800">Temporary 10-band Design EQ filter bank</summary>
-      <div className="mt-1 font-mono text-[10px] text-slate-600">House-curve constraint: cut up to −15 dB / boost up to +6 dB, capability-limited</div>
+      <div className="mt-1 font-mono text-[10px] text-slate-600">{profile === "house_curve" ? "House-curve constraint: cut up to −15 dB / boost up to +6 dB, capability-limited" : `Profile constraint: cut up to −${profileConfig?.maximumCutDb ?? 10} dB / boost up to +${profileConfig?.maximumAggregateBoostDb ?? 6} dB, capability-limited`}</div>
       <div className="mt-2 overflow-x-auto">
         <table className="min-w-[820px] text-right font-mono text-[10px] text-slate-700">
           <thead className="border-b border-slate-300 text-slate-500">

@@ -107,8 +107,11 @@ function buildCandidateRef(candidate) {
     ? (typeof candidate.achievedP20Level === "number" ? candidate.achievedP20Level : parseLegacyLevel(candidate.achievedP20Level))
     : numericRp22Level(levelP20_lfConsistency(p20Value));
   return {
-    id: null,
+    id: candidate.candidateId || null,
     designEqFitProfile: candidate.designEqFitProfile || "standard",
+    startStrategy: candidate.startStrategy || null,
+    selectedStart: candidate.selectedStart || null,
+    filterBankSignature: candidate.filterBankSignature || null,
     requestedP14Level: candidate.requestedP14Level ?? null,
     requestedP18Level: candidate.requestedP18Level ?? null,
     requestedP19Level: candidate.requestedP19Level ?? null,
@@ -267,6 +270,9 @@ export function adaptCurrentBassOptimisationResult({
     contract.job.completedAtMs = Number.isFinite(backgroundLifecycle.completedAtMs) ? backgroundLifecycle.completedAtMs : null;
     contract.job.elapsedMs = Number.isFinite(backgroundLifecycle.elapsedMs) ? backgroundLifecycle.elapsedMs : contract.job.elapsedMs;
     contract.job.cacheStatus = backgroundLifecycle.cacheStatus || "none";
+    contract.job.cacheRejectionReason = backgroundLifecycle.cacheRejectionReason || null;
+    contract.job.engineVersion = optimisationResult?.engineVersion || null;
+    contract.job.resultSchemaVersion = optimisationResult?.resultSchemaVersion || null;
     contract.job.errorMessage = backgroundLifecycle.errorMessage || null;
     contract.job.previousResultStale = !!backgroundLifecycle.previousResultStale;
     contract.job.phase = backgroundLifecycle.progressStage || contract.job.phase;
@@ -281,17 +287,23 @@ export function adaptCurrentBassOptimisationResult({
 
   // --- Selected candidate ID (matches live-candidate consistency signature) ---
   if (selectedCandidate && optimisationResult) {
-    try {
-      const sig = buildCandidateSignature({ result: optimisationResult, rspRawCurve });
-      contract.selectedCandidateId = sig ? signatureToString(sig) : null;
-    } catch (e) {
-      contract.selectedCandidateId = null;
+    contract.selectedCandidateId = optimisationResult.selectedCandidateId || selectedCandidate.candidateId || null;
+    if (!contract.selectedCandidateId) {
+      try {
+        const sig = buildCandidateSignature({ result: optimisationResult, rspRawCurve });
+        contract.selectedCandidateId = sig ? signatureToString(sig) : null;
+      } catch (e) {
+        contract.selectedCandidateId = null;
+      }
     }
   }
 
   // --- Provenance ---
   contract.provenance.poolId = poolId;
   contract.provenance.candidateSignature = buildProvenanceSignature(selectedCandidate, poolId);
+  contract.provenance.filterBankSignature = optimisationResult?.filterBankSignature || selectedCandidate?.filterBankSignature || null;
+  contract.provenance.postEqCurveSignature = optimisationResult?.postEqCurveSignature || null;
+  contract.provenance.engineVersion = optimisationResult?.engineVersion || null;
   contract.provenance.realSeatCount = realSeatCount;
   contract.provenance.createdAtMs = null;
 
@@ -306,8 +318,8 @@ export function adaptCurrentBassOptimisationResult({
   // --- Mode candidates ---
   const selectedByMode = optimisationResult?.selectedByMode || {};
   contract.modeCandidates[BASS_MODE_BALANCED] = buildCandidateRef(selectedByMode.balanced || null);
-  contract.modeCandidates[BASS_MODE_HOUSE_CURVE_ACCURACY] = buildCandidateRef(selectedByMode.accuracy || null);
-  contract.modeCandidates[BASS_MODE_DEPTH] = buildCandidateRef(selectedByMode.extension || null);
+  contract.modeCandidates[BASS_MODE_HOUSE_CURVE_ACCURACY] = buildCandidateRef(selectedByMode.house_curve_accuracy || null);
+  contract.modeCandidates[BASS_MODE_DEPTH] = buildCandidateRef(selectedByMode.depth || null);
   contract.modeCandidates[BASS_MODE_SPL] = buildCandidateRef(selectedByMode.spl || null);
 
   // --- Product analysis status ---

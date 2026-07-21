@@ -3,6 +3,7 @@ import { createBassResultsScope } from "./bassResultsStore.js";
 import { BassBackgroundAnalysisController } from "./bassBackgroundAnalysisStore.js";
 import { formatBassResults } from "./bassResultsPresentation.js";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
+import { stampPoolAuthority } from "./bassResultAuthority.js";
 
 const FP_A = "cal:v1:aaaaaaaaaaaaaaaa";
 const FP_B = "cal:v1:bbbbbbbbbbbbbbbb";
@@ -34,7 +35,8 @@ export function runBassResultsOwnershipFixtures() {
   now = 6000;
   const requestId = controller.activeRequest.requestId;
   controller.handleWorkerMessage({ type: "progress", requestId, fingerprint: FP_A, progress: { phase: "Fitting" } });
-  controller.handleWorkerMessage({ type: "complete", requestId, fingerprint: FP_A, pool: { candidates: [], selectablePool: [] } });
+  const completedPool = stampPoolAuthority({ candidates: [{ designEqFitProfile: "house_curve", startStrategy: "multi-start", designEqFitProfileConfig: { maximumCutDb: 15, maximumAggregateBoostDb: 6 }, generatedFilterBank: [], finalPostEqCurve: [{ frequency: 20, spl: 100 }] }], selectablePool: [] });
+  controller.handleWorkerMessage({ type: "complete", requestId, fingerprint: FP_A, pool: completedPool });
   check("2. Collapsed calculation timer and completion continue", runningBeforeCollapse && controller.getSnapshot().elapsedMs === 5000 && controller.getSnapshot().status === "ready");
   check("3. BassResponse absence retains ready room result", scope.getSnapshot().contract === contractA);
 

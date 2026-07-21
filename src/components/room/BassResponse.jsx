@@ -1,5 +1,3 @@
-// BassResponse.jsx - Simplified bass simulation UI
-
 import React, { useMemo, useEffect, useState, useRef } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +18,7 @@ import BassResultsSummary from "@/components/room/bass/BassResultsSummary";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import DesignEqLimitStatus from "@/components/room/bass/DesignEqLimitStatus";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 import { useNormalizedRoomTransferLive } from "@/components/room/bass/useNormalizedRoomTransferLive";
 import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalizedPhysicsOptions";
@@ -29,12 +28,7 @@ import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layou
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveBestSubLayoutContextId } from "@/components/room/bass/best-layout/bestSubLayoutContext";
 
-// Development flag — set to false to hide all diagnostic UI panels in production.
-// Flip to true to re-enable. Do not delete diagnostic code.
 const IS_DEVELOPMENT_MODE = false;
-
-// REW_PARITY_PRESET and REW_SOURCE_CURVES are imported from @/components/room/bass/rewSourceCurves
-// (extracted in Phase 2A so the normalized room-transfer engine can reuse the exact production flat-source definition).
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings }) {
   const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = useAppState();
@@ -198,8 +192,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     enableRewCoreReflections === REW_PARITY_PRESET.enableRewCoreReflections &&
     rewParityFieldMode === REW_PARITY_PRESET.rewParityFieldMode;
 
-  // Temporary overlay: re-runs the identical authoritative engine with qStrategy forced to 'production',
-  // for the "Overlay Production" comparison toggle only. No second engine, no duplicated logic.
   const overlayProductionResults = useMemo(
     () => (overlayProduction ? runSimulation('production') : null),
     [runSimulation, overlayProduction]
@@ -300,11 +292,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const setOptimiserPriorityMode = sharedBassResults.onPriorityChange;
   const calculateDetailed = sharedBassResults.onRetry;
 
-  // --- Phase 2B: Normalized room-transfer live wiring ---
-  // Product-independent physics options for the normalized engine. Built by
-  // the shared builder (normalizedPhysicsOptionsBuilder.js) which mirrors the
-  // production flat-source path. Excludes model key, product curve, requested
-  // SPL, EQ, priority, smoothing.
+  // Product-independent normalized physics options.
   const normalizedPhysicsOptions = useNormalizedPhysicsOptions({
     surfaceAbsorption, qStrategy, enableRewCoreReflections, roomDamping, axialQ,
     modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode,
@@ -343,6 +331,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
     detailedStatus, optimisationResult, error: detailedError,
   });
+  const graphCandidateId = multiSeriesForGraph.find((series) => series.kind === "post-eq")?.candidateId || null;
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -561,11 +550,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 <option value="auto">Auto</option>
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Design EQ for P14:</span>
-              <Switch checked={!!designEqEnabled} onCheckedChange={setDesignEqEnabled} />
-              <span style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace' }}>{designEqEnabled ? 'On' : 'Off'} (cut -10dB / boost up to +6dB, capability-limited)</span>
-            </div>
+            <DesignEqLimitStatus enabled={designEqEnabled} onChange={setDesignEqEnabled} priorityMode={optimiserPriorityMode} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show house curve:</span>
               <Switch checked={showHouseCurve} onCheckedChange={setHouseCurveOverride} />
@@ -755,6 +740,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           multiSeries={multiSeries}
           runtimeCapture={simulationResults.runtimeVectorCapture}
           smoothingMode={bassSmoothingMode}
+          lifecycle={detailedLifecycle}
+          graphCandidateId={graphCandidateId}
         />
 
         {/* Allen & Berkley model attribution — presentation only, no simulation/scaling logic */}

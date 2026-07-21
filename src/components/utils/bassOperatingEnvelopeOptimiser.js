@@ -7,6 +7,9 @@ import { calculateHouseCurveEqCurve } from "@/components/utils/houseCurveFitter"
 import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCurveFitterCore";
 import { retargetCandidateForRequest } from "@/components/utils/bassCandidateRequestRetargeting";
 import { summarizeCoreOperations } from "@/components/utils/bassOptimiserPerformance";
+import { annotateCandidatePoolForHouseCurveRanking } from "@/components/utils/houseCurveCandidateRankingMetrics";
+import { stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
+import { displayBassCandidates, isPhysicallyCredibleBassCandidate } from "@/components/utils/bassCandidatePoolEligibility";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -79,6 +82,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
   const rspResiduals = assessedCurve.map((point) => point.spl - (request.p14.p14TargetDb + artcousticHouseCurveOffsetAt(point.frequency)));
   const rspRmsResidualDb = rspResiduals.length ? Math.sqrt(rspResiduals.reduce((sum, value) => sum + value ** 2, 0) / rspResiduals.length) : null;
   const rspMeanSignedResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + value, 0) / rspResiduals.length : null;
+  const rspMeanAbsoluteResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + Math.abs(value), 0) / rspResiduals.length : null;
   const rspShapeRmsResidualDb = rspResiduals.length ? Math.sqrt(rspResiduals.reduce((sum, value) => sum + (value - rspMeanSignedResidualDb) ** 2, 0) / rspResiduals.length) : null;
   const p19 = computeP19DeviationBelowSchroeder({
     freqsHz: assessedCurve.map((point) => point.frequency),
@@ -218,7 +222,10 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     rspObjectiveMaxDeviationDb: eq.rspObjectiveMaxDeviationDb ?? achievedP19VariationDb,
     rspRmsResidualDb: eq.rspRmsDeviationDb ?? rspRmsResidualDb,
     rspMeanSignedResidualDb: eq.rspMeanSignedResidualDb ?? rspMeanSignedResidualDb,
+    rspMeanAbsoluteResidualDb,
     rspShapeRmsResidualDb: eq.rspShapeRmsDeviationDb ?? rspShapeRmsResidualDb,
+    startStrategy: eq.designEqFitProfile === "house_curve" ? "multi-start" : "single",
+    selectedStart: eq.selectedStart ?? null,
     generatedFilterBank: eq.filters,
     finalPostEqCurve,
     combinedEqCurve,
@@ -272,26 +279,6 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     // Normalised aggregate bank limits — retained for diagnostics compatibility.
     aggregateBankLimits,
   };
-}
-
-function displayCandidates(candidates, selected) {
-  const baseline = candidates[0];
-  const valid = candidates.filter((candidate) => candidate.meetsRequestedEnvelope);
-  const rejected = candidates.filter((candidate) => !candidate.meetsRequestedEnvelope && candidate.rejectionReason);
-  return [...new Set([baseline, ...valid, ...rejected.slice(0, 3), selected].filter(Boolean))];
-}
-
-// A selectable candidate must have a finite post-EQ response, a valid filter bank,
-// and finite P14/P18/P19 results. Bank limits and broad-worsening guards are
-// already enforced by the Design EQ fitter.
-function isPhysicallyCredible(candidate) {
-  if (!candidate) return false;
-  if (!Array.isArray(candidate.finalPostEqCurve) || candidate.finalPostEqCurve.length === 0) return false;
-  if (!Array.isArray(candidate.generatedFilterBank)) return false;
-  if (!Number.isFinite(candidate.achievedP14Db)) return false;
-  if (!Number.isFinite(candidate.achievedP18FrequencyHz)) return false;
-  if (!Number.isFinite(candidate.achievedP19VariationDb)) return false;
-  return true;
 }
 
 // Part E: The two profile families generated for every RP22 request. Standard
@@ -450,13 +437,14 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     appendCandidate(houseCurveCacheKey, request, houseCurveEq);
   }
   report("Candidate-bank validation", totalTasks);
-  const selectablePool = candidates.filter(isPhysicallyCredible);
-  const requestedEnvelopeValidCount = candidates.filter((c) => c.meetsRequestedEnvelope).length;
+  const rankedCandidates = annotateCandidatePoolForHouseCurveRanking(candidates);
+  const rankedSelectablePool = rankedCandidates.filter(isPhysicallyCredibleBassCandidate);
+  const requestedEnvelopeValidCount = rankedCandidates.filter((c) => c.meetsRequestedEnvelope).length;
   const t1 = perf();
   const poolId = `${rawCurve.length}:${activeSubs.length}:${usableLfHz}:${transitionHz}:${perSeatRawCurves.length}:${t0}`;
-  return {
-    candidates,
-    selectablePool,
+  return stampPoolAuthority({
+    candidates: rankedCandidates,
+    selectablePool: rankedSelectablePool,
     definitions,
     performanceSummary: {
       totalOptimiserTimeMs: t1 - t0,
@@ -473,21 +461,21 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       contractAdaptationTimeMs: 0,
       completedBankEvaluationCount: totalCompletedBankEvaluations,
       seatCount: preparedSeatCurves.length,
-      candidateBankCount: candidates.length,
+      candidateBankCount: rankedCandidates.length,
       candidateEvaluationCount,
       reusedCandidateEvaluationCount,
       curveFilterEvaluationCount,
       ...summarizeCoreOperations(coreFitCache.values()),
     },
     poolId,
-    generatedCandidateCount: candidates.length,
-    physicallyCredibleCount: selectablePool.length,
+    generatedCandidateCount: rankedCandidates.length,
+    physicallyCredibleCount: rankedSelectablePool.length,
     requestedEnvelopeValidCount,
     standardFitCount,
     accuracyFitCount,
     houseCurveFitCount,
     warningMessage: null,
-  };
+  });
 }
 
 // Lightweight priority selection — reuses the stored candidate pool.
@@ -558,6 +546,10 @@ export function selectCandidateFromPool(pool, priorityMode) {
     selectedMode: mode,
     selectedP14TargetDb: selected.requestedTargetSpl,
     selectedCandidate: selected,
+    selectedCandidateId: selected.candidateId,
+    productionCandidateId: selected.candidateId,
+    filterBankSignature: selected.filterBankSignature,
+    postEqCurveSignature: selected.postEqCurveSignature,
     selectedFilters: selected.generatedFilterBank,
     finalPostEqCurve: selected.finalPostEqCurve,
     achievedP14Level: levelText(selected.achievedP14Level),
@@ -571,7 +563,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
     selectedFitProfileConfig: selected.designEqFitProfileConfig || null,
     requestedP19ToleranceDb: selected.requestedP19ToleranceDb ?? null,
     candidates: pool.candidates,
-    displayCandidates: displayCandidates(pool.candidates, selected),
+    displayCandidates: displayBassCandidates(pool.candidates, selected),
     rejectedCandidates: pool.candidates.filter((c) => !c.meetsRequestedEnvelope),
     selectedByMode,
     isBestCalibratedAttempt,

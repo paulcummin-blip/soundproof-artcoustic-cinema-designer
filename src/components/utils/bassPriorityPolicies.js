@@ -61,11 +61,9 @@ export function rankingTupleForMode(candidate, mode) {
   const [p14, p18, p19] = levels(candidate);
   const balance = balancedTuple(candidate);
   if (canonicalMode === BASS_PRIORITY_MODES.HOUSE_CURVE_ACCURACY) return [
-    lowerScore(candidate?.rspObjectiveMaxDeviationDb ?? candidate?.achievedP19VariationDb),
-    lowerScore(candidate?.rspRmsResidualDb ?? candidate?.achievedP19VariationDb),
-    lowerScore(candidate?.rspShapeRmsResidualDb ?? candidate?.rspRmsResidualDb),
-    lowerScore(worstSeatDeviation(candidate)), lowerScore(meanSeatDeviation(candidate)),
-    lowerScore(rmsTargetError(candidate)), ...balance, lowerScore(eqCost(candidate)),
+    lowerScore(candidate?.houseCurveRankingMaxResidualDb ?? candidate?.rspObjectiveMaxDeviationDb),
+    lowerScore(candidate?.houseCurveRankingRmsResidualDb ?? candidate?.rspRmsResidualDb),
+    lowerScore(candidate?.houseCurveRankingMeanAbsoluteResidualDb ?? candidate?.rspMeanAbsoluteResidualDb),
   ];
   if (canonicalMode === BASS_PRIORITY_MODES.DEPTH) return [
     p18, lowerScore(candidate?.achievedP18FrequencyHz), Math.min(p14, p19),
@@ -93,22 +91,50 @@ export function rankBassCandidates(pool, mode) {
   const canonicalMode = normalizeBassPriorityMode(mode);
   const bankValid = Array.isArray(pool) ? pool.filter(isBankAndBandValid) : [];
   const fullyValid = bankValid.filter(isAllL1);
-  const eligible = fullyValid.length ? fullyValid : bankValid;
-  const eligibilityGroup = fullyValid.length ? "bank_valid_all_p14_p18_p19_l1" :
+  const houseCurveMode = canonicalMode === BASS_PRIORITY_MODES.HOUSE_CURVE_ACCURACY;
+  const hasHouseCurveCandidate = bankValid.some((candidate) => candidate?.designEqFitProfile === "house_curve");
+  const eligible = houseCurveMode
+    ? (hasHouseCurveCandidate ? bankValid : [])
+    : (fullyValid.length ? fullyValid : bankValid);
+  const eligibilityGroup = houseCurveMode && bankValid.length ? "bank_valid_raw_house_curve_objective" :
+    fullyValid.length ? "bank_valid_all_p14_p18_p19_l1" :
     bankValid.length ? "bank_valid_best_calibrated_attempt_below_l1" : "no_bank_and_band_valid_candidates";
   const selected = eligible.length ? [...eligible].sort((a, b) => compareRanked(a, b, canonicalMode))[0] : null;
   const signature = selected ? stableCandidateSignature(selected) : null;
   const rankingTuple = selected ? rankingTupleForMode(selected, canonicalMode) : [];
+  const houseCurveCandidate = houseCurveMode
+    ? [...eligible].filter((candidate) => candidate?.designEqFitProfile === "house_curve").sort((a, b) => compareRanked(a, b, canonicalMode))[0] || null
+    : null;
+  const comparison = houseCurveMode && selected ? {
+    houseCurve: houseCurveCandidate ? {
+      candidateId: houseCurveCandidate.candidateId || null,
+      max: houseCurveCandidate.houseCurveRankingMaxResidualDb ?? null,
+      rms: houseCurveCandidate.houseCurveRankingRmsResidualDb ?? null,
+    } : null,
+    winner: {
+      candidateId: selected.candidateId || null,
+      profile: selected.designEqFitProfile || "standard",
+      max: selected.houseCurveRankingMaxResidualDb ?? null,
+      rms: selected.houseCurveRankingRmsResidualDb ?? null,
+    },
+  } : null;
   const selectionReason = selected
-    ? fullyValid.length
-      ? `${canonicalMode}: selected from ${fullyValid.length} bank-valid candidates achieving P14, P18 and P19 at L1 or above.`
-      : `${canonicalMode}: no candidate achieved L1 across P14, P18 and P19; selected the best calibrated invalid/FAIL attempt without changing achieved levels.`
+    ? houseCurveMode
+      ? houseCurveCandidate
+        ? selected === houseCurveCandidate
+          ? `${canonicalMode}: generated house_curve candidate won the raw RSP maximum, RMS and mean-absolute residual ranking outside protected nulls.`
+          : `${canonicalMode}: ${selected.designEqFitProfile || "standard"} beat house_curve on measured raw residual metrics (${selected.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${selected.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB vs ${houseCurveCandidate.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${houseCurveCandidate.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB).`
+        : `${canonicalMode}: ERROR — no compatible generated house_curve candidate was available; no legacy accuracy fallback was accepted.`
+      : fullyValid.length
+        ? `${canonicalMode}: selected from ${fullyValid.length} bank-valid candidates achieving P14, P18 and P19 at L1 or above.`
+        : `${canonicalMode}: no candidate achieved L1 across P14, P18 and P19; selected the best calibrated invalid/FAIL attempt without changing achieved levels.`
     : `${canonicalMode}: no bank-valid candidate with a valid assessment band was available.`;
   return {
     selected,
     diagnostics: {
       mode: canonicalMode, eligibilityGroup, rankingTuple,
       selectedCandidateSignature: signature, selectionReason,
+      houseCurveCandidateComparison: comparison,
       heavyPoolReused: true, workerStarted: false,
     },
   };

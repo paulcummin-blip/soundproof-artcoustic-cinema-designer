@@ -36,7 +36,7 @@ export function buildCandidateSignature({ result, rspRawCurve }) {
   const requestedCombo = `P14-${c.requestedP14Level ?? "—"}/P18-${c.requestedP18Level ?? "—"}/P19-${c.requestedP19Level ?? "—"}`;
   const assessmentBand = `${c.assessmentStartHz ?? "—"}–${c.assessmentEndHz ?? "—"}Hz`;
   const fitProfile = c.designEqFitProfile || "standard";
-  const selectedStart = c.houseCurveBaselineWorstSeatDeviation != null ? "multi-start" : "single";
+  const selectedStart = c.startStrategy || (fitProfile === "house_curve" ? "multi-start" : "single");
   return {
     poolId,
     requestedCombo,
@@ -139,13 +139,13 @@ export function buildVisibleConditionReport({ result, rspRawCurve }) {
   });
 
   // 3. Selected objective
-  const objective = c.designEqFitProfile === "house_curve" ? "worst real seat" : "RSP P19";
+  const objective = c.designEqFitProfile === "house_curve" ? "RSP maximum residual, then RSP RMS; real seats constrained" : "RSP P19";
   rows.push({
     test: "Selected objective",
     expected: "Matches displayed graph and P19 reporting",
     actual: objective,
-    delta: objective === "worst real seat" ? "0" : "Objective is RSP-based but worst-seat is L4",
-    severity: objective === "worst real seat" ? "info" : "medium",
+    delta: objective.startsWith("RSP maximum") ? "0" : "Legacy objective",
+    severity: objective.startsWith("RSP maximum") ? "info" : "medium",
     nextTest: "Confirm the optimiser was run with house-curve priority (accuracy mode)",
   });
 

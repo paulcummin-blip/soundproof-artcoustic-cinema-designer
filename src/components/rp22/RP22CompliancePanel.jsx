@@ -968,7 +968,7 @@ export default function RP22CompliancePanel({
           const targetBasisNote =
             p.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
             p.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
-            p14Result ? `Design EQ: ${p14Result.designEqEnabled ? "On" : "Off"} (cut -10 dB / boost +6 dB) — ${p14Result.note || "Post-EQ design estimate at RSP using selected subwoofer product data."}` :
+            p14Result ? `Design EQ: ${p14Result.designEqEnabled ? "On" : "Off"} (${p14Result.designEqFitProfile === "house_curve" ? "cut up to −15 dB / boost up to +6 dB, capability-limited" : "profile-specific limits, capability-limited"}) — ${p14Result.note || "Post-EQ design estimate at RSP using selected subwoofer product data."}` :
             null;
           const debugMetric = String(reportSource).startsWith("seat:")
             ? (() => {

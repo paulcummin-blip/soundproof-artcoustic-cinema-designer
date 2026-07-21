@@ -40,7 +40,7 @@ export function runBassPriorityPolicyFixtures() {
   results.p4BalancedL2Tuple = rankBassCandidates([candidate("421", 4, 2, 1), candidate("222", 2, 2, 2)], "balanced").selected?.id === "222";
   results.p5BalancedSpreadTieBreak = rankBassCandidates([candidate("spread", 4, 2, 2), candidate("compact", 3, 3, 2)], "balanced").selected?.id === "compact";
 
-  const inaccurate = { ...candidate("inaccurate", 4, 4, 4, { worst: 2, mean: 1.5, rms: 1 }), rspObjectiveMaxDeviationDb: 5, rspRmsResidualDb: 3 };
+  const inaccurate = { ...candidate("inaccurate", 4, 4, 4, { worst: 2, mean: 1.5, rms: 1 }), designEqFitProfile: "house_curve", startStrategy: "multi-start", rspObjectiveMaxDeviationDb: 5, rspRmsResidualDb: 3 };
   const accurate = { ...candidate("accurate", 1, 1, 1, { worst: 5, mean: 4, rms: 3 }), rspObjectiveMaxDeviationDb: 2, rspRmsResidualDb: 1 };
   results.p6AccuracyUsesAuthoritativeDeviation = rankBassCandidates([inaccurate, accurate], "house_curve_accuracy").selected === accurate;
 
@@ -69,8 +69,10 @@ export function runBassPriorityPolicyFixtures() {
   const selected = selectCandidateFromPool(poolOf([preserved]), "spl");
   results.p13SelectedValuesRemainExact = selected.selectedFilters === filters && selected.selectedCandidate === preserved && selected.achievedP14Db === 109.25 && selected.achievedP18FrequencyHz === 27 && selected.achievedP19VariationDb === 4.75 && stableCandidateSignature(selected.selectedCandidate) === "preserved";
 
-  const legacyAccuracy = selectCandidateFromPool(pool, "accuracy");
-  const legacyExtension = selectCandidateFromPool(pool, "extension");
+  const houseCandidate = { ...candidate("house", 1, 1, 1), designEqFitProfile: "house_curve", startStrategy: "multi-start" };
+  const legacyPool = poolOf([...pool.candidates, houseCandidate]);
+  const legacyAccuracy = selectCandidateFromPool(legacyPool, "accuracy");
+  const legacyExtension = selectCandidateFromPool(legacyPool, "extension");
   results.p14LegacyPriorityValuesRerank = legacyAccuracy.selectedMode === "house_curve_accuracy" && legacyExtension.selectedMode === "depth";
   results.p15LegacySelectedByModeAliases = legacyAccuracy.selectedByMode.accuracy === legacyAccuracy.selectedByMode.house_curve_accuracy && legacyAccuracy.selectedByMode.extension === legacyAccuracy.selectedByMode.depth;
   results.p16InvalidBankRejected = rankBassCandidates([candidate("invalid-bank", 4, 4, 4, { bankValid: false })], "balanced").selected === null;

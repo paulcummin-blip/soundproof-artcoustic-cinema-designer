@@ -5,6 +5,12 @@ import { useAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
 import { createBassBackgroundAnalysisStore } from "./bassBackgroundAnalysisStore";
 import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
+import {
+  BASS_RESULT_SCHEMA_VERSION,
+  HOUSE_CURVE_ENGINE_VERSION,
+  buildBassResultCacheKey,
+} from "./bassResultAuthority";
+import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
@@ -27,20 +33,41 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     fingerprints, payload, inputsValid, includeDiagnostics,
   } = authoritative;
 
-  useEffect(() => { controller.updateInputs({ valid: inputsValid, fingerprint: fingerprints.calibration, payload, collectDiagnostics: includeDiagnostics }); }, [controller, inputsValid, fingerprints.calibration, payload, includeDiagnostics]);
+  const cacheKey = useMemo(() => buildBassResultCacheKey(fingerprints.calibration), [fingerprints.calibration]);
+  useEffect(() => {
+    controller.updateInputs({
+      valid: inputsValid,
+      fingerprint: cacheKey,
+      legacyFingerprint: fingerprints.calibration,
+      payload,
+      collectDiagnostics: includeDiagnostics,
+    });
+  }, [controller, inputsValid, cacheKey, fingerprints.calibration, payload, includeDiagnostics]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
-  const matchingResult = lifecycle.status === "ready" && lifecycle.resultFingerprint === fingerprints.calibration ? lifecycle.result : null;
-  const optimisationResult = useMemo(() => matchingResult?.pool ? selectCandidateFromPool(matchingResult.pool, selectedPriorityMode) : null, [matchingResult, selectedPriorityMode]);
+  const matchingResult = lifecycle.status === "ready" && lifecycle.resultFingerprint === cacheKey ? lifecycle.result : null;
+  const optimisationResult = useMemo(() => {
+    if (!matchingResult?.pool) return null;
+    const selected = selectCandidateFromPool(matchingResult.pool, selectedPriorityMode);
+    return {
+      ...selected,
+      engineVersion: HOUSE_CURVE_ENGINE_VERSION,
+      resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
+      cacheKey,
+      cacheSource: lifecycle.cacheRejectionReason ? "rejected-stale" : lifecycle.cacheStatus === "hit" ? "restored" : "fresh",
+      cacheRejectionReason: lifecycle.cacheRejectionReason || null,
+      calibrationFingerprint: fingerprints.calibration,
+    };
+  }, [matchingResult, selectedPriorityMode, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, fingerprints.calibration]);
   const contract = useBassAnalysisContract({
     ...fingerprintInputs, subsForSimulation: sources, designEqSystemLimits, optimisationResult,
     detailedStatus, detailedProgress: lifecycle.progress, detailedElapsedMs: lifecycle.elapsedMs,
     rspRawCurve, perSeatRawCurves, optimiserPriorityMode: selectedPriorityMode, ...requested,
     fingerprintsOverride: fingerprints, backgroundLifecycle: lifecycle,
   });
-  const onPriorityChange = useCallback((mode) => setSelectedPriorityMode(mode), []);
-  const onRetry = useCallback((collectDiagnostics = false) => controller.requestManual({ fingerprint: fingerprints.calibration, payload, collectDiagnostics, force: true }), [controller, fingerprints.calibration, payload]);
-  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange, onRetry, authoritative });
+  const onPriorityChange = useCallback((mode) => setSelectedPriorityMode(normalizeBassPriorityMode(mode)), []);
+  const onRetry = useCallback((collectDiagnostics = false) => controller.requestManual({ fingerprint: cacheKey, payload, collectDiagnostics, force: true }), [controller, cacheKey, payload]);
+  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange, onRetry, authoritative });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

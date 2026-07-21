@@ -4,6 +4,7 @@ import {
   defaultClearTimer,
   defaultSetTimer,
 } from "./bassBackgroundAnalysisStore.js";
+import { buildBassResultCacheKey, stampPoolAuthority } from "./bassResultAuthority.js";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import {
   BASS_OPTIMISER_POOL_PROPERTY,
@@ -42,8 +43,18 @@ function harness() {
   return { clock, workers, cache, controller };
 }
 
-function completeCurrent(h, pool = { candidates: [{ id: "candidate" }], selectablePool: [] }) {
-  h.workers[h.workers.length - 1].send("complete", { pool });
+function completeCurrent(h, pool = {}) {
+  const house = {
+    designEqFitProfile: "house_curve", startStrategy: "multi-start",
+    designEqFitProfileConfig: { maximumCutDb: 15, maximumAggregateBoostDb: 6 },
+    generatedFilterBank: [], finalPostEqCurve: [{ frequency: 20, spl: 100 }],
+  };
+  const compatiblePool = stampPoolAuthority({
+    ...pool,
+    candidates: Array.isArray(pool.candidates) && pool.candidates.length ? pool.candidates : [house],
+    selectablePool: Array.isArray(pool.selectablePool) && pool.selectablePool.length ? pool.selectablePool : [house],
+  });
+  h.workers[h.workers.length - 1].send("complete", { pool: compatiblePool });
 }
 
 export function runBassBackgroundAnalysisFixtures() {
@@ -139,6 +150,20 @@ export function runBassBackgroundAnalysisFixtures() {
     const observed = h.controller.getSnapshot();
     unsubscribe();
     check("34. Reopened panel observes existing job without duplication", observed === before && observed.status === "calculating" && h.workers.length === 1);
+  }
+  {
+    const h = harness();
+    const legacyFingerprint = validInput().fingerprint;
+    h.cache.set(legacyFingerprint, {
+      engineVersion: "legacy-minus10-single", resultSchemaVersion: 1,
+      pool: { candidates: [], selectablePool: [] },
+    });
+    const fingerprint = buildBassResultCacheKey(legacyFingerprint);
+    h.controller.updateInputs({ ...validInput(fingerprint), legacyFingerprint });
+    check("35. Legacy minus-10 single-start cache is rejected and recalculation queued",
+      h.controller.getSnapshot().status === "queued"
+      && h.controller.getSnapshot().cacheStatus === "rejected-stale"
+      && h.controller.getSnapshot().cacheRejectionReason === "engine-version-mismatch");
   }
 
   const passed = checks.filter((item) => item.passed).length;

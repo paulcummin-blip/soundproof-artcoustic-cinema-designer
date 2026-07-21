@@ -72,6 +72,8 @@ export function buildBassGraphSeries({
     if (hasMatchingDetailedResult && optimisationResult?.finalPostEqCurve?.length) {
       series.push({
         id: "rsp-eq", kind: "post-eq", label: "RSP after EQ", tooltipLabel: "RSP after EQ",
+        candidateId: optimisationResult.selectedCandidateId,
+        filterBankSignature: optimisationResult.filterBankSignature,
         color: "#16A34A", strokeWidth: 2.5,
         data: applyBassSmoothing(optimisationResult.finalPostEqCurve, smoothingMode),
       });
