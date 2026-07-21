@@ -6,7 +6,6 @@ import {
   createBassAnalysisResult,
   createBassParameterResult,
   formatParameterResult,
-  adaptCurrentBassOptimisationResult,
   validateStructuredCloneSafe,
   normalizeMode,
   toCanonicalMode,
@@ -19,6 +18,8 @@ import {
   BASS_MODE_BALANCED, BASS_MODE_HOUSE_CURVE_ACCURACY, BASS_MODE_DEPTH, BASS_MODE_SPL,
   CANONICAL_BASS_MODES,
 } from "@/components/room/bass/bassAnalysisContract";
+
+import { adaptCurrentBassOptimisationResult } from "@/components/room/bass/bassAnalysisAdapter";
 
 export function runContractFixtures() {
   const results = {};
@@ -395,30 +396,30 @@ export function runContractFixtures() {
 
   // ---- Phase 1B adapter fingerprint fixtures ----
 
-  // F1. Valid fingerprints are copied into the contract.
+  // F1. Valid fingerprints are copied into the contract (64-bit hash format).
   {
     const adapted = adaptCurrentBassOptimisationResult({
       fingerprints: {
-        geometry: "geo:v1:abcdef12",
-        product: "prod:v1:fedcba98",
-        calibration: "cal:v1:12345678",
+        geometry: "geo:v1:abcdef1212345678",
+        product: "prod:v1:fedcba9898765432",
+        calibration: "cal:v1:12345678abcdef12",
       },
       perSeatRawCurves: [],
     });
     results.adapterCopiesValidFingerprints =
-      adapted.fingerprints.geometry === "geo:v1:abcdef12" &&
-      adapted.fingerprints.product === "prod:v1:fedcba98" &&
-      adapted.fingerprints.calibration === "cal:v1:12345678";
+      adapted.fingerprints.geometry === "geo:v1:abcdef1212345678" &&
+      adapted.fingerprints.product === "prod:v1:fedcba9898765432" &&
+      adapted.fingerprints.calibration === "cal:v1:12345678abcdef12";
   }
 
   // F2. Missing fingerprints remain null.
   {
     const adapted = adaptCurrentBassOptimisationResult({
-      fingerprints: { geometry: "geo:v1:abcdef12" },
+      fingerprints: { geometry: "geo:v1:abcdef1212345678" },
       perSeatRawCurves: [],
     });
     results.adapterMissingFingerprintsNull =
-      adapted.fingerprints.geometry === "geo:v1:abcdef12" &&
+      adapted.fingerprints.geometry === "geo:v1:abcdef1212345678" &&
       adapted.fingerprints.product === null &&
       adapted.fingerprints.calibration === null;
   }
@@ -437,8 +438,8 @@ export function runContractFixtures() {
     const adapted = adaptCurrentBassOptimisationResult({
       fingerprints: {
         geometry: "not-a-fingerprint",
-        product: "prod:v1:NOTHEX",
-        calibration: "cal:x1:12345678",
+        product: "prod:v1:NOTHEX1234567890",
+        calibration: "cal:x1:12345678abcdef12",
       },
       perSeatRawCurves: [],
     });
@@ -460,13 +461,13 @@ export function runContractFixtures() {
       adapted.fingerprints.calibration === null;
   }
 
-  // F6. Fingerprints survive structured clone.
+  // F6. Fingerprints survive structured clone (64-bit hash format).
   {
     const adapted = adaptCurrentBassOptimisationResult({
       fingerprints: {
-        geometry: "geo:v1:abcdef12",
-        product: "prod:v1:fedcba98",
-        calibration: "cal:v1:12345678",
+        geometry: "geo:v1:abcdef1212345678",
+        product: "prod:v1:fedcba9898765432",
+        calibration: "cal:v1:12345678abcdef12",
       },
       perSeatRawCurves: [],
     });
@@ -475,10 +476,10 @@ export function runContractFixtures() {
     try {
       if (typeof structuredClone === "function") {
         const cloned = structuredClone(adapted);
-        cloneOk = cloned.fingerprints.geometry === "geo:v1:abcdef12";
+        cloneOk = cloned.fingerprints.geometry === "geo:v1:abcdef1212345678";
       } else {
         const json = JSON.stringify(adapted);
-        cloneOk = json != null && JSON.parse(json).fingerprints.geometry === "geo:v1:abcdef12";
+        cloneOk = json != null && JSON.parse(json).fingerprints.geometry === "geo:v1:abcdef1212345678";
       }
     } catch (e) {
       cloneOk = false;

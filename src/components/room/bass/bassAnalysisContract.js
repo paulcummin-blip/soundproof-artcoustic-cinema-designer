@@ -1,5 +1,9 @@
-// bassAnalysisContract.js — Phase 1A: Shared, versioned, serializable BassAnalysisResult
-// contract and current-result adapter.
+// bassAnalysisContract.js — Phase 1A/1C: Shared, versioned, serializable
+// BassAnalysisResult contract, factory, and validation.
+//
+// The adapter function lives in bassAnalysisAdapter.js (extracted to keep
+// this module under 600 lines). This module re-exports it for backward
+// compatibility with existing imports.
 //
 // This module is PURE and SIDE-EFFECT FREE. It does NOT:
 //   - Change simulation maths, EQ fitting, candidate generation, or ranking.
@@ -8,6 +12,10 @@
 //   - Modify the production UI.
 //
 // It exists alongside the current implementation and has zero visible effect.
+
+import { isValidFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
+
+export { isValidFingerprint };
 
 // ---------------------------------------------------------------------------
 // 1. Canonical optimisation modes
@@ -183,11 +191,13 @@ export function createBassAnalysisResult() {
 
     roomResponse: {
       status: "uncalculated",
-      productIndependent: true,
+      responseDomain: "unavailable",
+      productIndependent: null,
       geometryFingerprint: null,
       rspCurve: [],
       seatCurves: [],
       sourceLayout: null,
+      usableLfHz: null,
     },
 
     layoutRecommendations: {
@@ -231,304 +241,12 @@ export function createBassAnalysisResult() {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Current-result adapter
+// 4. Current-result adapter (extracted to bassAnalysisAdapter.js)
 // ---------------------------------------------------------------------------
 
-// Parse a legacy level string ("L2", "FAIL", "L0") into a numeric level.
-// Returns null if the input is missing/unparseable.
-function parseLegacyLevel(legacy) {
-  if (legacy == null) return null;
-  if (typeof legacy === "number") return Number.isFinite(legacy) ? Math.max(0, Math.min(4, Math.round(legacy))) : null;
-  const s = String(legacy).trim();
-  if (s === "" || s === "FAIL" || s === "L0" || s === "0") return 0;
-  const m = s.match(/^L?(\d)$/);
-  return m ? Math.max(0, Math.min(4, parseInt(m[1], 10))) : null;
-}
-
-// Count real seats, excluding RSP and synthetic RSP entries.
-function countRealSeats(perSeatRawCurves) {
-  if (!Array.isArray(perSeatRawCurves)) return 0;
-  return perSeatRawCurves.filter((s) => {
-    if (!s || !s.seatId) return false;
-    if (s.seatId === "rsp") return false;
-    if (s.__isSyntheticRsp) return false;
-    return true;
-  }).length;
-}
-
-// Map the detailed-calculation hook status to contract job status.
-function mapJobStatus(detailedStatus, hasResult) {
-  switch (detailedStatus) {
-    case "CALCULATING":
-      return "running";
-    case "COMPLETE":
-      return "complete";
-    case "OUT_OF_DATE":
-      return "stale";
-    case "CANCELLED":
-      return "stale";
-    case "ERROR":
-      return "error";
-    case "IDLE":
-    default:
-      return hasResult ? "complete" : "uncalculated";
-  }
-}
-
-// Map the detailed-calculation hook status to productAnalysis section status.
-// Uses ONLY valid product statuses — never "calculating".
-function mapProductAnalysisStatus(detailedStatus, hasResult) {
-  switch (detailedStatus) {
-    case "CALCULATING":
-      return PRODUCT_STATUS_RUNNING;
-    case "COMPLETE":
-      return PRODUCT_STATUS_COMPLETE;
-    case "OUT_OF_DATE":
-      return hasResult ? PRODUCT_STATUS_STALE : PRODUCT_STATUS_UNCALCULATED;
-    case "CANCELLED":
-      return hasResult ? PRODUCT_STATUS_STALE : PRODUCT_STATUS_UNCALCULATED;
-    case "ERROR":
-      return PRODUCT_STATUS_ERROR;
-    case "IDLE":
-    default:
-      return hasResult ? PRODUCT_STATUS_COMPLETE : PRODUCT_STATUS_UNCALCULATED;
-  }
-}
-
-// Convert detailedProgress (object with completed/total) to a 0–1 number.
-function progressToNumber(detailedProgress) {
-  if (!detailedProgress || typeof detailedProgress !== "object") return null;
-  const completed = Number(detailedProgress.completedRequests ?? detailedProgress.completedTasks);
-  const total = Number(detailedProgress.totalRequests ?? detailedProgress.totalTasks);
-  if (!Number.isFinite(completed) || !Number.isFinite(total) || total <= 0) return null;
-  return Math.max(0, Math.min(1, completed / total));
-}
-
-// Build a compact candidate reference (no large curve arrays duplicated).
-function buildCandidateRef(candidate) {
-  if (!candidate) return null;
-  return {
-    id: null, // Phase 1A: no stable ID yet; signature covers identity
-    designEqFitProfile: candidate.designEqFitProfile || "standard",
-    requestedP14Level: candidate.requestedP14Level ?? null,
-    requestedP18Level: candidate.requestedP18Level ?? null,
-    requestedP19Level: candidate.requestedP19Level ?? null,
-    achievedP14Level: typeof candidate.achievedP14Level === "number" ? candidate.achievedP14Level : parseLegacyLevel(candidate.achievedP14Level),
-    achievedP14Db: Number.isFinite(candidate.achievedP14Db) ? candidate.achievedP14Db : null,
-    achievedP18Level: typeof candidate.achievedP18Level === "number" ? candidate.achievedP18Level : parseLegacyLevel(candidate.achievedP18Level),
-    achievedP18FrequencyHz: Number.isFinite(candidate.achievedP18FrequencyHz) ? candidate.achievedP18FrequencyHz : null,
-    achievedP19Level: typeof candidate.achievedP19Level === "number" ? candidate.achievedP19Level : parseLegacyLevel(candidate.achievedP19Level),
-    achievedP19VariationDb: Number.isFinite(candidate.achievedP19VariationDb) ? candidate.achievedP19VariationDb : null,
-    achievedP20Level: typeof candidate.achievedP20Level === "number" ? candidate.achievedP20Level : parseLegacyLevel(candidate.achievedP20Level),
-    achievedP20VariationDb: Number.isFinite(candidate.achievedP20VariationDb) ? candidate.achievedP20VariationDb : null,
-    p20Available: !!candidate.p20Available,
-    meetsRequestedEnvelope: candidate.meetsRequestedEnvelope ?? null,
-    filterCount: Array.isArray(candidate.generatedFilterBank) ? candidate.generatedFilterBank.filter((f) => f?.enabled).length : 0,
-  };
-}
-
-// Coerce a possibly-missing/numeric-string value to a finite number for formatting.
-function toFiniteOrZero(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-// Build a candidate signature string for provenance (compact, no curves).
-// Hardened: never throws on partial/malformed filter data (numeric strings,
-// missing fields, nulls). All values are coerced to finite numbers first.
-function buildProvenanceSignature(candidate, poolId) {
-  if (!candidate) return null;
-  const filters = (Array.isArray(candidate.generatedFilterBank) ? candidate.generatedFilterBank : [])
-    .filter((f) => f?.enabled)
-    .map((f) => {
-      const freq = toFiniteOrZero(f?.frequencyHz).toFixed(2);
-      const gain = toFiniteOrZero(f?.gainDb).toFixed(2);
-      const q = toFiniteOrZero(f?.Q).toFixed(2);
-      return `${freq}/${gain}/Q${q}`;
-    })
-    .join("|");
-  return `Pool:${poolId || "—"}|Profile:${candidate.designEqFitProfile || "standard"}|Filters:[${filters || "(none)"}]`;
-}
-
-/**
- * Adapt the current live bass optimisation result into the new contract.
- * Pure, defensive, no recalculation. Tolerates missing/partial data.
- */
-export function adaptCurrentBassOptimisationResult({
-  optimisationResult = null,
-  detailedStatus = null,
-  detailedProgress = null,
-  detailedElapsedMs = null,
-  perSeatRawCurves = [],
-  canonicalPriorityMode = null,
-  fingerprints = null,
-} = {}) {
-  const contract = createBassAnalysisResult();
-
-  // --- Fingerprints (Phase 1B) ---
-  // Copy only valid string fingerprints supplied by the caller. Missing or
-  // invalid fingerprints remain null. The adapter never computes fingerprints.
-  if (fingerprints && typeof fingerprints === "object") {
-    if (isValidFingerprintString(fingerprints.geometry)) {
-      contract.fingerprints.geometry = fingerprints.geometry;
-    }
-    if (isValidFingerprintString(fingerprints.product)) {
-      contract.fingerprints.product = fingerprints.product;
-    }
-    if (isValidFingerprintString(fingerprints.calibration)) {
-      contract.fingerprints.calibration = fingerprints.calibration;
-    }
-  }
-
-  const hasResult = !!optimisationResult && !!optimisationResult.selectedCandidate;
-  const realSeatCount = countRealSeats(perSeatRawCurves);
-  const selectedCandidate = optimisationResult?.selectedCandidate || null;
-  const poolId = optimisationResult?.poolId || null;
-
-  // --- Job status ---
-  const jobStatus = mapJobStatus(detailedStatus, hasResult);
-  contract.job.status = jobStatus;
-  contract.job.elapsedMs = Number.isFinite(detailedElapsedMs) ? detailedElapsedMs : (optimisationResult?.performanceSummary?.totalOptimiserTimeMs ?? null);
-  contract.job.progress = progressToNumber(detailedProgress); // number 0–1 or null
-  contract.job.phase = (detailedProgress && typeof detailedProgress === "object" && typeof detailedProgress.phase === "string") ? detailedProgress.phase : null;
-  contract.job.message = optimisationResult?.warningMessage || null;
-  contract.job.errorMessage = null;
-  contract.job.isRefreshingPreviousResult = detailedStatus === "CALCULATING" && hasResult;
-
-  // --- Selected mode (normalize both internal and canonical inputs) ---
-  const rawMode = canonicalPriorityMode || optimisationResult?.selectedMode || null;
-  contract.selectedMode = normalizeMode(rawMode);
-
-  // --- Selected candidate ---
-  contract.selectedCandidate = buildCandidateRef(selectedCandidate);
-  contract.selectedCandidateId = null;
-
-  // --- Provenance ---
-  contract.provenance.poolId = poolId;
-  contract.provenance.candidateSignature = buildProvenanceSignature(selectedCandidate, poolId);
-  contract.provenance.realSeatCount = realSeatCount;
-  contract.provenance.createdAtMs = null;
-
-  // --- Mode candidates (where already available in selectedByMode) ---
-  const selectedByMode = optimisationResult?.selectedByMode || {};
-  contract.modeCandidates[BASS_MODE_BALANCED] = buildCandidateRef(selectedByMode.balanced || null);
-  contract.modeCandidates[BASS_MODE_HOUSE_CURVE_ACCURACY] = buildCandidateRef(selectedByMode.accuracy || null);
-  contract.modeCandidates[BASS_MODE_DEPTH] = buildCandidateRef(selectedByMode.extension || null);
-  contract.modeCandidates[BASS_MODE_SPL] = buildCandidateRef(selectedByMode.spl || null);
-
-  // --- Product analysis status (valid product statuses only — never "calculating") ---
-  contract.productAnalysis.status = mapProductAnalysisStatus(detailedStatus, hasResult);
-
-  // --- Parameters (mapped from existing values, never recalculated) ---
-  // isStale: OUT_OF_DATE / CANCELLED with a previous result. NOT updating.
-  // isUpdating: CALCULATING with a previous result (refresh in progress).
-  const isStale = (detailedStatus === "OUT_OF_DATE" || detailedStatus === "CANCELLED") && hasResult;
-  const isUpdating = contract.job.isRefreshingPreviousResult;
-
-  // Helper: choose parameter status from level + stale/updating state.
-  // - level present + updating → "updating" (isStale=false)
-  // - level present + stale    → "complete" with isStale=true (NOT updating)
-  // - level present + normal   → "complete"
-  // - level null + CALCULATING → "calculating"
-  // - level null otherwise      → "uncalculated"
-  function paramStatus(levelPresent) {
-    if (levelPresent) {
-      if (isUpdating) return PARAM_STATUS_UPDATING;
-      return PARAM_STATUS_COMPLETE;
-    }
-    return detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED;
-  }
-
-  // P14
-  const p14Level = selectedCandidate
-    ? (typeof selectedCandidate.achievedP14Level === "number" ? selectedCandidate.achievedP14Level : parseLegacyLevel(optimisationResult?.achievedP14Level))
-    : parseLegacyLevel(optimisationResult?.achievedP14Level);
-  const p14Value = Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : (Number.isFinite(optimisationResult?.achievedP14Db) ? optimisationResult.achievedP14Db : null);
-  contract.productAnalysis.parameters.p14 = createBassParameterResult({
-    parameter: PARAM_P14,
-    status: paramStatus(p14Level != null),
-    level: p14Level,
-    value: p14Value,
-    unit: "dB",
-    passedL1: p14Level != null ? p14Level >= 1 : null,
-    isStale,
-  });
-
-  // P18
-  const p18Level = selectedCandidate
-    ? (typeof selectedCandidate.achievedP18Level === "number" ? selectedCandidate.achievedP18Level : parseLegacyLevel(optimisationResult?.achievedP18Level))
-    : parseLegacyLevel(optimisationResult?.achievedP18Level);
-  const p18Value = Number.isFinite(selectedCandidate?.achievedP18FrequencyHz) ? selectedCandidate.achievedP18FrequencyHz : (Number.isFinite(optimisationResult?.achievedP18FrequencyHz) ? optimisationResult.achievedP18FrequencyHz : null);
-  contract.productAnalysis.parameters.p18 = createBassParameterResult({
-    parameter: PARAM_P18,
-    status: paramStatus(p18Level != null),
-    level: p18Level,
-    value: p18Value,
-    unit: "Hz",
-    passedL1: p18Level != null ? p18Level >= 1 : null,
-    isStale,
-  });
-
-  // P19
-  const p19Level = selectedCandidate
-    ? (typeof selectedCandidate.achievedP19Level === "number" ? selectedCandidate.achievedP19Level : parseLegacyLevel(optimisationResult?.achievedP19Level))
-    : parseLegacyLevel(optimisationResult?.achievedP19Level);
-  const p19Value = Number.isFinite(selectedCandidate?.achievedP19VariationDb) ? selectedCandidate.achievedP19VariationDb : (Number.isFinite(optimisationResult?.achievedP19VariationDb) ? optimisationResult.achievedP19VariationDb : null);
-  contract.productAnalysis.parameters.p19 = createBassParameterResult({
-    parameter: PARAM_P19,
-    status: paramStatus(p19Level != null),
-    level: p19Level,
-    value: p19Value,
-    unit: "dB",
-    passedL1: p19Level != null ? p19Level >= 1 : null,
-    isStale,
-  });
-
-  // P20 — not_applicable when fewer than 2 real seats
-  if (realSeatCount < 2) {
-    contract.productAnalysis.parameters.p20 = createBassParameterResult({
-      parameter: PARAM_P20,
-      status: PARAM_STATUS_NOT_APPLICABLE,
-      level: null,
-      value: null,
-      unit: "dB",
-      passedL1: null,
-      isStale: false,
-      reason: "Fewer than two real seats",
-    });
-  } else if (selectedCandidate && selectedCandidate.p20Available) {
-    const p20Level = typeof selectedCandidate.achievedP20Level === "number" ? selectedCandidate.achievedP20Level : parseLegacyLevel(selectedCandidate.achievedP20Level);
-    const p20Value = Number.isFinite(selectedCandidate.achievedP20VariationDb) ? selectedCandidate.achievedP20VariationDb : null;
-    contract.productAnalysis.parameters.p20 = createBassParameterResult({
-      parameter: PARAM_P20,
-      status: paramStatus(p20Level != null),
-      level: p20Level,
-      value: p20Value,
-      unit: "dB",
-      passedL1: p20Level != null ? p20Level >= 1 : null,
-      isStale,
-    });
-  } else {
-    contract.productAnalysis.parameters.p20 = createBassParameterResult({
-      parameter: PARAM_P20,
-      status: detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED,
-      level: null,
-      value: null,
-      unit: "dB",
-      passedL1: null,
-      isStale,
-    });
-  }
-
-  // --- Room response ---
-  // Phase 1A does not supply rspRawCurve to the adapter, so rspCurve and
-  // seatCurves remain empty. A section cannot be "complete" while its
-  // authoritative data is absent — leave status as "uncalculated" until
-  // Phase 1C maps real room-response data.
-  // (No status override here.)
-
-  return contract;
-}
+// The adapter function and its helpers live in bassAnalysisAdapter.js to keep
+// this module under 600 lines. Re-exported here for backward compatibility.
+export { adaptCurrentBassOptimisationResult } from "@/components/room/bass/bassAnalysisAdapter";
 
 // ---------------------------------------------------------------------------
 // 5. Structured-clone safety validation
@@ -572,20 +290,4 @@ function findUnsafeValues(obj, path = "$root", stack = new WeakSet()) {
 export function validateStructuredCloneSafe(obj) {
   const issues = findUnsafeValues(obj);
   return { safe: issues.length === 0, issues };
-}
-
-// ---------------------------------------------------------------------------
-// 6. Fingerprint validation (for adapter copy-in)
-// ---------------------------------------------------------------------------
-
-// Returns true if a fingerprint string is well-formed: non-empty string with
-// a version prefix and hex hash suffix. Does not decode the hash.
-function isValidFingerprintString(fp) {
-  if (typeof fp !== "string" || fp.length === 0) return false;
-  const parts = fp.split(":");
-  if (parts.length < 3) return false;
-  if (!["geo", "prod", "cal"].includes(parts[0])) return false;
-  if (!parts[1].startsWith("v")) return false;
-  if (!/^[0-9a-f]+$/.test(parts[parts.length - 1])) return false;
-  return true;
 }

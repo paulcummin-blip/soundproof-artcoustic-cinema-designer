@@ -29,6 +29,8 @@ import P14LevelPill from "@/components/room/P14LevelPill";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
+import { useBassAnalysisContract } from "@/components/room/bass/useBassAnalysisContract";
+import BassContractParityAudit from "@/components/room/bass/BassContractParityAudit";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code.
@@ -993,6 +995,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return selectCandidateFromPool(detailedResult.pool, optimiserPriorityMode);
   }, [detailedStatus, detailedResult, optimiserPriorityMode]);
 
+  // --- Phase 1C: Live contract instantiation ---
+  // Memoized pure calls via custom hook. Does NOT start a calculation, restart
+  // a worker, rerank candidates, change the selected candidate, change graph
+  // series, or change visible parameter values. Mode/display changes do not
+  // affect any fingerprint.
+  const bassAnalysisContract = useBassAnalysisContract({
+    roomDims, rspPosition, seatingPositions, subsForSimulation,
+    surfaceAbsorption, roomDamping, axialQ, modalSourceReferenceMode,
+    modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
+    enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale,
+    disableReflectionPhaseJitter, disableReflectionCoherenceWeight, disableLateField,
+    disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution,
+    rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ,
+    debugMode200Multiplier, debugModalPhaseConvention, reflectionGainScale,
+    debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
+    splConfig, optimisationTransitionHz, designEqSystemLimits,
+    optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
+    rspRawCurve, perSeatRawCurves, optimiserPriorityMode,
+  });
+
   const houseCurveSeries = useMemo(() => {
     const candidate = optimisationResult?.selectedCandidate;
     const anchorDb = optimisationResult?.selectedP14TargetDb;
@@ -1635,6 +1657,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <strong>RSP coordinates:</strong> {rspPosition ? `x=${rspPosition.x.toFixed(3)} / y=${rspPosition.y.toFixed(3)} / z=${rspPosition.z.toFixed(3)} m` : "unavailable"} &nbsp;|&nbsp;
             <strong>Real seats:</strong> {seatingPositions?.length ?? 0}
           </div>
+          {includeDiagnostics && (
+            <BassContractParityAudit
+              contract={bassAnalysisContract}
+              optimisationResult={optimisationResult}
+              detailedStatus={detailedStatus}
+              rspRawCurve={rspRawCurve}
+              perSeatRawCurves={perSeatRawCurves}
+              canonicalPriorityMode={optimiserPriorityMode}
+            />
+          )}
           <BassOptimiserValidationPanel
             result={optimisationResult}
             priorityMode={optimiserPriorityMode}

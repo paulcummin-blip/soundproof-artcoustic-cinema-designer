@@ -290,11 +290,21 @@ export function runFingerprintFixtures() {
     results.badInputNoInfinity = !all.some((s) => s.includes("Infinity"));
   }
 
-  // 22. Fingerprints are valid per isValidFingerprint.
+  // 22. Fingerprints are valid per isValidFingerprint and use 64-bit hash (16 hex chars).
   {
-    results.validGeometry = isValidFingerprint(computeGeometryFingerprint(baseInputs()));
-    results.validProduct = isValidFingerprint(computeProductFingerprint(baseInputs()));
-    results.validCalibration = isValidFingerprint(computeCalibrationFingerprint(baseInputs()));
+    const geo = computeGeometryFingerprint(baseInputs());
+    const prod = computeProductFingerprint(baseInputs());
+    const cal = computeCalibrationFingerprint(baseInputs());
+    results.validGeometry = isValidFingerprint(geo);
+    results.validProduct = isValidFingerprint(prod);
+    results.validCalibration = isValidFingerprint(cal);
+    // 64-bit hash: the hash suffix must be 16 hex characters.
+    const geoHash = geo.split(":").pop();
+    const prodHash = prod.split(":").pop();
+    const calHash = cal.split(":").pop();
+    results.hashLength64Geometry = geoHash.length === 16;
+    results.hashLength64Product = prodHash.length === 16;
+    results.hashLength64Calibration = calHash.length === 16;
   }
 
   // 23. Fingerprints carry the correct version prefix.

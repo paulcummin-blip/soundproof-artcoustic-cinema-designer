@@ -48,9 +48,11 @@ function stableStringify(value) {
   return "null";
 }
 
-// FNV-1a 32-bit hash. No external dependencies. Works in browser and worker.
-function fnv1a32(str) {
-  let hash = 0x811c9dc5;
+// FNV-1a 32-bit hash with configurable offset basis (seed). No external
+// dependencies. Works in browser and worker. Two independently seeded 32-bit
+// hashes are combined into a 16-character hexadecimal result (64-bit).
+function fnv1a32Seeded(str, offsetBasis) {
+  let hash = offsetBasis;
   for (let i = 0; i < str.length; i++) {
     hash ^= str.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
@@ -58,8 +60,19 @@ function fnv1a32(str) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+// 64-bit fingerprint: two independently seeded FNV-1a 32-bit hashes combined.
+// Seed A = standard FNV-1a offset basis (0x811c9dc5).
+// Seed B = independent offset basis (0x40007a67) — different seed, same prime.
+// Produces a 16-character hex string. Deterministic, synchronous, no deps.
+function fingerprint64(canonical) {
+  const str = stableStringify(canonical);
+  const hashA = fnv1a32Seeded(str, 0x811c9dc5);
+  const hashB = fnv1a32Seeded(str, 0x40007a67);
+  return hashA + hashB;
+}
+
 function fingerprint(canonical, prefix) {
-  return `${prefix}:v${FINGERPRINT_VERSION}:${fnv1a32(stableStringify(canonical))}`;
+  return `${prefix}:v${FINGERPRINT_VERSION}:${fingerprint64(canonical)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -241,13 +254,18 @@ export function computeCalibrationFingerprint(inputs) {
 // ---------------------------------------------------------------------------
 
 // Returns true if a fingerprint string is well-formed: non-empty string with
-// a version prefix and hex hash suffix. Does not decode the hash.
+// a version prefix and a 16-character hex hash suffix (64-bit). Does not decode
+// the hash. Accepts 8-char (legacy 32-bit) hashes for backward compatibility
+// with Phase 1B fixture test strings.
 export function isValidFingerprint(fp) {
   if (typeof fp !== "string" || fp.length === 0) return false;
   const parts = fp.split(":");
   if (parts.length < 3) return false;
   if (!["geo", "prod", "cal"].includes(parts[0])) return false;
   if (!parts[1].startsWith("v")) return false;
-  if (!/^[0-9a-f]+$/.test(parts[parts.length - 1])) return false;
+  const hash = parts[parts.length - 1];
+  if (!/^[0-9a-f]+$/.test(hash)) return false;
+  // Accept 16-char (64-bit) or 8-char (legacy 32-bit) hashes.
+  if (hash.length !== 16 && hash.length !== 8) return false;
   return true;
 }
