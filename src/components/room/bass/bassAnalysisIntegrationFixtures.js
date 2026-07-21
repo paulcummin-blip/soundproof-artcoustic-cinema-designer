@@ -15,6 +15,11 @@ import {
   buildCandidateSignature,
   signatureToString,
 } from "@/components/room/bass/candidateConsistency";
+import {
+  buildBassGraphSeries,
+  detailedEqStatusText,
+  isMatchingDetailedResult,
+} from "@/components/room/bass/bassGraphDomainBuilder";
 
 // Shared base inputs for fingerprint computation.
 function baseFingerprintInputs() {
@@ -334,6 +339,31 @@ export function runIntegrationFixtures() {
     results.i14JobStatusComplete = complete.job.status === "complete";
     results.i14JobStatusRunning = calculating.job.status === "running";
     results.i14JobStatusStale = stale.job.status === "stale";
+  }
+
+  // I15–I21. Phase 4 graph-domain regression coverage.
+  {
+    const normalized = { id: "normalized-rsp", kind: "normalized", data: baseRspRawCurve() };
+    const absent = buildBassGraphSeries({ designEqEnabled: false, normalizedSeries: normalized });
+    results.i15AbsentOptimisationResultIsSafe = absent.length === 1 && absent[0].id === "normalized-rsp";
+
+    const withTarget = buildBassGraphSeries({ designEqEnabled: false, showHouseCurve: true, normalizedSeries: normalized });
+    results.i16NormalizedTargetIndependent = withTarget.some((item) => item.kind === "normalized-target" && item.label.includes("not predicted product SPL"));
+
+    const calculating = buildBassGraphSeries({ designEqEnabled: true, rspRawCurve: baseRspRawCurve(), optimisationResult: null, hasMatchingDetailedResult: false });
+    results.i17EqOnWithoutResultKeepsRaw = calculating.length === 1 && calculating[0].kind === "raw";
+    results.i18CalculatingLifecycleVisible = detailedEqStatusText({ designEqEnabled: true, detailedStatus: "CALCULATING" }).startsWith("Calculating detailed EQ");
+
+    const ready = { ...baseOptimisationResult(), selectedP14TargetDb: 100, finalPostEqCurve: baseRspRawCurve().map((point) => ({ ...point, spl: point.spl + 2 })) };
+    const matching = buildBassGraphSeries({ designEqEnabled: true, showHouseCurve: true, rspRawCurve: baseRspRawCurve(), optimisationResult: ready, hasMatchingDetailedResult: true });
+    results.i19MatchingResultShowsThreeDomains = ["raw", "post-eq", "house-curve"].every((kind) => matching.some((item) => item.kind === kind));
+
+    const currentFingerprint = "cal-current";
+    const staleResult = { calibrationFingerprint: "cal-stale", pool: [{}] };
+    results.i20StaleResultRejected = !isMatchingDetailedResult("COMPLETE", staleResult, currentFingerprint);
+
+    const returned = buildBassGraphSeries({ designEqEnabled: false, showHouseCurve: false, normalizedSeries: normalized, rspRawCurve: baseRspRawCurve(), optimisationResult: ready, hasMatchingDetailedResult: true });
+    results.i21EqOffReturnsUnchangedNormalized = returned.length === 1 && returned[0].id === "normalized-rsp" && JSON.stringify(returned[0].data) === JSON.stringify(normalized.data);
   }
 
   return results;

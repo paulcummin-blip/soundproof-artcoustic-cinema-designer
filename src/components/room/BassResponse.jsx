@@ -28,7 +28,6 @@ import { buildCandidateSignature, signatureToString } from "@/components/room/ba
 import P14LevelPill from "@/components/room/P14LevelPill";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { useBassAnalysisContract } from "@/components/room/bass/useBassAnalysisContract";
 import BassContractParityAudit from "@/components/room/bass/BassContractParityAudit";
 import { deriveRequestedCalibrationConfig } from "@/components/room/bass/requestedCalibrationConfig";
@@ -37,6 +36,7 @@ import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rew
 import { useNormalizedRoomTransferLive } from "@/components/room/bass/useNormalizedRoomTransferLive";
 import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalizedPhysicsOptions";
 import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
+import { buildBassGraphSeries, detailedEqStatusText, isMatchingDetailedResult } from "@/components/room/bass/bassGraphDomainBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS as PHYSICS_DEFAULTS } from "@/components/room/bass/bassPhysicsDefaults";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -986,21 +986,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     [normalizedLive.result, normalizedLive.quality, normalizedLive.isRefining]
   );
 
-  // A valid detailed result is one that is COMPLETE and matches the current
-  // physical fingerprint. When geometry changes, detailedStatus becomes
-  // OUT_OF_DATE and this flag is false — the stale result is NOT presented
-  // as current; the normalized curve is shown instead.
-  const hasValidDetailedResult = designEqEnabled && detailedStatus === "COMPLETE" &&
-    detailedResult?.calibrationFingerprint === detailedFingerprint &&
-    optimisationResult?.finalPostEqCurve?.length > 0 && rspRawCurve.length > 0;
-
-  // Lightweight priority selection — reuses the stored candidate pool from the
-  // completed detailed calculation. Changing priorityMode only triggers this
-  // memo (reranking), not the worker. Returns null when no current result exists.
+  // Select only from a completed result matching the current design. This declaration
+  // must precede every render-time reference to optimisationResult.
+  const matchingDetailedResult = isMatchingDetailedResult(detailedStatus, detailedResult, detailedFingerprint)
+    ? detailedResult
+    : null;
   const optimisationResult = useMemo(() => {
-    if (detailedStatus !== "COMPLETE" || !detailedResult?.pool) return null;
-    return selectCandidateFromPool(detailedResult.pool, optimiserPriorityMode);
-  }, [detailedStatus, detailedResult, optimiserPriorityMode]);
+    if (!matchingDetailedResult?.pool) return null;
+    return selectCandidateFromPool(matchingDetailedResult.pool, optimiserPriorityMode);
+  }, [matchingDetailedResult, optimiserPriorityMode]);
+
+  const hasValidDetailedResult = !!designEqEnabled &&
+    optimisationResult?.finalPostEqCurve?.length > 0 && rspRawCurve.length > 0;
 
   // --- Phase 1C: Live contract instantiation ---
   // Memoized pure calls via custom hook. Does NOT start a calculation, restart
@@ -1030,88 +1027,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     backgroundLifecycle: detailedLifecycle,
   });
 
-  const houseCurveSeries = useMemo(() => {
-    const candidate = optimisationResult?.selectedCandidate;
-    const anchorDb = optimisationResult?.selectedP14TargetDb;
-    const displayStartHz = 20;
-    if (!showHouseCurve || !candidate || !Number.isFinite(anchorDb)) return null;
-    const assessmentEndHz = candidate.assessmentEndHz;
-    return {
-      id: "house-curve",
-      kind: "house-curve",
-      label: `House-curve target — P19 band ${displayStartHz}–${Math.round(assessmentEndHz)} Hz`,
-      tooltipLabel: "House-curve target",
-      color: "#625143",
-      strokeWidth: 2.25,
-      strokeDasharray: "10 5",
-      data: optimisationResult.finalPostEqCurve
-        .filter((point) => point.frequency >= displayStartHz && point.frequency <= assessmentEndHz)
-        .map((point) => ({ frequency: point.frequency, spl: anchorDb + artcousticHouseCurveOffsetAt(point.frequency) })),
-    };
-  }, [showHouseCurve, optimisationResult]);
+  const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
+    designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
+    hasMatchingDetailedResult: hasValidDetailedResult, multiSeries, showRealSeatOverlays,
+    smoothingMode: bassSmoothingMode, overlayProductionSeries, showRewOverlay, rewOverlaySeries,
+  }), [designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
+    hasValidDetailedResult, multiSeries, showRealSeatOverlays, bassSmoothingMode,
+    overlayProductionSeries, showRewOverlay, rewOverlaySeries]);
 
-  const multiSeriesForGraph = useMemo(() => {
-    // Phase 2B: When no valid detailed result, show the product-independent
-    // normalized room response instead of the product-aware raw curve. The
-    // 94 dB reference is NOT predicted product SPL. No P14/P18/P19/P20,
-    // house-curve, or post-EQ is shown — calibration has not occurred.
-    if (!hasValidDetailedResult) {
-      if (!normalizedSeries) return [];
-      let nOut = [{ ...normalizedSeries, data: applyBassSmoothing(normalizedSeries.data, bassSmoothingMode) }];
-      if (showRewOverlay && rewOverlaySeries) nOut = [...nOut, rewOverlaySeries];
-      return nOut;
-    }
-
-    // Valid detailed result — existing product-aware display (raw + post-EQ).
-    // When overlaying, highlight the active REW-style Absorption Authority curve in green
-    // so it's clearly distinguishable from the grey Production overlay curve.
-    let out = (overlayProduction && qStrategy === 'rew_absorption_authority')
-      ? multiSeries.map((s, i) => (i === 0 ? { ...s, color: '#16a34a' } : s))
-      : multiSeries;
-    if (overlayProductionSeries) out = [...out, overlayProductionSeries];
-    // When Design EQ is ON, the Raw + Post-EQ pair must represent RSP (the authoritative
-    // assessment position). Real-seat curves remain visible as labelled display overlays.
-    if (designEqEnabled && optimisationResult?.finalPostEqCurve?.length && rspRawCurve.length) {
-      const rawSeries = {
-        id: "rsp-raw",
-        kind: "raw",
-        label: "RSP before EQ",
-        tooltipLabel: "RSP before EQ",
-        color: "#64748B",
-        strokeWidth: 1.75,
-        strokeDasharray: "6 4",
-        data: applyBassSmoothing(rspRawCurve, bassSmoothingMode),
-      };
-      const postEqSeries = {
-        id: "rsp-eq",
-        kind: "post-eq",
-        label: "RSP after EQ",
-        tooltipLabel: "RSP after EQ",
-        color: "#16A34A",
-        strokeWidth: 2.5,
-        data: applyBassSmoothing(optimisationResult.finalPostEqCurve, bassSmoothingMode),
-      };
-      // Real-seat overlays — only included when the user explicitly enables them.
-      // Thin, muted lines so they remain visually subordinate to the three primary curves.
-      const seatOverlays = showRealSeatOverlays
-        ? out
-            .filter((s) => s.id !== "rsp")
-            .map((s) => ({
-              ...s,
-              kind: "real-seat-overlay",
-              strokeWidth: 1.25,
-              strokeOpacity: 0.5,
-              data: applyBassSmoothing(s.data, bassSmoothingMode),
-            }))
-        : [];
-      out = [rawSeries, postEqSeries, ...seatOverlays];
-    } else {
-      out = out.map((s) => ({ ...s, data: applyBassSmoothing(s.data, bassSmoothingMode) }));
-    }
-    if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
-    if (houseCurveSeries) out = [...out, houseCurveSeries];
-    return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult, houseCurveSeries, rspRawCurve, showRealSeatOverlays, hasValidDetailedResult, normalizedSeries]);
+  const graphStatusText = detailedEqStatusText({
+    designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
+    detailedStatus, optimisationResult, error: detailedError,
+  });
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -1568,8 +1495,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         })()}
 
         {/* Fixed curve key — derived from series metadata so the key, graph and tooltip cannot drift apart */}
-        {designEqEnabled && multiSeriesForGraph.length > 0 && (() => {
-          const primaryCurves = multiSeriesForGraph.filter(s => s.kind === "raw" || s.kind === "post-eq" || s.kind === "house-curve");
+        {multiSeriesForGraph.length > 0 && (() => {
+          const primaryCurves = multiSeriesForGraph.filter(s => s.kind === "raw" || s.kind === "post-eq" || s.kind === "house-curve" || s.kind === "normalized-target");
           const realSeatOverlays = multiSeriesForGraph.filter(s => s.kind === "real-seat-overlay");
           if (primaryCurves.length === 0) return null;
           return (
@@ -1595,7 +1522,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         })()}
 
         <div className="mt-4">
-          {multiSeries.length > 0 ? (
+          {multiSeriesForGraph.length > 0 ? (
             <BassGraph
               multiSeries={multiSeriesForGraph}
               responseData={(designEqEnabled ? multiSeriesForGraph.find((series) => series.id.endsWith("-eq")) : multiSeriesForGraph[0])?.data ?? []}
@@ -1638,13 +1565,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
-          {hasValidDetailedResult
-            ? (optimisationResult?.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate')
-            : designEqEnabled
-              ? (detailedStatus === 'OUT_OF_DATE'
-                  ? 'Showing product-independent normalized room response — detailed analysis updating after design changes'
-                  : 'Showing product-independent normalized room response — detailed analysis is queued automatically')
-              : 'Showing product-independent normalized room response (94 dB flat reference) — not predicted product SPL'}
+          {graphStatusText}
         </div>
         {designEqEnabled && optimisationResult && <>
           {/* Source diagnostics — assessment position provenance */}
