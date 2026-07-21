@@ -61,11 +61,21 @@ export function levelP17_wsFR(dB) {
   return { level: 'L2', ok: true };
 }
 
+export function floorP20Deviation(dB) {
+  return Number.isFinite(dB) ? Math.floor(dB) : null;
+}
+
+export function formatP20Deviation(dB) {
+  const floored = floorP20Deviation(dB);
+  return floored == null ? '—' : `${floored} dB`;
+}
+
 export function levelP20_lfConsistency(dB) {
-  if (!Number.isFinite(dB)) return { level: 'N/A', ok: false };
-  if (dB <= 2) return { level: 'L4', ok: true };
-  if (dB <= 3) return { level: 'L3', ok: true };
-  if (dB <= 4) return { level: 'L2', ok: true };
+  const floored = floorP20Deviation(dB);
+  if (floored == null) return { level: 'N/A', ok: false };
+  if (floored <= 2) return { level: 'L4', ok: true };
+  if (floored === 3) return { level: 'L3', ok: true };
+  if (floored === 4) return { level: 'L2', ok: true };
   return { level: 'L1', ok: true };
 }
 

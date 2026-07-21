@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import LiveHouseCurveDiagnostics from "@/components/room/bass/LiveHouseCurveDiagnostics";
 import { buildCandidateSignature, signatureToString } from "@/components/room/bass/candidateConsistency";
 import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
-import { levelP20_lfConsistency } from "@/components/utils/rp22/levels";
+import { formatP20Deviation, levelP20_lfConsistency } from "@/components/utils/rp22/levels";
 
 const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
@@ -67,7 +67,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       return <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
         <span>Official P19 (RSP): {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
         <span>Worst-seat house-curve deviation (P19-equivalent): {seatLevel} (±{fmt(c.worstRealSeatHouseCurveVariationDb, " dB")}) @ {c.worstRealSeatHouseCurveSeatId || "—"}</span>
-        <span>P20: {p20Text}{c.p20Available ? ` (±${fmt(c.achievedP20VariationDb, " dB")}) @ ${c.worstP20SeatId || "—"}` : ""}</span>
+        <span>P20: {p20Text}{c.p20Available ? ` (${formatP20Deviation(c.achievedP20VariationDb)}) @ ${c.worstP20SeatId || "—"}` : ""}</span>
       </div>;
     })()}
     {result.selectionReason && <div className="mt-1 font-mono text-[10px] text-slate-600">Selection: {result.selectionReason}</div>}

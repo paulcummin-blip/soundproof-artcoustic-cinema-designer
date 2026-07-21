@@ -2,6 +2,8 @@
 // Pure functions. Distances in meters; angles in degrees.
 // NAMED EXPORTS ONLY (no default export)
 
+import { levelP20_lfConsistency } from '@/components/utils/rp22/levels';
+
 const isFiniteNum = (v) => Number.isFinite(v);
 
 /** ---------------- P1: nearest wall distance ---------------- */
@@ -201,10 +203,6 @@ export function metricP20_lowFreqConsistencyDb() {
   return null; // TODO: wire when frequency response data available
 }
 
-export function levelP20_forVarDb(v) { 
-  if (!isFiniteNum(v)) return null; 
-  if (v <= 2) return 'L4'; 
-  if (v <= 3) return 'L3'; 
-  if (v <= 4) return 'L2'; 
-  return 'L1'; 
+export function levelP20_forVarDb(v) {
+  return isFiniteNum(v) ? levelP20_lfConsistency(v).level : null;
 }

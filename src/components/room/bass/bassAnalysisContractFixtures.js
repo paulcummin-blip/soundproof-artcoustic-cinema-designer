@@ -160,7 +160,7 @@ export function runContractFixtures() {
     results.structuredCloneSucceeds = ok;
   }
 
-  // 13. Existing P14/P18/P19/P20 fields map without changing their values or levels.
+  // 13. Existing values remain full precision; P20 level uses its authoritative floored grade.
   {
     const adapted = adaptCurrentBassOptimisationResult({
       optimisationResult: {
@@ -184,7 +184,7 @@ export function runContractFixtures() {
     results.parityP14 = p.p14.level === 3 && p.p14.value === 107.5;
     results.parityP18 = p.p18.level === 2 && p.p18.value === 32;
     results.parityP19 = p.p19.level === 1 && p.p19.value === 5.0;
-    results.parityP20 = p.p20.level === 2 && p.p20.value === 3.5;
+    results.parityP20 = p.p20.level === 3 && p.p20.value === 3.5;
     results.parityAll = results.parityP14 && results.parityP18 && results.parityP19 && results.parityP20;
   }
 

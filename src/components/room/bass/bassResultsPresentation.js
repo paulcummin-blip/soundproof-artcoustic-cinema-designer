@@ -1,3 +1,5 @@
+import { formatP20Deviation } from "@/components/utils/rp22/levels";
+
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
@@ -23,13 +25,14 @@ export function formatBassParameterValue(key, value) {
   if (key === "p14") return `${Math.ceil(number)} dB`;
   if (key === "p18") return `${Math.floor(number)} Hz`;
   if (key === "p19") return `±${Math.floor(Math.abs(number))} dB`;
-  if (key === "p20") return `±${number.toFixed(1)} dB`;
+  if (key === "p20") return formatP20Deviation(number);
   return `${number.toFixed(1)} dB`;
 }
 
 function readyPill(key, parameter) {
   const label = key.toUpperCase();
   if (parameter?.status === "not_applicable") return { text: `${label} N/A`, level: "N/A" };
+  if (parameter?.status === "error") return { text: `${label} error`, level: "—" };
   if (parameter?.level == null) return { text: `${label} —`, level: "—" };
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
   const value = formatBassParameterValue(key, parameter.value);
@@ -48,6 +51,7 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
   const pills = Object.fromEntries(PARAM_KEYS.map((key) => {
     if (isQueued) return [key, { text: `${key.toUpperCase()} Queued`, level: "—" }];
     if (isUpdating) return [key, { text: `${key.toUpperCase()} Updating · ${elapsedSeconds} s`, level: "—" }];
+    if (status === "error" && key === "p20") return [key, { text: "P20 error", level: "—" }];
     if (!isReady) return [key, { text: `${key.toUpperCase()} —`, level: "—" }];
     return [key, readyPill(key, parameters[key])];
   }));

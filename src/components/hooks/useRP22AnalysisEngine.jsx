@@ -9,7 +9,7 @@ import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
 import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis";
-import { levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
+import { formatP20Deviation, levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
 import { getSpeakerModelMeta, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { useAppState } from "@/components/AppStateProvider";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
@@ -1484,7 +1484,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         if (isRspSeat) {
           const worstDev = bassP20.worstSeatDeviationDb;
           const worstLvl = bassP20.worstSeatLevel; // 4/3/2/1
-          const worstDbTxt = `Worst: ±${worstDev.toFixed(1)} dB${bassP20.isSingleSeat ? ' (single seat)' : (bassP20.worstSeatId ? ` (${bassP20.worstSeatId})` : '')}`;
+          const worstDbTxt = `Worst: ${formatP20Deviation(worstDev)}${bassP20.isSingleSeat ? ' (single seat)' : (bassP20.worstSeatId ? ` (${bassP20.worstSeatId})` : '')}`;
           metrics.p20 = {
             valueDb: worstDev,
             level: worstLvl,
@@ -1502,7 +1502,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             metrics.p20 = {
               valueDb: perSeat.deviationDb,
               level: perSeat.level,
-              formatted: `±${perSeat.deviationDb.toFixed(1)} dB`,
+              formatted: formatP20Deviation(perSeat.deviationDb),
               transitionHz: bassP20.transitionHz,
               note: bassP20.note,
             };

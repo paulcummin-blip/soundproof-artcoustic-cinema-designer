@@ -87,7 +87,7 @@ function basePerSeatCurves() {
 export function runIntegrationFixtures() {
   const results = {};
 
-  // I1. Live adaptation retains exact metric parity (P14/P18/P19/P20).
+  // I1. Live adaptation retains full-precision values and authoritative P20 grading.
   {
     const opt = baseOptimisationResult();
     const adapted = adaptCurrentBassOptimisationResult({
@@ -101,7 +101,7 @@ export function runIntegrationFixtures() {
     results.i1MetricParityP14 = p.p14.level === 3 && p.p14.value === 107.5;
     results.i1MetricParityP18 = p.p18.level === 2 && p.p18.value === 32;
     results.i1MetricParityP19 = p.p19.level === 1 && p.p19.value === 5.0;
-    results.i1MetricParityP20 = p.p20.level === 2 && p.p20.value === 3.5;
+    results.i1MetricParityP20 = p.p20.level === 3 && p.p20.value === 3.5;
   }
 
   // I2. Candidate and pool identities match the live candidate signature.
