@@ -76,6 +76,10 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
   const p18 = computeParam18BassExtension(finalPostEqCurve);
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third");
   const assessedCurve = smoothed.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz);
+  const rspResiduals = assessedCurve.map((point) => point.spl - (request.p14.p14TargetDb + artcousticHouseCurveOffsetAt(point.frequency)));
+  const rspRmsResidualDb = rspResiduals.length ? Math.sqrt(rspResiduals.reduce((sum, value) => sum + value ** 2, 0) / rspResiduals.length) : null;
+  const rspMeanSignedResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + value, 0) / rspResiduals.length : null;
+  const rspShapeRmsResidualDb = rspResiduals.length ? Math.sqrt(rspResiduals.reduce((sum, value) => sum + (value - rspMeanSignedResidualDb) ** 2, 0) / rspResiduals.length) : null;
   const p19 = computeP19DeviationBelowSchroeder({
     freqsHz: assessedCurve.map((point) => point.frequency),
     splDb: assessedCurve.map((point) => point.spl),
@@ -211,6 +215,10 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     achievedP18Level,
     achievedP19VariationDb,
     achievedP19Level,
+    rspObjectiveMaxDeviationDb: eq.rspObjectiveMaxDeviationDb ?? achievedP19VariationDb,
+    rspRmsResidualDb: eq.rspRmsDeviationDb ?? rspRmsResidualDb,
+    rspMeanSignedResidualDb: eq.rspMeanSignedResidualDb ?? rspMeanSignedResidualDb,
+    rspShapeRmsResidualDb: eq.rspShapeRmsDeviationDb ?? rspShapeRmsResidualDb,
     generatedFilterBank: eq.filters,
     finalPostEqCurve,
     combinedEqCurve,
@@ -222,6 +230,16 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     designEqWorstResidualDiagnostics: candidateWorstResidualDiagnostics,
     designEqSelectionReason: eq.selectionReason,
     designEqRevisionDiagnostics: eq.revisionDiagnostics,
+    houseCurveDiagnostics: eq.houseCurveDiagnostics ? {
+      ...eq.houseCurveDiagnostics,
+      finalParameters: {
+        p14: { level: achievedP14Level, valueDb: achievedP14Db },
+        p18: { level: achievedP18Level, frequencyHz: achievedP18FrequencyHz },
+        p19: { level: achievedP19Level, deviationDb: achievedP19VariationDb },
+        p20: { level: achievedP20Level, deviationDb: achievedP20VariationDb },
+      },
+      bankLimits: aggregateBankLimits,
+    } : null,
     p14CheckpointDeltaDb,
     capabilityLimitedFrequencies,
     meetsRequestedEnvelope,

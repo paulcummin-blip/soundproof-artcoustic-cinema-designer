@@ -61,9 +61,11 @@ export function rankingTupleForMode(candidate, mode) {
   const [p14, p18, p19] = levels(candidate);
   const balance = balancedTuple(candidate);
   if (canonicalMode === BASS_PRIORITY_MODES.HOUSE_CURVE_ACCURACY) return [
+    lowerScore(candidate?.rspObjectiveMaxDeviationDb ?? candidate?.achievedP19VariationDb),
+    lowerScore(candidate?.rspRmsResidualDb ?? candidate?.achievedP19VariationDb),
+    lowerScore(candidate?.rspShapeRmsResidualDb ?? candidate?.rspRmsResidualDb),
     lowerScore(worstSeatDeviation(candidate)), lowerScore(meanSeatDeviation(candidate)),
-    lowerScore(rmsTargetError(candidate)), lowerScore(candidate?.achievedP19VariationDb),
-    ...balance, lowerScore(eqCost(candidate)),
+    lowerScore(rmsTargetError(candidate)), ...balance, lowerScore(eqCost(candidate)),
   ];
   if (canonicalMode === BASS_PRIORITY_MODES.DEPTH) return [
     p18, lowerScore(candidate?.achievedP18FrequencyHz), Math.min(p14, p19),

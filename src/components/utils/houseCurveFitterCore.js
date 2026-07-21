@@ -6,15 +6,15 @@
 // null — it skips blocked regions and continues evaluating other regions.
 
 import {
-  evaluateProvisionalBankLimits, limitBoostForCapability,
-  isNearDuplicate, countSameSignFiltersInRegion,
-  buildCurveFromBank, findRegions, qForRegion, peakingEqResponseDb,
+  evaluateProvisionalBankLimits, findRegions, peakingEqResponseDb,
 } from "@/components/utils/designEqCalibration";
+import { generateHouseCurveTrials } from "@/components/utils/houseCurveFilterTrials";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { bankResponseSignature, createHouseCurveEvaluationMemo, readExactMemo, writeExactMemo } from "@/components/utils/houseCurveEvaluationMemo";
 import { calculatePreparedBassCurveMetrics, prepareBassCurveMetricGrid } from "@/components/utils/preparedBassCurveMetrics";
 import { evaluatePreparedBankLimits, prepareBankValidation } from "@/components/utils/preparedBankValidation";
+import { evaluateNearTargetProtection, isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 
 const isNumber = (v) => Number.isFinite(Number(v));
 
@@ -28,13 +28,9 @@ const filterCount = (obj) => {
   return Array.isArray(bank) ? bank.filter((f) => f?.enabled).length : 0;
 };
 
-// Shared house-curve metric comparator. Used consistently for trial admissibility,
-// best-trial selection, multi-start selection, and final candidate ranking.
-// Comparison order: worst-seat P19 level, worst-seat max deviation, mean seat max
-// deviation, RMS target error, RSP P19, P14, P18, fewest filters.
-// Worst-seat and mean deviations within WORST_EQUIV_DB are treated as equivalent;
-// when equivalent, RMS decides with RMS_EPSILON_DB epsilon.
-// A candidate that worsens worst-seat by more than WORST_EQUIV_DB is always worse.
+// Shared comparator. House-curve trials expose RSP metrics, which are compared
+// first (maximum absolute residual, then RMS). Real-seat metrics are constraints
+// and tie-breakers; legacy callers without RSP metrics retain the old ordering.
 const WORST_EQUIV_DB = 0.05;
 const MEAN_EQUIV_DB = 0.05;
 const RMS_EPSILON_DB = 0.01;
@@ -42,7 +38,12 @@ const RMS_EPSILON_DB = 0.01;
 export function compareHouseCurveMetrics(a, b) {
   if (!a) return b ? 1 : 0;
   if (!b) return -1;
-  // 1. Worst-seat P19 level (higher is better)
+  if (Number.isFinite(a.rspMaxDeviationDb) && Number.isFinite(b.rspMaxDeviationDb)) {
+    if (Math.abs(a.rspMaxDeviationDb - b.rspMaxDeviationDb) > WORST_EQUIV_DB) return a.rspMaxDeviationDb - b.rspMaxDeviationDb;
+    if (Number.isFinite(a.rspRmsDeviationDb) && Number.isFinite(b.rspRmsDeviationDb)
+      && Math.abs(a.rspRmsDeviationDb - b.rspRmsDeviationDb) > RMS_EPSILON_DB) return a.rspRmsDeviationDb - b.rspRmsDeviationDb;
+  }
+  // Legacy/worst-seat tie-breakers.
   const aWorstLevel = levelValue(a.worstSeatP19Level ?? a.worstRealSeatHouseCurveLevel);
   const bWorstLevel = levelValue(b.worstSeatP19Level ?? b.worstRealSeatHouseCurveLevel);
   if (aWorstLevel !== bWorstLevel) return bWorstLevel - aWorstLevel;
@@ -106,8 +107,12 @@ function calculateSeatMetricsFromCorrected(correctedCurve, assessmentStartHz, as
   if (!assessedPoints.length) return null;
   const maxAbsDev = Math.max(...assessedPoints.map((p) => Math.abs(p.deviationDb)));
   const rmsDev = Math.sqrt(assessedPoints.reduce((sum, p) => sum + p.deviationDb ** 2, 0) / assessedPoints.length);
+  const meanSignedResidualDb = assessedPoints.reduce((sum, p) => sum + p.deviationDb, 0) / assessedPoints.length;
+  const shapeRmsDeviationDb = Math.sqrt(assessedPoints.reduce((sum, p) => sum + (p.deviationDb - meanSignedResidualDb) ** 2, 0) / assessedPoints.length);
   const worstPoint = assessedPoints.reduce((best, p) => Math.abs(p.deviationDb) > Math.abs(best.deviationDb) ? p : best);
-  return { maxAbsDeviationDb: maxAbsDev, rmsDeviationDb: rmsDev, worstFrequencyHz: worstPoint.frequency };
+  return { maxAbsDeviationDb: maxAbsDev, rmsDeviationDb: rmsDev, meanSignedResidualDb, shapeRmsDeviationDb,
+    minimumSmoothedSplDb: Math.min(...assessedPoints.map((p) => p.spl)), residualPoints: assessedPoints,
+    worstFrequencyHz: worstPoint.frequency };
 }
 
 // Apply shared filter bank to a seat's raw response, smooth, and calculate per-seat
@@ -142,6 +147,40 @@ function correctedCurvesForSharedBank(seats, filters, operationCounts, memo = nu
   return writeExactMemo(memo?.correctedCurves, bankKey, corrected, memo?.enabled);
 }
 
+function summarizeSeatMetrics(seatMetrics, protectedNullRegions = []) {
+  if (!seatMetrics.length) return null;
+  const rsp = seatMetrics.find((metric) => metric.seatId === "rsp") || null;
+  const scoredRspPoints = (rsp?.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+  const rspMaxDeviationDb = scoredRspPoints.length ? Math.max(...scoredRspPoints.map((point) => Math.abs(point.deviationDb))) : rsp?.maxAbsDeviationDb ?? null;
+  const rspRmsDeviationDb = scoredRspPoints.length ? Math.sqrt(scoredRspPoints.reduce((sum, point) => sum + point.deviationDb ** 2, 0) / scoredRspPoints.length) : rsp?.rmsDeviationDb ?? null;
+  const rspMeanSignedResidualDb = scoredRspPoints.length ? scoredRspPoints.reduce((sum, point) => sum + point.deviationDb, 0) / scoredRspPoints.length : rsp?.meanSignedResidualDb ?? null;
+  const rspShapeRmsDeviationDb = scoredRspPoints.length ? Math.sqrt(scoredRspPoints.reduce((sum, point) => sum + (point.deviationDb - rspMeanSignedResidualDb) ** 2, 0) / scoredRspPoints.length) : rsp?.shapeRmsDeviationDb ?? null;
+  const objectiveMetric = (metric) => {
+    const points = (metric.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+    return { ...metric,
+      objectiveMaxAbsDeviationDb: points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : metric.maxAbsDeviationDb,
+      objectiveRmsDeviationDb: points.length ? Math.sqrt(points.reduce((sum, point) => sum + point.deviationDb ** 2, 0) / points.length) : metric.rmsDeviationDb,
+    };
+  };
+  const realSeats = seatMetrics.filter((metric) => metric.seatId !== "rsp").map(objectiveMetric);
+  const constrainedSeats = realSeats.length ? realSeats : (rsp ? [objectiveMetric(rsp)] : seatMetrics.map(objectiveMetric));
+  const worstSeat = constrainedSeats.reduce((worst, metric) => metric.objectiveMaxAbsDeviationDb > worst.objectiveMaxAbsDeviationDb ? metric : worst);
+  return {
+    seatMetrics,
+    worstSeatId: worstSeat.seatId,
+    worstSeatMaxDeviationDb: worstSeat.objectiveMaxAbsDeviationDb,
+    worstSeatP19Level: houseCurveP19Level(worstSeat.objectiveMaxAbsDeviationDb),
+    meanSeatMaxDeviationDb: constrainedSeats.reduce((sum, metric) => sum + metric.objectiveMaxAbsDeviationDb, 0) / constrainedSeats.length,
+    rmsSeatTargetErrorDb: Math.sqrt(constrainedSeats.reduce((sum, metric) => sum + metric.objectiveRmsDeviationDb ** 2, 0) / constrainedSeats.length),
+    rspMaxDeviationDb,
+    rspRmsDeviationDb,
+    rspMeanSignedResidualDb,
+    rspShapeRmsDeviationDb,
+    rspMinimumSmoothedSplDb: scoredRspPoints.length ? Math.min(...scoredRspPoints.map((point) => point.smoothedSplDb ?? Infinity)) : rsp?.minimumSmoothedSplDb ?? null,
+    rspResidualPoints: rsp?.residualPoints ?? [],
+  };
+}
+
 // Calculate metrics across a set of already-corrected seat curves. Used by the
 // production optimiser to compute uniform worst/mean/RMS metrics for every
 // candidate profile (Standard, Accuracy, house-curve) from perSeatPostEqCurves.
@@ -153,22 +192,11 @@ export function calculateAllSeatMetricsFromCorrected(correctedCurves, assessment
     const metrics = calculateSeatMetricsFromCorrected(curve, assessmentStartHz, assessmentEndHz, anchorDb);
     if (metrics) seatMetrics.push({ seatId: seat.seatId, isPrimary: seat.isPrimary, ...metrics });
   }
-  if (!seatMetrics.length) return null;
-  const worstSeat = seatMetrics.reduce((worst, m) => m.maxAbsDeviationDb > worst.maxAbsDeviationDb ? m : worst);
-  const meanMaxDev = seatMetrics.reduce((sum, m) => sum + m.maxAbsDeviationDb, 0) / seatMetrics.length;
-  const rmsTargetError = Math.sqrt(seatMetrics.reduce((sum, m) => sum + m.rmsDeviationDb ** 2, 0) / seatMetrics.length);
-  return {
-    seatMetrics,
-    worstSeatId: worstSeat.seatId,
-    worstSeatMaxDeviationDb: worstSeat.maxAbsDeviationDb,
-    worstSeatP19Level: houseCurveP19Level(worstSeat.maxAbsDeviationDb),
-    meanSeatMaxDeviationDb: meanMaxDev,
-    rmsSeatTargetErrorDb: rmsTargetError,
-  };
+  return summarizeSeatMetrics(seatMetrics);
 }
 
 // Calculate metrics across a set of seats for a given filter bank.
-export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts = null, memo = null) {
+export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts = null, memo = null, qualityOptions = {}) {
   const startedAt = operationCounts ? performance.now() : 0;
   const correctedSeats = correctedCurvesForSharedBank(seats, filters, operationCounts, memo);
   if (operationCounts) operationCounts.perSeatMetricEvaluations += correctedSeats.length;
@@ -197,28 +225,19 @@ export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, asses
     operationCounts.perSeatEvaluationTimeMs += performance.now() - startedAt;
   }
   if (!seatMetrics.length) return null;
-  const worstSeat = seatMetrics.reduce((worst, m) => m.maxAbsDeviationDb > worst.maxAbsDeviationDb ? m : worst);
-  const meanMaxDev = seatMetrics.reduce((sum, m) => sum + m.maxAbsDeviationDb, 0) / seatMetrics.length;
-  const rmsTargetError = Math.sqrt(seatMetrics.reduce((sum, m) => sum + m.rmsDeviationDb ** 2, 0) / seatMetrics.length);
-  return writeExactMemo(memo?.metrics, metricsKey, {
-    seatMetrics,
-    worstSeatId: worstSeat.seatId,
-    worstSeatMaxDeviationDb: worstSeat.maxAbsDeviationDb,
-    worstSeatP19Level: houseCurveP19Level(worstSeat.maxAbsDeviationDb),
-    meanSeatMaxDeviationDb: meanMaxDev,
-    rmsSeatTargetErrorDb: rmsTargetError,
-  }, memo?.enabled);
+  return writeExactMemo(memo?.metrics, metricsKey, summarizeSeatMetrics(seatMetrics, qualityOptions.protectedNullRegions), memo?.enabled);
 }
 
 // Find ALL broad residual regions across all seats, sorted by severity (descending).
 // Each region is seat-specific so trials can be generated per-seat while the shared
 // bank is evaluated across all seats.
-function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo) {
+function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions = []) {
   const allRegions = [];
   for (const { seat, corrected } of correctedCurvesForSharedBank(seats, filters, operationCounts, memo)) {
     const smoothed = applyBassSmoothing(corrected, "third");
     const trendPoints = smoothed
       .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
+      .filter((p) => !isProtectedFrequency(p.frequency, protectedNullRegions))
       .map((p) => ({ ...p, deviationDb: p.spl - (anchorDb + artcousticHouseCurveOffsetAt(p.frequency)) }));
     const regions = [
       ...findRegions(trendPoints, "peak", peakThresholdDb, valleyThresholdDb),
@@ -234,6 +253,7 @@ function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEnd
 function buildProposedBank(trial, filters) {
   if (trial.action === "append") return [...filters, trial.filter];
   if (trial.action === "remove") return filters.filter((_, i) => i !== trial.removedFilterIndex);
+  if (trial.action === "merge") return [...filters.filter((_, i) => !trial.mergedFilterIndices.includes(i)), trial.filter];
   return filters.map((f, i) => i === trial.replacedFilterIndex ? trial.filter : f);
 }
 
@@ -287,96 +307,13 @@ function validateAndScaleTrial(proposedFilters, scalableFilterIndex, bankRaw, ac
   return result;
 }
 
-// Generate trials for a single residual region. Returns { trials, productLimited }.
-// Trial types: append, gain revision, Q revision, replacement, removal.
-function generateTrialsForRegion(region, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb) {
-  const trials = [];
-  const isPeak = region.kind === "peak";
-  const maximumCutDb = profile.maximumCutDb;
-  const maximumAggregateBoostDb = profile.maximumAggregateBoostDb;
-  const requestedGainDb = isPeak
-    ? -Math.min(maximumCutDb, region.severityDb * 0.85)
-    : Math.min(maximumAggregateBoostDb, region.severityDb * 0.75);
-  const correctionSign = isPeak ? -1 : 1;
-  const baseCandidate = limitBoostForCapability({
-    band: filters.length + 1, enabled: true, type: "Peak",
-    frequencyHz: region.centrePoint.frequency, gainDb: requestedGainDb,
-    Q: qForRegion(region), startHz: region.startHz, endHz: region.endHz,
-    reason: isPeak ? "Residual peak above house curve" : "Residual valley below house curve",
-  }, activeSubs, usableLfHz, requestedSystemOutputDb);
-
-  const productLimited = Math.abs(baseCandidate.gainDb) <= 0.1;
-  const gainScales = [1, 0.75, 0.5];
-  // Adaptive high-Q values: existing Q, Q×1.5, Q×2, Q×3, Q8, Q10 (clamped 0.5–10, deduplicated).
-  const rawQValues = [baseCandidate.Q, baseCandidate.Q * 1.5, baseCandidate.Q * 2, baseCandidate.Q * 3, 8, 10];
-  const qValues = [];
-  const seenQ = new Set();
-  for (const q of rawQValues) {
-    const clamped = Math.max(0.5, Math.min(10, q));
-    const key = clamped.toFixed(4);
-    if (!seenQ.has(key)) { seenQ.add(key); qValues.push(clamped); }
-  }
-  const seenVariants = new Set();
-
-  // Append candidates (if < 10 filters and not product-limited)
-  if (!productLimited && filters.length < 10) {
-    for (const gainScale of gainScales) {
-      for (const q of qValues) {
-        const scaled = { ...baseCandidate, gainDb: baseCandidate.gainDb * gainScale, Q: q };
-        const candidate = scaled.gainDb > 0 ? limitBoostForCapability(scaled, activeSubs, usableLfHz, requestedSystemOutputDb) : scaled;
-        const key = `${candidate.gainDb.toFixed(4)}:${candidate.Q.toFixed(4)}`;
-        if (seenVariants.has(key) || Math.abs(candidate.gainDb) <= 0.1) continue;
-        seenVariants.add(key);
-        if (isNearDuplicate(candidate, filters)) continue;
-        if (countSameSignFiltersInRegion(candidate, filters) >= 2) continue;
-        trials.push({ action: "append", filter: candidate, scalableIndex: filters.length });
-      }
-    }
-  }
-
-  // Gain revision, Q revision, replacement, removal for existing filters near the region.
-  for (let fi = 0; fi < filters.length; fi++) {
-    const existing = filters[fi];
-    if (!existing.enabled) continue;
-    const freqRatio = Math.log2(Math.max(baseCandidate.frequencyHz, existing.frequencyHz) / Math.min(baseCandidate.frequencyHz, existing.frequencyHz));
-    if (freqRatio > 1 / 12) continue;
-    const existingSign = existing.gainDb > 0 ? 1 : -1;
-
-    if (existingSign === correctionSign && !productLimited) {
-      // Gain revision: adjust existing same-sign filter's gain toward the correction.
-      for (const gainScale of gainScales) {
-        const correctionDelta = baseCandidate.gainDb * gainScale;
-        if (Math.abs(correctionDelta) <= 0.1) continue;
-        const proposedGain = existing.gainDb + correctionDelta;
-        const clampedGain = existing.gainDb > 0 ? Math.min(maximumAggregateBoostDb, proposedGain) : Math.max(-maximumCutDb, proposedGain);
-        if (Math.abs(clampedGain - existing.gainDb) <= 0.1) continue;
-        trials.push({ action: "revise", filter: { ...existing, gainDb: clampedGain }, replacedFilterIndex: fi, scalableIndex: fi });
-      }
-      // Q revision: widen/narrow existing same-sign filter to broaden the correction.
-      for (const qMult of [0.5, 0.75, 1.5, 2, 3]) {
-        const newQ = Math.max(0.5, Math.min(10, existing.Q * qMult));
-        if (Math.abs(newQ - existing.Q) <= 0.1) continue;
-        trials.push({ action: "reviseQ", filter: { ...existing, Q: newQ }, replacedFilterIndex: fi, scalableIndex: fi });
-      }
-    } else if (existingSign !== correctionSign) {
-      // Replacement: replace opposite-sign filter with a correct-sign one (if not product-limited).
-      if (!productLimited) {
-        trials.push({ action: "replace", filter: { ...baseCandidate, band: existing.band }, replacedFilterIndex: fi, scalableIndex: fi });
-      }
-      // Removal: remove the counterproductive opposite-sign filter.
-      trials.push({ action: "remove", removedFilterIndex: fi, scalableIndex: null });
-    }
-  }
-
-  return { trials, productLimited };
-}
-
 // Run a single-start optimisation loop. Returns { filters, metrics, baselineWorstSeatDeviation,
 // blockedResiduals, stopReason, bankEvalCount, operations }.
 export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, options = {}) {
   const peakThresholdDb = profile.peakDiscoveryThresholdDb || 1;
   const valleyThresholdDb = profile.valleyDiscoveryThresholdDb || 1;
   const maxOperations = 30;
+  const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
 
   const operationCounts = {
     curveEvaluationRequests: 0,
@@ -396,22 +333,36 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     uniqueFilterResponses: 0,
     bankFilterPointEvaluations: 0,
     candidateBankValidationTimeMs: 0,
+    nearTargetProtectionRejections: 0,
+    p14SafetyRejections: 0,
+    protectedNullWorseningRejections: 0,
+    mergedFilterOperations: 0,
+    replacedFilterOperations: 0,
   };
   const memo = options.memo || createHouseCurveEvaluationMemo(options.reuseExactEvaluations !== false);
   const preparedBankValidation = options.preparedBankValidation || (options.reuseExactEvaluations !== false
     ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
     : null);
   let filters = initialFilters.map((f) => ({ ...f }));
-  let currentMetrics = calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo);
+  let currentMetrics = calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo, { protectedNullRegions });
   if (!currentMetrics) return { filters, metrics: null, baselineWorstSeatDeviation: null, blockedResiduals: [], stopReason: "no seat metrics", bankEvalCount: 0, operations: 0, operationCounts };
 
   const baselineWorstSeatDeviation = currentMetrics.worstSeatMaxDeviationDb;
+  const baselineRspMetrics = {
+    maximumAbsoluteResidualDb: currentMetrics.rspMaxDeviationDb,
+    rmsResidualDb: currentMetrics.rspRmsDeviationDb,
+    meanSignedResidualDb: currentMetrics.rspMeanSignedResidualDb,
+    shapeRmsResidualDb: currentMetrics.rspShapeRmsDeviationDb,
+  };
+  const baselineRspPoints = currentMetrics.rspResidualPoints || [];
+  const baselineRspMinimumSplDb = currentMetrics.rspMinimumSmoothedSplDb;
   // Baseline per-seat max deviations — no seat may drift more than WORST_EQUIV_DB
   // from its baseline, preventing cumulative regression across iterations.
   const baselineSeatMaxDeviations = new Map();
   if (currentMetrics.seatMetrics) {
     for (const m of currentMetrics.seatMetrics) {
-      baselineSeatMaxDeviations.set(m.seatId, m.maxAbsDeviationDb);
+      const points = (m.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+      baselineSeatMaxDeviations.set(m.seatId, points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : m.maxAbsDeviationDb);
     }
   }
   let blockedResiduals = [];
@@ -424,7 +375,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const trace = [];
 
   while (operations < maxOperations) {
-    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo);
+    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions);
     if (!regions.length) { stopReason = "no residual regions found"; break; }
 
     const iterationEntry = {
@@ -434,14 +385,18 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
       bestTrialIndex: null,
     };
 
-    blockedResiduals = []; // reset for this iteration — only the last iteration's blocked residuals are kept
+    blockedResiduals = protectedNullRegions.map((region) => ({
+      seatId: "rsp", frequency: region.centreFrequencyHz, signedDeviationDb: region.signedResidualDb,
+      requiredCorrectionDb: region.requiredBoostDb, permittedCorrectionDb: region.permittedBoostDb,
+      blockingReason: "protected-null", reason: region.reason,
+    })); // retain protected nulls alongside this iteration's blocked residuals
     let bestTrial = null;
     let bestTrialMetrics = null;
     let bestTrialFilters = null;
     let bestTrialTraceIndex = null;
 
     for (const region of regions) {
-      const { trials, productLimited } = generateTrialsForRegion(region, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
+      const { trials, productLimited } = generateHouseCurveTrials(region, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
       let regionAdmissible = false;
       let regionBlockReason = productLimited ? "product-limited" : null;
 
@@ -471,9 +426,10 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
             maxAggregateCutHz: validation.limits?.maxAggregateCutHz ?? null,
           },
           metricsBefore: {
+            rspMaxDeviationDb: currentMetrics?.rspMaxDeviationDb ?? null,
+            rspRmsDeviationDb: currentMetrics?.rspRmsDeviationDb ?? null,
+            rspMeanSignedResidualDb: currentMetrics?.rspMeanSignedResidualDb ?? null,
             worstSeatMaxDeviationDb: currentMetrics?.worstSeatMaxDeviationDb ?? null,
-            meanSeatMaxDeviationDb: currentMetrics?.meanSeatMaxDeviationDb ?? null,
-            rmsSeatTargetErrorDb: currentMetrics?.rmsSeatTargetErrorDb ?? null,
           },
           metricsAfter: null,
           accepted: false,
@@ -491,35 +447,62 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           continue;
         }
         regionAdmissible = true;
-        const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo);
+        const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo, { protectedNullRegions });
         if (!trialMetrics) {
           trialEntry.rejectionReason = "no metrics computed";
           iterationEntry.trials.push(trialEntry);
           continue;
         }
         trialEntry.metricsAfter = {
+          rspMaxDeviationDb: trialMetrics.rspMaxDeviationDb ?? null,
+          rspRmsDeviationDb: trialMetrics.rspRmsDeviationDb ?? null,
+          rspMeanSignedResidualDb: trialMetrics.rspMeanSignedResidualDb ?? null,
           worstSeatMaxDeviationDb: trialMetrics.worstSeatMaxDeviationDb ?? null,
-          meanSeatMaxDeviationDb: trialMetrics.meanSeatMaxDeviationDb ?? null,
-          rmsSeatTargetErrorDb: trialMetrics.rmsSeatTargetErrorDb ?? null,
         };
-        // Admissibility: reject if the trial is not strictly better than current
-        // according to the shared comparator. The comparator's worst-seat equivalence
-        // (0.05 dB) enforces the hard rejection — a trial that worsens worst-seat by
-        // more than 0.05 dB is always worse and is rejected.
+        // The RSP objective is lexicographic: reduce maximum absolute residual,
+        // or hold it effectively unchanged while reducing RMS.
         if (compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
           trialEntry.rejectionReason = "not strictly better than current (comparator rejected)";
           iterationEntry.trials.push(trialEntry);
           continue;
         }
-        // Hard cap: no seat's max deviation may exceed its baseline by more than 0.05 dB.
-        // The comparator only guards against the current state; this prevents cumulative
-        // drift across iterations from exceeding the baseline tolerance.
+        const maxImprovementDb = currentMetrics.rspMaxDeviationDb - trialMetrics.rspMaxDeviationDb;
+        const nearTarget = evaluateNearTargetProtection(baselineRspPoints, trialMetrics.rspResidualPoints, maxImprovementDb);
+        if (!nearTarget.passed) {
+          operationCounts.nearTargetProtectionRejections++;
+          trialEntry.rejectionReason = nearTarget.violations[0].reason;
+          trialEntry.nearTargetViolations = nearTarget.violations;
+          iterationEntry.trials.push(trialEntry);
+          continue;
+        }
+        const protectedNullWorsened = protectedNullRegions.some((region) => {
+          const baselinePoint = baselineRspPoints.reduce((best, point) => !best || Math.abs(point.frequency - region.centreFrequencyHz) < Math.abs(best.frequency - region.centreFrequencyHz) ? point : best, null);
+          const trialPoint = trialMetrics.rspResidualPoints.reduce((best, point) => !best || Math.abs(point.frequency - region.centreFrequencyHz) < Math.abs(best.frequency - region.centreFrequencyHz) ? point : best, null);
+          return baselinePoint && trialPoint && trialPoint.deviationDb < baselinePoint.deviationDb - 0.5;
+        });
+        if (protectedNullWorsened) {
+          operationCounts.protectedNullWorseningRejections++;
+          trialEntry.rejectionReason = "protected cancellation null worsened by more than 0.5 dB";
+          iterationEntry.trials.push(trialEntry);
+          continue;
+        }
+        const requiredP14Floor = Number.isFinite(requestedSystemOutputDb) && baselineRspMinimumSplDb >= requestedSystemOutputDb - 0.05
+          ? requestedSystemOutputDb - 0.05 : baselineRspMinimumSplDb - 0.05;
+        if (Number.isFinite(requiredP14Floor) && trialMetrics.rspMinimumSmoothedSplDb < requiredP14Floor) {
+          operationCounts.p14SafetyRejections++;
+          trialEntry.rejectionReason = "P14 minimum would be reduced below the preserved capability floor";
+          iterationEntry.trials.push(trialEntry);
+          continue;
+        }
+        // Real seats constrain the RSP fit without becoming its primary objective.
         if (trialMetrics.seatMetrics) {
           let seatWorsened = false;
           let worsenedSeatId = null;
           for (const m of trialMetrics.seatMetrics) {
             const baselineDev = baselineSeatMaxDeviations.get(m.seatId);
-            if (baselineDev !== undefined && m.maxAbsDeviationDb > baselineDev + WORST_EQUIV_DB) {
+            const points = (m.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+            const constrainedDeviation = points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : m.maxAbsDeviationDb;
+            if (m.seatId !== "rsp" && baselineDev !== undefined && constrainedDeviation > baselineDev + 0.5) {
               seatWorsened = true;
               worsenedSeatId = m.seatId;
               break;
@@ -532,6 +515,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           }
         }
         trialEntry.accepted = true;
+        trialEntry.acceptanceReason = maxImprovementDb > WORST_EQUIV_DB ? "reduced maximum absolute RSP residual" : "held maximum residual while reducing RSP RMS";
         iterationEntry.trials.push(trialEntry);
         if (!bestTrial || compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) < 0) {
           bestTrial = trial;
@@ -563,10 +547,12 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     if (!bestTrial) { stopReason = "no admissible improvement from any region"; break; }
     filters = bestTrialFilters;
     currentMetrics = bestTrialMetrics;
+    if (bestTrial.action === "merge") operationCounts.mergedFilterOperations++;
+    if (["replace", "refit", "revise", "reviseQ"].includes(bestTrial.action)) operationCounts.replacedFilterOperations++;
     operations++;
   }
 
   if (operations >= maxOperations && stopReason === "no safe improvement remained") stopReason = "operation ceiling reached";
 
-  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace };
+  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace, baselineRspMetrics };
 }

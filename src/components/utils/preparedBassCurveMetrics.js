@@ -18,7 +18,10 @@ export function calculatePreparedBassCurveMetrics(curve, prepared) {
   if (!prepared?.bounds || !prepared.assessedIndices.length) return null;
   let maxAbsDeviationDb = -Infinity;
   let rmsSum = 0;
+  let signedSum = 0;
+  let minimumSmoothedSplDb = Infinity;
   let worstFrequencyHz = null;
+  const residualPoints = [];
   for (let assessedIndex = 0; assessedIndex < prepared.assessedIndices.length; assessedIndex += 1) {
     const pointIndex = prepared.assessedIndices[assessedIndex];
     const [start, end] = prepared.bounds[pointIndex];
@@ -30,19 +33,29 @@ export function calculatePreparedBassCurveMetrics(curve, prepared) {
       count += 1;
     }
     if (!count) continue;
-    const deviationDb = sum / count - prepared.targets[assessedIndex];
+    const smoothedSplDb = sum / count;
+    const deviationDb = smoothedSplDb - prepared.targets[assessedIndex];
     if (!Number.isFinite(deviationDb)) continue;
     const absoluteDeviationDb = Math.abs(deviationDb);
+    residualPoints.push({ frequency: curve[pointIndex].frequency, deviationDb, smoothedSplDb });
+    signedSum += deviationDb;
+    minimumSmoothedSplDb = Math.min(minimumSmoothedSplDb, smoothedSplDb);
     if (absoluteDeviationDb > maxAbsDeviationDb) {
       maxAbsDeviationDb = absoluteDeviationDb;
       worstFrequencyHz = curve[pointIndex].frequency;
     }
     rmsSum += deviationDb ** 2;
   }
-  if (!Number.isFinite(maxAbsDeviationDb)) return null;
+  if (!Number.isFinite(maxAbsDeviationDb) || !residualPoints.length) return null;
+  const meanSignedResidualDb = signedSum / residualPoints.length;
+  const shapeRmsDeviationDb = Math.sqrt(residualPoints.reduce((sum, point) => sum + (point.deviationDb - meanSignedResidualDb) ** 2, 0) / residualPoints.length);
   return {
     maxAbsDeviationDb,
-    rmsDeviationDb: Math.sqrt(rmsSum / prepared.assessedIndices.length),
+    rmsDeviationDb: Math.sqrt(rmsSum / residualPoints.length),
+    meanSignedResidualDb,
+    shapeRmsDeviationDb,
+    minimumSmoothedSplDb,
+    residualPoints,
     worstFrequencyHz,
   };
 }

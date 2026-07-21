@@ -15,6 +15,7 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 import { houseCurveP19Level, calculateAllSeatMetrics, runSingleStart, compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
 import { createHouseCurveEvaluationMemo } from "@/components/utils/houseCurveEvaluationMemo";
 import { prepareBankValidation } from "@/components/utils/preparedBankValidation";
+import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
 
 export { houseCurveP19Level };
 
@@ -23,7 +24,7 @@ const isNumber = (v) => Number.isFinite(Number(v));
 // Fallback resolver — exported for deterministic testing of both fallback routes.
 // Never converts a validator failure into success. If the empty bank fails
 // validation, reports an invariant violation and leaves bankValidationPassed: false.
-export function resolveFallback({ selectedFilters, standardSeedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, objectiveSeats, assessmentStartHz, assessmentEndHz, anchorDb, bankEvalCount = 0 }) {
+export function resolveFallback({ selectedFilters, standardSeedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, objectiveSeats, assessmentStartHz, assessmentEndHz, anchorDb, protectedNullRegions = [], bankEvalCount = 0 }) {
   let filters = (Array.isArray(selectedFilters) ? selectedFilters : []).map((f) => ({ ...f }));
   let finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   bankEvalCount++;
@@ -51,7 +52,7 @@ export function resolveFallback({ selectedFilters, standardSeedFilters, bankRaw,
       filters = [];
       fallbackType = "empty";
     }
-    finalMetrics = calculateAllSeatMetrics(objectiveSeats, filters, assessmentStartHz, assessmentEndHz, anchorDb);
+    finalMetrics = calculateAllSeatMetrics(objectiveSeats, filters, assessmentStartHz, assessmentEndHz, anchorDb, null, null, { protectedNullRegions });
     stopReason = `final bank validation failed — reverted to ${fallbackType}`;
     blockedResiduals = [];
     finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
@@ -74,8 +75,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const rspRaw = normaliseCurve(rawCurve);
   if (!rspRaw.length) return { filters: emptyFilters([]), curve: [], combinedEqCurve: [], designEqFitProfile: "house_curve", perSeatMetrics: [] };
 
-  // Separate RSP from real seats. RSP is used for official RP22 P19 only.
-  // The worst-seat objective uses real seats exclusively.
+  // RSP is the primary house-curve target. Real seats constrain the shared bank
+  // so the RSP improvement does not create unacceptable seat deterioration.
   const realSeatCurves = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
     .filter((s) => s?.seatId && s.seatId !== "rsp" && !s.__isSyntheticRsp && Array.isArray(s?.responseData) && s.responseData.length > 0)
     .map((s) => {
@@ -85,8 +86,9 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     .filter((s) => s.raw.length > 0);
 
   const hasRealSeats = realSeatCurves.length > 0;
-  const objectiveSeats = hasRealSeats ? realSeatCurves : [{ seatId: "rsp", isPrimary: true, raw: rspRaw, gridKey: rspRaw.map((point) => point.frequency).join("|") }];
-  const objectiveLabel = hasRealSeats ? "Worst real seat" : "RSP fallback — no real seats";
+  const rspSeat = { seatId: "rsp", isPrimary: true, raw: rspRaw, gridKey: rspRaw.map((point) => point.frequency).join("|") };
+  const objectiveSeats = [rspSeat, ...realSeatCurves];
+  const objectiveLabel = hasRealSeats ? "RSP primary; real seats constrained" : "RSP primary — no real seats";
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
@@ -94,8 +96,11 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   if (!isNumber(anchorDb)) return { filters: emptyFilters([]), curve: [], combinedEqCurve: [], designEqFitProfile: "house_curve", perSeatMetrics: [] };
 
   const requestedSystemOutputDb = Number.isFinite(Number(options.requestedSystemOutputDb)) ? Number(options.requestedSystemOutputDb) : undefined;
-  const profile = DESIGN_EQ_FIT_PROFILES.accuracy;
+  const profile = { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: true, maximumCutDb: 10 };
   const bankRaw = rspRaw;
+  const protectedNullRegions = identifyProtectedNullRegions(
+    rspRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb,
+  );
 
   const standardSeedFilters = Array.isArray(options.initialFilters)
     ? options.initialFilters
@@ -110,14 +115,14 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const preparedBankValidation = reuseExactEvaluations
     ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
     : null;
-  const evaluationOptions = { reuseExactEvaluations, memo: evaluationMemo, preparedBankValidation };
+  const evaluationOptions = { reuseExactEvaluations, memo: evaluationMemo, preparedBankValidation, protectedNullRegions };
   const startA = runSingleStart([], objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
   let startB = startA;
   if (standardSeedFilters.length > 0) {
     startB = runSingleStart(standardSeedFilters, objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
   }
 
-  // Select the start with the best worst-real-seat score.
+  // Select the start with the best RSP maximum residual, then RSP RMS.
   let selected = startA;
   let selectedStartLabel = "empty";
   if (startB !== startA && startB.metrics && startA.metrics) {
@@ -144,7 +149,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const fallback = resolveFallback({
     selectedFilters: filters, standardSeedFilters, bankRaw, activeSubs,
     usableLfHz, requestedSystemOutputDb, profile, objectiveSeats,
-    assessmentStartHz, assessmentEndHz, anchorDb, bankEvalCount,
+    assessmentStartHz, assessmentEndHz, anchorDb, protectedNullRegions, bankEvalCount,
   });
   filters = fallback.filters;
   let finalBankLimits = fallback.finalBankLimits;
@@ -176,7 +181,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   if (!bankValidationPassed) limitingReason = "bank-validation-failed";
   else if (filters.length >= 10) limitingReason = "filter-limited";
   else if (finalBankLimits.maxAggregateBoostDb >= 5.95) limitingReason = "boost-limited";
-  else if (finalBankLimits.maxAggregateCutDb <= -14.95) limitingReason = "cut-limited";
+  else if (finalBankLimits.maxAggregateCutDb <= -9.95) limitingReason = "cut-limited";
   else if (blockedResiduals.some((b) => b.blockingReason === "product-limited")) limitingReason = "product-limited";
   else if (blockedResiduals.some((b) => b.blockingReason === "bank-limited")) limitingReason = "bank-limited";
 
@@ -186,8 +191,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     combinedEqCurve,
     designEqFitProfile: "house_curve",
     designEqFitProfileConfig: {
-      preserveP14: false, fittingToleranceDb: 1,
-      maximumCutDb: 15, maximumAggregateBoostDb: 6,
+      preserveP14: true, fittingToleranceDb: 1,
+      maximumCutDb: 10, maximumAggregateBoostDb: 6,
       peakDiscoveryThresholdDb: 1, valleyDiscoveryThresholdDb: 1,
     },
     perSeatMetrics: finalMetrics?.seatMetrics ?? [],
@@ -197,6 +202,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     meanSeatMaxDeviationDb: finalMetrics?.meanSeatMaxDeviationDb ?? null,
     rmsSeatTargetErrorDb: finalMetrics?.rmsSeatTargetErrorDb ?? null,
     rspMaxDeviationDb: rspMaxDev,
+    rspObjectiveMaxDeviationDb: finalMetrics?.rspMaxDeviationDb ?? null,
+    rspRmsDeviationDb: finalMetrics?.rspRmsDeviationDb ?? null,
+    rspMeanSignedResidualDb: finalMetrics?.rspMeanSignedResidualDb ?? null,
+    rspShapeRmsDeviationDb: finalMetrics?.rspShapeRmsDeviationDb ?? null,
     rspP19Level: houseCurveP19Level(rspMaxDev),
     baselineWorstSeatDeviationDb: selected.baselineWorstSeatDeviation,
     objectiveLabel,
@@ -224,6 +233,23 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       broadBelowTargetWorsening: false,
     },
     iterationTrace: selected.trace || [],
+    houseCurveDiagnostics: {
+      preRsp: selected.baselineRspMetrics,
+      postRsp: {
+        maximumAbsoluteResidualDb: finalMetrics?.rspMaxDeviationDb ?? null,
+        rmsResidualDb: finalMetrics?.rspRmsDeviationDb ?? null,
+        meanSignedResidualDb: finalMetrics?.rspMeanSignedResidualDb ?? null,
+        shapeRmsResidualDb: finalMetrics?.rspShapeRmsDeviationDb ?? null,
+      },
+      protectedNullRegions,
+      nearTargetProtectionRejectionCount: operationCounts.nearTargetProtectionRejections || 0,
+      p14SafetyRejectionCount: operationCounts.p14SafetyRejections || 0,
+      protectedNullWorseningRejectionCount: operationCounts.protectedNullWorseningRejections || 0,
+      mergedFilterOperationCount: operationCounts.mergedFilterOperations || 0,
+      replacedFilterOperationCount: operationCounts.replacedFilterOperations || 0,
+      productHeadroomRejections: (selected.trace || []).flatMap((entry) => entry.trials || [])
+        .filter((trial) => trial.rejectionReason?.includes("headroom")).map((trial) => trial.rejectionReason),
+    },
     bankDiagnostics: {
       completedBankEvaluationCount: bankEvalCount,
       selectedBankLimits: {
@@ -239,7 +265,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     },
     checkpointSummaries: [],
     worstResidualDiagnostics: [],
-    selectionReason: `House-curve fitter (${selectedStartLabel} start, ${objectiveLabel}): ${operations} operations, worst-seat ${finalMetrics?.worstSeatId ?? "—"} at ±${(finalMetrics?.worstSeatMaxDeviationDb ?? 0).toFixed(1)} dB. ${stopReason}.`,
+    selectionReason: `House-curve fitter (${selectedStartLabel} start, ${objectiveLabel}): ${operations} operations, RSP max ${selected.baselineRspMetrics?.maximumAbsoluteResidualDb?.toFixed(1) ?? "—"}→${finalMetrics?.rspMaxDeviationDb?.toFixed(1) ?? "—"} dB, RMS ${selected.baselineRspMetrics?.rmsResidualDb?.toFixed(1) ?? "—"}→${finalMetrics?.rspRmsDeviationDb?.toFixed(1) ?? "—"} dB. ${stopReason}.`,
     revisionDiagnostics: { attempts: [] },
     requestedP19ToleranceDb: Number.isFinite(Number(options.targetToleranceDb)) ? Number(options.targetToleranceDb) : 0,
     operationCounts,
