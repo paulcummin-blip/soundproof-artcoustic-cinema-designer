@@ -11,12 +11,20 @@ function readyMatchesCurrent(result) {
   return !!current && completed === current && !!result?.selectedCandidate;
 }
 
-function displayValue(key, value) {
+const normalizeIntegerNoise = (value) => {
+  const number = Number(value);
+  const nearestInteger = Math.round(number);
+  return Math.abs(number - nearestInteger) <= 1e-8 ? nearestInteger : number;
+};
+
+export function formatBassParameterValue(key, value) {
   if (!isFiniteNumber(value)) return "";
-  const number = Number(value).toFixed(1);
-  if (key === "p18") return `${number} Hz`;
-  if (key === "p19" || key === "p20") return `±${number} dB`;
-  return `${number} dB`;
+  const number = normalizeIntegerNoise(value);
+  if (key === "p14") return `${Math.ceil(number)} dB`;
+  if (key === "p18") return `${Math.floor(number)} Hz`;
+  if (key === "p19") return `±${Math.floor(Math.abs(number))} dB`;
+  if (key === "p20") return `±${number.toFixed(1)} dB`;
+  return `${number.toFixed(1)} dB`;
 }
 
 function readyPill(key, parameter) {
@@ -24,7 +32,7 @@ function readyPill(key, parameter) {
   if (parameter?.status === "not_applicable") return { text: `${label} N/A`, level: "N/A" };
   if (parameter?.level == null) return { text: `${label} —`, level: "—" };
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
-  const value = displayValue(key, parameter.value);
+  const value = formatBassParameterValue(key, parameter.value);
   return { text: `${label} ${grade}${value ? ` · ${value}` : ""}`, level: grade };
 }
 
@@ -47,8 +55,9 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
   const isRsp = !seatId || seatId === "rsp" || seatId === "mlp";
   if (isReady && !isRsp) {
     const seat = result?.selectedCandidate?.perSeatDiagnostics?.find((item) => String(item.seatId) === String(seatId));
-    pills.p19 = isFiniteNumber(seat?.maxAbsDeviationDb)
-      ? { text: `Target · ±${Number(seat.maxAbsDeviationDb).toFixed(1)} dB`, level: "—", diagnostic: true }
+    const seatDeviation = formatBassParameterValue("p19", seat?.maxAbsDeviationDb);
+    pills.p19 = seatDeviation
+      ? { text: `Target · ${seatDeviation}`, level: "—", diagnostic: true }
       : { text: "Target · —", level: "—", diagnostic: true };
   }
 
