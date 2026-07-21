@@ -14,6 +14,7 @@
 // It exists alongside the current implementation and has zero visible effect.
 
 import { isValidFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
+import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 
 export { isValidFingerprint };
 
@@ -116,11 +117,15 @@ export function createBassParameterResult({
   isStale = false,
   reason = null,
 } = {}) {
+  const finiteValue = Number.isFinite(value) ? value : null;
+  const authoritativeLevel = parameter === PARAM_P20 && finiteValue != null && [PARAM_STATUS_COMPLETE, PARAM_STATUS_UPDATING].includes(status)
+    ? numericRp22Level(levelP20_lfConsistency(finiteValue))
+    : level;
   return {
     parameter,
     status,
-    level: level == null ? null : Math.max(0, Math.min(4, Math.round(level))),
-    value: Number.isFinite(value) ? value : null,
+    level: authoritativeLevel == null ? null : Math.max(0, Math.min(4, Math.round(authoritativeLevel))),
+    value: finiteValue,
     unit,
     passedL1,
     isStale: !!isStale,

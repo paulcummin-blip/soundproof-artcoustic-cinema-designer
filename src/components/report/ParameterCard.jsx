@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
+import { getP21PresetResult } from '@/components/utils/rp22/levels';
 
 export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange, p21EarlyReflectionPreset, onP21EarlyReflectionPresetChange, displayedLevel = null }) {
     const [p15Local, setP15Local] = React.useState("purpose-built");
@@ -48,14 +49,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
     };
     const p15Result = P15_MAP[p15Local];
 
-    // P21 local result computation
-    const P21_MAP = {
-        l1: { value: "N/A", level: "L1", label: "No estimate / untreated room" },
-        l2: { value: "-8 dB", level: "L2", label: "Moderately live room" },
-        l3: { value: "-10 dB", level: "L3", label: "Well-balanced treated room" },
-        l4: { value: "-12 dB", level: "L4", label: "Heavily optimised room" },
-    };
-    const p21Result = P21_MAP[p21Local];
+    const p21Result = getP21PresetResult(p21Local);
 
     return (
         <Card className="border bg-white border-[#DCDBD6] h-full">
@@ -259,7 +253,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                         value={p21Local}
                                         onChange={(e) => onP21EarlyReflectionPresetChange?.(e.target.value)}
                                     >
-                                        <option value="l1">No estimate / untreated room</option>
+                                        <option value="l1">No estimate / not applicable</option>
                                         <option value="l2">Moderately live room</option>
                                         <option value="l3">Well-balanced treated room</option>
                                         <option value="l4">Heavily optimised room</option>
@@ -342,7 +336,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                         ) : parameter.id === 21 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
-                                    {p21Result.value} (estimate)
+                                    {p21Result.formatted} (estimate)
                                 </span>
                                 <RP22GradingPill level={p21Result.level} />
                             </div>

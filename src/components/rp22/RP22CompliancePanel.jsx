@@ -5,6 +5,7 @@ import { computeScreenMetrics } from "@/components/utils/screenMetrics";
 import { renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 
 let p18TraceReferenceCount = 0;
 const p18TraceReferences = new WeakMap();
@@ -769,6 +770,11 @@ export default function RP22CompliancePanel({
         return res.level ?? "—";
       }
 
+      if (pid === 21 && res?.status === "error") return "—";
+      if (pid === 21 && res && res.status !== "no_data" && res.status !== "fail" && Number.isFinite(res.value)) {
+        return levelP21_earlyReflections(res.value).level;
+      }
+
       // If engine gave a usable level, use it
       if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) {
         return res.level; // may be "L1".."L4" or numeric
@@ -789,8 +795,7 @@ export default function RP22CompliancePanel({
       }
 
       if (pid === 21) {
-        const MAP = { l1: "L1", l2: "L2", l3: "L3", l4: "L4" };
-        return MAP[p21EarlyReflectionPreset || "l2"] || "—";
+        return getP21PresetResult(p21EarlyReflectionPreset || "l2").level;
       }
 
       return "—";
@@ -824,8 +829,10 @@ export default function RP22CompliancePanel({
     if (isRoomScope) {
       const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
 
+      if (pid === 21 && res?.status === "error") return "Analysis error";
+
       // Engine value if present
-      if (res && res.status !== "no_data" && res.status !== "fail") {
+      if (res && res.status !== "no_data" && res.status !== "fail" && res.status !== "error") {
         const v = res.value;
 
         // P3 must always show a whole-speaker count, never the engine's preformatted decimal string
@@ -874,7 +881,7 @@ export default function RP22CompliancePanel({
       }
 
       if (pid === 21) {
-        return String(p21EarlyReflectionPreset || "l2").toUpperCase();
+        return getP21PresetResult(p21EarlyReflectionPreset || "l2").formatted;
       }
 
       return "—";

@@ -15,6 +15,7 @@ import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { computeSurroundRingGaps, rp22LevelForP5 } from '@/components/utils/p5SurroundGaps';
 import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
+import { levelP17_wsFR } from '@/components/utils/rp22/levels';
 
 // Helper for safe number extraction
 const finite = (v, fallback) => {
@@ -665,15 +666,10 @@ export function buildSeatHudSnapshot({
         }
       }
       
-      // P17 LEVELS (ONLY L4/L3/L2, no L1, no FAIL) using floored integer dB
-      let level17 = '—';
-      if (Number.isFinite(worstLossDb)) {
-        // worstLossDb is already an integer bucket (1, 3, or 4+)
-        if (worstLossDb <= 1) level17 = 'L4';     // (shouldn't occur with our buckets, but safe)
-        else if (worstLossDb <= 2) level17 = 'L4'; // treat 2 as L4 (conservative)
-        else if (worstLossDb <= 3) level17 = 'L3'; // 3 => L3
-        else level17 = 'L2';                       // 4+ => L2
-      }
+      // Grade the measured value through the authoritative P17 floor rule.
+      const level17 = Number.isFinite(worstLossDb)
+        ? levelP17_wsFR(worstLossDb).level
+        : '—';
       
       // P17 MUST BE N/A UNTIL REAL SL + SR SPEAKERS EXIST (NO GHOSTS)
       const _p17Candidates = (placedSpeakers || [])

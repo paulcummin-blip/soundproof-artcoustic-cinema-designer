@@ -33,6 +33,7 @@ import {
   buildCandidateSignature,
   signatureToString,
 } from "@/components/room/bass/candidateConsistency";
+import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 
 // ---------------------------------------------------------------------------
 // Adapter helpers
@@ -101,6 +102,10 @@ function progressToNumber(detailedProgress) {
 // Build a compact candidate reference (no large curve arrays duplicated).
 function buildCandidateRef(candidate) {
   if (!candidate) return null;
+  const p20Value = Number.isFinite(candidate.achievedP20VariationDb) ? candidate.achievedP20VariationDb : null;
+  const p20Level = p20Value == null
+    ? (typeof candidate.achievedP20Level === "number" ? candidate.achievedP20Level : parseLegacyLevel(candidate.achievedP20Level))
+    : numericRp22Level(levelP20_lfConsistency(p20Value));
   return {
     id: null,
     designEqFitProfile: candidate.designEqFitProfile || "standard",
@@ -113,8 +118,8 @@ function buildCandidateRef(candidate) {
     achievedP18FrequencyHz: Number.isFinite(candidate.achievedP18FrequencyHz) ? candidate.achievedP18FrequencyHz : null,
     achievedP19Level: typeof candidate.achievedP19Level === "number" ? candidate.achievedP19Level : parseLegacyLevel(candidate.achievedP19Level),
     achievedP19VariationDb: Number.isFinite(candidate.achievedP19VariationDb) ? candidate.achievedP19VariationDb : null,
-    achievedP20Level: typeof candidate.achievedP20Level === "number" ? candidate.achievedP20Level : parseLegacyLevel(candidate.achievedP20Level),
-    achievedP20VariationDb: Number.isFinite(candidate.achievedP20VariationDb) ? candidate.achievedP20VariationDb : null,
+    achievedP20Level: p20Level,
+    achievedP20VariationDb: p20Value,
     p20Available: !!candidate.p20Available,
     perSeatDiagnostics: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
       seatId: seat?.seatId ?? null,

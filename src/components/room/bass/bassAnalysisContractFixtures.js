@@ -74,14 +74,14 @@ export function runContractFixtures() {
     results.oneSeatP20NotApplicable = adapted.productAnalysis.parameters.p20.status === PARAM_STATUS_NOT_APPLICABLE;
   }
 
-  // 7. Two seats with P20 level zero produces FAIL.
+  // 7. Two seats with a finite P20 value receive the authoritative L1 floor.
   {
     const adapted = adaptCurrentBassOptimisationResult({
       optimisationResult: { selectedCandidate: { p20Available: true, achievedP20Level: 0, achievedP20VariationDb: 9.5, generatedFilterBank: [] }, poolId: "p1" },
       perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }],
     });
     const p20 = adapted.productAnalysis.parameters.p20;
-    results.twoSeatsP20LevelZeroFail = p20.status === PARAM_STATUS_COMPLETE && p20.level === 0 && formatParameterResult(p20).text === "P20 FAIL";
+    results.twoSeatsP20FiniteLevelFloor = p20.status === PARAM_STATUS_COMPLETE && p20.level === 1 && p20.value === 9.5 && formatParameterResult(p20).text === "P20 L1";
   }
 
   // 8. Canonical/internal mode mappings round-trip correctly.

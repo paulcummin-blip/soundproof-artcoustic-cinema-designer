@@ -37,6 +37,7 @@ import FrontElevation from '../components/room/FrontElevation';
 import SideElevation from '../components/room/SideElevation';
 import { getLevelColors } from '../components/utils/rp22Colors';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
+import { getP21PresetResult, levelP21_earlyReflections } from '@/components/utils/rp22/levels';
 
 // Local print-only pill — exact same visual spec as RP22GradingPill
 function PrintRp23Pill({ level }) {
@@ -680,7 +681,8 @@ function RP22ReportInner() {
         };
         const res = getRoomResult(paramId);
         if (res) {
-            if (res.status && typeof res.status === "string") { const s = res.status.toLowerCase(); if (s === "no_data" || s === "fail") return null; }
+            if (res.status && typeof res.status === "string") { const s = res.status.toLowerCase(); if (s === "no_data" || s === "fail" || s === "error") return null; }
+            if (paramId === 21 && Number.isFinite(res.value)) return levelP21_earlyReflections(res.value).level;
             const lvl = normaliseLvl(res.level);
             if (lvl) return lvl;
         }
@@ -693,7 +695,7 @@ function RP22ReportInner() {
         if (paramId === 8) return "L4";
         if (paramId === 11) return "L4";
         if (paramId === 15) return ({ standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" })[app?.p15ConstructionLevel || 'standard'] || null;
-        if (paramId === 21) return ({ l1: "L1", l2: "L2", l3: "L3", l4: "L4" })[app?.p21EarlyReflectionPreset || 'l2'] || null;
+        if (paramId === 21) return getP21PresetResult(app?.p21EarlyReflectionPreset || 'l2').level;
         return null;
     }, [analysisResult, getRoomResult, p2SystemConfig, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset]);
 
@@ -1179,7 +1181,7 @@ function RP22ReportInner() {
                                                         value={app?.p21EarlyReflectionPreset || 'l2'}
                                                         onChange={e => app?.setP21EarlyReflectionPresetSafe?.(e.target.value)}
                                                     >
-                                                        <option value="l1">No estimate / untreated room (L1)</option>
+                                                        <option value="l1">No estimate / not applicable (N/A)</option>
                                                         <option value="l2">Moderately live room (−8 dB · L2)</option>
                                                         <option value="l3">Well-balanced treated room (−10 dB · L3)</option>
                                                         <option value="l4">Heavily optimised room (−12 dB · L4)</option>

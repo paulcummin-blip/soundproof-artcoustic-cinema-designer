@@ -68,3 +68,23 @@ export function levelP20_lfConsistency(dB) {
   if (dB <= 4) return { level: 'L2', ok: true };
   return { level: 'L1', ok: true };
 }
+
+export function levelP21_earlyReflections(dB) {
+  if (!Number.isFinite(dB)) return { level: 'N/A', ok: false };
+  if (dB <= -12) return { level: 'L4', ok: true };
+  if (dB <= -10) return { level: 'L3', ok: true };
+  if (dB <= -8) return { level: 'L2', ok: true };
+  return { level: 'L1', ok: true };
+}
+
+export function numericRp22Level(result) {
+  const match = String(result?.level || '').match(/^L([1-4])$/);
+  return match ? Number(match[1]) : null;
+}
+
+export function getP21PresetResult(preset) {
+  const values = { l2: -8, l3: -10, l4: -12 };
+  const value = values[String(preset || '').toLowerCase()];
+  if (!Number.isFinite(value)) return { value: null, formatted: 'N/A', level: 'N/A', applicable: false };
+  return { value, formatted: `${value} dB`, level: levelP21_earlyReflections(value).level, applicable: true };
+}

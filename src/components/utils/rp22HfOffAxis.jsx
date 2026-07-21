@@ -11,6 +11,7 @@ import { resolveSpeakerYaw } from "@/components/utils/speakerAimResolver";
 // polarModel.type === "measured" with real PAS/FRD data). See measuredP17Engine.jsx header.
 import { computeMeasuredP17Response } from "@/components/utils/rp22/measuredP17Engine";
 import { validatePolarModel } from "@/components/utils/rp22/polarModelValidation";
+import { levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
 
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
 const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC", "TRL", "TRR"]);
@@ -796,10 +797,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
 // The measured engine (measuredP17Engine.jsx) intentionally does NOT assign RP22 levels itself —
 // this is the single place that maps a measured maximum seat-to-RSP spread to an RP22 level.
 export function classifyMeasuredP17Level(maxDeviationDb) {
-  if (!isNum(maxDeviationDb)) return null;
-  if (maxDeviationDb <= 3) return 4;
-  if (maxDeviationDb <= 6) return 3;
-  return 2;
+  return numericRp22Level(levelP17_wsFR(maxDeviationDb));
 }
 
 // P17: Compute surround/wide/overhead HF variance across all non-LCR speakers for all seats

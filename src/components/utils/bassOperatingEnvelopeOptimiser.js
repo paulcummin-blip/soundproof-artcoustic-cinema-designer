@@ -172,8 +172,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
         allOk: eq.bankDiagnostics?.selectedBankLimits?.allOk ?? null,
       };
 
-  // P20 seat consistency (reuse existing helper — do not implement a second version).
-  // P20 is N/A when fewer than 2 real seats; FAIL/0 when 2+ seats but outside all tolerances.
+  // P20 seat consistency reuses the authoritative grader. It is N/A with
+  // fewer than two real seats and has an L1 floor for every finite result.
   let achievedP20Level = 0;
   let achievedP20VariationDb = null;
   let worstP20SeatId = null;
@@ -188,7 +188,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     p20Available = true;
     achievedP20VariationDb = p20.worstSeatDeviationDb ?? null;
     worstP20SeatId = p20.worstSeatId ?? null;
-    achievedP20Level = p20.worstSeatLevel ?? 0; // null → 0 (FAIL), never N/A→0
+    achievedP20Level = p20.worstSeatLevel ?? 0;
   }
 
   return {

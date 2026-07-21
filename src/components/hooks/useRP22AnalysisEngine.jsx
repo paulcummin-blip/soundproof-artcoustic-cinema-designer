@@ -9,6 +9,7 @@ import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
 import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis";
+import { levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
 import { getSpeakerModelMeta, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { useAppState } from "@/components/AppStateProvider";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
@@ -1443,12 +1444,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         if (p17Data && isNum(p17Data.p17Db)) {
           const valueDb = p17Data.p17Db;
 
-          // P17 level mapping
-          let level17 = 2; // Default
-          if (valueDb <= 1.5) level17 = 4;
-          else if (valueDb <= 3.0) level17 = 3;
+          let level17 = numericRp22Level(levelP17_wsFR(valueDb));
 
-          // If any speaker is beyond 41°, cap at Level 2
+          // If any speaker is beyond 41°, cap at Level 2.
           if (p17Data.p17HasNaAngles) {
             level17 = Math.min(level17, 2);
           }
@@ -1485,8 +1483,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           !!seat.__isSyntheticMLP;
         if (isRspSeat) {
           const worstDev = bassP20.worstSeatDeviationDb;
-          const worstLvl = bassP20.worstSeatLevel; // 4/3/2 or null
-          const worstDbTxt = `Worst: ±${worstDev.toFixed(1)} dB${bassP20.isSingleSeat ? ' (single seat)' : (bassP20.worstSeatId ? ` (${bassP20.worstSeatId})` : '')}${worstLvl == null ? ' · Below L2' : ''}`;
+          const worstLvl = bassP20.worstSeatLevel; // 4/3/2/1
+          const worstDbTxt = `Worst: ±${worstDev.toFixed(1)} dB${bassP20.isSingleSeat ? ' (single seat)' : (bassP20.worstSeatId ? ` (${bassP20.worstSeatId})` : '')}`;
           metrics.p20 = {
             valueDb: worstDev,
             level: worstLvl,

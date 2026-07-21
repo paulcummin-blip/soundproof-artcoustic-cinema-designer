@@ -5,6 +5,7 @@ import RP22ComplianceParameterTile from "@/components/rp22/RP22ComplianceParamet
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { useAppState } from "@/components/AppStateProvider";
 import { getLevelColors } from "@/components/utils/rp22Colors";
+import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 
 /* ---------- Canonical RP22 parameter definitions (mirrored from RP22CompliancePanel) ---------- */
 const RP22_PARAMS = [
@@ -192,13 +193,15 @@ export default function RP22ReportParameterGrid({
         return "—";
       }
 
+      if (pid === 21 && res?.status === "error") return "—";
+      if (pid === 21 && res && res.status !== "no_data" && res.status !== "fail" && Number.isFinite(res.value)) return levelP21_earlyReflections(res.value).level;
       if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) return res.level;
       if (pid === 2 && p2SystemConfig) return p2SystemConfig.p2Level;
       if (pid === 3) { const p3 = analysisResult?.gradedParameters?.primary?.[3]; return (p3 && p3.status === "ok") ? p3.level : "—"; }
       if (pid === 8) return "L4";
       if (pid === 11) return "L4";
       if (pid === 15) { const MAP = { standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" }; return MAP[p15ConstructionLevel || "standard"] || "—"; }
-      if (pid === 21) { const MAP = { l1: "L1", l2: "L2", l3: "L3", l4: "L4" }; return MAP[p21EarlyReflectionPreset || "l2"] || "—"; }
+      if (pid === 21) return getP21PresetResult(p21EarlyReflectionPreset || "l2").level;
       return "—";
     }
 
@@ -215,6 +218,7 @@ export default function RP22ReportParameterGrid({
 
     if (isRoomScope) {
       const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
+      if (pid === 21 && res?.status === "error") return "Analysis error";
       if (pid === 3) {
         const p3 = analysisResult?.gradedParameters?.primary?.[3] || null;
         if (p3?.status === "ok") {
@@ -229,7 +233,7 @@ export default function RP22ReportParameterGrid({
         if (p3?.status === "no_data") return "Not Calculated";
         return "—";
       }
-      if (res && res.status !== "no_data" && res.status !== "fail") {
+      if (res && res.status !== "no_data" && res.status !== "fail" && res.status !== "error") {
         const v = res.value;
         if (res.formatted) return res.formatted;
         if (v !== null && v !== undefined) {
@@ -245,7 +249,7 @@ export default function RP22ReportParameterGrid({
       if (pid === 8) return "No";
       if (pid === 11) return "0";
       if (pid === 15) { const LABEL = { standard: "NCB 26 (standard)", "purpose-built": "NCB 22 (purpose-built)", reference: "NCB 18 (reference)", studio: "NCB 15 (studio)" }; return LABEL[p15ConstructionLevel || "standard"] || "—"; }
-      if (pid === 21) return String(p21EarlyReflectionPreset || "l2").toUpperCase();
+      if (pid === 21) return getP21PresetResult(p21EarlyReflectionPreset || "l2").formatted;
       return "—";
     }
 

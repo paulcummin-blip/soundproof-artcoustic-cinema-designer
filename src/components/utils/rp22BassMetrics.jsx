@@ -11,6 +11,7 @@
 import { applyBassSmoothing } from '../room/bass/bassGraphSmoothing';
 import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
+import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 export { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 export { applyDesignEqCurve, calculateDesignEqCurve };
@@ -309,10 +310,7 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
 }
 
 function levelForDeviation(dev) {
-  if (dev <= 2) return 4;
-  if (dev <= 3) return 3;
-  if (dev <= 4) return 2;
-  return null; // "N/A" — below L2 floor (Param 20 has no L1)
+  return numericRp22Level(levelP20_lfConsistency(dev));
 }
 
 // Parameter 20 — Seat-to-seat frequency response below transition, relative to
