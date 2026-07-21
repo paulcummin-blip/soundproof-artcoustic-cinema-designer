@@ -33,6 +33,7 @@ import { useBassAnalysisContract } from "@/components/room/bass/useBassAnalysisC
 import BassContractParityAudit from "@/components/room/bass/BassContractParityAudit";
 import { deriveRequestedCalibrationConfig } from "@/components/room/bass/requestedCalibrationConfig";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
+import { useNormalizedRoomTransferLive } from "@/components/room/bass/useNormalizedRoomTransferLive";
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code.
@@ -927,6 +928,71 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     handleFingerprintChange(detailedFingerprint);
   }, [detailedFingerprint, handleFingerprintChange]);
 
+  // --- Phase 2B: Normalized room-transfer live wiring ---
+  // Product-independent physics options for the normalized engine. Uses the
+  // flat 94 dB source (pureDeterministicModalSum, debugReflectionOrder 1,
+  // disableModalPropagationPhase true) matching the production flat-source path.
+  // Excludes model key, product curve, requested SPL, EQ, priority, smoothing.
+  const normalizedPhysicsOptions = useMemo(() => ({
+    surfaceAbsorption,
+    enableReflections: qStrategy === 'ab_corrected' ? true : enableRewCoreReflections,
+    enableModes: true,
+    roomDamping,
+    axialQ,
+    modalSourceReferenceMode,
+    modalGainScalar,
+    modalDistanceBlend,
+    modalStorageMode,
+    propagationPhaseScale,
+    pureDeterministicModalSum: true,
+    disableReflectionPhaseJitter,
+    disableReflectionCoherenceWeight,
+    disableLateField: true,
+    disableModalPropagationPhase: true,
+    mute68HzAxialMode,
+    debugDisableModalContribution,
+    rewParityFieldMode,
+    overrideConstantAxialQ,
+    overrideAbsorptionAxialQ,
+    debugMode200Multiplier,
+    debugModalPhaseConvention: 'normal',
+    debugReflectionOrder: 1,
+    reflectionGainScale,
+    debugModalHSign: 'normal',
+    rewParityModalMagnitudeScale: 1.0,
+    modalCoherenceMode,
+    highOrderAxialScale,
+    qStrategy,
+    rewModalBandwidthScale,
+  }), [surfaceAbsorption, qStrategy, enableRewCoreReflections, roomDamping, axialQ, modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight, mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode, overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, reflectionGainScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale]);
+
+  const normalizedLive = useNormalizedRoomTransferLive({
+    roomDims, rspPosition, seatingPositions, subsForSimulation,
+    physicsOptions: normalizedPhysicsOptions,
+  });
+
+  // Normalized RSP series for the live, pre-calibration room-response display.
+  // Labelled as product-independent; its 94 dB reference is NOT predicted product SPL.
+  const normalizedSeries = useMemo(() => {
+    if (!normalizedLive.result?.rspCurve?.length) return null;
+    return {
+      id: "normalized-rsp",
+      kind: "normalized",
+      label: "Normalized room response (RSP)",
+      tooltipLabel: "Product-independent normalized room response (94 dB flat reference) — not predicted product SPL",
+      color: "#16A34A",
+      strokeWidth: 2,
+      data: normalizedLive.result.rspCurve,
+    };
+  }, [normalizedLive.result]);
+
+  // A valid detailed result is one that is COMPLETE and matches the current
+  // physical fingerprint. When geometry changes, detailedStatus becomes
+  // OUT_OF_DATE and this flag is false — the stale result is NOT presented
+  // as current; the normalized curve is shown instead.
+  const hasValidDetailedResult = designEqEnabled && detailedStatus === "COMPLETE" &&
+    optimisationResult?.finalPostEqCurve?.length > 0 && rspRawCurve.length > 0;
+
   // Worker payload — structured-clone-safe data for the detailed calculation.
   const detailedPayload = useMemo(() => ({
     rawCurve: rspRawCurve,
@@ -995,6 +1061,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [showHouseCurve, optimisationResult]);
 
   const multiSeriesForGraph = useMemo(() => {
+    // Phase 2B: When no valid detailed result, show the product-independent
+    // normalized room response instead of the product-aware raw curve. The
+    // 94 dB reference is NOT predicted product SPL. No P14/P18/P19/P20,
+    // house-curve, or post-EQ is shown — calibration has not occurred.
+    if (!hasValidDetailedResult) {
+      if (!normalizedSeries) return [];
+      let nOut = [{ ...normalizedSeries, data: applyBassSmoothing(normalizedSeries.data, bassSmoothingMode) }];
+      if (showRewOverlay && rewOverlaySeries) nOut = [...nOut, rewOverlaySeries];
+      return nOut;
+    }
+
+    // Valid detailed result — existing product-aware display (raw + post-EQ).
     // When overlaying, highlight the active REW-style Absorption Authority curve in green
     // so it's clearly distinguishable from the grey Production overlay curve.
     let out = (overlayProduction && qStrategy === 'rew_absorption_authority')
@@ -1043,7 +1121,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (showRewOverlay && rewOverlaySeries) out = [...out, rewOverlaySeries];
     if (houseCurveSeries) out = [...out, houseCurveSeries];
     return out;
-  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult, houseCurveSeries, rspRawCurve, showRealSeatOverlays]);
+  }, [multiSeries, rewOverlaySeries, showRewOverlay, overlayProduction, overlayProductionSeries, qStrategy, bassSmoothingMode, designEqEnabled, optimisationResult, houseCurveSeries, rspRawCurve, showRealSeatOverlays, hasValidDetailedResult, normalizedSeries]);
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -1606,7 +1684,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
-          {designEqEnabled ? (optimisationResult?.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : optimisationResult ? 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate' : 'Detailed result not calculated — click Calculate to run optimisation') : 'Showing raw simulated curve'}
+          {hasValidDetailedResult
+            ? (optimisationResult?.isBestCalibratedAttempt ? 'BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED' : 'BASS OPTIMISER VALIDATION ACTIVE — showing selected post-EQ candidate')
+            : designEqEnabled
+              ? (detailedStatus === 'OUT_OF_DATE'
+                  ? 'Showing product-independent normalized room response — detailed result out of date, click Calculate to recalculate'
+                  : 'Showing product-independent normalized room response — detailed result not calculated, click Calculate to run optimisation')
+              : 'Showing product-independent normalized room response (94 dB flat reference) — not predicted product SPL'}
         </div>
         {designEqEnabled && optimisationResult && <>
           {/* Source diagnostics — assessment position provenance */}

@@ -22,9 +22,15 @@
 //
 // Run via runNormalizedRoomTransferFixtures().
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { computeNormalizedRoomTransfer } from "@/components/room/bass/normalizedRoomTransferEngine";
-import normalizedEngineSourceText from "@/components/room/bass/normalizedRoomTransferEngine.js?raw";
 import { simulateBassResponseRewCore } from "@/bass/core/rewBassEngine";
+
+const __filename_ntf = fileURLToPath(import.meta.url);
+const __dirname_ntf = dirname(__filename_ntf);
+const normalizedEngineSourceText = readFileSync(join(__dirname_ntf, "normalizedRoomTransferEngine.js"), "utf8");
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
 import { REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 

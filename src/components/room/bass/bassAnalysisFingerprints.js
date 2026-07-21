@@ -187,6 +187,108 @@ export function computeGeometryFingerprint(inputs) {
 }
 
 // ---------------------------------------------------------------------------
+// 3b. Normalized-transfer fingerprint (Phase 2B)
+// ---------------------------------------------------------------------------
+
+// Product-independent fingerprint for the normalized room-transfer engine.
+// Identical to computeGeometryFingerprint except:
+//   - Sources are sorted by physical position (x, y, z), not by model-derived
+//     ID. Swapping SUB2-12 for SUB3-12 without moving anything produces the
+//     same fingerprint and queues no normalized worker job.
+//   - Source normalization excludes the `id` field entirely.
+//   - `rewSourceCurveMode` is fixed to "normalized_room_transfer" (the
+//     engine always uses the flat 94 dB source).
+//   - Prefix is "nrt" (normalized room transfer).
+//
+// Includes: room dims, RSP/seat coords, source coords, source quantity,
+//   placement, relative gain/delay/polarity, and all relevant room-physics
+//   settings.
+// Excludes: model key, product curve, product capability, product-derived
+//   source IDs, requested SPL, EQ settings, priority mode, graph smoothing
+//   and display controls.
+
+function sortSourcesByPosition(arr) {
+  return arr.slice().sort((a, b) => {
+    const ax = a.x ?? 0, bx = b.x ?? 0;
+    if (ax !== bx) return ax - bx;
+    const ay = a.y ?? 0, by = b.y ?? 0;
+    if (ay !== by) return ay - by;
+    const az = a.z ?? 0, bz = b.z ?? 0;
+    return az - bz;
+  });
+}
+
+function normalizeSourceGeometryNoId(s) {
+  return {
+    x: num(s?.x),
+    y: num(s?.y),
+    z: num(s?.z),
+    placement: s?.placement || null,
+    gainDb: num(s?.tuning?.gainDb),
+    delayMs: num(s?.tuning?.delayMs, 3),
+    polarity: s?.tuning?.polarity ?? 0,
+  };
+}
+
+export function computeNormalizedTransferFingerprint(inputs) {
+  const i = inputs || {};
+
+  const sources = sortSourcesByPosition(resolveSources(i).map(normalizeSourceGeometryNoId));
+  const seats = sortById((Array.isArray(i.seatingPositions) ? i.seatingPositions : []).map(normalizeSeat));
+
+  const canonical = {
+    room: {
+      w: num(i.roomDims?.widthM),
+      l: num(i.roomDims?.lengthM),
+      h: num(i.roomDims?.heightM),
+    },
+    rsp: i.rspPosition
+      ? { x: num(i.rspPosition.x), y: num(i.rspPosition.y), z: num(i.rspPosition.z) }
+      : null,
+    sources,
+    sourceCount: sources.length,
+    seats,
+    absorption: {
+      front: num(i.surfaceAbsorption?.front, 4),
+      back: num(i.surfaceAbsorption?.back, 4),
+      left: num(i.surfaceAbsorption?.left, 4),
+      right: num(i.surfaceAbsorption?.right, 4),
+      ceiling: num(i.surfaceAbsorption?.ceiling, 4),
+      floor: num(i.surfaceAbsorption?.floor, 4),
+    },
+    roomDamping: num(i.roomDamping, 2),
+    axialQ: num(i.axialQ, 3),
+    modalSourceReferenceMode: i.modalSourceReferenceMode || null,
+    modalGainScalar: num(i.modalGainScalar, 4),
+    modalDistanceBlend: num(i.modalDistanceBlend, 4),
+    modalStorageMode: i.modalStorageMode || null,
+    propagationPhaseScale: num(i.propagationPhaseScale, 4),
+    enableRewCoreReflections: !!i.enableRewCoreReflections,
+    rewSourceCurveMode: "normalized_room_transfer",
+    qStrategy: i.qStrategy || null,
+    rewModalBandwidthScale: num(i.rewModalBandwidthScale, 4),
+    disableReflectionPhaseJitter: !!i.disableReflectionPhaseJitter,
+    disableReflectionCoherenceWeight: !!i.disableReflectionCoherenceWeight,
+    disableLateField: !!i.disableLateField,
+    disableModalPropagationPhase: !!i.disableModalPropagationPhase,
+    mute68HzAxialMode: !!i.mute68HzAxialMode,
+    debugDisableModalContribution: !!i.debugDisableModalContribution,
+    rewParityFieldMode: i.rewParityFieldMode || null,
+    overrideConstantAxialQ: !!i.overrideConstantAxialQ,
+    overrideAbsorptionAxialQ: !!i.overrideAbsorptionAxialQ,
+    debugMode200Multiplier: num(i.debugMode200Multiplier, 4),
+    debugModalPhaseConvention: i.debugModalPhaseConvention || null,
+    reflectionGainScale: num(i.reflectionGainScale, 4),
+    debugModalHSign: i.debugModalHSign || null,
+    rewParityModalMagnitudeScale: num(i.rewParityModalMagnitudeScale, 4),
+    modalCoherenceMode: i.modalCoherenceMode || null,
+    highOrderAxialScale: num(i.highOrderAxialScale, 4),
+  };
+
+  return fingerprint(canonical, "nrt");
+}
+
+// ---------------------------------------------------------------------------
 // 4. Product fingerprint
 // ---------------------------------------------------------------------------
 
@@ -300,7 +402,7 @@ export function isValidFingerprint(fp) {
   if (typeof fp !== "string" || fp.length === 0) return false;
   const parts = fp.split(":");
   if (parts.length < 3) return false;
-  if (!["geo", "prod", "cal", "hcurve"].includes(parts[0])) return false;
+  if (!["geo", "prod", "cal", "hcurve", "nrt"].includes(parts[0])) return false;
   if (!parts[1].startsWith("v")) return false;
   const hash = parts[parts.length - 1];
   if (!/^[0-9a-f]+$/.test(hash)) return false;
