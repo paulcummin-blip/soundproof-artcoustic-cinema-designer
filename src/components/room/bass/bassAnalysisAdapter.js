@@ -379,11 +379,12 @@ export function adaptCurrentBassOptimisationResult({
     unit: "dB", passedL1: p19Level != null ? p19Level >= 1 : null, isStale,
   });
 
-  // P20 — not_applicable when fewer than 2 real seats
-  if (realSeatCount < 2) {
+  // P20 — not applicable without a valid non-RSP comparison result.
+  if (realSeatCount < 2 || selectedCandidate?.p20Available === false) {
     contract.productAnalysis.parameters.p20 = createBassParameterResult({
       parameter: PARAM_P20, status: PARAM_STATUS_NOT_APPLICABLE, level: null, value: null,
-      unit: "dB", passedL1: null, isStale: false, reason: "Fewer than two real seats",
+      unit: "dB", passedL1: null, isStale: false,
+      reason: realSeatCount < 2 ? "Fewer than two real seats" : "No valid overlapping non-RSP seat response",
     });
   } else if (selectedCandidate && selectedCandidate.p20Available) {
     const p20Level = typeof selectedCandidate.achievedP20Level === "number" ? selectedCandidate.achievedP20Level : parseLegacyLevel(selectedCandidate.achievedP20Level);

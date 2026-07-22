@@ -15,7 +15,9 @@ const EXPECTED = {
     product: "prod:v1:3f55cab9863453b3",
     calibration: "cal:v1:793662cea8c5a550",
   },
-  selectedCandidate: "e72b524a",
+  // Audited authority-only structure update: the legacy candidate shape hashes
+  // to e72b524a after removing APPROVED_AUTHORITY_FIELDS below.
+  selectedCandidate: "f948c9c6",
   filterBank: "456a46ca",
   postEqCurve: "e3d9bef1",
   parameters: "b36aafdd",
@@ -35,6 +37,19 @@ function hash(value) {
     result = Math.imul(result, 16777619);
   }
   return (result >>> 0).toString(16).padStart(8, "0");
+}
+
+const APPROVED_AUTHORITY_FIELDS = [
+  "officialP19WorstFrequencyHz",
+  "officialP19Label",
+  "correctableP19Label",
+  "perSeatP20Results",
+  "p20Label",
+];
+const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "e72b524a";
+
+function withoutApprovedAuthorityFields(candidate) {
+  return Object.fromEntries(Object.entries(candidate || {}).filter(([key]) => !APPROVED_AUTHORITY_FIELDS.includes(key)));
 }
 
 function savedProjectInputs() {
@@ -140,5 +155,18 @@ export function runBassAuthorityParityFixtures() {
   };
   const fields = Object.keys(observed);
   const results = fields.map((field) => ({ name: field, passed: EXPECTED != null && stable(observed[field]) === stable(EXPECTED[field]) }));
-  return { observed, results, passed: results.filter((result) => result.passed).length, total: results.length, allPassed: results.every((result) => result.passed) };
+  const structuralAudit = {
+    approvedFields: APPROVED_AUTHORITY_FIELDS,
+    strippedCandidateHash: hash(withoutApprovedAuthorityFields(candidate)),
+    expectedPreAuthorityHash: PRE_AUTHORITY_SELECTED_CANDIDATE_HASH,
+  };
+  structuralAudit.approvedOnly = structuralAudit.strippedCandidateHash === structuralAudit.expectedPreAuthorityHash;
+  return {
+    observed,
+    results,
+    structuralAudit,
+    passed: results.filter((result) => result.passed).length,
+    total: results.length,
+    allPassed: results.every((result) => result.passed) && structuralAudit.approvedOnly,
+  };
 }

@@ -3,6 +3,16 @@ const finite = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
+export function canonicalizeSeatIdentity(value) {
+  const rawIdentity = value?.seatId ?? value?.id ?? value;
+  return rawIdentity == null ? "" : String(rawIdentity).trim().toLowerCase();
+}
+
+export function isReferenceSeatIdentity(seat) {
+  if (seat?.__isSyntheticRsp === true) return true;
+  return ["rsp", "mlp"].includes(canonicalizeSeatIdentity(seat));
+}
+
 export function canonicalizeRoomDims(room) {
   const widthM = finite(room?.widthM ?? room?.width_m ?? room?.width ?? room?.room_width);
   const lengthM = finite(room?.lengthM ?? room?.length_m ?? room?.length ?? room?.room_length);

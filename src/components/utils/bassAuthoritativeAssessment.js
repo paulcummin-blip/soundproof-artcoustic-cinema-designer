@@ -1,7 +1,8 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
+import { isReferenceSeatIdentity } from "@/components/room/bass/normalizedRoomInputAdapters";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 
-const finite = (value) => Number.isFinite(Number(value));
+const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
 function normalizedCurve(curve) {
   return (Array.isArray(curve) ? curve : [])
@@ -17,8 +18,9 @@ function smoothedAssessmentCurve(curve, startHz, endHz) {
 
 function curveValueAt(curve, frequency) {
   if (!curve.length) return null;
-  if (frequency <= curve[0].frequency) return curve[0].spl;
-  if (frequency >= curve[curve.length - 1].frequency) return curve[curve.length - 1].spl;
+  if (frequency < curve[0].frequency || frequency > curve[curve.length - 1].frequency) return null;
+  if (frequency === curve[0].frequency) return curve[0].spl;
+  if (frequency === curve[curve.length - 1].frequency) return curve[curve.length - 1].spl;
   for (let index = 0; index < curve.length - 1; index += 1) {
     const low = curve[index];
     const high = curve[index + 1];
@@ -71,20 +73,23 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
   const rspCurve = smoothedAssessmentCurve(rspPostEqCurve, assessmentStartHz, assessmentEndHz);
   if (!rspCurve.length) return { available: false, perSeatResults: [], worstSeat: null, label: "P20 worst seat" };
   const perSeatResults = (Array.isArray(perSeatPostEqCurves) ? perSeatPostEqCurves : [])
-    .filter((seat) => seat?.seatId && seat.seatId !== "rsp" && seat.__isSyntheticRsp !== true)
+    .filter((seat) => seat?.seatId && !isReferenceSeatIdentity(seat))
     .map((seat) => {
       const seatCurve = smoothedAssessmentCurve(seat.responseData, assessmentStartHz, assessmentEndHz);
-      let variationDbRaw = 0;
+      let variationDbRaw = null;
       let worstFrequencyHz = null;
+      let comparisonPointCount = 0;
       rspCurve.forEach((rspPoint) => {
         const seatSpl = curveValueAt(seatCurve, rspPoint.frequency);
-        if (!finite(seatSpl)) return;
+        if (!finite(rspPoint.spl) || !finite(seatSpl)) return;
+        comparisonPointCount += 1;
         const difference = Math.abs(seatSpl - rspPoint.spl);
-        if (worstFrequencyHz == null || difference > variationDbRaw) {
+        if (variationDbRaw == null || difference > variationDbRaw) {
           variationDbRaw = difference;
           worstFrequencyHz = rspPoint.frequency;
         }
       });
+      if (comparisonPointCount === 0 || variationDbRaw == null) return null;
       const displayVariationDb = Math.floor(variationDbRaw);
       return {
         seatId: seat.seatId,
@@ -92,8 +97,10 @@ export function computeOfficialP20Assessment({ rspPostEqCurve, perSeatPostEqCurv
         displayVariationDb,
         level: p20LevelFromDisplayVariation(displayVariationDb),
         worstFrequencyHz,
+        comparisonPointCount,
       };
-    });
+    })
+    .filter(Boolean);
   const worstSeat = perSeatResults.reduce((worst, seat) => (
     !worst || seat.variationDbRaw > worst.variationDbRaw ? seat : worst
   ), null);

@@ -39,6 +39,11 @@ export function runRp22GradingBoundaryFixtures() {
     perSeatRawCurves: [{ seatId: "seat-1" }],
   });
   check("P20 single seat remains N/A", singleSeat.productAnalysis.parameters.p20.status === "not_applicable" && singleSeat.productAnalysis.parameters.p20.value === null);
+  const missingOverlap = adaptCurrentBassOptimisationResult({
+    optimisationResult: { selectedCandidate: { p20Available: false, generatedFilterBank: [] }, poolId: "missing-overlap" },
+    perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }],
+  });
+  check("P20 missing overlap remains N/A", missingOverlap.productAnalysis.parameters.p20.status === "not_applicable" && missingOverlap.productAnalysis.parameters.p20.value === null);
   const fullPrecision = adaptCurrentBassOptimisationResult({
     optimisationResult: { selectedCandidate: { p20Available: true, achievedP20Level: 1, achievedP20VariationDb: 4.9, generatedFilterBank: [] }, poolId: "full-precision" },
     perSeatRawCurves: [{ seatId: "seat-1" }, { seatId: "seat-2" }],
