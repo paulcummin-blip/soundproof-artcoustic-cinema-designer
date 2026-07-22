@@ -370,7 +370,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     product: computeProductFingerprint(fingerprintInputs),
     calibration: computeCalibrationFingerprint(fingerprintInputs),
   }), [fingerprintInputs]);
-  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, targetAnchorDb: requested.requestedTargetAnchorDb, targetAnchorSource: "splConfig.targetSpl", perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, requested.requestedTargetAnchorDb, perSeatRawCurves]);
+  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, targetAnchorDb: requested.requestedTargetAnchorDb, targetAnchorSource: "rp22-request.p14.p14TargetDb", perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, requested.requestedTargetAnchorDb, perSeatRawCurves]);
   const inputsValid = !!rspPosition && seatingPositions.length > 0 && rspRawCurve.length > 0 && sources.length > 0 && [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
 
   return {

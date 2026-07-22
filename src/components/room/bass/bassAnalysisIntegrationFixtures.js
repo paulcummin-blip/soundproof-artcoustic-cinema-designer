@@ -354,7 +354,18 @@ export function runIntegrationFixtures() {
     results.i17EqOnWithoutResultKeepsRaw = calculating.length === 1 && calculating[0].kind === "raw";
     results.i18CalculatingLifecycleVisible = detailedEqStatusText({ designEqEnabled: true, detailedStatus: "CALCULATING" }).startsWith("Calculating detailed EQ");
 
-    const ready = { ...baseOptimisationResult(), selectedP14TargetDb: 100, finalPostEqCurve: baseRspRawCurve().map((point) => ({ ...point, spl: point.spl + 2 })) };
+    const baseReady = baseOptimisationResult();
+    const ready = {
+      ...baseReady,
+      selectedCandidate: {
+        ...baseReady.selectedCandidate,
+        correctionStartHz: 20,
+        correctionEndHz: 80,
+        productionHouseCurveTarget: baseRspRawCurve().map((point) => ({ ...point, spl: 100 })),
+      },
+      selectedP14TargetDb: 100,
+      finalPostEqCurve: baseRspRawCurve().map((point) => ({ ...point, spl: point.spl + 2 })),
+    };
     const matching = buildBassGraphSeries({ designEqEnabled: true, showHouseCurve: true, rspRawCurve: baseRspRawCurve(), optimisationResult: ready, hasMatchingDetailedResult: true });
     results.i19MatchingResultShowsThreeDomains = ["raw", "post-eq", "house-curve"].every((kind) => matching.some((item) => item.kind === kind));
 

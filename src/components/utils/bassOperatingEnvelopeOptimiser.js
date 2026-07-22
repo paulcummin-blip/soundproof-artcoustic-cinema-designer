@@ -208,6 +208,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
 
   return {
     requestedP14Level: request.p14.level,
+    requestedP14TargetDb: request.p14.p14TargetDb,
     requestedP18Level: request.p18.level,
     requestedP19Level: request.p19.level,
     requestedTargetSpl: targetAnchorDb,
@@ -302,12 +303,18 @@ const FIT_PROFILES_TO_GENERATE = [
   DESIGN_EQ_FIT_PROFILES.accuracy,
 ];
 
-export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, correctionEndHz = 200, targetAnchorDb = null, targetAnchorSource = null, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
-  if (!rawCurve.length || !activeSubs.length || !Number.isFinite(targetAnchorDb)) return stampPoolAuthority({
+export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, correctionEndHz = 200, targetAnchorDb = null, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
+  const missingInputs = [
+    !rawCurve.length && "rawCurve",
+    !activeSubs.length && "activeSubs",
+  ].filter(Boolean);
+  if (missingInputs.length) return stampPoolAuthority({
     poolVersion: BASS_OPTIMISER_POOL_VERSION,
     candidates: [], selectablePool: [], definitions: null, performanceSummary: null, poolId: null,
     generatedCandidateCount: 0, physicallyCredibleCount: 0, requestedEnvelopeValidCount: 0,
-    standardFitCount: 0, accuracyFitCount: 0, warningMessage: "A raw response curve and active subwoofer system are required.",
+    standardFitCount: 0, accuracyFitCount: 0, houseCurveFitCount: 0,
+    generationStatus: "invalid-inputs", missingInputs,
+    warningMessage: `Missing mandatory optimiser input${missingInputs.length > 1 ? "s" : ""}: ${missingInputs.join(", ")}`,
   });
   const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
   const t0 = perf();
@@ -315,10 +322,6 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   const definitions = getRp22BassOperatingDefinitions();
   const requests = makeRequests(definitions);
   const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
-  const canonicalTargetCurve = buildCanonicalAbsoluteHouseCurveTarget({
-    frequencyGrid: rawCurve.map((point) => point.frequency), targetAnchorDb,
-    correctionStartHz: domains.correctionStartHz, correctionEndHz: domains.correctionEndHz,
-  });
   const preparedSeatCurves = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : []).filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length > 0);
   const responsePreparationTimeMs = perf() - preparationStart;
   const coreFitCache = new Map();
@@ -345,7 +348,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   report("Candidate definitions generated", 0);
   let taskIndex = 0;
   const candidates = [];
-  const appendCandidate = (evaluationKey, request, eqResult) => {
+  const appendCandidate = (evaluationKey, request, eqResult, requestTargetAnchorDb, requestTargetAnchorSource, canonicalTargetCurve) => {
     const cached = reuseCandidateEvaluations ? candidateEvaluationCache.get(evaluationKey) : null;
     if (cached) {
       reusedCandidateEvaluationCount++;
@@ -353,7 +356,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       return;
     }
     const seatStart = perf();
-    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves, targetAnchorDb, targetAnchorSource, domains, canonicalTargetCurve });
+    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves, targetAnchorDb: requestTargetAnchorDb, targetAnchorSource: requestTargetAnchorSource, domains, canonicalTargetCurve });
     perSeatEvaluationTimeMs += perf() - seatStart;
     candidateEvaluationCount++;
     curveFilterEvaluationCount += preparedSeatCurves.reduce((count, seat) => count + seat.responseData.length, 0);
@@ -363,13 +366,21 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   for (const request of requests) {
     const assessmentStartHz = domains.correctionStartHz;
     const assessmentEndHz = domains.correctionEndHz;
+    const requestTargetAnchorDb = request.p14.p14TargetDb;
+    const requestTargetAnchorSource = "rp22-request.p14.p14TargetDb";
+    const canonicalTargetCurve = buildCanonicalAbsoluteHouseCurveTarget({
+      frequencyGrid: rawCurve.map((point) => point.frequency),
+      targetAnchorDb: requestTargetAnchorDb,
+      correctionStartHz: domains.correctionStartHz,
+      correctionEndHz: domains.correctionEndHz,
+    });
     // Standard fit — generated first so its enabled filter bank can seed the
     // Accuracy fit. The seed guarantees the Accuracy result retains or improves
     // the Standard checkpoint's maximum house-curve deviation.
     taskIndex++;
     report("Core EQ fitting", taskIndex);
     const standardCacheKey = [
-      targetAnchorDb, assessmentStartHz, assessmentEndHz,
+      requestTargetAnchorDb, assessmentStartHz, assessmentEndHz,
       "standard", DESIGN_EQ_FIT_PROFILES.standard.fittingToleranceDb,
       DESIGN_EQ_FIT_PROFILES.standard.maximumCutDb,
       DESIGN_EQ_FIT_PROFILES.standard.maximumAggregateBoostDb,
@@ -379,8 +390,8 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     if (!standardEq) {
       const fitStart = perf();
       standardEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: targetAnchorDb,
-        targetAnchorDb,
+        requestedSystemOutputDb: requestTargetAnchorDb,
+        targetAnchorDb: requestTargetAnchorDb,
         canonicalTargetCurve,
         targetToleranceDb: request.p19.p19ToleranceDb,
         fitProfile: "standard", assessmentStartHz, assessmentEndHz, collectDiagnostics,
@@ -391,7 +402,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       standardFitCount++;
     }
     report("Per-seat evaluation", taskIndex);
-    appendCandidate(standardCacheKey, request, standardEq);
+    appendCandidate(standardCacheKey, request, standardEq, requestTargetAnchorDb, requestTargetAnchorSource, canonicalTargetCurve);
 
     // Accuracy fit — seeded with the Standard fit's enabled filter bank.
     // The seed signature is included in the cache key so a seeded Accuracy fit
@@ -401,7 +412,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     const standardSeedFilters = (standardEq.filters || []).filter((f) => f && f.enabled);
     const seedSignature = standardSeedFilters.map((f) => `${f.frequencyHz}:${f.gainDb}:${f.Q}`).join(",");
     const accuracyCacheKey = [
-      targetAnchorDb, assessmentStartHz, assessmentEndHz,
+      requestTargetAnchorDb, assessmentStartHz, assessmentEndHz,
       "accuracy", DESIGN_EQ_FIT_PROFILES.accuracy.fittingToleranceDb,
       DESIGN_EQ_FIT_PROFILES.accuracy.maximumCutDb,
       DESIGN_EQ_FIT_PROFILES.accuracy.maximumAggregateBoostDb,
@@ -411,8 +422,8 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     if (!accuracyEq) {
       const fitStart = perf();
       accuracyEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: targetAnchorDb,
-        targetAnchorDb,
+        requestedSystemOutputDb: requestTargetAnchorDb,
+        targetAnchorDb: requestTargetAnchorDb,
         canonicalTargetCurve,
         targetToleranceDb: request.p19.p19ToleranceDb,
         fitProfile: "accuracy", assessmentStartHz, assessmentEndHz, collectDiagnostics,
@@ -424,7 +435,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       accuracyFitCount++;
     }
     report("Per-seat evaluation", taskIndex);
-    appendCandidate(accuracyCacheKey, request, accuracyEq);
+    appendCandidate(accuracyCacheKey, request, accuracyEq, requestTargetAnchorDb, requestTargetAnchorSource, canonicalTargetCurve);
 
     // House-curve fit — seat-aware, optimised for worst-seat P19 deviation.
     // Uses the same shared bank for RSP and every real seat. Seeded from the
@@ -432,15 +443,15 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     taskIndex++;
     report("House-curve multi-start fits", taskIndex);
     const houseCurveCacheKey = [
-      targetAnchorDb, assessmentStartHz, assessmentEndHz,
+      requestTargetAnchorDb, assessmentStartHz, assessmentEndHz,
       "house_curve", `seed:${seedSignature}`,
     ].join(":");
     let houseCurveEq = coreFitCache.get(houseCurveCacheKey);
     if (!houseCurveEq) {
       const fitStart = perf();
       houseCurveEq = calculateHouseCurveEqCurve(rawCurve, preparedSeatCurves, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: targetAnchorDb,
-        targetAnchorDb,
+        requestedSystemOutputDb: requestTargetAnchorDb,
+        targetAnchorDb: requestTargetAnchorDb,
         canonicalTargetCurve,
         targetToleranceDb: request.p19.p19ToleranceDb,
         assessmentStartHz, assessmentEndHz, collectDiagnostics,
@@ -454,7 +465,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       houseCurveFitCount++;
     }
     report("Per-seat evaluation", taskIndex);
-    appendCandidate(houseCurveCacheKey, request, houseCurveEq);
+    appendCandidate(houseCurveCacheKey, request, houseCurveEq, requestTargetAnchorDb, requestTargetAnchorSource, canonicalTargetCurve);
   }
   report("Candidate bank built", totalTasks);
   const rankedCandidates = annotateCandidatePoolForHouseCurveRanking(candidates);
@@ -497,6 +508,8 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     standardFitCount,
     accuracyFitCount,
     houseCurveFitCount,
+    generationStatus: "complete",
+    missingInputs: [],
     warningMessage: null,
   });
 }

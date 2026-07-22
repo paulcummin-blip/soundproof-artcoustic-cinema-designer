@@ -129,6 +129,14 @@ export function validateCachedBassResult(result, expectedIdentity = {}) {
     return { valid: false, reason: "pool-version-mismatch", message: describeOptimiserCompatibility(expected, poolActual, "pool-version-mismatch"), expected, actual: poolActual };
   }
   const candidates = Array.isArray(pool.candidates) ? pool.candidates : [];
+  if (!candidates.length) {
+    const missingInputs = Array.isArray(pool?.missingInputs) ? pool.missingInputs : [];
+    const reason = missingInputs.length ? "candidate-pool-invalid-inputs" : "candidate-pool-empty";
+    const message = missingInputs.length
+      ? `Candidate pool generation rejected: missing mandatory input${missingInputs.length > 1 ? "s" : ""} ${missingInputs.join(", ")}`
+      : "Candidate pool generation completed without candidates";
+    return { valid: false, reason, message };
+  }
   if (candidates.some((candidate) => candidate.filterBankSignature !== buildFilterBankSignature(candidate))) {
     return { valid: false, reason: "candidate-filter-signature-mismatch" };
   }

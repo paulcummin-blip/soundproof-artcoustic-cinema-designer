@@ -12,13 +12,13 @@ const EXPECTED = {
   perSeatResponses: "cfd03f6c",
   fingerprints: {
     geometry: "geo:v1:3596cd7dff97dc17",
-    product: "prod:v1:977ef67df51e68bf",
-    calibration: "cal:v1:78a112f01d23d1e2",
+    product: "prod:v1:3f55cab9863453b3",
+    calibration: "cal:v1:793662cea8c5a550",
   },
-  selectedCandidate: "b6c39088",
-  filterBank: "2fc9b742",
-  postEqCurve: "2b52e9f6",
-  parameters: "60b0cc0d",
+  selectedCandidate: "5d83142d",
+  filterBank: "46e7db8f",
+  postEqCurve: "90a4b8a1",
+  parameters: "8d80b4d3",
 };
 
 function stable(value) {
@@ -90,7 +90,7 @@ export function runBassAuthorityParityFixtures() {
   const usable = inputs.sources.map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.modelKey))?.approvedUsableLfHzMinus6dB).filter(Number.isFinite);
   const designEqSystemLimits = { activeSubs: inputs.sources, usableLfHz: usable.length ? Math.max(...usable) : null };
   const transitionHz = 2000 * Math.sqrt(0.4 / (4.5 * 6 * 2.4));
-  const splConfig = { targetSpl: 105, globalPowerW: 100, globalEqHeadroomDb: 0, radiationMode: "half-space" };
+  const splConfig = { globalPowerW: 100, globalEqHeadroomDb: 0, radiationMode: "half-space" };
   const requested = deriveRequestedCalibrationConfig({ splConfig, optimisationTransitionHz: transitionHz, designEqSystemLimits });
   const productCapabilities = inputs.sources.map((sub) => {
     const model = MODELS.find((item) => item.key === normaliseModelKey(sub.modelKey));
