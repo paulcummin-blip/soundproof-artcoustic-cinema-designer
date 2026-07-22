@@ -15,12 +15,12 @@ const EXPECTED = {
     product: "prod:v1:3f55cab9863453b3",
     calibration: "cal:v1:793662cea8c5a550",
   },
-  // Audited authority-only structure update: the legacy candidate shape hashes
-  // to e72b524a after removing APPROVED_AUTHORITY_FIELDS below.
-  selectedCandidate: "f948c9c6",
-  filterBank: "456a46ca",
-  postEqCurve: "e3d9bef1",
-  parameters: "b36aafdd",
+  // Audited fitting-output update: authority inputs and calibration fingerprints
+  // remain unchanged; the selected bank, reconstructed curve and derived values change.
+  selectedCandidate: "35b8ae25",
+  filterBank: "46e7db8f",
+  postEqCurve: "90a4b8a1",
+  parameters: "b821c6e2",
 };
 
 function stable(value) {
@@ -46,7 +46,7 @@ const APPROVED_AUTHORITY_FIELDS = [
   "perSeatP20Results",
   "p20Label",
 ];
-const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "e72b524a";
+const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "7ced168d";
 
 function withoutApprovedAuthorityFields(candidate) {
   return Object.fromEntries(Object.entries(candidate || {}).filter(([key]) => !APPROVED_AUTHORITY_FIELDS.includes(key)));
@@ -159,8 +159,12 @@ export function runBassAuthorityParityFixtures() {
     approvedFields: APPROVED_AUTHORITY_FIELDS,
     strippedCandidateHash: hash(withoutApprovedAuthorityFields(candidate)),
     expectedPreAuthorityHash: PRE_AUTHORITY_SELECTED_CANDIDATE_HASH,
+    candidateIdentityPass: candidate?.candidateId === selected.selectedCandidateId
+      && candidate?.candidateId === selected.productionCandidateId
+      && candidate?.filterBankSignature === selected.filterBankSignature,
   };
-  structuralAudit.approvedOnly = structuralAudit.strippedCandidateHash === structuralAudit.expectedPreAuthorityHash;
+  structuralAudit.approvedOnly = structuralAudit.strippedCandidateHash === structuralAudit.expectedPreAuthorityHash
+    && structuralAudit.candidateIdentityPass;
   return {
     observed,
     results,

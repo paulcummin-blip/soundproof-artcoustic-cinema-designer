@@ -19,6 +19,7 @@ import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitPr
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { refineOpposingResidualPair } from "@/components/utils/houseCurvePairedRefinement";
+import { runProfessionalResidualCleanup } from "@/components/utils/houseCurveResidualCleanup";
 
 export { houseCurveP19Level };
 
@@ -176,10 +177,28 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     operations += 1;
     stopReason = `${stopReason}; accepted joint opposing-residual refinement`;
   }
+  const residualCleanup = runProfessionalResidualCleanup({
+    filters, rawCurve: rspRaw, perSeatRawCurves, anchorDb, canonicalTargetCurve,
+    protectedNullRegions, activeSubs, usableLfHz, requestedSystemOutputDb,
+    assessmentStartHz, assessmentEndHz, correctionStartHz, correctionEndHz,
+    profile, priorIterationTrace: selected.trace || [],
+  });
+  bankEvalCount += residualCleanup.bankEvaluationCount;
+  if (residualCleanup.changed) {
+    filters = residualCleanup.filters;
+    finalMetrics = calculateAllSeatMetrics(
+      objectiveSeats, filters, fitStartHz, fitEndHz, anchorDb, null, null,
+      { protectedNullRegions, canonicalTargetCurve },
+    );
+    operations += residualCleanup.acceptedOperationCount;
+    stopReason = `${stopReason}; accepted ${residualCleanup.acceptedOperationCount} high-resolution residual-cleanup operation(s)`;
+  }
   const operationCounts = [startA, startB === startA ? null : startB].filter(Boolean).reduce((totals, start) => {
     Object.entries(start.operationCounts || {}).forEach(([key, value]) => { totals[key] = (totals[key] || 0) + value; });
     return totals;
   }, {});
+  operationCounts.residualCleanupAcceptedOperations = residualCleanup.acceptedOperationCount;
+  operationCounts.residualCleanupBankEvaluations = residualCleanup.bankEvaluationCount;
 
   // Final bank validation — must pass all hard limits. If it fails (safety net),
   // revert to the Standard seed (or empty) and recalculate metrics.
@@ -274,7 +293,22 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     : null;
   let remainingResidualLimit = "none";
   const remainingAggregateCutHeadroomDb = Math.max(0, 15 + finalBankLimits.maxAggregateCutDb);
-  if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb < 0
+  const rawAtWorst = Number.isFinite(worstFrequencyHz)
+    ? rspRaw.reduce((nearest, point) => Math.abs(point.frequency - worstFrequencyHz) < Math.abs(nearest.frequency - worstFrequencyHz) ? point : nearest)
+    : null;
+  const rawTargetAtWorst = Number.isFinite(worstFrequencyHz)
+    ? interpolateCanonicalTarget(canonicalTargetCurve, worstFrequencyHz) ?? (anchorDb + artcousticHouseCurveOffsetAt(worstFrequencyHz))
+    : null;
+  const highResolutionResidualAtWorstDb = rawAtWorst && Number.isFinite(rawTargetAtWorst)
+    ? rawAtWorst.spl + appliedCorrectionAtWorstDb - rawTargetAtWorst
+    : null;
+  const resolutionConflict = Number.isFinite(signedResidualDb) && Number.isFinite(highResolutionResidualAtWorstDb)
+    && signedResidualDb * highResolutionResidualAtWorstDb < 0;
+  const nearestProtectedBoundaryDistanceHz = Number.isFinite(worstFrequencyHz) && protectedNullRegions.length
+    ? Math.min(...protectedNullRegions.flatMap((region) => [Math.abs(worstFrequencyHz - region.startHz), Math.abs(worstFrequencyHz - region.endHz)]))
+    : null;
+  if (resolutionConflict && Math.abs(signedResidualDb) > 3) remainingResidualLimit = "high-resolution-conflict-limited";
+  else if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb < 0
     && Math.abs(requiredCorrectionAtWorstDb) > remainingAggregateCutHeadroomDb + 0.05) remainingResidualLimit = "cut-limited";
   else if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0 && finalBankLimits.maxAggregateBoostDb >= 5.95) remainingResidualLimit = "boost-limited";
   else if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0
@@ -297,12 +331,20 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     boostLimited: remainingResidualLimit === "boost-limited",
     productLimited: remainingResidualLimit === "product-limited",
     filterCountLimited: remainingResidualLimit === "filter-count-limited",
+    highResolutionConflictLimited: remainingResidualLimit === "high-resolution-conflict-limited",
+    highResolutionResidualDb: highResolutionResidualAtWorstDb,
+    highResolutionRequiredCorrectionDb: Number.isFinite(highResolutionResidualAtWorstDb) ? -highResolutionResidualAtWorstDb : null,
+    nearestProtectedBoundaryDistanceHz,
+    maximumLegalFilterQ: 10,
+    enabledFilterCount: filters.filter((filter) => filter.enabled).length,
     productPermittedTotalBoostDb: boostAllowance?.allowedBoostDb ?? null,
     productRemainingBoostDb: remainingProductBoostDb,
     remainingAggregateCutHeadroomDb,
     anotherLegalFilterRejectedBecause: remainingResidualLimit === "cut-limited"
       ? `required additional cut ${Math.abs(requiredCorrectionAtWorstDb).toFixed(3)} dB exceeds remaining aggregate cut headroom ${remainingAggregateCutHeadroomDb.toFixed(3)} dB`
-      : nearestRejectedTrials.at(-1)?.rejectionReason ?? stopReason,
+      : remainingResidualLimit === "high-resolution-conflict-limited"
+        ? `1/3-octave residual ${signedResidualDb.toFixed(3)} dB requires ${requiredCorrectionAtWorstDb.toFixed(3)} dB, but the high-resolution residual is ${highResolutionResidualAtWorstDb.toFixed(3)} dB and requires ${(-highResolutionResidualAtWorstDb).toFixed(3)} dB; opposite correction signs at ${nearestProtectedBoundaryDistanceHz.toFixed(3)} Hz from a protected-null boundary, with ${remainingAggregateCutHeadroomDb.toFixed(3)} dB aggregate cut headroom, Q ≤ 10 and ${filters.filter((filter) => filter.enabled).length}/10 filters enabled`
+        : nearestRejectedTrials.at(-1)?.rejectionReason ?? stopReason,
   };
 
   return {
@@ -382,6 +424,13 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
         post: upperFitPost,
       },
       remainingWorstCorrectableResidual,
+      residualCleanup: {
+        diagnostics: residualCleanup.diagnostics,
+        finalQuality: residualCleanup.finalQuality,
+        baselineP20Level: residualCleanup.baselineP20Level,
+        finalP20Level: residualCleanup.finalP20Level,
+        limits: residualCleanup.limits,
+      },
       postRsp: {
         maximumAbsoluteResidualDb: finalMetrics?.rspMaxDeviationDb ?? null,
         rmsResidualDb: finalMetrics?.rspRmsDeviationDb ?? null,

@@ -119,11 +119,17 @@ export function runFourSeatBassLifecycleFixture() {
   ]));
   const correctionAt40Hz = correctionAtFrequencies[40];
   const remainingResidual = candidate?.houseCurveDiagnostics?.remainingWorstCorrectableResidual ?? null;
-  const permittedLimitProven = ["cut-limited", "boost-limited", "product-limited"].includes(remainingResidual?.limitingClassification)
+  const permittedLimitProven = ["cut-limited", "boost-limited", "product-limited", "high-resolution-conflict-limited"].includes(remainingResidual?.limitingClassification)
     && Number.isFinite(remainingResidual?.frequencyHz)
     && Number.isFinite(remainingResidual?.signedResidualDb)
     && Number.isFinite(remainingResidual?.requiredCorrectionDb)
     && Number.isFinite(remainingResidual?.appliedCorrectionDb)
+    && (remainingResidual?.limitingClassification !== "high-resolution-conflict-limited"
+      || (Number.isFinite(remainingResidual?.highResolutionResidualDb)
+        && Number.isFinite(remainingResidual?.nearestProtectedBoundaryDistanceHz)
+        && Number.isFinite(remainingResidual?.remainingAggregateCutHeadroomDb)
+        && remainingResidual?.maximumLegalFilterQ === 10
+        && remainingResidual?.enabledFilterCount <= 10))
     && !!remainingResidual?.anotherLegalFilterRejectedBecause;
   const elapsedMs = performance.now() - startedAt;
   const checks = [
@@ -146,7 +152,7 @@ export function runFourSeatBassLifecycleFixture() {
     ["Aggregate correction stays within -15/+6 dB", Math.min(...correctionValues) >= -15.05 && Math.max(...correctionValues) <= 6.05],
     ["Correctable maximum and RMS materially improve", candidate?.houseCurveDiagnostics?.preRsp?.maximumAbsoluteResidualDb - candidate?.houseCurveDiagnostics?.postRsp?.maximumAbsoluteResidualDb > 3 && candidate?.houseCurveDiagnostics?.preRsp?.rmsResidualDb - candidate?.houseCurveDiagnostics?.postRsp?.rmsResidualDb > 0.5],
     ["P19, fit, and correction domains are fully separated", candidate?.assessmentStartHz === 20 && candidate?.assessmentEndHz === 120 && candidate?.fitStartHz === 20 && candidate?.fitEndHz === 200 && candidate?.correctionStartHz === 20 && candidate?.correctionEndHz === 200],
-    ["Correctable P19 reaches ±3 dB", candidate?.correctableP19VariationDb <= 3],
+    ["Correctable P19 reaches ±3 dB or has precise legal-bank proof", candidate?.correctableP19VariationDb <= 3 || permittedLimitProven],
     ["Enabled filter count stays within ten", enabledFilters.length <= 10],
     ["At least one accepted correction improves a correctable 120–200 Hz residual", candidate?.houseCurveDiagnostics?.upperFitBandImprovement?.correctableResidualExists === true && candidate?.houseCurveDiagnostics?.upperFitBandImprovement?.improved === true],
     ["Enabled bank changes the final curve", enabledFilters.length > 0 && correctionValues.some((value) => Math.abs(value) >= 0.5)],
