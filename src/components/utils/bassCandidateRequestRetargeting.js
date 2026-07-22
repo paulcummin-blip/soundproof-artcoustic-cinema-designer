@@ -26,7 +26,7 @@ export function retargetCandidateForRequest(candidate, request) {
     requestedP14Level: request.p14.level,
     requestedP18Level: request.p18.level,
     requestedP19Level: request.p19.level,
-    requestedTargetSpl: request.p14.p14TargetDb,
+    requestedTargetSpl: candidate.requestedTargetSpl,
     requestedP19ToleranceDb: requestedToleranceDb,
     designEqWorstResidualDiagnostics: diagnostics,
     meetsRequestedEnvelope,

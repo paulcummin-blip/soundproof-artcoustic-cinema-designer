@@ -1,4 +1,4 @@
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-rsp-v2-minus15-plus6";
+export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-canonical-target-v3";
 export const BASS_RESULT_SCHEMA_VERSION = 2;
 export const HOUSE_CURVE_LIMITS = Object.freeze({ maximumCutDb: 15, maximumAggregateBoostDb: 6 });
 

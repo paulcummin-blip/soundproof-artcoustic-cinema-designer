@@ -1,16 +1,22 @@
 import {
   countSameSignFiltersInRegion, isNearDuplicate, limitBoostForCapability, qForRegion,
 } from "@/components/utils/designEqCalibration";
+import { resolveRequiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 
 export function generateHouseCurveTrials(region, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb) {
   const trials = [];
-  const isPeak = region.kind === "peak";
+  const requiredAtCentreDb = resolveRequiredCorrectionDb({
+    targetSplDb: 0,
+    currentPostEqSplDb: region.centrePoint.deviationDb,
+    protectedNull: !!region.protectedNull,
+  });
+  const isPeak = requiredAtCentreDb < 0;
   const maximumCutDb = profile.maximumCutDb;
   const maximumAggregateBoostDb = profile.maximumAggregateBoostDb;
   const requestedGainDb = isPeak
-    ? -Math.min(maximumCutDb, region.severityDb * 0.85)
-    : Math.min(maximumAggregateBoostDb, region.severityDb * 0.75);
-  const correctionSign = isPeak ? -1 : 1;
+    ? -Math.min(maximumCutDb, Math.abs(requiredAtCentreDb) * 0.85)
+    : Math.min(maximumAggregateBoostDb, Math.max(0, requiredAtCentreDb) * 0.75);
+  const correctionSign = Math.sign(requiredAtCentreDb);
   const baseCandidate = limitBoostForCapability({
     band: filters.length + 1, enabled: true, type: "Peak",
     frequencyHz: region.centrePoint.frequency, gainDb: requestedGainDb,

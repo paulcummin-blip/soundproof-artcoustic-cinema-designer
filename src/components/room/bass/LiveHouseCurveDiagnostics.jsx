@@ -7,7 +7,6 @@
 import React, { useState } from "react";
 import { peakingEqResponseDb, evaluateProvisionalBankLimits, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
-import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getSourceDomainBoostAllowance, getSystemSourceCapability, getCurrentSystemSourceOutput } from "@/components/utils/subwooferCapability";
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import {
@@ -58,7 +57,7 @@ function buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawC
 
   // Probe frequency data
   const probeData = PROBE_FREQS.map((freq) => {
-    const target = Number.isFinite(anchorDb) ? anchorDb + artcousticHouseCurveOffsetAt(freq) : null;
+    const target = interpolateCurve(c.productionHouseCurveTarget || [], freq);
     const rawBefore = interpolateCurve(rawCurve, freq);
     const rawAfter = interpolateCurve(postEqCurve, freq);
     const rawResidual = (Number.isFinite(rawAfter) && Number.isFinite(target)) ? rawAfter - target : null;

@@ -15,6 +15,7 @@ import { bankResponseSignature, createHouseCurveEvaluationMemo, readExactMemo, w
 import { calculatePreparedBassCurveMetrics, prepareBassCurveMetricGrid } from "@/components/utils/preparedBassCurveMetrics";
 import { evaluatePreparedBankLimits, prepareBankValidation } from "@/components/utils/preparedBankValidation";
 import { evaluateNearTargetProtection, isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 
 const isNumber = (v) => Number.isFinite(Number(v));
 
@@ -92,17 +93,15 @@ export function houseCurveP19Level(deviationDb) {
 // Calculate per-seat house-curve deviation metrics from an already-corrected curve.
 // Uses the identical 1/3-octave smoothing, assessment band, and target curve as the
 // house-curve fitter. Shared between the fitter and the production optimiser.
-function calculateSeatMetricsFromCorrected(correctedCurve, assessmentStartHz, assessmentEndHz, anchorDb, prepared = null) {
+function calculateSeatMetricsFromCorrected(correctedCurve, assessmentStartHz, assessmentEndHz, anchorDb, prepared = null, canonicalTargetCurve = null) {
   if (prepared) return calculatePreparedBassCurveMetrics(correctedCurve, prepared);
   const smoothed = applyBassSmoothing(correctedCurve, "third");
   const assessedPoints = smoothed
     .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
-    .map((p) => ({
-      frequency: p.frequency,
-      spl: p.spl,
-      targetDb: anchorDb + artcousticHouseCurveOffsetAt(p.frequency),
-      deviationDb: p.spl - (anchorDb + artcousticHouseCurveOffsetAt(p.frequency)),
-    }))
+    .map((p) => {
+      const targetDb = interpolateCanonicalTarget(canonicalTargetCurve, p.frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(p.frequency));
+      return { frequency: p.frequency, spl: p.spl, targetDb, deviationDb: p.spl - targetDb };
+    })
     .filter((p) => isNumber(p.deviationDb));
   if (!assessedPoints.length) return null;
   const maxAbsDev = Math.max(...assessedPoints.map((p) => Math.abs(p.deviationDb)));
@@ -176,20 +175,27 @@ function summarizeSeatMetrics(seatMetrics, protectedNullRegions = []) {
     rspRmsDeviationDb,
     rspMeanSignedResidualDb,
     rspShapeRmsDeviationDb,
-    rspMinimumSmoothedSplDb: scoredRspPoints.length ? Math.min(...scoredRspPoints.map((point) => point.smoothedSplDb ?? Infinity)) : rsp?.minimumSmoothedSplDb ?? null,
+    rspMinimumSmoothedSplDb: rsp?.minimumSmoothedSplDb ?? null,
     rspResidualPoints: rsp?.residualPoints ?? [],
   };
+}
+
+function rspMinimumInBand(metrics, startHz = 20, endHz = 120) {
+  const rsp = metrics?.seatMetrics?.find((metric) => metric.seatId === "rsp");
+  const values = (rsp?.residualPoints || []).filter((point) => point.frequency >= startHz && point.frequency <= endHz)
+    .map((point) => point.smoothedSplDb ?? point.spl).filter(Number.isFinite);
+  return values.length ? Math.min(...values) : null;
 }
 
 // Calculate metrics across a set of already-corrected seat curves. Used by the
 // production optimiser to compute uniform worst/mean/RMS metrics for every
 // candidate profile (Standard, Accuracy, house-curve) from perSeatPostEqCurves.
-export function calculateAllSeatMetricsFromCorrected(correctedCurves, assessmentStartHz, assessmentEndHz, anchorDb) {
+export function calculateAllSeatMetricsFromCorrected(correctedCurves, assessmentStartHz, assessmentEndHz, anchorDb, canonicalTargetCurve = null) {
   const seatMetrics = [];
   for (const seat of correctedCurves) {
     const curve = Array.isArray(seat.responseData) ? seat.responseData : seat.raw;
     if (!Array.isArray(curve) || curve.length === 0) continue;
-    const metrics = calculateSeatMetricsFromCorrected(curve, assessmentStartHz, assessmentEndHz, anchorDb);
+    const metrics = calculateSeatMetricsFromCorrected(curve, assessmentStartHz, assessmentEndHz, anchorDb, null, canonicalTargetCurve);
     if (metrics) seatMetrics.push({ seatId: seat.seatId, isPrimary: seat.isPrimary, ...metrics });
   }
   return summarizeSeatMetrics(seatMetrics);
@@ -213,11 +219,11 @@ export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, asses
     const gridKey = seat.gridKey || corrected.map((point) => point.frequency).join("|");
     let prepared = memo?.enabled ? memo.metricGrids.get(gridKey) : null;
     if (!prepared && memo?.enabled) {
-      prepared = prepareBassCurveMetricGrid(corrected, assessmentStartHz, assessmentEndHz, anchorDb);
+      prepared = prepareBassCurveMetricGrid(corrected, assessmentStartHz, assessmentEndHz, anchorDb, qualityOptions.canonicalTargetCurve);
       memo.metricGrids.set(gridKey, prepared);
       if (operationCounts) operationCounts.uniqueMetricGridPreparations += 1;
     }
-    const metrics = calculateSeatMetricsFromCorrected(corrected, assessmentStartHz, assessmentEndHz, anchorDb, prepared);
+    const metrics = calculateSeatMetricsFromCorrected(corrected, assessmentStartHz, assessmentEndHz, anchorDb, prepared, qualityOptions.canonicalTargetCurve);
     if (metrics) seatMetrics.push({ seatId: seat.seatId, isPrimary: seat.isPrimary, ...metrics });
   }
   if (operationCounts) {
@@ -231,7 +237,7 @@ export function calculateAllSeatMetrics(seats, filters, assessmentStartHz, asses
 // Find ALL broad residual regions across all seats, sorted by severity (descending).
 // Each region is seat-specific so trials can be generated per-seat while the shared
 // bank is evaluated across all seats.
-function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions = []) {
+function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions = [], canonicalTargetCurve = null) {
   const allRegions = [];
   const correctedSeats = correctedCurvesForSharedBank(seats, filters, operationCounts, memo);
   const rspDiscoverySeats = correctedSeats.filter(({ seat }) => seat.seatId === "rsp");
@@ -240,8 +246,10 @@ function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEnd
     const smoothed = applyBassSmoothing(corrected, "third");
     const trendPoints = smoothed
       .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
-      .filter((p) => !isProtectedFrequency(p.frequency, protectedNullRegions))
-      .map((p) => ({ ...p, deviationDb: p.spl - (anchorDb + artcousticHouseCurveOffsetAt(p.frequency)) }));
+      .map((p) => {
+        const targetSpl = interpolateCanonicalTarget(canonicalTargetCurve, p.frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(p.frequency));
+        return { ...p, targetSpl, deviationDb: p.spl - targetSpl };
+      });
     const regions = [
       ...findRegions(trendPoints, "peak", peakThresholdDb, valleyThresholdDb),
       ...findRegions(trendPoints, "valley", peakThresholdDb, valleyThresholdDb),
@@ -317,6 +325,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const valleyThresholdDb = profile.valleyDiscoveryThresholdDb || 1;
   const maxOperations = 30;
   const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
+  const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : null;
 
   const operationCounts = {
     curveEvaluationRequests: 0,
@@ -347,7 +356,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
     : null);
   let filters = initialFilters.map((f) => ({ ...f }));
-  let currentMetrics = calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo, { protectedNullRegions });
+  let currentMetrics = calculateAllSeatMetrics(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo, { protectedNullRegions, canonicalTargetCurve });
   if (!currentMetrics) return { filters, metrics: null, baselineWorstSeatDeviation: null, blockedResiduals: [], stopReason: "no seat metrics", bankEvalCount: 0, operations: 0, operationCounts };
 
   const baselineWorstSeatDeviation = currentMetrics.worstSeatMaxDeviationDb;
@@ -358,7 +367,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     shapeRmsResidualDb: currentMetrics.rspShapeRmsDeviationDb,
   };
   const baselineRspPoints = currentMetrics.rspResidualPoints || [];
-  const baselineRspMinimumSplDb = currentMetrics.rspMinimumSmoothedSplDb;
+  const baselineRspMinimumSplDb = rspMinimumInBand(currentMetrics);
   // Baseline per-seat max deviations — no seat may drift more than WORST_EQUIV_DB
   // from its baseline, preventing cumulative regression across iterations.
   const baselineSeatMaxDeviations = new Map();
@@ -378,7 +387,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const trace = [];
 
   while (operations < maxOperations) {
-    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions);
+    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions, canonicalTargetCurve);
     if (!regions.length) { stopReason = "no residual regions found"; break; }
 
     const iterationEntry = {
@@ -399,9 +408,11 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     let bestTrialTraceIndex = null;
 
     for (const region of regions) {
-      const { trials, productLimited } = generateHouseCurveTrials(region, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
+      const protectedNull = region.kind === "valley" && isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions);
+      const { trials, productLimited } = generateHouseCurveTrials({ ...region, protectedNull }, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
       let regionAdmissible = false;
-      let regionBlockReason = productLimited ? "product-limited" : null;
+      let regionBlockReason = protectedNull ? "protected-null" : productLimited ? "product-limited" : null;
+      if (protectedNull) continue;
 
       for (const trial of trials) {
         const proposedFilters = buildProposedBank(trial, filters);
@@ -450,7 +461,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           continue;
         }
         regionAdmissible = true;
-        const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo, { protectedNullRegions });
+        const trialMetrics = calculateAllSeatMetrics(seats, validation.filters, assessmentStartHz, assessmentEndHz, anchorDb, operationCounts, memo, { protectedNullRegions, canonicalTargetCurve });
         if (!trialMetrics) {
           trialEntry.rejectionReason = "no metrics computed";
           iterationEntry.trials.push(trialEntry);
@@ -462,10 +473,24 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           rspMeanSignedResidualDb: trialMetrics.rspMeanSignedResidualDb ?? null,
           worstSeatMaxDeviationDb: trialMetrics.worstSeatMaxDeviationDb ?? null,
         };
-        // The RSP objective is lexicographic: reduce maximum absolute residual,
-        // or hold it effectively unchanged while reducing RMS.
-        if (compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
-          trialEntry.rejectionReason = "not strictly better than current (comparator rejected)";
+        const centreHz = region.centrePoint.frequency;
+        const currentEqAtCentre = filters.reduce((sum, filter) => sum + peakingEqResponseDb(centreHz, filter), 0);
+        const trialEqAtCentre = validation.filters.reduce((sum, filter) => sum + peakingEqResponseDb(centreHz, filter), 0);
+        const requiredAtCentre = requiredCorrectionDb(region.centrePoint.targetSpl, region.centrePoint.spl);
+        const appliedStepAtCentre = trialEqAtCentre - currentEqAtCentre;
+        const directionPass = Math.abs(requiredAtCentre) <= 0.05 || requiredAtCentre * appliedStepAtCentre > 0;
+        const rmsImproved = trialMetrics.rspRmsDeviationDb < currentMetrics.rspRmsDeviationDb - RMS_EPSILON_DB;
+        const maxProtected = trialMetrics.rspMaxDeviationDb <= currentMetrics.rspMaxDeviationDb + WORST_EQUIV_DB;
+        if (!directionPass || !rmsImproved || !maxProtected || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
+          trialEntry.rejectionReason = !directionPass ? "correction direction opposed target-minus-current residual" : !rmsImproved ? "weighted RMS did not improve" : !maxProtected ? "maximum correctable deviation increased" : "not strictly better than current";
+          iterationEntry.trials.push(trialEntry);
+          continue;
+        }
+        const baselineP14L1 = Number.isFinite(baselineRspMinimumSplDb) && baselineRspMinimumSplDb >= 114;
+        const trialP14MinimumSplDb = rspMinimumInBand(trialMetrics);
+        if (baselineP14L1 && (!Number.isFinite(trialP14MinimumSplDb) || trialP14MinimumSplDb < 113.95)) {
+          operationCounts.p14SafetyRejections++;
+          trialEntry.rejectionReason = "P14 L1 preservation guard rejected trial";
           iterationEntry.trials.push(trialEntry);
           continue;
         }
@@ -544,5 +569,5 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
 
   if (operations >= maxOperations && stopReason === "no safe improvement remained") stopReason = "operation ceiling reached";
 
-  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace, baselineRspMetrics };
+  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, baselineRspMinimumSplDb, finalRspMinimumSplDb: rspMinimumInBand(currentMetrics), blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace, baselineRspMetrics };
 }

@@ -1,13 +1,14 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
+import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 
 const octaveWidth = (startHz, endHz) => startHz > 0 && endHz > startHz ? Math.log2(endHz / startHz) : 0;
 
-export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb) {
+export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, canonicalTargetCurve = null) {
   const points = applyBassSmoothing(curve, "third")
     .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
-    .map((point) => ({ ...point, residualDb: point.spl - (anchorDb + artcousticHouseCurveOffsetAt(point.frequency)) }));
+    .map((point) => ({ ...point, residualDb: point.spl - (interpolateCanonicalTarget(canonicalTargetCurve, point.frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(point.frequency))) }));
   const regions = [];
   let current = [];
   const finish = () => {

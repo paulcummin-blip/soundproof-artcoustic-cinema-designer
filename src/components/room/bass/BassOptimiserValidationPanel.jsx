@@ -3,6 +3,7 @@ import LiveHouseCurveDiagnostics from "@/components/room/bass/LiveHouseCurveDiag
 import { buildCandidateSignature, signatureToString } from "@/components/room/bass/candidateConsistency";
 import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
 import { formatP20Deviation, levelP20_lfConsistency } from "@/components/utils/rp22/levels";
+import ProductionHouseCurveAuthorityDiagnostic from "./ProductionHouseCurveAuthorityDiagnostic";
 
 const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
@@ -21,6 +22,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       perSeatRawCurves={perSeatRawCurves}
       rspRawCurve={rspRawCurve}
     />
+    <ProductionHouseCurveAuthorityDiagnostic result={result} rspRawCurve={rspRawCurve} activeSubs={activeSubs} usableLfHz={usableLfHz} />
     {result?.selectedCandidate && (() => {
       const sig = buildCandidateSignature({ result, rspRawCurve });
       if (!sig) return null;

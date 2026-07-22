@@ -41,6 +41,9 @@ self.onmessage = (e) => {
       activeSubs: payload?.activeSubs || [],
       usableLfHz: payload?.usableLfHz ?? null,
       transitionHz: payload?.transitionHz ?? 120,
+      correctionEndHz: payload?.correctionEndHz ?? 200,
+      targetAnchorDb: payload?.targetAnchorDb ?? null,
+      targetAnchorSource: payload?.targetAnchorSource || null,
       perSeatRawCurves: payload?.perSeatRawCurves || [],
       collectDiagnostics: !!collectDiagnostics,
       onProgress: (progress) => {

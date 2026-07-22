@@ -478,6 +478,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
+  const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
   // Part A: Resolve the fitting profile. Standard preserves current behaviour;
   // Accuracy trades P14/P18 preservation for closer target alignment.
   const profile = getDesignEqFitProfile(options.fitProfile);
@@ -989,9 +990,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     curve,
     filters: filterBank,
     combinedEqCurve,
-    fitterHouseCurveTarget: sortedResidualPoints
-      .map(({ frequency, targetDb }) => ({ frequency, spl: targetDb }))
-      .sort((a, b) => a.frequency - b.frequency),
+    fitterHouseCurveTarget: canonicalTargetCurve.length
+      ? canonicalTargetCurve.map((point) => ({ ...point }))
+      : sortedResidualPoints.map(({ frequency, targetDb }) => ({ frequency, spl: targetDb })).sort((a, b) => a.frequency - b.frequency),
     iterationTrace,
     stopReason,
     // Part D: Effective profile contract — identifies the selected profile and

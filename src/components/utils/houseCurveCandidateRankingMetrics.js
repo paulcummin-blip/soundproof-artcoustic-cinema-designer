@@ -1,5 +1,5 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
-import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
+import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 
 const requestKey = (candidate) => [
   candidate?.requestedP14Level, candidate?.requestedP18Level, candidate?.requestedP19Level,
@@ -12,9 +12,9 @@ function outsideProtectedNulls(frequency, regions) {
 
 function rankingMetrics(candidate, protectedNullRegions) {
   const points = applyBassSmoothing(candidate?.finalPostEqCurve || [], "third")
-    .filter((point) => point.frequency >= candidate.assessmentStartHz && point.frequency <= candidate.assessmentEndHz)
+    .filter((point) => point.frequency >= candidate.correctionStartHz && point.frequency <= candidate.correctionEndHz)
     .filter((point) => outsideProtectedNulls(point.frequency, protectedNullRegions))
-    .map((point) => point.spl - (candidate.requestedTargetSpl + artcousticHouseCurveOffsetAt(point.frequency)))
+    .map((point) => point.spl - interpolateCanonicalTarget(candidate.productionHouseCurveTarget, point.frequency))
     .filter(Number.isFinite);
   if (!points.length) return { maximumAbsoluteResidualDb: null, rmsResidualDb: null, meanAbsoluteResidualDb: null };
   return {

@@ -39,11 +39,12 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
   const candidate = optimisationResult?.selectedCandidate;
   const exactTarget = candidate?.productionHouseCurveTarget;
   if (!candidate || !Array.isArray(exactTarget) || !exactTarget.length) return null;
-  const endHz = candidate.assessmentEndHz;
+  const startHz = candidate.correctionStartHz;
+  const endHz = candidate.correctionEndHz;
   return {
     id: "house-curve",
     kind: "house-curve",
-    label: `Absolute house-curve target — P19 band 20–${Math.round(endHz)} Hz`,
+    label: `Absolute house-curve target — correction band ${Math.round(startHz)}–${Math.round(endHz)} Hz`,
     tooltipLabel: "Absolute house-curve target",
     color: "#625143",
     strokeWidth: 2.25,

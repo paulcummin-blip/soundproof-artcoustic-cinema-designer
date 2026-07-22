@@ -16,6 +16,7 @@ import { houseCurveP19Level, calculateAllSeatMetrics, runSingleStart, compareHou
 import { createHouseCurveEvaluationMemo } from "@/components/utils/houseCurveEvaluationMemo";
 import { prepareBankValidation } from "@/components/utils/preparedBankValidation";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
+import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 
 export { houseCurveP19Level };
 
@@ -24,7 +25,7 @@ const isNumber = (v) => Number.isFinite(Number(v));
 // Fallback resolver — exported for deterministic testing of both fallback routes.
 // Never converts a validator failure into success. If the empty bank fails
 // validation, reports an invariant violation and leaves bankValidationPassed: false.
-export function resolveFallback({ selectedFilters, standardSeedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, objectiveSeats, assessmentStartHz, assessmentEndHz, anchorDb, protectedNullRegions = [], bankEvalCount = 0 }) {
+export function resolveFallback({ selectedFilters, standardSeedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, objectiveSeats, assessmentStartHz, assessmentEndHz, anchorDb, protectedNullRegions = [], canonicalTargetCurve = null, bankEvalCount = 0 }) {
   let filters = (Array.isArray(selectedFilters) ? selectedFilters : []).map((f) => ({ ...f }));
   let finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   bankEvalCount++;
@@ -52,7 +53,7 @@ export function resolveFallback({ selectedFilters, standardSeedFilters, bankRaw,
       filters = [];
       fallbackType = "empty";
     }
-    finalMetrics = calculateAllSeatMetrics(objectiveSeats, filters, assessmentStartHz, assessmentEndHz, anchorDb, null, null, { protectedNullRegions });
+    finalMetrics = calculateAllSeatMetrics(objectiveSeats, filters, assessmentStartHz, assessmentEndHz, anchorDb, null, null, { protectedNullRegions, canonicalTargetCurve });
     stopReason = `final bank validation failed — reverted to ${fallbackType}`;
     blockedResiduals = [];
     finalBankLimits = evaluateProvisionalBankLimits(filters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
@@ -96,10 +97,11 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   if (!isNumber(anchorDb)) return { filters: emptyFilters([]), curve: [], combinedEqCurve: [], designEqFitProfile: "house_curve", perSeatMetrics: [] };
 
   const requestedSystemOutputDb = Number.isFinite(Number(options.requestedSystemOutputDb)) ? Number(options.requestedSystemOutputDb) : undefined;
+  const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
   const profile = { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: true, maximumCutDb: 15 };
   const bankRaw = rspRaw;
   const protectedNullRegions = identifyProtectedNullRegions(
-    rspRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb,
+    rspRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, canonicalTargetCurve,
   );
 
   const standardSeedFilters = Array.isArray(options.initialFilters)
@@ -115,7 +117,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const preparedBankValidation = reuseExactEvaluations
     ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
     : null;
-  const evaluationOptions = { reuseExactEvaluations, memo: evaluationMemo, preparedBankValidation, protectedNullRegions };
+  const evaluationOptions = { reuseExactEvaluations, memo: evaluationMemo, preparedBankValidation, protectedNullRegions, canonicalTargetCurve };
   const startA = runSingleStart([], objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
   let startB = startA;
   if (standardSeedFilters.length > 0) {
@@ -126,7 +128,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   let selected = startA;
   let selectedStartLabel = "empty";
   if (startB !== startA && startB.metrics && startA.metrics) {
-    if (compareHouseCurveMetrics(startB.metrics, startA.metrics) < 0) {
+    const baselineReachedL1 = Number.isFinite(startA.baselineRspMinimumSplDb) && startA.baselineRspMinimumSplDb >= 114;
+    const startAPreservesL1 = !baselineReachedL1 || startA.finalRspMinimumSplDb >= 113.95;
+    const startBPreservesL1 = !baselineReachedL1 || startB.finalRspMinimumSplDb >= 113.95;
+    if ((!startAPreservesL1 && startBPreservesL1) || (startAPreservesL1 === startBPreservesL1 && compareHouseCurveMetrics(startB.metrics, startA.metrics) < 0)) {
       selected = startB;
       selectedStartLabel = "standard-seeded";
     }
@@ -149,7 +154,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const fallback = resolveFallback({
     selectedFilters: filters, standardSeedFilters, bankRaw, activeSubs,
     usableLfHz, requestedSystemOutputDb, profile, objectiveSeats,
-    assessmentStartHz, assessmentEndHz, anchorDb, protectedNullRegions, bankEvalCount,
+    assessmentStartHz, assessmentEndHz, anchorDb, protectedNullRegions, canonicalTargetCurve, bankEvalCount,
   });
   filters = fallback.filters;
   let finalBankLimits = fallback.finalBankLimits;
@@ -170,7 +175,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const rspAssessed = rspSmoothed
     .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
     .map((p) => {
-      const targetSpl = anchorDb + artcousticHouseCurveOffsetAt(p.frequency);
+      const targetSpl = interpolateCanonicalTarget(canonicalTargetCurve, p.frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(p.frequency));
       return { frequency: p.frequency, targetSpl, deviationDb: p.spl - targetSpl };
     })
     .filter((p) => isNumber(p.deviationDb));
@@ -192,7 +197,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     filters: emptyFilters(filters),
     curve,
     combinedEqCurve,
-    fitterHouseCurveTarget: rspAssessed.map(({ frequency, targetSpl }) => ({ frequency, spl: targetSpl })),
+    fitterHouseCurveTarget: canonicalTargetCurve.map((point) => ({ ...point })),
     designEqFitProfile: "house_curve",
     designEqFitProfileConfig: {
       preserveP14: true, fittingToleranceDb: 1,

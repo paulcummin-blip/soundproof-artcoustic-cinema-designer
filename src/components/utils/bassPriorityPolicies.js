@@ -92,11 +92,15 @@ export function rankBassCandidates(pool, mode) {
   const bankValid = Array.isArray(pool) ? pool.filter(isBankAndBandValid) : [];
   const fullyValid = bankValid.filter(isAllL1);
   const houseCurveMode = canonicalMode === BASS_PRIORITY_MODES.HOUSE_CURVE_ACCURACY;
-  const hasHouseCurveCandidate = bankValid.some((candidate) => candidate?.designEqFitProfile === "house_curve");
+  const houseCurveCandidates = bankValid.filter((candidate) => candidate?.designEqFitProfile === "house_curve");
+  const preEqReachedP14L1 = houseCurveCandidates.some((candidate) => candidate?.preEqP14Level >= 1);
+  const p14PreservingHouseCandidates = houseCurveCandidates.filter((candidate) => candidate?.achievedP14Level >= 1);
   const eligible = houseCurveMode
-    ? (hasHouseCurveCandidate ? bankValid : [])
+    ? (preEqReachedP14L1 && p14PreservingHouseCandidates.length ? p14PreservingHouseCandidates : houseCurveCandidates)
     : (fullyValid.length ? fullyValid : bankValid);
-  const eligibilityGroup = houseCurveMode && bankValid.length ? "bank_valid_raw_house_curve_objective" :
+  const p14PreservationUnavailable = houseCurveMode && preEqReachedP14L1 && p14PreservingHouseCandidates.length === 0;
+  const eligibilityGroup = p14PreservationUnavailable ? "house_curve_no_admissible_p14_l1_preserving_candidate" :
+    houseCurveMode && bankValid.length ? "bank_valid_raw_house_curve_objective" :
     fullyValid.length ? "bank_valid_all_p14_p18_p19_l1" :
     bankValid.length ? "bank_valid_best_calibrated_attempt_below_l1" : "no_bank_and_band_valid_candidates";
   const selected = eligible.length ? [...eligible].sort((a, b) => compareRanked(a, b, canonicalMode))[0] : null;

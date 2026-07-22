@@ -1,7 +1,8 @@
 import { prepareBassSmoothingGrid } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
+import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 
-export function prepareBassCurveMetricGrid(curve, assessmentStartHz, assessmentEndHz, anchorDb) {
+export function prepareBassCurveMetricGrid(curve, assessmentStartHz, assessmentEndHz, anchorDb, canonicalTargetCurve = null) {
   const { sorted, bounds } = prepareBassSmoothingGrid(curve, "third");
   const assessedIndices = [];
   const targets = [];
@@ -9,7 +10,7 @@ export function prepareBassCurveMetricGrid(curve, assessmentStartHz, assessmentE
     const frequency = sorted[index].frequency;
     if (frequency < assessmentStartHz || frequency > assessmentEndHz) continue;
     assessedIndices.push(index);
-    targets.push(anchorDb + artcousticHouseCurveOffsetAt(frequency));
+    targets.push(interpolateCanonicalTarget(canonicalTargetCurve, frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(frequency)));
   }
   return { bounds, assessedIndices, targets };
 }
