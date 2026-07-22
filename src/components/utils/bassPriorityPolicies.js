@@ -35,6 +35,47 @@ const rmsTargetError = (candidate) => finiteOr(candidate?.rmsSeatTargetErrorDb, 
 const eqCost = (candidate) => (candidate?.generatedFilterBank || []).reduce((sum, filter) => (
   filter?.enabled && Number.isFinite(filter.gainDb) ? sum + Math.abs(filter.gainDb) : sum
 ), 0);
+const DOMINANCE_DB_TOLERANCE = 0.05;
+const DOMINANCE_HZ_TOLERANCE = 0.1;
+const enabledFilterCount = (candidate) => (candidate?.generatedFilterBank || []).filter((filter) => filter?.enabled).length;
+const maximumPositiveAggregateEqDb = (candidate) => {
+  const value = candidate?.aggregateBankLimits?.maxAggregateBoostDb
+    ?? candidate?.bankValidationResult?.maxAggregateBoostDb;
+  return Number.isFinite(value) ? Math.max(0, value) : null;
+};
+const lowerMetricComparison = (a, b, tolerance) => {
+  if (!Number.isFinite(a) && !Number.isFinite(b)) return { noWorse: true, materiallyBetter: false };
+  if (!Number.isFinite(a)) return { noWorse: false, materiallyBetter: false };
+  if (!Number.isFinite(b)) return { noWorse: true, materiallyBetter: false };
+  return { noWorse: a <= b + tolerance, materiallyBetter: a < b - tolerance };
+};
+const higherMetricComparison = (a, b, tolerance) => {
+  if (!Number.isFinite(a) && !Number.isFinite(b)) return { noWorse: true, materiallyBetter: false };
+  if (!Number.isFinite(a)) return { noWorse: false, materiallyBetter: false };
+  if (!Number.isFinite(b)) return { noWorse: true, materiallyBetter: false };
+  return { noWorse: a + tolerance >= b, materiallyBetter: a > b + tolerance };
+};
+
+function strictlyDominatesBalancedFallback(a, b) {
+  if (levels(a).some((level, index) => level !== levels(b)[index])) return false;
+  const comparisons = [
+    lowerMetricComparison(a?.achievedP18FrequencyHz, b?.achievedP18FrequencyHz, DOMINANCE_HZ_TOLERANCE),
+    lowerMetricComparison(a?.achievedP19VariationDb, b?.achievedP19VariationDb, DOMINANCE_DB_TOLERANCE),
+    lowerMetricComparison(a?.achievedP20VariationDb, b?.achievedP20VariationDb, DOMINANCE_DB_TOLERANCE),
+    higherMetricComparison(a?.achievedP14Db, b?.achievedP14Db, DOMINANCE_DB_TOLERANCE),
+    lowerMetricComparison(maximumPositiveAggregateEqDb(a), maximumPositiveAggregateEqDb(b), DOMINANCE_DB_TOLERANCE),
+    lowerMetricComparison(enabledFilterCount(a), enabledFilterCount(b), 0),
+  ];
+  return comparisons.every((comparison) => comparison.noWorse)
+    && comparisons.some((comparison) => comparison.materiallyBetter);
+}
+
+export function removeStrictlyDominatedBalancedFallbacks(candidates) {
+  if (!Array.isArray(candidates) || candidates.length < 2) return Array.isArray(candidates) ? candidates : [];
+  return candidates.filter((candidate, index) => !candidates.some((other, otherIndex) => (
+    index !== otherIndex && strictlyDominatesBalancedFallback(other, candidate)
+  )));
+}
 
 export function stableCandidateSignature(candidate) {
   if (typeof candidate?.candidateSignature === "string") return candidate.candidateSignature;
@@ -97,9 +138,15 @@ export function rankBassCandidates(pool, mode) {
   const houseCurveCandidates = bankValid.filter((candidate) => candidate?.designEqFitProfile === "house_curve");
   const preEqReachedP14L1 = houseCurveCandidates.some((candidate) => candidate?.preEqP14Level >= 1);
   const p14PreservingHouseCandidates = houseCurveCandidates.filter((candidate) => candidate?.achievedP14Level >= 1);
-  const eligible = houseCurveMode
+  const baseEligible = houseCurveMode
     ? (preEqReachedP14L1 && p14PreservingHouseCandidates.length ? p14PreservingHouseCandidates : houseCurveCandidates)
     : (fullyValid.length ? fullyValid : bankValid);
+  const balancedFallbackDominanceApplied = canonicalMode === BASS_PRIORITY_MODES.BALANCED
+    && fullyValid.length === 0 && bankValid.length > 0;
+  const eligible = balancedFallbackDominanceApplied
+    ? removeStrictlyDominatedBalancedFallbacks(baseEligible)
+    : baseEligible;
+  const dominatedCandidateCount = balancedFallbackDominanceApplied ? baseEligible.length - eligible.length : 0;
   const p14PreservationUnavailable = houseCurveMode && preEqReachedP14L1 && p14PreservingHouseCandidates.length === 0;
   const eligibilityGroup = p14PreservationUnavailable ? "house_curve_no_admissible_p14_l1_preserving_candidate" :
     houseCurveMode && bankValid.length ? "bank_valid_raw_house_curve_objective" :
@@ -133,12 +180,15 @@ export function rankBassCandidates(pool, mode) {
         : `${canonicalMode}: ERROR — no compatible generated house_curve candidate was available; no legacy accuracy fallback was accepted.`
       : fullyValid.length
         ? `${canonicalMode}: selected from ${fullyValid.length} bank-valid candidates achieving P14, P18 and P19 at L1 or above.`
-        : `${canonicalMode}: no candidate achieved L1 across P14, P18 and P19; selected the best calibrated invalid/FAIL attempt without changing achieved levels.`
+        : balancedFallbackDominanceApplied
+          ? `${canonicalMode}: no candidate achieved L1 across P14, P18 and P19; removed ${dominatedCandidateCount} strictly dominated fallback candidate${dominatedCandidateCount === 1 ? "" : "s"}, then selected the best calibrated invalid/FAIL attempt with the existing fallback comparator without changing achieved levels.`
+          : `${canonicalMode}: no candidate achieved L1 across P14, P18 and P19; selected the best calibrated invalid/FAIL attempt without changing achieved levels.`
     : `${canonicalMode}: no bank-valid candidate with a valid assessment band was available.`;
   return {
     selected,
     diagnostics: {
       mode: canonicalMode, eligibilityGroup, rankingTuple,
+      balancedFallbackDominanceApplied, dominatedCandidateCount,
       selectedCandidateSignature: signature, selectionReason,
       houseCurveCandidateComparison: comparison,
       heavyPoolReused: true, workerStarted: false,

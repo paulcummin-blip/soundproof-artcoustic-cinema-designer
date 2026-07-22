@@ -12,7 +12,7 @@ const candidate = (id, p14, p18, p19, options = {}) => ({
   meanSeatMaxDeviationDb: options.mean ?? options.worst ?? options.p19Dev ?? 6 - p19,
   rmsSeatTargetErrorDb: options.rms ?? options.p19Dev ?? 6 - p19,
   allAtLeastL1: p14 >= 1 && p18 >= 1 && p19 >= 1,
-  bankValidationResult: { allOk: options.bankValid !== false, maxAggregateBoostDb: 4, maxAggregateCutDb: -8 },
+  bankValidationResult: { allOk: options.bankValid !== false, maxAggregateBoostDb: options.maxBoost ?? 4, maxAggregateCutDb: -8 },
   assessmentStartHz: 20, assessmentEndHz: 120,
   generatedFilterBank: options.filters || [{ enabled: true, frequencyHz: 40, gainDb: -2, Q: 4 }],
   finalPostEqCurve: [{ frequency: 40, spl: 100 }],
@@ -76,6 +76,33 @@ export function runBassPriorityPolicyFixtures() {
   results.p14LegacyPriorityValuesRerank = legacyAccuracy.selectedMode === "house_curve_accuracy" && legacyExtension.selectedMode === "depth";
   results.p15LegacySelectedByModeAliases = legacyAccuracy.selectedByMode.accuracy === legacyAccuracy.selectedByMode.house_curve_accuracy && legacyAccuracy.selectedByMode.extension === legacyAccuracy.selectedByMode.depth;
   results.p16InvalidBankRejected = rankBassCandidates([candidate("invalid-bank", 4, 4, 4, { bankValid: false })], "balanced").selected === null;
+
+  const dominant = candidate("dominant", 0, 0, 0, {
+    p14Db: 110, p18Hz: 25, p19Dev: 4, worst: 6, maxBoost: 2,
+    filters: [{ enabled: true, gainDb: 1 }],
+  });
+  dominant.achievedP20VariationDb = 3;
+  const dominated = candidate("dominated", 0, 0, 0, {
+    p14Db: 109, p18Hz: 26, p19Dev: 4.5, worst: 1, maxBoost: 3,
+    filters: [{ enabled: true, gainDb: 1 }, { enabled: true, gainDb: -1 }],
+  });
+  dominated.achievedP20VariationDb = 3.5;
+  const dominanceSelection = rankBassCandidates([dominated, dominant], "balanced");
+  results.p17BalancedFallbackRemovesStrictlyDominated = dominanceSelection.selected === dominant
+    && dominanceSelection.diagnostics.balancedFallbackDominanceApplied === true
+    && dominanceSelection.diagnostics.dominatedCandidateCount === 1;
+
+  const exactTieSelection = rankBassCandidates([candidate("tie-b", 0, 0, 0), candidate("tie-a", 0, 0, 0)], "balanced");
+  results.p18ExactTiesDoNotDominate = exactTieSelection.diagnostics.dominatedCandidateCount === 0;
+
+  const missingP20 = { ...dominant, id: "missing-p20", candidateSignature: "missing-p20", achievedP20VariationDb: null };
+  const finiteP20 = { ...dominated, id: "finite-p20", candidateSignature: "finite-p20", achievedP20VariationDb: 3.5 };
+  const p20Selection = rankBassCandidates([missingP20, finiteP20], "balanced");
+  results.p19MissingP20CannotDominateFiniteP20 = p20Selection.diagnostics.dominatedCandidateCount === 0;
+
+  const splSelection = rankBassCandidates([dominated, dominant], "spl");
+  results.p20OtherModesDoNotApplyDominance = splSelection.diagnostics.balancedFallbackDominanceApplied === false
+    && splSelection.diagnostics.dominatedCandidateCount === 0;
 
   return results;
 }
