@@ -37,9 +37,8 @@ export function buildNormalizedHouseCurveSeries(normalizedSeries) {
 
 export function buildAbsoluteHouseCurveSeries(optimisationResult) {
   const candidate = optimisationResult?.selectedCandidate;
-  const anchorDb = optimisationResult?.selectedP14TargetDb;
-  const postEq = optimisationResult?.finalPostEqCurve;
-  if (!candidate || !Number.isFinite(anchorDb) || !Array.isArray(postEq)) return null;
+  const exactTarget = candidate?.productionHouseCurveTarget;
+  if (!candidate || !Array.isArray(exactTarget) || !exactTarget.length) return null;
   const endHz = candidate.assessmentEndHz;
   return {
     id: "house-curve",
@@ -49,9 +48,7 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
     color: "#625143",
     strokeWidth: 2.25,
     strokeDasharray: "10 5",
-    data: postEq
-      .filter(({ frequency }) => frequency >= 20 && frequency <= endHz)
-      .map(({ frequency }) => ({ frequency, spl: anchorDb + artcousticHouseCurveOffsetAt(frequency) })),
+    data: exactTarget,
   };
 }
 

@@ -8,7 +8,7 @@ import { buildCandidateSignature, signatureToString } from "./candidateConsisten
 import LiveResultAuthorityDiagnostic, { shouldShowLiveResultAuthorityDiagnostic } from "./LiveResultAuthorityDiagnostic";
 import ExactHouseCurveCaseCaptureButton from "./ExactHouseCurveCaseCaptureButton";
 
-export default function BassEngineeringDetails({ enabled, designEqEnabled, result, rspPosition, seatingPositions, contract, detailedStatus, rspRawCurve, perSeatRawCurves, priorityMode, onPriorityChange, systemLimits, multiSeries, runtimeCapture, smoothingMode, lifecycle, graphCandidateId, transitionFrequencyHz }) {
+export default function BassEngineeringDetails({ enabled, designEqEnabled, result, rspPosition, seatingPositions, contract, detailedStatus, rspRawCurve, perSeatRawCurves, priorityMode, onPriorityChange, systemLimits, multiSeries, runtimeCapture, smoothingMode, lifecycle, graphCandidateId, graphFilterBankSignature, graphSeries, transitionFrequencyHz }) {
   if (!enabled) return null;
   const signature = designEqEnabled && result?.selectedCandidate ? buildCandidateSignature({ result, rspRawCurve }) : null;
   const baseCurve = rspRawCurve.length ? rspRawCurve : (multiSeries[0]?.data || []);
@@ -19,7 +19,7 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
   return <>
     {signature && <div style={{ fontSize: 9, color: "#625143", fontFamily: "monospace", marginTop: 4, background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 4, padding: "4px 8px" }}><strong>Candidate signature:</strong> {signatureToString(signature)}</div>}
     {shouldShowLiveResultAuthorityDiagnostic({ engineeringDiagnosticsEnabled: enabled }) && <LiveResultAuthorityDiagnostic result={result} contract={contract} graphCandidateId={graphCandidateId} lifecycle={lifecycle} />}
-    <ExactHouseCurveCaseCaptureButton captureInputs={{ result, contract, lifecycle, rspRawCurve, perSeatRawCurves, activeSubs: systemLimits.activeSubs, usableLfHz: systemLimits.usableLfHz, transitionFrequencyHz }} />
+    <ExactHouseCurveCaseCaptureButton captureInputs={{ result, contract, lifecycle, rspRawCurve, perSeatRawCurves, activeSubs: systemLimits.activeSubs, usableLfHz: systemLimits.usableLfHz, transitionFrequencyHz, graphSeries, graphCandidateId, graphFilterBankSignature, designEqEnabled, detailedStatus }} />
     {designEqEnabled && result && <>
       <div style={{ fontSize: 10, fontFamily: "monospace", color: "#625143", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
         <strong>Assessment position:</strong> RSP &nbsp;|&nbsp; <strong>Response ID:</strong> rsp &nbsp;|&nbsp; <strong>RSP coordinates:</strong> {rspPosition ? `x=${rspPosition.x.toFixed(3)} / y=${rspPosition.y.toFixed(3)} / z=${rspPosition.z.toFixed(3)} m` : "unavailable"} &nbsp;|&nbsp; <strong>Real seats:</strong> {seatingPositions?.length ?? 0}

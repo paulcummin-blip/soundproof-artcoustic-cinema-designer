@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { buildExactHouseCurveCaseCapture } from "./exactHouseCurveCaseCapture";
 
 export default function ExactHouseCurveCaseCaptureButton({ captureInputs }) {
   const [status, setStatus] = useState("");
-  const available = !!captureInputs?.result && captureInputs?.rspRawCurve?.length > 0;
+  const capture = useMemo(() => buildExactHouseCurveCaseCapture(captureInputs), [captureInputs]);
+  const available = capture.captureValidation.valid;
+  const unavailableReason = capture.captureValidation.failures.join("; ");
   const copyCase = async () => {
     try {
-      const capture = buildExactHouseCurveCaseCapture(captureInputs);
+      if (!available) return;
       await navigator.clipboard.writeText(JSON.stringify(capture, null, 2));
       setStatus(`Copied ${capture.frequencyGrid.length} exact frequency points`);
     } catch (error) {
@@ -17,6 +19,6 @@ export default function ExactHouseCurveCaseCaptureButton({ captureInputs }) {
     <button type="button" onClick={copyCase} disabled={!available} className="rounded border border-amber-700 bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
       Copy exact house-curve case
     </button>
-    <span className="font-mono text-[10px] text-amber-900">{status || (available ? "Copies current live production data as cloneable JSON" : "Run the live analysis before copying")}</span>
+    <span className="font-mono text-[10px] text-amber-900">{status || (available ? `Validated · ${capture.caseFingerprint}` : unavailableReason)}</span>
   </div>;
 }

@@ -989,6 +989,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     curve,
     filters: filterBank,
     combinedEqCurve,
+    fitterHouseCurveTarget: sortedResidualPoints
+      .map(({ frequency, targetDb }) => ({ frequency, spl: targetDb }))
+      .sort((a, b) => a.frequency - b.frequency),
     iterationTrace,
     stopReason,
     // Part D: Effective profile contract — identifies the selected profile and

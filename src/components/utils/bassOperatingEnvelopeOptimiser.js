@@ -79,7 +79,11 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
   const p18 = computeParam18BassExtension(finalPostEqCurve);
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third");
   const assessedCurve = smoothed.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz);
-  const rspResiduals = assessedCurve.map((point) => point.spl - (request.p14.p14TargetDb + artcousticHouseCurveOffsetAt(point.frequency)));
+  const productionHouseCurveTarget = assessedCurve.map((point) => ({
+    frequency: point.frequency,
+    spl: request.p14.p14TargetDb + artcousticHouseCurveOffsetAt(point.frequency),
+  }));
+  const rspResiduals = assessedCurve.map((point, index) => point.spl - productionHouseCurveTarget[index].spl);
   const rspRmsResidualDb = rspResiduals.length ? Math.sqrt(rspResiduals.reduce((sum, value) => sum + value ** 2, 0) / rspResiduals.length) : null;
   const rspMeanSignedResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + value, 0) / rspResiduals.length : null;
   const rspMeanAbsoluteResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + Math.abs(value), 0) / rspResiduals.length : null;
@@ -87,7 +91,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
   const p19 = computeP19DeviationBelowSchroeder({
     freqsHz: assessedCurve.map((point) => point.frequency),
     splDb: assessedCurve.map((point) => point.spl),
-    targetDb: assessedCurve.map((point) => request.p14.p14TargetDb + artcousticHouseCurveOffsetAt(point.frequency)),
+    targetDb: productionHouseCurveTarget.map((point) => point.spl),
     schroederHz: assessmentEndHz,
   });
   const achievedP14Db = p14?.value ?? null;
@@ -229,6 +233,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, tran
     generatedFilterBank: eq.filters,
     finalPostEqCurve,
     combinedEqCurve,
+    productionHouseCurveTarget,
+    fitterHouseCurveTarget: eq.fitterHouseCurveTarget || productionHouseCurveTarget,
     designEqIterationTrace: eq.iterationTrace,
     designEqStopReason: eq.stopReason,
     designEqSelectedCheckpoint: eq.selectedCheckpoint,

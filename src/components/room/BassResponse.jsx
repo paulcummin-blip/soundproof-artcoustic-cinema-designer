@@ -331,7 +331,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
     detailedStatus, optimisationResult, error: detailedError,
   });
-  const graphCandidateId = multiSeriesForGraph.find((series) => series.kind === "post-eq")?.candidateId || null;
+  const graphPostEqSeries = multiSeriesForGraph.find((series) => series.kind === "post-eq");
+  const graphCandidateId = graphPostEqSeries?.candidateId || null;
+  const graphFilterBankSignature = graphPostEqSeries?.filterBankSignature || null;
 
   // __TEMP_CASE077_VERIFICATION__ — live inputs for the Case072/077 audit panel.
   // Passes the exact same room/seat/sub/absorption/source-curve that feed the visible Bass
@@ -742,6 +744,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           smoothingMode={bassSmoothingMode}
           lifecycle={detailedLifecycle}
           graphCandidateId={graphCandidateId}
+          graphFilterBankSignature={graphFilterBankSignature}
+          graphSeries={multiSeriesForGraph}
           transitionFrequencyHz={optimisationTransitionHz}
         />
 

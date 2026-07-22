@@ -169,7 +169,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const rspSmoothed = applyBassSmoothing(rspCorrected, "third");
   const rspAssessed = rspSmoothed
     .filter((p) => p.frequency >= assessmentStartHz && p.frequency <= assessmentEndHz)
-    .map((p) => ({ frequency: p.frequency, deviationDb: p.spl - (anchorDb + artcousticHouseCurveOffsetAt(p.frequency)) }))
+    .map((p) => {
+      const targetSpl = anchorDb + artcousticHouseCurveOffsetAt(p.frequency);
+      return { frequency: p.frequency, targetSpl, deviationDb: p.spl - targetSpl };
+    })
     .filter((p) => isNumber(p.deviationDb));
   const rspMaxDev = rspAssessed.length ? Math.max(...rspAssessed.map((p) => Math.abs(p.deviationDb))) : null;
 
@@ -189,6 +192,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     filters: emptyFilters(filters),
     curve,
     combinedEqCurve,
+    fitterHouseCurveTarget: rspAssessed.map(({ frequency, targetSpl }) => ({ frequency, spl: targetSpl })),
     designEqFitProfile: "house_curve",
     designEqFitProfileConfig: {
       preserveP14: true, fittingToleranceDb: 1,

@@ -2,10 +2,10 @@ import { applyBassSmoothing } from "./bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
-
-const exactCurve = (curve) => (Array.isArray(curve) ? curve : [])
-  .filter((point) => Number.isFinite(point?.frequency) && Number.isFinite(point?.spl))
-  .map((point) => ({ frequency: point.frequency, spl: point.spl }));
+import {
+  contentFingerprint, serializeEqCurve, serializeSplCurve, serializeTargetCurve,
+  validateExactHouseCurveCapture,
+} from "./exactHouseCurveCaptureValidation";
 
 const productSummary = (activeSubs) => {
   const counts = new Map();
@@ -16,82 +16,103 @@ const productSummary = (activeSubs) => {
   return Array.from(counts, ([model, quantity]) => ({ model, quantity }));
 };
 
-export function buildExactHouseCurveCaseCapture({
-  result, contract, lifecycle, rspRawCurve, perSeatRawCurves, activeSubs,
-  usableLfHz, transitionFrequencyHz,
-}) {
+const graphSeriesByKind = (series, kind) => {
+  const match = (series || []).find((item) => item?.kind === kind);
+  return { source: match ? `live graph series: ${match.label || match.id}` : "unavailable", data: serializeSplCurve(match?.data) };
+};
+
+const reconstructedTarget = (frequencyGrid, anchorDb, startHz, endHz) => frequencyGrid
+  .filter((frequency) => frequency >= startHz && frequency <= endHz)
+  .map((frequency) => ({ frequency, spl: anchorDb + artcousticHouseCurveOffsetAt(frequency) }));
+
+export function buildExactHouseCurveCaseCapture(inputs) {
+  const {
+    result, contract, lifecycle, rspRawCurve, perSeatRawCurves, activeSubs = [], usableLfHz,
+    transitionFrequencyHz, graphSeries, graphCandidateId, graphFilterBankSignature,
+    designEqEnabled, detailedStatus,
+  } = inputs || {};
   const candidate = result?.selectedCandidate || null;
-  const rawRsp = exactCurve(rspRawCurve);
-  const targetAnchorDb = Number.isFinite(candidate?.requestedTargetSpl)
-    ? candidate.requestedTargetSpl
-    : Number.isFinite(result?.selectedP14TargetDb) ? result.selectedP14TargetDb : null;
-  const requestedSystemOutputDb = targetAnchorDb;
-  const frequencyGrid = rawRsp.map((point) => point.frequency);
-  const aggregateFilterResponse = exactCurve(candidate?.combinedEqCurve);
-  const capabilityAndHeadroom = frequencyGrid.map((frequency) => ({
-    frequency,
-    ...getSourceDomainBoostAllowance({
-      frequency,
-      requestedBoostDb: 6,
-      activeSubs: activeSubs || [],
-      usableLfHz,
-      requestedSystemOutputDb,
-    }),
-  }));
+  const before = serializeSplCurve(rspRawCurve);
+  const after = serializeSplCurve(candidate?.finalPostEqCurve);
+  const aggregateEqResponse = serializeEqCurve(candidate?.combinedEqCurve);
+  const targetAnchorDb = Number.isFinite(candidate?.requestedTargetSpl) ? candidate.requestedTargetSpl : null;
+  const startHz = candidate?.assessmentStartHz ?? null;
+  const endHz = candidate?.assessmentEndHz ?? null;
+  const fallback = Number.isFinite(targetAnchorDb) && Number.isFinite(startHz) && Number.isFinite(endHz)
+    ? reconstructedTarget(before.map((point) => point.frequency), targetAnchorDb, startHz, endHz) : [];
+  const productionTargetExact = serializeTargetCurve(candidate?.productionHouseCurveTarget);
+  const fitterTargetExact = serializeTargetCurve(candidate?.fitterHouseCurveTarget);
+  const graphBefore = graphSeriesByKind(graphSeries, "raw");
+  const graphAfter = graphSeriesByKind(graphSeries, "post-eq");
+  const graphTarget = graphSeriesByKind(graphSeries, "house-curve");
+  const exactTargetAuthority = productionTargetExact.length > 0 && fitterTargetExact.length > 0 && graphTarget.data.length > 0;
+  const productionHouseCurveTarget = productionTargetExact.length ? productionTargetExact : fallback;
+  const fitterHouseCurveTarget = fitterTargetExact.length ? fitterTargetExact : fallback;
+  const graphHouseCurveTarget = graphTarget.data.length ? graphTarget.data : fallback;
+  const selectedModels = productSummary(activeSubs);
+  const assessment = { startHz, endHz, transitionFrequencyHz: Number.isFinite(transitionFrequencyHz) ? transitionFrequencyHz : null, targetAnchorDb };
+  const selectedFilterBank = candidate?.generatedFilterBank || result?.selectedFilters || [];
+  const content = {
+    frequencyGrid: before.map((point) => point.frequency), before, after,
+    target: productionHouseCurveTarget, aggregateEqResponse, selectedFilterBank,
+    products: selectedModels, assessment,
+  };
+  const productionCandidateId = result?.productionCandidateId || result?.selectedCandidateId || candidate?.candidateId || null;
+  const contractCandidateId = contract?.selectedCandidateId || null;
+  const productionFilterBankSignature = result?.filterBankSignature || candidate?.filterBankSignature || null;
+  const contractFilterBankSignature = contract?.provenance?.filterBankSignature || null;
   const capture = {
     captureType: "exact-live-house-curve-production-case",
-    captureVersion: 1,
+    captureVersion: 2,
     capturedAt: new Date().toISOString(),
-    caseFingerprint: contract?.fingerprints?.calibration || lifecycle?.currentCalibrationFingerprint || null,
-    candidateId: result?.selectedCandidateId || candidate?.candidateId || null,
-    frequencyGrid,
-    rspResponseUnsmoothed: rawRsp,
-    rspResponseThirdOctave: exactCurve(applyBassSmoothing(rawRsp, "third")),
-    realSeatResponses: (perSeatRawCurves || [])
-      .filter((seat) => seat?.seatId !== "rsp" && !seat?.__isSyntheticRsp)
-      .map((seat) => ({ seatId: seat.seatId, isPrimary: !!seat.isPrimary, responseData: exactCurve(seat.responseData) })),
-    absoluteHouseCurveTarget: frequencyGrid.map((frequency) => ({
-      frequency,
-      spl: Number.isFinite(targetAnchorDb) ? targetAnchorDb + artcousticHouseCurveOffsetAt(frequency) : null,
-    })),
-    assessment: {
-      startHz: candidate?.assessmentStartHz ?? null,
-      endHz: candidate?.assessmentEndHz ?? null,
-      transitionFrequencyHz: Number.isFinite(transitionFrequencyHz) ? transitionFrequencyHz : null,
-      targetAnchorDb,
+    caseFingerprint: contentFingerprint(content),
+    calibrationFingerprint: contract?.fingerprints?.calibration || lifecycle?.currentCalibrationFingerprint || null,
+    frequencyGrid: content.frequencyGrid,
+    productionSeries: {
+      rspBeforeEq: { source: "authoritative rspRawCurve supplied to production optimiser", data: before },
+      rspAfterEq: { source: "selectedCandidate.finalPostEqCurve", data: after },
     },
+    graphSeries: { rspBeforeEq: graphBefore, rspAfterEq: graphAfter, absoluteHouseCurveTarget: graphTarget },
+    aggregateEqResponse,
+    aggregateEqSource: "selectedCandidate.combinedEqCurve ({frequency, spl}; spl is aggregate gain dB)",
+    productionHouseCurveTarget,
+    graphHouseCurveTarget,
+    fitterHouseCurveTarget,
+    targetSource: exactTargetAuthority ? "exact-live-authority" : "reconstructed-fallback",
+    targetSources: {
+      production: productionTargetExact.length ? "selectedCandidate.productionHouseCurveTarget" : "reconstructed-fallback",
+      graph: graphTarget.data.length ? graphTarget.source : "reconstructed-fallback",
+      fitter: fitterTargetExact.length ? "selectedCandidate.fitterHouseCurveTarget" : "reconstructed-fallback",
+    },
+    rspResponseThirdOctave: serializeSplCurve(applyBassSmoothing(before, "third")),
+    realSeatResponses: (perSeatRawCurves || []).filter((seat) => seat?.seatId !== "rsp" && !seat?.__isSyntheticRsp)
+      .map((seat) => ({ seatId: seat.seatId, isPrimary: !!seat.isPrimary, responseData: serializeSplCurve(seat.responseData) })),
+    assessment,
     products: {
-      selectedModels: productSummary(activeSubs),
-      activeSubs: activeSubs || [],
-      usableLfHz: Number.isFinite(usableLfHz) ? usableLfHz : null,
-      capabilityAndHeadroom,
+      selectedModels, activeSubs, usableLfHz: Number.isFinite(usableLfHz) ? usableLfHz : null,
+      capabilityAndHeadroom: content.frequencyGrid.map((frequency) => ({ frequency, ...getSourceDomainBoostAllowance({ frequency, requestedBoostDb: 6, activeSubs, usableLfHz, requestedSystemOutputDb: targetAnchorDb }) })),
     },
     rp22Definitions: getRp22BassOperatingDefinitions(),
     globalTrimDb: Number.isFinite(candidate?.globalTrimDb) ? candidate.globalTrimDb : null,
-    selectedFilterBank: candidate?.generatedFilterBank || result?.selectedFilters || [],
-    aggregateFilterResponse,
+    selectedFilterBank,
     protectedNullRegions: candidate?.houseCurveDiagnostics?.protectedNullRegions || [],
-    protectedNullDiagnostics: {
-      blockedResiduals: candidate?.blockedResiduals || [],
-      worstResiduals: candidate?.designEqWorstResidualDiagnostics || [],
-    },
-    parameters: {
-      p14: contract?.productAnalysis?.parameters?.p14 || null,
-      p18: contract?.productAnalysis?.parameters?.p18 || null,
-      p19: contract?.productAnalysis?.parameters?.p19 || null,
-      p20: contract?.productAnalysis?.parameters?.p20 || null,
-    },
+    protectedNullDiagnostics: { blockedResiduals: candidate?.blockedResiduals || [], worstResiduals: candidate?.designEqWorstResidualDiagnostics || [] },
+    parameters: { ...contract?.productAnalysis?.parameters },
     fingerprints: contract?.fingerprints || null,
     authority: {
       requestFingerprint: lifecycle?.currentJobFingerprint || null,
       returnedFingerprint: lifecycle?.returnedFingerprint || null,
       resultFingerprint: lifecycle?.resultFingerprint || null,
-      filterBankSignature: result?.filterBankSignature || candidate?.filterBankSignature || null,
+      filterBankSignature: productionFilterBankSignature,
       engineVersion: result?.engineVersion || lifecycle?.requestIdentity?.engineVersion || null,
       resultSchemaVersion: result?.resultSchemaVersion || lifecycle?.requestIdentity?.resultSchemaVersion || null,
     },
-    finalPostEqCurve: exactCurve(candidate?.finalPostEqCurve || result?.finalPostEqCurve),
     bankValidation: candidate?.bankValidationResult || candidate?.aggregateBankLimits || null,
+    captureValidation: { graphCandidateId, contractCandidateId, productionCandidateId },
   };
+  capture.captureValidation = validateExactHouseCurveCapture(capture, {
+    candidate, result, designEqEnabled, detailedStatus, graphFilterBankSignature,
+    contractFilterBankSignature, productionFilterBankSignature,
+  });
   return JSON.parse(JSON.stringify(capture));
 }
