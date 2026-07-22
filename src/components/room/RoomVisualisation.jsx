@@ -199,7 +199,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   const appState = useAppState();
   const sharedBassResults = useOptionalSharedBassResults();
-  const currentP20Results = sharedBassResults?.contract?.selectedCandidate?.perSeatP20Results || [];
+  const currentBassContract = sharedBassResults?.contract || null;
+  const currentP19Result = currentBassContract?.productAnalysis?.parameters?.p19 || null;
+  const currentP19Results = currentBassContract?.selectedCandidate?.perSeatP19Results || [];
+  const currentP20Results = currentBassContract?.selectedCandidate?.perSeatP20Results || [];
   const widthM  = Number(appState?.roomDims?.widthM)  || 4.5;
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
@@ -1389,6 +1392,8 @@ const byId = useEntitiesById({
     getSpeakerModelMeta,
     rvWrapRef,
     computeAllSeatSplMetrics,
+    officialP19Result: currentP19Result,
+    perSeatP19Results: currentP19Results,
     perSeatP20Results: currentP20Results,
   });
 

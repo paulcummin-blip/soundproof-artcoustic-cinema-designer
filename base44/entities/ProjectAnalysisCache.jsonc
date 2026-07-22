@@ -1,0 +1,31 @@
+{
+  "name": "ProjectAnalysisCache",
+  "type": "object",
+  "description": "Persistent completed bass-analysis authority for a project, keyed by exact result fingerprint.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Project identifier owning this analysis authority."
+    },
+    "current_fingerprint": {
+      "type": "string",
+      "description": "Exact calibration/result fingerprint currently required by the project."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "uncalculated",
+        "updating",
+        "complete"
+      ],
+      "default": "uncalculated"
+    },
+    "completed_by_fingerprint": {
+      "type": "object",
+      "description": "Bounded completed-result snapshots keyed by exact result fingerprint."
+    }
+  },
+  "required": [
+    "project_id"
+  ]
+}

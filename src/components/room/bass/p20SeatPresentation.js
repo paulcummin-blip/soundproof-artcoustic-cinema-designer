@@ -1,7 +1,9 @@
+import { formatP20Deviation } from "@/components/utils/rp22/levels";
+
 const referenceIds = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
 
 const seatId = (value) => String(value ?? "").trim();
-const finite = (value) => Number.isFinite(Number(value));
+const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
 export function isRealP20Seat(seat) {
   const id = seatId(seat?.id ?? seat?.seatId).toLowerCase();
@@ -23,9 +25,8 @@ function columnNumber(seat, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function displayVariation(result) {
-  if (typeof result?.displayVariationDb === "string" && result.displayVariationDb.trim()) return result.displayVariationDb;
-  return finite(result?.displayVariationDb) ? `±${Math.abs(Number(result.displayVariationDb))} dB` : "—";
+export function formatAuthoritativeP20Result(result) {
+  return finite(result?.variationDbRaw) ? formatP20Deviation(Number(result.variationDbRaw)) : "—";
 }
 
 export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) {
@@ -43,7 +44,7 @@ export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) 
       column: columnNumber(seat, index + 1),
       level: result && finite(result.variationDbRaw) ? p20LevelText(result.level) : "—",
       variationDbRaw: result && finite(result.variationDbRaw) ? Number(result.variationDbRaw) : null,
-      displayVariationDb: result && finite(result.variationDbRaw) ? displayVariation(result) : "—",
+      displayVariationDb: result && finite(result.variationDbRaw) ? formatAuthoritativeP20Result(result) : "—",
       worstFrequencyHz: result && finite(result.worstFrequencyHz) ? Number(result.worstFrequencyHz) : null,
       comparisonPointCount: result && finite(result.comparisonPointCount) ? Number(result.comparisonPointCount) : null,
       source: result,

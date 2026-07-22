@@ -17,7 +17,7 @@ import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import { levelP17_wsFR } from '@/components/utils/rp22/levels';
 import { RP22_SEAT_PARAMETERS, createEmptySeatRp22Metrics } from '@/components/utils/rp22ParameterPresentation';
-import { attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
+import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 
 // Helper for safe number extraction
 const finite = (v, fallback) => {
@@ -143,6 +143,8 @@ export function buildSeatHudSnapshot({
   sevenBedMode = '',
   dolbyLayout = '5.1',
   overlaysForRendering = {},
+  officialP19Result = null,
+  perSeatP19Results = [],
   perSeatP20Results = [],
 }) {
   if (!seat) return null;
@@ -867,5 +869,8 @@ export function buildSeatHudSnapshot({
   // Legacy bridge
   data.p1NearestM = data.rp22.p1.valueM;
 
-  return attachAuthoritativeP20ToSeatSnapshot(data, engineSeatId, perSeatP20Results);
+  const isRspPosition = Number.isFinite(mlp?.x) && Number.isFinite(mlp?.y)
+    && Math.hypot(seatX - mlp.x, seatY - mlp.y) <= 0.05;
+  const withP19 = attachAuthoritativeP19ToSeatSnapshot(data, engineSeatId, isRspPosition, officialP19Result, perSeatP19Results);
+  return attachAuthoritativeP20ToSeatSnapshot(withP19, engineSeatId, perSeatP20Results);
 }

@@ -1,4 +1,4 @@
-import { buildP20BeforeAfter, buildP20SeatRows, p20SummaryFromResults } from "./p20SeatPresentation.js";
+import { buildP20BeforeAfter, buildP20SeatRows, formatAuthoritativeP20Result, p20SummaryFromResults } from "./p20SeatPresentation.js";
 
 const seats = [
   { id: "s1", row: 1, column: 1 }, { id: "s2", row: 1, column: 2 },
@@ -13,7 +13,7 @@ export function runP20SeatPresentationFixtures() {
   const oneRow = buildP20SeatRows(seats, baseline);
   check("1. Four seats render in one row", oneRow.length === 1 && oneRow[0].seats.length === 4);
   const twoRows = buildP20SeatRows([...seats.slice(0, 2), { ...seats[2], row: 2, column: 1 }, { ...seats[3], row: 2, column: 2 }], baseline);
-  check("2. Two rows preserve row and column arrangement", twoRows.length === 2 && twoRows.every((row) => row.seats.length === 2) && twoRows[1].seats[0].seatId === "s3");
+  check("2. P20 pills preserve exact physical row and column placement", twoRows.length === 2 && twoRows.every((row) => row.seats.length === 2) && twoRows.flatMap((row) => row.seats.map((seat) => `${seat.row}:${seat.column}:${seat.seatId}`)).join("|") === "1:1:s1|1:2:s2|2:1:s3|2:2:s4");
   check("3. Every tile uses its own authoritative level", oneRow[0].seats.map((seat) => seat.level).join(",") === "L4,L3,L2,L4");
   const changed = baseline.map((item) => item.seatId === "s2" ? { ...item, level: 1, variationDbRaw: 4.4, displayVariationDb: "±4 dB" } : item);
   const comparison = buildP20BeforeAfter(seats, baseline, changed);
@@ -28,5 +28,8 @@ export function runP20SeatPresentationFixtures() {
   const candidate = { perSeatP20Results: changed };
   const authoritative = buildP20SeatRows(seats, candidate.perSeatP20Results);
   check("9. Presentation reads selected candidate perSeatP20Results", authoritative[0].seats[1].level === "L1" && authoritative[0].seats[1].source === changed[1]);
+  check("10. Canonical P20 formatter preserves numeric zero", formatAuthoritativeP20Result({ variationDbRaw: 0.2 }) === "±0 dB");
+  check("11. Canonical P20 formatter floors 4.9 and preserves 5.0", formatAuthoritativeP20Result({ variationDbRaw: 4.9 }) === "±4 dB" && formatAuthoritativeP20Result({ variationDbRaw: 5.0 }) === "±5 dB");
+  check("12. Numeric and formatted P20 levels never double-prefix", buildP20SeatRows(seats.slice(0, 2), [result("s1", 4, 1.2), result("s2", "L4", 1.2)])[0].seats.every((seat) => seat.level === "L4"));
   return { checks, passed: checks.filter((item) => item.passed).length, total: checks.length, allPassed: checks.every((item) => item.passed) };
 }

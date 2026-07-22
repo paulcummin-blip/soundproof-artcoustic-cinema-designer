@@ -37,6 +37,8 @@ export default function ReportHeader({
     // Plan View aiming state — passed to cadExport so CAD angles match Plan View
     lcrAngleInfo,
     aimToggles,
+    exportDisabled = false,
+    exportDisabledMessage = "Bass analysis updating",
 }) {
     const navigate = useNavigate();
 
@@ -52,7 +54,7 @@ export default function ReportHeader({
     };
 
     const handleExportPDF = () => {
-        if (exportGuardRef.current.active) return;
+        if (exportDisabled || exportGuardRef.current.active) return;
         exportGuardRef.current = { active: true, startedAt: Date.now() };
 
         try {
@@ -152,7 +154,9 @@ export default function ReportHeader({
                 <Button
                     type="button"
                     onClick={handleExportPDF}
-                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                    disabled={exportDisabled}
+                    title={exportDisabled ? exportDisabledMessage : "Export PDF"}
+                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] disabled:cursor-not-allowed disabled:opacity-50"
                     style={{
                         fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                         backgroundColor: "#FFFFFF",
@@ -162,7 +166,7 @@ export default function ReportHeader({
                     }}
                 >
                     <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
-                    Export PDF
+                    {exportDisabled ? exportDisabledMessage : "Export PDF"}
                 </Button>
 
                 <div style={{ position: 'relative' }}>

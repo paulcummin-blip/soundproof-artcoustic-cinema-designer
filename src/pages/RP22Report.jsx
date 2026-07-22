@@ -39,7 +39,7 @@ import PrintRp23Pill from '@/components/report/PrintRp23Pill';
 import { usePlanCapture } from '@/components/report/usePlanCapture';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
 import { getP21PresetResult, levelP21_earlyReflections } from '@/components/utils/rp22/levels';
-import { useCompletedBassContract } from '@/components/room/bass/completedBassResultStore';
+import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 
@@ -70,9 +70,12 @@ function RP22ReportInner() {
         searchParams.get("projectId") ||
         searchParams.get("id") ||
         activeProjectId;
-    const completedBassContract = useCompletedBassContract(effectiveProjectId || "free");
+    const completedBassAuthority = useCompletedBassAuthority(effectiveProjectId || "free");
+    const completedBassContract = completedBassAuthority.contract;
     const completedBassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract), [completedBassContract]);
     const complianceBassExportData = useMemo(() => buildComplianceBassExportData(completedBassContract), [completedBassContract]);
+    const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
+    const completedP19Results = completedBassContract?.selectedCandidate?.perSeatP19Results || [];
     const completedP20Results = completedBassPresentation.perSeatP20Results;
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
@@ -387,6 +390,7 @@ function RP22ReportInner() {
         aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
         p15ConstructionLevel: app?.p15ConstructionLevel,
         screen,
+        includeBassAnalysis: false,
     });
 
     const reportSeatHudById = React.useMemo(() => {
@@ -419,13 +423,15 @@ function RP22ReportInner() {
                     lcrAngleInfo, analysisResult: analysisResult || {},
                     seatingPositions: seats, splConfig: app?.splConfig || {},
                     sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
+                    officialP19Result: completedP19Result,
+                    perSeatP19Results: completedP19Results,
                     perSeatP20Results: completedP20Results,
                 });
                 if (snapshot) out[seat.id] = snapshot;
             } catch (e) { console.warn(`[RP22Report] HUD failed for seat ${seat.id}:`, e); }
         }
         return out;
-    }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout, completedP20Results]);
+    }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout, completedP19Result, completedP19Results, completedP20Results]);
 
     const seatScopedParamNumbers = React.useMemo(() => new Set(RP22_SEAT_PARAMETERS.map((parameter) => parameter.number)), []);
 
@@ -496,7 +502,7 @@ function RP22ReportInner() {
 
     const roomLevelCounts = React.useMemo(() => {
         const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
-        for (const id of [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 19, 21]) {
+        for (const id of [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 21]) {
             const lvl = getDisplayedRoomLevel(id);
             if (lvl && lvl.match(/^L[1-4]$/)) counts[lvl] += 1;
         }
@@ -875,7 +881,8 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId)}
+                        exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId) || !completedBassAuthority.exportable}
+                        exportDisabledMessage={!completedBassAuthority.exportable ? "Bass analysis updating" : "Report loading"}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
                             // lcrAimMode === 'angled' → compute yaw from speaker position to MLP

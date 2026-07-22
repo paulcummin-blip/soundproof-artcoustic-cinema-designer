@@ -6,16 +6,18 @@ import ParameterCard from '@/components/report/ParameterCard';
 import SeatComplianceSummary from '@/components/report/SeatComplianceSummary';
 import { useRP22AnalysisEngine } from '@/components/hooks/useRP22AnalysisEngine';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
-import { useCompletedBassContract } from '@/components/room/bass/completedBassResultStore';
+import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
-import { p20LevelText } from '@/components/room/bass/p20SeatPresentation';
+import { formatAuthoritativeP20Result, p20LevelText } from '@/components/room/bass/p20SeatPresentation';
+import { attachAuthoritativeP19ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 
 export default function ComplianceReportPrint() {
   const app = useAppState();
   const [isReady, setIsReady] = useState(false);
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
-  const completedBassContract = useCompletedBassContract(reportScopeId);
+  const completedBassAuthority = useCompletedBassAuthority(reportScopeId);
+  const completedBassContract = completedBassAuthority.contract;
   const bassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract), [completedBassContract]);
 
   // Extract data
@@ -37,6 +39,7 @@ export default function ComplianceReportPrint() {
     dolbyLayout,
     mlp,
     seatMetricsById: app?.seatMetricsById || {},
+    includeBassAnalysis: false,
   });
 
   const roomParams = React.useMemo(
@@ -83,19 +86,19 @@ export default function ComplianceReportPrint() {
 
   // Auto-print once ready
   useEffect(() => {
-    if (roomParams.length > 0 || Object.keys(seatParams).length > 0) {
+    if (completedBassAuthority.exportable && (roomParams.length > 0 || Object.keys(seatParams).length > 0)) {
       setIsReady(true);
       // Delay print to ensure render completes
       setTimeout(() => {
         window.print();
       }, 500);
     }
-  }, [roomParams, seatParams]);
+  }, [roomParams, seatParams, completedBassAuthority.exportable]);
 
-  if (!isReady) {
+  if (!completedBassAuthority.exportable || !isReady) {
     return (
       <div className="flex items-center justify-center min-h-screen" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-        <p className="text-lg">Preparing report...</p>
+        <p className="text-lg">{completedBassAuthority.exportable ? 'Preparing report...' : 'Bass analysis updating'}</p>
       </div>
     );
   }
@@ -264,10 +267,19 @@ export default function ComplianceReportPrint() {
 
                 // Extract seat-specific parameters
                 const seatParamsList = RP22_SEAT_PARAMETERS.map(({ number }) => {
+                  if (number === 19) {
+                    const withP19 = attachAuthoritativeP19ToSeatSnapshot(
+                      { rp22: rp22Raw }, seatId, isRsp,
+                      completedBassContract?.productAnalysis?.parameters?.p19,
+                      completedBassContract?.selectedCandidate?.perSeatP19Results,
+                    );
+                    const metric = withP19.rp22.p19;
+                    return { num: 'P19', valueFormatted: metric.formatted, level: metric.level };
+                  }
                   if (number === 20) {
                     const result = bassPresentation.perSeatP20Results.find((item) => String(item?.seatId) === String(seatId));
                     return result && Number.isFinite(Number(result.variationDbRaw))
-                      ? { num: 'P20', valueFormatted: result.displayVariationDb, level: p20LevelText(result.level) }
+                      ? { num: 'P20', valueFormatted: formatAuthoritativeP20Result(result), level: p20LevelText(result.level) }
                       : { num: 'P20', valueFormatted: '—', level: '—' };
                   }
                   const metric = rp22Raw[`p${number}`] || rp22Raw[`P${number}`] || {};
@@ -293,7 +305,7 @@ export default function ComplianceReportPrint() {
                           <div key={param.num} className="flex items-center justify-between text-xs">
                             <span className="font-medium text-[#1B1A1A]">{param.num}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-[#3E4349]">{param.valueFormatted || '—'}</span>
+                              <span className="text-[#3E4349]">{param.valueFormatted ?? '—'}</span>
                               <RP22GradingPill level={param.level} compact />
                             </div>
                           </div>

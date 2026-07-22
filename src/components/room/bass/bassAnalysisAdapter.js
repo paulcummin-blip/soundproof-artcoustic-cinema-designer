@@ -34,6 +34,7 @@ import {
   signatureToString,
 } from "@/components/room/bass/candidateConsistency";
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
+import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 
 // ---------------------------------------------------------------------------
 // Adapter helpers
@@ -128,6 +129,12 @@ function buildCandidateRef(candidate) {
     worstP20SeatId: candidate.worstP20SeatId ?? null,
     perSeatP20Results: Array.isArray(candidate.perSeatP20Results) ? candidate.perSeatP20Results.map((seat) => ({ ...seat })) : [],
     p20Available: !!candidate.p20Available,
+    perSeatP19Results: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
+      seatId: seat?.seatId ?? null,
+      variationDbRaw: Number.isFinite(seat?.maxAbsDeviationDb) ? seat.maxAbsDeviationDb : null,
+      level: Number.isFinite(seat?.maxAbsDeviationDb) ? houseCurveP19Level(seat.maxAbsDeviationDb) : null,
+      worstFrequencyHz: Number.isFinite(seat?.worstFrequencyHz) ? seat.worstFrequencyHz : null,
+    })),
     perSeatDiagnostics: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
       seatId: seat?.seatId ?? null,
       maxAbsDeviationDb: Number.isFinite(seat?.maxAbsDeviationDb) ? seat.maxAbsDeviationDb : null,

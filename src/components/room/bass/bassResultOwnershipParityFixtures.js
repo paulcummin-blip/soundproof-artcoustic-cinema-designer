@@ -1,28 +1,40 @@
 import { createBassAnalysisResult, createBassParameterResult } from "./bassAnalysisContract.js";
 import { formatBassResults } from "./bassResultsPresentation.js";
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from "./bassCompliancePresentation.js";
-import { attachAuthoritativeP20ToSeatSnapshot, buildSeatHudParameterRows } from "@/components/room/seatHudPresentation";
+import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot, buildSeatHudParameterRows } from "@/components/room/seatHudPresentation";
 import { RP22_SEAT_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
+import { buildPersistedBassAuthority, resolvePersistedBassAuthority } from "./completedBassResultStore.js";
 
 const FP = "cal:v1:ownership123456";
 const contractFixture = () => {
   const contract = createBassAnalysisResult();
-  Object.assign(contract.job, { status: "complete", currentJobFingerprint: FP, resultFingerprint: FP });
+  Object.assign(contract.job, { status: "complete", currentJobFingerprint: FP, resultFingerprint: FP, completedAtMs: 100 });
   contract.selectedCandidateId = "candidate-authoritative";
-  contract.selectedCandidate = { perSeatP20Results: [
-    { seatId: "s1", variationDbRaw: 2.2, displayVariationDb: "±2 dB", level: "L3" },
-    { seatId: "s2", variationDbRaw: 3.8, displayVariationDb: "±3 dB", level: "L2" },
-  ] };
+  contract.selectedCandidate = {
+    perSeatP19Results: [
+      { seatId: "s1", variationDbRaw: 2.2, level: 3 },
+      { seatId: "s2", variationDbRaw: 3.2, level: 2 },
+    ],
+    perSeatP20Results: [
+      { seatId: "s1", variationDbRaw: 0.2, displayVariationDb: 0, level: "L4" },
+      { seatId: "s2", variationDbRaw: 4.9, displayVariationDb: 4, level: "L2" },
+    ],
+  };
   contract.productAnalysis.parameters = {
     p14: createBassParameterResult({ parameter: "P14", status: "complete", level: 2, value: 116.2 }),
     p18: createBassParameterResult({ parameter: "P18", status: "complete", level: 3, value: 18.9 }),
     p19: createBassParameterResult({ parameter: "P19", status: "complete", level: 1, value: 4.7 }),
-    p20: createBassParameterResult({ parameter: "P20", status: "complete", level: 2, value: 3.8 }),
+    p20: createBassParameterResult({ parameter: "P20", status: "complete", level: 2, value: 4.9 }),
   };
   return contract;
 };
 
 const baseSnapshot = { rp22: Object.fromEntries(RP22_SEAT_PARAMETERS.map(({ number }) => [`p${number}`, { formatted: `${number}`, level: "L2" }])) };
+const withBassSeat = (contract, seatId, isRsp) => attachAuthoritativeP20ToSeatSnapshot(
+  attachAuthoritativeP19ToSeatSnapshot(baseSnapshot, seatId, isRsp, contract.productAnalysis.parameters.p19, contract.selectedCandidate.perSeatP19Results),
+  seatId,
+  contract.selectedCandidate.perSeatP20Results,
+);
 
 export function runBassResultOwnershipParityFixtures() {
   const checks = [];
@@ -31,19 +43,35 @@ export function runBassResultOwnershipParityFixtures() {
   const simulation = formatBassResults(contract);
   const compliance = buildComplianceBassPresentation(contract);
   const pdf = buildComplianceBassExportData(contract);
-  check("1. Bass Simulation compliance and PDF share P14-P20 display", ["p14", "p18", "p19", "p20"].every((key) => pdf.parameters[key].valueText === compliance.parameters[key].valueText && pdf.parameters[key].level === compliance.parameters[key].level && simulation.pills[key].text.includes(compliance.parameters[key].valueText)));
-  check("2. All consumers share fingerprint and selected candidate", simulation.resultFingerprint === FP && compliance.resultFingerprint === FP && pdf.resultFingerprint === FP && simulation.selectedCandidateId === "candidate-authoritative" && compliance.selectedCandidateId === "candidate-authoritative" && pdf.selectedCandidateId === "candidate-authoritative");
-  check("3. Seat HUD presentation has no global bass strip", !buildSeatHudParameterRows(baseSnapshot).some((row) => [14, 18, 19].includes(row.parameter.number)));
-  check("4. Seat HUD contains every catalogued seat parameter", buildSeatHudParameterRows(baseSnapshot).map((row) => row.parameter.number).join(",") === RP22_SEAT_PARAMETERS.map((row) => row.number).join(","));
-  check("5. Seat HUD contains no room-scoped parameter", buildSeatHudParameterRows(baseSnapshot).every((row) => row.parameter.scope === "Seat"));
-  const s1 = attachAuthoritativeP20ToSeatSnapshot(baseSnapshot, "s1", contract.selectedCandidate.perSeatP20Results);
-  const s2 = attachAuthoritativeP20ToSeatSnapshot(baseSnapshot, "s2", contract.selectedCandidate.perSeatP20Results);
-  check("6. Changing seat changes only selected-seat result", s1.rp22.p20.formatted === "±2 dB" && s2.rp22.p20.formatted === "±3 dB" && s1.rp22.p1 === s2.rp22.p1);
-  check("7. Selected-seat P20 matches compliance tile source", s1.rp22.p20.formatted === contract.selectedCandidate.perSeatP20Results[0].displayVariationDb && s1.rp22.p20.level === "L3");
-  check("8. Selected-seat data cannot replace official P19 RSP", !s1.rp22.p19 && compliance.parameters.p19.valueText === "±4 dB");
-  const missing = attachAuthoritativeP20ToSeatSnapshot(baseSnapshot, "missing", contract.selectedCandidate.perSeatP20Results);
-  check("9. Missing seat values display dash", buildSeatHudParameterRows(missing).find((row) => row.parameter.number === 20)?.valueText === "—");
-  check("10. PDF reads completed result without independent calculation", pdf.completed && pdf.source === "completed-authoritative-bass-result" && pdf.independentBassCalculation === false);
+  const expectedSeatOrder = "1,4,5,6,9,10,16,17,19,20";
+  const rows = buildSeatHudParameterRows(baseSnapshot);
+
+  check("1. Seat HUD contains P19 and P20 in canonical order", rows.map((row) => row.parameter.number).join(",") === expectedSeatOrder);
+  check("2. Seat HUD excludes P14 P18 and P21", !rows.some((row) => [14, 18, 21].includes(row.parameter.number)));
+  const emptyRows = buildSeatHudParameterRows({ rp22: {} });
+  check("3. Every seat-scoped row remains present when unavailable", emptyRows.map((row) => row.parameter.number).join(",") === expectedSeatOrder && emptyRows.every((row) => row.valueText === "—"));
+
+  const rsp = withBassSeat(contract, "s1", true);
+  const other = withBassSeat(contract, "s2", false);
+  check("4. RSP P19 uses official authoritative result", rsp.rp22.p19.formatted === "±4 dB" && rsp.rp22.p19.source === "official-authoritative-rsp-p19");
+  check("5. Real-seat P19 uses existing authoritative seat metric", other.rp22.p19.formatted === "±3 dB" && other.rp22.p19.source === "authoritative-per-seat-house-curve");
+  const missingP19 = attachAuthoritativeP19ToSeatSnapshot(baseSnapshot, "missing", false, contract.productAnalysis.parameters.p19, contract.selectedCandidate.perSeatP19Results);
+  check("6. Missing real-seat P19 remains a visible dash", buildSeatHudParameterRows(missingP19).find((row) => row.parameter.number === 19)?.valueText === "—");
+  check("7. Selecting another seat changes only seat-local bass metrics", rsp.rp22.p1 === other.rp22.p1 && rsp.rp22.p19.formatted !== other.rp22.p19.formatted && rsp.rp22.p20.formatted !== other.rp22.p20.formatted);
+  check("8. Non-RSP P19 never overwrites official report P19", other.rp22.p19.value !== contract.productAnalysis.parameters.p19.value && compliance.parameters.p19.valueText === "±4 dB");
+  check("9. Numeric P20 zero displays canonically", rsp.rp22.p20.formatted === "±0 dB" && rsp.rp22.p20.level === "L4");
+
+  check("10. Bass Simulation compliance and PDF share exact parameter values and levels", ["p14", "p18", "p19", "p20"].every((key) => pdf.parameters[key].valueText === compliance.parameters[key].valueText && pdf.parameters[key].level === compliance.parameters[key].level && simulation.pills[key].text.includes(compliance.parameters[key].valueText)));
+  check("11. All three surfaces share fingerprint and selected candidate", simulation.resultFingerprint === FP && compliance.resultFingerprint === FP && pdf.resultFingerprint === FP && simulation.selectedCandidateId === contract.selectedCandidateId && compliance.selectedCandidateId === contract.selectedCandidateId && pdf.selectedCandidateId === contract.selectedCandidateId);
+
+  const persisted = buildPersistedBassAuthority(null, FP, contract);
+  const newPageAuthority = resolvePersistedBassAuthority("project-1", JSON.parse(JSON.stringify(persisted)));
+  check("12. New page context restores identical completed result", newPageAuthority.exportable && newPageAuthority.contract.job.resultFingerprint === FP && newPageAuthority.contract.selectedCandidateId === contract.selectedCandidateId);
+  const updating = resolvePersistedBassAuthority("project-1", buildPersistedBassAuthority(persisted, "cal:v1:newfingerprint", null));
+  check("13. Export is blocked without a current completed fingerprint", !updating.exportable && updating.status === "updating" && updating.contract === null && updating.staleContract?.job?.resultFingerprint === FP);
+  const refreshingSameFingerprint = resolvePersistedBassAuthority("project-1", buildPersistedBassAuthority(persisted, FP, null, true));
+  check("14. A recalculating matching fingerprint remains stale and non-exportable", !refreshingSameFingerprint.exportable && refreshingSameFingerprint.staleContract?.job?.resultFingerprint === FP);
+  check("15. PDF reads completed authority without independent bass calculation", pdf.completed && pdf.source === "completed-authoritative-bass-result" && pdf.independentBassCalculation === false);
 
   const passed = checks.filter((item) => item.passed).length;
   return { checks, passed, total: checks.length, allPassed: passed === checks.length };

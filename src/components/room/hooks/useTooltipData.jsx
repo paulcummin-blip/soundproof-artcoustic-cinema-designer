@@ -27,6 +27,8 @@ export function useTooltipData({
   seatingPositions,
   dolbyLayout,
   getCanonicalRole,
+  officialP19Result,
+  perSeatP19Results,
   perSeatP20Results,
 }) {
   return useMemo(() => {
@@ -71,11 +73,15 @@ export function useTooltipData({
       || 'rears'
     ).toLowerCase();
     const seatRp22 = seatId ? analysisResult?.perSeatRp22?.[seatId]?.rp22 : null;
+    const seatP19 = (Array.isArray(perSeatP19Results) ? perSeatP19Results : []).find((item) => String(item?.seatId) === String(seatId));
     const seatP20 = (Array.isArray(perSeatP20Results) ? perSeatP20Results : []).find((item) => String(item?.seatId) === String(seatId));
     const rp22Fingerprint = [
       seatRp22?.[9]?.formatted || '',
       seatRp22?.[9]?.details?.worst?.deg ?? '',
       seatRp22?.[10]?.formatted || '',
+      officialP19Result?.value ?? '',
+      seatP19?.variationDbRaw ?? '',
+      seatP19?.level ?? '',
       seatP20?.variationDbRaw ?? '',
       seatP20?.level ?? '',
     ].join('|');
@@ -104,6 +110,8 @@ export function useTooltipData({
       splConfig: appState?.splConfig || {},
       sevenBedMode,
       dolbyLayout,
+      officialP19Result,
+      perSeatP19Results,
       perSeatP20Results,
     };
 
@@ -145,6 +153,8 @@ export function useTooltipData({
     appState?.sevenBedLayoutType,
     appState?.speakerSystem?.sevenBedLayoutType,
     appState?.speakerSystem?.useWidesInsteadOfRears,
+    officialP19Result,
+    perSeatP19Results,
     perSeatP20Results,
   ]);
 }

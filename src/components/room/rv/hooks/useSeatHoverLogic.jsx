@@ -28,6 +28,8 @@ export function useSeatHoverLogic({
   getSpeakerModelMeta,
   rvWrapRef,
   computeAllSeatSplMetrics,
+  officialP19Result,
+  perSeatP19Results,
   perSeatP20Results,
 }) {
   // Hover state
@@ -163,6 +165,8 @@ export function useSeatHoverLogic({
     seatingPositions,
     dolbyLayout,
     getCanonicalRole,
+    officialP19Result,
+    perSeatP19Results,
     perSeatP20Results,
   });
 

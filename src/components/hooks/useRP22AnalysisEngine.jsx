@@ -386,9 +386,10 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers }) => {
-  // Per-seat bass response curves from the CURRENT bass engine (no maths changed).
-  const seatResponses = useSeatResponses();
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers, includeBassAnalysis = true }) => {
+  // Report consumers disable this calculation path and present only the completed bass authority.
+  const liveSeatResponses = useSeatResponses();
+  const seatResponses = includeBassAnalysis ? liveSeatResponses : [];
   // Active subwoofer models — used to enforce the product LF boost guard in the
   // RP22 Design EQ stage (applyDesignEqCurve). We take the MOST restrictive
   // (highest) approved usable -6 dB limit across enabled subs, since a multi-sub
@@ -1635,6 +1636,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     screen?.mountMode,
     screen?.floatDepthM,
     seatResponses,
+    includeBassAnalysis,
     designEqUsableLfHz,
     designEqSystemLimits.activeSubs,
   ]);
