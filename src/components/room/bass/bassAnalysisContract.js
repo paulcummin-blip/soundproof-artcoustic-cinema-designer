@@ -116,6 +116,8 @@ export function createBassParameterResult({
   passedL1 = null,
   isStale = false,
   reason = null,
+  recommendedLevel = null,
+  recommendedDetail = null,
 } = {}) {
   const finiteValue = Number.isFinite(value) ? value : null;
   const authoritativeLevel = parameter === PARAM_P20 && finiteValue != null && [PARAM_STATUS_COMPLETE, PARAM_STATUS_UPDATING].includes(status)
@@ -130,6 +132,8 @@ export function createBassParameterResult({
     passedL1,
     isStale: !!isStale,
     reason,
+    recommendedLevel: recommendedLevel == null ? null : Math.max(0, Math.min(4, Math.round(recommendedLevel))),
+    recommendedDetail,
   };
 }
 

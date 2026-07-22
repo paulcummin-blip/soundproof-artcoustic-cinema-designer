@@ -23,8 +23,9 @@ export default function BassResultsPills({ contract, compact = false, seatId = n
   const formatted = formatBassResults(result, nowMs ?? clock, seatId);
   return <div className="grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Bass RP22 results">
     {Object.entries(formatted.pills).map(([key, pill]) => (
-      <span key={key} title={pill.diagnostic ? "Per-seat target-curve diagnostic; not official RP22 P19." : TOOLTIPS[key]} aria-label={pill.text}>
+      <span key={key} className="flex flex-col gap-1" title={pill.diagnostic ? "Per-seat target-curve diagnostic; not official RP22 P19." : TOOLTIPS[key]} aria-label={pill.text}>
         <RP22GradingPill level={pill.level} compact={compact} style={{ width: "100%" }}>{pill.text}</RP22GradingPill>
+        {pill.detail && <small className="text-center text-[10px] text-muted-foreground">{pill.detail}</small>}
       </span>
     ))}
   </div>;

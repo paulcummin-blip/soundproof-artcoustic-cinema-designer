@@ -1,6 +1,6 @@
 import { formatBassParameterValue } from "@/components/room/bass/bassResultsPresentation";
 import { p20SummaryFromResults } from "@/components/room/bass/p20SeatPresentation";
-import { isCompletedBassContract } from "@/components/room/bass/completedBassResultStore";
+import { isCompletedBassContract } from "@/components/room/bass/completedBassResultPersistence";
 
 const levelLabel = (level) => level == null ? "—" : Number(level) === 0 ? "FAIL" : `L${Number(level)}`;
 
@@ -22,6 +22,8 @@ export function formatAuthoritativeBassParameter(contract, key) {
     valueText: formatBassParameterValue(key, parameter.value),
     level: levelLabel(parameter.level),
     status: parameter.status,
+    rawValue: Number(parameter.value),
+    detail: key === "p14" ? parameter.recommendedDetail : null,
   };
 }
 

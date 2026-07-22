@@ -1,5 +1,5 @@
 import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
-import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
+import { computeParam18BassExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
 import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
@@ -14,6 +14,7 @@ import { BASS_OPTIMISER_POOL_VERSION } from "@/components/room/bass/bassOptimise
 import { displayBassCandidates, isPhysicallyCredibleBassCandidate } from "@/components/utils/bassCandidatePoolEligibility";
 import { buildCanonicalAbsoluteHouseCurveTarget, deriveResponseAnchoredTarget, interpolateCanonicalTarget, resolveHouseCurveDomains } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions, isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { assessP14Capability } from "@/components/utils/p14CapabilityAuthority";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -81,8 +82,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
         return { ...diag, requiredBoostToP19ToleranceDb, p19ToleranceCapabilityLimited };
       })
     : eq.worstResidualDiagnostics;
-  const preEqP14 = computeParam14LfeCapability(rawCurve, false, [20, 120]);
-  const p14 = computeParam14LfeCapability(finalPostEqCurve, false, [20, 120]);
+  const preEqP14 = assessP14Capability({ activeSubs });
+  const p14 = assessP14Capability({ activeSubs, combinedEqCurve });
   const p18 = computeParam18BassExtension(finalPostEqCurve);
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third");
   const assessedCurve = smoothed.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz);
@@ -106,19 +107,16 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     schroederHz: assessmentEndHz,
   });
   const achievedP14Db = p14?.value ?? null;
-  const p14CheckpointDeltaDb =
-    Number.isFinite(achievedP14Db) &&
-    Number.isFinite(Number(eq.selectedCheckpoint?.p14MinimumSpl))
-      ? achievedP14Db - Number(eq.selectedCheckpoint.p14MinimumSpl)
-      : null;
-  const achievedP14Level = levelFromValue(achievedP14Db, definitions, "p14TargetDb");
+  const p14CheckpointDeltaDb = null;
+  const achievedP14Level = p14?.minimumLevel ?? 0;
+  const achievedP14RecommendedLevel = p14?.recommendedLevel ?? 0;
   const achievedP18FrequencyHz = p18?.value ?? null;
   const achievedP18Level = Number(String(p18?.level || "").replace("L", "")) || 0;
   const achievedP19VariationDb = officialP19.variationDbRaw;
   const achievedP19Level = levelFromValue(achievedP19VariationDb, definitions, "p19ToleranceDb", true);
-  const meetsRequestedEnvelope = achievedP14Level >= request.p14.value && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
+  const meetsRequestedEnvelope = achievedP14RecommendedLevel >= request.p14.value && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
   const rejectionReason = [
-    achievedP14Level < request.p14.value && `P14 target not maintained between ${assessmentStartHz}–${assessmentEndHz} Hz`,
+    achievedP14RecommendedLevel < request.p14.value && `P14 recommended design target not achieved after EQ headroom`, 
     achievedP18Level < request.p18.value && `P18 extension does not reach the requested ${request.p18.p18LimitHz} Hz boundary`,
     achievedP19Level < request.p19.value && `P19 variation exceeds ±${request.p19.p19ToleranceDb} dB between ${assessmentStartHz}–${assessmentEndHz} Hz`,
   ].filter(Boolean).join("; ");
@@ -225,7 +223,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     correctionStartHz,
     correctionEndHz,
     preEqP14Db: preEqP14?.value ?? null,
-    preEqP14Level: preEqP14?.level ? Number(String(preEqP14.level).replace("L", "")) || 0 : 0,
+    preEqP14Level: preEqP14?.minimumLevel ?? 0,
     // Part E: Carry the effective profile contract from the Design EQ fit so
     // the priority selector and validation panel can distinguish Standard from
     // Accuracy candidates.
@@ -233,6 +231,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     designEqFitProfileConfig: eq.designEqFitProfileConfig || null,
     achievedP14Db,
     achievedP14Level,
+    achievedP14RecommendedLevel,
+    p14CapabilityDetails: p14,
     achievedP18FrequencyHz,
     achievedP18Level,
     achievedP19VariationDb,

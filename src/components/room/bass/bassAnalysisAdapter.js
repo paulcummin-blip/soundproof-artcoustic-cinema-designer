@@ -35,6 +35,7 @@ import {
 } from "@/components/room/bass/candidateConsistency";
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
+import { formatP14RecommendedDetail } from "@/components/utils/p14CapabilityAuthority";
 
 // ---------------------------------------------------------------------------
 // Adapter helpers
@@ -118,6 +119,8 @@ function buildCandidateRef(candidate) {
     requestedP19Level: candidate.requestedP19Level ?? null,
     achievedP14Level: typeof candidate.achievedP14Level === "number" ? candidate.achievedP14Level : parseLegacyLevel(candidate.achievedP14Level),
     achievedP14Db: Number.isFinite(candidate.achievedP14Db) ? candidate.achievedP14Db : null,
+    achievedP14RecommendedLevel: typeof candidate.achievedP14RecommendedLevel === "number" ? candidate.achievedP14RecommendedLevel : 0,
+    p14CapabilityDetails: candidate.p14CapabilityDetails || null,
     achievedP18Level: typeof candidate.achievedP18Level === "number" ? candidate.achievedP18Level : parseLegacyLevel(candidate.achievedP18Level),
     achievedP18FrequencyHz: Number.isFinite(candidate.achievedP18FrequencyHz) ? candidate.achievedP18FrequencyHz : null,
     achievedP19Level: typeof candidate.achievedP19Level === "number" ? candidate.achievedP19Level : parseLegacyLevel(candidate.achievedP19Level),
@@ -361,9 +364,12 @@ export function adaptCurrentBassOptimisationResult({
     ? (typeof selectedCandidate.achievedP14Level === "number" ? selectedCandidate.achievedP14Level : parseLegacyLevel(optimisationResult?.achievedP14Level))
     : parseLegacyLevel(optimisationResult?.achievedP14Level);
   const p14Value = Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : (Number.isFinite(optimisationResult?.achievedP14Db) ? optimisationResult.achievedP14Db : null);
+  const p14RecommendedLevel = selectedCandidate?.achievedP14RecommendedLevel ?? 0;
   contract.productAnalysis.parameters.p14 = createBassParameterResult({
     parameter: PARAM_P14, status: paramStatus(p14Level != null), level: p14Level, value: p14Value,
-    unit: "dB", passedL1: p14Level != null ? p14Level >= 1 : null, isStale,
+    unit: "dBC", passedL1: p14Level != null ? p14Level >= 1 : null, isStale,
+    recommendedLevel: p14RecommendedLevel,
+    recommendedDetail: formatP14RecommendedDetail(p14RecommendedLevel),
   });
 
   // P18

@@ -780,7 +780,7 @@ export default function RP22CompliancePanel({
           const targetBasisNote =
             p.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
             p.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
-            p.id === 14 ? "Official RSP result from the completed authoritative bass analysis." :
+            p.id === 14 ? bassPresentation.parameters.p14.detail :
             p.id === 18 ? "Official room result from the completed authoritative bass analysis." :
             p.id === 19 ? "Official RSP-versus-target result from the completed authoritative bass analysis." :
             null;

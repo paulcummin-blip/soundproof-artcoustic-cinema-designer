@@ -21,7 +21,7 @@ const contractFixture = () => {
     ],
   };
   contract.productAnalysis.parameters = {
-    p14: createBassParameterResult({ parameter: "P14", status: "complete", level: 2, value: 116.2 }),
+    p14: createBassParameterResult({ parameter: "P14", status: "complete", level: 3, value: 116.2, recommendedLevel: 1, recommendedDetail: "Recommended target: L1 achieved" }),
     p18: createBassParameterResult({ parameter: "P18", status: "complete", level: 3, value: 18.9 }),
     p19: createBassParameterResult({ parameter: "P19", status: "complete", level: 1, value: 4.7 }),
     p20: createBassParameterResult({ parameter: "P20", status: "complete", level: 2, value: 4.9 }),
@@ -62,6 +62,7 @@ export function runBassResultOwnershipParityFixtures() {
   check("9. Numeric P20 zero displays canonically", rsp.rp22.p20.formatted === "±0 dB" && rsp.rp22.p20.level === "L4");
 
   check("10. Bass Simulation compliance and PDF share exact parameter values and levels", ["p14", "p18", "p19", "p20"].every((key) => pdf.parameters[key].valueText === compliance.parameters[key].valueText && pdf.parameters[key].level === compliance.parameters[key].level && simulation.pills[key].text.includes(compliance.parameters[key].valueText)));
+  check("10a. P14 raw authority and recommended detail are identical on all surfaces", simulation.parameterValues.p14 === compliance.parameters.p14.rawValue && compliance.parameters.p14.rawValue === pdf.parameters.p14.rawValue && simulation.pills.p14.detail === compliance.parameters.p14.detail && compliance.parameters.p14.detail === pdf.parameters.p14.detail);
   check("11. All three surfaces share fingerprint and selected candidate", simulation.resultFingerprint === FP && compliance.resultFingerprint === FP && pdf.resultFingerprint === FP && simulation.selectedCandidateId === contract.selectedCandidateId && compliance.selectedCandidateId === contract.selectedCandidateId && pdf.selectedCandidateId === contract.selectedCandidateId);
 
   const persisted = buildPersistedBassAuthority(null, FP, contract);

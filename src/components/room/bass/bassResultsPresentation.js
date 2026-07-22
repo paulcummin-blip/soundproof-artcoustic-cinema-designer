@@ -23,7 +23,7 @@ const normalizeIntegerNoise = (value) => {
 export function formatBassParameterValue(key, value) {
   if (!isFiniteNumber(value)) return "";
   const number = normalizeIntegerNoise(value);
-  if (key === "p14") return `${Math.ceil(number)} dB`;
+  if (key === "p14") return `${Math.ceil(number - 1e-8)} dBC`;
   if (key === "p18") return `${Math.floor(number)} Hz`;
   if (key === "p19") return `±${Math.floor(Math.abs(number))} dB`;
   if (key === "p20") return formatP20Deviation(number);
@@ -50,7 +50,11 @@ function readyPill(key, parameter, result) {
   if (parameter?.level == null) return { text: `${label} —`, level: "—" };
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
   const value = formatBassParameterValue(key, parameter.value);
-  return { text: `${label} ${grade}${value ? ` · ${value}` : ""}`, level: grade };
+  return {
+    text: `${label} ${grade}${value ? ` · ${value}` : ""}`,
+    level: grade,
+    detail: key === "p14" ? parameter.recommendedDetail : null,
+  };
 }
 
 export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
@@ -84,6 +88,7 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
     isUpdating,
     elapsedSeconds,
     selectedMode: result?.selectedMode || "balanced",
+    parameterValues: Object.fromEntries(PARAM_KEYS.map((key) => [key, parameters[key]?.value ?? null])),
     resultFingerprint: result?.job?.resultFingerprint || null,
     selectedCandidateId: result?.selectedCandidateId || null,
   };

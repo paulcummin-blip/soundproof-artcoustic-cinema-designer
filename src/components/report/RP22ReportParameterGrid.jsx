@@ -407,6 +407,7 @@ export default function RP22ReportParameterGrid({
         const targetBasisNote =
           param.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
           param.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
+          param.id === 14 ? bassPresentation.parameters.p14.detail :
           null;
         return (
           <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
