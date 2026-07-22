@@ -1,6 +1,7 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
+import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const DESIGN_EQ_SAMPLE_RATE = 48000;
@@ -479,6 +480,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
+  const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
   // Part A: Resolve the fitting profile. Standard preserves current behaviour;
   // Accuracy trades P14/P18 preservation for closer target alignment.
   const profile = getDesignEqFitProfile(options.fitProfile);
@@ -564,6 +566,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const qMultipliers = [1, 1.5, 2, 3];
     for (const region of regions) {
       const isPeak = region.kind === "peak";
+      if (!isPeak && isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions)) continue;
       // Part B: Per-filter cut clamp is profile-driven (−10 dB standard, −15 dB accuracy).
       const maximumCutDb = profile.maximumCutDb ?? 10;
       const maximumAggregateBoostDb = profile.maximumAggregateBoostDb ?? 6;

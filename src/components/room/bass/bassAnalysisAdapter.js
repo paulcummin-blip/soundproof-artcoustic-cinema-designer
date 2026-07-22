@@ -121,6 +121,8 @@ function buildCandidateRef(candidate) {
     achievedP18FrequencyHz: Number.isFinite(candidate.achievedP18FrequencyHz) ? candidate.achievedP18FrequencyHz : null,
     achievedP19Level: typeof candidate.achievedP19Level === "number" ? candidate.achievedP19Level : parseLegacyLevel(candidate.achievedP19Level),
     achievedP19VariationDb: Number.isFinite(candidate.achievedP19VariationDb) ? candidate.achievedP19VariationDb : null,
+    officialP19VariationDb: Number.isFinite(candidate.officialP19VariationDb) ? candidate.officialP19VariationDb : null,
+    correctableP19VariationDb: Number.isFinite(candidate.correctableP19VariationDb) ? candidate.correctableP19VariationDb : null,
     achievedP20Level: p20Level,
     achievedP20VariationDb: p20Value,
     p20Available: !!candidate.p20Available,

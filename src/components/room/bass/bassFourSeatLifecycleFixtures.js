@@ -4,6 +4,8 @@ import { deriveRequestedCalibrationConfig } from "./requestedCalibrationConfig";
 import { BassBackgroundAnalysisController } from "./bassBackgroundAnalysisStore";
 import { validateCachedBassResult } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, createCompleteMessage } from "./bassOptimiserWorkerProtocol";
+import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
+import { buildBassGraphSeries } from "./bassGraphDomainBuilder";
 
 class FixtureClock {
   constructor() { this.time = 0; this.jobs = []; }
@@ -44,7 +46,6 @@ export function runFourSeatBassLifecycleFixture() {
     usableLfHz: 20,
     transitionHz: 120,
     targetAnchorDb: requested.requestedTargetAnchorDb,
-    targetAnchorSource: "rp22-request.p14.p14TargetDb",
     onProgress: (progress) => stages.push(progress.phase),
   });
 
@@ -72,7 +73,7 @@ export function runFourSeatBassLifecycleFixture() {
     requestProfiles.get(key).add(candidate.designEqFitProfile);
   });
   const workersBeforeRerank = workers.length;
-  const selected = selectCandidateFromPool(pool, "balanced");
+  const selected = selectCandidateFromPool(pool, "house_curve_accuracy");
   selectCandidateFromPool(pool, "depth");
   const invalidPool = generateCandidatePool({ rawCurve: [], activeSubs: [{ modelKey: "SUB2-12" }] });
   const invalidFingerprint = "four-seat-invalid-input-reporting";
@@ -82,6 +83,38 @@ export function runFourSeatBassLifecycleFixture() {
     identity: { ...BASS_OPTIMISER_VERSIONS, fingerprint: invalidFingerprint },
     pool: invalidPool,
   }, { fingerprint: invalidFingerprint });
+  const candidate = selected.selectedCandidate;
+  const enabledFilters = (candidate?.generatedFilterBank || []).filter((filter) => filter.enabled);
+  const canonicalTargets = new Set(pool.candidates.map((entry) => JSON.stringify(entry.productionHouseCurveTarget)));
+  const targetValues = Object.fromEntries([20, 30, 40, 80, 120, 200].map((frequency) => [frequency, interpolateCanonicalTarget(candidate?.productionHouseCurveTarget, frequency)]));
+  const exactGraphAuthority = candidate?.finalPostEqCurve?.every((point, index) => {
+    const raw = rawCurve[index];
+    const correction = candidate.combinedEqCurve[index];
+    return raw?.frequency === point.frequency && correction?.frequency === point.frequency
+      && Math.abs(point.spl - (raw.spl + correction.spl)) < 1e-9;
+  });
+  const correctionValues = candidate?.combinedEqCurve?.map((point) => point.spl) || [];
+  const graphSeries = buildBassGraphSeries({
+    designEqEnabled: true,
+    showHouseCurve: true,
+    rspRawCurve: rawCurve,
+    optimisationResult: selected,
+    hasMatchingDetailedResult: true,
+    smoothingMode: "none",
+  });
+  const graphRaw = graphSeries.find((series) => series.kind === "raw")?.data;
+  const graphPostEq = graphSeries.find((series) => series.kind === "post-eq")?.data;
+  const graphTarget = graphSeries.find((series) => series.kind === "house-curve")?.data;
+  const graphSeriesAuthorityExact = JSON.stringify(graphRaw) === JSON.stringify(rawCurve)
+    && JSON.stringify(graphPostEq) === JSON.stringify(candidate?.finalPostEqCurve)
+    && JSON.stringify(graphTarget) === JSON.stringify(candidate?.productionHouseCurveTarget);
+  const residualMagnitudeAt = (curve, frequency) => Math.abs(
+    interpolateCanonicalTarget(curve, frequency) - interpolateCanonicalTarget(candidate.productionHouseCurveTarget, frequency)
+  );
+  const markerImprovements = Object.fromEntries([78, 100, 120].map((frequency) => [frequency,
+    residualMagnitudeAt(rawCurve, frequency) - residualMagnitudeAt(candidate.finalPostEqCurve, frequency)
+  ]));
+  const correctionAt40Hz = interpolateCanonicalTarget(candidate?.combinedEqCurve, 40);
   const elapsedMs = performance.now() - startedAt;
   const checks = [
     ["Production splConfig has no targetSpl", !("targetSpl" in splConfig) && requested.requestedTargetAnchorDb === null],
@@ -91,7 +124,19 @@ export function runFourSeatBassLifecycleFixture() {
     ["Pool contains 64 Accuracy candidates", profileCounts.accuracy === 64],
     ["Pool contains 64 House-curve candidates", profileCounts.house_curve === 64],
     ["Every RP22 request has all three profiles", requestProfiles.size === 64 && [...requestProfiles.values()].every((profiles) => ["standard", "accuracy", "house_curve"].every((profile) => profiles.has(profile)))],
-    ["Every candidate uses its requested P14 anchor", pool.candidates.every((candidate) => candidate.requestedTargetSpl === candidate.requestedP14TargetDb && candidate.targetAnchorSource === "rp22-request.p14.p14TargetDb")],
+    ["Target anchor is independent of requested P14 level", new Set(pool.candidates.map((entry) => entry.responseTargetAnchorDb)).size === 1 && new Set(pool.candidates.map((entry) => entry.requestedP14TargetDb)).size === 4],
+    ["Every candidate uses the response-derived target source", pool.candidates.every((entry) => entry.targetAnchorSource === "product-aware-rsp-robust-average")],
+    ["Every candidate carries the identical canonical target", canonicalTargets.size === 1],
+    ["Final curve equals worker raw plus selected correction", exactGraphAuthority],
+    ["Graph series exactly match selected authority", graphSeriesAuthorityExact],
+    ["Response-derived target is in expected live range", targetValues[20] >= 119 && targetValues[20] <= 121 && targetValues[200] >= 114 && targetValues[200] <= 116],
+    ["34 Hz peak receives a material cut", interpolateCanonicalTarget(candidate?.combinedEqCurve, 34) <= -5],
+    ["Ordinary 78, 100 and 120 Hz peaks move toward target", Object.values(markerImprovements).every((improvement) => improvement > 0.05)],
+    ["Protected 40 Hz null receives no material boost", correctionAt40Hz <= 0.25],
+    ["Aggregate correction stays within -15/+6 dB", Math.min(...correctionValues) >= -15.05 && Math.max(...correctionValues) <= 6.05],
+    ["Correctable maximum and RMS materially improve", candidate?.houseCurveDiagnostics?.preRsp?.maximumAbsoluteResidualDb - candidate?.houseCurveDiagnostics?.postRsp?.maximumAbsoluteResidualDb > 3 && candidate?.houseCurveDiagnostics?.preRsp?.rmsResidualDb - candidate?.houseCurveDiagnostics?.postRsp?.rmsResidualDb > 0.5],
+    ["Enabled bank changes the final curve", enabledFilters.length > 0 && correctionValues.some((value) => Math.abs(value) >= 0.5)],
+    ["Official P19 retains protected nulls", candidate?.officialP19VariationDb > candidate?.correctableP19VariationDb],
     ["Completed pool passes result validation", validation.valid],
     ["Invalid pool reports exact missing input", invalidValidation.reason === "candidate-pool-invalid-inputs" && invalidValidation.message.includes("rawCurve") && invalidValidation.reason !== "house-curve-candidate-missing"],
     ["Lifecycle reaches ready complete without replacement", lifecycle.status === "ready" && lifecycle.terminalOutcome === "complete" && lifecycle.replacementRunCount === 0],
@@ -112,5 +157,27 @@ export function runFourSeatBassLifecycleFixture() {
     lastStage: stages.at(-1) || null,
     poolId: pool.poolId,
     validation,
+    numericalReport: {
+      responseTargetAnchorDb: candidate?.responseTargetAnchorDb ?? null,
+      targetValues,
+      correctableResidual: {
+        preMaximumDb: candidate?.houseCurveDiagnostics?.preRsp?.maximumAbsoluteResidualDb ?? null,
+        postMaximumDb: candidate?.houseCurveDiagnostics?.postRsp?.maximumAbsoluteResidualDb ?? null,
+        preRmsDb: candidate?.houseCurveDiagnostics?.preRsp?.rmsResidualDb ?? null,
+        postRmsDb: candidate?.houseCurveDiagnostics?.postRsp?.rmsResidualDb ?? null,
+      },
+      officialP19VariationDb: candidate?.officialP19VariationDb ?? null,
+      correctableP19VariationDb: candidate?.correctableP19VariationDb ?? null,
+      protectedNullRegions: candidate?.protectedNullRegions ?? [],
+      selectedFilters: enabledFilters,
+      aggregateMaximumCutDb: Math.min(0, ...correctionValues),
+      aggregateMaximumBoostDb: Math.max(0, ...correctionValues),
+      markerImprovements,
+      correctionAt40Hz,
+      graphAuthorityExact: exactGraphAuthority && graphSeriesAuthorityExact,
+      rawSeriesExact: JSON.stringify(graphRaw) === JSON.stringify(rawCurve),
+      postEqSeriesExact: JSON.stringify(graphPostEq) === JSON.stringify(candidate?.finalPostEqCurve),
+      targetSeriesExact: JSON.stringify(graphTarget) === JSON.stringify(candidate?.productionHouseCurveTarget),
+    },
   };
 }

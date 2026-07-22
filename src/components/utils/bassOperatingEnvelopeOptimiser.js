@@ -11,7 +11,8 @@ import { annotateCandidatePoolForHouseCurveRanking } from "@/components/utils/ho
 import { stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
 import { BASS_OPTIMISER_POOL_VERSION } from "@/components/room/bass/bassOptimiserWorkerProtocol";
 import { displayBassCandidates, isPhysicallyCredibleBassCandidate } from "@/components/utils/bassCandidatePoolEligibility";
-import { buildCanonicalAbsoluteHouseCurveTarget, interpolateCanonicalTarget, resolveHouseCurveDomains } from "@/components/utils/houseCurveTargetAuthority";
+import { buildCanonicalAbsoluteHouseCurveTarget, deriveResponseAnchoredTarget, interpolateCanonicalTarget, resolveHouseCurveDomains } from "@/components/utils/houseCurveTargetAuthority";
+import { identifyProtectedNullRegions, isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -49,7 +50,7 @@ function makeRequests(definitions) {
   return requests;
 }
 
-export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves, targetAnchorDb, targetAnchorSource, domains, canonicalTargetCurve }) {
+export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves, targetAnchorDb, targetAnchorSource, domains, canonicalTargetCurve, protectedNullRegions }) {
   const assessmentStartHz = domains.p19StartHz;
   const assessmentEndHz = domains.p19EndHz;
   const correctionStartHz = domains.correctionStartHz;
@@ -94,6 +95,13 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     freqsHz: assessedCurve.map((point) => point.frequency),
     splDb: assessedCurve.map((point) => point.spl),
     targetDb: assessedCurve.map((point) => interpolateCanonicalTarget(productionHouseCurveTarget, point.frequency)),
+    schroederHz: assessmentEndHz,
+  });
+  const correctableAssessedCurve = assessedCurve.filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+  const correctableP19 = computeP19DeviationBelowSchroeder({
+    freqsHz: correctableAssessedCurve.map((point) => point.frequency),
+    splDb: correctableAssessedCurve.map((point) => point.spl),
+    targetDb: correctableAssessedCurve.map((point) => interpolateCanonicalTarget(productionHouseCurveTarget, point.frequency)),
     schroederHz: assessmentEndHz,
   });
   const achievedP14Db = p14?.value ?? null;
@@ -212,6 +220,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     requestedP18Level: request.p18.level,
     requestedP19Level: request.p19.level,
     requestedTargetSpl: targetAnchorDb,
+    responseTargetAnchorDb: targetAnchorDb,
     targetAnchorSource,
     requestedP19ToleranceDb: request.p19.p19ToleranceDb,
     assessmentStartHz,
@@ -231,6 +240,9 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     achievedP18Level,
     achievedP19VariationDb,
     achievedP19Level,
+    officialP19VariationDb: achievedP19VariationDb,
+    correctableP19VariationDb: correctableP19?.resultDb ?? null,
+    protectedNullRegions: (protectedNullRegions || []).map((region) => ({ ...region })),
     rspObjectiveMaxDeviationDb: eq.rspObjectiveMaxDeviationDb ?? achievedP19VariationDb,
     rspRmsResidualDb: eq.rspRmsDeviationDb ?? rspRmsResidualDb,
     rspMeanSignedResidualDb: eq.rspMeanSignedResidualDb ?? rspMeanSignedResidualDb,
@@ -322,6 +334,18 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   const definitions = getRp22BassOperatingDefinitions();
   const requests = makeRequests(definitions);
   const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
+  const responseTargetAnchorDb = deriveResponseAnchoredTarget({ rawCurve, usableLfHz, startHz: domains.correctionStartHz, endHz: domains.correctionEndHz });
+  const targetAnchorSource = "product-aware-rsp-robust-average";
+  const canonicalTargetCurve = buildCanonicalAbsoluteHouseCurveTarget({
+    frequencyGrid: rawCurve.map((point) => point.frequency),
+    targetAnchorDb: responseTargetAnchorDb,
+    correctionStartHz: domains.correctionStartHz,
+    correctionEndHz: domains.correctionEndHz,
+  });
+  const protectedNullRegions = identifyProtectedNullRegions(
+    rawCurve, domains.correctionStartHz, domains.correctionEndHz, responseTargetAnchorDb,
+    activeSubs, usableLfHz, null, canonicalTargetCurve,
+  );
   const preparedSeatCurves = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : []).filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length > 0);
   const responsePreparationTimeMs = perf() - preparationStart;
   const coreFitCache = new Map();
@@ -348,7 +372,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   report("Candidate definitions generated", 0);
   let taskIndex = 0;
   const candidates = [];
-  const appendCandidate = (evaluationKey, request, eqResult, requestTargetAnchorDb, requestTargetAnchorSource, canonicalTargetCurve) => {
+  const appendCandidate = (evaluationKey, request, eqResult) => {
     const cached = reuseCandidateEvaluations ? candidateEvaluationCache.get(evaluationKey) : null;
     if (cached) {
       reusedCandidateEvaluationCount++;
@@ -356,7 +380,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       return;
     }
     const seatStart = perf();
-    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves, targetAnchorDb: requestTargetAnchorDb, targetAnchorSource: requestTargetAnchorSource, domains, canonicalTargetCurve });
+    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves, targetAnchorDb: responseTargetAnchorDb, targetAnchorSource, domains, canonicalTargetCurve, protectedNullRegions });
     perSeatEvaluationTimeMs += perf() - seatStart;
     candidateEvaluationCount++;
     curveFilterEvaluationCount += preparedSeatCurves.reduce((count, seat) => count + seat.responseData.length, 0);
@@ -366,21 +390,14 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   for (const request of requests) {
     const assessmentStartHz = domains.correctionStartHz;
     const assessmentEndHz = domains.correctionEndHz;
-    const requestTargetAnchorDb = request.p14.p14TargetDb;
-    const requestTargetAnchorSource = "rp22-request.p14.p14TargetDb";
-    const canonicalTargetCurve = buildCanonicalAbsoluteHouseCurveTarget({
-      frequencyGrid: rawCurve.map((point) => point.frequency),
-      targetAnchorDb: requestTargetAnchorDb,
-      correctionStartHz: domains.correctionStartHz,
-      correctionEndHz: domains.correctionEndHz,
-    });
+    const requestCapabilityTargetDb = request.p14.p14TargetDb;
     // Standard fit — generated first so its enabled filter bank can seed the
     // Accuracy fit. The seed guarantees the Accuracy result retains or improves
     // the Standard checkpoint's maximum house-curve deviation.
     taskIndex++;
     report("Core EQ fitting", taskIndex);
     const standardCacheKey = [
-      requestTargetAnchorDb, assessmentStartHz, assessmentEndHz,
+      responseTargetAnchorDb, requestCapabilityTargetDb, assessmentStartHz, assessmentEndHz,
       "standard", DESIGN_EQ_FIT_PROFILES.standard.fittingToleranceDb,
       DESIGN_EQ_FIT_PROFILES.standard.maximumCutDb,
       DESIGN_EQ_FIT_PROFILES.standard.maximumAggregateBoostDb,
@@ -390,9 +407,10 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     if (!standardEq) {
       const fitStart = perf();
       standardEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: requestTargetAnchorDb,
-        targetAnchorDb: requestTargetAnchorDb,
+        requestedSystemOutputDb: requestCapabilityTargetDb,
+        targetAnchorDb: responseTargetAnchorDb,
         canonicalTargetCurve,
+        protectedNullRegions,
         targetToleranceDb: request.p19.p19ToleranceDb,
         fitProfile: "standard", assessmentStartHz, assessmentEndHz, collectDiagnostics,
       });
@@ -402,7 +420,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       standardFitCount++;
     }
     report("Per-seat evaluation", taskIndex);
-    appendCandidate(standardCacheKey, request, standardEq, requestTargetAnchorDb, requestTargetAnchorSource, canonicalTargetCurve);
+    appendCandidate(standardCacheKey, request, standardEq);
 
     // Accuracy fit — seeded with the Standard fit's enabled filter bank.
     // The seed signature is included in the cache key so a seeded Accuracy fit
@@ -412,7 +430,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     const standardSeedFilters = (standardEq.filters || []).filter((f) => f && f.enabled);
     const seedSignature = standardSeedFilters.map((f) => `${f.frequencyHz}:${f.gainDb}:${f.Q}`).join(",");
     const accuracyCacheKey = [
-      requestTargetAnchorDb, assessmentStartHz, assessmentEndHz,
+      responseTargetAnchorDb, requestCapabilityTargetDb, assessmentStartHz, assessmentEndHz,
       "accuracy", DESIGN_EQ_FIT_PROFILES.accuracy.fittingToleranceDb,
       DESIGN_EQ_FIT_PROFILES.accuracy.maximumCutDb,
       DESIGN_EQ_FIT_PROFILES.accuracy.maximumAggregateBoostDb,
@@ -422,9 +440,10 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     if (!accuracyEq) {
       const fitStart = perf();
       accuracyEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: requestTargetAnchorDb,
-        targetAnchorDb: requestTargetAnchorDb,
+        requestedSystemOutputDb: requestCapabilityTargetDb,
+        targetAnchorDb: responseTargetAnchorDb,
         canonicalTargetCurve,
+        protectedNullRegions,
         targetToleranceDb: request.p19.p19ToleranceDb,
         fitProfile: "accuracy", assessmentStartHz, assessmentEndHz, collectDiagnostics,
         initialFilters: standardSeedFilters,
@@ -435,7 +454,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       accuracyFitCount++;
     }
     report("Per-seat evaluation", taskIndex);
-    appendCandidate(accuracyCacheKey, request, accuracyEq, requestTargetAnchorDb, requestTargetAnchorSource, canonicalTargetCurve);
+    appendCandidate(accuracyCacheKey, request, accuracyEq);
 
     // House-curve fit — seat-aware, optimised for worst-seat P19 deviation.
     // Uses the same shared bank for RSP and every real seat. Seeded from the
@@ -443,16 +462,17 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     taskIndex++;
     report("House-curve multi-start fits", taskIndex);
     const houseCurveCacheKey = [
-      requestTargetAnchorDb, assessmentStartHz, assessmentEndHz,
+      responseTargetAnchorDb, requestCapabilityTargetDb, assessmentStartHz, assessmentEndHz,
       "house_curve", `seed:${seedSignature}`,
     ].join(":");
     let houseCurveEq = coreFitCache.get(houseCurveCacheKey);
     if (!houseCurveEq) {
       const fitStart = perf();
       houseCurveEq = calculateHouseCurveEqCurve(rawCurve, preparedSeatCurves, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: requestTargetAnchorDb,
-        targetAnchorDb: requestTargetAnchorDb,
+        requestedSystemOutputDb: requestCapabilityTargetDb,
+        targetAnchorDb: responseTargetAnchorDb,
         canonicalTargetCurve,
+        protectedNullRegions,
         targetToleranceDb: request.p19.p19ToleranceDb,
         assessmentStartHz, assessmentEndHz, collectDiagnostics,
         initialFilters: standardSeedFilters,
@@ -465,7 +485,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       houseCurveFitCount++;
     }
     report("Per-seat evaluation", taskIndex);
-    appendCandidate(houseCurveCacheKey, request, houseCurveEq, requestTargetAnchorDb, requestTargetAnchorSource, canonicalTargetCurve);
+    appendCandidate(houseCurveCacheKey, request, houseCurveEq);
   }
   report("Candidate bank built", totalTasks);
   const rankedCandidates = annotateCandidatePoolForHouseCurveRanking(candidates);
@@ -474,7 +494,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   report("rankedSelectablePool created", totalTasks);
   const requestedEnvelopeValidCount = rankedCandidates.filter((c) => c.meetsRequestedEnvelope).length;
   const t1 = perf();
-  const poolId = `${rawCurve.length}:${activeSubs.length}:${usableLfHz}:${transitionHz}:${correctionEndHz}:${targetAnchorDb}:${perSeatRawCurves.length}:${t0}`;
+  const poolId = `${rawCurve.length}:${activeSubs.length}:${usableLfHz}:${transitionHz}:${correctionEndHz}:${responseTargetAnchorDb}:${perSeatRawCurves.length}:${t0}`;
   return stampPoolAuthority({
     poolVersion: BASS_OPTIMISER_POOL_VERSION,
     candidates: rankedCandidates,
@@ -511,6 +531,10 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     generationStatus: "complete",
     missingInputs: [],
     warningMessage: null,
+    responseTargetAnchorDb,
+    targetAnchorSource,
+    canonicalTargetCurve,
+    protectedNullRegions,
   });
 }
 
@@ -594,6 +618,8 @@ export function selectCandidateFromPool(pool, priorityMode) {
     achievedP18FrequencyHz: selected.achievedP18FrequencyHz,
     achievedP19Level: levelText(selected.achievedP19Level),
     achievedP19VariationDb: selected.achievedP19VariationDb,
+    officialP19VariationDb: selected.officialP19VariationDb,
+    correctableP19VariationDb: selected.correctableP19VariationDb,
     // Part F: Surface the selected candidate's fit profile for the validation panel.
     selectedFitProfile: selected.designEqFitProfile || "standard",
     selectedFitProfileConfig: selected.designEqFitProfileConfig || null,

@@ -1,6 +1,6 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
 export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v1";
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-canonical-target-v3";
+export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-response-target-v4";
 export const BASS_RESULT_SCHEMA_VERSION = 2;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 

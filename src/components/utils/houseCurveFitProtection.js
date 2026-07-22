@@ -7,49 +7,71 @@ const octaveWidth = (startHz, endHz) => startHz > 0 && endHz > startHz ? Math.lo
 
 export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, canonicalTargetCurve = null) {
   const points = applyBassSmoothing(curve, "third")
-    .filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
-    .map((point) => ({ ...point, residualDb: point.spl - (interpolateCanonicalTarget(canonicalTargetCurve, point.frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(point.frequency))) }));
+    .filter((point) => Number.isFinite(point.frequency) && Number.isFinite(point.spl)
+      && point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
+    .map((point) => ({
+      ...point,
+      residualDb: point.spl - (interpolateCanonicalTarget(canonicalTargetCurve, point.frequency)
+        ?? (anchorDb + artcousticHouseCurveOffsetAt(point.frequency))),
+    }));
+  const median = (values) => {
+    const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+    if (!sorted.length) return null;
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  };
+  const localized = points.map((point) => {
+    const left = points.filter((candidate) => candidate.frequency >= point.frequency / 2 ** (2 / 3)
+      && candidate.frequency <= point.frequency / 2 ** (1 / 4));
+    const right = points.filter((candidate) => candidate.frequency >= point.frequency * 2 ** (1 / 4)
+      && candidate.frequency <= point.frequency * 2 ** (2 / 3));
+    const leftShoulderDb = median(left.map((candidate) => candidate.spl));
+    const rightShoulderDb = median(right.map((candidate) => candidate.spl));
+    const neighbouringShoulderSplDb = Number.isFinite(leftShoulderDb) && Number.isFinite(rightShoulderDb)
+      ? (leftShoulderDb + rightShoulderDb) / 2
+      : null;
+    return {
+      ...point,
+      neighbouringShoulderSplDb,
+      depthRelativeToShouldersDb: Number.isFinite(neighbouringShoulderSplDb) ? neighbouringShoulderSplDb - point.spl : null,
+    };
+  });
   const regions = [];
   let current = [];
   const finish = () => {
     if (!current.length) return;
-    const worst = current.reduce((a, b) => b.residualDb < a.residualDb ? b : a);
-    const startHz = current[0].frequency;
-    const endHz = current[current.length - 1].frequency;
-    const requiredBoostDb = Math.abs(worst.residualDb);
+    const worst = current.reduce((a, b) => b.depthRelativeToShouldersDb > a.depthRelativeToShouldersDb ? b : a);
+    let startIndex = localized.indexOf(current[0]);
+    let endIndex = localized.indexOf(current.at(-1));
+    while (startIndex > 0 && localized[startIndex - 1].depthRelativeToShouldersDb >= 6) startIndex--;
+    while (endIndex < localized.length - 1 && localized[endIndex + 1].depthRelativeToShouldersDb >= 6) endIndex++;
+    const startHz = localized[startIndex].frequency;
+    const endHz = localized[endIndex].frequency;
+    const requiredBoostDb = Math.max(0, -worst.residualDb);
     const allowance = getSourceDomainBoostAllowance({
       frequency: worst.frequency, requestedBoostDb: 6, activeSubs, usableLfHz,
       maxBoostDb: 6, requestedSystemOutputDb,
     });
     const permittedBoostDb = Number.isFinite(allowance?.allowedBoostDb) ? allowance.allowedBoostDb : 6;
-    const widthOctaves = octaveWidth(startHz, endHz);
-    const narrowCancellation = widthOctaves < 1 / 3;
     const capabilityLimited = permittedBoostDb + 0.05 < Math.min(6, requiredBoostDb);
-    const leftShoulder = points.filter((point) => point.frequency < startHz && point.frequency >= startHz / 2 ** (1 / 3)).at(-1);
-    const rightShoulder = points.find((point) => point.frequency > endHz && point.frequency <= endHz * 2 ** (1 / 3));
-    const shoulderResiduals = [leftShoulder?.residualDb, rightShoulder?.residualDb].filter(Number.isFinite);
-    const neighbouringShoulderResidualDb = shoulderResiduals.length
-      ? shoulderResiduals.reduce((sum, value) => sum + value, 0) / shoulderResiduals.length
-      : 0;
-    const depthRelativeToShouldersDb = neighbouringShoulderResidualDb - worst.residualDb;
-    if (requiredBoostDb >= 8 || (narrowCancellation && depthRelativeToShouldersDb >= 4) || capabilityLimited) {
-      const reason = capabilityLimited
-        ? "Significant cancellation null; required boost exceeds selected-product headroom"
-        : "Significant narrow cancellation null with elevated neighbouring shoulders";
-      regions.push({
-        startHz: startHz / 2 ** (1 / 24), endHz: endHz * 2 ** (1 / 24),
-        widthHz: endHz - startHz, widthOctaves,
-        centreFrequencyHz: worst.frequency, signedResidualDb: worst.residualDb,
-        depthRelativeToTargetDb: requiredBoostDb, neighbouringShoulderResidualDb,
-        depthRelativeToShouldersDb, requiredBoostDb, permittedBoostDb,
-        boostRejectedDb: requiredBoostDb, narrowCancellation, capabilityLimited,
-        rejectionReason: reason, reason,
-      });
-    }
+    const widthOctaves = octaveWidth(startHz, endHz);
+    const reason = "Localized cancellation null at least 10 dB below neighbouring broad response";
+    regions.push({
+      startHz: startHz / 2 ** (1 / 24), endHz: endHz * 2 ** (1 / 24),
+      widthHz: endHz - startHz, widthOctaves,
+      centreFrequencyHz: worst.frequency, signedResidualDb: worst.residualDb,
+      depthRelativeToTargetDb: requiredBoostDb,
+      neighbouringShoulderResidualDb: worst.neighbouringShoulderSplDb
+        - (interpolateCanonicalTarget(canonicalTargetCurve, worst.frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(worst.frequency))),
+      depthRelativeToShouldersDb: worst.depthRelativeToShouldersDb,
+      requiredBoostDb, permittedBoostDb, boostRejectedDb: requiredBoostDb,
+      narrowCancellation: widthOctaves < 1 / 3, capabilityLimited,
+      rejectionReason: reason, reason,
+    });
     current = [];
   };
-  for (const point of points) {
-    if (point.residualDb <= -6) current.push(point); else finish();
+  for (const point of localized) {
+    if (point.depthRelativeToShouldersDb >= 10) current.push(point); else finish();
   }
   finish();
   return regions;
@@ -59,11 +81,11 @@ export function isProtectedFrequency(frequency, regions) {
   return (regions || []).some((region) => frequency >= region.startHz && frequency <= region.endHz);
 }
 
-export function evaluateNearTargetProtection(baselinePoints, candidatePoints, maximumResidualImprovementDb) {
+export function evaluateNearTargetProtection(baselinePoints, candidatePoints, maximumResidualImprovementDb, protectedNullRegions = []) {
   const candidateByFrequency = new Map((candidatePoints || []).map((point) => [point.frequency, point]));
   const violations = [];
   for (const before of baselinePoints || []) {
-    if (Math.abs(before.deviationDb) > 1) continue;
+    if (isProtectedFrequency(before.frequency, protectedNullRegions) || Math.abs(before.deviationDb) > 1) continue;
     const after = candidateByFrequency.get(before.frequency);
     if (!after) continue;
     const afterAbs = Math.abs(after.deviationDb);

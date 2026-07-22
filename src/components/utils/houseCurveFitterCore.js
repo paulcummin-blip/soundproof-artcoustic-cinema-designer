@@ -495,7 +495,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           continue;
         }
         const maxImprovementDb = currentMetrics.rspMaxDeviationDb - trialMetrics.rspMaxDeviationDb;
-        const nearTarget = evaluateNearTargetProtection(baselineRspPoints, trialMetrics.rspResidualPoints, maxImprovementDb);
+        const nearTarget = evaluateNearTargetProtection(baselineRspPoints, trialMetrics.rspResidualPoints, maxImprovementDb, protectedNullRegions);
         if (!nearTarget.passed) {
           operationCounts.nearTargetProtectionRejections++;
           trialEntry.rejectionReason = nearTarget.violations[0].reason;

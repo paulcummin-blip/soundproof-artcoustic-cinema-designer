@@ -100,9 +100,11 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
   const profile = { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: true, maximumCutDb: 15 };
   const bankRaw = rspRaw;
-  const protectedNullRegions = identifyProtectedNullRegions(
-    rspRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, canonicalTargetCurve,
-  );
+  const protectedNullRegions = Array.isArray(options.protectedNullRegions)
+    ? options.protectedNullRegions
+    : identifyProtectedNullRegions(
+        rspRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, canonicalTargetCurve,
+      );
 
   const standardSeedFilters = Array.isArray(options.initialFilters)
     ? options.initialFilters
@@ -180,6 +182,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     })
     .filter((p) => isNumber(p.deviationDb));
   const rspMaxDev = rspAssessed.length ? Math.max(...rspAssessed.map((p) => Math.abs(p.deviationDb))) : null;
+  const rspCorrectableAssessed = rspAssessed.filter((point) => !protectedNullRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz));
+  const rspCorrectableMaxDev = rspCorrectableAssessed.length
+    ? Math.max(...rspCorrectableAssessed.map((point) => Math.abs(point.deviationDb)))
+    : null;
 
   const combinedEqCurve = rspRaw.map((p) => ({ frequency: p.frequency, spl: filters.reduce((sum, f) => sum + peakingEqResponseDb(p.frequency, f), 0) }));
   const curve = rspRaw.map((p, i) => ({ frequency: p.frequency, spl: p.spl + combinedEqCurve[i].spl }));
@@ -211,6 +217,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     meanSeatMaxDeviationDb: finalMetrics?.meanSeatMaxDeviationDb ?? null,
     rmsSeatTargetErrorDb: finalMetrics?.rmsSeatTargetErrorDb ?? null,
     rspMaxDeviationDb: rspMaxDev,
+    officialP19VariationDb: rspMaxDev,
+    correctableP19VariationDb: rspCorrectableMaxDev,
     rspObjectiveMaxDeviationDb: finalMetrics?.rspMaxDeviationDb ?? null,
     rspRmsDeviationDb: finalMetrics?.rspRmsDeviationDb ?? null,
     rspMeanSignedResidualDb: finalMetrics?.rspMeanSignedResidualDb ?? null,
@@ -244,6 +252,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     iterationTrace: selected.trace || [],
     houseCurveDiagnostics: {
       preRsp: selected.baselineRspMetrics,
+      officialP19VariationDb: rspMaxDev,
+      correctableP19VariationDb: rspCorrectableMaxDev,
       postRsp: {
         maximumAbsoluteResidualDb: finalMetrics?.rspMaxDeviationDb ?? null,
         rmsResidualDb: finalMetrics?.rspRmsDeviationDb ?? null,

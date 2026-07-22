@@ -4,6 +4,7 @@ import { BassBackgroundAnalysisController } from "./bassBackgroundAnalysisStore.
 import { formatBassResults } from "./bassResultsPresentation.js";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import { stampPoolAuthority } from "./bassResultAuthority.js";
+import { BASS_OPTIMISER_VERSIONS, createCompleteMessage, createProgressMessage } from "./bassOptimiserWorkerProtocol.js";
 
 const FP_A = "cal:v1:aaaaaaaaaaaaaaaa";
 const FP_B = "cal:v1:bbbbbbbbbbbbbbbb";
@@ -29,14 +30,15 @@ export function runBassResultsOwnershipFixtures() {
   let worker = null;
   const timers = [];
   const controller = new BassBackgroundAnalysisController({ now: () => now, setTimer: (fn) => (timers.push(fn), timers.length), clearTimer: () => {}, workerFactory: () => (worker = { postMessage() {}, terminate() {} }) });
-  controller.updateInputs({ valid: true, fingerprint: FP_A, payload: {} });
+  const identity = { ...BASS_OPTIMISER_VERSIONS, fingerprint: FP_A };
+  controller.updateInputs({ valid: true, fingerprint: FP_A, payload: {}, identity });
   timers.shift()();
   const runningBeforeCollapse = controller.getSnapshot().status === "calculating";
   now = 6000;
   const requestId = controller.activeRequest.requestId;
-  controller.handleWorkerMessage({ type: "progress", requestId, fingerprint: FP_A, progress: { phase: "Fitting" } });
+  controller.handleWorkerMessage(createProgressMessage(requestId, FP_A, { phase: "Fitting" }, identity));
   const completedPool = stampPoolAuthority({ candidates: [{ designEqFitProfile: "house_curve", startStrategy: "multi-start", designEqFitProfileConfig: { maximumCutDb: 15, maximumAggregateBoostDb: 6 }, generatedFilterBank: [], finalPostEqCurve: [{ frequency: 20, spl: 100 }] }], selectablePool: [] });
-  controller.handleWorkerMessage({ type: "complete", requestId, fingerprint: FP_A, pool: completedPool });
+  controller.handleWorkerMessage(createCompleteMessage(requestId, FP_A, completedPool, identity));
   check("2. Collapsed calculation timer and completion continue", runningBeforeCollapse && controller.getSnapshot().elapsedMs === 5000 && controller.getSnapshot().status === "ready");
   check("3. BassResponse absence retains ready room result", scope.getSnapshot().contract === contractA);
 
