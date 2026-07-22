@@ -9,10 +9,6 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { useRspState } from "@/components/state/useRspState";
 
-// --- SINGLE-PRIMARY ENFORCER ---
-// After normalising, re-run computeMLPAndPrimary and collapse to exactly one
-// isPrimary seat (the RSP — closest to MLP). Prevents stale saved data from
-// carrying multiple isPrimary: true flags into live state.
 const enforceOnePrimary = (seats, dims, mlpBasis = "front") => {
   if (!Array.isArray(seats) || seats.length === 0) return seats;
   const W = Number(dims?.widthM ?? dims?.width) || 4.5;
@@ -163,10 +159,7 @@ function getTargetOverheadIdsForLayout(layout) {
     .split('_')[0]; // "5.1.4_atmos" -> "5.1.4"
   return OVERHEAD_IDS_BY_LAYOUT_APPSTATE[normalized] || [];
 }
-// --- END ATMOS PROTECTION HELPERS ---
 
-// --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
-// Simple, explicit visibility rules for bed-layer channels + overhead channels
 export function getSpeakerVisibilityFor(layoutString, sevenBedLayoutType) {
   const layout = String(layoutString || "5.1");
   const parts = layout.split(".");
@@ -664,8 +657,6 @@ function useDesignerState() {
     (__autosavePayload && __autosavePayload.p21EarlyReflectionPreset) ? __autosavePayload.p21EarlyReflectionPreset : 'l3'
   ));
 
-  // RP22 Parameter 14 Design EQ — shared room setting. Read by useRP22AnalysisEngine
-  // (P14 calculation) and the Bass Response graph toggle, so both stay in sync.
   const [designEqEnabled, setDesignEqEnabled] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.designEqEnabled === "boolean") ? __autosavePayload.designEqEnabled : false
   ));
@@ -785,7 +776,6 @@ function useDesignerState() {
     []
   );
 
-  // --- OVERHEAD MODEL SYNC EFFECT — keeps placedSpeakers in sync with overhead state ---
   useEffect(() => {
     if (!isHydrated) return;
 
@@ -824,9 +814,6 @@ function useDesignerState() {
 
   const prevProjectHydrationReadyRef = useRef(isProjectHydrationReady);
 
-  // --- EXTRA SURROUNDS SYNC EFFECT (promoted to real speakers with canonical roles SL2/SR2...) ---
-  // TRUE IDEMPOTENCE: only update when speakersShallowEqual detects a real change.
-  // Preserves user-dragged positions for existing extra surround speakers.
   useEffect(() => {
     const didJustFinishProjectHydration = !prevProjectHydrationReadyRef.current && isProjectHydrationReady;
     prevProjectHydrationReadyRef.current = isProjectHydrationReady;
@@ -995,6 +982,7 @@ function useDesignerState() {
         globalEqHeadroomDb: autosaveConfig.globalEqHeadroomDb || 0,
         radiationMode: autosaveConfig.radiationMode || 'half-space',
         p13Mode: autosaveConfig.p13Mode || 'minimum',
+        p14Mode: autosaveConfig.p14Mode || 'minimum',
         perRole: autosaveConfig.perRole || {},
         // Separate L/R and centre heights for center_only soundbar override mode
         lcrHeightM: autosaveConfig.lcrHeightM,
@@ -1056,7 +1044,6 @@ function useDesignerState() {
     }));
   }, []);
 
-  // --- CANONICAL VISIBILITY HELPER (used everywhere) ---------------------
   const visibleRoles = useMemo(() => {
     // --- B44 VISIBILITY FIX: robust layout + correct rears/wides rules ---
     const layoutRaw =
@@ -1222,13 +1209,13 @@ function useDesignerState() {
     const apply = (map) => {
       const obj = (map && typeof map === "object") ? map : {};
       setScreen((prev) => ({ ...(prev || {}), splModels: obj }));
-      try { window.__SPL_MODELS__ = obj; } catch (e) {}
+      try { window.__SPL_MODELS__ = obj; } catch (e) { /* ignore */ }
       
       if (SHOW_DEBUG_LOGS) {
         try {
           window.__APP_DEBUG = window.__APP_DEBUG || [];
           window.__APP_DEBUG.push(`[SPL] Models mapping applied: ${Object.keys(obj).join(", ") || "(empty)"}`);
-        } catch (e) {}
+        } catch (e) { /* ignore */ }
       }
     };
 
@@ -1243,7 +1230,7 @@ function useDesignerState() {
       if (window.__SPL_MODELS__ && typeof window.__SPL_MODELS__ === "object") {
         apply(window.__SPL_MODELS__);
       }
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
 
     let last = "";
     const timer = window.setInterval(() => {
@@ -1253,12 +1240,12 @@ function useDesignerState() {
           last = curr;
           apply(window.__SPL_MODELS__ || {});
         }
-      } catch (e) {}
+      } catch (e) { /* ignore */ }
     }, 750);
 
     return () => {
       window.removeEventListener("spl:models", onModelsEvent);
-      try { window.clearInterval(timer); } catch (e) {}
+      try { window.clearInterval(timer); } catch (e) { /* ignore */ }
     };
   }, []);
 
@@ -1386,7 +1373,6 @@ function useDesignerState() {
     } finally {
       setIsHydrated(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- Autosave: Debounced save on change ---
@@ -1448,6 +1434,7 @@ function useDesignerState() {
       seatMetricsById,
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
+      splConfig,
       mlpOverride,
       extraSurroundCount,
       rsp_mode: rspMode,
@@ -1502,6 +1489,7 @@ function useDesignerState() {
     seatMetricsById,
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
+    splConfig,
     mlpOverride,
     extraSurroundCount,
     rspMode,
@@ -1509,7 +1497,6 @@ function useDesignerState() {
     roomElements
     ]);
 
-    // --- Autosave: Manual restore/clear functions ---
   const restoreAutosave = useCallback(() => {
     const data = loadAutosave();
     if (!data?.payload) return false;
@@ -1550,6 +1537,7 @@ function useDesignerState() {
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
       if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
+      if (p.splConfig && typeof p.splConfig === "object") setSplConfig(p.splConfig);
       if (typeof p.screenHeight === "number") setScreenHeight(p.screenHeight);
       if (typeof p.seatingRows === "number") setSeatingRows(p.seatingRows);
       if (typeof p.seatsPerRow === "number") setSeatsPerRow(p.seatsPerRow);
@@ -1625,14 +1613,15 @@ function useDesignerState() {
       overheadRearOverride,
       useFrontGlobal,
       useMidGlobal,
-      useRearGlobal
+      useRearGlobal,
+      splConfig
     };
     try {
       saveAutosave(payload);
     } catch (e) {
       console.warn("Autosave failed:", e);
     }
-  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]);
+  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, splConfig]);
 
   const clearWorkingCopy = useCallback(() => {
     try {
@@ -1769,6 +1758,7 @@ function useDesignerState() {
       globalEqHeadroomDb: 0,
       radiationMode: 'half-space',
       p13Mode: 'minimum',
+      p14Mode: 'minimum',
       perRole: {}
     });
 
@@ -1976,7 +1966,6 @@ function useDesignerState() {
     resetRspState,
   ]);
 
-  // Export p21 setter as convenience (same pattern as p15)
   value.setP21EarlyReflectionPreset = setP21EarlyReflectionPresetSafe;
 
   return value;

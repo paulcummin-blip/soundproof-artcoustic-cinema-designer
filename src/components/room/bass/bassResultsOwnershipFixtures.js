@@ -13,7 +13,7 @@ const readyContract = (fingerprint, value) => {
   contract.fingerprints.calibration = fingerprint;
   Object.assign(contract.job, { status: "ready", resultFingerprint: fingerprint, currentJobFingerprint: fingerprint });
   contract.selectedCandidate = { id: `candidate-${fingerprint}` };
-  contract.productAnalysis.parameters.p14 = createBassParameterResult({ parameter: "P14", status: "complete", level: 2, value, unit: "dB" });
+  contract.productAnalysis.parameters.p14 = createBassParameterResult({ parameter: "P14", status: "complete", level: 2, value, unit: "dBC", targetBasis: "minimum" });
   return contract;
 };
 const candidate = (id, level) => ({ id, achievedP14Level: level, achievedP14Db: 113 + level, achievedP18Level: 1, achievedP18FrequencyHz: 30, achievedP19Level: 1, achievedP19VariationDb: 4, allAtLeastL1: true, bankValidationResult: { allOk: true }, assessmentStartHz: 20, assessmentEndHz: 100, generatedFilterBank: [], finalPostEqCurve: [{ frequency: 20, spl: 100 }] });
@@ -24,7 +24,7 @@ export function runBassResultsOwnershipFixtures() {
   const scope = createBassResultsScope("room-a");
   const contractA = readyContract(FP_A, 115.2);
   scope.replace({ contract: contractA, lifecycle: { status: "ready" }, selectedPriorityMode: "balanced" });
-  check("1. Never-opened simulation publishes product pills", formatBassResults(scope.getSnapshot().contract).pills.p14.text === "P14 L2 · 116 dB");
+  check("1. Never-opened simulation publishes product pills", formatBassResults(scope.getSnapshot().contract).pills.p14.text === "P14 L2 · 116 dBC — Minimum target");
 
   let now = 1000;
   let worker = null;

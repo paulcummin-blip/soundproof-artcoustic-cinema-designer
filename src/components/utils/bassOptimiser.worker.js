@@ -44,6 +44,7 @@ self.onmessage = (e) => {
       correctionEndHz: payload?.correctionEndHz ?? 200,
       targetAnchorDb: payload?.targetAnchorDb ?? null,
       targetAnchorSource: payload?.targetAnchorSource || null,
+      p14TargetBasis: payload?.p14TargetBasis || "minimum",
       perSeatRawCurves: payload?.perSeatRawCurves || [],
       collectDiagnostics: !!collectDiagnostics,
       onProgress: (progress) => {

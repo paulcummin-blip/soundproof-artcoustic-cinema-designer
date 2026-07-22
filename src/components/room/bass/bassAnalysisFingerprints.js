@@ -368,6 +368,7 @@ export function computeCalibrationFingerprint(inputs) {
     optimisationTransitionHz: num(i.optimisationTransitionHz, 3),
     targetAnchorDb: num(i.targetAnchorDb, 2),
     activeFitProfile: i.activeFitProfile || null,
+    p14TargetBasis: i.p14TargetBasis === "recommended" ? "recommended" : "minimum",
     requestedOutputDb: num(i.requestedOutputDb, 2),
     usableLfHz: num(i.usableLfHz, 3),
     // Phase 2A: The sorted set of fit profiles the optimiser actually

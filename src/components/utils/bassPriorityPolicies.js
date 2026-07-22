@@ -40,6 +40,7 @@ export function stableCandidateSignature(candidate) {
   if (typeof candidate?.candidateSignature === "string") return candidate.candidateSignature;
   return JSON.stringify({
     request: [candidate?.requestedP14Level, candidate?.requestedP18Level, candidate?.requestedP19Level],
+    p14TargetBasis: candidate?.p14TargetBasis || "minimum",
     profile: candidate?.designEqFitProfile || "standard",
     filters: (candidate?.generatedFilterBank || []).map((filter) => [
       !!filter?.enabled, finiteOr(filter?.frequencyHz, null), finiteOr(filter?.gainDb, null), finiteOr(filter?.Q, null),

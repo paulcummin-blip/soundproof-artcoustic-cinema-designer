@@ -24,7 +24,8 @@ export function compactCompletedBassContract(contract) {
       worstP20SeatId: contract.selectedCandidate?.worstP20SeatId || null,
       perSeatP19Results: contract.selectedCandidate?.perSeatP19Results || [],
       perSeatP20Results: contract.selectedCandidate?.perSeatP20Results || [],
-    },
+      p14TargetBasis: contract.selectedCandidate?.p14TargetBasis || contract.productAnalysis?.parameters?.p14?.targetBasis || "minimum",
+      },
     provenance: contract.provenance || {},
   };
 }

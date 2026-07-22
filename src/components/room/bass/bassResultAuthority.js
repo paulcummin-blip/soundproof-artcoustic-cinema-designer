@@ -50,6 +50,7 @@ export function buildCandidateId(candidate) {
   const identity = [
     candidate.designEqFitProfile || "standard",
     candidateStartStrategy(candidate),
+    candidate.p14TargetBasis || "minimum",
     candidate.requestedP14Level, candidate.requestedP18Level, candidate.requestedP19Level,
     fixed(candidate.assessmentStartHz), fixed(candidate.assessmentEndHz),
     buildFilterBankSignature(candidate), buildCurveSignature(candidate.finalPostEqCurve),

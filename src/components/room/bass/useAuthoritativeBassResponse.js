@@ -339,6 +339,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     return volume > 0 ? 2000 * Math.sqrt(0.4 / volume) : 120;
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
   const requested = useMemo(() => deriveRequestedCalibrationConfig({ splConfig, optimisationTransitionHz, designEqSystemLimits }), [splConfig, optimisationTransitionHz, designEqSystemLimits]);
+  const p14TargetBasis = requested.p14TargetBasis;
   const productCapabilities = useMemo(() => sources.map((sub) => {
     const model = MODELS.find((item) => item.key === normaliseModelKey(sub.modelKey));
     return model ? { modelKey: model.key, response: model.frequency_response_curve, usableLfHz: model.approvedUsableLfHzMinus6dB, continuousSplDb: model.approvedContinuousSplAt1mDb, continuousSpl30HzDb: model.approvedContinuousSplAt30HzDb, peakSplDb: model.approvedPeakSplDb } : { modelKey: sub.modelKey };
@@ -355,6 +356,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     houseCurveFingerprint: computeHouseCurveFingerprint(ARTCOUSTIC_HOUSE_CURVE),
     assessmentStartHz: requested.requestedAssessmentStartHz, assessmentEndHz: requested.requestedAssessmentEndHz,
     targetAnchorDb: requested.requestedTargetAnchorDb, activeFitProfile: requested.requestedFitProfile,
+    p14TargetBasis,
     usableLfHz: requested.requestedUsableLfHz, evaluatedProfiles: requested.evaluatedProfiles,
     productDataVersion: 1, productCapabilities,
   }), [roomDims, sources, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ,
@@ -370,7 +372,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     product: computeProductFingerprint(fingerprintInputs),
     calibration: computeCalibrationFingerprint(fingerprintInputs),
   }), [fingerprintInputs]);
-  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, targetAnchorDb: requested.requestedTargetAnchorDb, targetAnchorSource: "rp22-request.p14.p14TargetDb", perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, requested.requestedTargetAnchorDb, perSeatRawCurves]);
+  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, targetAnchorDb: requested.requestedTargetAnchorDb, targetAnchorSource: "rp22-request.p14.p14TargetDb", p14TargetBasis, perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, requested.requestedTargetAnchorDb, p14TargetBasis, perSeatRawCurves]);
   const inputsValid = !!rspPosition && seatingPositions.length > 0 && rspRawCurve.length > 0 && sources.length > 0 && [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
 
   return {

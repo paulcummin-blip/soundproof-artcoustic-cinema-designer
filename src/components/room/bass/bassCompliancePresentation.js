@@ -23,7 +23,9 @@ export function formatAuthoritativeBassParameter(contract, key) {
     level: levelLabel(parameter.level),
     status: parameter.status,
     rawValue: Number(parameter.value),
-    detail: key === "p14" ? parameter.recommendedDetail : null,
+    detail: key === "p14" ? parameter.targetBasisDetail : null,
+    targetBasis: key === "p14" ? parameter.targetBasis : null,
+    targetBasisLabel: key === "p14" ? (parameter.targetBasis === "recommended" ? "Recommended" : "Minimum") : null,
   };
 }
 

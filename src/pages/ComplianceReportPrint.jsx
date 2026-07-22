@@ -231,7 +231,7 @@ export default function ComplianceReportPrint() {
               {roomParams.map(param => {
                 const authority = [14, 18, 19].includes(param.id) ? bassPresentation.parameters[`p${param.id}`] : null;
                 const roomResult = authority
-                  ? { status: authority.status, formatted: authority.valueText, level: authority.level }
+                  ? { status: authority.status, formatted: authority.valueText, level: authority.level, detail: authority.detail }
                   : analysis?.gradedParameters?.primary?.[param.id] || null;
                 return (
                   <div key={param.id} className="print-avoid-break">

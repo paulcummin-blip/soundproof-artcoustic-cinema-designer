@@ -52,7 +52,7 @@ function makeRequests(definitions) {
   return requests;
 }
 
-export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves, targetAnchorDb, targetAnchorSource, domains, canonicalTargetCurve, protectedNullRegions }) {
+export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves, targetAnchorDb, targetAnchorSource, p14TargetBasis, domains, canonicalTargetCurve, protectedNullRegions }) {
   const assessmentStartHz = domains.p19StartHz;
   const assessmentEndHz = domains.p19EndHz;
   const correctionStartHz = domains.correctionStartHz;
@@ -82,8 +82,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
         return { ...diag, requiredBoostToP19ToleranceDb, p19ToleranceCapabilityLimited };
       })
     : eq.worstResidualDiagnostics;
-  const preEqP14 = assessP14Capability({ activeSubs });
-  const p14 = assessP14Capability({ activeSubs, combinedEqCurve });
+  const preEqP14 = assessP14Capability({ activeSubs, targetBasis: p14TargetBasis });
+  const p14 = assessP14Capability({ activeSubs, combinedEqCurve, targetBasis: p14TargetBasis });
   const p18 = computeParam18BassExtension(finalPostEqCurve);
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third");
   const assessedCurve = smoothed.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz);
@@ -108,15 +108,16 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   });
   const achievedP14Db = p14?.value ?? null;
   const p14CheckpointDeltaDb = null;
-  const achievedP14Level = p14?.minimumLevel ?? 0;
+  const achievedP14Level = p14?.level ?? 0;
+  const achievedP14MinimumLevel = p14?.minimumLevel ?? 0;
   const achievedP14RecommendedLevel = p14?.recommendedLevel ?? 0;
   const achievedP18FrequencyHz = p18?.value ?? null;
   const achievedP18Level = Number(String(p18?.level || "").replace("L", "")) || 0;
   const achievedP19VariationDb = officialP19.variationDbRaw;
   const achievedP19Level = levelFromValue(achievedP19VariationDb, definitions, "p19ToleranceDb", true);
-  const meetsRequestedEnvelope = achievedP14RecommendedLevel >= request.p14.value && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
+  const meetsRequestedEnvelope = achievedP14Level >= request.p14.value && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
   const rejectionReason = [
-    achievedP14RecommendedLevel < request.p14.value && `P14 recommended design target not achieved after EQ headroom`, 
+    achievedP14Level < request.p14.value && `P14 ${p14?.targetBasisLabel || "Minimum"} design target not achieved after EQ headroom`, 
     achievedP18Level < request.p18.value && `P18 extension does not reach the requested ${request.p18.p18LimitHz} Hz boundary`,
     achievedP19Level < request.p19.value && `P19 variation exceeds ±${request.p19.p19ToleranceDb} dB between ${assessmentStartHz}–${assessmentEndHz} Hz`,
   ].filter(Boolean).join("; ");
@@ -223,7 +224,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     correctionStartHz,
     correctionEndHz,
     preEqP14Db: preEqP14?.value ?? null,
-    preEqP14Level: preEqP14?.minimumLevel ?? 0,
+    preEqP14Level: preEqP14?.level ?? 0,
     // Part E: Carry the effective profile contract from the Design EQ fit so
     // the priority selector and validation panel can distinguish Standard from
     // Accuracy candidates.
@@ -231,7 +232,9 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     designEqFitProfileConfig: eq.designEqFitProfileConfig || null,
     achievedP14Db,
     achievedP14Level,
+    achievedP14MinimumLevel,
     achievedP14RecommendedLevel,
+    p14TargetBasis: p14?.targetBasis || p14TargetBasis,
     p14CapabilityDetails: p14,
     achievedP18FrequencyHz,
     achievedP18Level,
@@ -317,7 +320,7 @@ const FIT_PROFILES_TO_GENERATE = [
   DESIGN_EQ_FIT_PROFILES.accuracy,
 ];
 
-export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, correctionEndHz = 200, targetAnchorDb = null, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
+export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, correctionEndHz = 200, targetAnchorDb = null, p14TargetBasis = "recommended", perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
   const missingInputs = [
     !rawCurve.length && "rawCurve",
     !activeSubs.length && "activeSubs",
@@ -333,7 +336,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
   const t0 = perf();
   const preparationStart = perf();
-  const definitions = getRp22BassOperatingDefinitions();
+  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
   const requests = makeRequests(definitions);
   const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
   const responseTargetAnchorDb = deriveResponseAnchoredTarget({ rawCurve, usableLfHz, startHz: domains.correctionStartHz, endHz: domains.correctionEndHz });
@@ -382,7 +385,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       return;
     }
     const seatStart = perf();
-    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves, targetAnchorDb: responseTargetAnchorDb, targetAnchorSource, domains, canonicalTargetCurve, protectedNullRegions });
+    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves, targetAnchorDb: responseTargetAnchorDb, targetAnchorSource, p14TargetBasis, domains, canonicalTargetCurve, protectedNullRegions });
     perSeatEvaluationTimeMs += perf() - seatStart;
     candidateEvaluationCount++;
     curveFilterEvaluationCount += preparedSeatCurves.reduce((count, seat) => count + seat.responseData.length, 0);
@@ -539,6 +542,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     warningMessage: null,
     responseTargetAnchorDb,
     targetAnchorSource,
+    p14TargetBasis,
     canonicalTargetCurve,
     protectedNullRegions,
   });
@@ -620,6 +624,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
     finalPostEqCurve: selected.finalPostEqCurve,
     achievedP14Level: levelText(selected.achievedP14Level),
     achievedP14Db: selected.achievedP14Db,
+    p14TargetBasis: selected.p14TargetBasis || pool.p14TargetBasis || "minimum",
     achievedP18Level: levelText(selected.achievedP18Level),
     achievedP18FrequencyHz: selected.achievedP18FrequencyHz,
     achievedP19Level: levelText(selected.achievedP19Level),

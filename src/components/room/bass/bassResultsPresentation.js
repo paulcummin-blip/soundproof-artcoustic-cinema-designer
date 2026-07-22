@@ -50,10 +50,13 @@ function readyPill(key, parameter, result) {
   if (parameter?.level == null) return { text: `${label} —`, level: "—" };
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
   const value = formatBassParameterValue(key, parameter.value);
+  const basis = key === "p14" && parameter.targetBasis
+    ? ` — ${parameter.targetBasis === "recommended" ? "Recommended" : "Minimum"} target`
+    : "";
   return {
-    text: `${label} ${grade}${value ? ` · ${value}` : ""}`,
+    text: `${label} ${grade}${value ? ` · ${value}` : ""}${basis}`,
     level: grade,
-    detail: key === "p14" ? parameter.recommendedDetail : null,
+    detail: key === "p14" ? parameter.targetBasisDetail : null,
   };
 }
 

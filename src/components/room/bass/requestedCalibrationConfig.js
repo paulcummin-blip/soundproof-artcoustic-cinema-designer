@@ -50,8 +50,10 @@ export function deriveRequestedCalibrationConfig({
   const targetSpl = Number.isFinite(splConfig?.targetSpl) ? splConfig.targetSpl : null;
   const transitionHz = Number.isFinite(optimisationTransitionHz) ? optimisationTransitionHz : null;
   const usableLfHz = Number.isFinite(designEqSystemLimits?.usableLfHz) ? designEqSystemLimits.usableLfHz : null;
+  const p14TargetBasis = splConfig?.p14Mode === "recommended" ? "recommended" : "minimum";
 
   return {
+    p14TargetBasis,
     // P18 boundary — searched across all RP22 levels by the optimiser, not a
     // single requested value. null is truthful.
     requestedAssessmentStartHz: null,

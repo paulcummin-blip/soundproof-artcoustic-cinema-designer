@@ -21,14 +21,17 @@ const P12_THRESHOLDS_MINIMUM = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 
 const P12_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
 const P13_THRESHOLDS_MINIMUM = { direction: ">=", L1: 96, L2: 99, L3: 102, L4: 105 };
 const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 };
+const P14_THRESHOLDS_MINIMUM = { direction: ">=", L1: 109, L2: 112, L3: 115, L4: 118 };
+const P14_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 114, L2: 117, L3: 120, L4: 123 };
 
-function resolveParamThresholds(param, p12Mode, p13Mode) {
+function resolveParamThresholds(param, p12Mode, p13Mode, p14Mode) {
   if (param.id === 12) {
     return p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM;
   }
   if (param.id === 13) {
     return p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM;
   }
+  if (param.id === 14) return p14Mode === "recommended" ? P14_THRESHOLDS_RECOMMENDED : P14_THRESHOLDS_MINIMUM;
   return param.thresholds;
 }
 
@@ -120,6 +123,7 @@ export default function RP22ReportParameterGrid({
   const bassPresentation = React.useMemo(() => buildComplianceBassPresentation(resolvedBassContract), [resolvedBassContract]);
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
+  const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";
   /* ----- p2SystemConfig ----- */
   const p2SystemConfig = React.useMemo(() => {
     const preset = dolbyLayout || "5.1";
@@ -400,8 +404,8 @@ export default function RP22ReportParameterGrid({
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
       {RP22_PARAMS.map(param => {
-        const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode);
-        const resolvedParam = (param.id === 12 || param.id === 13)
+        const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
+        const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
           ? { ...param, thresholds: resolvedThresholds }
           : param;
         const targetBasisNote =

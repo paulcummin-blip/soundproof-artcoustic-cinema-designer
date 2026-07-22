@@ -17,7 +17,7 @@ export function retargetCandidateForRequest(candidate, request) {
     && candidate.achievedP18Level >= request.p18.value
     && candidate.achievedP19Level >= request.p19.value;
   const rejectionReason = [
-    candidate.achievedP14Level < request.p14.value && `P14 target not maintained between ${candidate.assessmentStartHz}–${candidate.assessmentEndHz} Hz`,
+    candidate.achievedP14Level < request.p14.value && `P14 ${candidate.p14TargetBasis === "recommended" ? "Recommended" : "Minimum"} target not maintained after EQ headroom`,
     candidate.achievedP18Level < request.p18.value && `P18 extension does not reach the requested ${request.p18.p18LimitHz} Hz boundary`,
     candidate.achievedP19Level < request.p19.value && `P19 variation exceeds ±${requestedToleranceDb} dB between ${candidate.assessmentStartHz}–${candidate.assessmentEndHz} Hz`,
   ].filter(Boolean).join("; ");

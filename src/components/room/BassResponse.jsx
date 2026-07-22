@@ -381,12 +381,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // Shared transition frequency for graph markers and the optimiser validation path.
   const schroederFrequency = optimisationTransitionHz;
 
-  const rp22Levels = React.useMemo(() => ([
-    { level: "L1", spl: 114, color: "#C1B6AD" },
-    { level: "L2", spl: 117, color: "#8B7F76" },
-    { level: "L3", spl: 120, color: "#625143" },
-    { level: "L4", spl: 123, color: "#213428" },
-  ]), []);
+  const rp22Levels = React.useMemo(() => {
+    const thresholds = splConfig?.p14Mode === "recommended" ? [114, 117, 120, 123] : [109, 112, 115, 118];
+    return [
+      { level: "L1", spl: thresholds[0], color: "#C1B6AD" },
+      { level: "L2", spl: thresholds[1], color: "#8B7F76" },
+      { level: "L3", spl: thresholds[2], color: "#625143" },
+      { level: "L4", spl: thresholds[3], color: "#213428" },
+    ];
+  }, [splConfig?.p14Mode]);
 
   // Expose drag state
   useEffect(() => {

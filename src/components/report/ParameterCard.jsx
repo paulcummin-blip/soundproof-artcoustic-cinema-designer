@@ -319,12 +319,13 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </span>
                                 {renderLevelBadge('L4')}
                             </div>
-                        ) : parameter.id === 12 || parameter.id === 13 ? (
+                        ) : parameter.id === 12 || parameter.id === 13 || parameter.id === 14 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
                                     {formatted || formatValue(value)}
                                 </span>
                                 {renderLevelBadge(level)}
+                                {parameter.id === 14 && roomResult?.detail && <span className="ml-2 text-[10px] italic text-[#625143]">{roomResult.detail}</span>}
                             </div>
                         ) : parameter.id === 15 ? (
                             <div className="flex justify-between items-center">

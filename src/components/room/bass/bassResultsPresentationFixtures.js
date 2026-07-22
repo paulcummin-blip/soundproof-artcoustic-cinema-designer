@@ -17,7 +17,7 @@ const ready = ({ seats = 2, cacheStatus = "miss", level = 1 } = {}) => {
   };
   result.provenance.realSeatCount = seats;
   result.productAnalysis.parameters = {
-    p14: createBassParameterResult({ parameter: "P14", status: "complete", level, value: 114.1, unit: "dB" }),
+    p14: createBassParameterResult({ parameter: "P14", status: "complete", level, value: 114.1, unit: "dBC", targetBasis: "minimum", targetBasisDetail: "Target basis: Minimum" }),
     p18: createBassParameterResult({ parameter: "P18", status: "complete", level: 2, value: 23.4, unit: "Hz" }),
     p19: createBassParameterResult({ parameter: "P19", status: "complete", level: 1, value: 4.7, unit: "dB" }),
     p20: seats < 2 ? createBassParameterResult({ parameter: "P20", status: "not_applicable" }) : createBassParameterResult({ parameter: "P20", status: "complete", level: 2, value: 3.8, unit: "dB" }),
@@ -34,8 +34,8 @@ export function runBassResultsPresentationFixtures() {
   check("1. Idle produces four dashes", Object.values(idle.pills).every((pill) => pill.text.endsWith("—")));
   for (const status of ["queued", "calculating"]) { const r = ready(); Object.assign(r.job, { status, startedAtMs: 1000, resultFingerprint: null }); const f = formatBassResults(r, 13000); check(`2. ${status} hides stale levels`, Object.values(f.pills).every((pill) => !pill.text.includes("L1") && !pill.text.includes("114.1"))); }
   { const r = ready(); Object.assign(r.job, { status: "calculating", startedAtMs: 1000, resultFingerprint: null }); check("3. Genuine elapsed time updates", formatBassResults(r, 13000).pills.p14.text === "P14 Updating · 12 s"); }
-  { const f = formatBassResults(ready());   check("4. Ready values format correctly", f.pills.p14.text === "P14 L1 · 115 dB" && f.pills.p18.text === "P18 L2 · 23 Hz" && f.pills.p19.text === "P19 RSP L1 · ±4 dB" && f.pills.p20.text === "P20 worst seat · L2 · ±3 dB"); }
-  check("5. FAIL retains value", formatBassResults(ready({ level: 0 })).pills.p14.text === "P14 FAIL · 115 dB");
+  { const f = formatBassResults(ready());   check("4. Ready values format correctly", f.pills.p14.text === "P14 L1 · 115 dBC — Minimum target" && f.pills.p18.text === "P18 L2 · 23 Hz" && f.pills.p19.text === "P19 RSP L1 · ±4 dB" && f.pills.p20.text === "P20 worst seat · L2 · ±3 dB"); }
+  check("5. FAIL retains value", formatBassResults(ready({ level: 0 })).pills.p14.text === "P14 FAIL · 115 dBC — Minimum target");
   check("6. Single-seat P20 is N/A", formatBassResults(ready({ seats: 1 })).pills.p20.text === "P20 worst seat N/A");
   check("7. Multi-seat P20 floors display only", formatBassResults(ready()).pills.p20.text === "P20 worst seat · L2 · ±3 dB");
   { const candidates = [candidate("a", 1), candidate("b", 2)]; const pool = { candidates, selectablePool: candidates, poolId: "pool", performanceSummary: {} }; const a = selectCandidateFromPool(pool, "balanced"); const b = selectCandidateFromPool(pool, "spl"); check("8. Priority switch reuses pool with zero workers", a.poolId === b.poolId && b.workerStarted === false && b.heavyPoolReused === true); }
@@ -47,10 +47,10 @@ export function runBassResultsPresentationFixtures() {
   check("14. Engineering details default hidden and recover", !engineeringDetailsVisible(false) && engineeringDetailsVisible(true));
 
   const formatterCases = [
-    ["P14 exact integer", "p14", 114.0, "114 dB"],
-    ["P14 rounds 114.1 upward", "p14", 114.1, "115 dB"],
-    ["P14 rounds 114.9 upward", "p14", 114.9, "115 dB"],
-    ["P14 ignores positive integer noise", "p14", 114.0000000001, "114 dB"],
+    ["P14 exact integer", "p14", 114.0, "114 dBC"],
+    ["P14 rounds 114.1 upward", "p14", 114.1, "115 dBC"],
+    ["P14 rounds 114.9 upward", "p14", 114.9, "115 dBC"],
+    ["P14 ignores positive integer noise", "p14", 114.0000000001, "114 dBC"],
     ["P18 exact integer", "p18", 23.0, "23 Hz"],
     ["P18 rounds 23.4 downward", "p18", 23.4, "23 Hz"],
     ["P18 rounds 23.9 downward", "p18", 23.9, "23 Hz"],

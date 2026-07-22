@@ -438,5 +438,14 @@ export function runFingerprintFixtures() {
     results.evaluatedProfilesConstraintChange = computeCalibrationFingerprint(a) !== computeCalibrationFingerprint(b);
   }
 
+  // 34. P14 target basis is calibration-only.
+  {
+    const a = { ...baseInputs(), p14TargetBasis: "minimum" };
+    const b = { ...baseInputs(), p14TargetBasis: "recommended" };
+    results.p14BasisChangesCalibration = computeCalibrationFingerprint(a) !== computeCalibrationFingerprint(b);
+    results.p14BasisDoesNotChangeGeometry = computeGeometryFingerprint(a) === computeGeometryFingerprint(b);
+    results.p14BasisDoesNotChangeProduct = computeProductFingerprint(a) === computeProductFingerprint(b);
+  }
+
   return results;
 }

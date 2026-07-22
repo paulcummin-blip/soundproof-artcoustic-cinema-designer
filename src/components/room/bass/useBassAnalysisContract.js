@@ -115,6 +115,7 @@ export function useBassAnalysisContract({
     optimisationTransitionHz,
     targetAnchorDb: liveTargetAnchorDb,
     activeFitProfile: liveFitProfile,
+    p14TargetBasis: splConfig?.p14Mode === "recommended" ? "recommended" : "minimum",
     usableLfHz: liveUsableLfHz,
     evaluatedProfiles,
   }), [roomDims, rspPosition, seatingPositions, subsForSimulation, surfaceAbsorption,
@@ -156,10 +157,11 @@ export function useBassAnalysisContract({
     },
     responseDomain: contractResponseDomain,
     backgroundLifecycle,
+    p14TargetBasis: splConfig?.p14Mode === "recommended" ? "recommended" : "minimum",
   }), [optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
     rspRawCurve, perSeatRawCurves, designEqSystemLimits, subsForSimulation,
     optimiserPriorityMode, contractGeometryFp, contractProductFp, contractCalibrationFp,
-    contractResponseDomain, fingerprintsOverride, backgroundLifecycle]);
+    contractResponseDomain, fingerprintsOverride, backgroundLifecycle, splConfig?.p14Mode]);
 
   return bassAnalysisContract;
 }

@@ -1,4 +1,4 @@
-import { assessP14Capability, formatP14Capability, gradeP14Minimum } from "./p14CapabilityAuthority.js";
+import { assessP14Capability, formatP14Capability, gradeP14Minimum, gradeP14Recommended } from "./p14CapabilityAuthority.js";
 import { computeP18InRoomF3, computeP19DeviationBelowSchroeder } from "./rp22BassMetrics.jsx";
 
 export function runP14CapabilityFixtures() {
@@ -9,6 +9,11 @@ export function runP14CapabilityFixtures() {
     [114.999, 2], [115, 3], [117.999, 3], [118, 4],
   ];
   boundaries.forEach(([raw, level]) => check(`Minimum boundary ${raw}`, level, gradeP14Minimum(raw), gradeP14Minimum(raw) === level));
+  const recommendedBoundaries = [
+    [113.999, 0], [114, 1], [116.999, 1], [117, 2],
+    [119.999, 2], [120, 3], [122.999, 3], [123, 4],
+  ];
+  recommendedBoundaries.forEach(([raw, level]) => check(`Recommended boundary ${raw}`, level, gradeP14Recommended(raw), gradeP14Recommended(raw) === level));
 
   const rounded = assessP14Capability({ productCapabilityDb: 111.1 });
   check("Raw grading and display rounding are separate", "L1 · 112 dBC", `L${rounded.minimumLevel} · ${formatP14Capability(rounded.value)}`, rounded.minimumLevel === 1 && rounded.formatted === "112 dBC");

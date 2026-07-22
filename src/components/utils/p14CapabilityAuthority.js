@@ -14,7 +14,13 @@ function gradeAtThresholds(value, thresholds) {
 
 export const gradeP14Minimum = (value) => gradeAtThresholds(value, P14_MINIMUM_THRESHOLDS);
 export const gradeP14Recommended = (value) => gradeAtThresholds(value, P14_RECOMMENDED_THRESHOLDS);
+export const normalizeP14TargetBasis = (basis) => basis === "recommended" ? "recommended" : "minimum";
+export const p14ThresholdsForBasis = (basis) => normalizeP14TargetBasis(basis) === "recommended"
+  ? P14_RECOMMENDED_THRESHOLDS
+  : P14_MINIMUM_THRESHOLDS;
+export const gradeP14ForBasis = (value, basis) => gradeAtThresholds(value, p14ThresholdsForBasis(basis));
 export const formatP14Capability = (value) => Number.isFinite(value) ? `${Math.ceil(value - 1e-8)} dBC` : "—";
+export const formatP14BasisLabel = (basis) => normalizeP14TargetBasis(basis) === "recommended" ? "Recommended" : "Minimum";
 
 export function combinedApprovedP14Capability(activeSubs) {
   const values = (activeSubs || []).map((sub) => getApprovedContinuousSplDb(sub?.modelKey ?? sub?.model));
@@ -27,14 +33,18 @@ export function consumedEqBoostDb(combinedEqCurve) {
   return values.length ? Math.max(0, ...values) : 0;
 }
 
-export function assessP14Capability({ activeSubs = [], productCapabilityDb = null, combinedEqCurve = [] } = {}) {
+export function assessP14Capability({ activeSubs = [], productCapabilityDb = null, combinedEqCurve = [], targetBasis = "minimum" } = {}) {
   const product = Number.isFinite(productCapabilityDb) ? productCapabilityDb : combinedApprovedP14Capability(activeSubs);
+  const normalizedTargetBasis = normalizeP14TargetBasis(targetBasis);
   if (!Number.isFinite(product)) return null;
   const consumedHeadroomDb = consumedEqBoostDb(combinedEqCurve);
   const value = product - consumedHeadroomDb;
   return {
     value,
     formatted: formatP14Capability(value),
+    level: gradeP14ForBasis(value, normalizedTargetBasis),
+    targetBasis: normalizedTargetBasis,
+    targetBasisLabel: formatP14BasisLabel(normalizedTargetBasis),
     minimumLevel: gradeP14Minimum(value),
     recommendedLevel: gradeP14Recommended(value),
     productCapabilityBeforeEqDb: product,
@@ -48,4 +58,8 @@ export function assessP14Capability({ activeSubs = [], productCapabilityDb = nul
 
 export function formatP14RecommendedDetail(level) {
   return level > 0 ? `Recommended target: L${level} achieved` : "Recommended target: L1 not achieved";
+}
+
+export function formatP14TargetBasisDetail(basis) {
+  return `Target basis: ${formatP14BasisLabel(basis)}`;
 }
