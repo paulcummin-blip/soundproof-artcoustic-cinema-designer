@@ -4,12 +4,13 @@ import { buildCandidateSignature, signatureToString } from "@/components/room/ba
 import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
 import { formatP20Deviation, levelP20_lfConsistency } from "@/components/utils/rp22/levels";
 import ProductionHouseCurveAuthorityDiagnostic from "./ProductionHouseCurveAuthorityDiagnostic";
+import ShadowPairedCapabilityDiagnostic from "./ShadowPairedCapabilityDiagnostic";
 
 const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
 const fmtMs = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
 
-export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve, includeDiagnostics = false }) {
+export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve, normalizedTransferResult, includeDiagnostics = false }) {
   const [fitterDiagnosticsOpen, setFitterDiagnosticsOpen] = useState(false);
   const [showAllRevisions, setShowAllRevisions] = useState(false);
   if (!result) return null;
@@ -23,6 +24,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       rspRawCurve={rspRawCurve}
     />
     <ProductionHouseCurveAuthorityDiagnostic result={result} rspRawCurve={rspRawCurve} activeSubs={activeSubs} usableLfHz={usableLfHz} />
+    <ShadowPairedCapabilityDiagnostic result={result} activeSubs={activeSubs} normalizedTransferResult={normalizedTransferResult} />
     {result?.selectedCandidate && (() => {
       const sig = buildCandidateSignature({ result, rspRawCurve });
       if (!sig) return null;

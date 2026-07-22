@@ -734,6 +734,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           graphFilterBankSignature={graphFilterBankSignature}
           graphSeries={multiSeriesForGraph}
           transitionFrequencyHz={optimisationTransitionHz}
+          normalizedTransferResult={normalizedLive.status === "ready" && normalizedLive.quality === "refined" ? normalizedLive.result : null}
         />
 
         {/* Allen & Berkley model attribution — presentation only, no simulation/scaling logic */}

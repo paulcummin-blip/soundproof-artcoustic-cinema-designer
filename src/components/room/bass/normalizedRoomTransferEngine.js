@@ -239,6 +239,7 @@ export function computeNormalizedRoomTransfer({
     : prepareModeBank(roomDims, engineOptions);
 
   const seatResponses = {};
+  let perSourceRspComplexTransfers = [];
   let frequencies = [];
 
   listeners.forEach((listener) => {
@@ -246,8 +247,9 @@ export function computeNormalizedRoomTransfer({
     let sumRe = null;
     let sumIm = null;
     let freqsHz = null;
+    const sourceComplexTransfers = [];
 
-    subsForSimulation.forEach((sub) => {
+    subsForSimulation.forEach((sub, sourceIndex) => {
       if (!Number.isFinite(sub?.x) || !Number.isFinite(sub?.y) || !Number.isFinite(sub?.z)) return;
 
       const listenerZ = Number.isFinite(Number(listener.z)) ? Number(listener.z) : 1.2;
@@ -271,6 +273,16 @@ export function computeNormalizedRoomTransfer({
         }
       );
 
+      sourceComplexTransfers.push({
+        sourceIndex,
+        sourceId: sub?.id || null,
+        points: rewResult.freqsHz.map((frequency, index) => ({
+          frequency,
+          re: rewResult.complexPressure[index]?.re ?? null,
+          im: rewResult.complexPressure[index]?.im ?? null,
+        })),
+      });
+
       if (!freqsHz) {
         freqsHz = rewResult.freqsHz;
         sumRe = rewResult.complexPressure.map((cp) => cp.re);
@@ -286,6 +298,7 @@ export function computeNormalizedRoomTransfer({
     });
 
     if (freqsHz && sumRe && sumIm) {
+      if (listener.__isRsp) perSourceRspComplexTransfers = sourceComplexTransfers;
       seatResponses[listenerKey] = {
         freqsHz,
         splDb: sumRe.map((re, index) => complexToDb(re, sumIm[index])),
@@ -339,6 +352,7 @@ export function computeNormalizedRoomTransfer({
     responseDomain: "normalized_room_transfer",
     rspCurve,
     seatCurves,
+    perSourceRspComplexTransfers,
     frequencies,
     sourceLayout: buildSourceLayout(subsForSimulation),
     geometryFingerprint,
