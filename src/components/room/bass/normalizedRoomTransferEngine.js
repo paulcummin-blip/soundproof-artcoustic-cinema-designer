@@ -276,6 +276,10 @@ export function computeNormalizedRoomTransfer({
       sourceComplexTransfers.push({
         sourceIndex,
         sourceId: sub?.id || null,
+        amplitudeDomain: "pressure amplitude relative to 20 µPa",
+        sourceReferenceDb: 94,
+        sourceReferenceAmplitude: Math.pow(10, 94 / 20),
+        dimensionlessTransferOperation: "complexPressure / sourceReferenceAmplitude",
         points: rewResult.freqsHz.map((frequency, index) => ({
           frequency,
           re: rewResult.complexPressure[index]?.re ?? null,

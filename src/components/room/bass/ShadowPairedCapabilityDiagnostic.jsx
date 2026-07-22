@@ -37,10 +37,11 @@ export default function ShadowPairedCapabilityDiagnostic({ result, activeSubs, n
       <span>Worst frequency: <strong>{fmt(shadow.worstFrequencyHz, " Hz")}</strong></span>
       <span>Contiguous under-target bandwidth: <strong>{region ? `${fmt(region.bandwidthHz, " Hz")} (${fmt(region.bandwidthOctaves, " oct")})` : "None"}</strong></span>
       <span>Under-target depth: <strong>{region ? fmt(region.depthDb, " dB") : "—"}</strong></span>
-      <span>Limiting cause: <strong>{shadow.limitingCause || "—"}</strong></span>
+      <span>Heuristic limiting cause: <strong>{shadow.heuristicLimitingCause?.join(", ") || "—"}</strong></span>
       <span>Amplifier limits: <strong>{shadow.sourceDiagnostics?.every((source) => Number.isFinite(source.amplifierLimitDb)) ? "Available" : "Not configured; product clean limits used"}</strong></span>
     </div>
     {shadow.reason && <div className="mt-2 font-mono text-[10px] text-amber-800">{shadow.reason}</div>}
+    <div className="mt-1 font-mono text-[9px] text-slate-500">Heuristic cause attribution is diagnostic only. Severe narrow-null threshold: {shadow.method?.severeNullDepthDb ?? 10} dB.</div>
     {chartData.length > 0 && <div className="mt-2 h-52 rounded border border-violet-200 bg-white p-2">
       <div className="mb-1 flex gap-4 font-mono text-[9px] text-slate-600"><span className="text-slate-700">Raw capability</span><span className="text-violet-700">Post-EQ capability</span><span className="text-rose-700">Paired envelope</span></div>
       <ResponsiveContainer width="100%" height="90%">
