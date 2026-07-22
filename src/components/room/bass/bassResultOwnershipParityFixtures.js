@@ -3,7 +3,7 @@ import { formatBassResults } from "./bassResultsPresentation.js";
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from "./bassCompliancePresentation.js";
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot, buildSeatHudParameterRows } from "@/components/room/seatHudPresentation";
 import { RP22_SEAT_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
-import { buildPersistedBassAuthority, resolvePersistedBassAuthority } from "./completedBassResultStore.js";
+import { buildPersistedBassAuthority, resolvePersistedBassAuthority } from "./completedBassResultPersistence.js";
 
 const FP = "cal:v1:ownership123456";
 const contractFixture = () => {

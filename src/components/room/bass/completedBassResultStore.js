@@ -1,11 +1,19 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
+import {
+  COMPLETED_BASS_CACHE_VERSION,
+  buildPersistedBassAuthority,
+  compactCompletedBassContract,
+  isCompletedBassContract,
+  resolvePersistedBassAuthority,
+} from "./completedBassResultPersistence";
+
+export { buildPersistedBassAuthority, compactCompletedBassContract, isCompletedBassContract, resolvePersistedBassAuthority };
 
 const memoryByProject = new Map();
 const listeners = new Set();
 const writeQueues = new Map();
 const syncSignatures = new Map();
-const CACHE_VERSION = 1;
 
 const projectKey = (projectId) => String(projectId || "free");
 const emptyAuthority = (projectId) => ({
@@ -25,76 +33,6 @@ function setMemory(projectId, authority) {
   memoryByProject.set(projectKey(projectId), authority);
   notify();
   return authority;
-}
-
-export function isCompletedBassContract(contract) {
-  const status = contract?.job?.status;
-  return ["ready", "complete"].includes(status)
-    && !!contract?.selectedCandidate
-    && !!contract?.selectedCandidateId
-    && !!contract?.job?.resultFingerprint
-    && contract.job.resultFingerprint === contract.job.currentJobFingerprint;
-}
-
-export function compactCompletedBassContract(contract) {
-  if (!isCompletedBassContract(contract)) return null;
-  return {
-    version: contract.version,
-    analysisId: contract.analysisId,
-    fingerprints: contract.fingerprints,
-    job: { ...contract.job, status: "complete" },
-    productAnalysis: {
-      status: "complete",
-      parameters: contract.productAnalysis?.parameters || {},
-    },
-    selectedMode: contract.selectedMode,
-    selectedCandidateId: contract.selectedCandidateId,
-    selectedCandidate: {
-      id: contract.selectedCandidate?.id || contract.selectedCandidateId,
-      worstP20SeatId: contract.selectedCandidate?.worstP20SeatId || null,
-      perSeatP19Results: contract.selectedCandidate?.perSeatP19Results || [],
-      perSeatP20Results: contract.selectedCandidate?.perSeatP20Results || [],
-    },
-    provenance: contract.provenance || {},
-  };
-}
-
-export function buildPersistedBassAuthority(existing, currentFingerprint, contract = null, forceUpdating = false) {
-  const previous = existing && typeof existing === "object" ? existing : {};
-  const completedByFingerprint = { ...(previous.completedByFingerprint || {}) };
-  const compact = compactCompletedBassContract(contract);
-  if (compact) completedByFingerprint[compact.job.resultFingerprint] = compact;
-  const ordered = Object.entries(completedByFingerprint)
-    .sort(([, left], [, right]) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))
-    .slice(0, 3);
-  const bounded = Object.fromEntries(ordered);
-  const fingerprint = currentFingerprint || compact?.job?.resultFingerprint || previous.currentFingerprint || null;
-  const matching = fingerprint ? bounded[fingerprint] || null : null;
-  return {
-    version: CACHE_VERSION,
-    currentFingerprint: fingerprint,
-    status: matching && !forceUpdating ? "complete" : fingerprint ? "updating" : "uncalculated",
-    completedByFingerprint: bounded,
-    updatedAtMs: Date.now(),
-  };
-}
-
-export function resolvePersistedBassAuthority(projectId, persisted) {
-  const state = persisted && typeof persisted === "object" ? persisted : {};
-  const currentFingerprint = state.currentFingerprint || null;
-  const snapshots = state.completedByFingerprint || {};
-  const current = state.status === "complete" && currentFingerprint ? snapshots[currentFingerprint] || null : null;
-  const staleContract = Object.values(snapshots)
-    .filter((snapshot) => snapshot !== current && isCompletedBassContract(snapshot))
-    .sort((left, right) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))[0] || null;
-  return {
-    projectId: projectKey(projectId),
-    status: current ? "complete" : state.status === "uncalculated" ? "uncalculated" : "updating",
-    currentFingerprint,
-    contract: isCompletedBassContract(current) ? current : null,
-    staleContract,
-    exportable: isCompletedBassContract(current),
-  };
 }
 
 export function publishCompletedBassContract(projectId, contract) {
@@ -134,7 +72,7 @@ export function syncPersistentBassAuthority(projectId, currentFingerprint, contr
     const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
     const record = Array.isArray(records) ? records[0] : null;
     const existing = record ? {
-      version: CACHE_VERSION,
+      version: COMPLETED_BASS_CACHE_VERSION,
       currentFingerprint: record.current_fingerprint,
       status: record.status,
       completedByFingerprint: record.completed_by_fingerprint,
@@ -160,7 +98,7 @@ export async function hydrateCompletedBassAuthority(projectId) {
   const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
   const record = Array.isArray(records) ? records[0] : null;
   const persisted = record ? {
-    version: CACHE_VERSION,
+    version: COMPLETED_BASS_CACHE_VERSION,
     currentFingerprint: record.current_fingerprint,
     status: record.status,
     completedByFingerprint: record.completed_by_fingerprint,
