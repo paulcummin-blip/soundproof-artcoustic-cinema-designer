@@ -9,18 +9,8 @@ import { getP21PresetResult, levelP21_earlyReflections } from "@/components/util
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
 import { p20SummaryFromResults } from "@/components/room/bass/p20SeatPresentation";
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
-
-let p18TraceReferenceCount = 0;
-const p18TraceReferences = new WeakMap();
-
-const getP18TraceReference = (analysisResult) => {
-  if (!analysisResult || (typeof analysisResult !== "object" && typeof analysisResult !== "function")) return "unavailable";
-  if (!p18TraceReferences.has(analysisResult)) {
-    p18TraceReferenceCount += 1;
-    p18TraceReferences.set(analysisResult, p18TraceReferenceCount);
-  }
-  return p18TraceReferences.get(analysisResult);
-};
+import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
+import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 
 /* ---------- Helpers */
 
@@ -226,196 +216,7 @@ const getMetricDebugText = (paramId, metric) => {
 };
 
 /* ---------- Canonical RP22 Parameters (FULL, with scope) ---------- */
-const RP22_PARAMS = [
-  {
-    id: 1,
-    title: "Minimum distance between the listening area and the room walls (dsw, dbw)",
-    scope: "Seat",
-    short: "Avoids seats too near boundaries. Measure from each listener head center to nearest wall or protruding baffle.",
-    unit: "m",
-    thresholds: { direction: ">=", L1: 0.5, L2: 0.8, L3: 1.2, L4: 1.5 },
-    valueFromAnalysis: (a) => a?.p1_minSeatToWall_m,
-  },
-  {
-    id: 2,
-    title: "Decoder/renderer capability and discretely rendered speaker configuration, excl. subwoofers",
-    scope: "Room",
-    short: "Includes all listener-level and upper discrete processor outputs; exact locations depend on design.",
-    unit: "speakers",
-    thresholds: { direction: ">=", L1: 5, L2: 11, L3: 15, L4: 15 },
-    valueFromAnalysis: (a) => a?.p2_discreteCount,
-  },
-  {
-    id: 3,
-    title: "Number of screen wall speakers allowed outside of recommended zonal locations",
-    scope: "Room",
-    short: "Screen speaker locations are zones (not fixed angles). Count of screen speakers outside their zones.",
-    unit: "speakers",
-    thresholds: { direction: "=", L1: 0, L2: 0, L3: 0, L4: 0 },
-    valueFromAnalysis: (a) => a?.p3_screenOutsideZones_count,
-  },
-  {
-    id: 4,
-    title: "Maximum SPL difference between screen wall speakers",
-    scope: "Seat",
-    short: "Per seat, max predicted SPL difference (anechoic propagation) between any two screen speakers.",
-    unit: "dB",
-    thresholds: { direction: "<=", L1: 6, L2: 5, L3: 4, L4: 2 },
-    valueFromAnalysis: (a) => a?.p4_screenSPLdiff_max_dB,
-  },
-  {
-    id: 5,
-    title: "Maximum allowable horizontal angle between adjacent surround speakers",
-    scope: "Seat",
-    short: "Ensures smooth panning/localization. Max horizontal angle between adjacent surrounds at the seat.",
-    unit: "°",
-    thresholds: { direction: "<=", L1: null, L2: 80, L3: 60, L4: 50 },
-    valueFromAnalysis: (a) => a?.p5_surroundAdjAngle_max_deg,
-  },
-  {
-    id: 6,
-    title: "Maximum SPL difference between surround speakers",
-    scope: "Seat",
-    short: "Per seat, max predicted SPL difference (anechoic) between any two listener-level surrounds.",
-    unit: "dB",
-    thresholds: { direction: "<=", L1: 10, L2: 6, L3: 4, L4: 2 },
-    valueFromAnalysis: (a) => a?.p6_surroundSPLdiff_max_dB,
-  },
-  {
-    id: 7,
-    title: "Wide speakers (if implemented) maximum allowable horizontal deviation from median angle",
-    scope: "Room",
-    short: "Max horizontal angular deviation allowed from ideal median angular location for wide fronts.",
-    unit: "°",
-    thresholds: { direction: "<=", L1: 10, L2: 7, L3: 5, L4: 2 },
-    valueFromAnalysis: (a) => a?.p7_wideMedianDeviation_deg,
-  },
-  {
-    id: 8,
-    title: "Upfiring/elevation speakers allowed?",
-    scope: "Room",
-    short: "If tops can't be installed, upfiring/elevation speakers may be used; must be suitably designed.",
-    unit: "Yes/No",
-    thresholds: { direction: "=", L1: "Yes", L2: "Yes", L3: "No", L4: "No" },
-    valueFromAnalysis: (a) => (a?.p8_upfiringAllowed ? "Yes" : "No"),
-  },
-  {
-    id: 9,
-    title: "Maximum allowable vertical angle between adjacent (L/R rows of) upper speakers",
-    scope: "Seat",
-    short: "Ensures smooth vertical panning. Excludes top-middle-center / height-center. (L1: >80.1°)",
-    unit: "°",
-    thresholds: { direction: "<=", L1: null, L2: 80, L3: 60, L4: 50 },
-    valueFromAnalysis: (a) => a?.p9_upperAdjVertAngle_max_deg,
-  },
-  {
-    id: 10,
-    title: "Maximum SPL difference between upper speakers",
-    scope: "Seat",
-    short: "Per seat, max predicted SPL difference (anechoic) between any two height/upper speakers.",
-    unit: "dB",
-    thresholds: { direction: "<=", L1: 12, L2: 8, L3: 5, L4: 2 },
-    valueFromAnalysis: (a) => a?.p10_upperSPLdiff_max_dB,
-  },
-  {
-    id: 11,
-    title: "Number of surround/wide/upper speakers allowed outside of zonal recommendation locations",
-    scope: "Room",
-    short: "Count of surround/wide/upper speakers outside their recommended zones.",
-    unit: "speakers",
-    thresholds: { direction: "=", L1: null, L2: 0, L3: 0, L4: 0 },
-    valueFromAnalysis: (a) => a?.p11_swUpperOutsideZones_count,
-  },
-  {
-    id: 12,
-    title: "Screen speakers SPL capability at RSP (post-EQ, within assigned bandwidth) without clipping",
-    scope: "Room",
-    short: "Minimum long-term SPL at RSP (AES75/CTA-2034 guidance). Allow for bass contour & +EQ headroom.",
-    unit: "dB",
-    thresholds: { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 },
-    valueFromAnalysis: (a) => a?.p12_screenSPL_capability_dB,
-  },
-  {
-    id: 13,
-    title: "Non-screen speakers SPL capability at RSP (post-EQ, within assigned bandwidth) without clipping",
-    scope: "Room",
-    short: "Minimum long-term SPL at RSP for non-screen channels. Includes amplifier headroom.",
-    unit: "dB",
-    thresholds: { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 },
-    valueFromAnalysis: (a) => a?.p13_nonScreenSPL_capability_dB,
-  },
-  {
-    id: 14,
-    title: "LFE frequencies total SPL capability at RSP (+ bass management if used) (post-EQ) without clipping",
-    scope: "Room",
-    short: "Total system SPL capability at LFE; can include boundary/room gain and multi-sub summation.",
-    unit: "dB",
-    thresholds: { direction: ">=", L1: 114, L2: 117, L3: 120, L4: 123 },
-    valueFromAnalysis: (a) => a?.p14_LFE_capability_dB,
-  },
-  {
-    id: 15,
-    title: "Background noise floor (all AV + mechanical/building services ON, nominal temps)",
-    scope: "Room",
-    short: "Noise floor with systems running while no content is playing (e.g., pause/menu).",
-    unit: "NCB",
-    thresholds: { direction: "<=", L1: 26, L2: 22, L3: 18, L4: 15 },
-    valueFromAnalysis: (a) => a?.p15_noiseFloor_NCB,
-  },
-  {
-    id: 16,
-    title: "Seat-to-seat frequency response variance across all screen wall speakers (500 Hz–16 kHz, 1-oct smoothing)",
-    scope: "Seat",
-    short: "Similarity across seats; consider alignment, off-axis response (H&V), and room effects.",
-    unit: "± dB",
-    thresholds: { direction: "<=", L1: 5, L2: 3, L3: 1.5, L4: 1.5 },
-    valueFromAnalysis: (a) => a?.p16_screenVariance_dB,
-  },
-  {
-    id: 17,
-    title: "Seat-to-seat FR variance across all wide/surround/upper speakers (500 Hz–16 kHz, 1-oct smoothing)",
-    scope: "Seat",
-    short: "Similarity across seats for wide/surround/upper; consider alignment, off-axis (H&V), room.",
-    unit: "± dB",
-    thresholds: { direction: "<=", L1: null, L2: null, L3: 3, L4: 1.5 },
-  },
-  {
-    id: 18,
-    title: "In-room bass extension -3 dB cutoff frequency point",
-    scope: "Room",
-    short: "Predicted in-room -3 dB extension with no audible distortion/resonance at the SPL of Param 14.",
-    unit: "Hz",
-    thresholds: { direction: "<=", L1: 30, L2: 25, L3: 18, L4: 15 },
-    valueFromAnalysis: (a) => a?.p18_bassExtension_Hz,
-  },
-  {
-    id: 19,
-    title: "Frequency response below the room's transition frequency at RSP relative to target (1/3-oct smoothing) - \"The Result\"",
-    scope: "Room",
-    short: "Predicts smooth response at RSP relative to target curve.",
-    unit: "± dB",
-    thresholds: { direction: "<=", L1: 5, L2: 4, L3: 3, L4: 2 },
-    valueFromAnalysis: (a) => a?.p19_belowTransition_atRSP_dB,
-  },
-  {
-    id: 20,
-    title: "Seat-to-seat FR relative to measured RSP below transition frequency per seat (1/3-oct) - \"The Consistency\"",
-    scope: "Seat",
-    short: "Predicts similarity across seats below transition.",
-    unit: "± dB",
-    thresholds: { direction: "<=", L1: null, L2: 4, L3: 3, L4: 2 },
-    valueFromAnalysis: (a) => a?.p20_belowTransition_seatToSeat_dB,
-  },
-  {
-    id: 21,
-    title: "Level of early reflections relative to direct sound (0–15 ms, 1–8 kHz)",
-    scope: "Room",
-    short: "Manage early reflections for optimum direct/reflected balance.",
-    unit: "dB",
-    thresholds: { direction: "<=", L1: null, L2: -8, L3: -10, L4: -12 },
-    valueFromAnalysis: (a) => a?.p21_earlyReflections_dB,
-  },
-];
+const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 
 /* ---------- P12/P13 mode-aware threshold constants ---------- */
 const P12_THRESHOLDS_MINIMUM     = { direction: ">=", L1: 99,  L2: 102, L3: 105, L4: 108 };
@@ -447,7 +248,8 @@ export default function RP22CompliancePanel({
 }) {
   const appState = useAppState();
   const bassResults = useOptionalSharedBassResults();
-  const selectedP20Results = bassResults?.contract?.selectedCandidate?.perSeatP20Results || [];
+  const bassPresentation = React.useMemo(() => buildComplianceBassPresentation(bassResults?.contract), [bassResults?.contract]);
+  const selectedP20Results = bassPresentation.perSeatP20Results;
   const selectedP20Summary = p20SummaryFromResults(selectedP20Results);
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
@@ -739,6 +541,7 @@ export default function RP22CompliancePanel({
 
   const getHudLevelForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
+    if ([14, 18, 19].includes(pid)) return bassPresentation.parameters[`p${pid}`].level;
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
@@ -825,10 +628,11 @@ export default function RP22CompliancePanel({
     }
 
     return "—";
-  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey]);
+  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation]);
 
   const getHudValueForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
+    if ([14, 18, 19].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
@@ -936,7 +740,7 @@ export default function RP22CompliancePanel({
     }
 
     return "—";
-  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey]);
+  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey, bassPresentation]);
 
   return (
     <div>
@@ -973,11 +777,12 @@ export default function RP22CompliancePanel({
           const resolvedParam = (p.id === 12 || p.id === 13)
             ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode) }
             : p;
-          const p14Result = p.id === 14 ? analysisResult?.gradedParameters?.primary?.[14] : null;
           const targetBasisNote =
             p.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
             p.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
-            p14Result ? `Design EQ: ${p14Result.designEqEnabled ? "On" : "Off"} (${p14Result.designEqFitProfile === "house_curve" ? "cut up to −15 dB / boost up to +6 dB, capability-limited" : "profile-specific limits, capability-limited"}) — ${p14Result.note || "Post-EQ design estimate at RSP using selected subwoofer product data."}` :
+            p.id === 14 ? "Official RSP result from the completed authoritative bass analysis." :
+            p.id === 18 ? "Official room result from the completed authoritative bass analysis." :
+            p.id === 19 ? "Official RSP-versus-target result from the completed authoritative bass analysis." :
             null;
           const debugMetric = String(reportSource).startsWith("seat:")
             ? (() => {
@@ -1049,25 +854,6 @@ export default function RP22CompliancePanel({
                   {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
                   <span style={{ color: "#213428" }}>{achievedValue}</span>
                 </div>
-                {p.id === 18 && (() => {
-                  const p18 = analysisResult?.gradedParameters?.primary?.[18] || null;
-                  return (
-                    <pre style={{ marginTop: 8, padding: 8, overflowX: "auto", whiteSpace: "pre-wrap", fontSize: 10, lineHeight: 1.4, color: "#1B1A1A", background: "#F6F3EE", border: "1px solid #C1B6AD", borderRadius: 4 }}>
-{`BUILD MARKER: P18-LIVE-TRACE-01
-analysisResult reference: ${getP18TraceReference(analysisResult)}
-gradedParameters.primary[18].level: ${String(p18?.level)}
-gradedParameters.primary[18].formatted: ${String(p18?.formatted)}
-gradedParameters.primary[18].value: ${String(p18?.value)}
-gradedParameters.primary[18].officialCoupledLevel: ${String(p18?.officialCoupledLevel)}
-gradedParameters.primary[18].targets: ${JSON.stringify(p18?.targets)}
-achievedValue: ${String(achievedValue)}
-lvl: ${String(lvl)}
-window.location.href: ${window.location.href}
-build/version: ${import.meta.env?.VITE_APP_VERSION || "unavailable"}
-render timestamp: ${new Date().toISOString()}`}
-                    </pre>
-                  );
-                })()}
                 {targetBasisNote && (
                   <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
                     {targetBasisNote}

@@ -16,6 +16,8 @@ import { computeSurroundRingGaps, rp22LevelForP5 } from '@/components/utils/p5Su
 import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import { levelP17_wsFR } from '@/components/utils/rp22/levels';
+import { RP22_SEAT_PARAMETERS, createEmptySeatRp22Metrics } from '@/components/utils/rp22ParameterPresentation';
+import { attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 
 // Helper for safe number extraction
 const finite = (v, fallback) => {
@@ -141,6 +143,7 @@ export function buildSeatHudSnapshot({
   sevenBedMode = '',
   dolbyLayout = '5.1',
   overlaysForRendering = {},
+  perSeatP20Results = [],
 }) {
   if (!seat) return null;
 
@@ -201,38 +204,16 @@ export function buildSeatHudSnapshot({
     }
   };
 
-  // RP22 per-seat metrics – initialise with defaults
-  data.rp22 = {
-    p1:  { valueM:  null, level: '—', formatted: '—' },
-    p4:  { valueDb: null, level: '—', formatted: '—' },
-    p5:  { valueDeg: null, level: '—', formatted: '—' },
-    p6:  { valueDb: null, level: '—', formatted: '—' },
-    p9:  { valueDeg: null, level: '—', formatted: '—' },
-    p10: { valueDb: null, level: '—', formatted: '—' },
-    p16: { valueDb: null, level: '—', formatted: '—' },
-    p17: { valueDb: null, level: '—', formatted: '—' },
-    p20: { valueDb: null, level: '—', formatted: 'Not Calculated' },
-  };
+  // Initialise every canonical seat-scoped parameter so missing values are never omitted.
+  data.rp22 = createEmptySeatRp22Metrics();
 
   const engineSeatId = seat.id || `seat-${seatX}-${seatY}`;
   const engineSeatRp22 = analysisResult?.perSeatRp22?.[engineSeatId]?.rp22 || null;
 
   if (engineSeatRp22) {
-    const seatScopedParamMap = {
-      1: 'p1',
-      4: 'p4',
-      5: 'p5',
-      6: 'p6',
-      9: 'p9',
-      10: 'p10',
-      16: 'p16',
-      17: 'p17',
-      20: 'p20',
-    };
-
-    Object.entries(seatScopedParamMap).forEach(([paramNumber, paramKey]) => {
-      const metric = engineSeatRp22?.[paramNumber];
-      if (metric) data.rp22[paramKey] = metric;
+    RP22_SEAT_PARAMETERS.forEach(({ number }) => {
+      const metric = engineSeatRp22?.[number];
+      if (metric) data.rp22[`p${number}`] = metric;
     });
   }
 
@@ -272,8 +253,9 @@ export function buildSeatHudSnapshot({
   if (!engineSeatRp22?.[9] && !hasOverheads && !data.rp22.p9.value) {
     data.rp22.p9 = {
       value: null,
-      formatted: 'Not Calculated',
-      level: '—',
+      formatted: 'N/A',
+      level: 'N/A',
+      status: 'not_applicable',
     };
   }
 
@@ -720,8 +702,9 @@ export function buildSeatHudSnapshot({
     if (!hasOverheads) {
       data.rp22.p10 = {
         value: null,
-        formatted: 'Not Calculated',
-        level: '—',
+        formatted: 'N/A',
+        level: 'N/A',
+        status: 'not_applicable',
       };
     } else {
       const upperEntries = seatSplData?.uppers
@@ -884,5 +867,5 @@ export function buildSeatHudSnapshot({
   // Legacy bridge
   data.p1NearestM = data.rp22.p1.valueM;
 
-  return data;
+  return attachAuthoritativeP20ToSeatSnapshot(data, engineSeatId, perSeatP20Results);
 }

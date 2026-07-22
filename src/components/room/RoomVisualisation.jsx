@@ -71,6 +71,7 @@ import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic"
 import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState";
 import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
 import { useLiveImpactBaseline } from "@/components/room/rv/hooks/useLiveImpactBaseline";
+import { useResetSideSurrounds } from "@/components/room/rv/hooks/useResetSideSurrounds";
 import { rvIsOverheadRole, getByRoleArray } from "@/components/room/rv/utils/roomVisualisationUtils";
 
 // New RP22 seat metrics import
@@ -1388,6 +1389,7 @@ const byId = useEntitiesById({
     getSpeakerModelMeta,
     rvWrapRef,
     computeAllSeatSplMetrics,
+    perSeatP20Results: currentP20Results,
   });
 
   // AUTOMATIC SEAT METRICS CACHE — extracted to hook
@@ -1696,59 +1698,16 @@ useEffect(() => {
   // Seating shift helper — extracted to hook
   const { shiftSeatsToMaintainAngle } = useShiftSeatsToAngle({ lengthM, screen, seatingPositions, onSetSeatingPositions });
 
-  // UPDATED: Reset side surrounds to their cached default positions
-  const resetSideSurroundsToDefault = useCallback(() => {
-    onSetSpeakers(prev => {
-      const slSpeaker = prev.find(s => getCanonicalRole(s.role) === 'SL');
-      const srSpeaker = prev.find(s => getCanonicalRole(s.role) === 'SR');
-
-      if (!slSpeaker && !srSpeaker) return prev;
-
-      const roomWidth = widthM || 4.5; // Use new widthM
-      const roomLengthM = lengthM || 6.0; // Use new lengthM
-
-      // Determine fixed X positions for both, even if only one exists for robustness
-      // Use getSpeakerDims directly to get dimensions.
-      const dimsL = slSpeaker ? getSpeakerDims(slSpeaker.model, tvPresetKey) : { heightM: 0.2, depthM: 0.082 };
-      const dimsR = srSpeaker ? getSpeakerDims(srSpeaker.model, tvPresetKey) : { heightM: 0.2, depthM: 0.082 };
-
-      const xL = fixedSideX(roomWidth, dimsL, 'L');
-      const xR = fixedSideX(roomWidth, dimsR, 'R');
-
-      // Get the y-range for the speaker center (already includes overhang)
-      const yMinRaw = Number(sideSurroundVisualSpanM?.minY);
-      const yMaxRaw = Number(sideSurroundVisualSpanM?.maxY);
-      const yMin_center = Number.isFinite(yMinRaw) ? yMinRaw : 0;
-      const yMax_center = Number.isFinite(yMaxRaw) ? yMaxRaw : 0;
-
-      // Calculate a default Y position, e.g., the midpoint of the available range
-      let defaultY = (yMin_center + yMax_center) / 2;
-      // If the span is invalid (e.g., yMin_center >= yMax_center), clamp to a safe default in the room center
-      if (!(yMax_center > yMin_center)) {
-        defaultY = roomLengthM / 2;
-      }
-
-      return prev.map(s => {
-        const role = getCanonicalRole(s.role);
-        if (role === 'SL' || role === 'SR') {
-          const targetX = role === 'SL' ? xL : xR;
-          const targetY = defaultY;
-
-          // Cache this as the new default position
-          const newDefaultPos = { x: targetX, y: targetY };
-          return { ...s, defaultPosition: newDefaultPos, position: { ...s.position, x: targetX, y: targetY } };
-        }
-        return s;
-      });
-    });
-  }, [onSetSpeakers, widthM, lengthM, sideSurroundVisualSpanM, getCanonicalRole]); // Use new widthM, lengthM
-
-  useEffect(() => {
-    window.addEventListener('b44:resetSideSurrounds', resetSideSurroundsToDefault);
-    return () => {
-      window.removeEventListener('b44:resetSideSurrounds', resetSideSurroundsToDefault);
-    };
-  }, [resetSideSurroundsToDefault]);
+  const resetSideSurroundsToDefault = useResetSideSurrounds({
+    onSetSpeakers,
+    widthM,
+    lengthM,
+    sideSurroundVisualSpanM,
+    getCanonicalRole,
+    getSpeakerDims,
+    fixedSideX,
+    tvPresetKey,
+  });
 
   // Expose functions so parent components can call them
   useImperativeHandle(ref, () => ({
@@ -1808,7 +1767,7 @@ useEffect(() => {
   const svgH = containerH;
 
 
-  const { renderLevelBadge, hudDynamicStyle } = useHudComputation({ isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned });
+  const { hudDynamicStyle } = useHudComputation({ isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned });
 
   // RP22 overhead corridors: shown whenever overheads are present in the layout  
   const overheadCorridorsOn = overheadCount > 0;
@@ -1940,7 +1899,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         hudElRef={hudElRef}
         setHudHiddenWhenPinned={setHudHiddenWhenPinned}
         hudHiddenWhenPinned={hudHiddenWhenPinned}
-        renderLevelBadge={renderLevelBadge}
         isHudPinned={isHudPinned}
         speakerTooltip={speakerTooltip}
         hudPosition={hudBasePosPx}

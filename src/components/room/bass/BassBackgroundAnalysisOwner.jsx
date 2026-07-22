@@ -7,6 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
+import { clearCompletedBassContract, publishCompletedBassContract } from "./completedBassResultStore";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
@@ -92,6 +93,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     rspRawCurve, perSeatRawCurves, optimiserPriorityMode: selectedPriorityMode, ...requested,
     fingerprintsOverride: fingerprints, backgroundLifecycle: lifecycle,
   });
+  useEffect(() => {
+    if (!publishCompletedBassContract(scopeId, contract)) clearCompletedBassContract(scopeId);
+  }, [scopeId, contract]);
+
   const publishedStagesRef = useRef(new Set());
   useEffect(() => {
     const resultFingerprint = lifecycle.resultFingerprint;

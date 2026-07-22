@@ -8,7 +8,7 @@ export function isRealP20Seat(seat) {
   return !!id && !referenceIds.has(id) && !seat?.__isSyntheticRsp && !seat?.isSyntheticRsp;
 }
 
-function levelText(level) {
+export function p20LevelText(level) {
   const match = String(level ?? "").toUpperCase().match(/^L?([1-4])$/);
   return match ? `L${match[1]}` : "—";
 }
@@ -41,7 +41,7 @@ export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) 
       seatId: id,
       row,
       column: columnNumber(seat, index + 1),
-      level: result && finite(result.variationDbRaw) ? levelText(result.level) : "—",
+      level: result && finite(result.variationDbRaw) ? p20LevelText(result.level) : "—",
       variationDbRaw: result && finite(result.variationDbRaw) ? Number(result.variationDbRaw) : null,
       displayVariationDb: result && finite(result.variationDbRaw) ? displayVariation(result) : "—",
       worstFrequencyHz: result && finite(result.worstFrequencyHz) ? Number(result.worstFrequencyHz) : null,

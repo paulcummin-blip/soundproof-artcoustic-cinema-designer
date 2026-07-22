@@ -77,7 +77,16 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
   if (isReady) statusText = result?.job?.cacheStatus === "hit" ? "Restored from cache" : "Analysis ready";
   if (status === "error") statusText = result?.job?.errorMessage || "Analysis failed · Retry";
 
-  return { pills, statusText, isReady, isUpdating, elapsedSeconds, selectedMode: result?.selectedMode || "balanced" };
+  return {
+    pills,
+    statusText,
+    isReady,
+    isUpdating,
+    elapsedSeconds,
+    selectedMode: result?.selectedMode || "balanced",
+    resultFingerprint: result?.job?.resultFingerprint || null,
+    selectedCandidateId: result?.selectedCandidateId || null,
+  };
 }
 
 export const engineeringDetailsVisible = (includeDiagnostics) => includeDiagnostics === true;

@@ -126,7 +126,6 @@ export default function RvPlanCanvas({
   hudElRef,
   setHudHiddenWhenPinned,
   hudHiddenWhenPinned,
-  renderLevelBadge,
   isHudPinned,
   speakerTooltip,
   hudPosition,  // canvas-pixel position of the HUD card (hudBasePosPx from parent)
@@ -635,7 +634,6 @@ export default function RvPlanCanvas({
           hudElRef={hudElRef}
           setHudHiddenWhenPinned={setHudHiddenWhenPinned}
           hudHiddenWhenPinned={hudHiddenWhenPinned}
-          renderLevelBadge={renderLevelBadge}
           isHudPinned={isHudPinned}
         />
 

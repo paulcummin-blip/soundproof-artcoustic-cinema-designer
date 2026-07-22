@@ -27,6 +27,7 @@ export function useTooltipData({
   seatingPositions,
   dolbyLayout,
   getCanonicalRole,
+  perSeatP20Results,
 }) {
   return useMemo(() => {
     if (!effectiveHoveredSeat) return null;
@@ -70,10 +71,13 @@ export function useTooltipData({
       || 'rears'
     ).toLowerCase();
     const seatRp22 = seatId ? analysisResult?.perSeatRp22?.[seatId]?.rp22 : null;
+    const seatP20 = (Array.isArray(perSeatP20Results) ? perSeatP20Results : []).find((item) => String(item?.seatId) === String(seatId));
     const rp22Fingerprint = [
       seatRp22?.[9]?.formatted || '',
       seatRp22?.[9]?.details?.worst?.deg ?? '',
       seatRp22?.[10]?.formatted || '',
+      seatP20?.variationDbRaw ?? '',
+      seatP20?.level ?? '',
     ].join('|');
 
     const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|${sevenBedMode}|${rp22Fingerprint}`;
@@ -100,6 +104,7 @@ export function useTooltipData({
       splConfig: appState?.splConfig || {},
       sevenBedMode,
       dolbyLayout,
+      perSeatP20Results,
     };
 
     if (isPinnedSeat) {
@@ -140,5 +145,6 @@ export function useTooltipData({
     appState?.sevenBedLayoutType,
     appState?.speakerSystem?.sevenBedLayoutType,
     appState?.speakerSystem?.useWidesInsteadOfRears,
+    perSeatP20Results,
   ]);
 }

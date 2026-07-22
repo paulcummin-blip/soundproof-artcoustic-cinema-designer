@@ -28,6 +28,7 @@ export function useSeatHoverLogic({
   getSpeakerModelMeta,
   rvWrapRef,
   computeAllSeatSplMetrics,
+  perSeatP20Results,
 }) {
   // Hover state
   const [hoveredSeat, setHoveredSeat] = useState(null);
@@ -162,6 +163,7 @@ export function useSeatHoverLogic({
     seatingPositions,
     dolbyLayout,
     getCanonicalRole,
+    perSeatP20Results,
   });
 
   // HUD cache writes — MUST be in an effect (never inside useMemo/render)
@@ -203,7 +205,7 @@ export function useSeatHoverLogic({
         // Avoid needless writes
         try {
           if (cur && JSON.stringify(cur) === nextHash) return prev;
-        } catch {}
+        } catch { /* non-serializable cached data is replaced */ }
         return { ...(prev || {}), [seatId]: tooltipData };
       });
     }
@@ -216,7 +218,7 @@ export function useSeatHoverLogic({
         // Avoid needless writes
         try {
           if (cur && JSON.stringify(cur) === nextHash) return prevObj;
-        } catch {}
+        } catch { /* non-serializable cached data is replaced */ }
         return { ...prevObj, [cacheKey]: tooltipData };
       });
     }

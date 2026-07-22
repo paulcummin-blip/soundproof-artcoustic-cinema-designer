@@ -5,13 +5,18 @@ import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import ParameterCard from '@/components/report/ParameterCard';
 import SeatComplianceSummary from '@/components/report/SeatComplianceSummary';
 import { useRP22AnalysisEngine } from '@/components/hooks/useRP22AnalysisEngine';
-import { computeAllSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
-import RP22ReportParameterGrid from '@/components/report/RP22ReportParameterGrid';
+import { useCompletedBassContract } from '@/components/room/bass/completedBassResultStore';
+import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
+import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
+import { p20LevelText } from '@/components/room/bass/p20SeatPresentation';
 
 export default function ComplianceReportPrint() {
   const app = useAppState();
   const [isReady, setIsReady] = useState(false);
+  const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
+  const completedBassContract = useCompletedBassContract(reportScopeId);
+  const bassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract), [completedBassContract]);
 
   // Extract data
   const roomDims = app?.roomDims || {};
@@ -24,12 +29,7 @@ export default function ComplianceReportPrint() {
   const dolbyLayout = app?.dolbyLayout || app?.dolbyConfig || '5.1';
   const mlp = app?.mlp;
 
-  // Run analysis
-  const splResults = React.useMemo(() => {
-    if (!widthM || !lengthM || !heightM || !speakers.length || !seats.length) return null;
-    return computeAllSeatSplMetrics(speakers, seats, widthM, lengthM, heightM, app);
-  }, [speakers, seats, widthM, lengthM, heightM, app]);
-
+  // Run non-bass RP22 analysis; P14/P18/P19/P20 display comes only from the completed bass contract.
   const analysis = useRP22AnalysisEngine({
     roomDims: { widthM, lengthM, heightM },
     speakers,
@@ -39,24 +39,10 @@ export default function ComplianceReportPrint() {
     seatMetricsById: app?.seatMetricsById || {},
   });
 
-  const reportGridElement = RP22ReportParameterGrid({
-    analysisResult: analysis,
-    seatHudSnapshots: {},
-    seatingPositions: seats,
-    mlpSeatId: rspSeatId,
-    dolbyLayout,
-    frontSubsCount: 0,
-    rearSubsCount: 0,
-    p15ConstructionLevel: app?.p15ConstructionLevel,
-    p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
-  });
-
-  const roomParams = React.useMemo(() => {
-    const roomElements = React.Children.toArray(reportGridElement?.props?.children || []);
-    return roomElements
-      .map((child) => child?.props?.children?.props?.param)
-      .filter((param) => String(param?.scope || '').toLowerCase() === 'room');
-  }, [reportGridElement]);
+  const roomParams = React.useMemo(
+    () => RP22_PRESENTATION_PARAMETERS.filter((parameter) => parameter.scope === 'Room'),
+    []
+  );
 
   const seatParams = analysis?.perSeatAnalysis || {};
 
@@ -240,7 +226,10 @@ export default function ComplianceReportPrint() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {roomParams.map(param => {
-                const roomResult = analysis?.gradedParameters?.primary?.[param.id] || null;
+                const authority = [14, 18, 19].includes(param.id) ? bassPresentation.parameters[`p${param.id}`] : null;
+                const roomResult = authority
+                  ? { status: authority.status, formatted: authority.valueText, level: authority.level }
+                  : analysis?.gradedParameters?.primary?.[param.id] || null;
                 return (
                   <div key={param.id} className="print-avoid-break">
                     <ParameterCard parameter={param} roomResult={roomResult} />
@@ -265,7 +254,6 @@ export default function ComplianceReportPrint() {
                 const seatId = seat?.id || '—';
                 const tooltipData = app?.seatMetricsById?.[seatId];
                 const rp22Raw = tooltipData?.rp22 || {};
-                const rp23 = tooltipData?.rp23 || {};
                 const isPrimary = tooltipData?.isPrimary || false;
 
                 if (!tooltipData) return null;
@@ -275,17 +263,16 @@ export default function ComplianceReportPrint() {
                 const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
 
                 // Extract seat-specific parameters
-                const seatParamsList = [
-                  { num: 'P1', ...rp22Raw.P1 },
-                  { num: 'P4', ...rp22Raw.P4 },
-                  { num: 'P5', ...rp22Raw.P5 },
-                  { num: 'P6', ...rp22Raw.P6 },
-                  { num: 'P9', ...rp22Raw.P9 },
-                  { num: 'P10', ...rp22Raw.P10 },
-                  { num: 'P16', ...rp22Raw.P16 },
-                  { num: 'P17', ...rp22Raw.P17 },
-                  { num: 'P20', ...rp22Raw.P20 },
-                ].filter(p => p.level);
+                const seatParamsList = RP22_SEAT_PARAMETERS.map(({ number }) => {
+                  if (number === 20) {
+                    const result = bassPresentation.perSeatP20Results.find((item) => String(item?.seatId) === String(seatId));
+                    return result && Number.isFinite(Number(result.variationDbRaw))
+                      ? { num: 'P20', valueFormatted: result.displayVariationDb, level: p20LevelText(result.level) }
+                      : { num: 'P20', valueFormatted: '—', level: '—' };
+                  }
+                  const metric = rp22Raw[`p${number}`] || rp22Raw[`P${number}`] || {};
+                  return { num: `P${number}`, valueFormatted: metric.formatted || metric.hudLabel || '—', level: metric.level || '—' };
+                });
 
                 return (
                   <div key={seatId} className="print-avoid-break">

@@ -35,234 +35,13 @@ import { fovForDistance } from '../components/utils/screenMetrics';
 import ElevationDrawing from '../components/report/ElevationDrawing';
 import FrontElevation from '../components/room/FrontElevation';
 import SideElevation from '../components/room/SideElevation';
-import { getLevelColors } from '../components/utils/rp22Colors';
+import PrintRp23Pill from '@/components/report/PrintRp23Pill';
+import { usePlanCapture } from '@/components/report/usePlanCapture';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '../components/utils/viewingAngleUtils';
 import { getP21PresetResult, levelP21_earlyReflections } from '@/components/utils/rp22/levels';
-
-// Local print-only pill — exact same visual spec as RP22GradingPill
-function PrintRp23Pill({ level }) {
-    const normalizeLevel = (lvl) => {
-        if (typeof lvl === 'number') return Math.max(0, Math.min(4, lvl));
-        const str = String(lvl || '').toUpperCase();
-        if (str === 'L1') return 1;
-        if (str === 'L2') return 2;
-        if (str === 'L3') return 3;
-        if (str === 'L4') return 4;
-        if (str === 'FAIL') return 0;
-        return -1;
-    };
-    const n = normalizeLevel(level);
-    const label = n === -1 ? '—' : n === 0 ? 'FAIL' : `L${n}`;
-    const colors = (n === -1 || n <= 0)
-        ? { bg: '#F3F4F6', border: '#E5E7EB', text: '#9CA3AF' }
-        : getLevelColors(n);
-    const safeColors = { bg: colors?.bg || '#F3F4F6', border: colors?.border || '#E5E7EB', text: colors?.text || '#9CA3AF' };
-    return (
-        <span style={{
-            border: `1px solid ${safeColors.border}`,
-            borderRadius: '6px',
-            padding: '6px 12px',
-            fontSize: '13px',
-            fontWeight: 600,
-            lineHeight: 1.2,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            background: safeColors.bg,
-            color: safeColors.text,
-            whiteSpace: 'nowrap',
-            minWidth: '40px',
-        }}>{label}</span>
-    );
-}
-
-// --- Plan capture helpers (kept here since they close over state setters) ---
-const MIN_EXPORT_BBOX_PX = 200;
-
-function hasRvExportBounds(svgEl) {
-    try { return !!(svgEl && svgEl.querySelector && svgEl.querySelector('#export-bounds')); } catch { return false; }
-}
-
-function stripExportViewportTransforms(svgClone) {
-    try {
-        const anchor = svgClone.querySelector('#export-crop-bounds') || svgClone.querySelector('#export-bounds');
-        if (!anchor) return;
-        let node = anchor.parentNode;
-        while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-            if (node.nodeName.toLowerCase() === 'g') {
-                node.removeAttribute('transform');
-                node.removeAttribute('clip-path');
-                node.removeAttribute('clipPath');
-                if (node.style) { node.style.transform = 'none'; node.style.transformOrigin = '0 0'; }
-            }
-            node = node.parentNode;
-        }
-    } catch { }
-}
-
-function measureBboxFromClone(svgClone, selector) {
-    let host = null;
-    try {
-        const el = svgClone.querySelector(selector);
-        if (!el) return null;
-        host = document.createElement('div');
-        host.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0;';
-        document.body.appendChild(host);
-        host.appendChild(svgClone);
-        const b = el.getBBox();
-        if (!b || !(b.width > 0) || !(b.height > 0)) return null;
-        return { x: b.x, y: b.y, width: b.width, height: b.height };
-    } catch { return null; }
-    finally {
-        try { if (host && host.parentNode) host.parentNode.removeChild(host); } catch { }
-    }
-}
-
-function drawDebugOverlay(ctx, canvasW, canvasH, debugInfo, enabled) {
-    if (!enabled) return;
-    const lines = [
-        `PLAN: ${debugInfo.planLabel || '?'}`,
-        `SRC: ${debugInfo.baseRectSource || '?'}`,
-        `crop: x${Math.round(debugInfo.cropRect?.x || 0)} y${Math.round(debugInfo.cropRect?.y || 0)} w${Math.round(debugInfo.cropRect?.width || 0)} h${Math.round(debugInfo.cropRect?.height || 0)}`,
-        `bbox: x${Math.round(debugInfo.contentBbox?.x || 0)} y${Math.round(debugInfo.contentBbox?.y || 0)} w${Math.round(debugInfo.contentBbox?.width || 0)} h${Math.round(debugInfo.contentBbox?.height || 0)}`,
-        `vb  : X${Math.round(debugInfo.viewBoxX || 0)} Y${Math.round(debugInfo.viewBoxY || 0)} W${Math.round(debugInfo.viewBoxW || 0)} H${Math.round(debugInfo.viewBoxH || 0)}`,
-        `ratio: ${(debugInfo.ratio || 0).toFixed(3)}`,
-        `png : ${debugInfo.canvasW || 0} x ${debugInfo.canvasH || 0}`,
-    ];
-    const fontSize = 12; const lineHeight = 16; const padding = 10; const margin = 20;
-    ctx.font = `${fontSize}px monospace`;
-    const textW = Math.max(...lines.map(l => ctx.measureText(l).width));
-    const boxW = textW + padding * 2;
-    const boxH = lines.length * lineHeight + padding * 2;
-    const boxX = margin;
-    const boxY = canvasH - boxH - margin;
-    ctx.fillStyle = 'rgba(0,0,0,0.65)';
-    ctx.fillRect(boxX, boxY, boxW, boxH);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textBaseline = 'top';
-    lines.forEach((line, i) => ctx.fillText(line, boxX + padding, boxY + padding + i * lineHeight));
-}
-
-// Generic SVG-to-PNG capture effect factory
-function usePlanCapture({ isPrinting, imageDataUrl, setImageDataUrl, selector, planLabel, debugPlanCapture, exportTimeoutRef, exportGuardRef, setExportStatus, setIsPrinting, setExportDebug }) {
-    useEffect(() => {
-        if (!isPrinting || imageDataUrl !== null) return;
-        setExportStatus(`Capturing ${planLabel}: waiting for SVG…`);
-        let attempts = 0;
-        const maxAttempts = 20;
-        let retryTimer = null;
-
-        const attemptCapture = async () => {
-            attempts++;
-            try {
-                const planElement = document.querySelector(selector);
-                if (!planElement) {
-                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
-                    setImageDataUrl('__SKIP__'); return;
-                }
-                const svgElement = planElement.querySelector('svg');
-                if (!svgElement) {
-                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
-                    setImageDataUrl('__SKIP__'); return;
-                }
-
-                let liveAnchor = null;
-                try { liveAnchor = svgElement.querySelector('#export-crop-bounds') || svgElement.querySelector('#export-bounds'); } catch { }
-                if (!liveAnchor) {
-                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
-                    setImageDataUrl('__SKIP__'); return;
-                }
-
-                try {
-                    const b = liveAnchor.getBBox?.();
-                    if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < MIN_EXPORT_BBOX_PX || b.height < MIN_EXPORT_BBOX_PX)) {
-                        if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
-                        setImageDataUrl('__SKIP__'); return;
-                    }
-                } catch { }
-
-                if (!hasRvExportBounds(svgElement)) {
-                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
-                    setImageDataUrl('__SKIP__'); return;
-                }
-
-                const svgClone = svgElement.cloneNode(true);
-                svgClone.style.opacity = '1';
-                stripExportViewportTransforms(svgClone);
-
-                const cropRectEl = svgClone.querySelector('#export-crop-bounds');
-                const cropRect = cropRectEl ? {
-                    x: Number(cropRectEl.getAttribute('x')),
-                    y: Number(cropRectEl.getAttribute('y')),
-                    width: Number(cropRectEl.getAttribute('width')),
-                    height: Number(cropRectEl.getAttribute('height')),
-                } : null;
-
-                const bbox = measureBboxFromClone(svgClone, '#export-content-bounds');
-                const baseRect = (bbox && bbox.width > 0 && bbox.height > 0) ? bbox : cropRect;
-
-                if (!baseRect || !Number.isFinite(baseRect.width) || baseRect.width <= 0) {
-                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
-                    setImageDataUrl('__SKIP__'); return;
-                }
-
-                const BUFFER_PX = 80;
-                const viewBoxX = baseRect.x - BUFFER_PX;
-                const viewBoxY = baseRect.y - BUFFER_PX;
-                const viewBoxW = baseRect.width + (2 * BUFFER_PX);
-                const viewBoxH = baseRect.height + (2 * BUFFER_PX);
-
-                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.removeAttribute('width');
-                svgClone.removeAttribute('height');
-
-                const svgString = new XMLSerializer().serializeToString(svgClone);
-                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const targetW = 3000;
-                    const ratio = viewBoxH / viewBoxW;
-                    canvas.width = targetW;
-                    canvas.height = Math.round(targetW * ratio);
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    drawDebugOverlay(ctx, canvas.width, canvas.height, {
-                        planLabel, baseRectSource: (bbox && bbox.width > 0) ? 'bbox' : 'cropRect',
-                        cropRect, contentBbox: bbox, baseRect, viewBoxX, viewBoxY, viewBoxW, viewBoxH,
-                        ratio, canvasW: canvas.width, canvasH: canvas.height, BUFFER_PX,
-                    }, debugPlanCapture);
-                    setImageDataUrl(canvas.toDataURL('image/png'));
-                    setExportStatus(`${planLabel} captured`);
-                    URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); }
-                    else { setImageDataUrl('__SKIP__'); }
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            } catch (err) {
-                if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); }
-                else {
-                    exportGuardRef.current.active = false;
-                    setIsPrinting(false);
-                    setTimeout(() => window.print(), 250);
-                }
-            }
-        };
-
-        attemptCapture();
-        return () => { if (retryTimer) clearTimeout(retryTimer); };
-    }, [isPrinting, imageDataUrl]);
-}
+import { useCompletedBassContract } from '@/components/room/bass/completedBassResultStore';
+import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
+import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -291,6 +70,10 @@ function RP22ReportInner() {
         searchParams.get("projectId") ||
         searchParams.get("id") ||
         activeProjectId;
+    const completedBassContract = useCompletedBassContract(effectiveProjectId || "free");
+    const completedBassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract), [completedBassContract]);
+    const complianceBassExportData = useMemo(() => buildComplianceBassExportData(completedBassContract), [completedBassContract]);
+    const completedP20Results = completedBassPresentation.perSeatP20Results;
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
@@ -636,14 +419,15 @@ function RP22ReportInner() {
                     lcrAngleInfo, analysisResult: analysisResult || {},
                     seatingPositions: seats, splConfig: app?.splConfig || {},
                     sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
+                    perSeatP20Results: completedP20Results,
                 });
                 if (snapshot) out[seat.id] = snapshot;
             } catch (e) { console.warn(`[RP22Report] HUD failed for seat ${seat.id}:`, e); }
         }
         return out;
-    }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout]);
+    }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout, completedP20Results]);
 
-    const seatScopedParamNumbers = React.useMemo(() => new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]), []);
+    const seatScopedParamNumbers = React.useMemo(() => new Set(RP22_SEAT_PARAMETERS.map((parameter) => parameter.number)), []);
 
     const roomScopedParamCount = React.useMemo(() => {
         return rp22Parameters.filter(p => !seatScopedParamNumbers.has(p.number)).length;
@@ -673,6 +457,7 @@ function RP22ReportInner() {
     const getRoomResult = React.useCallback((paramId) => analysisResult?.gradedParameters?.primary?.[paramId] ?? null, [analysisResult]);
 
     const getDisplayedRoomLevel = React.useCallback((paramId) => {
+        if ([14, 18, 19].includes(paramId)) return completedBassPresentation.parameters[`p${paramId}`].level;
         const normaliseLvl = (rawLevel) => {
             if (rawLevel == null) return null;
             if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) { if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`; return null; }
@@ -697,7 +482,7 @@ function RP22ReportInner() {
         if (paramId === 15) return ({ standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" })[app?.p15ConstructionLevel || 'standard'] || null;
         if (paramId === 21) return getP21PresetResult(app?.p21EarlyReflectionPreset || 'l2').level;
         return null;
-    }, [analysisResult, getRoomResult, p2SystemConfig, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset]);
+    }, [analysisResult, getRoomResult, p2SystemConfig, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset, completedBassPresentation]);
 
     const getSeatResults = React.useCallback((paramId) => {
         if (!analysisResult?.perSeatRp22) return [];
@@ -739,7 +524,7 @@ function RP22ReportInner() {
             const getRp22Metric = (key) => {
                 return seatHudRp22[key] ?? null;
             };
-            ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
+            RP22_SEAT_PARAMETERS.map((parameter) => `p${parameter.number}`).forEach(key => {
                 const metric = getRp22Metric(key);
                 if (!metric) return;
                 const rawLevel = metric.level;
@@ -753,12 +538,12 @@ function RP22ReportInner() {
                     counts[lvl] += 1;
                 }
             });
-            return { seatId, counts, activeCount, failCount, total: 9 };
+            return { seatId, counts, activeCount, failCount, total: RP22_SEAT_PARAMETERS.length };
         });
         if (!next.length && lastSeatLevelCountsRef.current.length) return lastSeatLevelCountsRef.current;
         lastSeatLevelCountsRef.current = next;
         return next;
-    }, [analysisResult, reportSeatHudById, app?.seatSnapshotBySeatId, app?.seatMetricsById, seats]);
+    }, [analysisResult, reportSeatHudById, app?.seatSnapshotBySeatId, app?.seatMetricsById, seats, completedBassContract]);
 
     const seatCountsByRow = React.useMemo(() => {
         const rows = {};
@@ -978,6 +763,7 @@ function RP22ReportInner() {
         rearSubsCount: app?.rearSubsCfg?.count,
         p15ConstructionLevel: app?.p15ConstructionLevel,
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
+        bassContract: completedBassContract,
     };
 
     const coverBoxStyle = {
@@ -1463,7 +1249,11 @@ function RP22ReportInner() {
                             </section>
                         )}
 
-                        <section id="pdf-room-parameters">
+                        <section
+                          id="pdf-room-parameters"
+                          data-bass-result-fingerprint={complianceBassExportData.resultFingerprint || ""}
+                          data-bass-selected-candidate={complianceBassExportData.selectedCandidateId || ""}
+                        >
                              <div>
                                  <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
                                 <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
