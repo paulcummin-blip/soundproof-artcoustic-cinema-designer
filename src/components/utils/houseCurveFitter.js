@@ -20,6 +20,7 @@ import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/u
 import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { refineOpposingResidualPair } from "@/components/utils/houseCurvePairedRefinement";
 import { runProfessionalResidualCleanup } from "@/components/utils/houseCurveResidualCleanup";
+import { refineLegalUnprotectedPeak } from "@/components/utils/houseCurveLegalPeakRefinement";
 
 export { houseCurveP19Level };
 
@@ -192,6 +193,17 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     );
     operations += residualCleanup.acceptedOperationCount;
     stopReason = `${stopReason}; accepted ${residualCleanup.acceptedOperationCount} high-resolution residual-cleanup operation(s)`;
+  }
+  const legalPeakRefinement = refineLegalUnprotectedPeak({
+    filters, rawCurve: rspRaw, targetCurve: canonicalTargetCurve, protectedNullRegions,
+    assessmentStartHz, assessmentEndHz, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb,
+    profile, objectiveSeats, fitStartHz, fitEndHz, anchorDb,
+  });
+  if (legalPeakRefinement.changed) {
+    filters = legalPeakRefinement.filters;
+    finalMetrics = legalPeakRefinement.metrics;
+    operations += 1;
+    stopReason = `${stopReason}; ${legalPeakRefinement.reason}`;
   }
   const operationCounts = [startA, startB === startA ? null : startB].filter(Boolean).reduce((totals, start) => {
     Object.entries(start.operationCounts || {}).forEach(([key, value]) => { totals[key] = (totals[key] || 0) + value; });
@@ -424,6 +436,12 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
         post: upperFitPost,
       },
       remainingWorstCorrectableResidual,
+      legalPeakRefinement: {
+        changed: legalPeakRefinement.changed,
+        reason: legalPeakRefinement.reason,
+        frequencyHz: legalPeakRefinement.frequencyHz ?? null,
+        rawPeakResidualDb: legalPeakRefinement.rawPeakResidual ?? null,
+      },
       residualCleanup: {
         diagnostics: residualCleanup.diagnostics,
         finalQuality: residualCleanup.finalQuality,

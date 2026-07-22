@@ -57,7 +57,7 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
     const widthOctaves = octaveWidth(startHz, endHz);
     const reason = "Localized cancellation null at least 10 dB below neighbouring broad response";
     regions.push({
-      startHz: startHz / 2 ** (1 / 24), endHz: endHz * 2 ** (1 / 24),
+      startHz: startHz / 2 ** (1 / 12), endHz: endHz * 2 ** (1 / 12),
       widthHz: endHz - startHz, widthOctaves,
       centreFrequencyHz: worst.frequency, signedResidualDb: worst.residualDb,
       depthRelativeToTargetDb: requiredBoostDb,

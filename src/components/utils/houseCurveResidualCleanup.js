@@ -138,8 +138,13 @@ function protectedNullWorsening(currentFilters, candidateFilters, protectedNullR
   }, 0);
 }
 
-function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemOutputDb) {
+function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemOutputDb, protectedNullRegions) {
   const requiredDb = -region.centre.residualDb;
+  const boostSpillsIntoProtectedNull = requiredDb > 0 && (protectedNullRegions || []).some((protectedRegion) => (
+    region.centre.frequency >= protectedRegion.startHz / 2 ** (1 / 24)
+    && region.centre.frequency <= protectedRegion.endHz * 2 ** (1 / 24)
+  ));
+  if (boostSpillsIntoProtectedNull) return [];
   const isCut = requiredDb < 0;
   const requestedDb = isCut ? Math.max(-15, requiredDb) : Math.min(6, requiredDb);
   const gains = [1, 0.9, 0.75, 0.5, 0.25];
@@ -167,10 +172,14 @@ function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemO
     .filter((overlap) => Math.abs(Math.log2(region.centre.frequency / overlap.frequencyHz)) <= 1 / 3)
     .forEach((overlap) => {
       const existing = filters[overlap.index];
-      for (const gainScale of gains) for (const Q of [MAX_Q, existing.Q]) {
+      const frequencyCandidates = [existing.frequencyHz, region.centre.frequency];
+      for (const frequencyHz of frequencyCandidates) for (const gainScale of gains) for (const Q of [MAX_Q, existing.Q]) {
         const gainDb = clamp(existing.gainDb + requiredDb * gainScale, -15, 6);
-        if (Math.abs(gainDb - existing.gainDb) <= 0.05) continue;
-        const filter = { ...existing, gainDb, Q: clamp(Q, 0.5, MAX_Q), reason: "Professional high-resolution gain refinement" };
+        const unchanged = Math.abs(gainDb - existing.gainDb) <= 0.05
+          && Math.abs(frequencyHz - existing.frequencyHz) <= 0.01
+          && Q === existing.Q;
+        if (unchanged) continue;
+        const filter = { ...existing, frequencyHz, gainDb, Q: clamp(Q, 0.5, MAX_Q), reason: "Professional high-resolution gain/frequency refinement" };
         const next = filters.map((candidate, index) => index === overlap.index ? filter : candidate);
         trials.push({ action: "revise", changedFilterIndex: overlap.index, filter, filters: next });
       }
@@ -305,7 +314,7 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
     const currentP14Level = p14Level(raw, selectedFilters);
     const currentP20 = p20Level(raw, perSeatRawCurves, selectedFilters, assessmentStartHz, assessmentEndHz);
     let accepted = [];
-    for (const trial of proposedBanks(region, selectedFilters, activeSubs, usableLfHz, requestedSystemOutputDb)) {
+    for (const trial of proposedBanks(region, selectedFilters, activeSubs, usableLfHz, requestedSystemOutputDb, protectedNullRegions)) {
       const outcome = rejectionForTrial({
         trial, currentFilters: selectedFilters, currentPoints, currentQuality, currentP14Level, currentP20, raw, perSeatRawCurves,
         region, protectedNullRegions, canonicalTargetCurve, anchorDb, assessmentStartHz, assessmentEndHz,

@@ -4,6 +4,14 @@ import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection
 
 const Q_VALUES = [6, 8, 10];
 const GAIN_SCALES = [0.25, 0.5, 0.75, 1];
+const PROTECTED_EDGE_GUARD_OCTAVES = 1 / 24;
+
+function boostWouldSpillIntoProtectedNull(frequency, protectedNullRegions) {
+  return (protectedNullRegions || []).some((region) => (
+    frequency >= region.startHz / 2 ** PROTECTED_EDGE_GUARD_OCTAVES
+    && frequency <= region.endHz * 2 ** PROTECTED_EDGE_GUARD_OCTAVES
+  ));
+}
 
 function realSeatsRemainConstrained(baseline, after, protectedNullRegions) {
   const beforeById = new Map((baseline?.seatMetrics || []).map((metric) => [metric.seatId, metric]));
@@ -25,6 +33,9 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
   const valley = points.filter((point) => point.deviationDb < 0).sort((a, b) => a.deviationDb - b.deviationDb)[0];
   const enabledFilterCount = filters.filter((filter) => filter.enabled).length;
   if (!peak || !valley) return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: null, limitation: "no opposing correctable residual pair remained" };
+  if (boostWouldSpillIntoProtectedNull(valley.frequency, protectedNullRegions)) {
+    return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: { valleyFrequencyHz: valley.frequency }, limitation: "valley boost rejected because its filter would spill into a protected cancellation region" };
+  }
   if (enabledFilterCount > 8) return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: null, limitation: "ten-filter ceiling left no room for a paired operation" };
   if (Math.max(peak.deviationDb, Math.abs(valley.deviationDb)) <= 3) {
     return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: null, limitation: "fit residual already within 3 dB" };

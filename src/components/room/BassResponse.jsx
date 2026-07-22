@@ -27,6 +27,9 @@ import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/ba
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveBestSubLayoutContextId } from "@/components/room/bass/best-layout/bestSubLayoutContext";
+import { buildVisibleRoomModeMarkers } from "@/components/room/bass/roomModePresentation";
+import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedNullPresentation";
+import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -147,20 +150,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // Modal Resonance Line Toggles — display-only, session-only state. Does not affect
   // bass calculation, SPL response, or mode generation; only filters which resonance
   // ReferenceLines are drawn on the graph.
-  const [modalLineToggles, setModalLineToggles] = useState({
-    axialLength: true,
-    axialWidth: true,
-    axialHeight: true,
-    tangentialLW: true,
-    tangentialLH: true,
-    tangentialWH: true,
-    oblique: true,
-  });
+  const [showRoomModes, setShowRoomModes] = useState(false);
+  const [modalLineToggles, setModalLineToggles] = useState({ axial: true, tangential: true, oblique: true });
   const toggleModalLine = (key) => setModalLineToggles(prev => ({ ...prev, [key]: !prev[key] }));
-  const setAllModalLines = (value) => setModalLineToggles({
-    axialLength: value, axialWidth: value, axialHeight: value,
-    tangentialLW: value, tangentialLH: value, tangentialWH: value, oblique: value,
-  });
   // Active test engine — set by RewRefinedEngineShootout promote button via window.__B44_ACTIVE_TEST_ENGINE__
   const [activeTestEngine, setActiveTestEngine] = useState(null);
   const lastStablePlotRef = useRef(null);
@@ -373,27 +365,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return computeRoomModesLocal({ widthM: roomDims.widthM, lengthM: roomDims.lengthM, heightM: roomDims.heightM, fMax: 200 });
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
-  const modeMarkersForGraph = useMemo(() => {
-    const axial = [];
-    const tangential = [];
-    const oblique = [];
-    roomModesForDisplay.forEach((mode) => {
-      const activeAxes = (mode.nx > 0 ? 1 : 0) + (mode.ny > 0 ? 1 : 0) + (mode.nz > 0 ? 1 : 0);
-      const n = [mode.nx, mode.ny, mode.nz];
-      if (activeAxes === 1) {
-        if (mode.ny > 0 && modalLineToggles.axialLength) axial.push({ fHz: mode.freq, n, axisLabel: 'Length' });
-        else if (mode.nx > 0 && modalLineToggles.axialWidth) axial.push({ fHz: mode.freq, n, axisLabel: 'Width' });
-        else if (mode.nz > 0 && modalLineToggles.axialHeight) axial.push({ fHz: mode.freq, n, axisLabel: 'Height' });
-      } else if (activeAxes === 2) {
-        if (mode.nx > 0 && mode.ny > 0 && modalLineToggles.tangentialLW) tangential.push({ fHz: mode.freq, n });
-        else if (mode.nx > 0 && mode.nz > 0 && modalLineToggles.tangentialWH) tangential.push({ fHz: mode.freq, n });
-        else if (mode.ny > 0 && mode.nz > 0 && modalLineToggles.tangentialLH) tangential.push({ fHz: mode.freq, n });
-      } else if (activeAxes === 3 && modalLineToggles.oblique) {
-        oblique.push({ fHz: mode.freq, n });
-      }
-    });
-    return { axial, tangential, oblique };
-  }, [roomModesForDisplay, modalLineToggles]);
+  const modeMarkersForGraph = useMemo(() => buildVisibleRoomModeMarkers({
+    modes: roomModesForDisplay,
+    show: showRoomModes,
+    families: modalLineToggles,
+    xDomain: [20, 200],
+  }), [roomModesForDisplay, showRoomModes, modalLineToggles]);
+
+  const protectedNullAnnotations = useMemo(() => buildProtectedNullAnnotations(
+    optimisationResult?.selectedCandidate,
+    roomModesForDisplay,
+    rspRawCurve,
+  ), [optimisationResult?.selectedCandidate, roomModesForDisplay, rspRawCurve]);
 
   // Shared transition frequency for graph markers and the optimiser validation path.
   const schroederFrequency = optimisationTransitionHz;
@@ -698,9 +681,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               rp22Levels={rp22Levels}
               toggles={{}}
               crossoverFrequency={80}
-              modeFrequencies={[]}
-              showModeMarkers={true}
+              showModeMarkers={showRoomModes}
               modeMarkers={modeMarkersForGraph}
+              protectedNullAnnotations={protectedNullAnnotations}
               linearHzAxis={false}
               rewStyleMode={true}
               yDomain={graphScaleMode === 'rew_fixed' ? [70, 140] : undefined}
@@ -718,6 +701,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             </div>
           )}
         </div>
+        <ProtectedNullNotice annotations={protectedNullAnnotations} />
 
         {/* Displayed smoothing label */}
         <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
@@ -768,11 +752,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           </label>
         </div>}
 
-        {includeDiagnostics && <ModalResonanceLineToggles
+        <ModalResonanceLineToggles
+          show={showRoomModes}
+          onShowChange={setShowRoomModes}
           toggles={modalLineToggles}
           onToggle={toggleModalLine}
-          onSetAll={setAllModalLines}
-        />}
+        />
       </div>
 
       {/* ── Active Q Strategy Label (debug mode only) ── */}

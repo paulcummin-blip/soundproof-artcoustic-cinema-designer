@@ -64,6 +64,7 @@ export function rankingTupleForMode(candidate, mode) {
     lowerScore(candidate?.houseCurveRankingMaxResidualDb ?? candidate?.rspObjectiveMaxDeviationDb),
     lowerScore(candidate?.houseCurveRankingRmsResidualDb ?? candidate?.rspRmsResidualDb),
     lowerScore(candidate?.houseCurveRankingMeanAbsoluteResidualDb ?? candidate?.rspMeanAbsoluteResidualDb),
+    lowerScore(eqCost(candidate)),
   ];
   if (canonicalMode === BASS_PRIORITY_MODES.DEPTH) return [
     p18, lowerScore(candidate?.achievedP18FrequencyHz), Math.min(p14, p19),

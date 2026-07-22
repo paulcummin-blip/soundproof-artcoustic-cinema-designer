@@ -1,6 +1,8 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { mergeBassGraphSeries } from '@/components/room/bass/bassGraphSeriesAlignment';
+import BassModeMarkers from '@/components/room/bass/BassModeMarkers';
+import ProtectedNullOverlay from '@/components/room/bass/ProtectedNullOverlay';
 
 const hasFiniteValue = (value) =>
   value !== null &&
@@ -68,9 +70,9 @@ export default function BassGraph({
   rp22Levels = [], 
   toggles = {}, 
   crossoverFrequency = 80,
-  modeFrequencies = [],
   showModeMarkers = false,
   modeMarkers = { axial: [], tangential: [], oblique: [] },
+  protectedNullAnnotations = [],
   linearHzAxis = false,
   rewStyleMode = false,
   yDomain,
@@ -373,86 +375,6 @@ export default function BassGraph({
     }
     const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${_rowCount}|${renderToken}|${_splSample}`;
 
-    // Render mode markers with hover tooltips (REW parity overlay)
-    const renderModeMarkers = () => {
-        if (!showModeMarkers) return null;
-
-        const hasMarkers = normalizedMarkers.axial.length > 0 || 
-                          normalizedMarkers.tangential.length > 0 || 
-                          normalizedMarkers.oblique.length > 0;
-
-        if (!hasMarkers) return null;
-
-        return (
-            <>
-                {/* Axial modes (stronger style) */}
-                {normalizedMarkers.axial.map((marker, i) => {
-                    if (!Number.isFinite(marker.fHz)) return null;
-
-                    const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
-                    const label = marker.axisLabel 
-                        ? `axial [${marker.axisLabel}] ${modeStr} ${marker.fHz.toFixed(1)} Hz`
-                        : `axial ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
-
-                    return (
-                        <ReferenceLine 
-                            key={`mode-axial-${i}`}
-                            x={marker.fHz}
-                            stroke="#8B7F76"
-                            strokeWidth={1.5}
-                            strokeDasharray="3 3"
-                            opacity={0.7}
-                        >
-                            <title>{label}</title>
-                        </ReferenceLine>
-                    );
-                })}
-
-                {/* Tangential modes (lighter style) */}
-                {normalizedMarkers.tangential.map((marker, i) => {
-                    if (!Number.isFinite(marker.fHz)) return null;
-
-                    const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
-                    const label = `tangential ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
-
-                    return (
-                        <ReferenceLine 
-                            key={`mode-tangential-${i}`}
-                            x={marker.fHz}
-                            stroke="#C1B6AD"
-                            strokeWidth={1.0}
-                            strokeDasharray="2 2"
-                            opacity={0.4}
-                        >
-                            <title>{label}</title>
-                        </ReferenceLine>
-                    );
-                })}
-
-                {/* Oblique modes (lightest style) */}
-                {normalizedMarkers.oblique.map((marker, i) => {
-                    if (!Number.isFinite(marker.fHz)) return null;
-
-                    const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
-                    const label = `oblique ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
-
-                    return (
-                        <ReferenceLine 
-                            key={`mode-oblique-${i}`}
-                            x={marker.fHz}
-                            stroke="#DCDBD6"
-                            strokeWidth={0.8}
-                            strokeDasharray="1 1"
-                            opacity={0.3}
-                        >
-                            <title>{label}</title>
-                        </ReferenceLine>
-                    );
-                })}
-            </>
-        );
-    };
-
     return (
         <div className="w-full h-[575px]">
             {rewStyleMode && (
@@ -518,20 +440,8 @@ export default function BassGraph({
                         />
                     )}
 
-                    {/* REW-style mode markers (prefer detailed modeMarkers data) */}
-                    {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && renderModeMarkers()}
-                    
-                    {/* Legacy mode markers (fallback to modeFrequencies array) */}
-                    {showModeMarkers && normalizedMarkers.axial.length === 0 && modeFrequencies.length > 0 && modeFrequencies.map((freq, i) => (
-                      <ReferenceLine 
-                        key={`mode-legacy-${i}`}
-                        x={freq} 
-                        stroke="#DCDBD6" 
-                        strokeWidth={1}
-                        strokeDasharray="1 2"
-                        opacity={0.3}
-                      />
-                    ))}
+                    <ProtectedNullOverlay annotations={protectedNullAnnotations} />
+                    {showModeMarkers && <BassModeMarkers markers={normalizedMarkers} />}
 
                     {/* REW mode: multi-series or single trace */}
                     {rewStyleMode && isMulti && multiSeries.map((s) => (
@@ -608,13 +518,6 @@ export default function BassGraph({
                           />
                     )}
                     
-                    {/* Mode line legend (REW style) */}
-                    {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && (
-                        <text x={60} y={20} fontSize={10} fill="#3E4349" className="font-body">
-                            Modes: Axial (━━) Tangential (- -) Oblique (···)
-                        </text>
-                    )}
-
                     {/* Schroeder frequency header label (top-right) */}
                     {schroederFrequency > 0 && Number.isFinite(schroederFrequency) && (
                         <text
