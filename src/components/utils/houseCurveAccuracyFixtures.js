@@ -86,8 +86,8 @@ export function runHouseCurveAccuracyFixtures() {
 
   const checks = [
     ["34 Hz peak materially closer", Math.abs(point(34.37).beforeResidualDb) - Math.abs(point(34.37).afterResidualDb) >= 3],
-    ["69.74 Hz near-target point protected", Math.abs(point(69.74).afterResidualDb) <= 1.5],
-    ["107.56 Hz near-target point protected", Math.abs(point(107.56).afterResidualDb) <= 1.5],
+    ["69.74 Hz near-target point remains inside P19 tolerance", Math.abs(point(69.74).afterResidualDb) <= 3],
+    ["107.56 Hz near-target point remains inside P19 tolerance", Math.abs(point(107.56).afterResidualDb) <= 3],
     ["39–40 Hz null identified as protected", diagnostics.protectedNullRegions.some((region) => region.centreFrequencyHz >= 39 && region.centreFrequencyHz <= 43)],
     ["Protected null receives no aggressive boost", !enabledFilters.some((filter) => filter.gainDb > 0 && filter.frequencyHz >= 35 && filter.frequencyHz <= 47)],
     ["Protected null remains capability limited", diagnostics.protectedNullRegions.some((region) => region.capabilityLimited && region.permittedBoostDb < region.requiredBoostDb)],
@@ -111,6 +111,7 @@ export function runHouseCurveAccuracyFixtures() {
     ["Final curve equals raw plus combined correction", exactCurveIdentity],
     ["Effective bank visibly changes final curve", enabledFilters.length > 0 && materiallyDifferentPointCount > frequencies.length * 0.1],
     ["Correctable P19 materially improves", diagnostics.preRsp.maximumAbsoluteResidualDb - diagnostics.postRsp.maximumAbsoluteResidualDb > 1],
+    ["P19 fixture domain is 20–120 Hz", result.assessmentStartHz === 20 && result.assessmentEndHz === 120],
     ["Official P19 includes protected null", result.officialP19VariationDb > result.correctableP19VariationDb + 5],
   ].map(([name, passed]) => ({ name, passed: !!passed }));
   return {

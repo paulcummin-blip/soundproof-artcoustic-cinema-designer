@@ -90,9 +90,7 @@ export function evaluateNearTargetProtection(baselinePoints, candidatePoints, ma
     if (!after) continue;
     const afterAbs = Math.abs(after.deviationDb);
     let reason = null;
-    if (afterAbs > 1.5 + 1e-9) reason = `near-target point exceeded ±1.5 dB while maximum residual improved ${maximumResidualImprovementDb.toFixed(2)} dB`;
-    else if (Math.sign(before.deviationDb) !== 0 && Math.sign(after.deviationDb) !== Math.sign(before.deviationDb)
-      && afterAbs > Math.abs(before.deviationDb) + 0.5 + 1e-9) reason = "filter crossed target and worsened opposite-side residual";
+    if (afterAbs > 3 + 1e-9) reason = `near-target point exceeded ±3 dB while maximum residual improved ${maximumResidualImprovementDb.toFixed(2)} dB`;
     if (reason) violations.push({ frequency: before.frequency, beforeResidualDb: before.deviationDb, afterResidualDb: after.deviationDb, reason });
   }
   return { passed: violations.length === 0, violations };

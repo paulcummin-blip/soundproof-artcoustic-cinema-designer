@@ -14,7 +14,7 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
   const maximumCutDb = profile.maximumCutDb;
   const maximumAggregateBoostDb = profile.maximumAggregateBoostDb;
   const requestedGainDb = isPeak
-    ? -Math.min(maximumCutDb, Math.abs(requiredAtCentreDb) * 0.85)
+    ? -Math.min(maximumCutDb, Math.abs(requiredAtCentreDb))
     : Math.min(maximumAggregateBoostDb, Math.max(0, requiredAtCentreDb) * 0.75);
   const correctionSign = Math.sign(requiredAtCentreDb);
   const baseCandidate = limitBoostForCapability({
@@ -25,7 +25,7 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
   }, activeSubs, usableLfHz, requestedSystemOutputDb);
   const productLimited = Math.abs(baseCandidate.gainDb) <= 0.1;
   const gainScales = [1, 0.75, 0.5];
-  const rawQValues = [baseCandidate.Q * 0.65, baseCandidate.Q, 4, 8, 10];
+  const rawQValues = [baseCandidate.Q * 0.65, baseCandidate.Q, 4, 5, 6, 7, 8, 10];
   const qValues = [...new Map(rawQValues.map((q) => {
     const value = Math.max(0.5, Math.min(10, q));
     return [value.toFixed(4), value];

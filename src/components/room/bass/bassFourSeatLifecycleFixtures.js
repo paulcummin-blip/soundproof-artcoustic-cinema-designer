@@ -114,7 +114,17 @@ export function runFourSeatBassLifecycleFixture() {
   const markerImprovements = Object.fromEntries([78, 100, 120].map((frequency) => [frequency,
     residualMagnitudeAt(rawCurve, frequency) - residualMagnitudeAt(candidate.finalPostEqCurve, frequency)
   ]));
-  const correctionAt40Hz = interpolateCanonicalTarget(candidate?.combinedEqCurve, 40);
+  const correctionAtFrequencies = Object.fromEntries([34, 40, 78, 100, 120].map((frequency) => [
+    frequency, interpolateCanonicalTarget(candidate?.combinedEqCurve, frequency),
+  ]));
+  const correctionAt40Hz = correctionAtFrequencies[40];
+  const remainingResidual = candidate?.houseCurveDiagnostics?.remainingWorstCorrectableResidual ?? null;
+  const permittedLimitProven = ["cut-limited", "boost-limited", "product-limited"].includes(remainingResidual?.limitingClassification)
+    && Number.isFinite(remainingResidual?.frequencyHz)
+    && Number.isFinite(remainingResidual?.signedResidualDb)
+    && Number.isFinite(remainingResidual?.requiredCorrectionDb)
+    && Number.isFinite(remainingResidual?.appliedCorrectionDb)
+    && !!remainingResidual?.anotherLegalFilterRejectedBecause;
   const elapsedMs = performance.now() - startedAt;
   const checks = [
     ["Production splConfig has no targetSpl", !("targetSpl" in splConfig) && requested.requestedTargetAnchorDb === null],
@@ -135,6 +145,8 @@ export function runFourSeatBassLifecycleFixture() {
     ["Protected 40 Hz null receives no material boost", correctionAt40Hz <= 0.25],
     ["Aggregate correction stays within -15/+6 dB", Math.min(...correctionValues) >= -15.05 && Math.max(...correctionValues) <= 6.05],
     ["Correctable maximum and RMS materially improve", candidate?.houseCurveDiagnostics?.preRsp?.maximumAbsoluteResidualDb - candidate?.houseCurveDiagnostics?.postRsp?.maximumAbsoluteResidualDb > 3 && candidate?.houseCurveDiagnostics?.preRsp?.rmsResidualDb - candidate?.houseCurveDiagnostics?.postRsp?.rmsResidualDb > 0.5],
+    ["P19 is assessed over 20–120 Hz", candidate?.assessmentStartHz === 20 && candidate?.assessmentEndHz === 120 && candidate?.correctionStartHz === 20 && candidate?.correctionEndHz === 200],
+    ["Correctable P19 reaches ±3 dB or proves a permitted physical limit", candidate?.correctableP19VariationDb <= 3 || permittedLimitProven],
     ["Enabled bank changes the final curve", enabledFilters.length > 0 && correctionValues.some((value) => Math.abs(value) >= 0.5)],
     ["Official P19 retains protected nulls", candidate?.officialP19VariationDb > candidate?.correctableP19VariationDb],
     ["Completed pool passes result validation", validation.valid],
@@ -173,7 +185,11 @@ export function runFourSeatBassLifecycleFixture() {
       aggregateMaximumCutDb: Math.min(0, ...correctionValues),
       aggregateMaximumBoostDb: Math.max(0, ...correctionValues),
       markerImprovements,
+      correctionAtFrequencies,
       correctionAt40Hz,
+      remainingWorstCorrectableResidual: remainingResidual,
+      assessmentDomainHz: { start: candidate?.assessmentStartHz ?? null, end: candidate?.assessmentEndHz ?? null },
+      correctionDomainHz: { start: candidate?.correctionStartHz ?? null, end: candidate?.correctionEndHz ?? null },
       graphAuthorityExact: exactGraphAuthority && graphSeriesAuthorityExact,
       rawSeriesExact: JSON.stringify(graphRaw) === JSON.stringify(rawCurve),
       postEqSeriesExact: JSON.stringify(graphPostEq) === JSON.stringify(candidate?.finalPostEqCurve),

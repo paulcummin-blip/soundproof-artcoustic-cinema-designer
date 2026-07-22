@@ -17,6 +17,18 @@ function localShoulderLevel(points, frequency) {
 }
 
 export function deriveResponseAnchoredTarget({ rawCurve, usableLfHz = null, startHz = 20, endHz = 200 }) {
+  const rawPoints = (rawCurve || [])
+    .map((point) => ({ frequency: Number(point?.frequency), spl: Number(point?.spl) }))
+    .filter((point) => Number.isFinite(point.frequency) && Number.isFinite(point.spl))
+    .sort((a, b) => a.frequency - b.frequency);
+  const sharpPeakFrequencies = rawPoints.filter((point) => {
+    const left = rawPoints.filter((candidate) => candidate.frequency >= point.frequency / 2 ** (1 / 12)
+      && candidate.frequency <= point.frequency / 2 ** (1 / 48));
+    const right = rawPoints.filter((candidate) => candidate.frequency >= point.frequency * 2 ** (1 / 48)
+      && candidate.frequency <= point.frequency * 2 ** (1 / 12));
+    const shoulder = median([...left, ...right].map((candidate) => candidate.spl));
+    return Number.isFinite(shoulder) && point.spl - shoulder >= 8;
+  }).map((point) => point.frequency);
   const smoothed = applyBassSmoothing(rawCurve, "third")
     .map((point) => ({ frequency: Number(point?.frequency), spl: Number(point?.spl) }))
     .filter((point) => Number.isFinite(point.frequency) && Number.isFinite(point.spl))
@@ -27,10 +39,11 @@ export function deriveResponseAnchoredTarget({ rawCurve, usableLfHz = null, star
   const lowerHz = Math.max(startHz, availableStartHz, Number.isFinite(Number(usableLfHz)) ? Number(usableLfHz) : startHz);
   const upperHz = Math.min(endHz, availableEndHz);
   const eligible = smoothed.filter((point) => point.frequency >= lowerHz && point.frequency <= upperHz)
+    .filter((point) => !sharpPeakFrequencies.some((frequency) => Math.abs(Math.log2(point.frequency / frequency)) <= 1 / 12))
     .filter((point) => {
       const shoulderLevel = localShoulderLevel(smoothed, point.frequency);
       if (!Number.isFinite(shoulderLevel)) return true;
-      return shoulderLevel - point.spl < 10 && point.spl - shoulderLevel < 6;
+      return shoulderLevel - point.spl < 10 && point.spl - shoulderLevel < 4;
     });
   if (!eligible.length) return null;
   const samples = eligible.map((point, index) => {

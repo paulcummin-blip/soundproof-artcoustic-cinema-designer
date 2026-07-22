@@ -388,8 +388,10 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     candidates.push(candidate);
   };
   for (const request of requests) {
-    const assessmentStartHz = domains.correctionStartHz;
-    const assessmentEndHz = domains.correctionEndHz;
+    const assessmentStartHz = domains.p19StartHz;
+    const assessmentEndHz = domains.p19EndHz;
+    const correctionStartHz = domains.correctionStartHz;
+    const correctionEndHz = domains.correctionEndHz;
     const requestCapabilityTargetDb = request.p14.p14TargetDb;
     // Standard fit — generated first so its enabled filter bank can seed the
     // Accuracy fit. The seed guarantees the Accuracy result retains or improves
@@ -397,7 +399,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     taskIndex++;
     report("Core EQ fitting", taskIndex);
     const standardCacheKey = [
-      responseTargetAnchorDb, requestCapabilityTargetDb, assessmentStartHz, assessmentEndHz,
+      responseTargetAnchorDb, requestCapabilityTargetDb, correctionStartHz, correctionEndHz,
       "standard", DESIGN_EQ_FIT_PROFILES.standard.fittingToleranceDb,
       DESIGN_EQ_FIT_PROFILES.standard.maximumCutDb,
       DESIGN_EQ_FIT_PROFILES.standard.maximumAggregateBoostDb,
@@ -412,7 +414,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
         canonicalTargetCurve,
         protectedNullRegions,
         targetToleranceDb: request.p19.p19ToleranceDb,
-        fitProfile: "standard", assessmentStartHz, assessmentEndHz, collectDiagnostics,
+        fitProfile: "standard", assessmentStartHz: correctionStartHz, assessmentEndHz: correctionEndHz, collectDiagnostics,
       });
       coreFitTimeMs += perf() - fitStart;
       totalCompletedBankEvaluations += standardEq.bankDiagnostics?.completedBankEvaluationCount || 0;
@@ -430,7 +432,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     const standardSeedFilters = (standardEq.filters || []).filter((f) => f && f.enabled);
     const seedSignature = standardSeedFilters.map((f) => `${f.frequencyHz}:${f.gainDb}:${f.Q}`).join(",");
     const accuracyCacheKey = [
-      responseTargetAnchorDb, requestCapabilityTargetDb, assessmentStartHz, assessmentEndHz,
+      responseTargetAnchorDb, requestCapabilityTargetDb, correctionStartHz, correctionEndHz,
       "accuracy", DESIGN_EQ_FIT_PROFILES.accuracy.fittingToleranceDb,
       DESIGN_EQ_FIT_PROFILES.accuracy.maximumCutDb,
       DESIGN_EQ_FIT_PROFILES.accuracy.maximumAggregateBoostDb,
@@ -445,7 +447,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
         canonicalTargetCurve,
         protectedNullRegions,
         targetToleranceDb: request.p19.p19ToleranceDb,
-        fitProfile: "accuracy", assessmentStartHz, assessmentEndHz, collectDiagnostics,
+        fitProfile: "accuracy", assessmentStartHz: correctionStartHz, assessmentEndHz: correctionEndHz, collectDiagnostics,
         initialFilters: standardSeedFilters,
       });
       coreFitTimeMs += perf() - fitStart;
@@ -462,7 +464,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     taskIndex++;
     report("House-curve multi-start fits", taskIndex);
     const houseCurveCacheKey = [
-      responseTargetAnchorDb, requestCapabilityTargetDb, assessmentStartHz, assessmentEndHz,
+      responseTargetAnchorDb, requestCapabilityTargetDb, assessmentStartHz, assessmentEndHz, correctionStartHz, correctionEndHz,
       "house_curve", `seed:${seedSignature}`,
     ].join(":");
     let houseCurveEq = coreFitCache.get(houseCurveCacheKey);
@@ -474,7 +476,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
         canonicalTargetCurve,
         protectedNullRegions,
         targetToleranceDb: request.p19.p19ToleranceDb,
-        assessmentStartHz, assessmentEndHz, collectDiagnostics,
+        assessmentStartHz, assessmentEndHz, correctionStartHz, correctionEndHz, collectDiagnostics,
         initialFilters: standardSeedFilters,
         reuseExactEvaluations: reuseExactHouseCurveEvaluations,
       });

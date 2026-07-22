@@ -250,10 +250,41 @@ function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEnd
         const targetSpl = interpolateCanonicalTarget(canonicalTargetCurve, p.frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(p.frequency));
         return { ...p, targetSpl, deviationDb: p.spl - targetSpl };
       });
-    const regions = [
-      ...findRegions(trendPoints, "peak", peakThresholdDb, valleyThresholdDb),
-      ...findRegions(trendPoints, "valley", peakThresholdDb, valleyThresholdDb),
-    ];
+    const unprotectedSegments = [];
+    let currentSegment = [];
+    for (const point of trendPoints) {
+      if (isProtectedFrequency(point.frequency, protectedNullRegions)) {
+        if (currentSegment.length) unprotectedSegments.push(currentSegment);
+        currentSegment = [];
+      } else {
+        currentSegment.push(point);
+      }
+    }
+    if (currentSegment.length) unprotectedSegments.push(currentSegment);
+    const regions = unprotectedSegments.flatMap((segment) => {
+      const discovered = [
+        ...findRegions(segment, "peak", peakThresholdDb, valleyThresholdDb),
+        ...findRegions(segment, "valley", peakThresholdDb, valleyThresholdDb),
+      ];
+      if (!segment.length) return discovered;
+      const worstPoint = segment.reduce((worst, point) => Math.abs(point.deviationDb) > Math.abs(worst.deviationDb) ? point : worst);
+      const candidatePoints = [worstPoint, segment[0], segment.at(-1)].filter((point, index, values) =>
+        values.findIndex((candidate) => candidate.frequency === point.frequency) === index);
+      for (const candidatePoint of candidatePoints) {
+        const thresholdDb = candidatePoint.deviationDb >= 0 ? peakThresholdDb : valleyThresholdDb;
+        const represented = discovered.some((region) => Math.abs(Math.log2(region.centrePoint.frequency / candidatePoint.frequency)) <= 1 / 24);
+        if (!represented && Math.abs(candidatePoint.deviationDb) >= thresholdDb) {
+          discovered.push({
+            kind: candidatePoint.deviationDb >= 0 ? "peak" : "valley",
+            startHz: candidatePoint.frequency / 2 ** (1 / 12),
+            endHz: candidatePoint.frequency * 2 ** (1 / 12),
+            centrePoint: candidatePoint,
+            severityDb: Math.abs(candidatePoint.deviationDb),
+          });
+        }
+      }
+      return discovered;
+    });
     for (const region of regions) allRegions.push({ ...region, seatId: seat.seatId });
   }
   allRegions.sort((a, b) => b.severityDb - a.severityDb);
@@ -326,6 +357,8 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const maxOperations = 30;
   const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : null;
+  const correctionStartHz = Number.isFinite(Number(options.correctionStartHz)) ? Number(options.correctionStartHz) : assessmentStartHz;
+  const correctionEndHz = Number.isFinite(Number(options.correctionEndHz)) ? Number(options.correctionEndHz) : assessmentEndHz;
 
   const operationCounts = {
     curveEvaluationRequests: 0,
@@ -387,7 +420,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const trace = [];
 
   while (operations < maxOperations) {
-    const regions = findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions, canonicalTargetCurve);
+    const regions = findAllResidualRegions(seats, filters, correctionStartHz, correctionEndHz, anchorDb, peakThresholdDb, valleyThresholdDb, operationCounts, memo, protectedNullRegions, canonicalTargetCurve);
     if (!regions.length) { stopReason = "no residual regions found"; break; }
 
     const iterationEntry = {
@@ -479,10 +512,12 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         const requiredAtCentre = requiredCorrectionDb(region.centrePoint.targetSpl, region.centrePoint.spl);
         const appliedStepAtCentre = trialEqAtCentre - currentEqAtCentre;
         const directionPass = Math.abs(requiredAtCentre) <= 0.05 || requiredAtCentre * appliedStepAtCentre > 0;
+        const maxImprovementDb = currentMetrics.rspMaxDeviationDb - trialMetrics.rspMaxDeviationDb;
         const rmsImproved = trialMetrics.rspRmsDeviationDb < currentMetrics.rspRmsDeviationDb - RMS_EPSILON_DB;
         const maxProtected = trialMetrics.rspMaxDeviationDb <= currentMetrics.rspMaxDeviationDb + WORST_EQUIV_DB;
-        if (!directionPass || !rmsImproved || !maxProtected || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
-          trialEntry.rejectionReason = !directionPass ? "correction direction opposed target-minus-current residual" : !rmsImproved ? "weighted RMS did not improve" : !maxProtected ? "maximum correctable deviation increased" : "not strictly better than current";
+        const objectiveImproved = maxImprovementDb > WORST_EQUIV_DB || (maxProtected && rmsImproved);
+        if (!directionPass || !objectiveImproved || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
+          trialEntry.rejectionReason = !directionPass ? "correction direction opposed target-minus-current residual" : !maxProtected ? "maximum correctable deviation increased" : !rmsImproved && maxImprovementDb <= WORST_EQUIV_DB ? "neither maximum residual nor weighted RMS improved" : "not strictly better than current";
           iterationEntry.trials.push(trialEntry);
           continue;
         }
@@ -494,7 +529,6 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           iterationEntry.trials.push(trialEntry);
           continue;
         }
-        const maxImprovementDb = currentMetrics.rspMaxDeviationDb - trialMetrics.rspMaxDeviationDb;
         const nearTarget = evaluateNearTargetProtection(baselineRspPoints, trialMetrics.rspResidualPoints, maxImprovementDb, protectedNullRegions);
         if (!nearTarget.passed) {
           operationCounts.nearTargetProtectionRejections++;
