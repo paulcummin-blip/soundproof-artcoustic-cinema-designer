@@ -1,20 +1,22 @@
 // Shared Phase 4 lifecycle for the existing detailed product-aware optimiser worker.
 // The controller owns scheduling, race rejection and the bounded memory cache;
 // acoustic calculation and candidate selection remain in their existing modules.
-import { BASS_OPTIMISER_POOL_PROPERTY } from "./bassOptimiserWorkerProtocol";
 import {
-  BASS_RESULT_SCHEMA_VERSION,
-  HOUSE_CURVE_ENGINE_VERSION,
-  validateCachedBassResult,
-} from "./bassResultAuthority";
+  BASS_OPTIMISER_POOL_PROPERTY,
+  BASS_OPTIMISER_VERSIONS,
+  bassOptimiserVersionSignature,
+  describeOptimiserCompatibility,
+  validateOptimiserVersions,
+} from "./bassOptimiserWorkerProtocol";
+import { validateCachedBassResult } from "./bassResultAuthority";
 
-export const BASS_BACKGROUND_SCHEMA_VERSION = BASS_RESULT_SCHEMA_VERSION;
+export const BASS_BACKGROUND_SCHEMA_VERSION = bassOptimiserVersionSignature();
 export const BASS_BACKGROUND_DEBOUNCE_MS = 1000;
 export const BASS_BACKGROUND_CACHE_LIMIT = 3;
 export const BASS_HEARTBEAT_STALL_MS = 15000;
 export const BASS_TERMINAL_WATCHDOG_MS = 180000;
 
-const IDENTITY_FIELDS = ["fingerprint", "geometryFingerprint", "productFingerprint", "calibrationFingerprint", "engineVersion", "resultSchemaVersion", "canonicalPriorityMode"];
+const IDENTITY_FIELDS = ["fingerprint", "geometryFingerprint", "productFingerprint", "calibrationFingerprint", "protocolVersion", "poolVersion", "engineVersion", "resultSchemaVersion", "canonicalPriorityMode"];
 const identityMismatch = (requested, returned) => IDENTITY_FIELDS.find((field) => requested?.[field] !== returned?.[field]) || null;
 
 const nowDefault = () => Date.now();
@@ -67,10 +69,10 @@ export class BassAnalysisLruCache {
       this.entries.delete(fingerprint);
       return { result: null, status: "rejected-stale", reason: "cache-schema-version-mismatch" };
     }
-    const validation = validator ? validator(entry.result) : { valid: true };
+    const validation = validator ? validator(entry.result, { fingerprint }) : { valid: true };
     if (!validation.valid) {
       this.entries.delete(fingerprint);
-      return { result: null, status: "rejected-stale", reason: validation.reason || "incompatible-result" };
+      return { result: null, status: "rejected-stale", reason: validation.message || validation.reason || "incompatible-result" };
     }
     this.entries.delete(fingerprint);
     this.entries.set(fingerprint, entry);
@@ -106,6 +108,7 @@ export class BassBackgroundAnalysisController {
     this.activeRequest = null;
     this.pending = null;
     this.requestSequence = 0;
+    this.protocolSignature = bassOptimiserVersionSignature();
   }
 
   getSnapshot = () => this.state;
@@ -152,6 +155,16 @@ export class BassBackgroundAnalysisController {
     this.clearQueuedTimer();
     if (this.activeRequest) this.stage(`Job ${outcome}`, { jobId: this.activeRequest.requestId, terminalOutcome: outcome });
     this.terminateWorker();
+  }
+  ensureProtocolCompatibility(versions = BASS_OPTIMISER_VERSIONS) {
+    const nextSignature = bassOptimiserVersionSignature(versions);
+    if (this.protocolSignature === nextSignature) return false;
+    this.protocolSignature = nextSignature;
+    this.cancelActive("protocol-replaced");
+    this.cache.clear();
+    this.pending = null;
+    this.emit({ ...createBackgroundState(), replacementRunCount: 0 });
+    return true;
   }
 
   updateInputs({ valid, fingerprint, legacyFingerprint = null, payload, identity = null, collectDiagnostics = false }) {
@@ -253,7 +266,7 @@ export class BassBackgroundAnalysisController {
       worker.onmessage = (event) => this.handleWorkerMessage(event?.data || {});
       worker.onerror = (event) => this.handleWorkerError(event?.message || "Worker error", requestId, pending.fingerprint);
       worker.onmessageerror = () => this.handleWorkerError("Worker message could not be decoded", requestId, pending.fingerprint);
-      worker.postMessage({ requestId, fingerprint: pending.fingerprint, identity: pending.identity, payload: pending.payload, collectDiagnostics: !!pending.collectDiagnostics, dispatchedAtMs: this.now() });
+      worker.postMessage({ requestId, fingerprint: pending.fingerprint, identity: pending.identity, ...BASS_OPTIMISER_VERSIONS, payload: pending.payload, collectDiagnostics: !!pending.collectDiagnostics, dispatchedAtMs: this.now() });
       this.stage("Worker request posted", { jobId: requestId });
       this.armHeartbeatTimer(requestId);
       this.terminalTimer = this.setTimer(() => this.handleWorkerError(`Bass analysis watchdog expired at: ${this.state.progressStage || "unknown stage"}`, requestId, pending.fingerprint), BASS_TERMINAL_WATCHDOG_MS);
@@ -266,6 +279,8 @@ export class BassBackgroundAnalysisController {
     const active = this.activeRequest;
     if (!active || message.requestId !== active.requestId) return false;
     if (message.fingerprint !== active.fingerprint) return this.handleIdentityMismatch(active, message, "fingerprint");
+    const envelopeCompatibility = validateOptimiserVersions(message, BASS_OPTIMISER_VERSIONS);
+    if (!envelopeCompatibility.valid) return this.handleCompatibilityMismatch(active, message, envelopeCompatibility.message);
     const mismatch = identityMismatch(active.identity, message.identity);
     if (mismatch) return this.handleIdentityMismatch(active, message, mismatch);
     if (message.type === "progress") {
@@ -279,21 +294,19 @@ export class BassBackgroundAnalysisController {
     if (message.type !== "complete") return false;
     if (active.fingerprint !== this.state.currentCalibrationFingerprint) return this.handleIdentityMismatch(active, message, "currentCalibrationFingerprint");
     const completedAtMs = this.now();
-    const returnedIdentity = message.identity || active.identity || {
-      fingerprint: active.fingerprint,
-      calibrationFingerprint: active.fingerprint,
-      engineVersion: HOUSE_CURVE_ENGINE_VERSION,
-      resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
-    };
+    const returnedIdentity = message.identity || active.identity;
     const result = {
       pool: message[BASS_OPTIMISER_POOL_PROPERTY], identity: returnedIdentity,
-      calibrationFingerprint: returnedIdentity.calibrationFingerprint,
-      engineVersion: returnedIdentity.engineVersion,
-      resultSchemaVersion: returnedIdentity.resultSchemaVersion,
+      calibrationFingerprint: returnedIdentity?.calibrationFingerprint,
+      fingerprint: message.fingerprint,
+      protocolVersion: message.protocolVersion,
+      poolVersion: message.poolVersion,
+      engineVersion: message.engineVersion,
+      resultSchemaVersion: message.resultSchemaVersion,
       calculationTimeMs: completedAtMs - active.startedAtMs, completedAtMs,
     };
-    const validation = validateCachedBassResult(result);
-    if (!validation.valid) return this.handleWorkerError(`Rejected incompatible optimiser result: ${validation.reason}`, active.requestId, active.fingerprint);
+    const validation = validateCachedBassResult(result, { fingerprint: active.fingerprint });
+    if (!validation.valid) return this.handleCompatibilityMismatch(active, message, `Rejected incompatible optimiser result: ${validation.message || validation.reason}`);
     this.stage("Main thread received result", { jobId: active.requestId });
     this.stage("Fingerprint validated", { jobId: active.requestId });
     this.cache.set(active.fingerprint, result);
@@ -312,12 +325,18 @@ export class BassBackgroundAnalysisController {
   }
 
   handleIdentityMismatch(active, message, field) {
-    const reason = `Returned result identity mismatch: ${field} (request=${active.identity?.[field] ?? active.fingerprint}, result=${message.identity?.[field] ?? message.fingerprint})`;
+    const expected = { ...BASS_OPTIMISER_VERSIONS, fingerprint: active.fingerprint };
+    const actual = { ...message, fingerprint: message.fingerprint };
+    const reason = `Returned result identity mismatch: ${field}; ${describeOptimiserCompatibility(expected, actual, "identity-mismatch")}`;
+    return this.handleCompatibilityMismatch(active, message, reason, field);
+  }
+  handleCompatibilityMismatch(active, message, reason, field = "worker-handshake") {
     const replacementRunCount = this.state.replacementRunCount || 0;
     this.stage("Job superseded", { jobId: active.requestId, field, terminalOutcome: "superseded" });
+    this.cache.entries.delete(active.fingerprint);
     this.terminateWorker();
     if (replacementRunCount < 1 && this.pending) {
-      this.emit({ terminalOutcome: "superseded", errorMessage: reason, replacementRunCount: 1, workerStatus: "replacing" });
+      this.emit({ status: "calculating", terminalOutcome: "superseded", errorMessage: reason, replacementRunCount: 1, workerStatus: "replacing", result: null, resultFingerprint: null });
       this.startPending();
     } else {
       this.pending = null;
@@ -354,7 +373,10 @@ export class BassBackgroundAnalysisController {
   }
 }
 
-export const createOptimiserWorker = () => new Worker(new URL("../../utils/bassOptimiser.worker.js", import.meta.url), { type: "module" });
+export const createOptimiserWorker = () => new Worker(new URL("../../utils/bassOptimiser.worker.js", import.meta.url), {
+  type: "module",
+  name: bassOptimiserVersionSignature(),
+});
 export function createBassBackgroundAnalysisStore() {
   return new BassBackgroundAnalysisController({ workerFactory: createOptimiserWorker });
 }

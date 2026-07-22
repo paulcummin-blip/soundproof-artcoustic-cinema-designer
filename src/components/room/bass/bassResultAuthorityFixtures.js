@@ -1,4 +1,6 @@
 import {
+  BASS_OPTIMISER_POOL_VERSION,
+  BASS_OPTIMISER_PROTOCOL_VERSION,
   BASS_RESULT_SCHEMA_VERSION,
   HOUSE_CURVE_ENGINE_VERSION,
   buildBassResultCacheKey,
@@ -49,7 +51,7 @@ export function runBassResultAuthorityFixtures() {
   const house = candidate("house_curve", "multi-start", 2.1, 1.1, [{ enabled: true, frequencyHz: 34, gainDb: -12, Q: 8 }]);
   const accuracy = candidate("accuracy", "single", 3.4, 1.8);
   const pool = stampPoolAuthority({ candidates: [legacyCandidate, accuracy, house], selectablePool: [legacyCandidate, accuracy, house] });
-  const currentResult = { engineVersion: HOUSE_CURVE_ENGINE_VERSION, resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION, pool };
+  const currentResult = { protocolVersion: BASS_OPTIMISER_PROTOCOL_VERSION, poolVersion: BASS_OPTIMISER_POOL_VERSION, engineVersion: HOUSE_CURVE_ENGINE_VERSION, resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION, pool };
   check("Current pool contains compatible house-curve candidate", validateCachedBassResult(currentResult).valid);
   const ranked = rankBassCandidates(pool.selectablePool, "house_curve_accuracy");
   check("Canonical house-curve ranking runs", ranked.selected?.candidateId === house.candidateId);

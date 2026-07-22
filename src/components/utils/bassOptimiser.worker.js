@@ -7,19 +7,19 @@
 
 import { generateCandidatePool } from "./bassOperatingEnvelopeOptimiser";
 import {
+  BASS_OPTIMISER_VERSIONS,
   createCompleteMessage,
   createErrorMessage,
   createProgressMessage,
+  validateOptimiserVersions,
 } from "../room/bass/bassOptimiserWorkerProtocol";
-import { BASS_RESULT_SCHEMA_VERSION, HOUSE_CURVE_ENGINE_VERSION } from "../room/bass/bassResultAuthority";
 
 self.onmessage = (e) => {
   const { requestId, fingerprint, payload, collectDiagnostics, dispatchedAtMs, identity: requestedIdentity } = e.data || {};
   const workerStartupTimeMs = Number.isFinite(dispatchedAtMs) ? Math.max(0, Date.now() - dispatchedAtMs) : 0;
   const identity = {
     ...(requestedIdentity || {}), fingerprint,
-    engineVersion: HOUSE_CURVE_ENGINE_VERSION,
-    resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
+    ...BASS_OPTIMISER_VERSIONS,
   };
 
   if (!requestId || !fingerprint) {
@@ -33,8 +33,8 @@ self.onmessage = (e) => {
   }
 
   try {
-    if (requestedIdentity?.engineVersion !== HOUSE_CURVE_ENGINE_VERSION) throw new Error(`Worker engine-version mismatch: requested ${requestedIdentity?.engineVersion || "missing"}, worker ${HOUSE_CURVE_ENGINE_VERSION}`);
-    if (requestedIdentity?.resultSchemaVersion !== BASS_RESULT_SCHEMA_VERSION) throw new Error(`Worker result-schema mismatch: requested ${requestedIdentity?.resultSchemaVersion ?? "missing"}, worker ${BASS_RESULT_SCHEMA_VERSION}`);
+    const requestCompatibility = validateOptimiserVersions(e.data, BASS_OPTIMISER_VERSIONS);
+    if (!requestCompatibility.valid) throw new Error(`Worker request incompatible: ${requestCompatibility.message}`);
     self.postMessage(createProgressMessage(requestId, fingerprint, { phase: "Worker request received" }, identity));
     const pool = generateCandidatePool({
       rawCurve: payload?.rawCurve || [],

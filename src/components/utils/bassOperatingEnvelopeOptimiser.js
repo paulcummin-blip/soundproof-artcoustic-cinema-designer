@@ -9,6 +9,7 @@ import { retargetCandidateForRequest } from "@/components/utils/bassCandidateReq
 import { summarizeCoreOperations } from "@/components/utils/bassOptimiserPerformance";
 import { annotateCandidatePoolForHouseCurveRanking } from "@/components/utils/houseCurveCandidateRankingMetrics";
 import { stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
+import { BASS_OPTIMISER_POOL_VERSION } from "@/components/room/bass/bassOptimiserWorkerProtocol";
 import { displayBassCandidates, isPhysicallyCredibleBassCandidate } from "@/components/utils/bassCandidatePoolEligibility";
 import { buildCanonicalAbsoluteHouseCurveTarget, interpolateCanonicalTarget, resolveHouseCurveDomains } from "@/components/utils/houseCurveTargetAuthority";
 
@@ -302,11 +303,12 @@ const FIT_PROFILES_TO_GENERATE = [
 ];
 
 export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, correctionEndHz = 200, targetAnchorDb = null, targetAnchorSource = null, perSeatRawCurves = [], collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
-  if (!rawCurve.length || !activeSubs.length || !Number.isFinite(targetAnchorDb)) return {
+  if (!rawCurve.length || !activeSubs.length || !Number.isFinite(targetAnchorDb)) return stampPoolAuthority({
+    poolVersion: BASS_OPTIMISER_POOL_VERSION,
     candidates: [], selectablePool: [], definitions: null, performanceSummary: null, poolId: null,
     generatedCandidateCount: 0, physicallyCredibleCount: 0, requestedEnvelopeValidCount: 0,
     standardFitCount: 0, accuracyFitCount: 0, warningMessage: "A raw response curve and active subwoofer system are required.",
-  };
+  });
   const perf = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => Date.now();
   const t0 = perf();
   const preparationStart = perf();
@@ -463,6 +465,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   const t1 = perf();
   const poolId = `${rawCurve.length}:${activeSubs.length}:${usableLfHz}:${transitionHz}:${correctionEndHz}:${targetAnchorDb}:${perSeatRawCurves.length}:${t0}`;
   return stampPoolAuthority({
+    poolVersion: BASS_OPTIMISER_POOL_VERSION,
     candidates: rankedCandidates,
     selectablePool: rankedSelectablePool,
     definitions,

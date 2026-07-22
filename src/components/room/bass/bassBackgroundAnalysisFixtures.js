@@ -8,6 +8,7 @@ import { buildBassResultCacheKey, stampPoolAuthority } from "./bassResultAuthori
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import {
   BASS_OPTIMISER_POOL_PROPERTY,
+  BASS_OPTIMISER_VERSIONS,
   createCompleteMessage,
   createErrorMessage,
   createProgressMessage,
@@ -25,7 +26,7 @@ class FakeWorker {
   constructor(registry) { this.registry = registry; this.terminated = false; registry.push(this); }
   postMessage(message) { this.message = message; }
   terminate() { this.terminated = true; }
-  send(type, data = {}) { this.onmessage?.({ data: { type, requestId: this.message.requestId, fingerprint: this.message.fingerprint, identity: this.message.identity || null, ...data } }); }
+  send(type, data = {}) { this.onmessage?.({ data: { type, requestId: this.message.requestId, fingerprint: this.message.fingerprint, identity: this.message.identity || null, ...BASS_OPTIMISER_VERSIONS, ...data } }); }
   fail(message = "Worker exception") { this.onerror?.({ message }); }
   messageFail() { this.onmessageerror?.({}); }
 }
@@ -35,8 +36,8 @@ function validInput(fingerprint = "cal:v1:0000000000000001") {
     valid: true, fingerprint,
     identity: {
       fingerprint, geometryFingerprint: "geo:v1:0000000000000001", productFingerprint: "prod:v1:0000000000000001",
-      calibrationFingerprint: fingerprint, engineVersion: "house-curve-rsp-v2-minus15-plus6",
-      resultSchemaVersion: 2, canonicalPriorityMode: "all-canonical-priorities", poolId: null,
+      calibrationFingerprint: fingerprint, ...BASS_OPTIMISER_VERSIONS,
+      canonicalPriorityMode: "all-canonical-priorities", poolId: null,
     },
     payload: { rawCurve: [{ frequency: 20, spl: 100 }], activeSubs: [{ modelKey: "sub2-12" }] },
   };
@@ -165,6 +166,7 @@ export function runBassBackgroundAnalysisFixtures() {
     const h = harness();
     const legacyFingerprint = validInput().fingerprint;
     h.cache.set(legacyFingerprint, {
+      ...BASS_OPTIMISER_VERSIONS,
       engineVersion: "legacy-minus10-single", resultSchemaVersion: 1,
       pool: { candidates: [], selectablePool: [] },
     });
@@ -173,7 +175,7 @@ export function runBassBackgroundAnalysisFixtures() {
     check("35. Legacy minus-10 single-start cache is rejected and recalculation queued",
       h.controller.getSnapshot().status === "queued"
       && h.controller.getSnapshot().cacheStatus === "rejected-stale"
-      && h.controller.getSnapshot().cacheRejectionReason === "engine-version-mismatch");
+      && h.controller.getSnapshot().cacheRejectionReason.includes("engine-version-mismatch"));
     h.clock.tick(1000);
     completeCurrent(h);
     h.controller.updateInputs({ ...validInput(fingerprint), legacyFingerprint });

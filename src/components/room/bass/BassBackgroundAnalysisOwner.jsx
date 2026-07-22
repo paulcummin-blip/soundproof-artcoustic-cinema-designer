@@ -5,11 +5,10 @@ import { useAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
 import { createBassBackgroundAnalysisStore } from "./bassBackgroundAnalysisStore";
 import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
-import {
-  BASS_RESULT_SCHEMA_VERSION,
-  HOUSE_CURVE_ENGINE_VERSION,
-  buildBassResultCacheKey,
-} from "./bassResultAuthority";
+import { buildBassResultCacheKey } from "./bassResultAuthority";
+import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
+
+const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -18,7 +17,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const appState = useAppState();
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
-  if (!controllerRef.current) controllerRef.current = createBassBackgroundAnalysisStore();
+  const retainedController = controllerRef.current;
+  if (!retainedController
+    || typeof retainedController.ensureProtocolCompatibility !== "function"
+    || retainedController.protocolSignature !== OPTIMISER_VERSION_SIGNATURE) {
+    retainedController?.dispose?.();
+    controllerRef.current = createBassBackgroundAnalysisStore();
+  }
   if (!scopeRef.current) scopeRef.current = createBassResultsScope(scopeId);
   const controller = controllerRef.current;
   const lifecycle = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
@@ -33,18 +38,18 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     fingerprints, payload, inputsValid, includeDiagnostics,
   } = authoritative;
 
-  const cacheKey = useMemo(() => buildBassResultCacheKey(fingerprints.calibration), [fingerprints.calibration]);
+  const cacheKey = useMemo(() => buildBassResultCacheKey(fingerprints.calibration), [fingerprints.calibration, OPTIMISER_VERSION_SIGNATURE]);
   const requestIdentity = useMemo(() => ({
     fingerprint: cacheKey,
     geometryFingerprint: fingerprints.geometry,
     productFingerprint: fingerprints.product,
     calibrationFingerprint: fingerprints.calibration,
-    engineVersion: HOUSE_CURVE_ENGINE_VERSION,
-    resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
+    ...BASS_OPTIMISER_VERSIONS,
     canonicalPriorityMode: "all-canonical-priorities",
     poolId: null,
-  }), [cacheKey, fingerprints.geometry, fingerprints.product, fingerprints.calibration]);
+  }), [cacheKey, fingerprints.geometry, fingerprints.product, fingerprints.calibration, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => {
+    controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
     controller.updateInputs({
       valid: inputsValid,
       fingerprint: cacheKey,
@@ -53,7 +58,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       identity: requestIdentity,
       collectDiagnostics: includeDiagnostics,
     });
-  }, [controller, inputsValid, cacheKey, fingerprints.calibration, payload, requestIdentity, includeDiagnostics]);
+  }, [controller, inputsValid, cacheKey, fingerprints.calibration, payload, requestIdentity, includeDiagnostics, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
@@ -74,8 +79,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     if (!selected) return null;
     return {
       ...selected,
-      engineVersion: HOUSE_CURVE_ENGINE_VERSION,
-      resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
+      ...BASS_OPTIMISER_VERSIONS,
       cacheKey,
       cacheSource: lifecycle.cacheRejectionReason ? "rejected-stale" : lifecycle.cacheStatus === "hit" ? "restored" : "fresh",
       cacheRejectionReason: lifecycle.cacheRejectionReason || null,

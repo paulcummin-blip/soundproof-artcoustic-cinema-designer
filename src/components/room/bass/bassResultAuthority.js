@@ -1,5 +1,19 @@
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-canonical-target-v3";
-export const BASS_RESULT_SCHEMA_VERSION = 2;
+import {
+  BASS_OPTIMISER_POOL_VERSION,
+  BASS_OPTIMISER_PROTOCOL_VERSION,
+  BASS_OPTIMISER_VERSIONS,
+  BASS_RESULT_SCHEMA_VERSION,
+  HOUSE_CURVE_ENGINE_VERSION,
+  describeOptimiserCompatibility,
+  validateOptimiserVersions,
+} from "./bassOptimiserWorkerProtocol";
+
+export {
+  BASS_OPTIMISER_POOL_VERSION,
+  BASS_OPTIMISER_PROTOCOL_VERSION,
+  BASS_RESULT_SCHEMA_VERSION,
+  HOUSE_CURVE_ENGINE_VERSION,
+};
 export const HOUSE_CURVE_LIMITS = Object.freeze({ maximumCutDb: 15, maximumAggregateBoostDb: 6 });
 
 function hashText(value) {
@@ -47,6 +61,8 @@ export function buildBassResultCacheKey(calibrationFingerprint) {
   return [
     calibrationFingerprint || "cal:none",
     "mode:all-canonical-priorities",
+    `protocol:${BASS_OPTIMISER_PROTOCOL_VERSION}`,
+    `pool:${BASS_OPTIMISER_POOL_VERSION}`,
     `engine:${HOUSE_CURVE_ENGINE_VERSION}`,
     `result-schema:${BASS_RESULT_SCHEMA_VERSION}`,
   ].join("|");
@@ -75,18 +91,42 @@ export function stampPoolAuthority(pool) {
     ...pool,
     candidates,
     selectablePool,
-    engineVersion: HOUSE_CURVE_ENGINE_VERSION,
-    resultSchemaVersion: BASS_RESULT_SCHEMA_VERSION,
+    ...BASS_OPTIMISER_VERSIONS,
   };
 }
 
-export function validateCachedBassResult(result) {
-  if (!result) return { valid: false, reason: "missing-result" };
-  if (result.engineVersion !== HOUSE_CURVE_ENGINE_VERSION) return { valid: false, reason: "engine-version-mismatch" };
-  if (result.resultSchemaVersion !== BASS_RESULT_SCHEMA_VERSION) return { valid: false, reason: "result-schema-version-mismatch" };
+export function validateCachedBassResult(result, expectedIdentity = {}) {
+  const expected = { ...BASS_OPTIMISER_VERSIONS, fingerprint: expectedIdentity?.fingerprint ?? null };
+  const actual = {
+    protocolVersion: result?.protocolVersion,
+    poolVersion: result?.poolVersion,
+    engineVersion: result?.engineVersion,
+    resultSchemaVersion: result?.resultSchemaVersion,
+    fingerprint: result?.fingerprint ?? result?.identity?.fingerprint ?? null,
+  };
+  if (!result) return { valid: false, reason: "missing-result", message: describeOptimiserCompatibility(expected, actual, "missing-result") };
+  const resultVersions = validateOptimiserVersions(actual, expected);
+  if (!resultVersions.valid) {
+    const reason = resultVersions.field === "engineVersion" ? "engine-version-mismatch"
+      : resultVersions.field === "resultSchemaVersion" ? "result-schema-version-mismatch"
+      : resultVersions.field === "poolVersion" ? "pool-version-mismatch"
+      : "protocol-version-mismatch";
+    return { valid: false, reason, message: describeOptimiserCompatibility(expected, actual, reason), expected, actual };
+  }
+  if (expected.fingerprint && actual.fingerprint !== expected.fingerprint) {
+    return { valid: false, reason: "fingerprint-mismatch", message: describeOptimiserCompatibility(expected, actual, "fingerprint-mismatch"), expected, actual };
+  }
   const pool = result.pool;
-  if (!pool || pool.engineVersion !== HOUSE_CURVE_ENGINE_VERSION || pool.resultSchemaVersion !== BASS_RESULT_SCHEMA_VERSION) {
-    return { valid: false, reason: "pool-version-mismatch" };
+  const poolActual = {
+    protocolVersion: pool?.protocolVersion,
+    poolVersion: pool?.poolVersion,
+    engineVersion: pool?.engineVersion,
+    resultSchemaVersion: pool?.resultSchemaVersion,
+    fingerprint: actual.fingerprint,
+  };
+  const poolVersions = validateOptimiserVersions(poolActual, expected);
+  if (!pool || !poolVersions.valid) {
+    return { valid: false, reason: "pool-version-mismatch", message: describeOptimiserCompatibility(expected, poolActual, "pool-version-mismatch"), expected, actual: poolActual };
   }
   const candidates = Array.isArray(pool.candidates) ? pool.candidates : [];
   if (candidates.some((candidate) => candidate.filterBankSignature !== buildFilterBankSignature(candidate))) {
