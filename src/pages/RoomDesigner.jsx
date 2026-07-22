@@ -213,6 +213,13 @@ function RoomDesignerWithState() {
   const _sevenBedLayoutType = appState?.sevenBedLayoutType;
   const _overlays = appState?.overlays;
   const _setOverlays = appState?.setOverlays;
+  const speakerPositionsView = ['off', 'plan', 'table', 'both'].includes(_overlays?.SPEAKER_POSITIONS_VIEW)
+    ? _overlays.SPEAKER_POSITIONS_VIEW
+    : 'off';
+  const setSpeakerPositionsView = useCallback((nextView) => {
+    if (!_setOverlays || !['off', 'plan', 'table', 'both'].includes(nextView)) return;
+    _setOverlays((previous) => ({ ...(previous || {}), SPEAKER_POSITIONS_VIEW: nextView }));
+  }, [_setOverlays]);
   const _frontSubsCfg = appState?.frontSubsCfg;
   const _rearSubsCfg = appState?.rearSubsCfg;
   const setSubwoofers = appState?.setSubwoofers;
@@ -286,7 +293,6 @@ function RoomDesignerWithState() {
   // NEW: Options panel state
   const [showPrices, setShowPrices] = useState(false);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
-  const [speakerPositionsView, setSpeakerPositionsView] = React.useState('off'); // 'off' | 'plan' | 'table' | 'both'
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("summary");

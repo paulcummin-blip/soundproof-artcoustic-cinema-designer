@@ -2,6 +2,7 @@ import React from "react";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/components/AppStateProvider";
+import SpeakerPositionsControl from "@/components/room/SpeakerPositionsControl";
 
 const roundToCm = (num) => {
   if (!Number.isFinite(num)) return null;
@@ -27,7 +28,7 @@ const formatDimension = (value) => {
   return fixed.replace(/\.?0+$/, '');
 };
 
-export default function RoomDimensions({ disabled }) {
+export default function RoomDimensions({ disabled, speakerPositionsView, onSpeakerPositionsViewChange }) {
   const { roomDims, setRoomWidthM, setRoomLengthM, setRoomHeightM, overlays, setOverlays } = useAppState();
 
   const [draftDims, setDraftDims] = React.useState(() => ({
@@ -197,6 +198,11 @@ export default function RoomDimensions({ disabled }) {
           />
         </button>
       </div>
+
+      <SpeakerPositionsControl
+        value={speakerPositionsView}
+        onChange={onSpeakerPositionsViewChange}
+      />
 
       {roomDims.widthM > 0 && roomDims.lengthM > 0 && roomDims.heightM > 0 && (
         <p className="text-xs text-gray-500 italic mt-2">
