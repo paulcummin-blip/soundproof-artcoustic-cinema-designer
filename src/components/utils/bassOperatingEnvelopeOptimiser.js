@@ -1,5 +1,6 @@
 import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
-import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, computeParam20SeatConsistency, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
+import { computeParam14LfeCapability, computeParam18BassExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
+import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { CANONICAL_BASS_PRIORITY_MODES, normalizeBassPriorityMode, rankBassCandidates } from "@/components/utils/bassPriorityPolicies";
@@ -91,11 +92,11 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   const rspMeanSignedResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + value, 0) / rspResiduals.length : null;
   const rspMeanAbsoluteResidualDb = rspResiduals.length ? rspResiduals.reduce((sum, value) => sum + Math.abs(value), 0) / rspResiduals.length : null;
   const rspShapeRmsResidualDb = rspResiduals.length ? Math.sqrt(rspResiduals.reduce((sum, value) => sum + (value - rspMeanSignedResidualDb) ** 2, 0) / rspResiduals.length) : null;
-  const p19 = computeP19DeviationBelowSchroeder({
-    freqsHz: assessedCurve.map((point) => point.frequency),
-    splDb: assessedCurve.map((point) => point.spl),
-    targetDb: assessedCurve.map((point) => interpolateCanonicalTarget(productionHouseCurveTarget, point.frequency)),
-    schroederHz: assessmentEndHz,
+  const officialP19 = computeOfficialP19Assessment({
+    rspPostEqCurve: finalPostEqCurve,
+    canonicalTargetCurve: productionHouseCurveTarget,
+    assessmentStartHz,
+    assessmentEndHz,
   });
   const correctableAssessedCurve = assessedCurve.filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
   const correctableP19 = computeP19DeviationBelowSchroeder({
@@ -113,7 +114,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   const achievedP14Level = levelFromValue(achievedP14Db, definitions, "p14TargetDb");
   const achievedP18FrequencyHz = p18?.value ?? null;
   const achievedP18Level = Number(String(p18?.level || "").replace("L", "")) || 0;
-  const achievedP19VariationDb = p19?.resultDb ?? null;
+  const achievedP19VariationDb = officialP19.variationDbRaw;
   const achievedP19Level = levelFromValue(achievedP19VariationDb, definitions, "p19ToleranceDb", true);
   const meetsRequestedEnvelope = achievedP14Level >= request.p14.value && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
   const rejectionReason = [
@@ -195,24 +196,18 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
         allOk: eq.bankDiagnostics?.selectedBankLimits?.allOk ?? null,
       };
 
-  // P20 seat consistency reuses the authoritative grader. It is N/A with
-  // fewer than two real seats and has an L1 floor for every finite result.
-  let achievedP20Level = 0;
-  let achievedP20VariationDb = null;
-  let worstP20SeatId = null;
-  let p20Available = false;
-  const p20 = computeParam20SeatConsistency({
-    rspResponse: finalPostEqCurve,
-    perSeatResponses: perSeatPostEqCurves,
-    transitionHz: assessmentEndHz,
-    rspSeatId: "rsp",
+  // P20 reporting compares each non-RSP seat with the authoritative RSP curve.
+  // It does not use the target curve or protected-null exclusions.
+  const p20 = computeOfficialP20Assessment({
+    rspPostEqCurve: finalPostEqCurve,
+    perSeatPostEqCurves,
+    assessmentStartHz,
+    assessmentEndHz,
   });
-  if (p20) {
-    p20Available = true;
-    achievedP20VariationDb = p20.worstSeatDeviationDb ?? null;
-    worstP20SeatId = p20.worstSeatId ?? null;
-    achievedP20Level = p20.worstSeatLevel ?? 0;
-  }
+  const achievedP20Level = p20.worstSeat?.level ?? 0;
+  const achievedP20VariationDb = p20.worstSeat?.variationDbRaw ?? null;
+  const worstP20SeatId = p20.worstSeat?.seatId ?? null;
+  const p20Available = p20.available;
 
   return {
     requestedP14Level: request.p14.level,
@@ -243,7 +238,10 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     achievedP19VariationDb,
     achievedP19Level,
     officialP19VariationDb: achievedP19VariationDb,
+    officialP19WorstFrequencyHz: officialP19.worstFrequencyHz,
+    officialP19Label: officialP19.label,
     correctableP19VariationDb: correctableP19?.resultDb ?? null,
+    correctableP19Label: "Correctable P19 — optimiser diagnostic",
     protectedNullRegions: (protectedNullRegions || []).map((region) => ({ ...region })),
     rspObjectiveMaxDeviationDb: eq.rspObjectiveMaxDeviationDb ?? achievedP19VariationDb,
     rspRmsResidualDb: eq.rspRmsDeviationDb ?? rspRmsResidualDb,
@@ -287,6 +285,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     achievedP20VariationDb,
     worstP20SeatId,
     p20Available,
+    perSeatP20Results: p20.perSeatResults,
+    p20Label: p20.label,
     perSeatPostEqCurves,
     // Uniform seat metrics — calculated identically for every profile (Standard,
     // Accuracy, house-curve) from perSeatPostEqCurves using the same 1/3-octave
@@ -626,6 +626,17 @@ export function selectCandidateFromPool(pool, priorityMode) {
     achievedP19VariationDb: selected.achievedP19VariationDb,
     officialP19VariationDb: selected.officialP19VariationDb,
     correctableP19VariationDb: selected.correctableP19VariationDb,
+    achievedP20Level: selected.achievedP20Level,
+    achievedP20VariationDb: selected.achievedP20VariationDb,
+    worstP20SeatId: selected.worstP20SeatId,
+    perSeatP20Results: selected.perSeatP20Results,
+    assessmentAuthority: {
+      candidateId: selected.candidateId,
+      graphCandidateId: selected.candidateId,
+      filterBankCandidateId: selected.candidateId,
+      p19CandidateId: selected.candidateId,
+      p20CandidateIds: (selected.perSeatP20Results || []).map(() => selected.candidateId),
+    },
     // Part F: Surface the selected candidate's fit profile for the validation panel.
     selectedFitProfile: selected.designEqFitProfile || "standard",
     selectedFitProfileConfig: selected.designEqFitProfileConfig || null,

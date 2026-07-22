@@ -66,7 +66,8 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
         ? levelP20_lfConsistency(c.achievedP20VariationDb).level
         : "N/A";
       return <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
-        <span>Official P19 (RSP): {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
+        <span>P19 RSP: {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
+        <span>Correctable P19 — optimiser diagnostic: ±{fmt(c.correctableP19VariationDb, " dB")}</span>
         <span>Worst-seat house-curve deviation (P19-equivalent): {seatLevel} (±{fmt(c.worstRealSeatHouseCurveVariationDb, " dB")}) @ {c.worstRealSeatHouseCurveSeatId || "—"}</span>
         <span>P20: {p20Text}{c.p20Available ? ` (${formatP20Deviation(c.achievedP20VariationDb)}) @ ${c.worstP20SeatId || "—"}` : ""}</span>
       </div>;

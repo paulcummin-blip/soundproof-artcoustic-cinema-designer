@@ -125,6 +125,8 @@ function buildCandidateRef(candidate) {
     correctableP19VariationDb: Number.isFinite(candidate.correctableP19VariationDb) ? candidate.correctableP19VariationDb : null,
     achievedP20Level: p20Level,
     achievedP20VariationDb: p20Value,
+    worstP20SeatId: candidate.worstP20SeatId ?? null,
+    perSeatP20Results: Array.isArray(candidate.perSeatP20Results) ? candidate.perSeatP20Results.map((seat) => ({ ...seat })) : [],
     p20Available: !!candidate.p20Available,
     perSeatDiagnostics: (Array.isArray(candidate.perSeatMetrics) ? candidate.perSeatMetrics : []).map((seat) => ({
       seatId: seat?.seatId ?? null,

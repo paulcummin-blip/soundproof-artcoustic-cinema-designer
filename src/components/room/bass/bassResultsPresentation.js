@@ -29,8 +29,17 @@ export function formatBassParameterValue(key, value) {
   return `${number.toFixed(1)} dB`;
 }
 
-function readyPill(key, parameter) {
-  const label = key.toUpperCase();
+function parameterLabel(key, result) {
+  if (key === "p19") return "P19 RSP";
+  if (key === "p20") {
+    const seatId = result?.selectedCandidate?.worstP20SeatId;
+    return `P20 worst seat${seatId ? ` (${seatId})` : ""}`;
+  }
+  return key.toUpperCase();
+}
+
+function readyPill(key, parameter, result) {
+  const label = parameterLabel(key, result);
   if (parameter?.status === "not_applicable") return { text: `${label} N/A`, level: "N/A" };
   if (parameter?.status === "error") return { text: `${label} error`, level: "—" };
   if (parameter?.level == null) return { text: `${label} —`, level: "—" };
@@ -49,21 +58,13 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
   const isReady = ["ready", "complete"].includes(status) && readyMatchesCurrent(result);
   const parameters = result?.productAnalysis?.parameters || {};
   const pills = Object.fromEntries(PARAM_KEYS.map((key) => {
-    if (isQueued) return [key, { text: `${key.toUpperCase()} Queued`, level: "—" }];
-    if (isUpdating) return [key, { text: `${key.toUpperCase()} Updating · ${elapsedSeconds} s`, level: "—" }];
-    if (status === "error") return [key, { text: `${key.toUpperCase()} error`, level: "—" }];
-    if (!isReady) return [key, { text: `${key.toUpperCase()} —`, level: "—" }];
-    return [key, readyPill(key, parameters[key])];
+    const label = parameterLabel(key, result);
+    if (isQueued) return [key, { text: `${label} Queued`, level: "—" }];
+    if (isUpdating) return [key, { text: `${label} Updating · ${elapsedSeconds} s`, level: "—" }];
+    if (status === "error") return [key, { text: `${label} error`, level: "—" }];
+    if (!isReady) return [key, { text: `${label} —`, level: "—" }];
+    return [key, readyPill(key, parameters[key], result)];
   }));
-
-  const isRsp = !seatId || seatId === "rsp" || seatId === "mlp";
-  if (isReady && !isRsp) {
-    const seat = result?.selectedCandidate?.perSeatDiagnostics?.find((item) => String(item.seatId) === String(seatId));
-    const seatDeviation = formatBassParameterValue("p19", seat?.maxAbsDeviationDb);
-    pills.p19 = seatDeviation
-      ? { text: `Target · ${seatDeviation}`, level: "—", diagnostic: true }
-      : { text: "Target · —", level: "—", diagnostic: true };
-  }
 
   let statusText = "Waiting for complete design";
   if (isQueued) statusText = "Analysis queued";
