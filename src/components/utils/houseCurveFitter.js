@@ -95,6 +95,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 120;
+  const fitStartHz = Number.isFinite(Number(options.fitStartHz)) ? Number(options.fitStartHz) : 20;
+  const fitEndHz = Number.isFinite(Number(options.fitEndHz)) ? Number(options.fitEndHz) : 200;
   const correctionStartHz = Number.isFinite(Number(options.correctionStartHz)) ? Number(options.correctionStartHz) : 20;
   const correctionEndHz = Number.isFinite(Number(options.correctionEndHz)) ? Number(options.correctionEndHz) : 200;
   const anchorDb = Number.isFinite(Number(options.targetAnchorDb)) ? Number(options.targetAnchorDb) : 0;
@@ -124,10 +126,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
     : null;
   const evaluationOptions = { reuseExactEvaluations, memo: evaluationMemo, preparedBankValidation, protectedNullRegions, canonicalTargetCurve, correctionStartHz, correctionEndHz };
-  const startA = runSingleStart([], objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
+  const startA = runSingleStart([], objectiveSeats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
   let startB = startA;
   if (standardSeedFilters.length > 0) {
-    startB = runSingleStart(standardSeedFilters, objectiveSeats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
+    startB = runSingleStart(standardSeedFilters, objectiveSeats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationOptions);
   }
 
   // Select the start with the best RSP maximum residual, then RSP RMS.
@@ -149,13 +151,26 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   let blockedResiduals = selected.blockedResiduals;
   let bankEvalCount = selected.bankEvalCount;
   let operations = selected.operations;
-  const pairedRefinement = refineOpposingResidualPair({
-    filters, metrics: finalMetrics, seats: objectiveSeats, bankRaw,
-    assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz,
-    requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve,
-  });
-  bankEvalCount += pairedRefinement.bankEvaluationCount;
-  if (pairedRefinement.changed) {
+  const pairedSeatBaselineMetrics = finalMetrics;
+  const baselineP14L1 = Number.isFinite(selected.baselineRspMinimumSplDb) && selected.baselineRspMinimumSplDb >= 114;
+  const correctableP19FromFitMetrics = (metrics) => {
+    const points = (metrics?.rspResidualPoints || []).filter((point) => point.frequency >= assessmentStartHz
+      && point.frequency <= assessmentEndHz
+      && !protectedNullRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz));
+    return points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : null;
+  };
+  for (let refinementPass = 0; refinementPass < 2; refinementPass++) {
+    if (correctableP19FromFitMetrics(finalMetrics) <= 3) break;
+    const pairedRefinement = refineOpposingResidualPair({
+      filters, metrics: finalMetrics, seatBaselineMetrics: pairedSeatBaselineMetrics,
+      seats: objectiveSeats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz,
+      requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve, baselineP14L1,
+    });
+    bankEvalCount += pairedRefinement.bankEvaluationCount;
+    if (!pairedRefinement.changed) {
+      stopReason = `${stopReason}; paired refinement stopped: ${pairedRefinement.limitation}`;
+      break;
+    }
     filters = pairedRefinement.filters;
     finalMetrics = pairedRefinement.metrics;
     operations += 1;
@@ -172,7 +187,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const fallback = resolveFallback({
     selectedFilters: filters, standardSeedFilters, bankRaw, activeSubs,
     usableLfHz, requestedSystemOutputDb, profile, objectiveSeats,
-    assessmentStartHz, assessmentEndHz, anchorDb, protectedNullRegions, canonicalTargetCurve, bankEvalCount,
+    assessmentStartHz: fitStartHz, assessmentEndHz: fitEndHz,
+    anchorDb, protectedNullRegions, canonicalTargetCurve, bankEvalCount,
   });
   filters = fallback.filters;
   let finalBankLimits = fallback.finalBankLimits;
@@ -202,6 +218,27 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const rspCorrectableMaxDev = rspCorrectableAssessed.length
     ? Math.max(...rspCorrectableAssessed.map((point) => Math.abs(point.deviationDb)))
     : null;
+  const upperFitStats = (smoothedCurve) => {
+    const residuals = smoothedCurve
+      .filter((point) => point.frequency > assessmentEndHz && point.frequency <= fitEndHz)
+      .filter((point) => !protectedNullRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz))
+      .map((point) => point.spl - (interpolateCanonicalTarget(canonicalTargetCurve, point.frequency)
+        ?? (anchorDb + artcousticHouseCurveOffsetAt(point.frequency))))
+      .filter(Number.isFinite);
+    return residuals.length ? {
+      maximumAbsoluteResidualDb: Math.max(...residuals.map(Math.abs)),
+      rmsResidualDb: Math.sqrt(residuals.reduce((sum, value) => sum + value ** 2, 0) / residuals.length),
+    } : { maximumAbsoluteResidualDb: null, rmsResidualDb: null };
+  };
+  const upperFitPre = upperFitStats(applyBassSmoothing(rspRaw, "third"));
+  const upperFitPost = upperFitStats(rspSmoothed);
+  const upperFitCorrectableResidualExists = Number.isFinite(upperFitPre.maximumAbsoluteResidualDb) && upperFitPre.maximumAbsoluteResidualDb > 1;
+  const upperFitImproved = upperFitCorrectableResidualExists && (
+    (upperFitPost.maximumAbsoluteResidualDb < upperFitPre.maximumAbsoluteResidualDb - 0.05
+      && upperFitPost.rmsResidualDb <= upperFitPre.rmsResidualDb + 0.01)
+    || (upperFitPost.rmsResidualDb < upperFitPre.rmsResidualDb - 0.01
+      && upperFitPost.maximumAbsoluteResidualDb <= upperFitPre.maximumAbsoluteResidualDb + 0.05)
+  );
 
   const combinedEqCurve = rspRaw.map((p) => ({ frequency: p.frequency, spl: filters.reduce((sum, f) => sum + peakingEqResponseDb(p.frequency, f), 0) }));
   const curve = rspRaw.map((p, i) => ({ frequency: p.frequency, spl: p.spl + combinedEqCurve[i].spl }));
@@ -236,7 +273,9 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     ? Math.max(0, Number(boostAllowance.allowedBoostDb) - Math.max(0, appliedCorrectionAtWorstDb || 0))
     : null;
   let remainingResidualLimit = "none";
-  if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb < 0 && finalBankLimits.maxAggregateCutDb <= -14.95) remainingResidualLimit = "cut-limited";
+  const remainingAggregateCutHeadroomDb = Math.max(0, 15 + finalBankLimits.maxAggregateCutDb);
+  if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb < 0
+    && Math.abs(requiredCorrectionAtWorstDb) > remainingAggregateCutHeadroomDb + 0.05) remainingResidualLimit = "cut-limited";
   else if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0 && finalBankLimits.maxAggregateBoostDb >= 5.95) remainingResidualLimit = "boost-limited";
   else if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0
     && Number.isFinite(remainingProductBoostDb) && requiredCorrectionAtWorstDb > remainingProductBoostDb + 0.05
@@ -260,7 +299,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     filterCountLimited: remainingResidualLimit === "filter-count-limited",
     productPermittedTotalBoostDb: boostAllowance?.allowedBoostDb ?? null,
     productRemainingBoostDb: remainingProductBoostDb,
-    anotherLegalFilterRejectedBecause: nearestRejectedTrials.at(-1)?.rejectionReason ?? stopReason,
+    remainingAggregateCutHeadroomDb,
+    anotherLegalFilterRejectedBecause: remainingResidualLimit === "cut-limited"
+      ? `required additional cut ${Math.abs(requiredCorrectionAtWorstDb).toFixed(3)} dB exceeds remaining aggregate cut headroom ${remainingAggregateCutHeadroomDb.toFixed(3)} dB`
+      : nearestRejectedTrials.at(-1)?.rejectionReason ?? stopReason,
   };
 
   return {
@@ -285,6 +327,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     correctableP19VariationDb: rspCorrectableMaxDev,
     assessmentStartHz,
     assessmentEndHz,
+    fitStartHz,
+    fitEndHz,
     correctionStartHz,
     correctionEndHz,
     remainingWorstCorrectableResidual,
@@ -325,8 +369,18 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       correctableP19VariationDb: rspCorrectableMaxDev,
       assessmentStartHz,
       assessmentEndHz,
+      fitStartHz,
+      fitEndHz,
       correctionStartHz,
       correctionEndHz,
+      upperFitBandImprovement: {
+        startHz: assessmentEndHz,
+        endHz: fitEndHz,
+        correctableResidualExists: upperFitCorrectableResidualExists,
+        improved: upperFitImproved,
+        pre: upperFitPre,
+        post: upperFitPost,
+      },
       remainingWorstCorrectableResidual,
       postRsp: {
         maximumAbsoluteResidualDb: finalMetrics?.rspMaxDeviationDb ?? null,

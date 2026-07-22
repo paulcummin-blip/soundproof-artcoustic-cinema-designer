@@ -40,8 +40,18 @@ export function runProductionPathFixtures() {
     assessmentStartHz: 35, assessmentEndHz: 120,
     initialFilters: (standardEq.filters || []).filter((f) => f && f.enabled),
   });
-  const standardCand = buildCandidate({ request, rawCurve, activeSubs, usableLfHz: 35, transitionHz: 120, definitions, eqResult: standardEq, perSeatRawCurves });
-  const houseCurveCand = buildCandidate({ request, rawCurve, activeSubs, usableLfHz: 35, transitionHz: 120, definitions, eqResult: houseCurveEq, perSeatRawCurves });
+  const domains = { p19StartHz: 20, p19EndHz: 120, correctionStartHz: 20, correctionEndHz: 200 };
+  const canonicalTargetCurve = rawCurve.map((point) => ({
+    frequency: point.frequency,
+    spl: base.p14TargetDb + artcousticHouseCurveOffsetAt(point.frequency),
+  }));
+  const candidateInputs = {
+    request, rawCurve, activeSubs, usableLfHz: 35, definitions, perSeatRawCurves,
+    targetAnchorDb: base.p14TargetDb, targetAnchorSource: "fixture",
+    domains, canonicalTargetCurve, protectedNullRegions: [],
+  };
+  const standardCand = buildCandidate({ ...candidateInputs, eqResult: standardEq });
+  const houseCurveCand = buildCandidate({ ...candidateInputs, eqResult: houseCurveEq });
 
   // Both must have finite worst, mean and RMS values.
   results.productionStandardHasFiniteMetrics = Number.isFinite(standardCand.worstSeatMaxDeviationDb)
