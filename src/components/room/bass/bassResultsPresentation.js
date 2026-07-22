@@ -1,4 +1,5 @@
 import { formatP20Deviation } from "@/components/utils/rp22/levels";
+import { p20SummaryFromResults } from "@/components/room/bass/p20SeatPresentation";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 
@@ -41,6 +42,10 @@ function parameterLabel(key, result) {
 function readyPill(key, parameter, result) {
   const label = parameterLabel(key, result);
   if (parameter?.status === "not_applicable") return { text: `${label} N/A`, level: "N/A" };
+  if (key === "p20") {
+    const worst = p20SummaryFromResults(result?.selectedCandidate?.perSeatP20Results);
+    return worst ? { text: `P20 worst seat · ${worst.level} · ${worst.displayVariationDb}`, level: worst.level } : { text: "P20 worst seat —", level: "—" };
+  }
   if (parameter?.status === "error") return { text: `${label} error`, level: "—" };
   if (parameter?.level == null) return { text: `${label} —`, level: "—" };
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;

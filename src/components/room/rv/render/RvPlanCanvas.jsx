@@ -157,7 +157,6 @@ export default function RvPlanCanvas({
   // Hoisted here (component body) so useMemo follows Rules of Hooks.
   // subDragTick is a dependency so every drag tick forces re-read of the mutated draft refs.
   // Three-tier priority: active draft > held last-valid draft > committed state
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const frontLive = useMemo(() => {
     let subs;
     if (dragging && Array.isArray(draftFrontSubsRef.current)) {
@@ -177,9 +176,8 @@ export default function RvPlanCanvas({
       model: frontSubsCfg?.model,
       orientation: frontSubsCfg?.orientation ?? "vertical"
     })) : subs;
-  }, [dragging, draftFrontSubsRef, lastValidDraftFrontSubs, frontSubs, frontSubsCfg, subDragTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dragging, draftFrontSubsRef, lastValidDraftFrontSubs, frontSubs, frontSubsCfg, subDragTick]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const rearLive = useMemo(() => {
     let subs;
     if (dragging && Array.isArray(draftRearSubsRef.current)) {
@@ -198,7 +196,7 @@ export default function RvPlanCanvas({
       model: rearSubsCfg?.model,
       orientation: rearSubsCfg?.orientation ?? "vertical"
     })) : subs;
-  }, [dragging, draftRearSubsRef, lastValidDraftRearSubs, rearSubs, rearSubsCfg, subDragTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dragging, draftRearSubsRef, lastValidDraftRearSubs, rearSubs, rearSubsCfg, subDragTick]);
 
   return (
     <div
@@ -393,7 +391,7 @@ export default function RvPlanCanvas({
                   const dims = getModelDimsM?.(model) || {};
                   const dd = Number(dims?.depthM);
                   if (Number.isFinite(dd) && dd > 0) d = dd;
-                } catch (_) {}
+                } catch (_) { /* optional dimensions lookup */ }
                 const halfD = d / 2;
                 if (wall === "front") return halfD + EPS;
                 if (wall === "rear") return Math.max(halfD + EPS, lengthM_safe - halfD - EPS);
@@ -444,7 +442,7 @@ export default function RvPlanCanvas({
                       const handlePointerDown = (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+                        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* pointer capture is optional */ }
                         handleMouseDown(e, subId, "sub");
                       };
 
@@ -458,7 +456,7 @@ export default function RvPlanCanvas({
                       const handlePointerUp = (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+                        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { /* pointer capture is optional */ }
                         handleMouseUp(e);
                       };
 
@@ -649,6 +647,9 @@ export default function RvPlanCanvas({
           <SeatingDragImpactCard
             baseline={dragImpact.baseline}
             live={dragImpact.live}
+            seatingPositions={seatingPositions}
+            baselineP20Results={dragImpact.baselineP20Results}
+            currentP20Results={dragImpact.currentP20Results}
             mode={liveImpactMode}
             isPostDrag={isPostDrag}
             onAccept={onAcceptBaseline}

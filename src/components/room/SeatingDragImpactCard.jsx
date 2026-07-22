@@ -1,5 +1,7 @@
 import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
+import P20SeatBlock from '@/components/room/bass/P20SeatBlock';
+import { buildP20BeforeAfter } from '@/components/room/bass/p20SeatPresentation';
 
 const MAX_VISIBLE_ROWS = 5;
 
@@ -22,6 +24,7 @@ const PARAM_LABELS = {
   15: 'P15 Noise Floor',
   16: 'P16 LCR Off-axis HF',
   17: 'P17 Surround Off-axis HF',
+  20: 'P20 Bass Seat Consistency',
   23: 'RP23 Viewing Angle',
 };
 
@@ -91,6 +94,7 @@ function buildAllParamData(baseline, live) {
   for (const seat of [...bRp22seats, ...lRp22seats]) {
     Object.keys(seat.rp22 || {}).forEach(k => seatParamNums.add(Number(k)));
   }
+  seatParamNums.delete(20); // P20 uses selected-candidate authority below.
 
   for (const paramNum of seatParamNums) {
     if (rp22Count === 0) continue;
@@ -212,8 +216,8 @@ function ScopeBadge({ scope, changed, total }) {
   );
 }
 
-function ParamRow({ paramNum, baseLevels, liveLevels, scope, isLast }) {
-  const summary = buildChangeSummary(baseLevels, liveLevels);
+function ParamRow({ paramNum, baseLevels, liveLevels, scope, isLast, summaryOverride = null, beforeRows = null, afterRows = null }) {
+  const summary = summaryOverride || buildChangeSummary(baseLevels, liveLevels);
   if (summary.changed === 0) return null;
 
   return (
@@ -244,7 +248,7 @@ function ParamRow({ paramNum, baseLevels, liveLevels, scope, isLast }) {
             }}>
               Before
             </span>
-            <PillRow levels={baseLevels} />
+            {paramNum === 20 ? <P20SeatBlock rows={beforeRows} compact /> : <PillRow levels={baseLevels} />}
           </div>
 
           {/* AFTER row */}
@@ -256,7 +260,7 @@ function ParamRow({ paramNum, baseLevels, liveLevels, scope, isLast }) {
             }}>
               After
             </span>
-            <PillRow levels={liveLevels} />
+            {paramNum === 20 ? <P20SeatBlock rows={afterRows} compact /> : <PillRow levels={liveLevels} />}
           </div>
         </div>
 
@@ -326,10 +330,20 @@ function SummaryParamRow({ paramNum, summary, scope, isLast }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function SeatingDragImpactCard({ baseline, live, cardTitle, mode = "detailed", isPostDrag = false, onAccept, onDismiss }) {
+export default function SeatingDragImpactCard({ baseline, live, seatingPositions = [], baselineP20Results = [], currentP20Results = [], cardTitle, mode = "detailed", isPostDrag = false, onAccept, onDismiss }) {
   if (!baseline || !live) return null;
 
   const paramData = buildAllParamData(baseline, live);
+  const p20Comparison = buildP20BeforeAfter(seatingPositions, baselineP20Results, currentP20Results);
+  if (p20Comparison.seatsAffected > 0) paramData.push({
+    paramNum: 20,
+    baseLevels: p20Comparison.beforeRows.flatMap((row) => row.seats.map((seat) => seat.level)),
+    liveLevels: p20Comparison.afterRows.flatMap((row) => row.seats.map((seat) => seat.level)),
+    beforeRows: p20Comparison.beforeRows,
+    afterRows: p20Comparison.afterRows,
+    summary: p20Comparison.summary,
+    scope: 'seat',
+  });
   if (paramData.length === 0) return null;
 
   const visibleParams = paramData.slice(0, MAX_VISIBLE_ROWS);
@@ -365,9 +379,9 @@ export default function SeatingDragImpactCard({ baseline, live, cardTitle, mode 
 
       {/* Parameter rows */}
       {visibleParams.map((d, idx) => (
-        mode === "summary"
+        mode === "summary" && d.paramNum !== 20
           ? <SummaryParamRow key={d.paramNum} paramNum={d.paramNum} summary={d.summary} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
-          : <ParamRow key={d.paramNum} paramNum={d.paramNum} baseLevels={d.baseLevels} liveLevels={d.liveLevels} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
+          : <ParamRow key={d.paramNum} paramNum={d.paramNum} baseLevels={d.baseLevels} liveLevels={d.liveLevels} beforeRows={d.beforeRows} afterRows={d.afterRows} summaryOverride={d.summary} scope={d.scope} isLast={idx === visibleParams.length - 1 && hiddenCount === 0} />
       ))}
 
       {/* Overflow indicator */}

@@ -70,6 +70,7 @@ import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation"
 import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic";
 import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState";
 import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
+import { useLiveImpactBaseline } from "@/components/room/rv/hooks/useLiveImpactBaseline";
 import { rvIsOverheadRole, getByRoleArray } from "@/components/room/rv/utils/roomVisualisationUtils";
 
 // New RP22 seat metrics import
@@ -91,6 +92,7 @@ import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
 import { useTooltipData } from '@/components/room/hooks/useTooltipData';
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
+import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
 
 import {
   SIDE_ALLOW_OVERHANG,
@@ -195,6 +197,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   } = props;
 
   const appState = useAppState();
+  const sharedBassResults = useOptionalSharedBassResults();
+  const currentP20Results = sharedBassResults?.contract?.selectedCandidate?.perSeatP20Results || [];
   const widthM  = Number(appState?.roomDims?.widthM)  || 4.5;
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
@@ -1232,60 +1236,14 @@ const byId = useEntitiesById({
     visiblePlanSpeakers,
   });
 
-  // ── Universal drag impact baseline — captured at ANY Plan View drag start ─
-  // baselineRp22/baselineMlp: comparison reference only — NOT used for card visibility.
-  // showLiveImpactCard: controls card visibility independently.
-  const [baselineRp22, setBaselineRp22] = useState(null);
-  const [baselineMlp, setBaselineMlp] = useState(null);
-  const [showLiveImpactCard, setShowLiveImpactCard] = useState(false);
-  const baselineCapturedRef = useRef(false);
-  const postDragTimerRef = useRef(null);
-
-  // Accept current liveRp22 as the new comparison baseline. Card hides.
-  const acceptBaseline = useCallback(() => {
-    setBaselineRp22(liveRp22);
-    setBaselineMlp(mlp ? { ...mlp } : null);
-    setShowLiveImpactCard(false);
-    if (postDragTimerRef.current) { clearTimeout(postDragTimerRef.current); postDragTimerRef.current = null; }
-  // liveRp22/mlp intentionally in deps — we want the snapshot at call time
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveRp22, mlp]);
-
-  // Dismiss: hide card only. Baseline is preserved.
-  const dismissCard = useCallback(() => {
-    setShowLiveImpactCard(false);
-    if (postDragTimerRef.current) { clearTimeout(postDragTimerRef.current); postDragTimerRef.current = null; }
-  }, []);
-
-  useEffect(() => {
-    if (dragging) {
-      // Capture baseline once at drag start — only if no baseline exists yet.
-      if (!baselineCapturedRef.current) {
-        baselineCapturedRef.current = true;
-        if (!baselineRp22) {
-          setBaselineRp22(liveRp22);
-          setBaselineMlp(mlp ? { ...mlp } : null);
-        }
-        setShowLiveImpactCard(true);
-      }
-    } else {
-      // Drag ended — reset capture flag but DO NOT clear baselineRp22/baselineMlp.
-      baselineCapturedRef.current = false;
-      // Keep card visible for 10 seconds post-drag, then auto-dismiss.
-      if (postDragTimerRef.current) clearTimeout(postDragTimerRef.current);
-      postDragTimerRef.current = setTimeout(() => {
-        setShowLiveImpactCard(false);
-        postDragTimerRef.current = null;
-      }, 10000);
-    }
-  // liveRp22/mlp intentionally excluded — baseline is a snapshot, not a live value
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging]);
-
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => { if (postDragTimerRef.current) clearTimeout(postDragTimerRef.current); };
-  }, []);
+  const {
+    baselineRp22,
+    baselineP20Results,
+    showLiveImpactCard,
+    acceptBaseline,
+    dismissCard,
+    rebaseline,
+  } = useLiveImpactBaseline({ dragging, liveRp22, currentP20Results });
 
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
@@ -1758,8 +1716,10 @@ useEffect(() => {
       const xR = fixedSideX(roomWidth, dimsR, 'R');
 
       // Get the y-range for the speaker center (already includes overhang)
-      const yMin_center = Number(sideSurroundVisualSpanM?.minY) ?? 0;
-      const yMax_center = Number(sideSurroundVisualSpanM?.maxY) ?? 0;
+      const yMinRaw = Number(sideSurroundVisualSpanM?.minY);
+      const yMaxRaw = Number(sideSurroundVisualSpanM?.maxY);
+      const yMin_center = Number.isFinite(yMinRaw) ? yMinRaw : 0;
+      const yMax_center = Number.isFinite(yMaxRaw) ? yMaxRaw : 0;
 
       // Calculate a default Y position, e.g., the midpoint of the available range
       let defaultY = (yMin_center + yMax_center) / 2;
@@ -1794,9 +1754,9 @@ useEffect(() => {
   useImperativeHandle(ref, () => ({
     shiftSeatsToMaintainAngle,
     resetSideSurrounds: resetSideSurroundsToDefault,
-    rebaseline: () => { setBaselineRp22(liveRp22); setShowLiveImpactCard(true); },
+    rebaseline,
     hasBaseline: () => baselineRp22 !== null,
-  }), [shiftSeatsToMaintainAngle, resetSideSurroundsToDefault, liveRp22, baselineRp22]);
+  }), [shiftSeatsToMaintainAngle, resetSideSurroundsToDefault, rebaseline, baselineRp22]);
 
   // LCR overlay event listener — extracted to hook
   useApplyLcrFromDetail({ onSetSpeakers, widthM, lengthM, getCanonicalRole });
@@ -1987,7 +1947,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         subDragTick={subDragTick}
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
-        dragImpact={{ baseline: baselineRp22, live: liveRp22, isActive: !!dragging, cardVisible: showLiveImpactCard && liveImpactMode !== 'off' }}
+        dragImpact={{ baseline: baselineRp22, live: liveRp22, baselineP20Results, currentP20Results, isActive: !!dragging, cardVisible: showLiveImpactCard && liveImpactMode !== 'off' }}
         onAcceptBaseline={acceptBaseline}
         onDismissCard={dismissCard}
         isPostDrag={!dragging && showLiveImpactCard}

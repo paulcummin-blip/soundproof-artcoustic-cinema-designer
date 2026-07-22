@@ -34,3 +34,7 @@ export function useSharedBassResults() {
   if (!value) throw new Error("Bass results require the room-level analysis owner");
   return value;
 }
+
+export function useOptionalSharedBassResults() {
+  return useContext(BassResultsContext);
+}

@@ -6,6 +6,9 @@ import { renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
+import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
+import { p20SummaryFromResults } from "@/components/room/bass/p20SeatPresentation";
+import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
 
 let p18TraceReferenceCount = 0;
 const p18TraceReferences = new WeakMap();
@@ -443,6 +446,9 @@ export default function RP22CompliancePanel({
   freeMoveLcr = false,
 }) {
   const appState = useAppState();
+  const bassResults = useOptionalSharedBassResults();
+  const selectedP20Results = bassResults?.contract?.selectedCandidate?.perSeatP20Results || [];
+  const selectedP20Summary = p20SummaryFromResults(selectedP20Results);
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   // Match pages/RP22Report.jsx fallback for P2
@@ -558,6 +564,7 @@ export default function RP22CompliancePanel({
   }, [seats]);
 
   const renderSeatPillGridForParam = (pId) => {
+    if (Number(pId) === 20) return <P20SeatBlock seatingPositions={seats} perSeatP20Results={selectedP20Results} compact />;
     if (!rows.length) return null;
 
     const pKey = `p${Number(pId)}`; // "p1" etc
@@ -958,8 +965,10 @@ export default function RP22CompliancePanel({
       {/* RP22 Parameters (1–21) */}
       <div style={{ display: "grid", gap: 12 }}>
         {RP22_PARAMS.map((p) => {
-          const lvl = getHudLevelForParam(p);
-          const achievedValue = getHudValueForParam(p);
+          const lvl = p.id === 20 ? (selectedP20Summary?.level || "—") : getHudLevelForParam(p);
+          const achievedValue = p.id === 20
+            ? (selectedP20Summary ? `${selectedP20Summary.level} · ${selectedP20Summary.displayVariationDb}` : "—")
+            : getHudValueForParam(p);
           const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
           const resolvedParam = (p.id === 12 || p.id === 13)
             ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode) }
