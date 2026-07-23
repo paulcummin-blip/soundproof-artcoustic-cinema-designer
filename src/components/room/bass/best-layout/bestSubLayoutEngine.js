@@ -16,9 +16,7 @@ export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rsp
     if (![x, y].every(Number.isFinite)) return null;
     return { id: sub?.id || `current-sub-${index + 1}`, x, y, z: Number.isFinite(z) ? z : C.fallbackSourceHeightM, placement: sub?.group === "rear" ? "rear" : "front", tuning: { gainDb: 0, delayMs: 0, polarity: 0 } };
   }).filter(Boolean);
-  const candidates = C.allowedSourceCounts.includes(currentSources.length)
-    ? generated.candidates.filter((layout) => layout.sources.length === currentSources.length)
-    : [];
+  const candidates = generated.candidates;
   const diagnostics = { ...generated.diagnostics, currentSourceCount: currentSources.length };
   const engineOptions = { ...physicsOptions, freqMinHz: 20, freqMaxHz: 200, smoothing: "none", pointsPerOctave: C.previewPointsPerOctave };
   const preparedModes = prepareModeBank(roomDims, engineOptions);
@@ -31,8 +29,12 @@ export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rsp
   };
   const ranked = candidates.map(assess).sort(compareRankedLayouts);
   const currentLayout = currentSources.length ? assess({ id: "current-layout", name: "Current layout", placementFamily: "Current design", placementMode: "Current positions", sources: currentSources }) : null;
+  const currentQuantityBest = ranked.find((layout) => layout.metrics.sourceCount === currentSources.length) || null;
+  const upgradeBest = ranked.find((layout) => layout.metrics.sourceCount > currentSources.length) || null;
   return {
     recommendations: ranked.slice(0, C.maximumRecommendations),
+    currentQuantityBest,
+    upgradeBest,
     allCandidates: ranked,
     candidateCount: candidates.length,
     renderedRecommendationCount: Math.min(ranked.length, C.maximumRecommendations),

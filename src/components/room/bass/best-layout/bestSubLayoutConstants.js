@@ -1,5 +1,5 @@
 export const BEST_SUB_LAYOUT_CONSTANTS = Object.freeze({
-  candidateDefinitionVersion: "rp22-guided-layouts-v1",
+  candidateDefinitionVersion: "rp22-guided-layouts-v2-hierarchy",
   previewPointsPerOctave: 8,
   debounceMs: 80,
   maximumRecommendations: 3,

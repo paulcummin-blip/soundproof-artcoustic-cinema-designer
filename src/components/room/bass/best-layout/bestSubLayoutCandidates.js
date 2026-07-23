@@ -34,14 +34,12 @@ export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomE
     make("rear-midpoint-1", "Rear midpoint", "Rear wall", "Rear wall midpoint", [{ x: midX, y: rear, placement: "rear" }]),
     make("left-midpoint-1", "Left midpoint", "Side wall", "Left wall midpoint", [{ x: left, y: midY, placement: "left" }]),
     make("right-midpoint-1", "Right midpoint", "Side wall", "Right wall midpoint", [{ x: right, y: midY, placement: "right" }]),
-    make("front-corners-2", "Front left + right", "Front wall", "Front left and front right", [{ x: left, y: front, placement: "front" }, { x: right, y: front, placement: "front" }]),
-    make("rear-corners-2", "Rear left + right", "Rear wall", "Rear left and rear right", [{ x: left, y: rear, placement: "rear" }, { x: right, y: rear, placement: "rear" }]),
-    make("front-rear-midpoint-2", "Front + rear midpoint", "Front + rear", "Front and rear wall midpoints", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }]),
-    make("side-midpoints-2", "Left + right midpoint", "Side walls", "Left and right wall midpoints", [{ x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
-    make("front-quarter-2", "Front quarter points", "Front wall", "Quarter point positions", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }]),
-    make("four-corners-4", "Four corners", "Four walls", "Four corners", [{ x: left, y: front, placement: "front" }, { x: right, y: front, placement: "front" }, { x: left, y: rear, placement: "rear" }, { x: right, y: rear, placement: "rear" }]),
-    make("four-midpoints-4", "Front + rear midpoints", "Four walls", "Front and rear midpoints", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }, { x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
-    make("front-rear-quarter-4", "Quarter point layout", "Front + rear", "Quarter point layout", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }, { x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
+    make("front-rear-midpoint-2", "Front + rear midpoint", "Front + rear", "Front wall midpoint + rear wall midpoint", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }]),
+    make("side-midpoints-2", "Opposite wall midpoints", "Side walls", "Opposite wall midpoint", [{ x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
+    make("front-quarter-2", "Quarter point positions", "Front wall", "Quarter point positions", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }]),
+    make("front-rear-pairs-4", "Front pair + rear pair", "Front + rear", "Front pair + rear pair", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }, { x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
+    make("four-midpoints-4", "Four midpoint positions", "Four walls", "Four midpoint positions", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }, { x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
+    make("four-corners-4", "Four corner positions", "Four walls", "Four corner positions", [{ x: left, y: front, placement: "front" }, { x: right, y: front, placement: "front" }, { x: left, y: rear, placement: "rear" }, { x: right, y: rear, placement: "rear" }]),
   ];
   const openings = (Array.isArray(roomElements) ? roomElements : []).filter((element) => element?.type === "door");
   const blocked = (item) => openings.some((opening) => {

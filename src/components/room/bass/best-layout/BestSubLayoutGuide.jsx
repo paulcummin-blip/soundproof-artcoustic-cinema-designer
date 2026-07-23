@@ -1,5 +1,4 @@
 import React, { useMemo } from "react";
-import BestSubLayoutCard from "@/components/room/bass/best-layout/BestSubLayoutCard";
 import Rp22PlacementRecommendation from "@/components/room/bass/best-layout/Rp22PlacementRecommendation";
 import { useBestSubLayoutRecommendations } from "@/components/room/bass/best-layout/useBestSubLayoutRecommendations";
 import { useBestSubLayoutLiveInputs } from "@/components/room/bass/best-layout/bestSubLayoutLiveInputs";
@@ -21,11 +20,10 @@ export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosi
       {recommendation.status === "idle" && <p className="mt-3 text-xs text-[#625143]">Waiting for valid room geometry and listening positions.</p>}
       {recommendation.status === "error" && <p className="mt-3 text-xs text-red-700">Recommendation could not be calculated.</p>}
       {recommendation.result?.rspOnly && <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-800">Provisional RSP-only result — add real seats for a definitive multi-seat recommendation.</p>}
-      {items.length > 0 && <div className="mt-3 space-y-3">{items.slice(0, 3).map((item, index) => <BestSubLayoutCard key={item.id} recommendation={item} rank={index + 1} />)}</div>}
-      {items[0] && <Rp22PlacementRecommendation recommendation={items[0]} currentLayout={recommendation.result?.currentLayout} frontSubsCfg={frontSubsCfg} rearSubsCfg={rearSubsCfg} setFrontSubsCfg={setFrontSubsCfg} setRearSubsCfg={setRearSubsCfg} />}
-      {recommendation.status === "ready" && items.length === 0 && <p className="mt-3 text-xs text-[#625143]">RP22 placement guidance is available for one, two, or four subwoofers.</p>}
+      {recommendation.result?.currentLayout && <Rp22PlacementRecommendation roomDims={canonical.roomDims} currentLayout={recommendation.result.currentLayout} currentQuantityBest={recommendation.result.currentQuantityBest} upgradeBest={recommendation.result.upgradeBest} frontSubsCfg={frontSubsCfg} rearSubsCfg={rearSubsCfg} setFrontSubsCfg={setFrontSubsCfg} setRearSubsCfg={setRearSubsCfg} />}
+      {recommendation.status === "ready" && !recommendation.result?.currentLayout && <p className="mt-3 text-xs text-[#625143]">Add a subwoofer to compare the current design with recognised RP22 layouts.</p>}
       {recommendation.status === "calculating" && items.length === 0 && <p className="mt-3 text-xs text-[#625143]">Calculating room-placement recommendations…</p>}
-      <p className="mt-3 text-[11px] text-[#8A7B6A]">Advisory only — your current subwoofer quantity and positions are unchanged.</p>
+      <p className="mt-3 text-[11px] text-[#8A7B6A]">Advisory only — the current design remains unchanged until a recommendation is applied.</p>
     </div>
   );
 }

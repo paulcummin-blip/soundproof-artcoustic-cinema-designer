@@ -50,9 +50,8 @@ export function gradeLayout(metrics, rspOnly) {
   if (rspOnly) return "Provisional";
   if (p19 === 4 && p20 === 4) return "A++";
   if ((p19 === 4 && p20 >= 3) || (p20 === 4 && p19 >= 3)) return "A+";
-  if (p19 === 3 && p20 === 3) return "A";
-  if ((p19 > 2 || p20 > 2) && (p19 >= 2 && p20 >= 2)) return "B+";
-  if (p19 === 2 && p20 === 2) return "B";
+  if (p19 >= 3 && p20 >= 3) return "A";
+  if (p19 >= 2 && p20 >= 2) return "B";
   if (p19 >= 1 && p20 >= 1) return "C";
   return "Not recommended";
 }
