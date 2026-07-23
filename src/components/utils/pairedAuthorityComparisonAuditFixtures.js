@@ -36,10 +36,6 @@ function selectionIds(candidates) {
   return Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((mode) => [mode, rankBassCandidates(candidates, mode).selected?.candidateId ?? null]));
 }
 
-function globalLargest(reports) {
-  return reports.map((report) => ({ layoutId: report.layoutId, ...report.audit.summary.largestMetricDelta })).filter((entry) => Number.isFinite(entry.absoluteDelta)).sort((a, b) => b.absoluteDelta - a.absoluteDelta || a.layoutId.localeCompare(b.layoutId))[0] ?? null;
-}
-
 export function runPairedAuthorityComparisonAuditFixtures() {
   const { rawCurve, perSeatRawCurves } = fixtureCurves();
   const reports = PAIRED_COMPARISON_FIXTURE_LAYOUTS.map((layout) => {
@@ -57,23 +53,20 @@ export function runPairedAuthorityComparisonAuditFixtures() {
     { name: "All required system and placement fixtures exist", passed: requiredTags.every((tag) => reports.some((report) => report.tags.includes(tag))) },
     { name: "Every generated optimiser candidate is audited", passed: reports.every((report) => report.generatedCandidateCount === report.audit.summary.candidateCount) },
     { name: "Audit does not mutate production selection", passed: reports.every((report) => report.productionSelectionUnchangedByAudit) },
-    { name: "P19 remains unchanged in every comparison", passed: reports.every((report) => report.audit.candidates.every((candidate) => candidate.differenceFlags.p19Changed === false)) },
-    { name: "Every row has the required comparison output", passed: reports.every((report) => report.audit.candidates.every((candidate) => candidate.candidateId && candidate.current?.p14 && candidate.current?.p18 && candidate.current?.p19 && candidate.current?.p20 && candidate.pairedMinimumResult && candidate.pairedRecommendedResult && typeof candidate.differenceFlags?.selectionImpact === "boolean")) },
+    { name: "Every row reports grade equivalence only", passed: reports.every((report) => report.audit.candidates.every((candidate) => candidate.candidateId && candidate.currentGrade?.p14 && candidate.currentGrade?.p18 && candidate.pairedGrade?.p14 && candidate.pairedGrade?.p18 && typeof candidate.gradeChanged?.any === "boolean" && typeof candidate.selectionImpact === "boolean")) },
+    { name: "Raw P14 and P18 quantities are absent", passed: reports.every((report) => report.audit.candidates.every((candidate) => candidate.current?.p14?.valueDb === undefined && candidate.current?.p18?.extensionHz === undefined && candidate.pairedMinimumResult === undefined && candidate.pairedRecommendedResult === undefined)) },
     { name: "Audit output is deterministic for an unchanged pool", passed: reports.every((report) => report.deterministic) },
   ];
   const selectionChanges = reports.flatMap((report) => Object.entries(report.audit.summary.selectedCandidateChanges).filter(([, value]) => value.changed).map(([mode, value]) => ({ layoutId: report.layoutId, mode, ...value })));
-  const smells = reports.flatMap((report) => report.audit.summary.professionalSmellTestFailures.map((failure) => ({ layoutId: report.layoutId, ...failure })));
   return {
     reports,
     summary: {
       layoutCount: reports.length,
       totalCandidateCount: reports.reduce((sum, report) => sum + report.audit.summary.candidateCount, 0),
-      changedStatusCandidateCount: reports.reduce((sum, report) => sum + report.audit.summary.changedStatusCandidateCount, 0),
+      gradeChangedCandidateCount: reports.reduce((sum, report) => sum + report.audit.summary.gradeChangedCandidateCount, 0),
+      gradeChangedComparisonCount: reports.reduce((sum, report) => sum + report.audit.summary.gradeChangedComparisonCount, 0),
       selectedCandidateChanges: selectionChanges,
       selectedCandidateChangesAnyLayout: selectionChanges.length > 0,
-      largestMetricDelta: globalLargest(reports),
-      professionalSmellTestFailureCount: smells.length,
-      professionalSmellTestFailures: smells,
     },
     checks,
     passed: checks.filter((check) => check.passed).length,
