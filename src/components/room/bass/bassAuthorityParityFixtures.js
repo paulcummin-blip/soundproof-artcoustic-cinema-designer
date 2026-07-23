@@ -13,14 +13,14 @@ const EXPECTED = {
   fingerprints: {
     geometry: "geo:v1:3596cd7dff97dc17",
     product: "prod:v1:3f55cab9863453b3",
-    calibration: "cal:v1:793662cea8c5a550",
+    calibration: "cal:v1:7fed44f4d51a6386",
   },
   // Audited fitting-output update: authority inputs and calibration fingerprints
   // remain unchanged; the selected bank, reconstructed curve and derived values change.
-  selectedCandidate: "35b8ae25",
+  selectedCandidate: "069caf0c",
   filterBank: "46e7db8f",
   postEqCurve: "90a4b8a1",
-  parameters: "b821c6e2",
+  parameters: "ab968989",
 };
 
 function stable(value) {
@@ -46,7 +46,7 @@ const APPROVED_AUTHORITY_FIELDS = [
   "perSeatP20Results",
   "p20Label",
 ];
-const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "7ced168d";
+const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "3088219a";
 
 function withoutApprovedAuthorityFields(candidate) {
   return Object.fromEntries(Object.entries(candidate || {}).filter(([key]) => !APPROVED_AUTHORITY_FIELDS.includes(key)));

@@ -28,16 +28,44 @@ export function combinedApprovedP14Capability(activeSubs) {
   return 10 * Math.log10(values.reduce((sum, value) => sum + Math.pow(10, value / 10), 0));
 }
 
+export const P14_EQ_ASSESSMENT_RANGE_HZ = Object.freeze({ lowerHz: 20, upperHz: 120 });
+
+function maximumPositiveEqPoint(points) {
+  return points.reduce((maximum, point) => {
+    const frequency = Number(point?.frequency);
+    const boostDb = Number(point?.spl);
+    if (!Number.isFinite(frequency) || !Number.isFinite(boostDb) || boostDb <= maximum.boostDb) return maximum;
+    return { boostDb, frequencyHz: frequency };
+  }, { boostDb: 0, frequencyHz: null });
+}
+
+export function analyseP14EqHeadroom(combinedEqCurve) {
+  const validPoints = (combinedEqCurve || []).filter((point) => Number.isFinite(Number(point?.frequency)) && Number.isFinite(Number(point?.spl)));
+  const wholeBankMaximum = maximumPositiveEqPoint(validPoints);
+  const inBandMaximum = maximumPositiveEqPoint(validPoints.filter((point) => {
+    const frequency = Number(point.frequency);
+    return frequency >= P14_EQ_ASSESSMENT_RANGE_HZ.lowerHz && frequency <= P14_EQ_ASSESSMENT_RANGE_HZ.upperHz;
+  }));
+  return {
+    assessmentRangeHz: P14_EQ_ASSESSMENT_RANGE_HZ,
+    maximumInBandPositiveEqBoostDb: inBandMaximum.boostDb,
+    maximumInBandPositiveEqBoostFrequencyHz: inBandMaximum.frequencyHz,
+    wholeBankMaximumPositiveEqBoostDb: wholeBankMaximum.boostDb,
+    wholeBankMaximumPositiveEqBoostFrequencyHz: wholeBankMaximum.frequencyHz,
+    wholeBankMaximumExcludedFromP14: wholeBankMaximum.boostDb > inBandMaximum.boostDb,
+  };
+}
+
 export function consumedEqBoostDb(combinedEqCurve) {
-  const values = (combinedEqCurve || []).map((point) => Number(point?.spl)).filter(Number.isFinite);
-  return values.length ? Math.max(0, ...values) : 0;
+  return analyseP14EqHeadroom(combinedEqCurve).maximumInBandPositiveEqBoostDb;
 }
 
 export function assessP14Capability({ activeSubs = [], productCapabilityDb = null, combinedEqCurve = [], targetBasis = "minimum" } = {}) {
   const product = Number.isFinite(productCapabilityDb) ? productCapabilityDb : combinedApprovedP14Capability(activeSubs);
   const normalizedTargetBasis = normalizeP14TargetBasis(targetBasis);
   if (!Number.isFinite(product)) return null;
-  const consumedHeadroomDb = consumedEqBoostDb(combinedEqCurve);
+  const eqHeadroomDiagnostics = analyseP14EqHeadroom(combinedEqCurve);
+  const consumedHeadroomDb = eqHeadroomDiagnostics.maximumInBandPositiveEqBoostDb;
   const value = product - consumedHeadroomDb;
   return {
     value,
@@ -51,6 +79,13 @@ export function assessP14Capability({ activeSubs = [], productCapabilityDb = nul
     maximumAggregateEqBoostDb: consumedHeadroomDb,
     headroomConsumedByEqDb: consumedHeadroomDb,
     capabilityRemainingAfterEqDb: value,
+    assessmentRangeHz: eqHeadroomDiagnostics.assessmentRangeHz,
+    maximumInBandPositiveEqBoostDb: eqHeadroomDiagnostics.maximumInBandPositiveEqBoostDb,
+    maximumInBandPositiveEqBoostFrequencyHz: eqHeadroomDiagnostics.maximumInBandPositiveEqBoostFrequencyHz,
+    wholeBankMaximumPositiveEqBoostDb: eqHeadroomDiagnostics.wholeBankMaximumPositiveEqBoostDb,
+    wholeBankMaximumPositiveEqBoostFrequencyHz: eqHeadroomDiagnostics.wholeBankMaximumPositiveEqBoostFrequencyHz,
+    wholeBankMaximumExcludedFromP14: eqHeadroomDiagnostics.wholeBankMaximumExcludedFromP14,
+    eqHeadroomDiagnostics,
     protectedNullDirectEffectDb: 0,
     source: "combined-approved-continuous-lfe-capability-post-eq-headroom",
   };
