@@ -20,7 +20,7 @@ export default function BassResultsPills({ contract, compact = false, seatId = n
       <span key={key} className="flex flex-col gap-1" aria-label={pill.text}>
         <BassRp22ParameterTooltip parameterKey={key}>
           <span className="cursor-help text-center text-[11px] font-semibold text-[#213428] underline decoration-dotted underline-offset-2">
-            {pill.label}
+            {key.toUpperCase()}
           </span>
         </BassRp22ParameterTooltip>
         <RP22GradingPill level={pill.level} compact={compact} style={{ width: "100%" }}>{pill.resultText}</RP22GradingPill>
