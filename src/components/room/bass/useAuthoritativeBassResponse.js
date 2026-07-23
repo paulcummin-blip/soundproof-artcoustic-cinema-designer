@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { simulateBassResponseRewCore, simulateBassResponseRewParityField } from "@/bass/core/rewBassEngine";
 import { getSubwooferCurve, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
+import { resolveSubwooferBassCapability } from "@/components/utils/speakerModelResolver";
 import { REW_SOURCE_CURVES } from "./rewSourceCurves";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS as DEFAULTS } from "./bassPhysicsDefaults";
 import { deriveRequestedCalibrationConfig } from "./requestedCalibrationConfig";
@@ -71,9 +72,11 @@ export function buildAuthoritativeBassSources({ frontSubsLive, rearSubsLive, fro
     settings ||= {};
     const resolvedGroup = resolveSubGroup(id, group);
     const resolvedIndex = id?.includes("-right") || id?.includes("-2") ? 1 : index;
+    const modelKey = item?.modelKey ?? item?.model ?? "SUB2-12";
     return {
       id,
-      modelKey: item?.model ?? "SUB2-12",
+      modelKey,
+      bassCapability: resolveSubwooferBassCapability(modelKey),
       x,
       y,
       z: Number.isFinite(Number(position?.z)) ? Number(position.z) : 0.35,
@@ -342,7 +345,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const p14TargetBasis = requested.p14TargetBasis;
   const productCapabilities = useMemo(() => sources.map((sub) => {
     const model = MODELS.find((item) => item.key === normaliseModelKey(sub.modelKey));
-    return model ? { modelKey: model.key, response: model.frequency_response_curve, usableLfHz: model.approvedUsableLfHzMinus6dB, continuousSplDb: model.approvedContinuousSplAt1mDb, continuousSpl30HzDb: model.approvedContinuousSplAt30HzDb, peakSplDb: model.approvedPeakSplDb } : { modelKey: sub.modelKey };
+    return model ? { modelKey: model.key, bassCapability: model.bassCapability ?? null, response: model.frequency_response_curve, usableLfHz: model.approvedUsableLfHzMinus6dB, continuousSplDb: model.approvedContinuousSplAt1mDb, continuousSpl30HzDb: model.approvedContinuousSplAt30HzDb, peakSplDb: model.approvedPeakSplDb } : { modelKey: sub.modelKey };
   }), [sources]);
   const fingerprintInputs = useMemo(() => ({
     roomDims, sources, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ,
@@ -358,7 +361,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     targetAnchorDb: requested.requestedTargetAnchorDb, activeFitProfile: requested.requestedFitProfile,
     p14TargetBasis,
     usableLfHz: requested.requestedUsableLfHz, evaluatedProfiles: requested.evaluatedProfiles,
-    productDataVersion: 1, productCapabilities,
+    productDataVersion: 2, productCapabilities,
   }), [roomDims, sources, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ,
     modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
     enableRewCoreReflections, rewSourceCurveMode, qStrategy, rewModalBandwidthScale,

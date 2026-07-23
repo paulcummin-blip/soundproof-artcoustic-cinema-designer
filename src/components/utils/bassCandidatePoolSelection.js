@@ -29,6 +29,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
       selectionDiagnostics: emptySelection.diagnostics,
       priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
       poolId: pool?.poolId || null,
+      capabilityEnvelopeDiagnostics: pool?.capabilityEnvelopeDiagnostics || [],
       generatedCandidateCount: pool?.generatedCandidateCount || 0,
       physicallyCredibleCount: pool?.physicallyCredibleCount || 0,
       requestedEnvelopeValidCount: pool?.requestedEnvelopeValidCount || 0,
@@ -62,6 +63,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
       selectionDiagnostics: activeSelection.diagnostics,
       priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
       poolId: pool.poolId,
+      capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
     };
   }
   const isBestCalibratedAttempt = activeSelection.diagnostics.eligibilityGroup !== "bank_valid_all_p14_p18_p19_l1";
@@ -121,6 +123,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
     heavyPoolReused: true,
     workerStarted: false,
     poolId: pool.poolId,
+    capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
     generatedCandidateCount: pool.generatedCandidateCount,
     physicallyCredibleCount: pool.physicallyCredibleCount,
     requestedEnvelopeValidCount: pool.requestedEnvelopeValidCount,

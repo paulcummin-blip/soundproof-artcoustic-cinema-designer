@@ -18,6 +18,7 @@ import { assessP14Capability } from "@/components/utils/p14CapabilityAuthority";
 import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pairedP14P18ProductionAuthority";
 import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P18CandidateSummary";
 import { buildFilterBankSignature } from "@/components/room/bass/bassResultAuthority";
+import { buildBassCapabilityReceiptDiagnostics } from "@/components/room/bass/bassCapabilityDiagnostics";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 
@@ -561,6 +562,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     p14TargetBasis,
     canonicalTargetCurve,
     protectedNullRegions,
+    capabilityEnvelopeDiagnostics: buildBassCapabilityReceiptDiagnostics(activeSubs),
   });
 }
 

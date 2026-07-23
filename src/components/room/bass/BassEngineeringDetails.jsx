@@ -7,6 +7,7 @@ import ProductionVectorCaptureTest10 from "./ProductionVectorCaptureTest10";
 import { buildCandidateSignature, signatureToString } from "./candidateConsistency";
 import LiveResultAuthorityDiagnostic, { shouldShowLiveResultAuthorityDiagnostic } from "./LiveResultAuthorityDiagnostic";
 import ExactHouseCurveCaseCaptureButton from "./ExactHouseCurveCaseCaptureButton";
+import BassCapabilityReceiptDiagnostic from "./BassCapabilityReceiptDiagnostic";
 
 export default function BassEngineeringDetails({ enabled, designEqEnabled, result, rspPosition, seatingPositions, contract, detailedStatus, rspRawCurve, perSeatRawCurves, priorityMode, onPriorityChange, systemLimits, multiSeries, runtimeCapture, smoothingMode, lifecycle, graphCandidateId, graphFilterBankSignature, graphSeries, transitionFrequencyHz, normalizedTransferResult }) {
   if (!enabled) return null;
@@ -19,6 +20,7 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
   return <>
     {signature && <div style={{ fontSize: 9, color: "#625143", fontFamily: "monospace", marginTop: 4, background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 4, padding: "4px 8px" }}><strong>Candidate signature:</strong> {signatureToString(signature)}</div>}
     {shouldShowLiveResultAuthorityDiagnostic({ engineeringDiagnosticsEnabled: enabled }) && <LiveResultAuthorityDiagnostic result={result} contract={contract} graphCandidateId={graphCandidateId} lifecycle={lifecycle} />}
+    <BassCapabilityReceiptDiagnostic receipts={result?.capabilityEnvelopeDiagnostics || []} />
     <ExactHouseCurveCaseCaptureButton captureInputs={{ result, contract, lifecycle, rspRawCurve, perSeatRawCurves, activeSubs: systemLimits.activeSubs, usableLfHz: systemLimits.usableLfHz, transitionFrequencyHz, graphSeries, graphCandidateId, graphFilterBankSignature, designEqEnabled, detailedStatus }} />
     {designEqEnabled && result && <>
       <div style={{ fontSize: 10, fontFamily: "monospace", color: "#625143", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>

@@ -23,6 +23,15 @@ const isSurroundRole = (role) => SURROUND_ROLES.has(String(role || "").toUpperCa
  * @param {string} role - The canonical role of the speaker (e.g., "SL").
  * @returns {string} The resolved model key, with "_s" appended for surrounds if necessary.
  */
+export function resolveSpeakerModelMeta(modelName, orientation) {
+  return getSpeakerModelMeta(modelName, orientation);
+}
+
+export function resolveSubwooferBassCapability(modelName) {
+  const meta = resolveSpeakerModelMeta(modelName);
+  return meta?.category === "SUBWOOFERS" ? meta.bassCapability ?? null : null;
+}
+
 export function resolveSurroundModel(baseModel, role) {
   if (!baseModel || !role) {
     return baseModel || "";
