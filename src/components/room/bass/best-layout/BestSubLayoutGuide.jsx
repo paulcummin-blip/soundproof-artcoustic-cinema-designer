@@ -1,15 +1,16 @@
 import React, { useMemo } from "react";
 import BestSubLayoutCard from "@/components/room/bass/best-layout/BestSubLayoutCard";
+import Rp22PlacementRecommendation from "@/components/room/bass/best-layout/Rp22PlacementRecommendation";
 import { useBestSubLayoutRecommendations } from "@/components/room/bass/best-layout/useBestSubLayoutRecommendations";
 import { useBestSubLayoutLiveInputs } from "@/components/room/bass/best-layout/bestSubLayoutLiveInputs";
 import { selectBestSubLayoutPhysics } from "@/components/room/bass/best-layout/bestSubLayoutPhysicsSnapshot";
 import { canonicalizeNormalizedRoomInputs } from "@/components/room/bass/normalizedRoomInputAdapters";
 
-export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosition, sourceHeights, contextId }) {
+export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosition, sourceHeights, contextId, roomElements, currentSubs, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg }) {
   const livePhysics = useBestSubLayoutLiveInputs();
   const canonical = useMemo(() => canonicalizeNormalizedRoomInputs({ roomDims, seatingPositions, rspPosition }), [roomDims, seatingPositions, rspPosition]);
   const physicsOptions = selectBestSubLayoutPhysics(livePhysics, contextId);
-  const recommendation = useBestSubLayoutRecommendations({ ...canonical, physicsOptions, sourceHeights });
+  const recommendation = useBestSubLayoutRecommendations({ ...canonical, physicsOptions, sourceHeights, roomElements, currentSubs });
   const items = recommendation.result?.recommendations || [];
   return (
     <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4" data-layout-candidates={recommendation.result?.candidateCount ?? 0} data-layout-cards={items.slice(0, 3).length}>
@@ -21,6 +22,8 @@ export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosi
       {recommendation.status === "error" && <p className="mt-3 text-xs text-red-700">Recommendation could not be calculated.</p>}
       {recommendation.result?.rspOnly && <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-800">Provisional RSP-only result — add real seats for a definitive multi-seat recommendation.</p>}
       {items.length > 0 && <div className="mt-3 space-y-3">{items.slice(0, 3).map((item, index) => <BestSubLayoutCard key={item.id} recommendation={item} rank={index + 1} />)}</div>}
+      {items[0] && <Rp22PlacementRecommendation recommendation={items[0]} currentLayout={recommendation.result?.currentLayout} frontSubsCfg={frontSubsCfg} rearSubsCfg={rearSubsCfg} setFrontSubsCfg={setFrontSubsCfg} setRearSubsCfg={setRearSubsCfg} />}
+      {recommendation.status === "ready" && items.length === 0 && <p className="mt-3 text-xs text-[#625143]">RP22 placement guidance is available for one, two, or four subwoofers.</p>}
       {recommendation.status === "calculating" && items.length === 0 && <p className="mt-3 text-xs text-[#625143]">Calculating room-placement recommendations…</p>}
       <p className="mt-3 text-[11px] text-[#8A7B6A]">Advisory only — your current subwoofer quantity and positions are unchanged.</p>
     </div>

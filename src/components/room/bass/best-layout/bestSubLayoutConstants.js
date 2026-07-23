@@ -1,10 +1,12 @@
 export const BEST_SUB_LAYOUT_CONSTANTS = Object.freeze({
-  candidateDefinitionVersion: "phase3-layouts-v2-acoustic-closeout",
+  candidateDefinitionVersion: "rp22-guided-layouts-v1",
   previewPointsPerOctave: 8,
   debounceMs: 80,
   maximumRecommendations: 3,
   allowedSourceCounts: [1, 2, 4],
   fallbackSourceHeightM: 0.05,
+  minimumWallClearanceM: 0.1,
+  openingClearanceM: 0.2,
   nullRule: { smoothingRadiusBins: 1, shoulderRadiusBins: 4, minimumContiguousBins: 2, destructiveDepthDb: 8 },
   extension: { referenceStartHz: 60, referenceEndHz: 100, allowedDropDb: 10 },
   efficiency: {

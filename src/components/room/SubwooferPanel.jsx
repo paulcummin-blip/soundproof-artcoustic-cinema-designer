@@ -359,6 +359,12 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               rspPosition={rspPosition}
               sourceHeights={{ front: frontSubsCfg?.bottomHeightM, rear: rearSubsCfg?.bottomHeightM }}
               contextId={layoutContextId}
+              roomElements={appState?.roomElements}
+              currentSubs={appState?.subwoofers}
+              frontSubsCfg={frontSubsCfg}
+              rearSubsCfg={rearSubsCfg}
+              setFrontSubsCfg={appState?.setFrontSubsCfg}
+              setRearSubsCfg={appState?.setRearSubsCfg}
             />
           </div>
         </div>

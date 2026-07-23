@@ -132,13 +132,15 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
             ? xFromPrev
             : xFromDefault;
         const finalX = clamp(pickedX, minX, maxX);
+        const savedY = Number(cfgPos?.[i]?.y);
+        const finalY = Number.isFinite(savedY) ? clamp(savedY, WALL_BUFFER_M, lengthM - WALL_BUFFER_M) : yPinned;
         return {
           ...(prev ? { ...prev } : {}),
           id: `sub-${group}-${i + 1}`,
           role: group === 'front' ? `SUBF${i + 1}` : `SUBR${i + 1}`,
           group, model,
           bottomHeightM: bottom,
-          position: { x: finalX, y: yPinned, z }
+          position: { x: finalX, y: finalY, z }
         };
       });
     };

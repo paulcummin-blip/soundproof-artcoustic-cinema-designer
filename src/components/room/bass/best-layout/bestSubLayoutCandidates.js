@@ -12,7 +12,7 @@ function resolveHeights(sourceHeights) {
 
 const source = (x, y, placement, index, heights) => ({
   id: `layout-source-${index + 1}`,
-  x, y, z: heights[placement], placement,
+  x, y, z: placement === "rear" ? heights.rear : heights.front, placement,
   tuning: { gainDb: 0, delayMs: 0, polarity: 0 },
 });
 
@@ -20,32 +20,42 @@ function candidate(id, name, placementFamily, placementMode, points, heights) {
   return { id, name, placementFamily, placementMode, sources: points.map((point, index) => source(point.x, point.y, point.placement, index, heights)) };
 }
 
-export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights) {
+export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomElements = []) {
   const width = Number(roomDims?.widthM), length = Number(roomDims?.lengthM);
   const heights = resolveHeights(sourceHeights);
   const diagnostics = { usedHeightFallback: heights.usedHeightFallback, sourceHeightsM: { front: heights.front, rear: heights.rear } };
   if (!(width > 0) || !(length > 0)) return { candidates: [], diagnostics };
-  const front = 0, rear = length, q1 = width * 0.25, q3 = width * 0.75, mid = width * 0.5, edge = Math.max(0.02, width * 0.02);
+  const inset = Math.min(C.minimumWallClearanceM, width / 4, length / 4);
+  const front = inset, rear = length - inset, left = inset, right = width - inset;
+  const q1 = width * 0.25, q3 = width * 0.75, midX = width * 0.5, midY = length * 0.5;
   const make = (id, name, family, mode, points) => candidate(id, name, family, mode, points, heights);
   const raw = [
-    make("front-midpoint-1", "Front midpoint", "Front only", "Midpoint", [{ x: mid, y: front, placement: "front" }]),
-    make("rear-midpoint-1", "Rear midpoint", "Rear only", "Midpoint", [{ x: mid, y: rear, placement: "rear" }]),
-    make("front-quarter-2", "Front quarter points", "Front only", "Quarter points", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }]),
-    make("rear-quarter-2", "Rear quarter points", "Rear only", "Quarter points", [{ x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
-    make("front-rear-midpoint-2", "Front + rear midpoints", "Front + rear", "Midpoint", [{ x: mid, y: front, placement: "front" }, { x: mid, y: rear, placement: "rear" }]),
-    make("front-corners-2", "Front corners", "Front only", "Corners", [{ x: edge, y: front, placement: "front" }, { x: width - edge, y: front, placement: "front" }]),
-    make("rear-corners-2", "Rear corners", "Rear only", "Corners", [{ x: edge, y: rear, placement: "rear" }, { x: width - edge, y: rear, placement: "rear" }]),
-    make("front-rear-quarter-4", "Front + rear quarter points", "Front + rear", "Quarter points", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }, { x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
-    make("front-rear-corners-4", "Front + rear corners", "Front + rear", "Corners", [{ x: edge, y: front, placement: "front" }, { x: width - edge, y: front, placement: "front" }, { x: edge, y: rear, placement: "rear" }, { x: width - edge, y: rear, placement: "rear" }]),
+    make("front-centre-1", "Front centre", "Front wall", "Front wall midpoint", [{ x: midX, y: front, placement: "front" }]),
+    make("rear-midpoint-1", "Rear midpoint", "Rear wall", "Rear wall midpoint", [{ x: midX, y: rear, placement: "rear" }]),
+    make("left-midpoint-1", "Left midpoint", "Side wall", "Left wall midpoint", [{ x: left, y: midY, placement: "left" }]),
+    make("right-midpoint-1", "Right midpoint", "Side wall", "Right wall midpoint", [{ x: right, y: midY, placement: "right" }]),
+    make("front-corners-2", "Front left + right", "Front wall", "Front left and front right", [{ x: left, y: front, placement: "front" }, { x: right, y: front, placement: "front" }]),
+    make("rear-corners-2", "Rear left + right", "Rear wall", "Rear left and rear right", [{ x: left, y: rear, placement: "rear" }, { x: right, y: rear, placement: "rear" }]),
+    make("front-rear-midpoint-2", "Front + rear midpoint", "Front + rear", "Front and rear wall midpoints", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }]),
+    make("side-midpoints-2", "Left + right midpoint", "Side walls", "Left and right wall midpoints", [{ x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
+    make("front-quarter-2", "Front quarter points", "Front wall", "Quarter point positions", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }]),
+    make("four-corners-4", "Four corners", "Four walls", "Four corners", [{ x: left, y: front, placement: "front" }, { x: right, y: front, placement: "front" }, { x: left, y: rear, placement: "rear" }, { x: right, y: rear, placement: "rear" }]),
+    make("four-midpoints-4", "Front + rear midpoints", "Four walls", "Front and rear midpoints", [{ x: midX, y: front, placement: "front" }, { x: midX, y: rear, placement: "rear" }, { x: left, y: midY, placement: "left" }, { x: right, y: midY, placement: "right" }]),
+    make("front-rear-quarter-4", "Quarter point layout", "Front + rear", "Quarter point layout", [{ x: q1, y: front, placement: "front" }, { x: q3, y: front, placement: "front" }, { x: q1, y: rear, placement: "rear" }, { x: q3, y: rear, placement: "rear" }]),
   ];
-  const seen = new Set();
-  const candidates = raw.filter((layout) => {
-    const key = layout.sources.map((item) => [item.x, item.y, item.z].map((value) => value.toFixed(6)).join(",")).sort().join("|");
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return C.allowedSourceCounts.includes(layout.sources.length) && layout.sources.length <= 4;
+  const openings = (Array.isArray(roomElements) ? roomElements : []).filter((element) => element?.type === "door");
+  const blocked = (item) => openings.some((opening) => {
+    const openingWall = opening.wall === "back" ? "rear" : opening.wall;
+    if (openingWall !== item.placement) return false;
+    const along = ["front", "rear"].includes(item.placement) ? item.x : item.y;
+    const wallSpan = ["front", "rear"].includes(item.placement) ? width : length;
+    const fractionalStart = Number(opening.x_position);
+    const start = Number.isFinite(Number(opening.pos_m)) ? Number(opening.pos_m) : Number.isFinite(fractionalStart) ? fractionalStart * wallSpan : 0;
+    const size = Number(opening.length_m ?? opening.width ?? 0.9);
+    return along >= start - C.openingClearanceM && along <= start + size + C.openingClearanceM;
   });
-  return { candidates, diagnostics };
+  const candidates = raw.filter((layout) => C.allowedSourceCounts.includes(layout.sources.length) && layout.sources.every((item) => !blocked(item)));
+  return { candidates, diagnostics: { ...diagnostics, rejectedForOpenings: raw.length - candidates.length } };
 }
 
 export function generateBestSubLayoutCandidates(roomDims, sourceHeights) {

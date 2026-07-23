@@ -1,5 +1,7 @@
 import { BEST_SUB_LAYOUT_CONSTANTS as C } from "@/components/room/bass/best-layout/bestSubLayoutConstants";
 import { summarizeTransferEfficiency } from "@/components/room/bass/best-layout/bestSubLayoutTransferEfficiency";
+import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
+import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 
 const round = (value, digits = 3) => Number(Number(value || 0).toFixed(digits));
 const mean = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -43,16 +45,16 @@ function extensionForCurve(curve) {
 }
 
 export function gradeLayout(metrics, rspOnly) {
-  const guardsPass = metrics.perSeat.every((seat) =>
-    seat.worstNullDepthDb < C.grades.individualSeatMaxNullDb &&
-    seat.extensionHz <= C.grades.individualSeatMaxExtensionHz &&
-    seat.relativeTransferEfficiencyDb >= C.efficiency.strongMinRelativeDb
-  );
-  const aPlus = metrics.destructiveBroadNullCount === 0 && metrics.transferEfficiencyClass === "Strong" && metrics.worstSeatVariationDb <= C.grades.aPlusMaxVariationDb && guardsPass;
-  if (aPlus) return rspOnly ? "A+ provisional" : "A+";
-  if (metrics.destructiveBroadNullCount === 0 && metrics.worstSeatVariationDb <= C.grades.aMaxVariationDb) return "A";
-  if (metrics.destructiveBroadNullCount <= 1 && metrics.worstSeatVariationDb <= C.grades.bMaxVariationDb) return "B";
-  return metrics.destructiveBroadNullCount <= 2 ? "C" : "Not recommended";
+  const p19 = metrics.p19Level;
+  const p20 = metrics.p20Level;
+  if (rspOnly) return "Provisional";
+  if (p19 === 4 && p20 === 4) return "A++";
+  if ((p19 === 4 && p20 >= 3) || (p20 === 4 && p19 >= 3)) return "A+";
+  if (p19 === 3 && p20 === 3) return "A";
+  if ((p19 > 2 || p20 > 2) && (p19 >= 2 && p20 >= 2)) return "B+";
+  if (p19 === 2 && p20 === 2) return "B";
+  if (p19 >= 1 && p20 >= 1) return "C";
+  return "Not recommended";
 }
 
 export function assessLayoutResult(layout, transferResult, directReferenceResult, rspOnly) {
@@ -90,20 +92,25 @@ export function assessLayoutResult(layout, transferResult, directReferenceResult
     transferEfficiencyClass: efficiency.transferEfficiencyClass,
     perSeat,
   };
-  metrics.overallGrade = gradeLayout(metrics, rspOnly);
-  metrics.rankingScore = round(1000000 - metrics.destructiveBroadNullCount * 100000 - metrics.worstSeatBroadNullDepthDb * 5000 - metrics.worstSeatVariationDb * 500 - metrics.lowestReliableNormalizedFrequencyHz * 20 + (metrics.worstSeatTransferEfficiencyDb ?? -100) * 10 - metrics.sourceCount, 3);
-  metrics.rankingReason = metrics.destructiveBroadNullCount === 0
-    ? `No destructive broad nulls; ${metrics.transferEfficiencyClass.toLowerCase()} corrected relative transfer efficiency.`
-    : `${metrics.destructiveBroadNullCount} broad null${metrics.destructiveBroadNullCount === 1 ? "" : "s"}; ranked by worst-seat protection first.`;
+  metrics.p19Level = rspOnly ? null : houseCurveP19Level(metrics.meanSeatVariationDb);
+  metrics.p20Level = rspOnly ? null : numericRp22Level(levelP20_lfConsistency(metrics.worstSeatVariationDb));
+  metrics.combinedConsistencyLevel = (metrics.p19Level || 0) + (metrics.p20Level || 0);
+  metrics.placementGrade = gradeLayout(metrics, rspOnly);
+  metrics.overallGrade = metrics.placementGrade;
+  metrics.rankingScore = round(metrics.combinedConsistencyLevel * 1000000 - metrics.worstSeatVariationDb * 1000 - metrics.destructiveBroadNullCount * 100 + (metrics.worstSeatTransferEfficiencyDb ?? -100), 3);
+  metrics.rankingReason = rspOnly
+    ? "Provisional placement guidance based on the reference seating position."
+    : `P19 L${metrics.p19Level} and P20 L${metrics.p20Level}; recommended for bass consistency across the listening area.`;
   return { ...layout, metrics };
 }
 
 export function compareRankedLayouts(a, b) {
   const A = a.metrics, B = b.metrics, tolerance = C.tieTolerance;
-  if (A.destructiveBroadNullCount !== B.destructiveBroadNullCount) return A.destructiveBroadNullCount - B.destructiveBroadNullCount;
-  if (Math.abs(A.worstSeatBroadNullDepthDb - B.worstSeatBroadNullDepthDb) > tolerance.nullDepthDb) return A.worstSeatBroadNullDepthDb - B.worstSeatBroadNullDepthDb;
+  if (A.combinedConsistencyLevel !== B.combinedConsistencyLevel) return B.combinedConsistencyLevel - A.combinedConsistencyLevel;
+  const aFloor = Math.min(A.p19Level || 0, A.p20Level || 0), bFloor = Math.min(B.p19Level || 0, B.p20Level || 0);
+  if (aFloor !== bFloor) return bFloor - aFloor;
   if (Math.abs(A.worstSeatVariationDb - B.worstSeatVariationDb) > tolerance.variationDb) return A.worstSeatVariationDb - B.worstSeatVariationDb;
-  if (Math.abs(A.lowestReliableNormalizedFrequencyHz - B.lowestReliableNormalizedFrequencyHz) > tolerance.extensionHz) return A.lowestReliableNormalizedFrequencyHz - B.lowestReliableNormalizedFrequencyHz;
+  if (A.destructiveBroadNullCount !== B.destructiveBroadNullCount) return A.destructiveBroadNullCount - B.destructiveBroadNullCount;
   if (Math.abs(A.worstSeatTransferEfficiencyDb - B.worstSeatTransferEfficiencyDb) > tolerance.efficiencyDb) return B.worstSeatTransferEfficiencyDb - A.worstSeatTransferEfficiencyDb;
   if (A.sourceCount !== B.sourceCount) return A.sourceCount - B.sourceCount;
   return a.id.localeCompare(b.id);
