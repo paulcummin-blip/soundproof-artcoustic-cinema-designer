@@ -8,25 +8,25 @@ const DEFINITIONS = Object.freeze({
     name: "Estimated LFE Capability",
     limitation: "LFE output capability",
     reason: "Available continuous subwoofer output and post-EQ headroom set the lowest achieved RP22 level.",
-    recommendation: "Increase subwoofer capability. Consider additional subwoofers or upgrading the SUB model.",
+    recommendation: "Improve by upgrading the subwoofer selection.",
   }),
   p18: Object.freeze({
     name: "Bass Extension",
     limitation: "Low frequency extension",
     reason: "The selected subwoofer system reaches its usable low-frequency limit before a higher RP22 extension level.",
-    recommendation: "Use a subwoofer with greater low-frequency capability.",
+    recommendation: "Improve by selecting a subwoofer with greater low-frequency extension.",
   }),
   p19: Object.freeze({
     name: "Seat Consistency",
     limitation: "Seat-to-seat consistency",
-    reason: "Variation across the listening area sets the lowest achieved RP22 level; deep modal nulls are not treated as EQ opportunities.",
-    recommendation: "Improve subwoofer placement. Consider additional rear subwoofers or adjust seating position.",
+    reason: "Variation across the listening area sets the lowest achieved RP22 level.",
+    recommendation: "Improve by adjusting subwoofer placement or adding additional subwoofers.",
   }),
   p20: Object.freeze({
     name: "Worst Seat Performance",
     limitation: "Worst-seat response",
     reason: "The largest response variation at the worst listening seat sets the lowest achieved RP22 level.",
-    recommendation: "Review seating position or subwoofer placement.",
+    recommendation: "Improve by reviewing seating position or subwoofer placement.",
   }),
 });
 

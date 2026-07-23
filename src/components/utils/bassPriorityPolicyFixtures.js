@@ -120,7 +120,7 @@ export function runBassPriorityPolicyFixtures() {
   results.p22P14GainCannotTradeAwayP19 = rankBassCandidates([p14Only, allRespected], "balanced").selected === allRespected;
 
   const limitationCases = [
-    [{ ...candidate("limit-p14", 1, 3, 3), p20Available: true, achievedP20Level: 3 }, "p14", "additional subwoofers"],
+    [{ ...candidate("limit-p14", 1, 3, 3), p20Available: true, achievedP20Level: 3 }, "p14", "upgrading"],
     [{ ...candidate("limit-p18", 3, 1, 3), p20Available: true, achievedP20Level: 3 }, "p18", "low-frequency capability"],
     [{ ...candidate("limit-p19", 3, 3, 1), p20Available: true, achievedP20Level: 3 }, "p19", "subwoofer placement"],
     [{ ...candidate("limit-p20", 3, 3, 3), p20Available: true, achievedP20Level: 1 }, "p20", "seating position"],

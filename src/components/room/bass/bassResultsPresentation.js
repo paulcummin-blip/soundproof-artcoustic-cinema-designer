@@ -40,19 +40,23 @@ function parameterLabel(key, result) {
 
 function readyPill(key, parameter, result) {
   const label = parameterLabel(key, result);
-  if (parameter?.status === "not_applicable") return { text: `${label} N/A`, level: "N/A" };
+  if (parameter?.status === "not_applicable") return { label, resultText: "N/A", text: `${label} N/A`, level: "N/A" };
   if (key === "p20") {
     const worst = p20SummaryFromResults(result?.selectedCandidate?.perSeatP20Results);
-    return worst ? { text: `Worst Seat Performance · ${worst.level} · ${worst.displayVariationDb}`, level: worst.level } : { text: "Worst Seat Performance —", level: "—" };
+    return worst
+      ? { label, resultText: `${worst.level} · ${worst.displayVariationDb}`, text: `Worst Seat Performance · ${worst.level} · ${worst.displayVariationDb}`, level: worst.level }
+      : { label, resultText: "—", text: "Worst Seat Performance —", level: "—" };
   }
-  if (parameter?.status === "error") return { text: `${label} error`, level: "—" };
-  if (parameter?.level == null) return { text: `${label} —`, level: "—" };
+  if (parameter?.status === "error") return { label, resultText: "Error", text: `${label} error`, level: "—" };
+  if (parameter?.level == null) return { label, resultText: "—", text: `${label} —`, level: "—" };
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
   const value = formatBassParameterValue(key, parameter.value);
   const basis = key === "p14" && parameter.targetBasis
     ? ` — ${parameter.targetBasis === "recommended" ? "Recommended" : "Minimum"} target`
     : "";
   return {
+    label,
+    resultText: `${grade}${value ? ` · ${value}` : ""}${basis}`,
     text: `${label} ${grade}${value ? ` · ${value}` : ""}${basis}`,
     level: grade,
     detail: key === "p14" ? parameter.targetBasisDetail : null,
@@ -70,10 +74,10 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
   const parameters = result?.productAnalysis?.parameters || {};
   const pills = Object.fromEntries(PARAM_KEYS.map((key) => {
     const label = parameterLabel(key, result);
-    if (isQueued) return [key, { text: `${label} Queued`, level: "—" }];
-    if (isUpdating) return [key, { text: `${label} Updating · ${elapsedSeconds} s`, level: "—" }];
-    if (status === "error") return [key, { text: `${label} error`, level: "—" }];
-    if (!isReady) return [key, { text: `${label} —`, level: "—" }];
+    if (isQueued) return [key, { label, resultText: "Queued", text: `${label} Queued`, level: "—" }];
+    if (isUpdating) return [key, { label, resultText: `Updating · ${elapsedSeconds} s`, text: `${label} Updating · ${elapsedSeconds} s`, level: "—" }];
+    if (status === "error") return [key, { label, resultText: "Error", text: `${label} error`, level: "—" }];
+    if (!isReady) return [key, { label, resultText: "—", text: `${label} —`, level: "—" }];
     return [key, readyPill(key, parameters[key], result)];
   }));
 
