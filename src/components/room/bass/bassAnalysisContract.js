@@ -222,6 +222,8 @@ export function createBassAnalysisResult() {
       geometryFingerprint: null,
       rspCurve: [],
       seatCurves: [],
+      postEqRspCurve: [],
+      postEqSeatCurves: [],
       sourceLayout: null,
       usableLfHz: null,
     },
@@ -260,6 +262,7 @@ export function createBassAnalysisResult() {
     },
     selectedCandidateId: null,
     selectedCandidate: null,
+    finalOptimisedBassResponse: null,
     designRecommendation: null,
 
     provenance: {

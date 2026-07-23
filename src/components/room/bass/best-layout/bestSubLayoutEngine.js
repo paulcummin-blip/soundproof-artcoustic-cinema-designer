@@ -3,9 +3,9 @@ import { computeNormalizedRoomTransfer } from "@/components/room/bass/normalized
 import { BEST_SUB_LAYOUT_CONSTANTS as C } from "@/components/room/bass/best-layout/bestSubLayoutConstants";
 import { generateBestSubLayoutCandidateSet } from "@/components/room/bass/best-layout/bestSubLayoutCandidates";
 import { computeBestSubLayoutDirectReference } from "@/components/room/bass/best-layout/bestSubLayoutDirectReference";
-import { assessLayoutResult, compareRankedLayouts } from "@/components/room/bass/best-layout/bestSubLayoutScoring";
+import { applyFinalOptimisedAuthorityToLayout, assessLayoutResult, compareRankedLayouts } from "@/components/room/bass/best-layout/bestSubLayoutScoring";
 
-export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs }) {
+export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs, finalOptimisedBassResponse }) {
   const started = performance.now();
   const realSeats = (Array.isArray(seatingPositions) ? seatingPositions : []).filter((seat) => Number.isFinite(seat?.x) && Number.isFinite(seat?.y));
   const rspOnly = realSeats.length === 0;
@@ -28,7 +28,8 @@ export function runBestSubLayoutRecommendation({ roomDims, seatingPositions, rsp
     return assessLayoutResult(layout, transfer, directReference, rspOnly);
   };
   const ranked = candidates.map(assess).sort(compareRankedLayouts);
-  const currentLayout = currentSources.length ? assess({ id: "current-layout", name: "Current layout", placementFamily: "Current design", placementMode: "Current positions", sources: currentSources }) : null;
+  const currentLayoutRaw = currentSources.length ? assess({ id: "current-layout", name: "Current layout", placementFamily: "Current design", placementMode: "Current positions", sources: currentSources }) : null;
+  const currentLayout = applyFinalOptimisedAuthorityToLayout(currentLayoutRaw, finalOptimisedBassResponse);
   const currentQuantityBest = ranked.find((layout) => layout.metrics.sourceCount === currentSources.length) || null;
   const upgradeBest = ranked.find((layout) => layout.metrics.sourceCount > currentSources.length) || null;
   return {

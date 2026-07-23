@@ -58,6 +58,7 @@ export function buildBassGraphSeries({
   hasMatchingDetailedResult, multiSeries = [], showRealSeatOverlays, smoothingMode = "none",
   overlayProductionSeries, showRewOverlay, rewOverlaySeries,
 }) {
+  const finalResponse = optimisationResult?.finalOptimisedBassResponse;
   let series;
   if (!designEqEnabled) {
     series = normalizedSeries
@@ -67,18 +68,28 @@ export function buildBassGraphSeries({
     if (target) series.push(target);
   } else {
     series = rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : [];
-    if (hasMatchingDetailedResult && optimisationResult?.finalPostEqCurve?.length) {
+    if (hasMatchingDetailedResult && finalResponse?.postEqRspCurve?.length) {
       series.push({
         id: "rsp-eq", kind: "post-eq", label: "RSP after EQ", tooltipLabel: "RSP after EQ",
-        candidateId: optimisationResult.selectedCandidateId,
-        filterBankSignature: optimisationResult.filterBankSignature,
+        candidateId: finalResponse.selectedCandidateId,
+        filterBankSignature: finalResponse.filterBankSignature,
         color: "#16A34A", strokeWidth: 2.5,
-        data: applyBassSmoothing(optimisationResult.finalPostEqCurve, smoothingMode),
+        data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode),
       });
       if (showRealSeatOverlays) {
-        series.push(...multiSeries.filter(({ id }) => id !== "rsp").map((item) => ({
-          ...item, kind: "real-seat-overlay", strokeWidth: 1.25, strokeOpacity: 0.5,
-          data: applyBassSmoothing(item.data, smoothingMode),
+        series.push(...finalResponse.postEqPerSeatCurves
+          .filter((seat) => multiSeries.some((item) => item.id === seat.seatId))
+          .map((seat, index) => ({
+          id: seat.seatId,
+          kind: "real-seat-overlay",
+          label: `${seat.seatId} after EQ`,
+          tooltipLabel: `${seat.seatId} after EQ`,
+          candidateId: finalResponse.selectedCandidateId,
+          filterBankSignature: finalResponse.filterBankSignature,
+          color: multiSeries.find((item) => item.id === seat.seatId)?.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
+          strokeWidth: 1.25,
+          strokeOpacity: 0.5,
+          data: applyBassSmoothing(seat.responseData, smoothingMode),
         })));
       }
       const target = showHouseCurve ? buildAbsoluteHouseCurveSeries(optimisationResult) : null;

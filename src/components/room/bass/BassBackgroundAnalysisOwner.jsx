@@ -12,6 +12,7 @@ import { markBassAuthorityUpdating, publishCompletedBassContract, syncPersistent
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
 import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
+import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
@@ -100,7 +101,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const optimisationResult = useMemo(() => {
     const selected = selectionAttempt.result;
     if (!selected) return null;
-    return {
+    const result = {
       ...selected,
       ...BASS_OPTIMISER_VERSIONS,
       cacheKey,
@@ -108,7 +109,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       cacheRejectionReason: lifecycle.cacheRejectionReason || null,
       calibrationFingerprint: fingerprints.calibration,
     };
-  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, fingerprints.calibration]);
+    return {
+      ...result,
+      finalOptimisedBassResponse: buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources }),
+    };
+  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, fingerprints.calibration, sources]);
   const contract = useBassAnalysisContract({
     ...fingerprintInputs, subsForSimulation: sources, designEqSystemLimits, optimisationResult,
     detailedStatus, detailedProgress: lifecycle.progress, detailedElapsedMs: lifecycle.elapsedMs,

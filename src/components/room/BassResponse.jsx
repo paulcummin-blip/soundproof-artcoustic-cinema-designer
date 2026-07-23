@@ -28,6 +28,7 @@ import { resolveBestSubLayoutContextId } from "@/components/room/bass/best-layou
 import { buildVisibleRoomModeMarkers } from "@/components/room/bass/roomModePresentation";
 import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedNullPresentation";
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
+import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -295,7 +296,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   );
 
   const hasValidDetailedResult = !!designEqEnabled &&
-    optimisationResult?.finalPostEqCurve?.length > 0 && rspRawCurve.length > 0;
+    finalOptimisedBassAuthorityMatches(optimisationResult?.finalOptimisedBassResponse) && rspRawCurve.length > 0;
 
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
     designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,

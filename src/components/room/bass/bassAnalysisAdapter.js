@@ -267,6 +267,7 @@ export function adaptCurrentBassOptimisationResult({
   const hasResult = !!optimisationResult && !!optimisationResult.selectedCandidate;
   const realSeatCount = countRealSeats(perSeatRawCurves);
   const selectedCandidate = optimisationResult?.selectedCandidate || null;
+  const finalResponse = optimisationResult?.finalOptimisedBassResponse || null;
   const poolId = optimisationResult?.poolId || null;
 
   // --- Job status ---
@@ -305,13 +306,14 @@ export function adaptCurrentBassOptimisationResult({
 
   // --- Selected candidate ---
   contract.selectedCandidate = buildCandidateRef(selectedCandidate);
+  contract.finalOptimisedBassResponse = finalResponse;
   contract.designRecommendation = optimisationResult?.primaryLimitation
     ? { ...optimisationResult.primaryLimitation }
     : null;
 
   // --- Selected candidate ID (matches live-candidate consistency signature) ---
   if (selectedCandidate && optimisationResult) {
-    contract.selectedCandidateId = optimisationResult.selectedCandidateId || selectedCandidate.candidateId || null;
+    contract.selectedCandidateId = finalResponse?.selectedCandidateId || optimisationResult.selectedCandidateId || selectedCandidate.candidateId || null;
     if (!contract.selectedCandidateId) {
       try {
         const sig = buildCandidateSignature({ result: optimisationResult, rspRawCurve });
@@ -325,8 +327,8 @@ export function adaptCurrentBassOptimisationResult({
   // --- Provenance ---
   contract.provenance.poolId = poolId;
   contract.provenance.candidateSignature = buildProvenanceSignature(selectedCandidate, poolId);
-  contract.provenance.filterBankSignature = optimisationResult?.filterBankSignature || selectedCandidate?.filterBankSignature || null;
-  contract.provenance.postEqCurveSignature = optimisationResult?.postEqCurveSignature || null;
+  contract.provenance.filterBankSignature = finalResponse?.filterBankSignature || optimisationResult?.filterBankSignature || selectedCandidate?.filterBankSignature || null;
+  contract.provenance.postEqCurveSignature = finalResponse?.postEqCurveSignature || optimisationResult?.postEqCurveSignature || null;
   contract.provenance.engineVersion = optimisationResult?.engineVersion || null;
   contract.provenance.realSeatCount = realSeatCount;
   contract.provenance.createdAtMs = null;
@@ -392,10 +394,15 @@ export function adaptCurrentBassOptimisationResult({
   });
 
   // P19
-  const p19Level = selectedCandidate
-    ? (typeof selectedCandidate.achievedP19Level === "number" ? selectedCandidate.achievedP19Level : parseLegacyLevel(optimisationResult?.achievedP19Level))
-    : parseLegacyLevel(optimisationResult?.achievedP19Level);
-  const p19Value = Number.isFinite(selectedCandidate?.achievedP19VariationDb) ? selectedCandidate.achievedP19VariationDb : (Number.isFinite(optimisationResult?.achievedP19VariationDb) ? optimisationResult.achievedP19VariationDb : null);
+  const authorityP19 = finalResponse?.finalSeatVariationData?.p19;
+  const p19Level = typeof authorityP19?.level === "number"
+    ? authorityP19.level
+    : selectedCandidate
+      ? (typeof selectedCandidate.achievedP19Level === "number" ? selectedCandidate.achievedP19Level : parseLegacyLevel(optimisationResult?.achievedP19Level))
+      : parseLegacyLevel(optimisationResult?.achievedP19Level);
+  const p19Value = Number.isFinite(authorityP19?.variationDb)
+    ? authorityP19.variationDb
+    : Number.isFinite(selectedCandidate?.achievedP19VariationDb) ? selectedCandidate.achievedP19VariationDb : (Number.isFinite(optimisationResult?.achievedP19VariationDb) ? optimisationResult.achievedP19VariationDb : null);
   contract.productAnalysis.parameters.p19 = createBassParameterResult({
     parameter: PARAM_P19, status: paramStatus(p19Level != null), level: p19Level, value: p19Value,
     unit: "dB", passedL1: p19Level != null ? p19Level >= 1 : null, isStale,
@@ -409,8 +416,13 @@ export function adaptCurrentBassOptimisationResult({
       reason: realSeatCount < 2 ? "Fewer than two real seats" : "No valid overlapping non-RSP seat response",
     });
   } else if (selectedCandidate && selectedCandidate.p20Available) {
-    const p20Level = typeof selectedCandidate.achievedP20Level === "number" ? selectedCandidate.achievedP20Level : parseLegacyLevel(selectedCandidate.achievedP20Level);
-    const p20Value = Number.isFinite(selectedCandidate.achievedP20VariationDb) ? selectedCandidate.achievedP20VariationDb : null;
+    const authorityP20 = finalResponse?.finalSeatVariationData?.p20;
+    const p20Level = typeof authorityP20?.level === "number"
+      ? authorityP20.level
+      : typeof selectedCandidate.achievedP20Level === "number" ? selectedCandidate.achievedP20Level : parseLegacyLevel(selectedCandidate.achievedP20Level);
+    const p20Value = Number.isFinite(authorityP20?.variationDb)
+      ? authorityP20.variationDb
+      : Number.isFinite(selectedCandidate.achievedP20VariationDb) ? selectedCandidate.achievedP20VariationDb : null;
     contract.productAnalysis.parameters.p20 = createBassParameterResult({
       parameter: PARAM_P20, status: paramStatus(p20Level != null), level: p20Level, value: p20Value,
       unit: "dB", passedL1: p20Level != null ? p20Level >= 1 : null, isStale,
@@ -442,9 +454,11 @@ export function adaptCurrentBassOptimisationResult({
   contract.roomResponse.responseDomain = domain.responseDomain;
   contract.roomResponse.productIndependent = domain.productIndependent;
 
-  // Map RSP curve (reference only — avoid duplicating the same large array).
+  // Preserve raw room transfer for provenance; final post-EQ authority is exposed separately.
   if (hasRspCurve) {
     contract.roomResponse.rspCurve = rspRawCurve;
+    contract.roomResponse.postEqRspCurve = finalResponse?.postEqRspCurve || [];
+    contract.roomResponse.postEqSeatCurves = finalResponse?.postEqPerSeatCurves || [];
     contract.roomResponse.status = "complete";
   } else {
     contract.roomResponse.status = "uncalculated";

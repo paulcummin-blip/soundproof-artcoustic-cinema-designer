@@ -103,6 +103,27 @@ export function assessLayoutResult(layout, transferResult, directReferenceResult
   return { ...layout, metrics };
 }
 
+export function applyFinalOptimisedAuthorityToLayout(layoutAssessment, finalResponse) {
+  const p19 = finalResponse?.finalSeatVariationData?.p19;
+  const p20 = finalResponse?.finalSeatVariationData?.p20;
+  if (!layoutAssessment?.metrics || !finalResponse?.selectedCandidateId || p19?.candidateId !== finalResponse.selectedCandidateId || p20?.candidateId !== finalResponse.selectedCandidateId) return layoutAssessment;
+  const metrics = {
+    ...layoutAssessment.metrics,
+    p19Level: Number.isFinite(p19.level) ? p19.level : layoutAssessment.metrics.p19Level,
+    p20Level: Number.isFinite(p20.level) ? p20.level : layoutAssessment.metrics.p20Level,
+    meanSeatVariationDb: Number.isFinite(p19.variationDb) ? p19.variationDb : layoutAssessment.metrics.meanSeatVariationDb,
+    worstSeatVariationDb: Number.isFinite(p20.variationDb) ? p20.variationDb : layoutAssessment.metrics.worstSeatVariationDb,
+    selectedCandidateId: finalResponse.selectedCandidateId,
+    filterBankSignature: finalResponse.filterBankSignature,
+    responseAuthority: "final-post-eq",
+  };
+  metrics.combinedConsistencyLevel = (metrics.p19Level || 0) + (metrics.p20Level || 0);
+  metrics.placementGrade = gradeLayout(metrics, false);
+  metrics.overallGrade = metrics.placementGrade;
+  metrics.rankingReason = `P19 ${metrics.p19Level > 0 ? `L${metrics.p19Level}` : "FAIL"} and P20 ${metrics.p20Level > 0 ? `L${metrics.p20Level}` : "FAIL"}; final selected post-EQ candidate.`;
+  return { ...layoutAssessment, metrics };
+}
+
 export function compareRankedLayouts(a, b) {
   const A = a.metrics, B = b.metrics, tolerance = C.tieTolerance;
   if (A.combinedConsistencyLevel !== B.combinedConsistencyLevel) return B.combinedConsistencyLevel - A.combinedConsistencyLevel;

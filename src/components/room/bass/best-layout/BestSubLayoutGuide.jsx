@@ -4,12 +4,15 @@ import { useBestSubLayoutRecommendations } from "@/components/room/bass/best-lay
 import { useBestSubLayoutLiveInputs } from "@/components/room/bass/best-layout/bestSubLayoutLiveInputs";
 import { selectBestSubLayoutPhysics } from "@/components/room/bass/best-layout/bestSubLayoutPhysicsSnapshot";
 import { canonicalizeNormalizedRoomInputs } from "@/components/room/bass/normalizedRoomInputAdapters";
+import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
 
 export default function BestSubLayoutGuide({ roomDims, seatingPositions, rspPosition, sourceHeights, contextId, roomElements, currentSubs, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg }) {
   const livePhysics = useBestSubLayoutLiveInputs();
+  const sharedBassResults = useOptionalSharedBassResults();
+  const finalOptimisedBassResponse = sharedBassResults?.optimisationResult?.finalOptimisedBassResponse || null;
   const canonical = useMemo(() => canonicalizeNormalizedRoomInputs({ roomDims, seatingPositions, rspPosition }), [roomDims, seatingPositions, rspPosition]);
   const physicsOptions = selectBestSubLayoutPhysics(livePhysics, contextId);
-  const recommendation = useBestSubLayoutRecommendations({ ...canonical, physicsOptions, sourceHeights, roomElements, currentSubs });
+  const recommendation = useBestSubLayoutRecommendations({ ...canonical, physicsOptions, sourceHeights, roomElements, currentSubs, finalOptimisedBassResponse });
   const items = recommendation.result?.recommendations || [];
   return (
     <div className="mt-4 rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4" data-layout-candidates={recommendation.result?.candidateCount ?? 0} data-layout-cards={items.slice(0, 3).length}>
