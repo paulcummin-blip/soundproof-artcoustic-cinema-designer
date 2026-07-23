@@ -1512,7 +1512,9 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
     if (_coherenceMode === 'split' && splitCoherenceDiagnostic) {
       postModalMagnitude = splitCoherenceDiagnostic.splitCoherenceFinalMag;
     } else {
-      postModalMagnitude = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+      // Final pressure-domain boundary: direct, reflection, late-field, and modal
+      // contributions remain complex until the complete listener field is assembled.
+      postModalMagnitude = Math.hypot(sumRe, sumIm);
     }
     const finalSplDb = 20 * Math.log10(postModalMagnitude);
     if (captureThisFrequency) runtimeVectorCapture.push({
@@ -1677,7 +1679,7 @@ export function simulateBassResponseRewCore(roomDims, seatPos, sub, subProductCu
   });
 
   const splDbRaw = complexPressure.map(({ re, im }) => {
-    const magnitude = Math.sqrt(re * re + im * im);
+    const magnitude = Math.hypot(re, im);
     return 20 * Math.log10(magnitude);
   });
 
