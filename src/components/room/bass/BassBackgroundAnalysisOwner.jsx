@@ -11,6 +11,8 @@ import { markBassAuthorityUpdating, publishCompletedBassContract, syncPersistent
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
+import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
+import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
@@ -36,8 +38,29 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const {
     roomDims, seatingPositions, rspPosition, sources, rspRawCurve, perSeatRawCurves,
     designEqSystemLimits, optimisationTransitionHz, requested, fingerprintInputs,
-    fingerprints, payload, inputsValid, includeDiagnostics,
+    fingerprints, payload: basePayload, inputsValid: baseInputsValid, includeDiagnostics,
   } = authoritative;
+  const normalizedPhysicsOptions = useNormalizedPhysicsOptions(authoritative);
+  const normalizedLive = useNormalizedRoomTransferLive({
+    roomDims,
+    rspPosition,
+    seatingPositions,
+    subsForSimulation: sources,
+    physicsOptions: normalizedPhysicsOptions,
+  });
+  const normalizedTransferReady = normalizedLive.status === "ready" && normalizedLive.quality === "refined";
+  const payload = useMemo(() => ({
+    ...basePayload,
+    perSourceComplexTransfers: normalizedTransferReady ? normalizedLive.result?.perSourceRspComplexTransfers || [] : [],
+    normalizedTransferFingerprint: normalizedTransferReady ? normalizedLive.geometryFingerprint : null,
+    calibrationFingerprint: fingerprints.calibration,
+  }), [basePayload, normalizedTransferReady, normalizedLive.result, normalizedLive.geometryFingerprint, fingerprints.calibration]);
+  const inputsValid = baseInputsValid && normalizedTransferReady;
+  const sharedAuthoritative = useMemo(() => ({
+    ...authoritative,
+    normalizedLive,
+    normalizedPhysicsOptions,
+  }), [authoritative, normalizedLive, normalizedPhysicsOptions]);
 
   const cacheKey = useMemo(() => buildBassResultCacheKey(fingerprints.calibration), [fingerprints.calibration, OPTIMISER_VERSION_SIGNATURE]);
   const requestIdentity = useMemo(() => ({
@@ -113,6 +136,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [controller, lifecycle.resultFingerprint, lifecycle.activeJobId, optimisationResult]);
   const onPriorityChange = useCallback((mode) => setSelectedPriorityMode(normalizeBassPriorityMode(mode)), []);
   const onRetry = useCallback((collectDiagnostics = false) => controller.requestManual({ fingerprint: cacheKey, payload, identity: requestIdentity, collectDiagnostics, force: true }), [controller, cacheKey, payload, requestIdentity]);
-  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange, onRetry, authoritative });
+  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange, onRetry, authoritative: sharedAuthoritative });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

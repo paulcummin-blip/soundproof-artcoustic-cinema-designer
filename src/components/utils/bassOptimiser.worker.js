@@ -46,6 +46,9 @@ self.onmessage = (e) => {
       targetAnchorSource: payload?.targetAnchorSource || null,
       p14TargetBasis: payload?.p14TargetBasis || "minimum",
       perSeatRawCurves: payload?.perSeatRawCurves || [],
+      perSourceComplexTransfers: payload?.perSourceComplexTransfers || [],
+      normalizedTransferFingerprint: payload?.normalizedTransferFingerprint || null,
+      calibrationFingerprint: payload?.calibrationFingerprint || null,
       collectDiagnostics: !!collectDiagnostics,
       onProgress: (progress) => {
         self.postMessage(createProgressMessage(requestId, fingerprint, progress, identity));

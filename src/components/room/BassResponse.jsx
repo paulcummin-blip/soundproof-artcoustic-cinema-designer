@@ -20,8 +20,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import DesignEqLimitStatus from "@/components/room/bass/DesignEqLimitStatus";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
-import { useNormalizedRoomTransferLive } from "@/components/room/bass/useNormalizedRoomTransferLive";
-import { useNormalizedPhysicsOptions } from "@/components/room/bass/useNormalizedPhysicsOptions";
 import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
 import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/bass/bassGraphDomainBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
@@ -55,6 +53,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     modalCoherenceMode, setModalCoherenceMode, highOrderAxialScale, setHighOrderAxialScale,
     qStrategy, setQStrategy, rewModalBandwidthScale, setRewModalBandwidthScale,
     bassSmoothingMode, setBassSmoothingMode, includeDiagnostics, setIncludeDiagnostics,
+    normalizedLive, normalizedPhysicsOptions,
   } = authoritative;
   const activeProjectId = useActiveProjectId();
   const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims });
@@ -284,22 +283,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const setOptimiserPriorityMode = sharedBassResults.onPriorityChange;
   const calculateDetailed = sharedBassResults.onRetry;
 
-  // Product-independent normalized physics options.
-  const normalizedPhysicsOptions = useNormalizedPhysicsOptions({
-    surfaceAbsorption, qStrategy, enableRewCoreReflections, roomDamping, axialQ,
-    modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode,
-    propagationPhaseScale, disableReflectionPhaseJitter, disableReflectionCoherenceWeight,
-    mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode,
-    overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier,
-    reflectionGainScale, modalCoherenceMode, highOrderAxialScale, rewModalBandwidthScale,
-  });
-
+  // Product-independent transfer is owned by the shared room analysis owner so
+  // the graph and optimiser consume one calculation for the current geometry.
   usePublishBestSubLayoutInputs({ contextId: layoutContextId, physicsOptions: normalizedPhysicsOptions });
-
-  const normalizedLive = useNormalizedRoomTransferLive({
-    roomDims, rspPosition, seatingPositions, subsForSimulation,
-    physicsOptions: normalizedPhysicsOptions,
-  });
 
   // Normalized RSP series for the live, pre-calibration room-response display.
   // Phase 2B: label reflects the two-stage quality (preview / refining / refined).
