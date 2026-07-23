@@ -36,6 +36,7 @@ import {
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { formatP14RecommendedDetail, formatP14TargetBasisDetail, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
+import { buildBassTargetViews } from "@/components/room/bass/bassTargetViews";
 
 // ---------------------------------------------------------------------------
 // Adapter helpers
@@ -421,6 +422,18 @@ export function adaptCurrentBassOptimisationResult({
       level: null, value: null, unit: "dB", passedL1: null, isStale,
     });
   }
+
+  // Build both target interpretations from the same selected candidate and acoustic result.
+  contract.bassTargets = buildBassTargetViews(contract.productAnalysis.parameters, contract.selectedCandidate);
+  contract.selectedTargetBasis = normalizeP14TargetBasis(p14TargetBasis);
+  const selectedTarget = contract.bassTargets[contract.selectedTargetBasis];
+  contract.productAnalysis.parameters = {
+    p14: selectedTarget.p14,
+    p18: selectedTarget.p18,
+    p19: selectedTarget.p19,
+    p20: selectedTarget.p20,
+  };
+  contract.designRecommendation = selectedTarget.designRecommendation;
 
   // --- Room response (Phase 1C: map real data truthfully) ---
   const hasRspCurve = Array.isArray(rspRawCurve) && rspRawCurve.length > 0;

@@ -50,7 +50,9 @@ export function deriveRequestedCalibrationConfig({
   const targetSpl = Number.isFinite(splConfig?.targetSpl) ? splConfig.targetSpl : null;
   const transitionHz = Number.isFinite(optimisationTransitionHz) ? optimisationTransitionHz : null;
   const usableLfHz = Number.isFinite(designEqSystemLimits?.usableLfHz) ? designEqSystemLimits.usableLfHz : null;
-  const p14TargetBasis = splConfig?.p14Mode === "recommended" ? "recommended" : "minimum";
+  // The optimiser keeps the existing Minimum authority. Minimum/Recommended is
+  // now a presentation interpretation and must never restart the worker.
+  const p14TargetBasis = "minimum";
 
   return {
     p14TargetBasis,

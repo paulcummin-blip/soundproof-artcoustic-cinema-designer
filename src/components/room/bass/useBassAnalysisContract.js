@@ -115,7 +115,6 @@ export function useBassAnalysisContract({
     optimisationTransitionHz,
     targetAnchorDb: liveTargetAnchorDb,
     activeFitProfile: liveFitProfile,
-    p14TargetBasis: splConfig?.p14Mode === "recommended" ? "recommended" : "minimum",
     usableLfHz: liveUsableLfHz,
     evaluatedProfiles,
   }), [roomDims, rspPosition, seatingPositions, subsForSimulation, surfaceAbsorption,
