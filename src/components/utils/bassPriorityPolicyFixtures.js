@@ -1,6 +1,7 @@
 import { CANONICAL_BASS_PRIORITY_MODES, rankBassCandidates, stableCandidateSignature } from "./bassPriorityPolicies";
 import { selectCandidateFromPool } from "./bassOperatingEnvelopeOptimiser";
 import { computeCalibrationFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
+import { identifyBassLimitingParameter } from "./bassLimitingParameter";
 
 const candidate = (id, p14, p18, p19, options = {}) => ({
   id, candidateSignature: id,
@@ -62,7 +63,7 @@ export function runBassPriorityPolicyFixtures() {
   results.p11TiesDeterministic = rankBassCandidates([tieB, tieA], "balanced").selected === tieA && rankBassCandidates([tieA, tieB], "balanced").selected === tieA;
 
   const fail = rankBassCandidates([candidate("fail-a", 4, 0, 4), candidate("fail-b", 2, 0, 2)], "balanced");
-  results.p12NoL1PoolHonestFail = fail.selected?.id === "fail-a" && fail.diagnostics.eligibilityGroup.includes("below_l1") && fail.diagnostics.selectionReason.includes("invalid/FAIL");
+  results.p12NoL1PoolHonestFail = fail.selected?.id === "fail-a" && fail.diagnostics.eligibilityGroup.includes("below_l1") && fail.diagnostics.selectionReason.includes("non-sacrificial");
 
   const filters = [{ enabled: true, frequencyHz: 52, gainDb: -3.25, Q: 5.5 }];
   const preserved = candidate("preserved", 3, 2, 1, { p14Db: 109.25, p18Hz: 27, p19Dev: 4.75, filters });
@@ -73,8 +74,8 @@ export function runBassPriorityPolicyFixtures() {
   const legacyPool = poolOf([...pool.candidates, houseCandidate]);
   const legacyAccuracy = selectCandidateFromPool(legacyPool, "accuracy");
   const legacyExtension = selectCandidateFromPool(legacyPool, "extension");
-  results.p14LegacyPriorityValuesRerank = legacyAccuracy.selectedMode === "house_curve_accuracy" && legacyExtension.selectedMode === "depth";
-  results.p15LegacySelectedByModeAliases = legacyAccuracy.selectedByMode.accuracy === legacyAccuracy.selectedByMode.house_curve_accuracy && legacyAccuracy.selectedByMode.extension === legacyAccuracy.selectedByMode.depth;
+  results.p14LegacyPriorityValuesResolveToBalancedAuthority = legacyAccuracy.selectedMode === "balanced" && legacyExtension.selectedMode === "balanced";
+  results.p15OnlyBalancedProductionSelectionReturned = Object.keys(legacyAccuracy.selectedByMode).length === 1 && legacyAccuracy.selectedByMode.balanced != null;
   results.p16InvalidBankRejected = rankBassCandidates([candidate("invalid-bank", 4, 4, 4, { bankValid: false })], "balanced").selected === null;
 
   const dominant = candidate("dominant", 0, 0, 0, {
@@ -103,6 +104,35 @@ export function runBassPriorityPolicyFixtures() {
   const splSelection = rankBassCandidates([dominated, dominant], "spl");
   results.p20OtherModesDoNotApplyDominance = splSelection.diagnostics.balancedFallbackDominanceApplied === false
     && splSelection.diagnostics.dominatedCandidateCount === 0;
+
+  const consistent = candidate("consistent", 2, 2, 2, { p14Db: 110, p18Hz: 25, p19Dev: 3 });
+  consistent.p20Available = true;
+  consistent.achievedP20Level = 2;
+  consistent.achievedP20VariationDb = 3;
+  const sacrificedWorstSeat = candidate("sacrificed", 3, 3, 3, { p14Db: 112, p18Hz: 22, p19Dev: 2 });
+  sacrificedWorstSeat.p20Available = true;
+  sacrificedWorstSeat.achievedP20Level = 0;
+  sacrificedWorstSeat.achievedP20VariationDb = 8;
+  results.p21BalancedDoesNotSacrificeP20 = rankBassCandidates([sacrificedWorstSeat, consistent], "balanced").selected === consistent;
+
+  const p14Only = candidate("p14-only", 4, 2, 0, { p14Db: 118, p19Dev: 8 });
+  const allRespected = candidate("all-respected", 3, 2, 2, { p14Db: 115, p19Dev: 4 });
+  results.p22P14GainCannotTradeAwayP19 = rankBassCandidates([p14Only, allRespected], "balanced").selected === allRespected;
+
+  const limitationCases = [
+    [{ ...candidate("limit-p14", 1, 3, 3), p20Available: true, achievedP20Level: 3 }, "p14", "additional subwoofers"],
+    [{ ...candidate("limit-p18", 3, 1, 3), p20Available: true, achievedP20Level: 3 }, "p18", "low-frequency capability"],
+    [{ ...candidate("limit-p19", 3, 3, 1), p20Available: true, achievedP20Level: 3 }, "p19", "subwoofer placement"],
+    [{ ...candidate("limit-p20", 3, 3, 3), p20Available: true, achievedP20Level: 1 }, "p20", "seating position"],
+  ];
+  results.p23PhysicalRecommendationsMatchLimitations = limitationCases.every(([item, key, phrase]) => {
+    const recommendation = identifyBassLimitingParameter(item);
+    return recommendation?.parameterKey === key && recommendation.recommendedImprovement.toLowerCase().includes(phrase);
+  });
+  const allL4 = { ...candidate("all-l4", 4, 4, 4), p20Available: true, achievedP20Level: 4 };
+  const allL4Recommendation = identifyBassLimitingParameter(allL4);
+  results.p24AllL4DoesNotRecommendUnnecessaryUpgrade = allL4Recommendation?.parameterKey === "none"
+    && allL4Recommendation.recommendedImprovement.includes("No physical design change");
 
   return results;
 }

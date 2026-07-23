@@ -572,5 +572,5 @@ export { selectCandidateFromPool };
 // Backward-compatible wrapper — calls both stages.
 export function optimiseBassSystem(options) {
   const pool = generateCandidatePool(options);
-  return selectCandidateFromPool(pool, options.priorityMode);
+  return selectCandidateFromPool(pool);
 }

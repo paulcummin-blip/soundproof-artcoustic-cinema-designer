@@ -27,7 +27,7 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
         <strong>Assessment position:</strong> RSP &nbsp;|&nbsp; <strong>Response ID:</strong> rsp &nbsp;|&nbsp; <strong>RSP coordinates:</strong> {rspPosition ? `x=${rspPosition.x.toFixed(3)} / y=${rspPosition.y.toFixed(3)} / z=${rspPosition.z.toFixed(3)} m` : "unavailable"} &nbsp;|&nbsp; <strong>Real seats:</strong> {seatingPositions?.length ?? 0}
       </div>
       <BassContractParityAudit contract={contract} optimisationResult={result} detailedStatus={detailedStatus} rspRawCurve={rspRawCurve} perSeatRawCurves={perSeatRawCurves} canonicalPriorityMode={priorityMode} graphCandidateId={graphCandidateId} />
-      <BassOptimiserValidationPanel result={result} priorityMode={priorityMode} onPriorityModeChange={onPriorityChange} activeSubs={systemLimits.activeSubs} usableLfHz={systemLimits.usableLfHz} perSeatRawCurves={perSeatRawCurves} rspRawCurve={rspRawCurve} normalizedTransferResult={normalizedTransferResult} includeDiagnostics />
+      <BassOptimiserValidationPanel result={result} activeSubs={systemLimits.activeSubs} usableLfHz={systemLimits.usableLfHz} perSeatRawCurves={perSeatRawCurves} rspRawCurve={rspRawCurve} normalizedTransferResult={normalizedTransferResult} includeDiagnostics />
       <DesignEqFilterBankDiagnostic filters={result.selectedFilters} combinedEqCurve={correction} profile={result.selectedCandidate?.designEqFitProfile} profileConfig={result.selectedCandidate?.designEqFitProfileConfig} />
       <SourceDomainCapabilityDiagnostic activeSubs={systemLimits.activeSubs} rawCurve={baseCurve} postEqCurve={result.finalPostEqCurve} usableLfHz={systemLimits.usableLfHz} optimisationResult={result} />
     </>}

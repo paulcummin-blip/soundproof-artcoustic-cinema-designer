@@ -20,7 +20,11 @@ export function bassLevelScore(value) {
 
 const finiteOr = (value, fallback) => Number.isFinite(value) ? value : fallback;
 const lowerScore = (value) => -finiteOr(value, Number.MAX_SAFE_INTEGER);
-const levels = (candidate) => [candidate?.achievedP14Level, candidate?.achievedP18Level, candidate?.achievedP19Level].map(bassLevelScore);
+const levels = (candidate) => {
+  const scores = [candidate?.achievedP14Level, candidate?.achievedP18Level, candidate?.achievedP19Level].map(bassLevelScore);
+  if (candidate?.p20Available === true && candidate?.achievedP20Level != null) scores.push(bassLevelScore(candidate.achievedP20Level));
+  return scores;
+};
 const balancedTuple = (candidate) => levels(candidate).sort((a, b) => a - b);
 const levelSpread = (candidate) => {
   const tuple = levels(candidate);
@@ -57,7 +61,10 @@ const higherMetricComparison = (a, b, tolerance) => {
 };
 
 function strictlyDominatesBalancedFallback(a, b) {
-  if (levels(a).some((level, index) => level !== levels(b)[index])) return false;
+  const aLevels = levels(a);
+  const bLevels = levels(b);
+  if (aLevels.length !== bLevels.length || aLevels.some((level, index) => level < bLevels[index])) return false;
+  const levelMateriallyBetter = aLevels.some((level, index) => level > bLevels[index]);
   const comparisons = [
     lowerMetricComparison(a?.achievedP18FrequencyHz, b?.achievedP18FrequencyHz, DOMINANCE_HZ_TOLERANCE),
     lowerMetricComparison(a?.achievedP19VariationDb, b?.achievedP19VariationDb, DOMINANCE_DB_TOLERANCE),
@@ -67,7 +74,7 @@ function strictlyDominatesBalancedFallback(a, b) {
     lowerMetricComparison(enabledFilterCount(a), enabledFilterCount(b), 0),
   ];
   return comparisons.every((comparison) => comparison.noWorse)
-    && comparisons.some((comparison) => comparison.materiallyBetter);
+    && (levelMateriallyBetter || comparisons.some((comparison) => comparison.materiallyBetter));
 }
 
 export function removeStrictlyDominatedBalancedFallbacks(candidates) {
@@ -116,7 +123,8 @@ export function rankingTupleForMode(candidate, mode) {
     p14, finiteOr(candidate?.achievedP14Db, -Number.MAX_SAFE_INTEGER), Math.min(p18, p19),
     lowerScore(candidate?.achievedP19VariationDb), lowerScore(candidate?.achievedP18FrequencyHz), lowerScore(eqCost(candidate)),
   ];
-  return [...balance, -levelSpread(candidate), lowerScore(worstSeatDeviation(candidate)),
+  return [...balance, -levelSpread(candidate), lowerScore(candidate?.achievedP20VariationDb),
+    lowerScore(worstSeatDeviation(candidate)), lowerScore(candidate?.achievedP19VariationDb),
     lowerScore(rmsTargetError(candidate)), lowerScore(eqCost(candidate))];
 }
 
@@ -141,8 +149,7 @@ export function rankBassCandidates(pool, mode) {
   const baseEligible = houseCurveMode
     ? (preEqReachedP14L1 && p14PreservingHouseCandidates.length ? p14PreservingHouseCandidates : houseCurveCandidates)
     : (fullyValid.length ? fullyValid : bankValid);
-  const balancedFallbackDominanceApplied = canonicalMode === BASS_PRIORITY_MODES.BALANCED
-    && fullyValid.length === 0 && bankValid.length > 0;
+  const balancedFallbackDominanceApplied = canonicalMode === BASS_PRIORITY_MODES.BALANCED && baseEligible.length > 0;
   const eligible = balancedFallbackDominanceApplied
     ? removeStrictlyDominatedBalancedFallbacks(baseEligible)
     : baseEligible;
@@ -150,7 +157,7 @@ export function rankBassCandidates(pool, mode) {
   const p14PreservationUnavailable = houseCurveMode && preEqReachedP14L1 && p14PreservingHouseCandidates.length === 0;
   const eligibilityGroup = p14PreservationUnavailable ? "house_curve_no_admissible_p14_l1_preserving_candidate" :
     houseCurveMode && bankValid.length ? "bank_valid_raw_house_curve_objective" :
-    fullyValid.length ? "bank_valid_all_p14_p18_p19_l1" :
+    fullyValid.length ? "bank_valid_all_rp22_bass_parameters_l1" :
     bankValid.length ? "bank_valid_best_calibrated_attempt_below_l1" : "no_bank_and_band_valid_candidates";
   const selected = eligible.length ? [...eligible].sort((a, b) => compareRanked(a, b, canonicalMode))[0] : null;
   const signature = selected ? stableCandidateSignature(selected) : null;
@@ -179,10 +186,10 @@ export function rankBassCandidates(pool, mode) {
           : `${canonicalMode}: ${selected.designEqFitProfile || "standard"} beat house_curve on measured raw residual metrics (${selected.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${selected.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB vs ${houseCurveCandidate.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${houseCurveCandidate.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB).`
         : `${canonicalMode}: ERROR — no compatible generated house_curve candidate was available; no legacy accuracy fallback was accepted.`
       : fullyValid.length
-        ? `${canonicalMode}: selected from ${fullyValid.length} bank-valid candidates achieving P14, P18 and P19 at L1 or above.`
+        ? `${canonicalMode}: selected the highest balanced RP22 outcome from ${fullyValid.length} bank-valid candidates, with P14, P18, P19 and available P20 respected together; ${dominatedCandidateCount} dominated candidate${dominatedCandidateCount === 1 ? " was" : "s were"} excluded.`
         : balancedFallbackDominanceApplied
-          ? `${canonicalMode}: no candidate achieved L1 across P14, P18 and P19; removed ${dominatedCandidateCount} strictly dominated fallback candidate${dominatedCandidateCount === 1 ? "" : "s"}, then selected the best calibrated invalid/FAIL attempt with the existing fallback comparator without changing achieved levels.`
-          : `${canonicalMode}: no candidate achieved L1 across P14, P18 and P19; selected the best calibrated invalid/FAIL attempt without changing achieved levels.`
+          ? `${canonicalMode}: no candidate achieved L1 across every available RP22 bass parameter; removed ${dominatedCandidateCount} strictly dominated candidate${dominatedCandidateCount === 1 ? "" : "s"}, then selected the strongest non-sacrificial calibrated attempt.`
+          : `${canonicalMode}: no candidate achieved L1 across every available RP22 bass parameter; selected the strongest calibrated attempt without changing achieved levels.`
     : `${canonicalMode}: no bank-valid candidate with a valid assessment band was available.`;
   return {
     selected,

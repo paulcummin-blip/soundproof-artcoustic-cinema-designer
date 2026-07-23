@@ -304,6 +304,9 @@ export function adaptCurrentBassOptimisationResult({
 
   // --- Selected candidate ---
   contract.selectedCandidate = buildCandidateRef(selectedCandidate);
+  contract.designRecommendation = optimisationResult?.primaryLimitation
+    ? { ...optimisationResult.primaryLimitation }
+    : null;
 
   // --- Selected candidate ID (matches live-candidate consistency signature) ---
   if (selectedCandidate && optimisationResult) {

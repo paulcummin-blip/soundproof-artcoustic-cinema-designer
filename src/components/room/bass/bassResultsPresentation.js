@@ -32,11 +32,9 @@ export function formatBassParameterValue(key, value) {
 
 function parameterLabel(key, result) {
   if (key === "p14") return "Estimated LFE Capability";
-  if (key === "p19") return "P19 RSP";
-  if (key === "p20") {
-    const seatId = result?.selectedCandidate?.worstP20SeatId;
-    return `P20 worst seat${seatId ? ` (${seatId})` : ""}`;
-  }
+  if (key === "p18") return "Bass Extension";
+  if (key === "p19") return "Seat Consistency";
+  if (key === "p20") return "Worst Seat Performance";
   return key.toUpperCase();
 }
 
@@ -45,7 +43,7 @@ function readyPill(key, parameter, result) {
   if (parameter?.status === "not_applicable") return { text: `${label} N/A`, level: "N/A" };
   if (key === "p20") {
     const worst = p20SummaryFromResults(result?.selectedCandidate?.perSeatP20Results);
-    return worst ? { text: `P20 worst seat · ${worst.level} · ${worst.displayVariationDb}`, level: worst.level } : { text: "P20 worst seat —", level: "—" };
+    return worst ? { text: `Worst Seat Performance · ${worst.level} · ${worst.displayVariationDb}`, level: worst.level } : { text: "Worst Seat Performance —", level: "—" };
   }
   if (parameter?.status === "error") return { text: `${label} error`, level: "—" };
   if (parameter?.level == null) return { text: `${label} —`, level: "—" };

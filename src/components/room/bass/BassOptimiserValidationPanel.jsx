@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import LiveHouseCurveDiagnostics from "@/components/room/bass/LiveHouseCurveDiagnostics";
 import { buildCandidateSignature, signatureToString } from "@/components/room/bass/candidateConsistency";
-import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
 import { formatP20Deviation, levelP20_lfConsistency } from "@/components/utils/rp22/levels";
 import ProductionHouseCurveAuthorityDiagnostic from "./ProductionHouseCurveAuthorityDiagnostic";
 import ShadowPairedCapabilityDiagnostic from "./ShadowPairedCapabilityDiagnostic";
@@ -10,7 +9,7 @@ const level = (value) => value > 0 ? `L${value}` : "FAIL";
 const fmt = (value, unit = "") => Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—";
 const fmtMs = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
 
-export default function BassOptimiserValidationPanel({ result, priorityMode, onPriorityModeChange, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve, normalizedTransferResult, includeDiagnostics = false }) {
+export default function BassOptimiserValidationPanel({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawCurve, normalizedTransferResult, includeDiagnostics = false }) {
   const [fitterDiagnosticsOpen, setFitterDiagnosticsOpen] = useState(false);
   const [showAllRevisions, setShowAllRevisions] = useState(false);
   if (!result) return null;
@@ -34,11 +33,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
         </div>
       );
     })()}
-    <label className="mt-2 flex w-fit items-center gap-2 font-mono text-[10px] text-emerald-950">Priority mode
-      <select value={normalizeBassPriorityMode(priorityMode)} onChange={(event) => onPriorityModeChange(event.target.value)} className="rounded border border-emerald-300 bg-white px-2 py-1">
-        <option value="balanced">Balanced</option><option value="house_curve_accuracy">House-curve accuracy</option><option value="depth">Depth priority</option><option value="spl">SPL priority</option>
-      </select>
-    </label>
+    <div className="mt-2 font-mono text-[10px] font-semibold text-emerald-950">Authority: Balanced RP22 Optimisation</div>
     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-emerald-950">
       <span>Estimated LFE Capability {result.achievedP14Level} ({fmt(result.achievedP14Db, " dBC")}) — {result.p14TargetBasis === "recommended" ? "Recommended" : "Minimum"} target</span><span>P18 {result.achievedP18Level} ({fmt(result.achievedP18FrequencyHz, " Hz")})</span><span>P19 {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
     </div>

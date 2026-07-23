@@ -176,7 +176,7 @@ export function formatParameterResult(result) {
 // 3. Versioned contract factory
 // ---------------------------------------------------------------------------
 
-export const BASS_ANALYSIS_CONTRACT_VERSION = 1;
+export const BASS_ANALYSIS_CONTRACT_VERSION = 2;
 
 export function createBassAnalysisResult() {
   return {
@@ -255,6 +255,7 @@ export function createBassAnalysisResult() {
     selectedMode: BASS_MODE_BALANCED,
     selectedCandidateId: null,
     selectedCandidate: null,
+    designRecommendation: null,
 
     provenance: {
       poolId: null,

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import { useAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
@@ -10,7 +10,6 @@ import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOp
 import { markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
-import { normalizeBassPriorityMode } from "@/components/utils/bassPriorityPolicies";
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
 import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
 
@@ -30,7 +29,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   if (!scopeRef.current) scopeRef.current = createBassResultsScope(scopeId);
   const controller = controllerRef.current;
   const lifecycle = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
-  const [selectedPriorityMode, setSelectedPriorityMode] = useState("balanced");
+  const selectedPriorityMode = "balanced";
 
   const frontSubsLive = useMemo(() => (appState?.subwoofers || []).filter((sub) => sub?.group === "front"), [appState?.subwoofers]);
   const rearSubsLive = useMemo(() => (appState?.subwoofers || []).filter((sub) => sub?.group === "rear"), [appState?.subwoofers]);
@@ -69,7 +68,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     productFingerprint: fingerprints.product,
     calibrationFingerprint: fingerprints.calibration,
     ...BASS_OPTIMISER_VERSIONS,
-    canonicalPriorityMode: "all-canonical-priorities",
+    canonicalPriorityMode: "balanced-rp22-authority",
     poolId: null,
   }), [cacheKey, fingerprints.geometry, fingerprints.product, fingerprints.calibration, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => {
@@ -90,13 +89,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const selectionAttempt = useMemo(() => {
     if (!matchingResult?.pool) return { result: null, error: null };
     try {
-      return { result: selectCandidateFromPool(matchingResult.pool, selectedPriorityMode), error: null };
+      return { result: selectCandidateFromPool(matchingResult.pool), error: null };
     } catch (error) {
       return { result: null, error };
     }
   }, [matchingResult, selectedPriorityMode]);
   useEffect(() => {
-    if (selectionAttempt.error) controller.reportMainThreadError(selectionAttempt.error, "Priority selections");
+    if (selectionAttempt.error) controller.reportMainThreadError(selectionAttempt.error, "Balanced RP22 selection");
   }, [controller, selectionAttempt.error]);
   const optimisationResult = useMemo(() => {
     const selected = selectionAttempt.result;
@@ -126,7 +125,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     const resultFingerprint = lifecycle.resultFingerprint;
     if (!resultFingerprint || !optimisationResult) return;
-    for (const stage of ["Priority selections created", "Contract adapted", "Authoritative result published"]) {
+    for (const stage of ["Balanced RP22 selection created", "Contract adapted", "Authoritative result published"]) {
       const key = `${resultFingerprint}:${stage}`;
       if (!publishedStagesRef.current.has(key)) {
         publishedStagesRef.current.add(key);
@@ -134,8 +133,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       }
     }
   }, [controller, lifecycle.resultFingerprint, lifecycle.activeJobId, optimisationResult]);
-  const onPriorityChange = useCallback((mode) => setSelectedPriorityMode(normalizeBassPriorityMode(mode)), []);
   const onRetry = useCallback((collectDiagnostics = false) => controller.requestManual({ fingerprint: cacheKey, payload, identity: requestIdentity, collectDiagnostics, force: true }), [controller, cacheKey, payload, requestIdentity]);
-  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange, onRetry, authoritative: sharedAuthoritative });
+  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

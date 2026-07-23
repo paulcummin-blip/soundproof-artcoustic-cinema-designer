@@ -1,12 +1,13 @@
-import { CANONICAL_BASS_PRIORITY_MODES, normalizeBassPriorityMode, rankBassCandidates } from "@/components/utils/bassPriorityPolicies";
+import { rankBassCandidates } from "@/components/utils/bassPriorityPolicies";
 import { displayBassCandidates } from "@/components/utils/bassCandidatePoolEligibility";
+import { identifyBassLimitingParameter } from "@/components/utils/bassLimitingParameter";
 
 const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
 
-// Lightweight priority selection — reuses the stored candidate pool and never
+// Balanced RP22 authority selection reuses the stored candidate pool and never
 // runs fitting, physics, paired diagnostics, or bank evaluation.
-export function selectCandidateFromPool(pool, priorityMode) {
-  const mode = normalizeBassPriorityMode(priorityMode);
+export function selectCandidateFromPool(pool) {
+  const mode = "balanced";
   const perf = (typeof performance !== "undefined" && performance.now) ? () => performance.now() : () => Date.now();
   const t0 = perf();
   if (!pool || !pool.candidates || pool.candidates.length === 0) {
@@ -17,7 +18,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
       achievedP18Level: "FAIL", achievedP18FrequencyHz: null,
       achievedP19Level: "FAIL", achievedP19VariationDb: null,
       selectedFitProfile: null, candidates: [], displayCandidates: [], rejectedCandidates: [], selectedByMode: {},
-      isBestCalibratedAttempt: true,
+      primaryLimitation: null, isBestCalibratedAttempt: true,
       warningMessage: pool?.warningMessage || "A raw response curve and active subwoofer system are required.",
       performanceSummary: {
         ...pool?.performanceSummary,
@@ -38,17 +39,8 @@ export function selectCandidateFromPool(pool, priorityMode) {
     };
   }
   const selectablePool = Array.isArray(pool.selectablePool) && pool.selectablePool.length > 0 ? pool.selectablePool : pool.candidates;
-  const selectionsByMode = Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((candidateMode) => (
-    [candidateMode, rankBassCandidates(selectablePool, candidateMode)]
-  )));
-  const selectedByMode = {
-    ...Object.fromEntries(CANONICAL_BASS_PRIORITY_MODES.map((candidateMode) => (
-      [candidateMode, selectionsByMode[candidateMode].selected]
-    ))),
-    accuracy: selectionsByMode.house_curve_accuracy.selected,
-    extension: selectionsByMode.depth.selected,
-  };
-  const activeSelection = selectionsByMode[mode];
+  const activeSelection = rankBassCandidates(selectablePool, mode);
+  const selectedByMode = { balanced: activeSelection.selected };
   const selected = activeSelection.selected;
   if (!selected) {
     return {
@@ -57,7 +49,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
       achievedP18Level: "FAIL", achievedP18FrequencyHz: null,
       achievedP19Level: "FAIL", achievedP19VariationDb: null,
       selectedFitProfile: null, candidates: pool.candidates, displayCandidates: [],
-      rejectedCandidates: pool.candidates, selectedByMode, isBestCalibratedAttempt: true,
+      rejectedCandidates: pool.candidates, selectedByMode, primaryLimitation: null, isBestCalibratedAttempt: true,
       warningMessage: activeSelection.diagnostics.selectionReason,
       selectionReason: activeSelection.diagnostics.selectionReason,
       selectionDiagnostics: activeSelection.diagnostics,
@@ -66,7 +58,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
       capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
     };
   }
-  const isBestCalibratedAttempt = activeSelection.diagnostics.eligibilityGroup !== "bank_valid_all_p14_p18_p19_l1";
+  const isBestCalibratedAttempt = activeSelection.diagnostics.eligibilityGroup !== "bank_valid_all_rp22_bass_parameters_l1";
   const modeSelectionReason = activeSelection.diagnostics.selectionReason;
   const t1 = perf();
   return {
@@ -106,6 +98,7 @@ export function selectCandidateFromPool(pool, priorityMode) {
     displayCandidates: displayBassCandidates(pool.candidates, selected),
     rejectedCandidates: pool.candidates.filter((candidate) => !candidate.meetsRequestedEnvelope),
     selectedByMode,
+    primaryLimitation: identifyBassLimitingParameter(selected),
     isBestCalibratedAttempt,
     warningMessage: isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : null,
     performanceSummary: {

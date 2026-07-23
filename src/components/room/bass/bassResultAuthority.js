@@ -61,7 +61,7 @@ export function buildCandidateId(candidate) {
 export function buildBassResultCacheKey(calibrationFingerprint) {
   return [
     calibrationFingerprint || "cal:none",
-    "mode:all-canonical-priorities",
+    "mode:balanced-rp22-authority",
     `protocol:${BASS_OPTIMISER_PROTOCOL_VERSION}`,
     `pool:${BASS_OPTIMISER_POOL_VERSION}`,
     `engine:${HOUSE_CURVE_ENGINE_VERSION}`,

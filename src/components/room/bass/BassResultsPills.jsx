@@ -5,9 +5,9 @@ import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 
 const TOOLTIPS = {
   p14: "This estimate uses simulated subwoofer output capability, approved continuous SPL data, and applied EQ headroom. It is intentionally conservative and does not include room gain.",
-  p18: "P18 — system in-room bass extension.",
-  p19: "P19 — official response relative to target at the Reference Seat Position.",
-  p20: "P20 — seat-to-seat bass response consistency across real seats.",
+  p18: "Bass Extension — system in-room low-frequency extension.",
+  p19: "Seat Consistency — official bass response consistency relative to target.",
+  p20: "Worst Seat Performance — largest response variation between the RSP and a real seat.",
 };
 
 export default function BassResultsPills({ contract, compact = false, seatId = null, nowMs }) {
