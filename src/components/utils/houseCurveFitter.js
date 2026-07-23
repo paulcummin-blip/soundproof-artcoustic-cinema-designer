@@ -17,10 +17,15 @@ import { createHouseCurveEvaluationMemo } from "@/components/utils/houseCurveEva
 import { prepareBankValidation } from "@/components/utils/preparedBankValidation";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
-import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { refineOpposingResidualPair } from "@/components/utils/houseCurvePairedRefinement";
 import { runProfessionalResidualCleanup } from "@/components/utils/houseCurveResidualCleanup";
 import { refineLegalUnprotectedPeak } from "@/components/utils/houseCurveLegalPeakRefinement";
+import {
+  buildLfCapabilityContext,
+  buildLfCapabilityProtectionDiagnostics,
+  calculateLfCapabilityPenalty,
+  getEqCapabilityBoostAllowance,
+} from "@/components/utils/lfCapabilityProtection";
 
 export { houseCurveP19Level };
 
@@ -108,6 +113,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
   const profile = { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: true, maximumCutDb: 15 };
   const bankRaw = rspRaw;
+  const capabilityContext = buildLfCapabilityContext(activeSubs, bankRaw.map((point) => point.frequency), profile.id, requestedSystemOutputDb);
+  const capabilityPenaltyForBank = (bank) => calculateLfCapabilityPenalty(
+    bank, capabilityContext, (frequency, candidateBank) => candidateBank.reduce((sum, filter) => sum + peakingEqResponseDb(frequency, filter), 0),
+  );
   const protectedNullRegions = Array.isArray(options.protectedNullRegions)
     ? options.protectedNullRegions
     : identifyProtectedNullRegions(
@@ -137,11 +146,18 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   // Select the start with the best RSP maximum residual, then RSP RMS.
   let selected = startA;
   let selectedStartLabel = "empty";
+  let capabilityPenaltyChangedStartSelection = false;
   if (startB !== startA && startB.metrics && startA.metrics) {
+    const rawComparatorPrefersB = compareHouseCurveMetrics(startB.metrics, startA.metrics) < 0;
+    const startAScore = startA.metrics.rspMaxDeviationDb + (startA.capabilityPenaltyCostDb || 0);
+    const startBScore = startB.metrics.rspMaxDeviationDb + (startB.capabilityPenaltyCostDb || 0);
+    const capabilityComparatorPrefersB = startBScore < startAScore - 0.01
+      || (Math.abs(startBScore - startAScore) <= 0.01 && rawComparatorPrefersB);
+    capabilityPenaltyChangedStartSelection = rawComparatorPrefersB !== capabilityComparatorPrefersB;
     const baselineReachedL1 = Number.isFinite(startA.baselineRspMinimumSplDb) && startA.baselineRspMinimumSplDb >= 114;
     const startAPreservesL1 = !baselineReachedL1 || startA.finalRspMinimumSplDb >= 113.95;
     const startBPreservesL1 = !baselineReachedL1 || startB.finalRspMinimumSplDb >= 113.95;
-    if ((!startAPreservesL1 && startBPreservesL1) || (startAPreservesL1 === startBPreservesL1 && compareHouseCurveMetrics(startB.metrics, startA.metrics) < 0)) {
+    if ((!startAPreservesL1 && startBPreservesL1) || (startAPreservesL1 === startBPreservesL1 && capabilityComparatorPrefersB)) {
       selected = startB;
       selectedStartLabel = "standard-seeded";
     }
@@ -211,6 +227,11 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   }, {});
   operationCounts.residualCleanupAcceptedOperations = residualCleanup.acceptedOperationCount;
   operationCounts.residualCleanupBankEvaluations = residualCleanup.bankEvaluationCount;
+  operationCounts.capabilityPenaltyRejections = (operationCounts.capabilityPenaltyRejections || 0)
+    + (residualCleanup.diagnostics || []).flatMap((item) => item.attempts || [])
+      .filter((attempt) => attempt.rejectionReason?.includes("LF capability penalty")).length;
+  operationCounts.capabilityPenaltySelectionChanges = (operationCounts.capabilityPenaltySelectionChanges || 0)
+    + (capabilityPenaltyChangedStartSelection ? 1 : 0);
 
   // Final bank validation — must pass all hard limits. If it fails (safety net),
   // revert to the Standard seed (or empty) and recalculate metrics.
@@ -295,8 +316,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     ? interpolateCanonicalTarget(combinedEqCurve, worstFrequencyHz)
     : null;
   const boostAllowance = Number.isFinite(worstFrequencyHz) && Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0
-    ? getSourceDomainBoostAllowance({
-        frequency: worstFrequencyHz, requestedBoostDb: 6, activeSubs, usableLfHz,
+    ? getEqCapabilityBoostAllowance({
+        frequency: worstFrequencyHz, requestedBoostDb: 6, activeSubs,
         maxBoostDb: 6, requestedSystemOutputDb,
       })
     : null;
@@ -417,6 +438,16 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       broadBelowTargetWorsening: false,
     },
     iterationTrace: selected.trace || [],
+    lfCapabilityProtection: buildLfCapabilityProtectionDiagnostics(
+      capabilityContext,
+      capabilityPenaltyForBank(filters),
+      {
+        penaltyInfluencedSelectedFilters: (operationCounts.capabilityPenaltyRejections || 0) > 0
+          || (operationCounts.capabilityPenaltySelectionChanges || 0) > 0,
+        candidatesRejectedByPenalty: operationCounts.capabilityPenaltyRejections || 0,
+        selectionsChangedByPenalty: operationCounts.capabilityPenaltySelectionChanges || 0,
+      },
+    ),
     houseCurveDiagnostics: {
       preRsp: selected.baselineRspMetrics,
       officialP19VariationDb: rspMaxDev,

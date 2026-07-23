@@ -20,7 +20,7 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
   return <>
     {signature && <div style={{ fontSize: 9, color: "#625143", fontFamily: "monospace", marginTop: 4, background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 4, padding: "4px 8px" }}><strong>Candidate signature:</strong> {signatureToString(signature)}</div>}
     {shouldShowLiveResultAuthorityDiagnostic({ engineeringDiagnosticsEnabled: enabled }) && <LiveResultAuthorityDiagnostic result={result} contract={contract} graphCandidateId={graphCandidateId} lifecycle={lifecycle} />}
-    <BassCapabilityReceiptDiagnostic receipts={result?.capabilityEnvelopeDiagnostics || []} />
+    <BassCapabilityReceiptDiagnostic receipts={result?.capabilityEnvelopeDiagnostics || []} protection={result?.selectedCandidate?.lfCapabilityProtection} />
     <ExactHouseCurveCaseCaptureButton captureInputs={{ result, contract, lifecycle, rspRawCurve, perSeatRawCurves, activeSubs: systemLimits.activeSubs, usableLfHz: systemLimits.usableLfHz, transitionFrequencyHz, graphSeries, graphCandidateId, graphFilterBankSignature, designEqEnabled, detailedStatus }} />
     {designEqEnabled && result && <>
       <div style={{ fontSize: 10, fontFamily: "monospace", color: "#625143", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>

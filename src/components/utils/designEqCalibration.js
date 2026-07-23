@@ -1,6 +1,11 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
-import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
+import {
+  buildLfCapabilityContext,
+  buildLfCapabilityProtectionDiagnostics,
+  calculateLfCapabilityPenalty,
+  getEqCapabilityBoostAllowance,
+} from "@/components/utils/lfCapabilityProtection";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 
 const isNumber = (value) => Number.isFinite(Number(value));
@@ -199,8 +204,9 @@ export function getDesignEqPeakingResponseValidation() {
 
 function limitBoostForCapability(filter, activeSubs, usableLfHz, requestedSystemOutputDb) {
   if (filter.gainDb <= 0) return filter;
-  const frequencies = [filter.startHz, (filter.startHz + filter.frequencyHz) / 2, filter.frequencyHz, (filter.frequencyHz + filter.endHz) / 2, filter.endHz];
-  const allowed = frequencies.map((frequency) => getSourceDomainBoostAllowance({
+  const frequencies = [filter.startHz, (filter.startHz + filter.frequencyHz) / 2, filter.frequencyHz, (filter.frequencyHz + filter.endHz) / 2, filter.endHz]
+    .filter(isNumber);
+  const allowed = frequencies.map((frequency) => getEqCapabilityBoostAllowance({
     frequency,
     requestedBoostDb: filter.gainDb,
     activeSubs,
@@ -243,13 +249,13 @@ function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, req
     if (aggregateDb > maximumAggregateBoostDb) boostLimitOk = false;
     if (aggregateDb < aggregateCutFloorDb) cutLimitOk = false;
     if (aggregateDb > 0) {
-      const allowed = getSourceDomainBoostAllowance({ frequency: point.frequency, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb });
+      const allowed = getEqCapabilityBoostAllowance({ frequency: point.frequency, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb });
       const permitted = Number.isFinite(allowed?.allowedBoostDb) ? allowed.allowedBoostDb : 6;
       if (aggregateDb > permitted + 0.05) sourceDomainHeadroomOk = false;
     }
   }
   if (maxAggregateBoostHz !== null && maxAggregateBoostDb > 0) {
-    const allowed = getSourceDomainBoostAllowance({ frequency: maxAggregateBoostHz, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb });
+    const allowed = getEqCapabilityBoostAllowance({ frequency: maxAggregateBoostHz, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb });
     limitingPermittedBoostDb = Number.isFinite(allowed?.allowedBoostDb) ? allowed.allowedBoostDb : 6;
   }
   return { maxAggregateBoostDb, maxAggregateBoostHz, maxAggregateCutDb, maxAggregateCutHz, limitingPermittedBoostDb, boostLimitOk, cutLimitOk, sourceDomainHeadroomOk, allOk: boostLimitOk && cutLimitOk && sourceDomainHeadroomOk };
@@ -441,7 +447,7 @@ function minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz) {
   return values.length ? Math.min(...values) : null;
 }
 
-function buildCheckpoint({ filters, curve, originalTrend, assessmentStartHz, assessmentEndHz, anchorDb, fittingToleranceDb, requestedSystemOutputDb }) {
+function buildCheckpoint({ filters, curve, originalTrend, assessmentStartHz, assessmentEndHz, anchorDb, fittingToleranceDb, requestedSystemOutputDb, capabilityPenaltyCostDb = 0 }) {
   const trend = applyBassSmoothing(curve, "third");
   const metrics = completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, anchorDb);
   const rawMinimumSpl = minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz);
@@ -464,6 +470,8 @@ function buildCheckpoint({ filters, curve, originalTrend, assessmentStartHz, ass
     minimumSpl: p14MinimumSpl, // compatibility alias for p14MinimumSpl
     broadBelowTargetWorsening,
     p14Safe,
+    capabilityPenaltyCostDb,
+    capabilityAdjustedMaximumDeviationDb: (metrics?.maximumAbsoluteDeviationDb ?? Infinity) + capabilityPenaltyCostDb,
   };
 }
 
@@ -484,6 +492,10 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   // Part A: Resolve the fitting profile. Standard preserves current behaviour;
   // Accuracy trades P14/P18 preservation for closer target alignment.
   const profile = getDesignEqFitProfile(options.fitProfile);
+  const capabilityContext = buildLfCapabilityContext(activeSubs, raw.map((point) => point.frequency), profile.id, options.requestedSystemOutputDb);
+  const capabilityPenaltyForBank = (bank) => calculateLfCapabilityPenalty(
+    bank, capabilityContext, (frequency, candidateBank) => aggregateResponseDbAt(frequency, candidateBank),
+  );
   const profileFittingToleranceDb = Number.isFinite(Number(profile.fittingToleranceDb)) ? Number(profile.fittingToleranceDb) : 2;
   const requestedFittingToleranceDb = Number.isFinite(Number(options.fittingToleranceDb))
     ? Number(options.fittingToleranceDb)
@@ -517,7 +529,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     anchorDb,
     fittingToleranceDb,
     requestedSystemOutputDb,
-  })];
+    capabilityPenaltyCostDb: capabilityPenaltyForBank(filters),
+    })];
   const iterationTrace = [];
   let bankLimitScaledCount = 0;
   let bankLimitRejectedCount = 0;
@@ -525,6 +538,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   let sameRegionRejectedCount = 0;
   let revisionAttemptCount = 0;
   let revisionPassedAcceptanceCount = 0;
+  let capabilityPenaltyRejectedCount = 0;
+  let capabilityPenaltyChangedSelectionCount = 0;
   let selectedRevisionOperationCount = 0;
   const revisionAttempts = [];
   let operations = 0;
@@ -560,6 +575,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
     const currentMinimumSpl = minimumSplAcrossBand(curve, assessmentStartHz, assessmentEndHz);
     const currentP14MinimumSpl = minimumSplAcrossBand(trend, assessmentStartHz, assessmentEndHz);
+    const currentCapabilityPenaltyCostDb = capabilityPenaltyForBank(filters);
     if (!Number.isFinite(currentMinimumSpl)) break;
     const acceptableCandidates = [];
     const gainScales = [1, 0.75, 0.5];
@@ -631,14 +647,20 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
           const localImprovementDb = before - after;
           const maximumDeviationReductionDb = currentMetrics.maximumAbsoluteDeviationDb - nextMetrics.maximumAbsoluteDeviationDb;
           const rmsReductionDb = currentMetrics.rmsDeviationDb - nextMetrics.rmsDeviationDb;
-          const acceptable = localImprovementDb >= 0.05
+          const capabilityPenaltyCostDb = capabilityPenaltyForBank([...filters, finalCandidate]);
+          const incrementalCapabilityPenaltyCostDb = Math.max(0, capabilityPenaltyCostDb - currentCapabilityPenaltyCostDb);
+          const capabilityAdjustedObjectiveDb = maximumDeviationReductionDb + 0.35 * rmsReductionDb - incrementalCapabilityPenaltyCostDb;
+          const acousticAcceptable = localImprovementDb >= 0.05
             && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
             && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
+          const acceptable = acousticAcceptable && capabilityAdjustedObjectiveDb > 0.01;
+          if (acousticAcceptable && !acceptable) capabilityPenaltyRejectedCount++;
           if (acceptable) regionAppendCandidates.push({
             action: "append", filter: finalCandidate, replacedFilterIndex: null,
             oldGainDb: null, newGainDb: finalCandidate.gainDb, gainDeltaDb: finalCandidate.gainDb,
             oldQ: null, newQ: finalCandidate.Q, curve: nextCurve,
             maximumDeviationReductionDb, rmsReductionDb, localImprovementDb,
+            capabilityPenaltyCostDb, incrementalCapabilityPenaltyCostDb, capabilityAdjustedObjectiveDb,
             gainBeforeBankLimiting, gainAfterBankLimiting, bankLimits: bankResult.limits,
             regionSameSignCount,
           });
@@ -703,9 +725,15 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
               const localImprovementDb = before - after;
               const maximumDeviationReductionDb = currentMetrics.maximumAbsoluteDeviationDb - revisedMetrics.maximumAbsoluteDeviationDb;
               const rmsReductionDb = currentMetrics.rmsDeviationDb - revisedMetrics.rmsDeviationDb;
-              const acceptable = localImprovementDb >= 0.05
+              const revisedFiltersForPenalty = filters.map((f, i) => i === filterIndex ? revisedFilter : f);
+              const capabilityPenaltyCostDb = capabilityPenaltyForBank(revisedFiltersForPenalty);
+              const incrementalCapabilityPenaltyCostDb = Math.max(0, capabilityPenaltyCostDb - currentCapabilityPenaltyCostDb);
+              const capabilityAdjustedObjectiveDb = maximumDeviationReductionDb + 0.35 * rmsReductionDb - incrementalCapabilityPenaltyCostDb;
+              const acousticAcceptable = localImprovementDb >= 0.05
                 && revisedMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
                 && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
+              const acceptable = acousticAcceptable && capabilityAdjustedObjectiveDb > 0.01;
+              if (acousticAcceptable && !acceptable) capabilityPenaltyRejectedCount++;
               attempt.passedRules = acceptable;
               if (!acceptable) attempt.rejectionReason = "Did not meet complete-band acceptance rules";
               if (collectDiagnostics) revisionAttempts.push(attempt);
@@ -717,6 +745,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
                   gainDeltaDb: revisedFilter.gainDb - existingFilter.gainDb,
                   oldQ: existingFilter.Q, newQ: existingFilter.Q, curve: revisedCurve,
                   maximumDeviationReductionDb, rmsReductionDb, localImprovementDb,
+                  capabilityPenaltyCostDb, incrementalCapabilityPenaltyCostDb, capabilityAdjustedObjectiveDb,
                   bankLimits: revisionResult.limits, regionSameSignCount,
                 });
               }
@@ -733,7 +762,12 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     // materially worse RMS. After max-deviation, RMS and local improvement,
     // prefer a legal append (preserves filter-shape flexibility), then lower
     // gain cost, then lower Q.
+    const acousticBest = [...acceptableCandidates].sort((a, b) =>
+      b.maximumDeviationReductionDb - a.maximumDeviationReductionDb
+      || b.rmsReductionDb - a.rmsReductionDb
+      || b.localImprovementDb - a.localImprovementDb)[0];
     acceptableCandidates.sort((a, b) => {
+      if (Math.abs(b.capabilityAdjustedObjectiveDb - a.capabilityAdjustedObjectiveDb) > 0.01) return b.capabilityAdjustedObjectiveDb - a.capabilityAdjustedObjectiveDb;
       const aMaxDev = Math.round(a.maximumDeviationReductionDb / 0.05);
       const bMaxDev = Math.round(b.maximumDeviationReductionDb / 0.05);
       if (bMaxDev !== aMaxDev) return bMaxDev - aMaxDev;
@@ -745,6 +779,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     });
     const chosen = acceptableCandidates[0];
     if (!chosen) break;
+    if (acousticBest && chosen !== acousticBest) capabilityPenaltyChangedSelectionCount++;
     if (chosen.action === "append" && filters.length >= 10) {
       stopReason = "ten-band ceiling reached";
       break;
@@ -759,6 +794,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const checkpoint = buildCheckpoint({
       filters, curve, originalTrend: thirdOctave,
       assessmentStartHz, assessmentEndHz, anchorDb, fittingToleranceDb, requestedSystemOutputDb,
+      capabilityPenaltyCostDb: capabilityPenaltyForBank(filters),
     });
     checkpoints.push(checkpoint);
     if (collectDiagnostics) iterationTrace.push({
@@ -809,19 +845,32 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       : fallbackPool;
     safePathTaken = safeCheckpoints.length > 0;
     if (safePathTaken) {
-      const rankedSafe = [...safeCheckpoints].sort((a, b) =>
+      const rawBestSafeCheckpoint = [...safeCheckpoints].sort((a, b) =>
         a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+        || a.rmsDeviationDb - b.rmsDeviationDb
+        || a.filters.length - b.filters.length)[0];
+      const rankedSafe = [...safeCheckpoints].sort((a, b) =>
+        a.capabilityAdjustedMaximumDeviationDb - b.capabilityAdjustedMaximumDeviationDb
+        || a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
         || a.rmsDeviationDb - b.rmsDeviationDb
         || a.filters.length - b.filters.length);
       selectedCheckpoint = rankedSafe[0];
+      if (selectedCheckpoint !== rawBestSafeCheckpoint) capabilityPenaltyChangedSelectionCount++;
       if (collectDiagnostics) selectionReason = `P14-safe checkpoint selected: lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}).`;
     } else if (preservationBand.length) {
-      const rankedFallback = [...preservationBand].sort((a, b) =>
+      const rawBestFallbackCheckpoint = [...preservationBand].sort((a, b) =>
         a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+        || a.rmsDeviationDb - b.rmsDeviationDb
+        || b.p14MinimumSpl - a.p14MinimumSpl
+        || a.filters.length - b.filters.length)[0];
+      const rankedFallback = [...preservationBand].sort((a, b) =>
+        a.capabilityAdjustedMaximumDeviationDb - b.capabilityAdjustedMaximumDeviationDb
+        || a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
         || a.rmsDeviationDb - b.rmsDeviationDb
         || b.p14MinimumSpl - a.p14MinimumSpl
         || a.filters.length - b.filters.length);
       selectedCheckpoint = rankedFallback[0];
+      if (selectedCheckpoint !== rawBestFallbackCheckpoint) capabilityPenaltyChangedSelectionCount++;
       if (collectDiagnostics) selectionReason = `Best credible calibrated attempt (P14 FAIL retained): selected for lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB) and RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB) within the 0.25 dB preservation band of the zero-filter P14 minimum (${baselineP14MinimumSpl?.toFixed(2)} dB). Selected P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB, ${selectedCheckpoint.filters.length} filters.`;
     } else {
       selectedCheckpoint = baselineCheckpoint;
@@ -841,11 +890,17 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const finiteCheckpoints = checkpoints.filter((cp) =>
       Number.isFinite(cp.maximumAbsoluteDeviationDb) && Number.isFinite(cp.rmsDeviationDb));
     if (finiteCheckpoints.length > 0) {
-      const rankedAccuracy = [...finiteCheckpoints].sort((a, b) =>
+      const rawBestAccuracyCheckpoint = [...finiteCheckpoints].sort((a, b) =>
         a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+        || a.rmsDeviationDb - b.rmsDeviationDb
+        || a.filters.length - b.filters.length)[0];
+      const rankedAccuracy = [...finiteCheckpoints].sort((a, b) =>
+        a.capabilityAdjustedMaximumDeviationDb - b.capabilityAdjustedMaximumDeviationDb
+        || a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
         || a.rmsDeviationDb - b.rmsDeviationDb
         || a.filters.length - b.filters.length);
       selectedCheckpoint = rankedAccuracy[0];
+      if (selectedCheckpoint !== rawBestAccuracyCheckpoint) capabilityPenaltyChangedSelectionCount++;
       if (collectDiagnostics) selectionReason = `Accuracy checkpoint selected (P14 preservation disabled): lowest maximum absolute deviation (${selectedCheckpoint.maximumAbsoluteDeviationDb.toFixed(2)} dB), then RMS (${selectedCheckpoint.rmsDeviationDb.toFixed(2)} dB), then fewest filters (${selectedCheckpoint.filters.length}). Broad-worsening diagnostic: ${selectedCheckpoint.broadBelowTargetWorsening ? "Yes" : "No"} (retained as diagnostic, not a hard exclusion). P14 minimum: ${selectedCheckpoint.p14MinimumSpl?.toFixed(2)} dB (may reduce — P14/P18 still reported).`;
     } else {
       selectedCheckpoint = baselineCheckpoint;
@@ -906,6 +961,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       rmsDeviationDb: checkpoint.rmsDeviationDb,
       worstResidualFrequencyHz: checkpoint.worstResidualFrequencyHz,
       broadBelowTargetWorsening: checkpoint.broadBelowTargetWorsening,
+      capabilityPenaltyCostDb: checkpoint.capabilityPenaltyCostDb,
       selected: isSelected,
       selectionEligibility,
       reasonExcluded,
@@ -953,7 +1009,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   }
   const worstResidualDiagnostics = collectDiagnostics ? distinctResidualPoints.map((point) => {
     const aggregateEqDb = aggregateResponseDbAt(point.frequency, selectedFilters);
-    const allowance = getSourceDomainBoostAllowance({
+    const allowance = getEqCapabilityBoostAllowance({
       frequency: point.frequency,
       requestedBoostDb: 6,
       activeSubs,
@@ -1026,6 +1082,15 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     checkpointSummaries,
     worstResidualDiagnostics,
     selectionReason,
+    lfCapabilityProtection: buildLfCapabilityProtectionDiagnostics(
+      capabilityContext,
+      capabilityPenaltyForBank(selectedFilters),
+      {
+        penaltyInfluencedSelectedFilters: capabilityPenaltyRejectedCount > 0 || capabilityPenaltyChangedSelectionCount > 0,
+        candidatesRejectedByPenalty: capabilityPenaltyRejectedCount,
+        selectionsChangedByPenalty: capabilityPenaltyChangedSelectionCount,
+      },
+    ),
     bankDiagnostics: {
       evaluatedVariantsScaledByBankLimit: bankLimitScaledCount,
       evaluatedVariantsRejectedByBankLimit: bankLimitRejectedCount,

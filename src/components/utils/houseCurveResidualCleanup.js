@@ -10,7 +10,7 @@ import { computeParam14LfeCapability } from "@/components/utils/rp22BassMetrics"
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
-import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
+import { buildLfCapabilityContext, calculateLfCapabilityPenalty, getEqCapabilityBoostAllowance } from "@/components/utils/lfCapabilityProtection";
 
 const MAX_FILTERS = 10;
 const MAX_Q = 10;
@@ -241,6 +241,12 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
   const localImprovementDb = Math.abs(region.centre.residualDb) - Math.abs(candidateCentre.residualDb);
   if (localImprovementDb <= EPSILON_DB) return { reason: "local-fit: attempted correction did not reduce the centre residual", limits, nullWorseningDb, candidateCentre };
   const candidateQuality = quality(candidatePoints, protectedNullRegions);
+  const capabilityContext = buildLfCapabilityContext(activeSubs, raw.map((point) => point.frequency), profile.id, requestedSystemOutputDb);
+  const penaltyForBank = (bank) => calculateLfCapabilityPenalty(
+    bank, capabilityContext, (frequency, candidateBank) => correctionAt(frequency, candidateBank),
+  );
+  const penaltyIncreaseDb = Math.max(0, penaltyForBank(trial.filters) - penaltyForBank(currentFilters));
+  if (localImprovementDb - penaltyIncreaseDb <= EPSILON_DB) return { reason: "LF capability penalty exceeded local acoustic improvement", limits, nullWorseningDb, candidateCentre, candidateQuality, penaltyIncreaseDb };
   if (candidateQuality.maximumAbsoluteResidualDb > currentQuality.maximumAbsoluteResidualDb + 0.25) {
     return { reason: "high-resolution-score: maximum correctable residual worsened by more than 0.25 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
   }
@@ -277,8 +283,8 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
     const region = { ...initialRegion, centre: nearest };
     const limitsBefore = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
     bankEvaluationCount++;
-    const boostAllowance = getSourceDomainBoostAllowance({
-      frequency: region.centre.frequency, requestedBoostDb: 6, activeSubs, usableLfHz,
+    const boostAllowance = getEqCapabilityBoostAllowance({
+      frequency: region.centre.frequency, requestedBoostDb: 6, activeSubs,
       maxBoostDb: 6, requestedSystemOutputDb,
     });
     const permittedBoostDb = Number.isFinite(boostAllowance?.allowedBoostDb) ? boostAllowance.allowedBoostDb : 6;

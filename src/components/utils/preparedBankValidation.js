@@ -1,5 +1,5 @@
 import { peakingEqResponseDb } from "@/components/utils/designEqCalibration";
-import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
+import { getEqCapabilityBoostAllowance } from "@/components/utils/lfCapabilityProtection";
 
 function filterSignature(filter) {
   return `${filter?.enabled ? 1 : 0}:${filter?.frequencyHz}:${filter?.gainDb}:${filter?.Q}`;
@@ -10,8 +10,8 @@ export function prepareBankValidation(raw, activeSubs, usableLfHz, requestedSyst
     .filter((point) => point.frequency >= 20 && point.frequency <= 200)
     .map((point) => point.frequency);
   const permittedBoostDb = frequencies.map((frequency) => {
-    const allowed = getSourceDomainBoostAllowance({
-      frequency, requestedBoostDb: 6, activeSubs, usableLfHz,
+    const allowed = getEqCapabilityBoostAllowance({
+      frequency, requestedBoostDb: 6, activeSubs,
       maxBoostDb: 6, requestedSystemOutputDb,
     });
     return Number.isFinite(allowed?.allowedBoostDb) ? allowed.allowedBoostDb : 6;

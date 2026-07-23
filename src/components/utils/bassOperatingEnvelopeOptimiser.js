@@ -280,6 +280,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     designEqWorstResidualDiagnostics: candidateWorstResidualDiagnostics,
     designEqSelectionReason: eq.selectionReason,
     designEqRevisionDiagnostics: eq.revisionDiagnostics,
+    lfCapabilityProtection: eq.lfCapabilityProtection || null,
     houseCurveDiagnostics: eq.houseCurveDiagnostics ? {
       ...eq.houseCurveDiagnostics,
       finalParameters: {

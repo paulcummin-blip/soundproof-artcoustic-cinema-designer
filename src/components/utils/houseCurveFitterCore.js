@@ -16,6 +16,7 @@ import { calculatePreparedBassCurveMetrics, prepareBassCurveMetricGrid } from "@
 import { evaluatePreparedBankLimits, prepareBankValidation } from "@/components/utils/preparedBankValidation";
 import { evaluateNearTargetProtection, isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
+import { buildLfCapabilityContext, calculateLfCapabilityPenalty } from "@/components/utils/lfCapabilityProtection";
 
 const isNumber = (v) => Number.isFinite(Number(v));
 
@@ -359,6 +360,10 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : null;
   const correctionStartHz = Number.isFinite(Number(options.correctionStartHz)) ? Number(options.correctionStartHz) : assessmentStartHz;
   const correctionEndHz = Number.isFinite(Number(options.correctionEndHz)) ? Number(options.correctionEndHz) : assessmentEndHz;
+  const capabilityContext = buildLfCapabilityContext(activeSubs, bankRaw.map((point) => point.frequency), profile.id, requestedSystemOutputDb);
+  const capabilityPenaltyForBank = (bank) => calculateLfCapabilityPenalty(
+    bank, capabilityContext, (frequency, candidateBank) => candidateBank.reduce((sum, filter) => sum + peakingEqResponseDb(frequency, filter), 0),
+  );
 
   const operationCounts = {
     curveEvaluationRequests: 0,
@@ -383,6 +388,8 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     protectedNullWorseningRejections: 0,
     mergedFilterOperations: 0,
     replacedFilterOperations: 0,
+    capabilityPenaltyRejections: 0,
+    capabilityPenaltySelectionChanges: 0,
   };
   const memo = options.memo || createHouseCurveEvaluationMemo(options.reuseExactEvaluations !== false);
   const preparedBankValidation = options.preparedBankValidation || (options.reuseExactEvaluations !== false
@@ -439,6 +446,8 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     let bestTrialMetrics = null;
     let bestTrialFilters = null;
     let bestTrialTraceIndex = null;
+    let bestCapabilityAdjustedObjectiveDb = -Infinity;
+    const currentCapabilityPenaltyCostDb = capabilityPenaltyForBank(filters);
 
     for (const region of regions) {
       const protectedNull = region.kind === "valley" && isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions);
@@ -513,11 +522,20 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         const appliedStepAtCentre = trialEqAtCentre - currentEqAtCentre;
         const directionPass = Math.abs(requiredAtCentre) <= 0.05 || requiredAtCentre * appliedStepAtCentre > 0;
         const maxImprovementDb = currentMetrics.rspMaxDeviationDb - trialMetrics.rspMaxDeviationDb;
-        const rmsImproved = trialMetrics.rspRmsDeviationDb < currentMetrics.rspRmsDeviationDb - RMS_EPSILON_DB;
+        const rmsImprovementDb = currentMetrics.rspRmsDeviationDb - trialMetrics.rspRmsDeviationDb;
+        const rmsImproved = rmsImprovementDb > RMS_EPSILON_DB;
         const maxProtected = trialMetrics.rspMaxDeviationDb <= currentMetrics.rspMaxDeviationDb + WORST_EQUIV_DB;
         const objectiveImproved = maxImprovementDb > WORST_EQUIV_DB || (maxProtected && rmsImproved);
-        if (!directionPass || !objectiveImproved || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
-          trialEntry.rejectionReason = !directionPass ? "correction direction opposed target-minus-current residual" : !maxProtected ? "maximum correctable deviation increased" : !rmsImproved && maxImprovementDb <= WORST_EQUIV_DB ? "neither maximum residual nor weighted RMS improved" : "not strictly better than current";
+        const capabilityPenaltyCostDb = capabilityPenaltyForBank(validation.filters);
+        const incrementalCapabilityPenaltyCostDb = Math.max(0, capabilityPenaltyCostDb - currentCapabilityPenaltyCostDb);
+        const capabilityAdjustedObjectiveDb = maxImprovementDb + 0.35 * rmsImprovementDb - incrementalCapabilityPenaltyCostDb;
+        const capabilityObjectiveImproved = capabilityAdjustedObjectiveDb > 0.01;
+        trialEntry.capabilityPenaltyCostDb = capabilityPenaltyCostDb;
+        trialEntry.incrementalCapabilityPenaltyCostDb = incrementalCapabilityPenaltyCostDb;
+        trialEntry.capabilityAdjustedObjectiveDb = capabilityAdjustedObjectiveDb;
+        if (directionPass && objectiveImproved && compareHouseCurveMetrics(trialMetrics, currentMetrics) < 0 && !capabilityObjectiveImproved) operationCounts.capabilityPenaltyRejections++;
+        if (!directionPass || !objectiveImproved || !capabilityObjectiveImproved || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
+          trialEntry.rejectionReason = !directionPass ? "correction direction opposed target-minus-current residual" : !capabilityObjectiveImproved ? "LF capability penalty exceeded acoustic objective improvement" : !maxProtected ? "maximum correctable deviation increased" : !rmsImproved && maxImprovementDb <= WORST_EQUIV_DB ? "neither maximum residual nor weighted RMS improved" : "not strictly better than current";
           iterationEntry.trials.push(trialEntry);
           continue;
         }
@@ -566,7 +584,10 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         trialEntry.accepted = true;
         trialEntry.acceptanceReason = maxImprovementDb > WORST_EQUIV_DB ? "reduced maximum absolute RSP residual" : "held maximum residual while reducing RSP RMS";
         iterationEntry.trials.push(trialEntry);
-        if (!bestTrial || compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) < 0) {
+        if (!bestTrial || capabilityAdjustedObjectiveDb > bestCapabilityAdjustedObjectiveDb + 0.01
+          || (Math.abs(capabilityAdjustedObjectiveDb - bestCapabilityAdjustedObjectiveDb) <= 0.01 && compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) < 0)) {
+          if (bestTrial && compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) >= 0) operationCounts.capabilityPenaltySelectionChanges++;
+          bestCapabilityAdjustedObjectiveDb = capabilityAdjustedObjectiveDb;
           bestTrial = trial;
           bestTrialMetrics = trialMetrics;
           bestTrialFilters = validation.filters;
@@ -603,5 +624,5 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
 
   if (operations >= maxOperations && stopReason === "no safe improvement remained") stopReason = "operation ceiling reached";
 
-  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, baselineRspMinimumSplDb, finalRspMinimumSplDb: rspMinimumInBand(currentMetrics), blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace, baselineRspMetrics };
+  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, baselineRspMinimumSplDb, finalRspMinimumSplDb: rspMinimumInBand(currentMetrics), blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace, baselineRspMetrics, capabilityContext, capabilityPenaltyCostDb: capabilityPenaltyForBank(filters) };
 }
