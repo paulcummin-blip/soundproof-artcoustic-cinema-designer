@@ -4,7 +4,7 @@ import { formatBassResults } from "@/components/room/bass/bassResultsPresentatio
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 
 const TOOLTIPS = {
-  p14: "P14 — system LFE SPL capability at the Reference Seat Position.",
+  p14: "This estimate uses simulated subwoofer output capability, approved continuous SPL data, and applied EQ headroom. It is intentionally conservative and does not include room gain.",
   p18: "P18 — system in-room bass extension.",
   p19: "P19 — official response relative to target at the Reference Seat Position.",
   p20: "P20 — seat-to-seat bass response consistency across real seats.",

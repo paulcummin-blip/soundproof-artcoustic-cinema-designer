@@ -32,7 +32,7 @@ export function runP14TargetBasisFixtures() {
   const displayed = formatP14Capability(112.4);
   const minimum112 = gradeP14ForBasis(112.4, "minimum");
   const recommended112 = gradeP14ForBasis(112.4, "recommended");
-  check("112.4 raw grading versus rounded display", "113 dBC; Minimum L2; Recommended FAIL", `${displayed}; Minimum ${minimum112 ? `L${minimum112}` : "FAIL"}; Recommended ${recommended112 ? `L${recommended112}` : "FAIL"}`, displayed === "113 dBC" && minimum112 === 2 && recommended112 === 0);
+  check("112.4 raw grading versus conservative display rounding", "112 dBC; Minimum L2; Recommended FAIL", `${displayed}; Minimum ${minimum112 ? `L${minimum112}` : "FAIL"}; Recommended ${recommended112 ? `L${recommended112}` : "FAIL"}`, displayed === "112 dBC" && minimum112 === 2 && recommended112 === 0);
 
   const minDefinitions = getRp22BassOperatingDefinitions("minimum");
   const recDefinitions = getRp22BassOperatingDefinitions("recommended");
@@ -67,8 +67,8 @@ export function runP14TargetBasisFixtures() {
   const minimumContract = completedContract(FP_MIN, "minimum", 112.4, 2);
   const pill = formatBassResults(minimumContract).pills.p14.text;
   const compliance = buildComplianceBassPresentation(minimumContract).parameters.p14;
-  const expectedText = "P14 L2 · 113 dBC — Minimum target";
-  const reportText = `P14 ${compliance.level} · ${compliance.valueText} — ${compliance.targetBasisLabel} target`;
+  const expectedText = "Estimated LFE Capability L2 · 112 dBC — Minimum target";
+  const reportText = `Estimated LFE Capability ${compliance.level} · ${compliance.valueText} — ${compliance.targetBasisLabel} target`;
   check("Subwoofers/Bass/Compliance/PDF P14 authority parity", expectedText, `${pill} | ${reportText}`, pill === expectedText && reportText === expectedText);
 
   const passed = checks.filter((item) => item.passed).length;

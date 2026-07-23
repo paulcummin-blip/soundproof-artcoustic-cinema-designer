@@ -40,7 +40,7 @@ export default function BassOptimiserValidationPanel({ result, priorityMode, onP
       </select>
     </label>
     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-emerald-950">
-      <span>P14 {result.achievedP14Level} ({fmt(result.achievedP14Db, " dBC")}) — {result.p14TargetBasis === "recommended" ? "Recommended" : "Minimum"} target</span><span>P18 {result.achievedP18Level} ({fmt(result.achievedP18FrequencyHz, " Hz")})</span><span>P19 {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
+      <span>Estimated LFE Capability {result.achievedP14Level} ({fmt(result.achievedP14Db, " dBC")}) — {result.p14TargetBasis === "recommended" ? "Recommended" : "Minimum"} target</span><span>P18 {result.achievedP18Level} ({fmt(result.achievedP18FrequencyHz, " Hz")})</span><span>P19 {result.achievedP19Level} (±{fmt(result.achievedP19VariationDb, " dB")})</span>
     </div>
     {(() => {
       // Part G: Profile contract diagnostics — safe optional access so stale or

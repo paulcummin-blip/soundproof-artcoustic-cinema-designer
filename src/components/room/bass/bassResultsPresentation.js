@@ -23,7 +23,7 @@ const normalizeIntegerNoise = (value) => {
 export function formatBassParameterValue(key, value) {
   if (!isFiniteNumber(value)) return "";
   const number = normalizeIntegerNoise(value);
-  if (key === "p14") return `${Math.ceil(number - 1e-8)} dBC`;
+  if (key === "p14") return `${Math.floor(number + 1e-8)} dBC`;
   if (key === "p18") return `${Math.floor(number)} Hz`;
   if (key === "p19") return `±${Math.floor(Math.abs(number))} dB`;
   if (key === "p20") return formatP20Deviation(number);
@@ -31,6 +31,7 @@ export function formatBassParameterValue(key, value) {
 }
 
 function parameterLabel(key, result) {
+  if (key === "p14") return "Estimated LFE Capability";
   if (key === "p19") return "P19 RSP";
   if (key === "p20") {
     const seatId = result?.selectedCandidate?.worstP20SeatId;

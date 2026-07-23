@@ -162,7 +162,7 @@ export const RP22_CATALOG = deepFreeze({
   "14": {
     number: 14,
     title: "LFE frequencies total SPL capability at RSP, plus bass management if used (post calibration EQ, within bass extension spec for the level) without clipping (includes amplifier headroom)",
-    metric: "Total LFE SPL capability at RSP",
+    metric: "Estimated LFE Capability",
     unit: "dB SPL (C)",
     scope: "Room",
     direction: "min",
