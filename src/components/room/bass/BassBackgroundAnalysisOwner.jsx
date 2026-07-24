@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
+import { markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -122,6 +122,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   });
   useEffect(() => {
     const currentFingerprint = contract?.job?.currentJobFingerprint || cacheKey || null;
+    if (contract?.job?.status === "error") {
+      markBassAuthorityFailed(scopeId, currentFingerprint, contract?.job?.errorMessage);
+      return;
+    }
     if (!publishCompletedBassContract(scopeId, contract)) markBassAuthorityUpdating(scopeId, currentFingerprint);
     syncPersistentBassAuthority(scopeId, currentFingerprint, contract);
   }, [scopeId, cacheKey, contract]);

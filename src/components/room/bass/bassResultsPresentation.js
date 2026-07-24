@@ -1,6 +1,10 @@
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 
-const isFiniteNumber = (value) => Number.isFinite(Number(value));
+const isFiniteNumber = (value) => value !== null
+  && value !== undefined
+  && value !== ""
+  && typeof value !== "boolean"
+  && Number.isFinite(Number(value));
 const secondsSince = (startedAtMs, nowMs) => Number.isFinite(startedAtMs)
   ? Math.max(0, Math.floor((nowMs - startedAtMs) / 1000))
   : 0;

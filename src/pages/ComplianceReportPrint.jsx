@@ -18,7 +18,9 @@ export default function ComplianceReportPrint() {
   const reportScopeId = new URLSearchParams(window.location.search).get('projectId') || new URLSearchParams(window.location.search).get('id') || 'free';
   const completedBassAuthority = useCompletedBassAuthority(reportScopeId);
   const completedBassContract = completedBassAuthority.contract;
-  const bassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract), [completedBassContract]);
+  const bassErrorMessage = completedBassAuthority.errorMessage || null;
+  const bassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract, bassErrorMessage), [completedBassContract, bassErrorMessage]);
+  const bassReportPending = completedBassAuthority.status === 'loading';
 
   // Extract data
   const roomDims = app?.roomDims || {};
@@ -86,19 +88,19 @@ export default function ComplianceReportPrint() {
 
   // Auto-print once ready
   useEffect(() => {
-    if (completedBassAuthority.exportable && (roomParams.length > 0 || Object.keys(seatParams).length > 0)) {
+    if (!bassReportPending && (roomParams.length > 0 || Object.keys(seatParams).length > 0)) {
       setIsReady(true);
       // Delay print to ensure render completes
       setTimeout(() => {
         window.print();
       }, 500);
     }
-  }, [roomParams, seatParams, completedBassAuthority.exportable]);
+  }, [roomParams, seatParams, bassReportPending]);
 
-  if (!completedBassAuthority.exportable || !isReady) {
+  if (bassReportPending || !isReady) {
     return (
       <div className="flex items-center justify-center min-h-screen" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-        <p className="text-lg">{completedBassAuthority.exportable ? 'Preparing report...' : 'Bass analysis updating'}</p>
+        <p className="text-lg">{bassReportPending ? 'Bass analysis updating' : 'Preparing report...'}</p>
       </div>
     );
   }
@@ -183,6 +185,8 @@ export default function ComplianceReportPrint() {
             <p className="text-sm text-[#3E4349]">{currentDate}</p>
             <p className="text-xs text-[#625143] mt-1">{dolbyLayout} Configuration</p>
           </div>
+
+          {bassErrorMessage && <p className="text-sm text-[#625143] mb-4">Bass analysis unavailable</p>}
 
           {/* Summary Counts */}
           <div className="space-y-6">

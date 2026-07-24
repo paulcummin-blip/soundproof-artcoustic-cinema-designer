@@ -22,6 +22,7 @@ const emptyAuthority = (projectId) => ({
   currentFingerprint: null,
   contract: null,
   staleContract: null,
+  errorMessage: null,
   exportable: false,
 });
 
@@ -44,6 +45,7 @@ export function publishCompletedBassContract(projectId, contract) {
     currentFingerprint: compact.job.resultFingerprint,
     contract: compact,
     staleContract: memoryByProject.get(projectKey(projectId))?.contract || null,
+    errorMessage: null,
     exportable: true,
   });
   return true;
@@ -57,7 +59,21 @@ export function markBassAuthorityUpdating(projectId, currentFingerprint) {
     currentFingerprint: currentFingerprint || null,
     contract: null,
     staleContract: previous.contract || previous.staleContract || null,
+    errorMessage: null,
     exportable: false,
+  });
+}
+
+export function markBassAuthorityFailed(projectId, currentFingerprint, errorMessage) {
+  const previous = memoryByProject.get(projectKey(projectId)) || emptyAuthority(projectId);
+  setMemory(projectId, {
+    ...previous,
+    status: "error",
+    currentFingerprint: currentFingerprint || null,
+    contract: null,
+    staleContract: previous.contract || previous.staleContract || null,
+    errorMessage: typeof errorMessage === "string" && errorMessage.trim() ? errorMessage : "Bass analysis failed",
+    exportable: true,
   });
 }
 
@@ -95,6 +111,8 @@ export function syncPersistentBassAuthority(projectId, currentFingerprint, contr
 export async function hydrateCompletedBassAuthority(projectId) {
   const key = projectKey(projectId);
   if (key === "free") return setMemory(key, { ...emptyAuthority(key), status: "uncalculated" });
+  const current = memoryByProject.get(key);
+  if (current?.status === "error" && current.errorMessage) return current;
   const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);
   const record = Array.isArray(records) ? records[0] : null;
   const persisted = record ? {

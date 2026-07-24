@@ -116,11 +116,13 @@ export default function RP22ReportParameterGrid({
   p15ConstructionLevel,
   p21EarlyReflectionPreset,
   bassContract = null,
+  bassErrorMessage = null,
 }) {
   const appState = useAppState();
   const sharedBassResults = useOptionalSharedBassResults();
   const resolvedBassContract = bassContract || sharedBassResults?.contract || null;
-  const bassPresentation = React.useMemo(() => buildComplianceBassPresentation(resolvedBassContract), [resolvedBassContract]);
+  const resolvedBassError = bassErrorMessage || sharedBassResults?.detailedError || null;
+  const bassPresentation = React.useMemo(() => buildComplianceBassPresentation(resolvedBassContract, resolvedBassError), [resolvedBassContract, resolvedBassError]);
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";

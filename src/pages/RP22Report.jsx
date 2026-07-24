@@ -72,8 +72,10 @@ function RP22ReportInner() {
         activeProjectId;
     const completedBassAuthority = useCompletedBassAuthority(effectiveProjectId || "free");
     const completedBassContract = completedBassAuthority.contract;
-    const completedBassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract), [completedBassContract]);
-    const complianceBassExportData = useMemo(() => buildComplianceBassExportData(completedBassContract), [completedBassContract]);
+    const bassErrorMessage = completedBassAuthority.errorMessage || null;
+    const completedBassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract, bassErrorMessage), [completedBassContract, bassErrorMessage]);
+    const complianceBassExportData = useMemo(() => buildComplianceBassExportData(completedBassContract, bassErrorMessage), [completedBassContract, bassErrorMessage]);
+    const bassReportPending = completedBassAuthority.status === "loading";
     const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
     const completedP19Results = completedBassContract?.selectedCandidate?.perSeatP19Results || [];
     const completedP20Results = completedBassPresentation.perSeatP20Results;
@@ -770,6 +772,7 @@ function RP22ReportInner() {
         p15ConstructionLevel: app?.p15ConstructionLevel,
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
         bassContract: completedBassContract,
+        bassErrorMessage,
     };
 
     const coverBoxStyle = {
@@ -881,8 +884,8 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId) || !completedBassAuthority.exportable}
-                        exportDisabledMessage={!completedBassAuthority.exportable ? "Bass analysis updating" : "Report loading"}
+                        exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId) || bassReportPending}
+                        exportDisabledMessage={bassReportPending ? "Bass analysis updating" : "Report loading"}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
                             // lcrAimMode === 'angled' → compute yaw from speaker position to MLP
@@ -1264,6 +1267,7 @@ function RP22ReportInner() {
                              <div>
                                  <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
                                 <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
+                                {bassErrorMessage && <div style={{ color: '#625143', fontSize: 11, marginBottom: 10 }}>Bass analysis unavailable</div>}
                                 <RP22ReportParameterGrid {...parameterGridProps} />
                             </div>
                         </section>
