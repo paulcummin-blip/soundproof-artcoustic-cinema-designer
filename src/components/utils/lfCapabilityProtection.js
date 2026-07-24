@@ -83,9 +83,11 @@ export function buildLfCapabilityContext(activeSubs = [], frequencies = [], prof
 
 export function calculateLfCapabilityPenalty(filters, context, responseAtFrequency) {
   if (!context?.belowLfFrequencies?.length || typeof responseAtFrequency !== "function") return 0;
+  const enabledFilters = (Array.isArray(filters) ? filters : []).filter((filter) => filter?.enabled !== false);
+  if (!enabledFilters.some((filter) => Number(filter?.gainDb) > 0)) return 0;
   let sumSquares = 0;
   for (const frequency of context.belowLfFrequencies) {
-    const positiveBoostDb = Math.max(0, Number(responseAtFrequency(frequency, filters)) || 0);
+    const positiveBoostDb = Math.max(0, Number(responseAtFrequency(frequency, enabledFilters)) || 0);
     const depth = Math.max(0, (context.usableLfHz - frequency) / 5);
     sumSquares += (positiveBoostDb * depth) ** 2;
   }

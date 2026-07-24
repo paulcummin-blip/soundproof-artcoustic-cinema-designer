@@ -17,6 +17,7 @@ import { evaluatePreparedBankLimits, prepareBankValidation } from "@/components/
 import { evaluateNearTargetProtection, isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 import { buildLfCapabilityContext, calculateLfCapabilityPenalty } from "@/components/utils/lfCapabilityProtection";
+import { evaluateSeatRegressionTolerance } from "@/components/utils/houseCurveSeatRegressionTolerance";
 
 const isNumber = (v) => Number.isFinite(Number(v));
 
@@ -390,6 +391,8 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     replacedFilterOperations: 0,
     capabilityPenaltyRejections: 0,
     capabilityPenaltySelectionChanges: 0,
+    seatRegressionToleranceAccepted: 0,
+    seatRegressionToleranceRejected: 0,
   };
   const memo = options.memo || createHouseCurveEvaluationMemo(options.reuseExactEvaluations !== false);
   const preparedBankValidation = options.preparedBankValidation || (options.reuseExactEvaluations !== false
@@ -488,6 +491,10 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
             worstSeatMaxDeviationDb: currentMetrics?.worstSeatMaxDeviationDb ?? null,
           },
           metricsAfter: null,
+          rspImprovementDb: null,
+          seatImpact: null,
+          capabilityPenaltyCostDb: null,
+          incrementalCapabilityPenaltyCostDb: null,
           accepted: false,
           rejectionReason: null,
         };
@@ -523,6 +530,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         const directionPass = Math.abs(requiredAtCentre) <= 0.05 || requiredAtCentre * appliedStepAtCentre > 0;
         const maxImprovementDb = currentMetrics.rspMaxDeviationDb - trialMetrics.rspMaxDeviationDb;
         const rmsImprovementDb = currentMetrics.rspRmsDeviationDb - trialMetrics.rspRmsDeviationDb;
+        trialEntry.rspImprovementDb = maxImprovementDb;
         const rmsImproved = rmsImprovementDb > RMS_EPSILON_DB;
         const maxProtected = trialMetrics.rspMaxDeviationDb <= currentMetrics.rspMaxDeviationDb + WORST_EQUIV_DB;
         const objectiveImproved = maxImprovementDb > WORST_EQUIV_DB || (maxProtected && rmsImproved);
@@ -562,24 +570,34 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         // remains a hard aggregate-bank constraint for boosts; cuts are not rejected
         // merely because they lower a room-response minimum.
         // Real seats constrain the RSP fit without becoming its primary objective.
-        if (trialMetrics.seatMetrics) {
-          let seatWorsened = false;
-          let worsenedSeatId = null;
-          for (const m of trialMetrics.seatMetrics) {
-            const baselineDev = baselineSeatMaxDeviations.get(m.seatId);
-            const points = (m.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
-            const constrainedDeviation = points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : m.maxAbsDeviationDb;
-            if (m.seatId !== "rsp" && baselineDev !== undefined && constrainedDeviation > baselineDev + 0.5) {
-              seatWorsened = true;
-              worsenedSeatId = m.seatId;
-              break;
-            }
-          }
-          if (seatWorsened) {
-            trialEntry.rejectionReason = `seat ${worsenedSeatId} worsened beyond baseline tolerance`;
-            iterationEntry.trials.push(trialEntry);
-            continue;
-          }
+        // Corrective cuts may use a controlled tolerance when they materially improve
+        // the RSP, never target a protected null, and introduce no unsafe boost.
+        const seatTolerance = evaluateSeatRegressionTolerance({
+          seatMetrics: trialMetrics.seatMetrics || [],
+          baselineSeatMaxDeviations,
+          protectedNullRegions,
+          isProtectedFrequency,
+          rspImprovementDb: maxImprovementDb,
+          isCorrectiveCut: region.kind === "peak" && Number(trial.filter?.gainDb) < 0,
+          protectedNull,
+          bankLimits: validation.limits,
+        });
+        trialEntry.seatImpact = {
+          worstSeatId: seatTolerance.worstSeatId,
+          worstSeatChangeDb: -seatTolerance.worstSeatRegressionDb,
+          worstSeatRegressionDb: seatTolerance.worstSeatRegressionDb,
+          allowedRegressionDb: seatTolerance.allowedRegressionDb,
+          toleranceRaised: seatTolerance.toleranceRaised,
+        };
+        if (!seatTolerance.passed) {
+          operationCounts.seatRegressionToleranceRejected++;
+          trialEntry.rejectionReason = `seat ${seatTolerance.worstSeatId} worsened ${seatTolerance.worstSeatRegressionDb.toFixed(2)} dB; allowed ${seatTolerance.allowedRegressionDb.toFixed(2)} dB`;
+          iterationEntry.trials.push(trialEntry);
+          continue;
+        }
+        if (seatTolerance.toleranceRaised && seatTolerance.worstSeatRegressionDb > 0.5) {
+          operationCounts.seatRegressionToleranceAccepted++;
+          trialEntry.acceptedAfterSeatToleranceAdjustment = true;
         }
         trialEntry.accepted = true;
         trialEntry.acceptanceReason = maxImprovementDb > WORST_EQUIV_DB ? "reduced maximum absolute RSP residual" : "held maximum residual while reducing RSP RMS";
@@ -624,5 +642,19 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
 
   if (operations >= maxOperations && stopReason === "no safe improvement remained") stopReason = "operation ceiling reached";
 
-  return { filters, metrics: currentMetrics, baselineWorstSeatDeviation, baselineRspMinimumSplDb, finalRspMinimumSplDb: rspMinimumInBand(currentMetrics), blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace, baselineRspMetrics, capabilityContext, capabilityPenaltyCostDb: capabilityPenaltyForBank(filters) };
+  return {
+    filters, metrics: currentMetrics, baselineWorstSeatDeviation,
+    baselineRspMinimumSplDb, finalRspMinimumSplDb: rspMinimumInBand(currentMetrics),
+    blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace,
+    baselineRspMetrics, capabilityContext, capabilityPenaltyCostDb: capabilityPenaltyForBank(filters),
+    seatRegressionToleranceDiagnostics: {
+      baselineToleranceDb: 0.5,
+      materialImprovementToleranceDb: 1,
+      majorImprovementToleranceDb: 1.5,
+      materialImprovementThresholdDb: 3,
+      majorImprovementThresholdDb: 5,
+      acceptedAfterAdjustment: operationCounts.seatRegressionToleranceAccepted,
+      rejectedBeyondTolerance: operationCounts.seatRegressionToleranceRejected,
+    },
+  };
 }

@@ -379,6 +379,21 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
         ? `1/3-octave residual ${signedResidualDb.toFixed(3)} dB requires ${requiredCorrectionAtWorstDb.toFixed(3)} dB, but the high-resolution residual is ${highResolutionResidualAtWorstDb.toFixed(3)} dB and requires ${(-highResolutionResidualAtWorstDb).toFixed(3)} dB; opposite correction signs at ${nearestProtectedBoundaryDistanceHz.toFixed(3)} Hz from a protected-null boundary, with ${remainingAggregateCutHeadroomDb.toFixed(3)} dB aggregate cut headroom, Q ≤ 10 and ${filters.filter((filter) => filter.enabled).length}/10 filters enabled`
         : nearestRejectedTrials.at(-1)?.rejectionReason ?? stopReason,
   };
+  const candidateDecision = (trial) => ({
+    filterFrequencyHz: trial.frequencyHz,
+    gainDb: trial.gainDb,
+    Q: trial.Q,
+    rspImprovementDb: trial.rspImprovementDb,
+    seatImpact: trial.seatImpact,
+    capabilityPenaltyDb: trial.incrementalCapabilityPenaltyCostDb ?? trial.capabilityPenaltyCostDb,
+    decision: trial.acceptedAfterSeatToleranceAdjustment ? "accepted after tolerance adjustment" : trial.accepted ? "accepted" : "rejected",
+    rejectionReason: trial.rejectionReason,
+  });
+  const evaluatedEqCandidates = (selected.trace || []).flatMap((entry) => entry.trials || []);
+  const rejectedEqCandidates = evaluatedEqCandidates.filter((trial) => !trial.accepted).map(candidateDecision);
+  const seatToleranceAdjustedCandidates = evaluatedEqCandidates
+    .filter((trial) => trial.acceptedAfterSeatToleranceAdjustment)
+    .map(candidateDecision);
 
   return {
     filters: emptyFilters(filters),
@@ -438,6 +453,9 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       broadBelowTargetWorsening: false,
     },
     iterationTrace: selected.trace || [],
+    rejectedEqCandidates,
+    seatToleranceAdjustedCandidates,
+    seatRegressionToleranceDiagnostics: selected.seatRegressionToleranceDiagnostics,
     lfCapabilityProtection: buildLfCapabilityProtectionDiagnostics(
       capabilityContext,
       capabilityPenaltyForBank(filters),

@@ -213,6 +213,26 @@ function buildReport({ result, activeSubs, usableLfHz, perSeatRawCurves, rspRawC
     lines.push("");
   });
 
+  const rejectedCandidates = Array.isArray(c.rejectedEqCandidates) ? c.rejectedEqCandidates : [];
+  const toleranceAccepted = Array.isArray(c.seatToleranceAdjustedCandidates) ? c.seatToleranceAdjustedCandidates : [];
+  lines.push("========== 6. EQ CANDIDATE ACCEPTANCE DECISIONS ==========");
+  lines.push(`  Rejected candidates: ${rejectedCandidates.length}`);
+  rejectedCandidates.forEach((candidate) => {
+    lines.push(`  REJECTED | ${fmt(candidate.filterFrequencyHz, 2, " Hz")} | ${fmt(candidate.gainDb, 2, " dB")} | Q ${fmt(candidate.Q, 2)}`);
+    lines.push(`    RSP improvement: ${fmt(candidate.rspImprovementDb, 2, " dB")}`);
+    lines.push(`    Worst seat change: ${fmt(candidate.seatImpact?.worstSeatChangeDb, 2, " dB")} (${candidate.seatImpact?.worstSeatId || "—"}); allowed regression ${fmt(candidate.seatImpact?.allowedRegressionDb, 2, " dB")}`);
+    lines.push(`    Capability penalty: ${fmt(candidate.capabilityPenaltyDb, 2, " dB")}`);
+    lines.push(`    Decision: ${candidate.rejectionReason || "rejected before acoustic metrics were available"}`);
+  });
+  lines.push(`  Accepted after controlled seat tolerance: ${toleranceAccepted.length}`);
+  toleranceAccepted.forEach((candidate) => {
+    lines.push(`  ACCEPTED AFTER TOLERANCE ADJUSTMENT | ${fmt(candidate.filterFrequencyHz, 2, " Hz")} | ${fmt(candidate.gainDb, 2, " dB")} | Q ${fmt(candidate.Q, 2)}`);
+    lines.push(`    RSP improvement: ${fmt(candidate.rspImprovementDb, 2, " dB")}`);
+    lines.push(`    Worst seat change: ${fmt(candidate.seatImpact?.worstSeatChangeDb, 2, " dB")} (${candidate.seatImpact?.worstSeatId || "—"}); allowed regression ${fmt(candidate.seatImpact?.allowedRegressionDb, 2, " dB")}`);
+    lines.push(`    Capability penalty: ${fmt(candidate.capabilityPenaltyDb, 2, " dB")}`);
+  });
+  lines.push("");
+
   lines.push("========== LIVE CANDIDATE CONSISTENCY TEST (A/B/C/D) ==========");
   lines.push(`  A = direct sum of peakingEqResponseDb() for enabled filters`);
   lines.push(`  B = interpolated selectedCandidate.combinedEqCurve`);
