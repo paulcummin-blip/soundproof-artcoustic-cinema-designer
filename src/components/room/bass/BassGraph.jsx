@@ -375,6 +375,16 @@ export default function BassGraph({
     }
     const chartRenderKey = `${isMulti ? 'multi' : 'single'}_rows${_rowCount}|${renderToken}|${_splSample}`;
 
+    // Draw post-EQ first and raw second so the dotted before-EQ reference
+    // remains visible wherever the two RSP curves overlap.
+    const renderedMultiSeries = React.useMemo(() => {
+      if (!Array.isArray(multiSeries)) return [];
+      const postEq = multiSeries.find((series) => series.id === 'rsp-eq');
+      const raw = multiSeries.find((series) => series.id === 'rsp-raw');
+      const remaining = multiSeries.filter((series) => series.id !== 'rsp-eq' && series.id !== 'rsp-raw');
+      return [postEq, raw, ...remaining].filter(Boolean);
+    }, [multiSeries]);
+
     return (
         <div className="w-full h-[575px]">
             {rewStyleMode && (
@@ -444,7 +454,7 @@ export default function BassGraph({
                     {showModeMarkers && <BassModeMarkers markers={normalizedMarkers} />}
 
                     {/* REW mode: multi-series or single trace */}
-                    {rewStyleMode && isMulti && multiSeries.map((s) => (
+                    {rewStyleMode && isMulti && renderedMultiSeries.map((s) => (
                       <Line
                         key={s.id}
                         type="linear" 
