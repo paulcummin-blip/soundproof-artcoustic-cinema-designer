@@ -64,7 +64,7 @@ export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, act
     ? systemCapabilityDb - currentSystemSourceOutputDb : null;
   const normalAllowedBoostDb = availableHeadroomDb == null ? Math.min(requested, maxBoostDb) : Math.max(0, Math.min(requested, maxBoostDb, availableHeadroomDb));
   const lf = isFiniteNumber(usableLfHz) ? Number(usableLfHz) : null;
-  const rampFraction = lf == null ? 1 : Math.max(0, Math.min(1, (Number(frequency) - lf) / 5));
+  const rampFraction = lf == null ? 1 : Number(frequency) >= lf ? 1 : 0;
   return {
     systemCapabilityDb,
     currentSystemSourceOutputDb,
