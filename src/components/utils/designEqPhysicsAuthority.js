@@ -28,13 +28,8 @@ export function classifyEqCorrectionRegion({ frequency, rawSpl, currentSpl, targ
   const narrowDeepDeficit = finite(currentResidualDb) && currentResidualDb <= -10 && finite(widthOctaves) && widthOctaves < 1 / 3;
   if (narrowDeepDeficit) return { classification: "Null", expectedAction: "Protect", rawResidualDb, currentResidualDb,
     reason: "Deep narrow deficit is treated as likely destructive cancellation." };
-  if (finite(requestedGainDb) && Number(requestedGainDb) > 0 && finite(permittedBoostDb)
-    && Number(requestedGainDb) > Number(permittedBoostDb) + 0.05) {
-    return { classification: "Capability limited", expectedAction: "Reject boost", rawResidualDb, currentResidualDb,
-      reason: "Required boost exceeds available source-domain headroom." };
-  }
-  return { classification: "Valley", expectedAction: "Boost if capable", rawResidualDb, currentResidualDb,
-    reason: "Broad response deficit may receive capability-limited boost." };
+  return { classification: "Valley", expectedAction: "Boost within +6 dB limit", rawResidualDb, currentResidualDb,
+    reason: "Broad response deficit may receive correction within the fixed EQ boost limit." };
 }
 
 export function validatePhysicalEqAction(classification, appliedCorrectionDb) {
@@ -43,7 +38,6 @@ export function validatePhysicalEqAction(classification, appliedCorrectionDb) {
   const actualAction = correction < 0 ? "Cut" : "Boost";
   if (classification === "Peak" && correction > 0) return { passed: false, actualAction, reason: "Positive gain is forbidden at a modal peak." };
   if (classification === "Null") return { passed: false, actualAction, reason: "Corrective EQ is forbidden inside a protected null." };
-  if (classification === "Capability limited" && correction > 0) return { passed: false, actualAction, reason: "Boost exceeds physical capability." };
   return { passed: true, actualAction };
 }
 

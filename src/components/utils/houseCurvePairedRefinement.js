@@ -1,7 +1,6 @@
 import { evaluateProvisionalBankLimits, limitBoostForCapability, peakingEqResponseDb } from "@/components/utils/designEqCalibration";
 import { calculateAllSeatMetrics, compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
-import { buildLfCapabilityContext, calculateLfCapabilityPenalty } from "@/components/utils/lfCapabilityProtection";
 
 const Q_VALUES = [6, 8, 10];
 const GAIN_SCALES = [0.25, 0.5, 0.75, 1];
@@ -28,7 +27,7 @@ function realSeatsRemainConstrained(baseline, after, protectedNullRegions) {
   });
 }
 
-export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetrics, seats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve, baselineP14L1 = false }) {
+export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetrics, seats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve }) {
   const points = (metrics?.rspResidualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
   const peak = points.filter((point) => point.deviationDb > 0).sort((a, b) => b.deviationDb - a.deviationDb)[0];
   const valley = points.filter((point) => point.deviationDb < 0).sort((a, b) => a.deviationDb - b.deviationDb)[0];
@@ -44,11 +43,7 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
   let bestFilters = filters;
   let bestMetrics = metrics;
   let bankEvaluationCount = 0;
-  const capabilityContext = buildLfCapabilityContext(activeSubs, bankRaw.map((point) => point.frequency), profile.id, requestedSystemOutputDb);
-  const capabilityPenaltyForBank = (bank) => calculateLfCapabilityPenalty(
-    bank, capabilityContext, (frequency, candidateBank) => candidateBank.reduce((sum, filter) => sum + peakingEqResponseDb(frequency, filter), 0),
-  );
-  const baselineCapabilityPenaltyCostDb = capabilityPenaltyForBank(filters);
+
   for (const cutQ of Q_VALUES) for (const boostQ of Q_VALUES) {
     for (const cutScale of GAIN_SCALES) for (const boostScale of GAIN_SCALES) {
       const cut = { band: filters.length + 1, enabled: true, type: "Peak", frequencyHz: peak.frequency,
@@ -63,15 +58,10 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
       if (!limits.allOk) continue;
       const candidateMetrics = calculateAllSeatMetrics(seats, proposed, fitStartHz, fitEndHz, anchorDb, null, null, { protectedNullRegions, canonicalTargetCurve });
       if (!candidateMetrics) continue;
-      const candidateRsp = candidateMetrics.seatMetrics?.find((metric) => metric.seatId === "rsp");
-      const p14Values = (candidateRsp?.residualPoints || []).filter((point) => point.frequency >= 20 && point.frequency <= 120)
-        .map((point) => point.spl).filter(Number.isFinite);
-      if (baselineP14L1 && (!p14Values.length || Math.min(...p14Values) < 113.95)) continue;
       if (!realSeatsRemainConstrained(seatBaselineMetrics, candidateMetrics, protectedNullRegions)) continue;
       const maxImprovementDb = bestMetrics.rspMaxDeviationDb - candidateMetrics.rspMaxDeviationDb;
       const rmsImprovementDb = bestMetrics.rspRmsDeviationDb - candidateMetrics.rspRmsDeviationDb;
-      const penaltyIncreaseDb = Math.max(0, capabilityPenaltyForBank(proposed) - baselineCapabilityPenaltyCostDb);
-      if (maxImprovementDb + 0.35 * rmsImprovementDb - penaltyIncreaseDb <= 0.01) continue;
+      if (maxImprovementDb + 0.35 * rmsImprovementDb <= 0.01) continue;
       const maxImproved = maxImprovementDb > 0.05;
       const rmsImproved = rmsImprovementDb > 0.01;
       const maxNotWorse = candidateMetrics.rspMaxDeviationDb <= bestMetrics.rspMaxDeviationDb + 0.05;

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import BassResultsPills from "@/components/room/bass/BassResultsPills";
 import BassDesignRecommendation from "@/components/room/bass/BassDesignRecommendation";
+import BassCapabilitySummary from "@/components/room/bass/BassCapabilitySummary";
 import { formatBassResults } from "@/components/room/bass/bassResultsPresentation";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 
@@ -24,6 +25,7 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
         ? <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>
         : <span>{formatted.statusText}</span>}
     </div>
+    <BassCapabilitySummary capability={shared.contract?.selectedCandidate?.postEqCapabilityAssessment} />
     <BassDesignRecommendation recommendation={shared.contract?.designRecommendation} />
   </div>;
 }

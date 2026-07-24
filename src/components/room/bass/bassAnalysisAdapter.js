@@ -374,10 +374,15 @@ export function adaptCurrentBassOptimisationResult({
   }
 
   // P14
-  const p14Level = selectedCandidate
-    ? (typeof selectedCandidate.achievedP14Level === "number" ? selectedCandidate.achievedP14Level : parseLegacyLevel(optimisationResult?.achievedP14Level))
-    : parseLegacyLevel(optimisationResult?.achievedP14Level);
-  const p14Value = Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : (Number.isFinite(optimisationResult?.achievedP14Db) ? optimisationResult.achievedP14Db : null);
+  const postEqP14 = selectedCandidate?.postEqCapabilityAssessment;
+  const p14Level = Number.isFinite(postEqP14?.achievedP14Level)
+    ? postEqP14.achievedP14Level
+    : selectedCandidate
+      ? (typeof selectedCandidate.achievedP14Level === "number" ? selectedCandidate.achievedP14Level : parseLegacyLevel(optimisationResult?.achievedP14Level))
+      : parseLegacyLevel(optimisationResult?.achievedP14Level);
+  const p14Value = Number.isFinite(postEqP14?.maximumAvailableSplAfterEqDb)
+    ? postEqP14.maximumAvailableSplAfterEqDb
+    : Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : (Number.isFinite(optimisationResult?.achievedP14Db) ? optimisationResult.achievedP14Db : null);
   const p14RecommendedLevel = selectedCandidate?.achievedP14RecommendedLevel ?? 0;
   const selectedP14TargetBasis = normalizeP14TargetBasis(selectedCandidate?.p14TargetBasis || p14TargetBasis);
   contract.productAnalysis.parameters.p14 = createBassParameterResult({

@@ -45,7 +45,7 @@ function buildTarget(parameters, basis, selectedCandidate) {
     parameterKey: "p14",
     parameterName: "Bass output capability",
     achievedLevel: postEqCapability.achievedP14LevelLabel,
-    reason: `${postEqCapability.limitation}${Number.isFinite(postEqCapability.splShortfallDb) ? ` ${postEqCapability.splShortfallDb.toFixed(1)} dB shortfall` : ""}${Number.isFinite(postEqCapability.limitingFrequencyHz) ? ` at ${postEqCapability.limitingFrequencyHz.toFixed(1)} Hz.` : ""}`,
+    reason: `${postEqCapability.failureMessage || postEqCapability.limitation}${Number.isFinite(postEqCapability.splShortfallDb) ? ` ${postEqCapability.splShortfallDb.toFixed(1)} dB shortfall` : ""}${Number.isFinite(postEqCapability.limitingFrequencyHz) ? ` at ${postEqCapability.limitingFrequencyHz.toFixed(1)} Hz.` : ""}`,
     recommendedImprovement: postEqCapability.recommendation,
   } : genericRecommendation;
   return { ...targetParameters, achievedLevel: achievedLevel(targetParameters), designRecommendation: recommendation };

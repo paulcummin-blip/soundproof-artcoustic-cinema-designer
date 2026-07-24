@@ -17,7 +17,10 @@ export function buildPostEqBassCapabilityOutcome({
     : achievedLevel >= requested;
   const limitation = passesRequestedLevel
     ? null
-    : "Insufficient low-frequency output capability.";
+    : "Subwoofer output insufficient";
+  const failureMessage = passesRequestedLevel
+    ? null
+    : `Requested RP22 Level ${requested} target not achieved. Increase subwoofer capacity.`;
 
   return {
     requestedLevel: requested,
@@ -30,6 +33,7 @@ export function buildPostEqBassCapabilityOutcome({
     maximumAvailableSplAfterEqDb: requestedResult?.worstCapabilityDb ?? scalarP14?.value ?? null,
     splShortfallDb: requestedResult?.shortfallDb ?? null,
     limitation,
+    failureMessage,
     recommendation: limitation
       ? "Increase subwoofer quantity or use higher-output subwoofers."
       : "Selected subwoofer system supports the requested bass target.",

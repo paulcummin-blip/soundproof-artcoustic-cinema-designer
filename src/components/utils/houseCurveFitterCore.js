@@ -16,7 +16,6 @@ import { calculatePreparedBassCurveMetrics, prepareBassCurveMetricGrid } from "@
 import { evaluatePreparedBankLimits, prepareBankValidation } from "@/components/utils/preparedBankValidation";
 import { evaluateNearTargetProtection, isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
-import { buildLfCapabilityContext, calculateLfCapabilityPenalty } from "@/components/utils/lfCapabilityProtection";
 import { evaluateSeatRegressionTolerance } from "@/components/utils/houseCurveSeatRegressionTolerance";
 import { classifyEqCorrectionRegion, curveSplAt, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 
@@ -71,15 +70,7 @@ export function compareHouseCurveMetrics(a, b) {
   const aRspDev = variationOr(a.rspMaxDeviationDb ?? a.achievedP19VariationDb);
   const bRspDev = variationOr(b.rspMaxDeviationDb ?? b.achievedP19VariationDb);
   if (Math.abs(aRspDev - bRspDev) > RMS_EPSILON_DB) return aRspDev - bRspDev;
-  // 6. P14 level (higher is better)
-  const aP14 = levelValue(a.achievedP14Level);
-  const bP14 = levelValue(b.achievedP14Level);
-  if (aP14 !== bP14) return bP14 - aP14;
-  // 7. P18 level (higher is better)
-  const aP18 = levelValue(a.achievedP18Level);
-  const bP18 = levelValue(b.achievedP18Level);
-  if (aP18 !== bP18) return bP18 - aP18;
-  // 8. Fewest filters
+  // Equivalent acoustic results use EQ cost only as the final tie-breaker.
   return filterCount(a) - filterCount(b);
 }
 
@@ -374,10 +365,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : null;
   const correctionStartHz = Number.isFinite(Number(options.correctionStartHz)) ? Number(options.correctionStartHz) : assessmentStartHz;
   const correctionEndHz = Number.isFinite(Number(options.correctionEndHz)) ? Number(options.correctionEndHz) : assessmentEndHz;
-  const capabilityContext = buildLfCapabilityContext(activeSubs, bankRaw.map((point) => point.frequency), profile.id, requestedSystemOutputDb);
-  const capabilityPenaltyForBank = (bank) => calculateLfCapabilityPenalty(
-    bank, capabilityContext, (frequency, candidateBank) => candidateBank.reduce((sum, filter) => sum + peakingEqResponseDb(frequency, filter), 0),
-  );
+  const capabilityPenaltyForBank = () => 0;
 
   const operationCounts = {
     curveEvaluationRequests: 0,
@@ -462,8 +450,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     let bestTrialMetrics = null;
     let bestTrialFilters = null;
     let bestTrialTraceIndex = null;
-    let bestCapabilityAdjustedObjectiveDb = -Infinity;
-    const currentCapabilityPenaltyCostDb = capabilityPenaltyForBank(filters);
+    const currentCapabilityPenaltyCostDb = 0;
 
     for (const region of regions) {
       const protectedNull = region.authority?.classification === "Null"
@@ -559,7 +546,6 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         const capabilityPenaltyCostDb = capabilityPenaltyForBank(validation.filters);
         const incrementalCapabilityPenaltyCostDb = Math.max(0, capabilityPenaltyCostDb - currentCapabilityPenaltyCostDb);
         const capabilityAdjustedObjectiveDb = maxImprovementDb + 0.35 * rmsImprovementDb - incrementalCapabilityPenaltyCostDb;
-        const capabilityObjectiveImproved = capabilityAdjustedObjectiveDb > 0.01;
         trialEntry.capabilityPenaltyCostDb = capabilityPenaltyCostDb;
         trialEntry.incrementalCapabilityPenaltyCostDb = incrementalCapabilityPenaltyCostDb;
         trialEntry.capabilityAdjustedObjectiveDb = capabilityAdjustedObjectiveDb;
@@ -583,9 +569,8 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         // Protected cancellation regions are excluded from scoring and never receive
         // corrective boost. Incidental overlap from a credible neighbouring peak cut
         // is retained in the final physical response rather than blocking that cut.
-        // P14/P18 are calculated from the final post-EQ response. Product capability
-        // remains a hard aggregate-bank constraint for boosts; cuts are not rejected
-        // merely because they lower a room-response minimum.
+        // P14/P18 are calculated only after the final EQ response. Candidate banks
+        // are constrained by the fixed +6 dB / -15 dB limits, not product capability.
         // Real seats constrain the RSP fit without becoming its primary objective.
         // Corrective cuts may use a controlled tolerance when they materially improve
         // the RSP, never target a protected null, and introduce no unsafe boost.
@@ -620,10 +605,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         trialEntry.acceptanceReason = maxImprovementDb > WORST_EQUIV_DB ? "reduced maximum absolute RSP residual" : "held maximum residual while reducing RSP RMS";
         iterationEntry.trials.push(trialEntry);
         const acousticComparison = bestTrial ? compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) : -1;
-        if (!bestTrial || acousticComparison < 0
-          || (acousticComparison === 0 && capabilityAdjustedObjectiveDb > bestCapabilityAdjustedObjectiveDb + 0.01)) {
-          if (bestTrial && acousticComparison === 0) operationCounts.capabilityPenaltySelectionChanges++;
-          bestCapabilityAdjustedObjectiveDb = capabilityAdjustedObjectiveDb;
+        if (!bestTrial || acousticComparison < 0) {
           bestTrial = trial;
           bestTrialMetrics = trialMetrics;
           bestTrialFilters = validation.filters;
@@ -664,7 +646,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     filters, metrics: currentMetrics, baselineWorstSeatDeviation,
     baselineRspMinimumSplDb, finalRspMinimumSplDb: rspMinimumInBand(currentMetrics),
     blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace,
-    baselineRspMetrics, capabilityContext, capabilityPenaltyCostDb: capabilityPenaltyForBank(filters),
+    baselineRspMetrics, capabilityContext: null, capabilityPenaltyCostDb: 0,
     seatRegressionToleranceDiagnostics: {
       baselineToleranceDb: 0.5,
       materialImprovementToleranceDb: 1,

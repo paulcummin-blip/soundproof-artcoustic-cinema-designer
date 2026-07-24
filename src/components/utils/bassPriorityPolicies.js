@@ -133,9 +133,8 @@ export function rankingTupleForMode(candidate, mode) {
     lowerScore(candidate?.achievedP19VariationDb), lowerScore(candidate?.achievedP18FrequencyHz), lowerScore(eqCost(candidate)),
   ];
   return [lowerScore(houseCurveRmsError(candidate)), lowerScore(houseCurveMaxError(candidate)),
-    ...balance, -levelSpread(candidate), lowerScore(candidate?.achievedP19VariationDb),
-    lowerScore(candidate?.achievedP20VariationDb), lowerScore(worstSeatDeviation(candidate)),
-    lowerScore(meanSeatDeviation(candidate)), lowerScore(rmsTargetError(candidate)), lowerScore(eqCost(candidate))];
+    lowerScore(candidate?.houseCurveRankingMeanAbsoluteResidualDb ?? candidate?.rspMeanAbsoluteResidualDb),
+    lowerScore(eqCost(candidate))];
 }
 
 function compareRanked(a, b, mode) {
@@ -154,24 +153,12 @@ function compareRanked(a, b, mode) {
 export function rankBassCandidates(pool, mode) {
   const canonicalMode = normalizeBassPriorityMode(mode);
   const bankValid = Array.isArray(pool) ? pool.filter(isBankAndBandValid) : [];
-  const fullyValid = bankValid.filter(isAllL1);
   const houseCurveMode = canonicalMode === BASS_PRIORITY_MODES.HOUSE_CURVE_ACCURACY;
   const houseCurveCandidates = bankValid.filter((candidate) => candidate?.designEqFitProfile === "house_curve");
-  const preEqReachedP14L1 = houseCurveCandidates.some((candidate) => candidate?.preEqP14Level >= 1);
-  const p14PreservingHouseCandidates = houseCurveCandidates.filter((candidate) => candidate?.achievedP14Level >= 1);
-  const baseEligible = houseCurveMode
-    ? (preEqReachedP14L1 && p14PreservingHouseCandidates.length ? p14PreservingHouseCandidates : houseCurveCandidates)
-    : bankValid;
-  const balancedFallbackDominanceApplied = canonicalMode === BASS_PRIORITY_MODES.BALANCED && baseEligible.length > 0;
-  const eligible = balancedFallbackDominanceApplied
-    ? removeStrictlyDominatedBalancedFallbacks(baseEligible)
-    : baseEligible;
-  const dominatedCandidateCount = balancedFallbackDominanceApplied ? baseEligible.length - eligible.length : 0;
-  const p14PreservationUnavailable = houseCurveMode && preEqReachedP14L1 && p14PreservingHouseCandidates.length === 0;
-  const eligibilityGroup = p14PreservationUnavailable ? "house_curve_no_admissible_p14_l1_preserving_candidate" :
-    houseCurveMode && bankValid.length ? "bank_valid_raw_house_curve_objective" :
-    fullyValid.length ? "bank_valid_all_rp22_bass_parameters_l1" :
-    bankValid.length ? "bank_valid_best_calibrated_attempt_below_l1" : "no_bank_and_band_valid_candidates";
+  const eligible = houseCurveMode && houseCurveCandidates.length ? houseCurveCandidates : bankValid;
+  const balancedFallbackDominanceApplied = false;
+  const dominatedCandidateCount = 0;
+  const eligibilityGroup = bankValid.length ? "bank_valid_fixed_house_curve_objective" : "no_bank_and_band_valid_candidates";
   const rankedEligible = [...eligible].sort((a, b) => compareRanked(a, b, canonicalMode));
   const selected = rankedEligible[0] || null;
   const signature = selected ? stableCandidateSignature(selected) : null;
@@ -187,7 +174,7 @@ export function rankBassCandidates(pool, mode) {
     const reason = candidate === selected
       ? selectedCandidateReason
       : !physicallyValid
-        ? "Rejected EQ candidate: exceeds physical capability"
+        ? "Rejected EQ candidate: exceeds fixed EQ safety limits"
         : residualWorse || !eligible.includes(candidate)
           ? "Rejected EQ candidate: higher residual error"
           : "Rejected EQ candidate: lower overall response quality or higher EQ cost after equivalent acoustic performance";
@@ -227,11 +214,7 @@ export function rankBassCandidates(pool, mode) {
           ? `${canonicalMode}: generated house_curve candidate won the raw RSP maximum, RMS and mean-absolute residual ranking outside protected nulls.`
           : `${canonicalMode}: ${selected.designEqFitProfile || "standard"} beat house_curve on measured raw residual metrics (${selected.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${selected.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB vs ${houseCurveCandidate.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${houseCurveCandidate.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB).`
         : `${canonicalMode}: ERROR — no compatible generated house_curve candidate was available; no legacy accuracy fallback was accepted.`
-      : fullyValid.length
-        ? `${canonicalMode}: best house curve match after valid EQ; house-curve RMS and maximum residual were ranked before RP22 outcomes and seat variation, with EQ cost used only after equivalent acoustic performance.`
-        : balancedFallbackDominanceApplied
-          ? `${canonicalMode}: best house curve match after valid EQ from the physically valid fallback pool; ${dominatedCandidateCount} acoustically dominated candidate${dominatedCandidateCount === 1 ? " was" : "s were"} excluded.`
-          : `${canonicalMode}: best house curve match after valid EQ from the available physically valid candidates.`
+      : `${canonicalMode}: best fixed house-curve match after valid EQ; capability and RP22 outcomes were excluded from selection.`
     : `${canonicalMode}: no bank-valid candidate with a valid assessment band was available.`;
   return {
     selected,

@@ -27,17 +27,20 @@ function capabilityFixture(modelKey, count, roomTransferDb, targetAnchorDb) {
 
 export function runBassFixedTargetValidationFixtures() {
   const definitions = getRp22BassOperatingDefinitions("minimum");
-  const designTarget = resolveRequestedRp22HouseCurveTarget(definitions, 4);
-  const target = buildCanonicalAbsoluteHouseCurveTarget({
-    frequencyGrid: FREQUENCIES,
-    targetAnchorDb: designTarget.targetAnchorDb,
-    correctionStartHz: 20,
-    correctionEndHz: 200,
+  const levelTargets = [1, 2, 3, 4].map((level) => {
+    const designTarget = resolveRequestedRp22HouseCurveTarget(definitions, level);
+    const curve = buildCanonicalAbsoluteHouseCurveTarget({
+      frequencyGrid: FREQUENCIES, targetAnchorDb: designTarget.targetAnchorDb,
+      correctionStartHz: 20, correctionEndHz: 200,
+    });
+    return { level, designTarget, curve, shape: curve.map((point) => point.spl - designTarget.targetAnchorDb) };
   });
+  const targetShapesMatch = levelTargets.every(({ shape }) => shape.every((value, index) => Math.abs(value - levelTargets[0].shape[index]) < 1e-9));
+  const targetOffsetsRise = levelTargets.every((entry, index) => index === 0 || entry.designTarget.targetAnchorDb > levelTargets[index - 1].designTarget.targetAnchorDb);
+  const { designTarget, curve: target } = levelTargets[3];
   const targetForOneSub = target.map((point) => ({ ...point }));
   const targetForFourSubs = target.map((point) => ({ ...point }));
-  const targetIsInvariant = JSON.stringify(targetForOneSub) === JSON.stringify(targetForFourSubs)
-    && designTarget.requestedLevel === 4;
+  const targetIsInvariant = JSON.stringify(targetForOneSub) === JSON.stringify(targetForFourSubs);
   const oneSubCapability = capabilityFixture("SUB2-12", 1, -5, designTarget.targetAnchorDb);
   const fourSubCapability = capabilityFixture("SUB4-12", 4, -12, designTarget.targetAnchorDb);
 
@@ -79,10 +82,12 @@ export function runBassFixedTargetValidationFixtures() {
   const boostedProtectedNull = nullResult.filters.some((filter) => filter.enabled && filter.gainDb > 0
     && protectedNulls.some((region) => filter.frequencyHz >= region.startHz && filter.frequencyHz <= region.endHz));
 
+  const weakFailureIsExplicit = oneSubCapability.failureMessage === "Requested RP22 Level 4 target not achieved. Increase subwoofer capacity.";
   return [
-    { test: "1 × SUB2-12 requested L4 target", expected: "L4 target unchanged; capability fails", actual: { targetIsInvariant, capability: oneSubCapability }, delta: targetIsInvariant && !oneSubCapability.passesRequestedLevel ? 0 : 1, severity: targetIsInvariant && !oneSubCapability.passesRequestedLevel ? "PASS" : "CRITICAL", nextTest: "Live one-sub capability run" },
-    { test: "4 × SUB4-12 requested L4 target", expected: "Same L4 target; capability passes or nearly passes", actual: { targetIsInvariant, capability: fourSubCapability }, delta: targetIsInvariant && fourSubCapability.achievedP14Level >= 3 ? 0 : 1, severity: targetIsInvariant && fourSubCapability.achievedP14Level >= 3 ? "PASS" : "HIGH", nextTest: "Live four-sub capability run" },
-    { test: "67 Hz peak", expected: "Peak cut toward target", actual: { cutFilterFound: !!peakCut, beforeDb: peakBefore, afterDb: peakAfter }, delta: peakAfter - peakBefore, severity: peakCut && peakAfter < peakBefore - 1 ? "PASS" : "HIGH", nextTest: "Production room peak regression" },
-    { test: "Deep null", expected: "No boost inside protected null", actual: { protectedRegionCount: protectedNulls.length, boostedProtectedNull }, delta: boostedProtectedNull ? 1 : 0, severity: !boostedProtectedNull && protectedNulls.length ? "PASS" : "CRITICAL", nextTest: "Multi-seat null regression" },
+    { test: "Target independence L1–L4", expected: "Identical shape; rising SPL offset only", actual: { targetShapesMatch, targetOffsetsRise, anchorsDb: levelTargets.map((entry) => entry.designTarget.targetAnchorDb) }, delta: targetShapesMatch && targetOffsetsRise ? 0 : 1, severity: targetShapesMatch && targetOffsetsRise ? "PASS" : "CRITICAL", nextTest: "Live L1–L4 graph overlay" },
+    { test: "Hardware independence", expected: "Identical L4 target; achieved capability changes", actual: { targetIsInvariant, oneSub: oneSubCapability.achievedP14LevelLabel, fourSubs: fourSubCapability.achievedP14LevelLabel }, delta: targetIsInvariant && oneSubCapability.achievedP14Level !== fourSubCapability.achievedP14Level ? 0 : 1, severity: targetIsInvariant && oneSubCapability.achievedP14Level !== fourSubCapability.achievedP14Level ? "PASS" : "CRITICAL", nextTest: "Live hardware swap" },
+    { test: "67 Hz EQ behaviour", expected: "Peak cut toward fixed target", actual: { cutFilterFound: !!peakCut, beforeDb: peakBefore, afterDb: peakAfter }, delta: peakAfter - peakBefore, severity: peakCut && peakAfter < peakBefore - 1 ? "PASS" : "HIGH", nextTest: "Production room peak regression" },
+    { test: "1 × SUB2-12 real L4 limitation", expected: "Explicit requested-target failure; target unchanged", actual: { targetIsInvariant, passes: oneSubCapability.passesRequestedLevel, message: oneSubCapability.failureMessage }, delta: targetIsInvariant && !oneSubCapability.passesRequestedLevel && weakFailureIsExplicit ? 0 : 1, severity: targetIsInvariant && !oneSubCapability.passesRequestedLevel && weakFailureIsExplicit ? "PASS" : "CRITICAL", nextTest: "Live one-sub report" },
+    { test: "Deep null protection", expected: "No boost inside protected null", actual: { protectedRegionCount: protectedNulls.length, boostedProtectedNull }, delta: boostedProtectedNull ? 1 : 0, severity: !boostedProtectedNull && protectedNulls.length ? "PASS" : "CRITICAL", nextTest: "Multi-seat null regression" },
   ];
 }

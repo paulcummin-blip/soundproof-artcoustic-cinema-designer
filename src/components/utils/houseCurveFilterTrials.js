@@ -1,5 +1,5 @@
 import {
-  countSameSignFiltersInRegion, isNearDuplicate, limitBoostForCapability, qForRegion,
+  countSameSignFiltersInRegion, isNearDuplicate, qForRegion,
 } from "@/components/utils/designEqCalibration";
 import { resolveRequiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 import { classifyEqCorrectionRegion, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
@@ -19,8 +19,8 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
     protectedNull: !!region.protectedNull,
     widthOctaves: region.widthOctaves,
   });
-  if (["Null", "Capability limited"].includes(authority.classification)) {
-    return { trials, productLimited: authority.classification === "Capability limited", authority };
+  if (authority.classification === "Null") {
+    return { trials, productLimited: false, authority };
   }
   const isPeak = authority.classification === "Peak";
   const maximumCutDb = profile.maximumCutDb;
@@ -29,7 +29,7 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
     ? -Math.min(maximumCutDb, Math.abs(authority.rawResidualDb ?? requiredAtCentreDb))
     : Math.min(maximumAggregateBoostDb, Math.max(0, requiredAtCentreDb) * 0.75);
   const correctionSign = Math.sign(requestedGainDb);
-  const baseCandidate = limitBoostForCapability({
+  const baseCandidate = {
     band: filters.length + 1, enabled: true, type: "Peak",
     frequencyHz: region.centrePoint.frequency, gainDb: requestedGainDb,
     Q: qForRegion(region), startHz: region.startHz, endHz: region.endHz,
@@ -38,7 +38,7 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
     beforeEqSpl: region.rawSpl,
     targetSpl: region.centrePoint.targetSpl,
     reason: authority.reason,
-  }, activeSubs, usableLfHz, requestedSystemOutputDb);
+  };
   const physicalAction = validatePhysicalEqAction(authority.classification, baseCandidate.gainDb);
   const productLimited = Math.abs(baseCandidate.gainDb) <= 0.1 || !physicalAction.passed;
   const gainScales = [1, 0.75, 0.5];
@@ -56,7 +56,7 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
     for (const gainScale of gainScales) {
       for (const q of qValues) {
         const scaled = { ...baseCandidate, gainDb: baseCandidate.gainDb * gainScale, Q: q };
-        const candidate = scaled.gainDb > 0 ? limitBoostForCapability(scaled, activeSubs, usableLfHz, requestedSystemOutputDb) : scaled;
+        const candidate = scaled;
         const key = `${candidate.gainDb.toFixed(4)}:${candidate.Q.toFixed(4)}`;
         if (seenVariants.has(key) || Math.abs(candidate.gainDb) <= 0.1) continue;
         seenVariants.add(key);

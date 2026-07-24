@@ -21,12 +21,6 @@ import { refineOpposingResidualPair } from "@/components/utils/houseCurvePairedR
 import { runProfessionalResidualCleanup } from "@/components/utils/houseCurveResidualCleanup";
 import { refineLegalUnprotectedPeak } from "@/components/utils/houseCurveLegalPeakRefinement";
 import { buildFilterDecisionDiagnostics, classifyEqCorrectionRegion, findAggregatePeakBoostViolations, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
-import {
-  buildLfCapabilityContext,
-  buildLfCapabilityProtectionDiagnostics,
-  calculateLfCapabilityPenalty,
-  getEqCapabilityBoostAllowance,
-} from "@/components/utils/lfCapabilityProtection";
 
 export { houseCurveP19Level };
 
@@ -114,10 +108,6 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
   const profile = { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: false, maximumCutDb: 15 };
   const bankRaw = rspRaw;
-  const capabilityContext = buildLfCapabilityContext(activeSubs, bankRaw.map((point) => point.frequency), profile.id, requestedSystemOutputDb);
-  const capabilityPenaltyForBank = (bank) => calculateLfCapabilityPenalty(
-    bank, capabilityContext, (frequency, candidateBank) => candidateBank.reduce((sum, filter) => sum + peakingEqResponseDb(frequency, filter), 0),
-  );
   const protectedNullRegions = Array.isArray(options.protectedNullRegions)
     ? options.protectedNullRegions
     : identifyProtectedNullRegions(
@@ -158,10 +148,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   // Select the start with the best RSP maximum residual, then RSP RMS.
   let selected = startA;
   let selectedStartLabel = "empty";
-  let capabilityPenaltyChangedStartSelection = false;
   if (startB !== startA && startB.metrics && startA.metrics) {
     const acousticComparatorPrefersB = compareHouseCurveMetrics(startB.metrics, startA.metrics) < 0;
-    capabilityPenaltyChangedStartSelection = false;
     if (acousticComparatorPrefersB) {
       selected = startB;
       selectedStartLabel = "standard-seeded";
@@ -175,7 +163,6 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   let bankEvalCount = selected.bankEvalCount;
   let operations = selected.operations;
   const pairedSeatBaselineMetrics = finalMetrics;
-  const baselineP14L1 = Number.isFinite(selected.baselineRspMinimumSplDb) && selected.baselineRspMinimumSplDb >= 114;
   const correctableP19FromFitMetrics = (metrics) => {
     const points = (metrics?.rspResidualPoints || []).filter((point) => point.frequency >= assessmentStartHz
       && point.frequency <= assessmentEndHz
@@ -187,7 +174,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     const pairedRefinement = refineOpposingResidualPair({
       filters, metrics: finalMetrics, seatBaselineMetrics: pairedSeatBaselineMetrics,
       seats: objectiveSeats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz,
-      requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve, baselineP14L1,
+      requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve,
     });
     bankEvalCount += pairedRefinement.bankEvaluationCount;
     if (!pairedRefinement.changed) {
@@ -232,11 +219,6 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   }, {});
   operationCounts.residualCleanupAcceptedOperations = residualCleanup.acceptedOperationCount;
   operationCounts.residualCleanupBankEvaluations = residualCleanup.bankEvaluationCount;
-  operationCounts.capabilityPenaltyRejections = (operationCounts.capabilityPenaltyRejections || 0)
-    + (residualCleanup.diagnostics || []).flatMap((item) => item.attempts || [])
-      .filter((attempt) => attempt.rejectionReason?.includes("LF capability penalty")).length;
-  operationCounts.capabilityPenaltySelectionChanges = (operationCounts.capabilityPenaltySelectionChanges || 0)
-    + (capabilityPenaltyChangedStartSelection ? 1 : 0);
 
   // Final bank validation — must pass all hard limits. If it fails (safety net),
   // revert to the Standard seed (or empty) and recalculate metrics.
@@ -306,7 +288,6 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   else if (filters.length >= 10) limitingReason = "filter-limited";
   else if (finalBankLimits.maxAggregateBoostDb >= 5.95) limitingReason = "boost-limited";
   else if (finalBankLimits.maxAggregateCutDb <= -14.95) limitingReason = "cut-limited";
-  else if (blockedResiduals.some((b) => b.blockingReason === "product-limited")) limitingReason = "product-limited";
   else if (blockedResiduals.some((b) => b.blockingReason === "bank-limited")) limitingReason = "bank-limited";
 
   const worstCorrectablePoint = rspCorrectableAssessed.length
@@ -320,14 +301,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const appliedCorrectionAtWorstDb = Number.isFinite(worstFrequencyHz)
     ? interpolateCanonicalTarget(combinedEqCurve, worstFrequencyHz)
     : null;
-  const boostAllowance = Number.isFinite(worstFrequencyHz) && Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0
-    ? getEqCapabilityBoostAllowance({
-        frequency: worstFrequencyHz, requestedBoostDb: 6, activeSubs,
-        maxBoostDb: 6, requestedSystemOutputDb,
-      })
-    : null;
-  const remainingProductBoostDb = boostAllowance
-    ? Math.max(0, Number(boostAllowance.allowedBoostDb) - Math.max(0, appliedCorrectionAtWorstDb || 0))
+  const remainingProductBoostDb = Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0
+    ? Math.max(0, 6 - Math.max(0, appliedCorrectionAtWorstDb || 0))
     : null;
   let remainingResidualLimit = "none";
   const remainingAggregateCutHeadroomDb = Math.max(0, 15 + finalBankLimits.maxAggregateCutDb);
@@ -349,9 +324,6 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   else if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb < 0
     && Math.abs(requiredCorrectionAtWorstDb) > remainingAggregateCutHeadroomDb + 0.05) remainingResidualLimit = "cut-limited";
   else if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0 && finalBankLimits.maxAggregateBoostDb >= 5.95) remainingResidualLimit = "boost-limited";
-  else if (Number.isFinite(requiredCorrectionAtWorstDb) && requiredCorrectionAtWorstDb > 0
-    && Number.isFinite(remainingProductBoostDb) && requiredCorrectionAtWorstDb > remainingProductBoostDb + 0.05
-    && Number(boostAllowance?.allowedBoostDb) < 5.95) remainingResidualLimit = "product-limited";
   else if (filters.filter((filter) => filter.enabled).length >= 10) remainingResidualLimit = "filter-count-limited";
   const nearestRejectedTrials = Number.isFinite(worstFrequencyHz)
     ? (selected.trace || []).flatMap((entry) => entry.trials || [])
@@ -367,7 +339,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     limitingClassification: remainingResidualLimit,
     cutLimited: remainingResidualLimit === "cut-limited",
     boostLimited: remainingResidualLimit === "boost-limited",
-    productLimited: remainingResidualLimit === "product-limited",
+    productLimited: false,
     filterCountLimited: remainingResidualLimit === "filter-count-limited",
     highResolutionConflictLimited: remainingResidualLimit === "high-resolution-conflict-limited",
     highResolutionResidualDb: highResolutionResidualAtWorstDb,
@@ -375,7 +347,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     nearestProtectedBoundaryDistanceHz,
     maximumLegalFilterQ: 10,
     enabledFilterCount: filters.filter((filter) => filter.enabled).length,
-    productPermittedTotalBoostDb: boostAllowance?.allowedBoostDb ?? null,
+    productPermittedTotalBoostDb: 6,
     productRemainingBoostDb: remainingProductBoostDb,
     remainingAggregateCutHeadroomDb,
     anotherLegalFilterRejectedBecause: remainingResidualLimit === "cut-limited"
@@ -473,16 +445,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     rejectedEqCandidates,
     seatToleranceAdjustedCandidates,
     seatRegressionToleranceDiagnostics: selected.seatRegressionToleranceDiagnostics,
-    lfCapabilityProtection: buildLfCapabilityProtectionDiagnostics(
-      capabilityContext,
-      capabilityPenaltyForBank(filters),
-      {
-        penaltyInfluencedSelectedFilters: (operationCounts.capabilityPenaltyRejections || 0) > 0
-          || (operationCounts.capabilityPenaltySelectionChanges || 0) > 0,
-        candidatesRejectedByPenalty: operationCounts.capabilityPenaltyRejections || 0,
-        selectionsChangedByPenalty: operationCounts.capabilityPenaltySelectionChanges || 0,
-      },
-    ),
+    lfCapabilityProtection: null,
     houseCurveDiagnostics: {
       preRsp: selected.baselineRspMetrics,
       officialP19VariationDb: rspMaxDev,
@@ -511,8 +474,6 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       residualCleanup: {
         diagnostics: residualCleanup.diagnostics,
         finalQuality: residualCleanup.finalQuality,
-        baselineP20Level: residualCleanup.baselineP20Level,
-        finalP20Level: residualCleanup.finalP20Level,
         limits: residualCleanup.limits,
       },
       postRsp: {
@@ -523,12 +484,11 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       },
       protectedNullRegions,
       nearTargetProtectionRejectionCount: operationCounts.nearTargetProtectionRejections || 0,
-      p14SafetyRejectionCount: operationCounts.p14SafetyRejections || 0,
+      p14SafetyRejectionCount: 0,
       protectedNullWorseningRejectionCount: operationCounts.protectedNullWorseningRejections || 0,
       mergedFilterOperationCount: operationCounts.mergedFilterOperations || 0,
       replacedFilterOperationCount: operationCounts.replacedFilterOperations || 0,
-      productHeadroomRejections: (selected.trace || []).flatMap((entry) => entry.trials || [])
-        .filter((trial) => trial.rejectionReason?.includes("headroom")).map((trial) => trial.rejectionReason),
+      productHeadroomRejections: [],
     },
     bankDiagnostics: {
       completedBankEvaluationCount: bankEvalCount,
@@ -552,8 +512,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   };
 }
 
-// Deterministic fixture: the deepest null is uncorrectable (product-limited by LF
-// ramp) but a broad peak is legally correctable. The fitter must skip the null,
+// Deterministic fixture: the deepest cancellation is protected as a modal null,
+// while a broad peak remains legally correctable. The fitter must skip the null,
 // correct the peak, and continue — not stop at the first uncorrectable residual.
 export function runHouseCurveFitterFixtures() {
   const results = {};
@@ -567,7 +527,6 @@ export function runHouseCurveFitterFixtures() {
     dev += 6 * Math.exp(-(((f - 50) / 10) ** 2));
     return { frequency: f, spl: anchorDb + artcousticHouseCurveOffsetAt(f) + dev };
   });
-  // usableLfHz = 35 makes 30 Hz boost product-limited (LF ramp = 0 below 35 Hz).
   const result = calculateHouseCurveEqCurve(rawCurve, [], 35, [], {
     targetAnchorDb: anchorDb,
     assessmentStartHz: 20,
@@ -590,8 +549,8 @@ export function runHouseCurveFitterFixtures() {
   results.rmsImproves = (baselineMetrics?.rmsSeatTargetErrorDb ?? Infinity) - (result.rmsSeatTargetErrorDb ?? -Infinity) > 0.05;
   // 4. Worst deviation does not worsen by more than 0.05 dB.
   results.worstDoesNotWorsen = (result.worstSeatMaxDeviationDb ?? Infinity) <= (baselineMetrics?.worstSeatMaxDeviationDb ?? Infinity) + 0.05;
-  // 5. The 30 Hz cancellation is explicitly protected or product-limited.
-  results.recordedBlockedNull = Array.isArray(result.blockedResiduals) && result.blockedResiduals.some((b) => Math.abs(b.frequency - 30) < 8 && ["protected-null", "product-limited"].includes(b.blockingReason));
+  // 5. The 30 Hz cancellation is explicitly protected as a modal null.
+  results.recordedBlockedNull = Array.isArray(result.blockedResiduals) && result.blockedResiduals.some((b) => Math.abs(b.frequency - 30) < 8 && b.blockingReason === "protected-null");
   // 6. Final complete-bank validation passes.
   results.bankValidationPassed = result.bankValidationPassed !== false;
   // The fitter must not have stopped at the null.

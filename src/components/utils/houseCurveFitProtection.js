@@ -1,6 +1,5 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 
 const octaveWidth = (startHz, endHz) => startHz > 0 && endHz > startHz ? Math.log2(endHz / startHz) : 0;
@@ -75,12 +74,8 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
     const startHz = localized[startIndex].frequency;
     const endHz = localized[endIndex].frequency;
     const requiredBoostDb = Math.max(0, -worst.residualDb);
-    const allowance = getSourceDomainBoostAllowance({
-      frequency: worst.frequency, requestedBoostDb: 6, activeSubs, usableLfHz,
-      maxBoostDb: 6, requestedSystemOutputDb,
-    });
-    const permittedBoostDb = Number.isFinite(allowance?.allowedBoostDb) ? allowance.allowedBoostDb : 6;
-    const capabilityLimited = permittedBoostDb + 0.05 < Math.min(6, requiredBoostDb);
+    const permittedBoostDb = 6;
+    const capabilityLimited = false;
     const widthOctaves = octaveWidth(startHz, endHz);
     const reason = "Localized cancellation null at least 10 dB below neighbouring broad response";
     regions.push({

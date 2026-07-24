@@ -5,12 +5,9 @@ import {
   normaliseCurve,
   peakingEqResponseDb,
 } from "@/components/utils/designEqCalibration";
-import { computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
-import { computeParam14LfeCapability } from "@/components/utils/rp22BassMetrics";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
-import { buildLfCapabilityContext, calculateLfCapabilityPenalty, getEqCapabilityBoostAllowance } from "@/components/utils/lfCapabilityProtection";
 import { classifyEqCorrectionRegion, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 
 const MAX_FILTERS = 10;
@@ -41,20 +38,6 @@ function correctedSeats(perSeatRawCurves, filters) {
         spl: point.spl + correctionAt(point.frequency, filters),
       })),
     }));
-}
-
-function p20Level(raw, perSeatRawCurves, filters, startHz, endHz) {
-  const assessment = computeOfficialP20Assessment({
-    rspPostEqCurve: buildCurveFromBank(raw, filters),
-    perSeatPostEqCurves: correctedSeats(perSeatRawCurves, filters),
-    assessmentStartHz: startHz,
-    assessmentEndHz: endHz,
-  });
-  return { available: assessment.available, level: assessment.worstSeat?.level ?? 0 };
-}
-
-function p14Level(raw, filters) {
-  return levelNumber(computeParam14LfeCapability(buildCurveFromBank(raw, filters), false, [20, 120])?.level);
 }
 
 function rawResidualPoints(raw, filters, startHz, endHz, anchorDb, canonicalTargetCurve) {
@@ -221,7 +204,7 @@ function priorDisposition(region, priorIterationTrace) {
   };
 }
 
-function rejectionForTrial({ trial, currentFilters, currentPoints, currentQuality, currentP14Level, currentP20, raw, perSeatRawCurves,
+function rejectionForTrial({ trial, currentFilters, currentPoints, currentQuality, raw, perSeatRawCurves,
   region, protectedNullRegions, canonicalTargetCurve, anchorDb, assessmentStartHz, assessmentEndHz,
   correctionStartHz, correctionEndHz, activeSubs, usableLfHz, requestedSystemOutputDb, profile }) {
   if (trial.filters.filter((filter) => filter.enabled).length > MAX_FILTERS) return { reason: "filter-count-limit: more than ten enabled filters" };
@@ -231,7 +214,6 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
     const failures = [];
     if (!limits.cutLimitOk) failures.push(`aggregate cut ${limits.maxAggregateCutDb.toFixed(3)} dB exceeds −15 dB`);
     if (!limits.boostLimitOk) failures.push(`aggregate boost ${limits.maxAggregateBoostDb.toFixed(3)} dB exceeds +6 dB`);
-    if (!limits.sourceDomainHeadroomOk) failures.push("product boost headroom exceeded");
     return { reason: `bank-limit: ${failures.join("; ")}`, limits };
   }
   const nullWorseningDb = protectedNullWorsening(currentFilters, trial.filters, protectedNullRegions);
@@ -251,20 +233,13 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
   const localImprovementDb = Math.abs(region.centre.residualDb) - Math.abs(candidateCentre.residualDb);
   if (localImprovementDb <= EPSILON_DB) return { reason: "local-fit: attempted correction did not reduce the centre residual", limits, nullWorseningDb, candidateCentre };
   const candidateQuality = quality(candidatePoints, protectedNullRegions);
-  const capabilityContext = buildLfCapabilityContext(activeSubs, raw.map((point) => point.frequency), profile.id, requestedSystemOutputDb);
-  const penaltyForBank = (bank) => calculateLfCapabilityPenalty(
-    bank, capabilityContext, (frequency, candidateBank) => correctionAt(frequency, candidateBank),
-  );
-  const penaltyIncreaseDb = Math.max(0, penaltyForBank(trial.filters) - penaltyForBank(currentFilters));
   if (candidateQuality.maximumAbsoluteResidualDb > currentQuality.maximumAbsoluteResidualDb + 0.25) {
     return { reason: "high-resolution-score: maximum correctable residual worsened by more than 0.25 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
   }
   if (candidateQuality.rmsResidualDb > currentQuality.rmsResidualDb + 0.1) {
     return { reason: "high-resolution-score: correctable RMS worsened by more than 0.10 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
   }
-  const candidateP14Level = p14Level(raw, trial.filters);
-  const candidateP20 = p20Level(raw, perSeatRawCurves, trial.filters, assessmentStartHz, assessmentEndHz);
-  return { accepted: true, reason: null, limits, nullWorseningDb, candidateCentre, candidateQuality, candidateP14Level, candidateP20, localImprovementDb };
+  return { accepted: true, reason: null, limits, nullWorseningDb, candidateCentre, candidateQuality, localImprovementDb };
 }
 
 export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], perSeatRawCurves = [], anchorDb = 0,
@@ -278,7 +253,6 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
   const diagnostics = [];
   const initialPoints = rawResidualPoints(raw, selectedFilters, correctionStartHz, correctionEndHz, anchorDb, canonicalTargetCurve);
   const initialRegions = residualRegions(initialPoints, protectedNullRegions);
-  const baselineP20 = p20Level(raw, perSeatRawCurves, selectedFilters, assessmentStartHz, assessmentEndHz);
 
   for (const initialRegion of initialRegions) {
     const currentPoints = rawResidualPoints(raw, selectedFilters, correctionStartHz, correctionEndHz, anchorDb, canonicalTargetCurve);
@@ -286,11 +260,7 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
     const region = { ...initialRegion, centre: nearest };
     const limitsBefore = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
     bankEvaluationCount++;
-    const boostAllowance = getEqCapabilityBoostAllowance({
-      frequency: region.centre.frequency, requestedBoostDb: 6, activeSubs,
-      maxBoostDb: 6, requestedSystemOutputDb,
-    });
-    const permittedBoostDb = Number.isFinite(boostAllowance?.allowedBoostDb) ? boostAllowance.allowedBoostDb : 6;
+    const permittedBoostDb = 6;
     const diagnostic = {
       kind: region.kind,
       classification: classifyEqCorrectionRegion({
@@ -311,7 +281,7 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
       remainingBoostHeadroomDb: Math.max(0, Math.min(6, permittedBoostDb) - Math.max(0, region.centre.aggregateCorrectionDb)),
       remainingAggregateCutHeadroomDb: Math.max(0, 15 + limitsBefore.maxAggregateCutDb),
       remainingAggregateBoostHeadroomDb: Math.max(0, 6 - limitsBefore.maxAggregateBoostDb),
-      productPermittedTotalBoostDb: permittedBoostDb,
+      permittedTotalBoostDb: permittedBoostDb,
       protectedNullOverlap: region.protectedNullOverlap,
       priorFit: priorDisposition(region, priorIterationTrace),
       candidateSelectionMismatch: false,
@@ -328,12 +298,10 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
       continue;
     }
     const currentQuality = quality(currentPoints, protectedNullRegions);
-    const currentP14Level = p14Level(raw, selectedFilters);
-    const currentP20 = p20Level(raw, perSeatRawCurves, selectedFilters, assessmentStartHz, assessmentEndHz);
     let accepted = [];
     for (const trial of proposedBanks(region, selectedFilters, activeSubs, usableLfHz, requestedSystemOutputDb, protectedNullRegions)) {
       const outcome = rejectionForTrial({
-        trial, currentFilters: selectedFilters, currentPoints, currentQuality, currentP14Level, currentP20, raw, perSeatRawCurves,
+        trial, currentFilters: selectedFilters, currentPoints, currentQuality, raw, perSeatRawCurves,
         region, protectedNullRegions, canonicalTargetCurve, anchorDb, assessmentStartHz, assessmentEndHz,
         correctionStartHz, correctionEndHz, activeSubs, usableLfHz, requestedSystemOutputDb, profile,
       });
@@ -352,8 +320,6 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
         predictedCentreResidualDb: outcome.candidateCentre?.residualDb ?? null,
         predictedCorrectableMaximumDb: outcome.candidateQuality?.maximumAbsoluteResidualDb ?? null,
         predictedCorrectableRmsDb: outcome.candidateQuality?.rmsResidualDb ?? null,
-        predictedP14Level: outcome.candidateP14Level ?? null,
-        predictedP20Level: outcome.candidateP20?.level ?? null,
       };
       diagnostic.attempts.push(attempt);
       if (outcome.accepted) accepted.push({ trial, outcome, attempt });
@@ -392,7 +358,6 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
       changed: true,
       acceptedOperationCount: acceptedOperationCount + nextPass.acceptedOperationCount,
       bankEvaluationCount: bankEvaluationCount + nextPass.bankEvaluationCount,
-      baselineP20Level: baselineP20.level,
     };
   }
   return {
@@ -405,8 +370,6 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
     bankEvaluationCount,
     finalQuality: quality(finalPoints, protectedNullRegions),
     finalBankLimits: finalLimits,
-    baselineP20Level: baselineP20.level,
-    finalP20Level: p20Level(raw, perSeatRawCurves, selectedFilters, assessmentStartHz, assessmentEndHz).level,
     limits: { maximumAggregateCutDb: -15, maximumAggregateBoostDb: 6, maximumFilterQ: MAX_Q, maximumEnabledFilters: MAX_FILTERS },
   };
 }
