@@ -10,8 +10,8 @@ function outsideProtectedNulls(frequency, regions) {
   return !regions.some((region) => frequency >= region.startHz && frequency <= region.endHz);
 }
 
-function rankingMetrics(candidate, protectedNullRegions) {
-  const points = applyBassSmoothing(candidate?.finalPostEqCurve || [], "third")
+function rankingMetrics(curve, candidate, protectedNullRegions) {
+  const points = applyBassSmoothing(curve || [], "third")
     .filter((point) => point.frequency >= candidate.correctionStartHz && point.frequency <= candidate.correctionEndHz)
     .filter((point) => outsideProtectedNulls(point.frequency, protectedNullRegions))
     .map((point) => point.spl - interpolateCanonicalTarget(candidate.productionHouseCurveTarget, point.frequency))
@@ -24,6 +24,14 @@ function rankingMetrics(candidate, protectedNullRegions) {
   };
 }
 
+function preEqCurve(candidate) {
+  const corrections = new Map((candidate?.combinedEqCurve || []).map((point) => [Number(point.frequency), Number(point.spl)]));
+  return (candidate?.finalPostEqCurve || []).map((point) => ({
+    frequency: point.frequency,
+    spl: point.spl - (corrections.get(Number(point.frequency)) || 0),
+  }));
+}
+
 export function annotateCandidatePoolForHouseCurveRanking(candidates) {
   const source = Array.isArray(candidates) ? candidates : [];
   const nullsByRequest = new Map();
@@ -34,12 +42,15 @@ export function annotateCandidatePoolForHouseCurveRanking(candidates) {
   });
   return source.map((candidate) => {
     const protectedNullRegions = nullsByRequest.get(requestKey(candidate)) || [];
-    const metrics = rankingMetrics(candidate, protectedNullRegions);
+    const postEqMetrics = rankingMetrics(candidate?.finalPostEqCurve, candidate, protectedNullRegions);
+    const preEqMetrics = rankingMetrics(preEqCurve(candidate), candidate, protectedNullRegions);
     return {
       ...candidate,
-      houseCurveRankingMaxResidualDb: metrics.maximumAbsoluteResidualDb,
-      houseCurveRankingRmsResidualDb: metrics.rmsResidualDb,
-      houseCurveRankingMeanAbsoluteResidualDb: metrics.meanAbsoluteResidualDb,
+      preEqHouseCurveErrorDb: preEqMetrics.rmsResidualDb,
+      postEqHouseCurveErrorDb: postEqMetrics.rmsResidualDb,
+      houseCurveRankingMaxResidualDb: postEqMetrics.maximumAbsoluteResidualDb,
+      houseCurveRankingRmsResidualDb: postEqMetrics.rmsResidualDb,
+      houseCurveRankingMeanAbsoluteResidualDb: postEqMetrics.meanAbsoluteResidualDb,
       houseCurveRankingProtectedNullCount: protectedNullRegions.length,
     };
   });

@@ -134,5 +134,33 @@ export function runBassPriorityPolicyFixtures() {
   results.p24AllL4DoesNotRecommendUnnecessaryUpgrade = allL4Recommendation?.parameterKey === "none"
     && allL4Recommendation.recommendedImprovement.includes("No physical design change");
 
+  const noEq = candidate("no-eq", 2, 2, 2, { rms: 4, filters: [] });
+  noEq.houseCurveRankingRmsResidualDb = 4;
+  noEq.houseCurveRankingMaxResidualDb = 6;
+  noEq.preEqHouseCurveErrorDb = 4;
+  const corrected = candidate("corrected", 2, 2, 2, { rms: 1.5, filters: [
+    { enabled: true, frequencyHz: 67, gainDb: -8, Q: 4 },
+    { enabled: true, frequencyHz: 77, gainDb: -4, Q: 5 },
+  ] });
+  corrected.houseCurveRankingRmsResidualDb = 1.5;
+  corrected.houseCurveRankingMaxResidualDb = 2;
+  corrected.preEqHouseCurveErrorDb = 4;
+  const accuracySelection = rankBassCandidates([noEq, corrected], "balanced");
+  results.p25MaterialHouseCurveImprovementDefeatsEqCost = accuracySelection.selected === corrected;
+  results.p26ModalCorrectionCandidatesSurviveDominance = accuracySelection.diagnostics.dominatedCandidateCount !== 1
+    || accuracySelection.selected === corrected;
+  results.p27SelectionDiagnosticsExposeAcousticErrors = accuracySelection.diagnostics.selectedCandidateReason === "Best house curve match after valid EQ"
+    && accuracySelection.diagnostics.rankedCandidates.every((item) => "preEqHouseCurveErrorDb" in item && "postEqHouseCurveErrorDb" in item && "eqCostDb" in item);
+
+  const efficient = candidate("efficient", 2, 2, 2, { rms: 1.5, filters: [{ enabled: true, frequencyHz: 67, gainDb: -4, Q: 4 }] });
+  efficient.houseCurveRankingRmsResidualDb = 1.5;
+  efficient.houseCurveRankingMaxResidualDb = 2;
+  results.p28EqCostBreaksEquivalentAcousticTie = rankBassCandidates([corrected, efficient], "balanced").selected === efficient;
+
+  const unsafe = candidate("unsafe", 4, 4, 4, { bankValid: false, filters: [{ enabled: true, frequencyHz: 35, gainDb: 20, Q: 8 }] });
+  const physicalSelection = rankBassCandidates([corrected, unsafe], "balanced");
+  results.p29UnsafeCandidateRemainsRejected = physicalSelection.selected === corrected
+    && physicalSelection.diagnostics.rankedCandidates.find((item) => item.candidateId === "unsafe")?.reason === "Rejected EQ candidate: exceeds physical capability";
+
   return results;
 }
