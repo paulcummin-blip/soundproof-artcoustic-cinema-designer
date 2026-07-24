@@ -34,10 +34,10 @@ export function runBassResultsPresentationFixtures() {
   check("1. Idle produces four dashes", Object.values(idle.pills).every((pill) => pill.text.endsWith("—")));
   for (const status of ["queued", "calculating"]) { const r = ready(); Object.assign(r.job, { status, startedAtMs: 1000, resultFingerprint: null }); const f = formatBassResults(r, 13000); check(`2. ${status} hides stale levels`, Object.values(f.pills).every((pill) => !pill.text.includes("L1") && !pill.text.includes("114.1"))); }
   { const r = ready(); Object.assign(r.job, { status: "calculating", startedAtMs: 1000, resultFingerprint: null }); check("3. Genuine elapsed time updates", formatBassResults(r, 13000).pills.p14.text === "P14 Updating · 12 s"); }
-  { const f = formatBassResults(ready());   check("4. Ready values format correctly", f.pills.p14.text === "P14 L1 · 115 dBC — Minimum target" && f.pills.p18.text === "P18 L2 · 23 Hz" && f.pills.p19.text === "P19 RSP L1 · ±4 dB" && f.pills.p20.text === "P20 worst seat · L2 · ±3 dB"); }
+  { const f = formatBassResults(ready());   check("4. Ready values format correctly", f.pills.p14.text === "Estimated LFE Capability L1 · 115 dBC — Minimum target" && f.pills.p18.text === "Bass Extension L2 · 23 Hz" && f.pills.p19.text === "Seat Consistency L1 · ±4.7 dB" && f.pills.p20.text === "Worst Seat Performance L2 · ±3.8 dB"); }
   check("5. FAIL retains value", formatBassResults(ready({ level: 0 })).pills.p14.text === "P14 FAIL · 115 dBC — Minimum target");
   check("6. Single-seat P20 is N/A", formatBassResults(ready({ seats: 1 })).pills.p20.text === "P20 worst seat N/A");
-  check("7. Multi-seat P20 floors display only", formatBassResults(ready()).pills.p20.text === "P20 worst seat · L2 · ±3 dB");
+  check("7. Multi-seat P20 uses contract authority", formatBassResults(ready()).pills.p20.text === "Worst Seat Performance L2 · ±3.8 dB");
   { const candidates = [candidate("a", 1), candidate("b", 2)]; const pool = { candidates, selectablePool: candidates, poolId: "pool", performanceSummary: {} }; const a = selectCandidateFromPool(pool, "balanced"); const b = selectCandidateFromPool(pool, "spl"); check("8. Priority switch reuses pool with zero workers", a.poolId === b.poolId && b.workerStarted === false && b.heavyPoolReused === true); }
   { const same = candidate("same", 2); const pool = { candidates: [same], selectablePool: [same], poolId: "pool", performanceSummary: {} }; check("9. Identical achievements stay identical", selectCandidateFromPool(pool, "balanced").achievedP14Db === selectCandidateFromPool(pool, "spl").achievedP14Db); }
   { const r = ready(); Object.assign(r.job, { status: "stale", queuedAtMs: 1000, resultFingerprint: null }); check("10. Changed inputs immediately update", formatBassResults(r, 2000).pills.p14.text.startsWith("P14 Updating")); }
@@ -55,18 +55,18 @@ export function runBassResultsPresentationFixtures() {
     ["P18 rounds 23.4 downward", "p18", 23.4, "23 Hz"],
     ["P18 rounds 23.9 downward", "p18", 23.9, "23 Hz"],
     ["P18 ignores negative integer noise", "p18", 22.9999999999, "23 Hz"],
-    ["P19 exact 4.0 magnitude", "p19", 4.0, "±4 dB"],
-    ["P19 floors 4.1 magnitude", "p19", 4.1, "±4 dB"],
-    ["P19 floors 4.7 magnitude", "p19", 4.7, "±4 dB"],
-    ["P19 exact 5.0 magnitude", "p19", 5.0, "±5 dB"],
-    ["P19 floors 5.9 magnitude", "p19", 5.9, "±5 dB"],
-    ["P19 ignores positive integer noise", "p19", 4.0000000001, "±4 dB"],
+    ["P19 exact 4.0 magnitude", "p19", 4.0, "±4.0 dB"],
+    ["P19 rounds 4.1 magnitude", "p19", 4.1, "±4.1 dB"],
+    ["P19 rounds 4.7 magnitude", "p19", 4.7, "±4.7 dB"],
+    ["P19 exact 5.0 magnitude", "p19", 5.0, "±5.0 dB"],
+    ["P19 rounds 5.9 magnitude", "p19", 5.9, "±5.9 dB"],
+    ["P19 ignores positive integer noise", "p19", 4.0000000001, "±4.0 dB"],
   ];
   formatterCases.forEach(([name, key, value, expected], index) => {
     check(`${15 + index}. ${name}`, formatBassParameterValue(key, value) === expected);
   });
-  check("29. Seat selection preserves official P19 RSP", formatBassResults(ready(), Date.now(), "s1").pills.p19.text === "P19 RSP L1 · ±4 dB");
-  check("30. P20 formatting uses shared flooring", formatBassParameterValue("p20", 3.8) === "±3 dB");
+  check("29. Seat selection preserves official P19 RSP", formatBassResults(ready(), Date.now(), "s1").pills.p19.text === "Seat Consistency L1 · ±4.7 dB");
+  check("30. P20 formatting uses authoritative deviation", formatBassParameterValue("p20", 3.8) === "±3.8 dB");
   { const r = ready(); Object.assign(r.job, { status: "error", resultFingerprint: null }); check("31. P20 job error remains explicit", formatBassResults(r).pills.p20.text === "P20 worst seat (s2) error"); }
   { const r = ready(); r.fingerprints.calibration = FP; r.job.currentJobFingerprint = `${FP}|engine:current`; r.job.resultFingerprint = `${FP}|engine:current`; check("32. Versioned cache-key completion is visible", formatBassResults(r).isReady && !formatBassResults(r).isUpdating); }
   const passed = checks.filter((item) => item.passed).length;

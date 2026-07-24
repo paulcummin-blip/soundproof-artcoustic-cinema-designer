@@ -1,5 +1,3 @@
-import { formatP20Deviation } from "@/components/utils/rp22/levels";
-
 const referenceIds = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
 
 const seatId = (value) => String(value ?? "").trim();
@@ -26,7 +24,7 @@ function columnNumber(seat, fallback) {
 }
 
 export function formatAuthoritativeP20Result(result) {
-  return finite(result?.variationDbRaw) ? formatP20Deviation(Number(result.variationDbRaw)) : "—";
+  return finite(result?.variationDbRaw) ? `±${Math.abs(Number(result.variationDbRaw)).toFixed(1)} dB` : "—";
 }
 
 export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) {

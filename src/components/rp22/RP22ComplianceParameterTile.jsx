@@ -2,6 +2,7 @@
 // Exact tile extracted from RP22CompliancePanel — do not alter appearance.
 import React from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
+import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 
 /* ---------- Shared style tokens (mirrored from RP22CompliancePanel) ---------- */
 const card  = { border: "1px solid #DCDBD6", background: "#fff", borderRadius: 8 };
@@ -38,7 +39,11 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
       {/* ── Section A: Title / description / scope / achieved — fixed min-height so Section B always starts at same Y ── */}
       <div style={{ ...head, minHeight: 160 }}>
         <div style={title}>
-          {param.id}. {param.title}
+          {[19, 20].includes(param.id) ? (
+            <BassRp22ParameterTooltip parameterKey={`p${param.id}`}>
+              <span className="cursor-help underline decoration-dotted underline-offset-2">P{param.id}</span>
+            </BassRp22ParameterTooltip>
+          ) : <>{param.id}. {param.title}</>}
         </div>
         <div style={{ ...sub, display: "flex", gap: 8, alignItems: "center" }}>
           <span>{param.short}</span>

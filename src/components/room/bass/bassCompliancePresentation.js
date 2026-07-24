@@ -1,17 +1,10 @@
 import { formatBassParameterValue } from "@/components/room/bass/bassResultsPresentation";
-import { p20SummaryFromResults } from "@/components/room/bass/p20SeatPresentation";
 import { isCompletedBassContract } from "@/components/room/bass/completedBassResultPersistence";
 
 const levelLabel = (level) => level == null ? "—" : Number(level) === 0 ? "FAIL" : `L${Number(level)}`;
 
 export function formatAuthoritativeBassParameter(contract, key) {
   if (!isCompletedBassContract(contract)) return { key, valueText: "—", level: "—", status: "uncalculated" };
-  if (key === "p20") {
-    const summary = p20SummaryFromResults(contract?.selectedCandidate?.perSeatP20Results);
-    return summary
-      ? { key, valueText: summary.displayVariationDb, level: summary.level, status: "complete", seatId: summary.seatId }
-      : { key, valueText: "—", level: "—", status: "uncalculated" };
-  }
   const parameter = contract?.productAnalysis?.parameters?.[key];
   if (parameter?.status === "not_applicable") return { key, valueText: "N/A", level: "N/A", status: parameter.status };
   if (parameter?.status !== "complete" || parameter?.level == null || !Number.isFinite(Number(parameter?.value))) {

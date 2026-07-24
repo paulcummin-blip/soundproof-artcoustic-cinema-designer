@@ -1,6 +1,3 @@
-import { formatP20Deviation } from "@/components/utils/rp22/levels";
-import { p20SummaryFromResults } from "@/components/room/bass/p20SeatPresentation";
-
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
@@ -25,8 +22,7 @@ export function formatBassParameterValue(key, value) {
   const number = normalizeIntegerNoise(value);
   if (key === "p14") return `${Math.floor(number + 1e-8)} dBC`;
   if (key === "p18") return `${Math.floor(number)} Hz`;
-  if (key === "p19") return `±${Math.floor(Math.abs(number))} dB`;
-  if (key === "p20") return formatP20Deviation(number);
+  if (key === "p19" || key === "p20") return `±${Math.abs(number).toFixed(1)} dB`;
   return `${number.toFixed(1)} dB`;
 }
 
@@ -41,12 +37,6 @@ function parameterLabel(key, result) {
 function readyPill(key, parameter, result) {
   const label = parameterLabel(key, result);
   if (parameter?.status === "not_applicable") return { label, resultText: "N/A", text: `${label} N/A`, level: "N/A" };
-  if (key === "p20") {
-    const worst = p20SummaryFromResults(result?.selectedCandidate?.perSeatP20Results);
-    return worst
-      ? { label, resultText: `${worst.level} · ${worst.displayVariationDb}`, text: `Worst Seat Performance · ${worst.level} · ${worst.displayVariationDb}`, level: worst.level }
-      : { label, resultText: "—", text: "Worst Seat Performance —", level: "—" };
-  }
   if (parameter?.status === "error") return { label, resultText: "Error", text: `${label} error`, level: "—" };
   if (parameter?.level == null) return { label, resultText: "—", text: `${label} —`, level: "—" };
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
