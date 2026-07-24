@@ -112,7 +112,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
 
   const requestedSystemOutputDb = Number.isFinite(Number(options.requestedSystemOutputDb)) ? Number(options.requestedSystemOutputDb) : undefined;
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
-  const profile = { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: true, maximumCutDb: 15 };
+  const profile = { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: false, maximumCutDb: 15 };
   const bankRaw = rspRaw;
   const capabilityContext = buildLfCapabilityContext(activeSubs, bankRaw.map((point) => point.frequency), profile.id, requestedSystemOutputDb);
   const capabilityPenaltyForBank = (bank) => calculateLfCapabilityPenalty(
@@ -416,7 +416,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     fitterHouseCurveTarget: canonicalTargetCurve.map((point) => ({ ...point })),
     designEqFitProfile: "house_curve",
     designEqFitProfileConfig: {
-      preserveP14: true, fittingToleranceDb: 1,
+      preserveP14: false, fittingToleranceDb: 1,
       maximumCutDb: 15, maximumAggregateBoostDb: 6,
       peakDiscoveryThresholdDb: 1, valleyDiscoveryThresholdDb: 1,
     },

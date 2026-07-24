@@ -13,14 +13,14 @@ const isNumber = (value) => Number.isFinite(Number(value));
 const DESIGN_EQ_SAMPLE_RATE = 48000;
 let __bankEvaluationCounter = 0;
 
-// Part A: Explicit fitting profiles. Standard preserves current behaviour (P14-safe
-// checkpoint selection, ±2 dB discovery, −10 dB cut ceiling). Accuracy trades P14/P18
-// preservation for closer house-curve alignment (±1 dB discovery, −15 dB cut ceiling).
+// Explicit fitting profiles share a fixed requested RP22 target. Standard uses
+// conservative discovery and cut limits; Accuracy allows tighter alignment.
+// P14/P18 capability is assessed after EQ and never selects the checkpoint.
 // Positive magnitudes configure boost; cuts are applied as negative gain.
 export const DESIGN_EQ_FIT_PROFILES = {
   standard: {
     id: "standard",
-    preserveP14: true,
+    preserveP14: false,
     fittingToleranceDb: 2,
     maximumCutDb: 10,
     maximumAggregateBoostDb: 6,
@@ -490,8 +490,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
   const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
-  // Part A: Resolve the fitting profile. Standard preserves current behaviour;
-  // Accuracy trades P14/P18 preservation for closer target alignment.
+  // Resolve conservative or accuracy fitting against the same fixed target.
   const profile = getDesignEqFitProfile(options.fitProfile);
   const capabilityContext = buildLfCapabilityContext(activeSubs, raw.map((point) => point.frequency), profile.id, options.requestedSystemOutputDb);
   const capabilityPenaltyForBank = (bank) => calculateLfCapabilityPenalty(

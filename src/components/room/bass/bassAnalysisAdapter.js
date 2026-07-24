@@ -118,11 +118,17 @@ function buildCandidateRef(candidate) {
     requestedP14Level: candidate.requestedP14Level ?? null,
     requestedP18Level: candidate.requestedP18Level ?? null,
     requestedP19Level: candidate.requestedP19Level ?? null,
-    achievedP14Level: typeof candidate.achievedP14Level === "number" ? candidate.achievedP14Level : parseLegacyLevel(candidate.achievedP14Level),
-    achievedP14Db: Number.isFinite(candidate.achievedP14Db) ? candidate.achievedP14Db : null,
+    achievedP14Level: Number.isFinite(candidate.postEqCapabilityAssessment?.achievedP14Level)
+      ? candidate.postEqCapabilityAssessment.achievedP14Level
+      : typeof candidate.achievedP14Level === "number" ? candidate.achievedP14Level : parseLegacyLevel(candidate.achievedP14Level),
+    achievedP14Db: Number.isFinite(candidate.postEqCapabilityAssessment?.maximumAvailableSplAfterEqDb)
+      ? candidate.postEqCapabilityAssessment.maximumAvailableSplAfterEqDb
+      : Number.isFinite(candidate.achievedP14Db) ? candidate.achievedP14Db : null,
     achievedP14RecommendedLevel: typeof candidate.achievedP14RecommendedLevel === "number" ? candidate.achievedP14RecommendedLevel : 0,
     p14TargetBasis: normalizeP14TargetBasis(candidate.p14TargetBasis),
     p14CapabilityDetails: candidate.p14CapabilityDetails || null,
+    postEqCapabilityAssessment: candidate.postEqCapabilityAssessment || null,
+    designTarget: candidate.designTarget || null,
     achievedP18Level: typeof candidate.achievedP18Level === "number" ? candidate.achievedP18Level : parseLegacyLevel(candidate.achievedP18Level),
     achievedP18FrequencyHz: Number.isFinite(candidate.achievedP18FrequencyHz) ? candidate.achievedP18FrequencyHz : null,
     achievedP19Level: typeof candidate.achievedP19Level === "number" ? candidate.achievedP19Level : parseLegacyLevel(candidate.achievedP19Level),

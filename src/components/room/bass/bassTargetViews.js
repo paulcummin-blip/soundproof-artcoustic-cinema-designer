@@ -32,7 +32,8 @@ function buildTarget(parameters, basis, selectedCandidate) {
     p19: cloneParameter(parameters?.p19),
     p20: cloneParameter(parameters?.p20),
   };
-  const recommendation = identifyBassLimitingParameter({
+  const postEqCapability = selectedCandidate?.postEqCapabilityAssessment;
+  const genericRecommendation = identifyBassLimitingParameter({
     achievedP14Level: targetParameters.p14.level,
     achievedP18Level: targetParameters.p18.level,
     achievedP19Level: targetParameters.p19.level,
@@ -40,6 +41,13 @@ function buildTarget(parameters, basis, selectedCandidate) {
     p20Available: targetParameters.p20.status !== "not_applicable" && Number.isFinite(targetParameters.p20.level),
     worstP20SeatId: selectedCandidate?.worstP20SeatId ?? null,
   });
+  const recommendation = postEqCapability?.limitation ? {
+    parameterKey: "p14",
+    parameterName: "Bass output capability",
+    achievedLevel: postEqCapability.achievedP14LevelLabel,
+    reason: `${postEqCapability.limitation}${Number.isFinite(postEqCapability.splShortfallDb) ? ` ${postEqCapability.splShortfallDb.toFixed(1)} dB shortfall` : ""}${Number.isFinite(postEqCapability.limitingFrequencyHz) ? ` at ${postEqCapability.limitingFrequencyHz.toFixed(1)} Hz.` : ""}`,
+    recommendedImprovement: postEqCapability.recommendation,
+  } : genericRecommendation;
   return { ...targetParameters, achievedLevel: achievedLevel(targetParameters), designRecommendation: recommendation };
 }
 

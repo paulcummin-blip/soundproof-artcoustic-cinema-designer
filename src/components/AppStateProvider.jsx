@@ -982,7 +982,7 @@ function useDesignerState() {
         globalEqHeadroomDb: autosaveConfig.globalEqHeadroomDb || 0,
         radiationMode: autosaveConfig.radiationMode || 'half-space',
         p13Mode: autosaveConfig.p13Mode || 'minimum',
-        p14Mode: autosaveConfig.p14Mode || 'minimum',
+        p14Mode: autosaveConfig.p14Mode || 'minimum', bassTargetLevel: autosaveConfig.bassTargetLevel || 4,
         perRole: autosaveConfig.perRole || {},
         // Separate L/R and centre heights for center_only soundbar override mode
         lcrHeightM: autosaveConfig.lcrHeightM,
@@ -1758,7 +1758,7 @@ function useDesignerState() {
       globalEqHeadroomDb: 0,
       radiationMode: 'half-space',
       p13Mode: 'minimum',
-      p14Mode: 'minimum',
+      p14Mode: 'minimum', bassTargetLevel: 4,
       perRole: {}
     });
 

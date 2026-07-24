@@ -359,7 +359,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     houseCurveFingerprint: computeHouseCurveFingerprint(ARTCOUSTIC_HOUSE_CURVE),
     assessmentStartHz: requested.requestedAssessmentStartHz, assessmentEndHz: requested.requestedAssessmentEndHz,
     targetAnchorDb: requested.requestedTargetAnchorDb, activeFitProfile: requested.requestedFitProfile,
-    p14TargetBasis,
+    requestedLevel: requested.requestedLevel, p14TargetBasis,
     usableLfHz: requested.requestedUsableLfHz, evaluatedProfiles: requested.evaluatedProfiles,
     productDataVersion: 3, productCapabilities,
   }), [roomDims, sources, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ,
@@ -375,7 +375,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     product: computeProductFingerprint(fingerprintInputs),
     calibration: computeCalibrationFingerprint(fingerprintInputs),
   }), [fingerprintInputs]);
-  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, targetAnchorDb: requested.requestedTargetAnchorDb, targetAnchorSource: "rp22-request.p14.p14TargetDb", p14TargetBasis, perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, requested.requestedTargetAnchorDb, p14TargetBasis, perSeatRawCurves]);
+  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, requestedLevel: requested.requestedLevel, p14TargetBasis, perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, requested.requestedLevel, p14TargetBasis, perSeatRawCurves]);
   const inputsValid = !!rspPosition && seatingPositions.length > 0 && rspRawCurve.length > 0 && sources.length > 0 && [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
 
   return {

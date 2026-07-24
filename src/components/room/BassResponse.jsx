@@ -19,6 +19,7 @@ import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import DesignEqLimitStatus from "@/components/room/bass/DesignEqLimitStatus";
+import BassTargetLevelControl from "@/components/room/bass/BassTargetLevelControl";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
 import { buildNormalizedSeries } from "@/components/room/bass/normalizedSeriesBuilder";
 import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/bass/bassGraphDomainBuilder";
@@ -524,6 +525,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 <option value="auto">Auto</option>
               </select>
             </div>
+            <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
             <DesignEqLimitStatus enabled={designEqEnabled} onChange={setDesignEqEnabled} priorityMode={optimiserPriorityMode} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show house curve:</span>

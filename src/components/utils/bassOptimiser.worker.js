@@ -42,8 +42,6 @@ self.onmessage = (e) => {
       usableLfHz: payload?.usableLfHz ?? null,
       transitionHz: payload?.transitionHz ?? 120,
       correctionEndHz: payload?.correctionEndHz ?? 200,
-      targetAnchorDb: payload?.targetAnchorDb ?? null,
-      targetAnchorSource: payload?.targetAnchorSource || null,
       requestedLevel: payload?.requestedLevel ?? 4,
       p14TargetBasis: payload?.p14TargetBasis || "minimum",
       perSeatRawCurves: payload?.perSeatRawCurves || [],

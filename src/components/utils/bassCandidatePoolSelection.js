@@ -31,7 +31,7 @@ export function selectCandidateFromPool(pool) {
       priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
       poolId: pool?.poolId || null,
       capabilityEnvelopeDiagnostics: pool?.capabilityEnvelopeDiagnostics || [],
-      bassOperatingPoint: pool?.bassOperatingPoint || null,
+      designTarget: pool?.designTarget || null,
       generatedCandidateCount: pool?.generatedCandidateCount || 0,
       physicallyCredibleCount: pool?.physicallyCredibleCount || 0,
       requestedEnvelopeValidCount: pool?.requestedEnvelopeValidCount || 0,
@@ -57,10 +57,10 @@ export function selectCandidateFromPool(pool) {
       priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
       poolId: pool.poolId,
       capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
-      bassOperatingPoint: pool.bassOperatingPoint || null,
+      designTarget: pool.designTarget || null,
     };
   }
-  const isBestCalibratedAttempt = activeSelection.diagnostics.eligibilityGroup !== "bank_valid_all_rp22_bass_parameters_l1";
+  const isBestCalibratedAttempt = selected.meetsRequestedEnvelope !== true;
   const modeSelectionReason = activeSelection.diagnostics.selectionReason;
   const t1 = perf();
   return {
@@ -73,8 +73,8 @@ export function selectCandidateFromPool(pool) {
     postEqCurveSignature: selected.postEqCurveSignature,
     selectedFilters: selected.generatedFilterBank,
     finalPostEqCurve: selected.finalPostEqCurve,
-    achievedP14Level: levelText(selected.achievedP14Level),
-    achievedP14Db: selected.achievedP14Db,
+    achievedP14Level: selected.postEqCapabilityAssessment?.achievedP14LevelLabel || levelText(selected.achievedP14Level),
+    achievedP14Db: selected.postEqCapabilityAssessment?.maximumAvailableSplAfterEqDb ?? selected.achievedP14Db,
     p14TargetBasis: selected.p14TargetBasis || pool.p14TargetBasis || "minimum",
     achievedP18Level: levelText(selected.achievedP18Level),
     achievedP18FrequencyHz: selected.achievedP18FrequencyHz,
@@ -102,7 +102,7 @@ export function selectCandidateFromPool(pool) {
     selectedByMode,
     primaryLimitation: identifyBassLimitingParameter(selected),
     isBestCalibratedAttempt,
-    warningMessage: isBestCalibratedAttempt ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED" : null,
+    warningMessage: isBestCalibratedAttempt ? `BEST CALIBRATED ATTEMPT — REQUESTED RP22 LEVEL ${selected.designTarget?.requestedLevel || selected.requestedP14Level} NOT ACHIEVED` : null,
     performanceSummary: {
       ...pool.performanceSummary,
       contractAdaptationTimeMs: t1 - t0,
@@ -119,7 +119,8 @@ export function selectCandidateFromPool(pool) {
     workerStarted: false,
     poolId: pool.poolId,
     capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
-    bassOperatingPoint: pool.bassOperatingPoint || null,
+    designTarget: pool.designTarget || null,
+    postEqCapabilityAssessment: selected.postEqCapabilityAssessment || null,
     generatedCandidateCount: pool.generatedCandidateCount,
     physicallyCredibleCount: pool.physicallyCredibleCount,
     requestedEnvelopeValidCount: pool.requestedEnvelopeValidCount,
