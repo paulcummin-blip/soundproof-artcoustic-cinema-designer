@@ -35,14 +35,17 @@ function combinedCapability(activeSubs, valueForSub) {
   return 20 * Math.log10(values.reduce((sum, value) => sum + dbToPressure(value), 0));
 }
 
-export function getEqCapabilityBoostAllowance({ frequency, requestedBoostDb, activeSubs, maxBoostDb = 6, requestedSystemOutputDb }) {
+export function getEqCapabilityBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6, requestedSystemOutputDb }) {
   const requested = Math.max(0, Number(requestedBoostDb) || 0);
+  const belowUsableLf = finite(usableLfHz) && Number(frequency) < Number(usableLfHz);
   const systemCapabilityDb = combinedCapability(activeSubs, (sub) => capabilityForSub(sub, frequency));
   const currentSystemSourceOutputDb = finite(requestedSystemOutputDb) ? Number(requestedSystemOutputDb) : 114;
   const availableHeadroomDb = finite(systemCapabilityDb) ? systemCapabilityDb - currentSystemSourceOutputDb : null;
-  const allowedBoostDb = availableHeadroomDb == null
-    ? Math.min(requested, maxBoostDb)
-    : Math.max(0, Math.min(requested, maxBoostDb, availableHeadroomDb));
+  const allowedBoostDb = belowUsableLf
+    ? 0
+    : availableHeadroomDb == null
+      ? Math.min(requested, maxBoostDb)
+      : Math.max(0, Math.min(requested, maxBoostDb, availableHeadroomDb));
   return { systemCapabilityDb, currentSystemSourceOutputDb, availableHeadroomDb, allowedBoostDb };
 }
 
@@ -60,7 +63,7 @@ export function buildLfCapabilityContext(activeSubs = [], frequencies = [], prof
     ? Math.max(1, Math.min(2.5, 1 + Math.max(0, scalarSystemMaxSplDb - 120) / 18))
     : 1;
   const allowances = belowLfFrequencies.map((frequency) => getEqCapabilityBoostAllowance({
-    frequency, requestedBoostDb: 6, activeSubs, requestedSystemOutputDb,
+    frequency, requestedBoostDb: 6, activeSubs, usableLfHz, requestedSystemOutputDb,
   }).allowedBoostDb).filter(Number.isFinite);
   return {
     models,

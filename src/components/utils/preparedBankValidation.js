@@ -11,7 +11,7 @@ export function prepareBankValidation(raw, activeSubs, usableLfHz, requestedSyst
     .map((point) => point.frequency);
   const permittedBoostDb = frequencies.map((frequency) => {
     const allowed = getEqCapabilityBoostAllowance({
-      frequency, requestedBoostDb: 6, activeSubs,
+      frequency, requestedBoostDb: 6, activeSubs, usableLfHz,
       maxBoostDb: 6, requestedSystemOutputDb,
     });
     return Number.isFinite(allowed?.allowedBoostDb) ? allowed.allowedBoostDb : 6;
