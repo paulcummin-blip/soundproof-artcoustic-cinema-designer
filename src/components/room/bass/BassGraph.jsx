@@ -259,18 +259,24 @@ export default function BassGraph({
       // Auto-calculation logic if no yDomain is provided
       let calculatedYMin, calculatedYMax;
 
-      // REW mode: compute Y domain from actual plotted data (only finite values within X range)
+      // REW mode: derive layout only from response/target data. The maximum-SPL
+      // capability ceiling remains rendered, but never participates in axis layout.
       if (rewStyleMode) {
-        const sourceData = isMulti ? multiChartData : chartData;
-        const splValues = (sourceData || [])
-          .filter(d => d.frequency >= xMin && d.frequency <= xMax)
-          .flatMap(d => {
-            if (isMulti) {
-              return Object.entries(d).filter(([k]) => k.startsWith('spl_')).map(([, v]) => v);
-            }
-            return [d.spl];
-          })
-          .filter(v => Number.isFinite(v));
+        const domainKinds = new Set([
+          "raw", "post-eq", "house-curve", "normalized", "normalized-target", "real-seat-overlay",
+        ]);
+        const domainSeries = isMulti
+          ? multiSeries.filter((series) => domainKinds.has(series.kind))
+          : [];
+        const responseValues = isMulti
+          ? domainSeries.flatMap((series) => (series.data || [])
+              .filter((point) => point.frequency >= xMin && point.frequency <= xMax)
+              .map((point) => point.spl))
+          : chartData
+              .filter((point) => point.frequency >= xMin && point.frequency <= xMax)
+              .map((point) => point.spl);
+        const rp22Values = (rp22Levels || []).map((level) => level.spl);
+        const splValues = [...responseValues, ...rp22Values].filter((value) => Number.isFinite(value));
 
         if (splValues.length > 0) {
           const dataMin = Math.min(...splValues);
@@ -415,6 +421,7 @@ export default function BassGraph({
                     <YAxis
                         domain={[finalYMin, finalYMax]}
                         ticks={finalYTicks}
+                        allowDataOverflow={true}
                         tickFormatter={(tick) => Number.isFinite(Number(tick)) ? Number(tick).toFixed(0) : ''}
                         label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"

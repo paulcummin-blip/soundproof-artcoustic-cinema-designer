@@ -138,7 +138,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   // Presentation-only state. Production response inputs and physics are owned by the room-scoped authority.
   const [isDraggingSub, setIsDraggingSub] = useState(false);
-  const [graphScaleMode, setGraphScaleMode] = useState('rew_fixed');
+  const [graphScaleMode, setGraphScaleMode] = useState('auto');
   const [houseCurveOverride, setHouseCurveOverride] = useState(null);
   const showHouseCurve = houseCurveOverride ?? !!designEqEnabled;
   const [overlayProduction, setOverlayProduction] = useState(false);
