@@ -1,5 +1,5 @@
 import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
-import { computeParam18BassExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
+import { computeParam18ProductExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
 import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
@@ -87,7 +87,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     : eq.worstResidualDiagnostics;
   const preEqP14 = assessP14Capability({ activeSubs, targetBasis: p14TargetBasis });
   const p14 = assessP14Capability({ activeSubs, combinedEqCurve, targetBasis: p14TargetBasis });
-  const p18 = computeParam18BassExtension(finalPostEqCurve);
+  const p18 = computeParam18ProductExtension(activeSubs, usableLfHz, p14TargetBasis);
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third");
   const assessedCurve = smoothed.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz);
   const productionHouseCurveTarget = canonicalTargetCurve.map((point) => ({ ...point }));

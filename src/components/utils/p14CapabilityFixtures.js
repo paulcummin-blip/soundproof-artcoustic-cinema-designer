@@ -1,5 +1,5 @@
 import { assessP14Capability, combinedApprovedP14Capability, formatP14Capability, gradeP14Minimum, gradeP14Recommended } from "./p14CapabilityAuthority.js";
-import { computeP18InRoomF3, computeP19DeviationBelowSchroeder } from "./rp22BassMetrics.jsx";
+import { computeP18InRoomF3, computeParam18ProductExtension, computeP19DeviationBelowSchroeder } from "./rp22BassMetrics.jsx";
 
 const subs = (modelKey, count) => Array.from({ length: count }, (_, index) => ({ id: `${modelKey}-${index + 1}`, modelKey }));
 const pointAt = (curve, frequency) => curve.find((point) => point.frequency === frequency);
@@ -58,6 +58,11 @@ export function runP14CapabilityFixtures() {
 
   const p18 = computeP18InRoomF3({ freqsHz: [15, 20, 25, 30, 40, 60], splDb: [108, 111, 113, 114, 114, 114], targetDb: 114 });
   check("P18 remains independently calculated", 20, p18.f3Hz, p18.f3Hz === 20);
+
+  const productP18 = computeParam18ProductExtension(subs("sub2-12", 2), 22, "minimum");
+  check("2 x SUB2-12 P18 uses the 22 Hz physical LF boundary", 22, productP18?.value, productP18?.value === 22);
+  check("2 x SUB2-12 product P18 achieves L2", "L2", productP18?.level, productP18?.level === "L2");
+  check("Product P18 declares isolated authority", "power-summed-authoritative-product-capability", productP18?.source, productP18?.source === "power-summed-authoritative-product-capability");
 
   return { checks, results, passed: checks.filter((item) => item.passed).length, total: checks.length, allPassed: checks.every((item) => item.passed) };
 }

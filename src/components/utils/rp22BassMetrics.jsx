@@ -11,6 +11,7 @@
 import { applyBassSmoothing } from '../room/bass/bassGraphSmoothing';
 import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/designEqCalibration";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
+import { getSpeakerModelMeta, getSubwooferCurve } from "@/components/models/speakers/registry";
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
 export { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
@@ -214,9 +215,85 @@ export function computeParam14LfeCapability(rspResponse, designEqEnabled, band =
   };
 }
 
-// Parameter 18 — independent in-room -3 dB extension assessment.
-// Each level uses its own catalogue-derived SPL cutoff and frequency limit; P14
-// is deliberately not an input to this grade.
+function productCurveForSub(sub) {
+  const modelKey = sub?.modelKey ?? sub?.model;
+  const curve = getSubwooferCurve(modelKey);
+  const meta = getSpeakerModelMeta(modelKey);
+  if (!Array.isArray(curve) || curve.length < 2) return null;
+  const usableLfHz = Number(meta?.bassCapability?.usableLF_neg6dB);
+  return {
+    usableLfHz: Number.isFinite(usableLfHz) ? usableLfHz : null,
+    curve: curve.map((point) => ({ frequency: Number(point.hz), spl: Number(point.db) })),
+  };
+}
+
+function interpolateProductCurve(curve, frequency) {
+  if (frequency < curve[0].frequency || frequency > curve[curve.length - 1].frequency) return null;
+  return valAt(curve, frequency);
+}
+
+export function computeParam18ProductExtension(activeSubs, configuredUsableLfHz = null, p14TargetBasis = "minimum") {
+  const products = (activeSubs || []).map(productCurveForSub);
+  if (!products.length || products.some((product) => !product)) return null;
+  const productLfLimits = products.map((product) => product.usableLfHz).filter(isNum);
+  const physicalLfHz = Math.max(
+    isNum(configuredUsableLfHz) ? Number(configuredUsableLfHz) : 0,
+    productLfLimits.length ? Math.max(...productLfLimits) : 0,
+  );
+  const frequencies = [...new Set([
+    physicalLfHz,
+    ...products.flatMap((product) => product.curve.map((point) => point.frequency)),
+  ])]
+    .filter((frequency) => frequency >= physicalLfHz)
+    .sort((a, b) => a - b);
+  const productCapabilityCurve = frequencies.map((frequency) => {
+    const values = products.map((product) => interpolateProductCurve(product.curve, frequency));
+    if (values.some((value) => !isNum(value))) return null;
+    const spl = 10 * Math.log10(values.reduce((sum, value) => sum + Math.pow(10, value / 10), 0));
+    return { frequency, spl };
+  }).filter(Boolean);
+  if (!productCapabilityCurve.length) return null;
+
+  const targets = getRp22BassOperatingDefinitions(p14TargetBasis).map((definition) => {
+    const cutoffDb = definition.p18CutoffDb;
+    let extensionHz = null;
+    if (productCapabilityCurve[0].spl >= cutoffDb) {
+      extensionHz = productCapabilityCurve[0].frequency;
+    } else {
+      for (let index = 0; index < productCapabilityCurve.length - 1; index += 1) {
+        const low = productCapabilityCurve[index];
+        const high = productCapabilityCurve[index + 1];
+        if (low.spl < cutoffDb && high.spl >= cutoffDb) {
+          const ratio = (cutoffDb - low.spl) / (high.spl - low.spl);
+          extensionHz = Math.max(physicalLfHz, low.frequency + (high.frequency - low.frequency) * ratio);
+          break;
+        }
+      }
+    }
+    return {
+      level: definition.level,
+      targetSplDb: definition.p14TargetDb,
+      cutoffDb,
+      limitHz: definition.p18LimitHz,
+      extensionHz,
+      bounded: extensionHz === productCapabilityCurve[0].frequency,
+      passesFrequency: extensionHz != null && extensionHz <= definition.p18LimitHz,
+    };
+  });
+  const winningTarget = targets.slice().reverse().find((target) => target.passesFrequency) || null;
+  return {
+    targets,
+    level: winningTarget?.level || null,
+    value: winningTarget?.extensionHz ?? null,
+    formatted: winningTarget == null ? null : `${Math.round(winningTarget.extensionHz)} Hz`,
+    physicalLfHz,
+    productCapabilityCurve,
+    source: "power-summed-authoritative-product-capability",
+    note: "Physical product extension; room response, boundary gain, modal gain and EQ are excluded.",
+  };
+}
+
+// Legacy in-room extension helper retained for non-authoritative simulation consumers.
 export function computeParam18BassExtension(rspResponse) {
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;
   const sorted = smoothThird(toSplCurve(rspResponse)).sort((a, b) => a.frequency - b.frequency);
