@@ -28,6 +28,12 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     postEqRspCurve,
     postEqPerSeatCurves,
     finalSeatVariationData: {
+      p18: {
+        candidateId: candidate.candidateId,
+        level: candidate.achievedP18Level ?? null,
+        extensionHz: candidate.achievedP18FrequencyHz ?? null,
+        authority: candidate.p18AchievedAuthority || null,
+      },
       p19: {
         candidateId: candidate.candidateId,
         level: candidate.achievedP19Level ?? null,
@@ -51,7 +57,8 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
 export function finalOptimisedBassAuthorityMatches(response) {
   if (!response?.selectedCandidateId) return false;
   const candidateId = response.selectedCandidateId;
-  return response.finalSeatVariationData?.p19?.candidateId === candidateId
+  return response.finalSeatVariationData?.p18?.candidateId === candidateId
+    && response.finalSeatVariationData?.p19?.candidateId === candidateId
     && response.finalSeatVariationData?.p20?.candidateId === candidateId
     && response.filterBankSignature === buildFilterBankSignature({ generatedFilterBank: response.eqFilterBank })
     && response.postEqCurveSignature === buildCurveSignature(response.postEqRspCurve);

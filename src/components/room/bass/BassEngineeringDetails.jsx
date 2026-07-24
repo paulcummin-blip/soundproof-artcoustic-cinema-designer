@@ -29,7 +29,15 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
       </div>
       <BassContractParityAudit contract={contract} optimisationResult={result} detailedStatus={detailedStatus} rspRawCurve={rspRawCurve} perSeatRawCurves={perSeatRawCurves} canonicalPriorityMode={priorityMode} graphCandidateId={graphCandidateId} />
       <BassOptimiserValidationPanel result={result} activeSubs={systemLimits.activeSubs} usableLfHz={systemLimits.usableLfHz} perSeatRawCurves={perSeatRawCurves} rspRawCurve={rspRawCurve} normalizedTransferResult={normalizedTransferResult} includeDiagnostics />
-      <DesignEqFilterBankDiagnostic filters={result.selectedFilters} combinedEqCurve={correction} profile={result.selectedCandidate?.designEqFitProfile} profileConfig={result.selectedCandidate?.designEqFitProfileConfig} />
+      <DesignEqFilterBankDiagnostic
+        filters={result.selectedFilters}
+        decisionDiagnostics={result.selectedCandidate?.designEqFilterDecisionDiagnostics || []}
+        rejectedCandidates={result.selectedCandidate?.rejectedEqCandidates || []}
+        protectedNullRegions={result.selectedCandidate?.protectedNullRegions || []}
+        combinedEqCurve={correction}
+        profile={result.selectedCandidate?.designEqFitProfile}
+        profileConfig={result.selectedCandidate?.designEqFitProfileConfig}
+      />
       <DesignEqLifecycleDiagnostic result={result} rspRawCurve={rspRawCurve} graphCandidateId={graphCandidateId} graphFilterBankSignature={graphFilterBankSignature} />
       <SourceDomainCapabilityDiagnostic activeSubs={systemLimits.activeSubs} rawCurve={baseCurve} postEqCurve={result.finalPostEqCurve} usableLfHz={systemLimits.usableLfHz} optimisationResult={result} />
     </>}

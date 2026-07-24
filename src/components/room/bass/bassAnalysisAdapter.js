@@ -383,11 +383,16 @@ export function adaptCurrentBassOptimisationResult({
     targetBasisDetail: formatP14TargetBasisDetail(selectedP14TargetBasis),
   });
 
-  // P18
-  const p18Level = selectedCandidate
-    ? (typeof selectedCandidate.achievedP18Level === "number" ? selectedCandidate.achievedP18Level : parseLegacyLevel(optimisationResult?.achievedP18Level))
-    : parseLegacyLevel(optimisationResult?.achievedP18Level);
-  const p18Value = Number.isFinite(selectedCandidate?.achievedP18FrequencyHz) ? selectedCandidate.achievedP18FrequencyHz : (Number.isFinite(optimisationResult?.achievedP18FrequencyHz) ? optimisationResult.achievedP18FrequencyHz : null);
+  // P18 — final selected-candidate authority is achieved post-EQ room extension.
+  const authorityP18 = finalResponse?.finalSeatVariationData?.p18;
+  const p18Level = typeof authorityP18?.level === "number"
+    ? authorityP18.level
+    : selectedCandidate
+      ? (typeof selectedCandidate.achievedP18Level === "number" ? selectedCandidate.achievedP18Level : parseLegacyLevel(optimisationResult?.achievedP18Level))
+      : parseLegacyLevel(optimisationResult?.achievedP18Level);
+  const p18Value = Number.isFinite(authorityP18?.extensionHz)
+    ? authorityP18.extensionHz
+    : Number.isFinite(selectedCandidate?.achievedP18FrequencyHz) ? selectedCandidate.achievedP18FrequencyHz : (Number.isFinite(optimisationResult?.achievedP18FrequencyHz) ? optimisationResult.achievedP18FrequencyHz : null);
   contract.productAnalysis.parameters.p18 = createBassParameterResult({
     parameter: PARAM_P18, status: paramStatus(p18Level != null), level: p18Level, value: p18Value,
     unit: "Hz", passedL1: p18Level != null ? p18Level >= 1 : null, isStale,

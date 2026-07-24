@@ -55,7 +55,7 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
 
 export function buildBassGraphSeries({
   designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve = [], optimisationResult,
-  hasMatchingDetailedResult, multiSeries = [], showRealSeatOverlays, smoothingMode = "none",
+  hasMatchingDetailedResult, multiSeries = [], selectedSeatIds = [], showRealSeatOverlays, smoothingMode = "none",
   overlayProductionSeries, showRewOverlay, rewOverlaySeries,
 }) {
   const finalResponse = optimisationResult?.finalOptimisedBassResponse;
@@ -67,30 +67,33 @@ export function buildBassGraphSeries({
     const target = showHouseCurve ? buildNormalizedHouseCurveSeries(normalizedSeries) : null;
     if (target) series.push(target);
   } else {
-    series = rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : [];
+    const selectedRealIds = selectedSeatIds.filter((id) => id !== "rsp");
+    const selectedRawSeats = selectedRealIds.map((id) => multiSeries.find((item) => item.id === id)).filter(Boolean);
+    const postEqBySeat = new Map((finalResponse?.postEqPerSeatCurves || []).map((seat) => [seat.seatId, seat]));
+    const seatValidationActive = selectedRawSeats.length > 0;
+    series = seatValidationActive
+      ? selectedRawSeats.map((seat) => ({ ...seat, id: `${seat.id}-raw`, kind: "raw", label: `${seat.id} before EQ`, tooltipLabel: `${seat.id} before EQ`, strokeDasharray: "6 4", strokeWidth: 1.5, data: applyBassSmoothing(seat.data, smoothingMode) }))
+      : (rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : []);
     if (hasMatchingDetailedResult && finalResponse?.postEqRspCurve?.length) {
-      series.push({
-        id: "rsp-eq", kind: "post-eq", label: "RSP after EQ", tooltipLabel: "RSP after EQ",
-        candidateId: finalResponse.selectedCandidateId,
-        filterBankSignature: finalResponse.filterBankSignature,
-        color: "#16A34A", strokeWidth: 2.5,
-        data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode),
-      });
-      if (showRealSeatOverlays) {
-        series.push(...finalResponse.postEqPerSeatCurves
+      if (seatValidationActive) {
+        series.push(...selectedRawSeats.map((seat, index) => {
+          const postEq = postEqBySeat.get(seat.id);
+          if (!postEq) return null;
+          return { id: `${seat.id}-eq`, kind: "post-eq", label: `${seat.id} after EQ`, tooltipLabel: `${seat.id} after EQ`,
+            candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
+            color: seat.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
+            strokeWidth: 2.25, data: applyBassSmoothing(postEq.responseData, smoothingMode) };
+        }).filter(Boolean));
+      } else {
+        series.push({ id: "rsp-eq", kind: "post-eq", label: "RSP after EQ", tooltipLabel: "RSP after EQ",
+          candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
+          color: "#16A34A", strokeWidth: 2.5, data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode) });
+        if (showRealSeatOverlays) series.push(...finalResponse.postEqPerSeatCurves
           .filter((seat) => multiSeries.some((item) => item.id === seat.seatId))
-          .map((seat, index) => ({
-          id: seat.seatId,
-          kind: "real-seat-overlay",
-          label: `${seat.seatId} after EQ`,
-          tooltipLabel: `${seat.seatId} after EQ`,
-          candidateId: finalResponse.selectedCandidateId,
-          filterBankSignature: finalResponse.filterBankSignature,
-          color: multiSeries.find((item) => item.id === seat.seatId)?.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
-          strokeWidth: 1.25,
-          strokeOpacity: 0.5,
-          data: applyBassSmoothing(seat.responseData, smoothingMode),
-        })));
+          .map((seat, index) => ({ id: seat.seatId, kind: "real-seat-overlay", label: `${seat.seatId} after EQ`, tooltipLabel: `${seat.seatId} after EQ`,
+            candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
+            color: multiSeries.find((item) => item.id === seat.seatId)?.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
+            strokeWidth: 1.25, strokeOpacity: 0.5, data: applyBassSmoothing(seat.responseData, smoothingMode) })));
       }
       const target = showHouseCurve ? buildAbsoluteHouseCurveSeries(optimisationResult) : null;
       if (target) series.push(target);

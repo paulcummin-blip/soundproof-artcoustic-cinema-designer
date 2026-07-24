@@ -29,6 +29,7 @@ import { buildVisibleRoomModeMarkers } from "@/components/room/bass/roomModePres
 import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedNullPresentation";
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
+import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -128,14 +129,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
   }, [seatingPositions]);
 
-  const toggleSeat = (sid) => {
-    setSelectedSeatIds(prev => {
-      if (prev.includes(sid)) {
-        // Don't allow deselecting the last active seat
-        return prev.length === 1 ? prev : prev.filter(id => id !== sid);
-      }
-      return [...prev, sid];
-    });
+  const selectSeat = (sid) => setSelectedSeatIds([sid]);
+  const selectAllSeats = () => setSelectedSeatIds(orderedSeats.map((seat) => seat.id || `${seat.x}-${seat.y}`));
+  const selectRsp = () => {
+    setShowRsp(true);
+    setSelectedSeatIds(["rsp"]);
   };
 
   // Presentation-only state. Production response inputs and physics are owned by the room-scoped authority.
@@ -194,6 +192,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // it reads rspRawCurve directly. Graph visibility never affects P14/P18/P19.
   const multiSeries = useMemo(() => {
     const responses = simulationResults.seatResponses;
+    const storedSeatCurves = new Map((perSeatRawCurves || []).map((seat) => [seat.seatId, seat.responseData]));
     const series = [];
 
     // RSP — always first, green, labelled
@@ -202,19 +201,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
 
     // Real-seat display overlays
-    const activeIds = selectedSeatIds.filter(id => id !== "rsp" && responses[id]);
+    const requestedIds = showRealSeatOverlays && selectedSeatIds.includes("rsp")
+      ? orderedSeats.map((seat) => seat.id || `${seat.x}-${seat.y}`)
+      : selectedSeatIds;
+    const activeIds = requestedIds.filter(id => id !== "rsp" && (storedSeatCurves.has(id) || responses[id]));
     activeIds.forEach(sid => {
       const response = responses[sid];
-      if (!response?.freqsHz || !response?.splDb) return;
+      const storedCurve = storedSeatCurves.get(sid);
+      const raw = Array.isArray(storedCurve) && storedCurve.length
+        ? storedCurve.map((point) => ({ frequency: Number(point.frequency), spl: Number(point.spl) }))
+        : (response?.freqsHz || []).map((frequency, i) => ({ frequency, spl: Number.isFinite(response?.splDb?.[i]) ? response.splDb[i] : null }));
+      const validRaw = raw.filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
 
-      const raw = response.freqsHz
-        .map((frequency, i) => ({
-          frequency,
-          spl: Number.isFinite(response.splDb[i]) ? response.splDb[i] : null,
-        }))
-        .filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
-
-      const sorted = [...raw].sort((a, b) => a.frequency - b.frequency);
+      const sorted = [...validRaw].sort((a, b) => a.frequency - b.frequency);
       const deduped = [];
       for (let i = 0; i < sorted.length; i++) {
         const curr = sorted[i];
@@ -231,7 +230,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
 
     return series;
-  }, [selectedSeatIds, simulationResults.seatResponses, orderedSeats, isDraggingSub, showRsp, rspRawCurve]);
+  }, [selectedSeatIds, simulationResults.seatResponses, perSeatRawCurves, orderedSeats, isDraggingSub, showRsp, showRealSeatOverlays, rspRawCurve]);
 
   // Parse pasted REW CSV into a series object
   const rewOverlaySeries = useMemo(() => {
@@ -300,10 +299,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
     designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
-    hasMatchingDetailedResult: hasValidDetailedResult, multiSeries, showRealSeatOverlays,
+    hasMatchingDetailedResult: hasValidDetailedResult, multiSeries, selectedSeatIds, showRealSeatOverlays,
     smoothingMode: bassSmoothingMode, overlayProductionSeries, showRewOverlay, rewOverlaySeries,
   }), [designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
-    hasValidDetailedResult, multiSeries, showRealSeatOverlays, bassSmoothingMode,
+    hasValidDetailedResult, multiSeries, selectedSeatIds, showRealSeatOverlays, bassSmoothingMode,
     overlayProductionSeries, showRewOverlay, rewOverlaySeries]);
 
   const graphStatusText = detailedEqStatusText({
@@ -562,78 +561,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
 
 
-        {/* RSP measurement pill — authoritative assessment position */}
-        {rspPosition && (
-          <div style={{ display: "flex", gap: 5, marginBottom: 6, alignItems: "center" }}>
-            <button
-              onClick={() => setShowRsp(prev => !prev)}
-              title={`RSP — Reference Seat Position (x=${rspPosition.x.toFixed(2)} m, y=${rspPosition.y.toFixed(2)} m, z=${rspPosition.z.toFixed(2)} m)`}
-              style={{
-                width: 52, height: 26,
-                border: showRsp ? "2px solid #16A34A" : "1px solid #DCDBD6",
-                borderRadius: 9999, fontSize: 11, fontWeight: showRsp ? 700 : 500,
-                background: showRsp ? "#16A34A" : "#F6F3EE",
-                color: showRsp ? "#fff" : "#625143",
-                cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
-                outline: "none", flexShrink: 0, transition: "background 0.12s, border-color 0.12s",
-              }}
-            >
-              RSP
-            </button>
-            <span style={{ fontSize: 10, color: "#8B7F76", fontFamily: "monospace" }}>
-              Assessment position
-            </span>
-          </div>
-        )}
-
-        {/* Seat selector pills */}
-        {Array.isArray(seatingPositions) && seatingPositions.length > 0 && (() => {
-          const rowMap = new Map();
-          orderedSeats.forEach(seat => {
-            const r = Number(seat?.row || seat?.rowNumber) || 1;
-            if (!rowMap.has(r)) rowMap.set(r, []);
-            rowMap.get(r).push(seat);
-          });
-          const rowNums = Array.from(rowMap.keys()).sort((a, b) => a - b);
-          return (
-            <div style={{ display: "grid", gap: 5, marginBottom: 12 }}>
-              {rowNums.map(r => {
-                const rowSeats = rowMap.get(r) || [];
-                return (
-                  <div key={r} style={{ display: "flex", gap: 5 }}>
-                    {rowSeats.map(seat => {
-                      const sid = seat.id || `${seat.x}-${seat.y}`;
-                      const isOn = selectedSeatIds.includes(sid);
-                      const color = getSeatColor(sid);
-                      const rowNum = Number(seat?.row || seat?.rowNumber) || 1;
-                      const rowSeatsOrdered = orderedSeats.filter(s => (Number(s?.row || s?.rowNumber) || 1) === rowNum);
-                      const posInRow = rowSeatsOrdered.findIndex(s => (s.id || `${s.x}-${s.y}`) === sid) + 1;
-                      const label = `R${rowNum}S${posInRow}`;
-                      return (
-                        <button
-                          key={sid}
-                          onClick={() => toggleSeat(sid)}
-                          title={label}
-                          style={{
-                            width: 52, height: 26,
-                            border: isOn ? `2px solid ${color}` : "1px solid #DCDBD6",
-                            borderRadius: 9999, fontSize: 11, fontWeight: isOn ? 700 : 500,
-                            background: isOn ? color : "#F6F3EE",
-                            color: isOn ? "#fff" : "#625143",
-                            cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            outline: "none", flexShrink: 0, transition: "background 0.12s, border-color 0.12s",
-                          }}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
+        <SeatResponseScopeControls
+          rspPosition={rspPosition}
+          orderedSeats={orderedSeats}
+          selectedSeatIds={selectedSeatIds}
+          getSeatColor={getSeatColor}
+          onSelectRsp={selectRsp}
+          onSelectSeat={selectSeat}
+          onSelectAll={selectAllSeats}
+        />
 
         {/* Fixed curve key — derived from series metadata so the key, graph and tooltip cannot drift apart */}
         {multiSeriesForGraph.length > 0 && (() => {

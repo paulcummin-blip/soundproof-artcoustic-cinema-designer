@@ -1,7 +1,7 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
-export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v3-balanced-rp22-authority";
+export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v4-achieved-p18-authority";
 export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-response-target-v8-protected-null-domain";
-export const BASS_RESULT_SCHEMA_VERSION = 4;
+export const BASS_RESULT_SCHEMA_VERSION = 5;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 
 export const BASS_OPTIMISER_VERSIONS = Object.freeze({

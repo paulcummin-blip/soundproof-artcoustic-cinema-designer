@@ -293,6 +293,44 @@ export function computeParam18ProductExtension(activeSubs, configuredUsableLfHz 
   };
 }
 
+function sustainedExtensionAtCutoff(curve, cutoffDb, upperHz = 120) {
+  const points = smoothThird(toSplCurve(curve)).filter((point) => point.frequency <= upperHz);
+  for (let index = 0; index < points.length; index += 1) {
+    if (points[index].spl < cutoffDb) continue;
+    if (points.slice(index).some((point) => point.spl < cutoffDb)) continue;
+    const previous = points[index - 1];
+    if (!previous || previous.spl >= cutoffDb) return points[index].frequency;
+    const ratio = (cutoffDb - previous.spl) / (points[index].spl - previous.spl);
+    return previous.frequency + (points[index].frequency - previous.frequency) * ratio;
+  }
+  return null;
+}
+
+export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqCurves = [], activeSubs = [], configuredUsableLfHz = null, p14TargetBasis = "minimum" }) {
+  if (!Array.isArray(rspPostEqCurve) || !rspPostEqCurve.length) return null;
+  const product = computeParam18ProductExtension(activeSubs, configuredUsableLfHz, p14TargetBasis);
+  if (!product) return null;
+  const seatCurves = (perSeatPostEqCurves || []).filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
+  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
+  const targets = definitions.map((definition) => {
+    const rspExtensionHz = sustainedExtensionAtCutoff(rspPostEqCurve, definition.p18CutoffDb);
+    const seatExtensions = seatCurves.map((seat) => ({ seatId: seat.seatId, extensionHz: sustainedExtensionAtCutoff(seat.responseData, definition.p18CutoffDb) }));
+    const productTarget = product.targets.find((target) => target.level === definition.level);
+    const sourceExtensions = [productTarget?.extensionHz, rspExtensionHz, ...seatExtensions.map((seat) => seat.extensionHz)];
+    const complete = sourceExtensions.every(isNum);
+    const extensionHz = complete ? Math.max(...sourceExtensions) : null;
+    const worstSeat = seatExtensions.filter((seat) => isNum(seat.extensionHz)).sort((a, b) => b.extensionHz - a.extensionHz)[0] || null;
+    return { level: definition.level, cutoffDb: definition.p18CutoffDb, limitHz: definition.p18LimitHz, extensionHz,
+      rspExtensionHz, productExtensionHz: productTarget?.extensionHz ?? null, worstSeatId: worstSeat?.seatId ?? null,
+      worstSeatExtensionHz: worstSeat?.extensionHz ?? null, passesFrequency: extensionHz != null && extensionHz <= definition.p18LimitHz };
+  });
+  const winningTarget = targets.slice().reverse().find((target) => target.passesFrequency) || null;
+  return { targets, level: winningTarget?.level || null, value: winningTarget?.extensionHz ?? null,
+    formatted: winningTarget ? `${Math.round(winningTarget.extensionHz)} Hz` : null,
+    productCapability: product, source: "post-eq-rsp-worst-seat-achieved-extension",
+    note: "Achieved in-room extension from post-EQ RSP, conservatively bounded by product capability and worst-seat post-EQ response." };
+}
+
 // Legacy in-room extension helper retained for non-authoritative simulation consumers.
 export function computeParam18BassExtension(rspResponse) {
   if (!Array.isArray(rspResponse) || rspResponse.length === 0) return null;

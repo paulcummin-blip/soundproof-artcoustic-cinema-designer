@@ -1,5 +1,5 @@
 import { calculateDesignEqCurve, DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
-import { computeParam18ProductExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
+import { computeParam18AchievedExtension, computeP19DeviationBelowSchroeder, artcousticHouseCurveOffsetAt } from "@/components/utils/rp22BassMetrics";
 import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
@@ -87,7 +87,6 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     : eq.worstResidualDiagnostics;
   const preEqP14 = assessP14Capability({ activeSubs, targetBasis: p14TargetBasis });
   const p14 = assessP14Capability({ activeSubs, combinedEqCurve, targetBasis: p14TargetBasis });
-  const p18 = computeParam18ProductExtension(activeSubs, usableLfHz, p14TargetBasis);
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third");
   const assessedCurve = smoothed.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz);
   const productionHouseCurveTarget = canonicalTargetCurve.map((point) => ({ ...point }));
@@ -114,16 +113,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   const achievedP14Level = p14?.level ?? 0;
   const achievedP14MinimumLevel = p14?.minimumLevel ?? 0;
   const achievedP14RecommendedLevel = p14?.recommendedLevel ?? 0;
-  const achievedP18FrequencyHz = p18?.value ?? null;
-  const achievedP18Level = Number(String(p18?.level || "").replace("L", "")) || 0;
   const achievedP19VariationDb = officialP19.variationDbRaw;
   const achievedP19Level = levelFromValue(achievedP19VariationDb, definitions, "p19ToleranceDb", true);
-  const meetsRequestedEnvelope = achievedP14Level >= request.p14.value && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
-  const rejectionReason = [
-    achievedP14Level < request.p14.value && `P14 ${p14?.targetBasisLabel || "Minimum"} design target not achieved after EQ headroom`, 
-    achievedP18Level < request.p18.value && `P18 extension does not reach the requested ${request.p18.p18LimitHz} Hz boundary`,
-    achievedP19Level < request.p19.value && `P19 variation exceeds ±${request.p19.p19ToleranceDb} dB between ${assessmentStartHz}–${assessmentEndHz} Hz`,
-  ].filter(Boolean).join("; ");
 
   // Seat-aware metrics: apply the candidate's exact EQ bank to each real seat's raw response.
   // The EQ bank is the RSP-calibrated combinedEqCurve; it is applied identically to every seat.
@@ -156,6 +147,18 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     }
   }
   worstRealSeatHouseCurveLevel = levelFromValue(worstRealSeatHouseCurveVariationDb, definitions, "p19ToleranceDb", true);
+  const p18 = computeParam18AchievedExtension({
+    rspPostEqCurve: finalPostEqCurve, perSeatPostEqCurves, activeSubs,
+    configuredUsableLfHz: usableLfHz, p14TargetBasis,
+  });
+  const achievedP18FrequencyHz = p18?.value ?? null;
+  const achievedP18Level = Number(String(p18?.level || "").replace("L", "")) || 0;
+  const meetsRequestedEnvelope = achievedP14Level >= request.p14.value && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
+  const rejectionReason = [
+    achievedP14Level < request.p14.value && `P14 ${p14?.targetBasisLabel || "Minimum"} design target not achieved after EQ headroom`,
+    achievedP18Level < request.p18.value && `Achieved post-EQ room extension does not reach the requested ${request.p18.p18LimitHz} Hz boundary`,
+    achievedP19Level < request.p19.value && `P19 variation exceeds ±${request.p19.p19ToleranceDb} dB between ${assessmentStartHz}–${assessmentEndHz} Hz`,
+  ].filter(Boolean).join("; ");
 
   // Uniform seat metrics: calculate the same worst/mean/RMS metrics for every
   // candidate profile using the identical 1/3-octave smoothing, assessment band,
@@ -252,6 +255,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     p14CapabilityDetails: p14,
     achievedP18FrequencyHz,
     achievedP18Level,
+    p18AchievedAuthority: p18,
     achievedP19VariationDb,
     achievedP19Level,
     officialP19VariationDb: achievedP19VariationDb,
