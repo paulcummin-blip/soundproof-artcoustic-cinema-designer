@@ -8,6 +8,7 @@ import { buildCandidateSignature, signatureToString } from "./candidateConsisten
 import LiveResultAuthorityDiagnostic, { shouldShowLiveResultAuthorityDiagnostic } from "./LiveResultAuthorityDiagnostic";
 import ExactHouseCurveCaseCaptureButton from "./ExactHouseCurveCaseCaptureButton";
 import BassCapabilityReceiptDiagnostic from "./BassCapabilityReceiptDiagnostic";
+import DesignEqLifecycleDiagnostic from "./DesignEqLifecycleDiagnostic";
 
 export default function BassEngineeringDetails({ enabled, designEqEnabled, result, rspPosition, seatingPositions, contract, detailedStatus, rspRawCurve, perSeatRawCurves, priorityMode, onPriorityChange, systemLimits, multiSeries, runtimeCapture, smoothingMode, lifecycle, graphCandidateId, graphFilterBankSignature, graphSeries, transitionFrequencyHz, normalizedTransferResult }) {
   if (!enabled) return null;
@@ -29,6 +30,7 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
       <BassContractParityAudit contract={contract} optimisationResult={result} detailedStatus={detailedStatus} rspRawCurve={rspRawCurve} perSeatRawCurves={perSeatRawCurves} canonicalPriorityMode={priorityMode} graphCandidateId={graphCandidateId} />
       <BassOptimiserValidationPanel result={result} activeSubs={systemLimits.activeSubs} usableLfHz={systemLimits.usableLfHz} perSeatRawCurves={perSeatRawCurves} rspRawCurve={rspRawCurve} normalizedTransferResult={normalizedTransferResult} includeDiagnostics />
       <DesignEqFilterBankDiagnostic filters={result.selectedFilters} combinedEqCurve={correction} profile={result.selectedCandidate?.designEqFitProfile} profileConfig={result.selectedCandidate?.designEqFitProfileConfig} />
+      <DesignEqLifecycleDiagnostic result={result} rspRawCurve={rspRawCurve} graphCandidateId={graphCandidateId} graphFilterBankSignature={graphFilterBankSignature} />
       <SourceDomainCapabilityDiagnostic activeSubs={systemLimits.activeSubs} rawCurve={baseCurve} postEqCurve={result.finalPostEqCurve} usableLfHz={systemLimits.usableLfHz} optimisationResult={result} />
     </>}
     <ProductionVectorCaptureTest10 capture={runtimeCapture} designEqEnabled={designEqEnabled} smoothingMode={smoothingMode} />

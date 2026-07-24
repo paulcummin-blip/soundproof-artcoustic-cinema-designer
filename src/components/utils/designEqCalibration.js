@@ -542,7 +542,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   let capabilityPenaltyChangedSelectionCount = 0;
   let selectedRevisionOperationCount = 0;
   const revisionAttempts = [];
+  const detectedRegions = [];
   const candidateAcceptanceDiagnostics = [];
+  const candidateSelectionDiagnostics = [];
   let operations = 0;
   const maxOperations = 30;
   const revisionScales = [1, 0.75, 0.5, 0.25];
@@ -584,6 +586,13 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     for (const region of regions) {
       const isPeak = region.kind === "peak";
       const isInsideProtectedNull = isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions);
+      if (collectDiagnostics) detectedRegions.push({
+        iteration: operations + 1,
+        frequencyHz: region.centrePoint.frequency,
+        kind: region.kind,
+        severityDb: region.severityDb,
+        insideProtectedNull: isInsideProtectedNull,
+      });
       if (!isPeak && isInsideProtectedNull) continue;
       // Part B: Per-filter cut clamp is profile-driven (−10 dB standard, −15 dB accuracy).
       const maximumCutDb = profile.maximumCutDb ?? 10;
@@ -676,6 +685,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
             action: "append",
             classification: candidateClassification,
             frequencyHz: region.centrePoint.frequency,
+            proposedGainDb: finalCandidate.gainDb,
+            proposedQ: finalCandidate.Q,
             regionKind: region.kind,
             severityDb: region.severityDb,
             insideProtectedNull: isInsideProtectedNull,
@@ -790,6 +801,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
                 action: "revise",
                 classification: candidateClassification,
                 frequencyHz: region.centrePoint.frequency,
+                proposedGainDb: revisedFilter.gainDb,
+                proposedQ: revisedFilter.Q,
                 regionKind: region.kind,
                 severityDb: region.severityDb,
                 insideProtectedNull: isInsideProtectedNull,
@@ -853,6 +866,27 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       return a.filter.Q - b.filter.Q;
     });
     const chosen = acceptableCandidates[0];
+    if (collectDiagnostics) candidateSelectionDiagnostics.push({
+      iteration: operations + 1,
+      acceptableCandidatesCount: acceptableCandidates.length,
+      sortedCandidateOrder: acceptableCandidates.map((candidate, index) => ({
+        rank: index + 1,
+        action: candidate.action,
+        frequencyHz: candidate.filter?.frequencyHz ?? null,
+        gainDb: candidate.filter?.gainDb ?? null,
+        Q: candidate.filter?.Q ?? null,
+        classification: candidate.candidateClassification || null,
+        capabilityAdjustedObjectiveDb: candidate.capabilityAdjustedObjectiveDb ?? null,
+      })),
+      chosen: chosen ? {
+        action: chosen.action,
+        frequencyHz: chosen.filter?.frequencyHz ?? null,
+        gainDb: chosen.filter?.gainDb ?? null,
+        Q: chosen.filter?.Q ?? null,
+        classification: chosen.candidateClassification || null,
+      } : null,
+      rejectionReason: acceptableCandidates.length > 0 && !chosen ? "Candidates remained after sorting but no chosen candidate was produced." : null,
+    });
     if (!chosen) break;
     if (acousticBest && chosen !== acousticBest) capabilityPenaltyChangedSelectionCount++;
     if (chosen.action === "append" && filters.length >= 10) {
@@ -1160,7 +1194,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       broadBelowTargetWorsening: selectedCheckpoint.broadBelowTargetWorsening,
     },
     checkpointSummaries,
+    detectedRegions,
     candidateAcceptanceDiagnostics,
+    candidateSelectionDiagnostics,
     worstResidualDiagnostics,
     selectionReason,
     lfCapabilityProtection: buildLfCapabilityProtectionDiagnostics(
