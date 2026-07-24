@@ -19,6 +19,7 @@ import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pai
 import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P18CandidateSummary";
 import { buildFilterBankSignature } from "@/components/room/bass/bassResultAuthority";
 import { buildBassCapabilityReceiptDiagnostics } from "@/components/room/bass/bassCapabilityDiagnostics";
+import { assessBassOperatingPoint } from "@/components/utils/bassOperatingPointAuthority";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 
@@ -55,7 +56,7 @@ function makeRequests(definitions) {
   return requests;
 }
 
-export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves, targetAnchorDb, targetAnchorSource, p14TargetBasis, domains, canonicalTargetCurve, protectedNullRegions, perSourceComplexTransfers, normalizedTransferFingerprint, calibrationFingerprint }) {
+export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves, targetAnchorDb, targetAnchorSource, bassOperatingPoint, p14TargetBasis, domains, canonicalTargetCurve, protectedNullRegions, perSourceComplexTransfers, normalizedTransferFingerprint, calibrationFingerprint }) {
   const assessmentStartHz = domains.p19StartHz;
   const assessmentEndHz = domains.p19EndHz;
   const correctionStartHz = domains.correctionStartHz;
@@ -233,6 +234,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     requestedTargetSpl: targetAnchorDb,
     responseTargetAnchorDb: targetAnchorDb,
     targetAnchorSource,
+    bassOperatingPoint,
     requestedP19ToleranceDb: request.p19.p19ToleranceDb,
     assessmentStartHz,
     assessmentEndHz,
@@ -351,7 +353,7 @@ const FIT_PROFILES_TO_GENERATE = [
   DESIGN_EQ_FIT_PROFILES.accuracy,
 ];
 
-export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, correctionEndHz = 200, targetAnchorDb = null, p14TargetBasis = "recommended", perSeatRawCurves = [], perSourceComplexTransfers = [], normalizedTransferFingerprint = null, calibrationFingerprint = null, collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
+export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120, correctionEndHz = 200, targetAnchorDb = null, requestedLevel = 4, p14TargetBasis = "recommended", perSeatRawCurves = [], perSourceComplexTransfers = [], normalizedTransferFingerprint = null, calibrationFingerprint = null, collectDiagnostics = false, onProgress = null, reuseCandidateEvaluations = true, reuseExactHouseCurveEvaluations = true }) {
   const missingInputs = [
     !rawCurve.length && "rawCurve",
     !activeSubs.length && "activeSubs",
@@ -370,8 +372,10 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
   const requests = makeRequests(definitions);
   const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
-  const responseTargetAnchorDb = deriveResponseAnchoredTarget({ rawCurve, usableLfHz, startHz: domains.correctionStartHz, endHz: domains.correctionEndHz });
-  const targetAnchorSource = "product-aware-rsp-robust-average";
+  const bassOperatingPoint = assessBassOperatingPoint({ activeSubs, perSourceComplexTransfers, requestedLevel });
+  const responseDerivedAnchorDb = deriveResponseAnchoredTarget({ rawCurve, usableLfHz, startHz: domains.correctionStartHz, endHz: domains.correctionEndHz });
+  const responseTargetAnchorDb = bassOperatingPoint.targetAnchorDb ?? responseDerivedAnchorDb;
+  const targetAnchorSource = bassOperatingPoint.targetAnchorDb == null ? "product-aware-rsp-robust-average-fallback" : bassOperatingPoint.source;
   const canonicalTargetCurve = buildCanonicalAbsoluteHouseCurveTarget({
     frequencyGrid: rawCurve.map((point) => point.frequency),
     targetAnchorDb: responseTargetAnchorDb,
@@ -416,7 +420,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
       return;
     }
     const seatStart = perf();
-    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves, targetAnchorDb: responseTargetAnchorDb, targetAnchorSource, p14TargetBasis, domains, canonicalTargetCurve, protectedNullRegions, perSourceComplexTransfers, normalizedTransferFingerprint, calibrationFingerprint });
+    const candidate = buildCandidate({ request, rawCurve, activeSubs, usableLfHz, definitions, eqResult, perSeatRawCurves: preparedSeatCurves, targetAnchorDb: responseTargetAnchorDb, targetAnchorSource, bassOperatingPoint, p14TargetBasis, domains, canonicalTargetCurve, protectedNullRegions, perSourceComplexTransfers, normalizedTransferFingerprint, calibrationFingerprint });
     perSeatEvaluationTimeMs += perf() - seatStart;
     candidateEvaluationCount++;
     curveFilterEvaluationCount += preparedSeatCurves.reduce((count, seat) => count + seat.responseData.length, 0);
@@ -572,7 +576,9 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     missingInputs: [],
     warningMessage: null,
     responseTargetAnchorDb,
+    responseDerivedAnchorDb,
     targetAnchorSource,
+    bassOperatingPoint,
     p14TargetBasis,
     canonicalTargetCurve,
     protectedNullRegions,

@@ -44,6 +44,7 @@ self.onmessage = (e) => {
       correctionEndHz: payload?.correctionEndHz ?? 200,
       targetAnchorDb: payload?.targetAnchorDb ?? null,
       targetAnchorSource: payload?.targetAnchorSource || null,
+      requestedLevel: payload?.requestedLevel ?? 4,
       p14TargetBasis: payload?.p14TargetBasis || "minimum",
       perSeatRawCurves: payload?.perSeatRawCurves || [],
       perSourceComplexTransfers: payload?.perSourceComplexTransfers || [],

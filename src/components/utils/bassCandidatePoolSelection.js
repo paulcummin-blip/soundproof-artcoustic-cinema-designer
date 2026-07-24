@@ -31,6 +31,7 @@ export function selectCandidateFromPool(pool) {
       priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
       poolId: pool?.poolId || null,
       capabilityEnvelopeDiagnostics: pool?.capabilityEnvelopeDiagnostics || [],
+      bassOperatingPoint: pool?.bassOperatingPoint || null,
       generatedCandidateCount: pool?.generatedCandidateCount || 0,
       physicallyCredibleCount: pool?.physicallyCredibleCount || 0,
       requestedEnvelopeValidCount: pool?.requestedEnvelopeValidCount || 0,
@@ -56,6 +57,7 @@ export function selectCandidateFromPool(pool) {
       priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
       poolId: pool.poolId,
       capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
+      bassOperatingPoint: pool.bassOperatingPoint || null,
     };
   }
   const isBestCalibratedAttempt = activeSelection.diagnostics.eligibilityGroup !== "bank_valid_all_rp22_bass_parameters_l1";
@@ -117,6 +119,7 @@ export function selectCandidateFromPool(pool) {
     workerStarted: false,
     poolId: pool.poolId,
     capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
+    bassOperatingPoint: pool.bassOperatingPoint || null,
     generatedCandidateCount: pool.generatedCandidateCount,
     physicallyCredibleCount: pool.physicallyCredibleCount,
     requestedEnvelopeValidCount: pool.requestedEnvelopeValidCount,
