@@ -11,6 +11,7 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { buildLfCapabilityContext, calculateLfCapabilityPenalty, getEqCapabilityBoostAllowance } from "@/components/utils/lfCapabilityProtection";
+import { classifyEqCorrectionRegion, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 
 const MAX_FILTERS = 10;
 const MAX_Q = 10;
@@ -140,6 +141,15 @@ function protectedNullWorsening(currentFilters, candidateFilters, protectedNullR
 
 function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemOutputDb, protectedNullRegions) {
   const requiredDb = -region.centre.residualDb;
+  const authority = classifyEqCorrectionRegion({
+    frequency: region.centre.frequency,
+    rawSpl: region.centre.rawSpl,
+    currentSpl: region.centre.postEqSpl,
+    targetSpl: region.centre.targetSpl,
+    protectedNull: region.protectedNullOverlap,
+    requestedGainDb: requiredDb,
+  });
+  if (!validatePhysicalEqAction(authority.classification, requiredDb).passed) return [];
   const boostSpillsIntoProtectedNull = requiredDb > 0 && (protectedNullRegions || []).some((protectedRegion) => (
     region.centre.frequency >= protectedRegion.startHz / 2 ** (1 / 24)
     && region.centre.frequency <= protectedRegion.endHz * 2 ** (1 / 24)
@@ -246,7 +256,6 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
     bank, capabilityContext, (frequency, candidateBank) => correctionAt(frequency, candidateBank),
   );
   const penaltyIncreaseDb = Math.max(0, penaltyForBank(trial.filters) - penaltyForBank(currentFilters));
-  if (localImprovementDb - penaltyIncreaseDb <= EPSILON_DB) return { reason: "LF capability penalty exceeded local acoustic improvement", limits, nullWorseningDb, candidateCentre, candidateQuality, penaltyIncreaseDb };
   if (candidateQuality.maximumAbsoluteResidualDb > currentQuality.maximumAbsoluteResidualDb + 0.25) {
     return { reason: "high-resolution-score: maximum correctable residual worsened by more than 0.25 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
   }
@@ -254,13 +263,7 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
     return { reason: "high-resolution-score: correctable RMS worsened by more than 0.10 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
   }
   const candidateP14Level = p14Level(raw, trial.filters);
-  if (currentP14Level >= 1 && candidateP14Level < 1) {
-    return { reason: "P14-preservation: this correction alone loses an otherwise-achieved P14 L1 result", limits, nullWorseningDb, candidateCentre, candidateQuality, candidateP14Level };
-  }
   const candidateP20 = p20Level(raw, perSeatRawCurves, trial.filters, assessmentStartHz, assessmentEndHz);
-  if (currentP20.available && candidateP20.available && candidateP20.level < currentP20.level) {
-    return { reason: `P20-preservation: level would fall from L${currentP20.level} to L${candidateP20.level}`, limits, nullWorseningDb, candidateCentre, candidateQuality, candidateP14Level, candidateP20 };
-  }
   return { accepted: true, reason: null, limits, nullWorseningDb, candidateCentre, candidateQuality, candidateP14Level, candidateP20, localImprovementDb };
 }
 
@@ -290,6 +293,14 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
     const permittedBoostDb = Number.isFinite(boostAllowance?.allowedBoostDb) ? boostAllowance.allowedBoostDb : 6;
     const diagnostic = {
       kind: region.kind,
+      classification: classifyEqCorrectionRegion({
+        frequency: region.centre.frequency,
+        rawSpl: region.centre.rawSpl,
+        currentSpl: region.centre.postEqSpl,
+        targetSpl: region.centre.targetSpl,
+        protectedNull: region.protectedNullOverlap,
+        requestedGainDb: -region.centre.residualDb,
+      }).classification,
       startHz: region.startHz,
       endHz: region.endHz,
       centreFrequencyHz: region.centre.frequency,
@@ -349,10 +360,10 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
     }
     accepted.sort((left, right) =>
       Math.abs(left.outcome.candidateCentre.residualDb) - Math.abs(right.outcome.candidateCentre.residualDb)
-      || left.trial.filters.length - right.trial.filters.length
-      || right.trial.filter.Q - left.trial.filter.Q
       || left.outcome.candidateQuality.maximumAbsoluteResidualDb - right.outcome.candidateQuality.maximumAbsoluteResidualDb
-      || left.outcome.candidateQuality.rmsResidualDb - right.outcome.candidateQuality.rmsResidualDb);
+      || left.outcome.candidateQuality.rmsResidualDb - right.outcome.candidateQuality.rmsResidualDb
+      || left.trial.filters.length - right.trial.filters.length
+      || right.trial.filter.Q - left.trial.filter.Q);
     if (!accepted.length) {
       diagnostic.finalDisposition = diagnostic.attempts.length ? "all-cleanup-trials-rejected" : "no-legal-filter-operation-generated";
       continue;

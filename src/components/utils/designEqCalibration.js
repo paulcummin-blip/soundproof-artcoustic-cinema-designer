@@ -7,6 +7,7 @@ import {
   getEqCapabilityBoostAllowance,
 } from "@/components/utils/lfCapabilityProtection";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { buildFilterDecisionDiagnostics, classifyEqCorrectionRegion, findAggregatePeakBoostViolations, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 
 const isNumber = (value) => Number.isFinite(Number(value));
 const DESIGN_EQ_SAMPLE_RATE = 48000;
@@ -509,6 +510,18 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     ? options.initialFilters
         .filter((f) => f && f.enabled && Number.isFinite(f.frequencyHz) && f.frequencyHz > 0
           && Number.isFinite(f.gainDb) && Number.isFinite(f.Q) && f.Q > 0)
+        .filter((filter) => {
+          const frequency = Number(filter.frequencyHz);
+          const authority = classifyEqCorrectionRegion({
+            frequency,
+            rawSpl: interpolate(raw, frequency),
+            currentSpl: interpolate(raw, frequency),
+            targetSpl: anchorDb + artcousticHouseCurveOffsetAt(frequency),
+            protectedNull: isProtectedFrequency(frequency, protectedNullRegions),
+            requestedGainDb: filter.gainDb,
+          });
+          return validatePhysicalEqAction(authority.classification, filter.gainDb).passed;
+        })
         .slice(0, 10)
         .map((f) => ({ ...f }))
     : [];
@@ -584,8 +597,18 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const gainScales = [1, 0.75, 0.5];
     const qMultipliers = [1, 1.5, 2, 3];
     for (const region of regions) {
-      const isPeak = region.kind === "peak";
       const isInsideProtectedNull = isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions);
+      const rawCentreSpl = interpolate(raw, region.centrePoint.frequency);
+      const targetCentreSpl = anchorDb + artcousticHouseCurveOffsetAt(region.centrePoint.frequency);
+      const physicalAuthority = classifyEqCorrectionRegion({
+        frequency: region.centrePoint.frequency,
+        rawSpl: rawCentreSpl,
+        currentSpl: region.centrePoint.spl,
+        targetSpl: targetCentreSpl,
+        protectedNull: isInsideProtectedNull,
+        widthOctaves: region.widthOctaves,
+      });
+      const isPeak = physicalAuthority.classification === "Peak";
       if (collectDiagnostics) detectedRegions.push({
         iteration: operations + 1,
         frequencyHz: region.centrePoint.frequency,
@@ -593,12 +616,12 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
         severityDb: region.severityDb,
         insideProtectedNull: isInsideProtectedNull,
       });
-      if (!isPeak && isInsideProtectedNull) continue;
+      if (["Null", "Capability limited"].includes(physicalAuthority.classification)) continue;
       // Part B: Per-filter cut clamp is profile-driven (−10 dB standard, −15 dB accuracy).
       const maximumCutDb = profile.maximumCutDb ?? 10;
       const maximumAggregateBoostDb = profile.maximumAggregateBoostDb ?? 6;
       const requestedGainDb = isPeak
-        ? -Math.min(maximumCutDb, region.severityDb * 0.85)
+        ? -Math.min(maximumCutDb, Math.max(region.severityDb, Math.abs(physicalAuthority.rawResidualDb || 0)) * 0.85)
         : Math.min(maximumAggregateBoostDb, region.severityDb * 0.75);
       const baseCandidate = limitBoostForCapability({
         band: filters.length + 1,
@@ -610,9 +633,13 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
         startHz: region.startHz,
         endHz: region.endHz,
         widthOctaves: region.widthOctaves,
-        reason: isPeak ? "Residual broad peak above Artcoustic target" : "Residual broad valley below Artcoustic target",
+        classification: physicalAuthority.classification,
+        expectedAction: physicalAuthority.expectedAction,
+        beforeEqSpl: rawCentreSpl,
+        targetSpl: targetCentreSpl,
+        reason: physicalAuthority.reason,
       }, activeSubs, usableLfHz, options.requestedSystemOutputDb);
-      if (Math.abs(baseCandidate.gainDb) <= 0.1) continue;
+      if (Math.abs(baseCandidate.gainDb) <= 0.1 || !validatePhysicalEqAction(physicalAuthority.classification, baseCandidate.gainDb).passed) continue;
 
       const regionSameSignCount = countSameSignFiltersInRegion(baseCandidate, filters);
       const regionAppendCandidates = [];
@@ -1158,6 +1185,13 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
   const finalBankLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile);
   const sameRegionFilterCount = maxSameRegionFilterCount(selectedFilters);
+  const diagnosticTargetCurve = canonicalTargetCurve.length
+    ? canonicalTargetCurve
+    : raw.map((point) => ({ frequency: point.frequency, spl: anchorDb + artcousticHouseCurveOffsetAt(point.frequency) }));
+  const filterDecisionDiagnostics = buildFilterDecisionDiagnostics(
+    selectedFilters, raw, curve, diagnosticTargetCurve, protectedNullRegions,
+  );
+  const physicalAuthorityViolations = findAggregatePeakBoostViolations(raw, curve, diagnosticTargetCurve);
 
   return {
     curve,
@@ -1197,6 +1231,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     detectedRegions,
     candidateAcceptanceDiagnostics,
     candidateSelectionDiagnostics,
+    filterDecisionDiagnostics,
+    physicalEqAuthorityPassed: physicalAuthorityViolations.length === 0,
+    physicalAuthorityViolations,
     worstResidualDiagnostics,
     selectionReason,
     lfCapabilityProtection: buildLfCapabilityProtectionDiagnostics(

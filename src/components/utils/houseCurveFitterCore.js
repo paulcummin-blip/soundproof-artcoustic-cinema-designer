@@ -18,6 +18,7 @@ import { evaluateNearTargetProtection, isProtectedFrequency } from "@/components
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 import { buildLfCapabilityContext, calculateLfCapabilityPenalty } from "@/components/utils/lfCapabilityProtection";
 import { evaluateSeatRegressionTolerance } from "@/components/utils/houseCurveSeatRegressionTolerance";
+import { classifyEqCorrectionRegion, curveSplAt, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 
 const isNumber = (v) => Number.isFinite(Number(v));
 
@@ -287,7 +288,19 @@ function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEnd
       }
       return discovered;
     });
-    for (const region of regions) allRegions.push({ ...region, seatId: seat.seatId });
+    for (const region of regions) {
+      const rawSpl = curveSplAt(seat.raw, region.centrePoint.frequency);
+      const protectedNull = isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions);
+      const authority = classifyEqCorrectionRegion({
+        frequency: region.centrePoint.frequency,
+        rawSpl,
+        currentSpl: region.centrePoint.spl,
+        targetSpl: region.centrePoint.targetSpl,
+        protectedNull,
+        widthOctaves: region.widthOctaves,
+      });
+      allRegions.push({ ...region, seatId: seat.seatId, rawSpl, authority });
+    }
   }
   allRegions.sort((a, b) => b.severityDb - a.severityDb);
   return allRegions;
@@ -453,8 +466,9 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     const currentCapabilityPenaltyCostDb = capabilityPenaltyForBank(filters);
 
     for (const region of regions) {
-      const protectedNull = region.kind === "valley" && isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions);
-      const { trials, productLimited } = generateHouseCurveTrials({ ...region, protectedNull }, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
+      const protectedNull = region.authority?.classification === "Null"
+        || (region.kind === "valley" && isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions));
+      const { trials, productLimited, authority } = generateHouseCurveTrials({ ...region, protectedNull }, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
       let regionAdmissible = false;
       let regionBlockReason = protectedNull ? "protected-null" : productLimited ? "product-limited" : null;
       if (protectedNull) continue;
@@ -469,6 +483,10 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           regionKind: region.kind,
           regionCentreHz: region.centrePoint.frequency,
           regionSeverityDb: region.severityDb,
+          regionClassification: authority?.classification || region.authority?.classification || null,
+          beforeEqSpl: region.rawSpl ?? null,
+          targetSpl: region.centrePoint.targetSpl ?? null,
+          expectedAction: authority?.expectedAction || region.authority?.expectedAction || null,
           action: trial.action,
           frequencyHz: trial.filter?.frequencyHz ?? null,
           gainDb: trial.filter?.gainDb ?? null,
@@ -527,7 +545,11 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         const trialEqAtCentre = validation.filters.reduce((sum, filter) => sum + peakingEqResponseDb(centreHz, filter), 0);
         const requiredAtCentre = requiredCorrectionDb(region.centrePoint.targetSpl, region.centrePoint.spl);
         const appliedStepAtCentre = trialEqAtCentre - currentEqAtCentre;
-        const directionPass = Math.abs(requiredAtCentre) <= 0.05 || requiredAtCentre * appliedStepAtCentre > 0;
+        const physicalAction = validatePhysicalEqAction(authority?.classification || region.authority?.classification, appliedStepAtCentre);
+        const directionPass = physicalAction.passed
+          && (Math.abs(requiredAtCentre) <= 0.05 || requiredAtCentre * appliedStepAtCentre > 0
+            || authority?.classification === "Peak" && appliedStepAtCentre < 0);
+        trialEntry.actualAction = physicalAction.actualAction;
         const maxImprovementDb = currentMetrics.rspMaxDeviationDb - trialMetrics.rspMaxDeviationDb;
         const rmsImprovementDb = currentMetrics.rspRmsDeviationDb - trialMetrics.rspRmsDeviationDb;
         trialEntry.rspImprovementDb = maxImprovementDb;
@@ -541,17 +563,12 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         trialEntry.capabilityPenaltyCostDb = capabilityPenaltyCostDb;
         trialEntry.incrementalCapabilityPenaltyCostDb = incrementalCapabilityPenaltyCostDb;
         trialEntry.capabilityAdjustedObjectiveDb = capabilityAdjustedObjectiveDb;
-        if (directionPass && objectiveImproved && compareHouseCurveMetrics(trialMetrics, currentMetrics) < 0 && !capabilityObjectiveImproved) operationCounts.capabilityPenaltyRejections++;
-        if (!directionPass || !objectiveImproved || !capabilityObjectiveImproved || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
-          trialEntry.rejectionReason = !directionPass ? "correction direction opposed target-minus-current residual" : !capabilityObjectiveImproved ? "LF capability penalty exceeded acoustic objective improvement" : !maxProtected ? "maximum correctable deviation increased" : !rmsImproved && maxImprovementDb <= WORST_EQUIV_DB ? "neither maximum residual nor weighted RMS improved" : "not strictly better than current";
-          iterationEntry.trials.push(trialEntry);
-          continue;
-        }
-        const baselineP14L1 = Number.isFinite(baselineRspMinimumSplDb) && baselineRspMinimumSplDb >= 114;
-        const trialP14MinimumSplDb = rspMinimumInBand(trialMetrics);
-        if (baselineP14L1 && (!Number.isFinite(trialP14MinimumSplDb) || trialP14MinimumSplDb < 113.95)) {
-          operationCounts.p14SafetyRejections++;
-          trialEntry.rejectionReason = "P14 L1 preservation guard rejected trial";
+        if (!directionPass || !objectiveImproved || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
+          trialEntry.rejectionReason = !directionPass
+            ? physicalAction.reason || "correction direction opposed target-minus-current residual"
+            : !maxProtected ? "maximum correctable deviation increased"
+              : !rmsImproved && maxImprovementDb <= WORST_EQUIV_DB ? "neither maximum residual nor weighted RMS improved"
+                : "not strictly better than current";
           iterationEntry.trials.push(trialEntry);
           continue;
         }
@@ -602,9 +619,10 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         trialEntry.accepted = true;
         trialEntry.acceptanceReason = maxImprovementDb > WORST_EQUIV_DB ? "reduced maximum absolute RSP residual" : "held maximum residual while reducing RSP RMS";
         iterationEntry.trials.push(trialEntry);
-        if (!bestTrial || capabilityAdjustedObjectiveDb > bestCapabilityAdjustedObjectiveDb + 0.01
-          || (Math.abs(capabilityAdjustedObjectiveDb - bestCapabilityAdjustedObjectiveDb) <= 0.01 && compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) < 0)) {
-          if (bestTrial && compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) >= 0) operationCounts.capabilityPenaltySelectionChanges++;
+        const acousticComparison = bestTrial ? compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) : -1;
+        if (!bestTrial || acousticComparison < 0
+          || (acousticComparison === 0 && capabilityAdjustedObjectiveDb > bestCapabilityAdjustedObjectiveDb + 0.01)) {
+          if (bestTrial && acousticComparison === 0) operationCounts.capabilityPenaltySelectionChanges++;
           bestCapabilityAdjustedObjectiveDb = capabilityAdjustedObjectiveDb;
           bestTrial = trial;
           bestTrialMetrics = trialMetrics;

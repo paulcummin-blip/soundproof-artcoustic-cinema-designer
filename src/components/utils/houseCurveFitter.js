@@ -20,6 +20,7 @@ import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/u
 import { refineOpposingResidualPair } from "@/components/utils/houseCurvePairedRefinement";
 import { runProfessionalResidualCleanup } from "@/components/utils/houseCurveResidualCleanup";
 import { refineLegalUnprotectedPeak } from "@/components/utils/houseCurveLegalPeakRefinement";
+import { buildFilterDecisionDiagnostics, classifyEqCorrectionRegion, findAggregatePeakBoostViolations, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 import {
   buildLfCapabilityContext,
   buildLfCapabilityProtectionDiagnostics,
@@ -126,6 +127,17 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const standardSeedFilters = Array.isArray(options.initialFilters)
     ? options.initialFilters
         .filter((f) => f && f.enabled && Number.isFinite(f.frequencyHz) && f.frequencyHz > 0 && Number.isFinite(f.gainDb) && Number.isFinite(f.Q) && f.Q > 0)
+        .filter((filter) => {
+          const frequency = Number(filter.frequencyHz);
+          const rawPoint = rspRaw.reduce((nearest, point) => Math.abs(point.frequency - frequency) < Math.abs(nearest.frequency - frequency) ? point : nearest);
+          const targetSpl = interpolateCanonicalTarget(canonicalTargetCurve, frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(frequency));
+          const authority = classifyEqCorrectionRegion({
+            frequency, rawSpl: rawPoint?.spl, currentSpl: rawPoint?.spl, targetSpl,
+            protectedNull: protectedNullRegions.some((region) => frequency >= region.startHz && frequency <= region.endHz),
+            requestedGainDb: filter.gainDb,
+          });
+          return validatePhysicalEqAction(authority.classification, filter.gainDb).passed;
+        })
         .slice(0, 10)
         .map((f) => ({ ...f }))
     : [];
@@ -148,16 +160,9 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   let selectedStartLabel = "empty";
   let capabilityPenaltyChangedStartSelection = false;
   if (startB !== startA && startB.metrics && startA.metrics) {
-    const rawComparatorPrefersB = compareHouseCurveMetrics(startB.metrics, startA.metrics) < 0;
-    const startAScore = startA.metrics.rspMaxDeviationDb + (startA.capabilityPenaltyCostDb || 0);
-    const startBScore = startB.metrics.rspMaxDeviationDb + (startB.capabilityPenaltyCostDb || 0);
-    const capabilityComparatorPrefersB = startBScore < startAScore - 0.01
-      || (Math.abs(startBScore - startAScore) <= 0.01 && rawComparatorPrefersB);
-    capabilityPenaltyChangedStartSelection = rawComparatorPrefersB !== capabilityComparatorPrefersB;
-    const baselineReachedL1 = Number.isFinite(startA.baselineRspMinimumSplDb) && startA.baselineRspMinimumSplDb >= 114;
-    const startAPreservesL1 = !baselineReachedL1 || startA.finalRspMinimumSplDb >= 113.95;
-    const startBPreservesL1 = !baselineReachedL1 || startB.finalRspMinimumSplDb >= 113.95;
-    if ((!startAPreservesL1 && startBPreservesL1) || (startAPreservesL1 === startBPreservesL1 && capabilityComparatorPrefersB)) {
+    const acousticComparatorPrefersB = compareHouseCurveMetrics(startB.metrics, startA.metrics) < 0;
+    capabilityPenaltyChangedStartSelection = false;
+    if (acousticComparatorPrefersB) {
       selected = startB;
       selectedStartLabel = "standard-seeded";
     }
@@ -383,6 +388,11 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     filterFrequencyHz: trial.frequencyHz,
     gainDb: trial.gainDb,
     Q: trial.Q,
+    classification: trial.regionClassification,
+    beforeEqSpl: trial.beforeEqSpl,
+    targetSpl: trial.targetSpl,
+    expectedAction: trial.expectedAction,
+    actualAction: trial.actualAction,
     rspImprovementDb: trial.rspImprovementDb,
     seatImpact: trial.seatImpact,
     capabilityPenaltyDb: trial.incrementalCapabilityPenaltyCostDb ?? trial.capabilityPenaltyCostDb,
@@ -391,6 +401,10 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   });
   const evaluatedEqCandidates = (selected.trace || []).flatMap((entry) => entry.trials || []);
   const rejectedEqCandidates = evaluatedEqCandidates.filter((trial) => !trial.accepted).map(candidateDecision);
+  const filterDecisionDiagnostics = buildFilterDecisionDiagnostics(
+    filters, rspRaw, curve, canonicalTargetCurve, protectedNullRegions,
+  );
+  const physicalAuthorityViolations = findAggregatePeakBoostViolations(rspRaw, curve, canonicalTargetCurve);
   const seatToleranceAdjustedCandidates = evaluatedEqCandidates
     .filter((trial) => trial.acceptedAfterSeatToleranceAdjustment)
     .map(candidateDecision);
@@ -453,6 +467,9 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
       broadBelowTargetWorsening: false,
     },
     iterationTrace: selected.trace || [],
+    filterDecisionDiagnostics,
+    physicalEqAuthorityPassed: physicalAuthorityViolations.length === 0,
+    physicalAuthorityViolations,
     rejectedEqCandidates,
     seatToleranceAdjustedCandidates,
     seatRegressionToleranceDiagnostics: selected.seatRegressionToleranceDiagnostics,

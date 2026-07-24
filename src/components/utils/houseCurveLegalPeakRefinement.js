@@ -22,7 +22,7 @@ function quality(raw, filters, target, startHz, endHz, protectedRegions) {
 }
 
 function tuple(result) {
-  return [result.quality.maximum, result.quality.rms, result.quality.meanAbsolute, result.quality.activity, result.rawPeakResidual];
+  return [result.quality.maximum, result.quality.rms, result.quality.meanAbsolute, result.rawPeakResidual, result.quality.activity];
 }
 
 function better(left, right) {

@@ -2,6 +2,7 @@ import {
   countSameSignFiltersInRegion, isNearDuplicate, limitBoostForCapability, qForRegion,
 } from "@/components/utils/designEqCalibration";
 import { resolveRequiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
+import { classifyEqCorrectionRegion, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
 
 export function generateHouseCurveTrials(region, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb) {
   const trials = [];
@@ -10,20 +11,36 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
     currentPostEqSplDb: region.centrePoint.deviationDb,
     protectedNull: !!region.protectedNull,
   });
-  const isPeak = requiredAtCentreDb < 0;
+  const authority = classifyEqCorrectionRegion({
+    frequency: region.centrePoint.frequency,
+    rawSpl: region.rawSpl,
+    currentSpl: region.centrePoint.spl,
+    targetSpl: region.centrePoint.targetSpl,
+    protectedNull: !!region.protectedNull,
+    widthOctaves: region.widthOctaves,
+  });
+  if (["Null", "Capability limited"].includes(authority.classification)) {
+    return { trials, productLimited: authority.classification === "Capability limited", authority };
+  }
+  const isPeak = authority.classification === "Peak";
   const maximumCutDb = profile.maximumCutDb;
   const maximumAggregateBoostDb = profile.maximumAggregateBoostDb;
   const requestedGainDb = isPeak
-    ? -Math.min(maximumCutDb, Math.abs(requiredAtCentreDb))
+    ? -Math.min(maximumCutDb, Math.abs(authority.rawResidualDb ?? requiredAtCentreDb))
     : Math.min(maximumAggregateBoostDb, Math.max(0, requiredAtCentreDb) * 0.75);
-  const correctionSign = Math.sign(requiredAtCentreDb);
+  const correctionSign = Math.sign(requestedGainDb);
   const baseCandidate = limitBoostForCapability({
     band: filters.length + 1, enabled: true, type: "Peak",
     frequencyHz: region.centrePoint.frequency, gainDb: requestedGainDb,
     Q: qForRegion(region), startHz: region.startHz, endHz: region.endHz,
-    reason: isPeak ? "Residual peak above house curve" : "Residual valley below house curve",
+    classification: authority.classification,
+    expectedAction: authority.expectedAction,
+    beforeEqSpl: region.rawSpl,
+    targetSpl: region.centrePoint.targetSpl,
+    reason: authority.reason,
   }, activeSubs, usableLfHz, requestedSystemOutputDb);
-  const productLimited = Math.abs(baseCandidate.gainDb) <= 0.1;
+  const physicalAction = validatePhysicalEqAction(authority.classification, baseCandidate.gainDb);
+  const productLimited = Math.abs(baseCandidate.gainDb) <= 0.1 || !physicalAction.passed;
   const gainScales = [1, 0.75, 0.5];
   const rawQValues = [baseCandidate.Q * 0.65, baseCandidate.Q, 4, 5, 6, 7, 8, 10];
   const qValues = [...new Map(rawQValues.map((q) => {
@@ -87,5 +104,5 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
       trials.push({ action: "merge", filter: merged, mergedFilterIndices: mergeIndices, scalableIndex: filters.length - mergeIndices.length });
     }
   }
-  return { trials, productLimited };
+  return { trials, productLimited, authority };
 }

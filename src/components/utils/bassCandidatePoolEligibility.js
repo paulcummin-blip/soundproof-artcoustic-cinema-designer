@@ -9,6 +9,7 @@ export function isPhysicallyCredibleBassCandidate(candidate) {
   if (!candidate) return false;
   if (!Array.isArray(candidate.finalPostEqCurve) || candidate.finalPostEqCurve.length === 0) return false;
   if (!Array.isArray(candidate.generatedFilterBank)) return false;
+  if (candidate.physicalEqAuthorityPassed === false) return false;
   return Number.isFinite(candidate.achievedP14Db)
     && Number.isFinite(candidate.achievedP18FrequencyHz)
     && Number.isFinite(candidate.achievedP19VariationDb);
