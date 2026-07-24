@@ -25,6 +25,7 @@ export function buildDesignEqLifecycleModel({ result, rspRawCurve, graphCandidat
   return {
     candidate, finalResponse, acceptance, selections, bank, enabledBank, handedOffFilters, firstEmptyStage,
     regions: asArray(candidate?.designEqDetectedRegions),
+    protectedNullRegions: asArray(candidate?.protectedNullRegions),
     sortedRows: selections.flatMap((selection) => asArray(selection?.sortedCandidateOrder).map((item) => ({ ...item, iteration: selection.iteration }))),
     maximumCurveDifferenceDb: maxCurveDifference(rspRawCurve, finalResponse?.postEqRspCurve),
     graphCandidateId, graphFilterBankSignature,

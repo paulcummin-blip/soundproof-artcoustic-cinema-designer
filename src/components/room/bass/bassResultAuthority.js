@@ -71,13 +71,27 @@ export function buildBassResultCacheKey(calibrationFingerprint) {
 
 export function stampCandidateAuthority(candidate) {
   if (!candidate) return candidate;
+  const candidateId = buildCandidateId(candidate);
   const filterBankSignature = buildFilterBankSignature(candidate);
   const postEqCurveSignature = buildCurveSignature(candidate.finalPostEqCurve);
+  const stampProtectedRegions = (regions) => (Array.isArray(regions) ? regions : []).map((region) => ({
+    ...region,
+    selectedCandidateId: candidateId,
+    curveSignature: postEqCurveSignature,
+    filterBankSignature,
+  }));
+  const protectedNullRegions = stampProtectedRegions(candidate.protectedNullRegions);
+  const houseCurveDiagnostics = candidate.houseCurveDiagnostics ? {
+    ...candidate.houseCurveDiagnostics,
+    protectedNullRegions: stampProtectedRegions(candidate.houseCurveDiagnostics.protectedNullRegions),
+  } : candidate.houseCurveDiagnostics;
   return {
     ...candidate,
-    candidateId: buildCandidateId(candidate),
+    candidateId,
     filterBankSignature,
     postEqCurveSignature,
+    protectedNullRegions,
+    houseCurveDiagnostics,
     startStrategy: candidateStartStrategy(candidate),
   };
 }
