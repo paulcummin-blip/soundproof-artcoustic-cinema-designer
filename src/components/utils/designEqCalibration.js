@@ -659,15 +659,19 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
             && region.severityDb >= 4
             && !isInsideProtectedNull
             && localImprovementDb >= 1;
-          const candidateClassification = isMajorModalCorrectionCandidate ? "modal correction" : "normal refinement";
-          const acousticAcceptable = isMajorModalCorrectionCandidate || normalRefinementAcceptable;
-          const acceptable = isMajorModalCorrectionCandidate
-            || (normalRefinementAcceptable && capabilityAdjustedObjectiveDb > 0.01);
-          const acceptanceReason = acceptable
-            ? `Accepted: ${candidateClassification} passed acceptance and capability checks.`
-            : !acousticAcceptable
-              ? `Rejected: normal refinement failed global improvement gate; modal gate ${region.kind !== "peak" ? "requires a peak" : region.severityDb < 4 ? "requires at least 4 dB severity" : isInsideProtectedNull ? "blocked by protected null" : "requires at least 1 dB local improvement"}.`
-              : "Rejected: capability-adjusted objective did not remain positive.";
+          const modalAcceptanceResult = isMajorModalCorrectionCandidate;
+          const candidateClassification = modalAcceptanceResult ? "modal correction" : "normal refinement";
+          const acousticAcceptable = modalAcceptanceResult || normalRefinementAcceptable;
+          const acceptable = modalAcceptanceResult
+            ? true
+            : normalRefinementAcceptable && capabilityAdjustedObjectiveDb > 0.01;
+          const acceptanceReason = modalAcceptanceResult
+            ? "Accepted: major modal correction passed the modal gate without requiring complete-band improvement."
+            : acceptable
+              ? "Accepted: normal refinement passed complete-band and capability checks."
+              : !normalRefinementAcceptable
+                ? `Rejected: normal refinement failed global improvement gate; modal gate ${region.kind !== "peak" ? "requires a peak" : region.severityDb < 4 ? "requires at least 4 dB severity" : isInsideProtectedNull ? "blocked by protected null" : "requires at least 1 dB local improvement"}.`
+                : "Rejected: capability-adjusted objective did not remain positive.";
           if (collectDiagnostics) candidateAcceptanceDiagnostics.push({
             action: "append",
             classification: candidateClassification,
@@ -680,7 +684,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
             rmsReductionDb,
             globalImprovement: { maximumDeviationReductionDb, rmsReductionDb },
             normalRefinementAcceptable,
-            majorModalCorrectionAcceptable: isMajorModalCorrectionCandidate,
+            modalAcceptanceResult,
+            majorModalCorrectionAcceptable: modalAcceptanceResult,
             capabilityAdjustedObjectiveDb,
             accepted: acceptable,
             reason: acceptanceReason,
@@ -768,15 +773,19 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
                 && region.severityDb >= 4
                 && !isInsideProtectedNull
                 && localImprovementDb >= 1;
-              const candidateClassification = isMajorModalCorrectionCandidate ? "modal correction" : "normal refinement";
-              const acousticAcceptable = isMajorModalCorrectionCandidate || normalRefinementAcceptable;
-              const acceptable = isMajorModalCorrectionCandidate
-                || (normalRefinementAcceptable && capabilityAdjustedObjectiveDb > 0.01);
-              const acceptanceReason = acceptable
-                ? `Accepted: ${candidateClassification} passed acceptance and capability checks.`
-                : !acousticAcceptable
-                  ? `Rejected: normal refinement failed global improvement gate; modal gate ${region.kind !== "peak" ? "requires a peak" : region.severityDb < 4 ? "requires at least 4 dB severity" : isInsideProtectedNull ? "blocked by protected null" : "requires at least 1 dB local improvement"}.`
-                  : "Rejected: capability-adjusted objective did not remain positive.";
+              const modalAcceptanceResult = isMajorModalCorrectionCandidate;
+              const candidateClassification = modalAcceptanceResult ? "modal correction" : "normal refinement";
+              const acousticAcceptable = modalAcceptanceResult || normalRefinementAcceptable;
+              const acceptable = modalAcceptanceResult
+                ? true
+                : normalRefinementAcceptable && capabilityAdjustedObjectiveDb > 0.01;
+              const acceptanceReason = modalAcceptanceResult
+                ? "Accepted: major modal correction passed the modal gate without requiring complete-band improvement."
+                : acceptable
+                  ? "Accepted: normal refinement passed complete-band and capability checks."
+                  : !normalRefinementAcceptable
+                    ? `Rejected: normal refinement failed global improvement gate; modal gate ${region.kind !== "peak" ? "requires a peak" : region.severityDb < 4 ? "requires at least 4 dB severity" : isInsideProtectedNull ? "blocked by protected null" : "requires at least 1 dB local improvement"}.`
+                    : "Rejected: capability-adjusted objective did not remain positive.";
               if (collectDiagnostics) candidateAcceptanceDiagnostics.push({
                 action: "revise",
                 classification: candidateClassification,
