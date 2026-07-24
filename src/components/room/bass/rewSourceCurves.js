@@ -21,8 +21,10 @@ export const REW_PARITY_PRESET = {
 
 export const REW_SOURCE_CURVES = {
   product: null,
-  // Flat 94 dB source from 20–200 Hz — matches REW Room Simulator flat reference for like-for-like parity.
+  // Flat 94 dB source from 15–200 Hz. The 20–200 Hz segment remains unchanged for REW parity;
+  // the 15 Hz point permits product-capability composition through the RP22 extension band.
   flat_rew_reference: [
+    { hz: 15,  db: 94 },
     { hz: 20,  db: 94 },
     { hz: 50,  db: 94 },
     { hz: 100, db: 94 },

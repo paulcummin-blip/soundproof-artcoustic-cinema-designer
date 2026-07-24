@@ -3,7 +3,7 @@
 //
 // Reuses the existing room-response physics engine (simulateBassResponseRewCore)
 // with the PRODUCTION flat-source definition (REW_SOURCE_CURVES.flat_rew_reference,
-// flat 94 dB across 20–200 Hz), producing a relative room-transfer response
+// flat 94 dB across 15–200 Hz), producing a relative room-transfer response
 // that excludes all product-specific shaping (model response, sensitivity,
 // max output, low-frequency capability, requested SPL, EQ fitting, RP22
 // parameter grading).
@@ -42,8 +42,8 @@ const FLAT_SOURCE_CURVE = REW_SOURCE_CURVES.flat_rew_reference;
 const NORMALIZATION_REFERENCE = {
   sourceCurveDb: 94,
   sourceCurveId: "flat_rew_reference",
-  description: "Production flat 94 dB source (REW_SOURCE_CURVES.flat_rew_reference) across 20–200 Hz. Output is relative room transfer referenced to this flat source, not absolute product SPL.",
-  frequencyRangeHz: [20, 200],
+  description: "Production flat 94 dB source (REW_SOURCE_CURVES.flat_rew_reference) across 15–200 Hz. Output is relative room transfer referenced to this flat source, not absolute product SPL.",
+  frequencyRangeHz: [15, 200],
 };
 
 // Private fixed listener keys — never derived from caller IDs.
@@ -229,7 +229,7 @@ export function computeNormalizedRoomTransfer({
   // change — the engine uses the precomputed bank exactly as if it computed it.
   const engineOptions = {
     ...physicsOptions,
-    freqMinHz: 20,
+    freqMinHz: 15,
     freqMaxHz: 200,
     smoothing: "none",
     ...(Number.isFinite(pointsPerOctave) ? { pointsPerOctave } : {}),

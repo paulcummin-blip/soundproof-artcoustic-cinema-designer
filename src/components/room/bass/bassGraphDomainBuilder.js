@@ -53,6 +53,21 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
   };
 }
 
+function buildMaximumSplSeries(finalResponse, smoothingMode) {
+  const curve = finalResponse?.maximumSplCurveAfterEq;
+  if (!Array.isArray(curve) || !curve.length) return null;
+  return {
+    id: "maximum-spl-after-eq",
+    kind: "maximum-spl",
+    label: "Maximum available SPL after EQ headroom",
+    tooltipLabel: "Maximum available SPL after EQ headroom",
+    color: "#B45309",
+    strokeWidth: 2,
+    strokeDasharray: "2 4",
+    data: applyBassSmoothing(curve, smoothingMode),
+  };
+}
+
 export function buildBassGraphSeries({
   designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve = [], optimisationResult,
   hasMatchingDetailedResult, multiSeries = [], selectedSeatIds = [], showRealSeatOverlays, smoothingMode = "none",
@@ -97,6 +112,8 @@ export function buildBassGraphSeries({
       }
       const target = showHouseCurve ? buildAbsoluteHouseCurveSeries(optimisationResult) : null;
       if (target) series.push(target);
+      const maximumSpl = buildMaximumSplSeries(finalResponse, smoothingMode);
+      if (maximumSpl) series.push(maximumSpl);
     }
     if (overlayProductionSeries) series.push(overlayProductionSeries);
   }

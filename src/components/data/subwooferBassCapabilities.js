@@ -1,6 +1,7 @@
 const trace = (rows) => Object.freeze(rows.map(([frequency, spl, phaseDeg]) => Object.freeze({ frequency, spl, phaseDeg })));
 
 const SUB2_12_TRACE = trace([
+  [15.000000,104.854677,-172.000000],[16.000000,105.974677,-168.000000],[18.000000,108.004077,-162.000000],
   [20.000000,109.834077,-154.750161],[20.667821,110.273388,-158.005197],[21.357941,110.704815,-109.875424],
   [22.071105,111.128169,-74.635948],[22.808082,111.543403,-47.990048],[23.569668,112.388911,-14.578634],
   [24.356684,113.211700,18.749651],[25.169979,114.011667,52.032845],[26.010431,114.787945,85.304814],
@@ -41,6 +42,7 @@ const SUB3_12_TRACE = trace([
 ]);
 
 const SUB4_12_TRACE = trace([
+  [12.000000,116.203406,169.000000],[15.000000,120.066431,162.000000],[18.000000,121.781581,156.000000],
   [20.000000,122.203406,151.325394],[20.962263,122.230291,148.400661],[21.970823,122.275232,145.568623],
   [23.027908,122.348335,142.740505],[24.135853,122.517668,136.670344],[25.297104,122.721037,130.793280],
   [26.514227,122.987299,124.716081],[27.789910,123.319257,118.205731],[29.126970,123.703170,111.138085],
@@ -65,6 +67,8 @@ const capability = (usableLF_neg6dB, maxSPL, engineeringTrace) => Object.freeze(
   frequencyResponseCurve: engineeringTrace,
   maxSPLCurve: Object.freeze(engineeringTrace.map(({ frequency, spl }) => Object.freeze({ frequency, spl }))),
   maxSPL,
+  outputReference: "maximum continuous SPL at 1 m, half-space",
+  responseModel: "frequency-dependent engineering curve",
 });
 
 export const SUBWOOFER_BASS_CAPABILITIES = Object.freeze({

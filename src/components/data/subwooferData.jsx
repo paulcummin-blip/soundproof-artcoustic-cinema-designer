@@ -1,4 +1,3 @@
-
 export const subModels = ["SUB2-12", "SUB3-12", "SUB4-12"];
 
 // Millimetres
@@ -48,19 +47,18 @@ export const subPerformance = {
     weight_kg: 32
   },
   "SUB4-12": {
-    // Specs not fully supplied beyond dimensions; we'll fill these when you're ready
-    frequency_range_hz: null,
-    usable_lf_hz: null,
+    frequency_range_hz: [15, 170],
+    usable_lf_hz: 12,
     coverage: "omni",
-    sensitivity_db_1w_1m: null,
-    power_handling_w: null,
-    max_cont_spl_db_1m: null,
-    max_cont_spl_30hz_db_1m: null,
-    max_peak_spl_db_1m_cf6: null,
-    impedance_ohm: null,
-    amp: "CPH-1000D (modeling tbd)",
-    drivers: "4 x 12\" system family (dimensions per your note)",
-    connection: "tbd",
+    sensitivity_db_1w_1m: 99,
+    power_handling_w: 1400,
+    max_cont_spl_db_1m: 126,
+    max_cont_spl_30hz_db_1m: 126,
+    max_peak_spl_db_1m_cf6: 132,
+    impedance_ohm: 4,
+    amp: "Approved system amplification",
+    drivers: "4 x 12\"",
+    connection: "Single amped input",
     weight_kg: null
   }
 };

@@ -27,6 +27,9 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     postEqCurveSignature: candidate.postEqCurveSignature || buildCurveSignature(postEqRspCurve),
     postEqRspCurve,
     postEqPerSeatCurves,
+    maximumSplCurveBeforeEq: cloneCurve(candidate.pairedP14P18Authority?.curves?.rawDeliveredCurve),
+    maximumSplCurveAfterEq: cloneCurve(candidate.pairedP14P18Authority?.curves?.postEqDeliveredCurve),
+    maximumSplAuthority: candidate.pairedP14P18Authority?.authority || null,
     finalSeatVariationData: {
       p18: {
         candidateId: candidate.candidateId,

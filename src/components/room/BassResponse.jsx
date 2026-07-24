@@ -573,7 +573,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
         {/* Fixed curve key — derived from series metadata so the key, graph and tooltip cannot drift apart */}
         {multiSeriesForGraph.length > 0 && (() => {
-          const primaryCurves = multiSeriesForGraph.filter(s => s.kind === "raw" || s.kind === "post-eq" || s.kind === "house-curve" || s.kind === "normalized-target");
+          const primaryCurves = multiSeriesForGraph.filter(s => s.kind === "raw" || s.kind === "post-eq" || s.kind === "maximum-spl" || s.kind === "house-curve" || s.kind === "normalized-target");
           const realSeatOverlays = multiSeriesForGraph.filter(s => s.kind === "real-seat-overlay");
           if (primaryCurves.length === 0) return null;
           return (
@@ -614,8 +614,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               rewStyleMode={true}
               yDomain={graphScaleMode === 'rew_fixed' ? [70, 140] : undefined}
               xDomain={graphScaleMode === 'rew_fixed'
-                ? (multiSeriesForGraph[0]?.data?.some(p => p.frequency > 200) ? [20, 300] : [20, 200])
-                : [20, 200]}
+                ? (multiSeriesForGraph[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200])
+                : [15, 200]}
               showAxialOnly={false}
               refDb={85}
               disableHighlight={false}
