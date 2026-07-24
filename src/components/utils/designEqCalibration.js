@@ -542,6 +542,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   let capabilityPenaltyChangedSelectionCount = 0;
   let selectedRevisionOperationCount = 0;
   const revisionAttempts = [];
+  const candidateAcceptanceDiagnostics = [];
   let operations = 0;
   const maxOperations = 30;
   const revisionScales = [1, 0.75, 0.5, 0.25];
@@ -582,7 +583,8 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const qMultipliers = [1, 1.5, 2, 3];
     for (const region of regions) {
       const isPeak = region.kind === "peak";
-      if (!isPeak && isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions)) continue;
+      const isInsideProtectedNull = isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions);
+      if (!isPeak && isInsideProtectedNull) continue;
       // Part B: Per-filter cut clamp is profile-driven (−10 dB standard, −15 dB accuracy).
       const maximumCutDb = profile.maximumCutDb ?? 10;
       const maximumAggregateBoostDb = profile.maximumAggregateBoostDb ?? 6;
@@ -650,16 +652,46 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
           const capabilityPenaltyCostDb = capabilityPenaltyForBank([...filters, finalCandidate]);
           const incrementalCapabilityPenaltyCostDb = Math.max(0, capabilityPenaltyCostDb - currentCapabilityPenaltyCostDb);
           const capabilityAdjustedObjectiveDb = maximumDeviationReductionDb + 0.35 * rmsReductionDb - incrementalCapabilityPenaltyCostDb;
-          const acousticAcceptable = localImprovementDb >= 0.05
+          const normalRefinementAcceptable = localImprovementDb >= 0.05
             && nextMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
             && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
-          const acceptable = acousticAcceptable && capabilityAdjustedObjectiveDb > 0.01;
+          const isMajorModalCorrectionCandidate = region.kind === "peak"
+            && region.severityDb >= 4
+            && !isInsideProtectedNull
+            && localImprovementDb >= 1;
+          const candidateClassification = isMajorModalCorrectionCandidate ? "modal correction" : "normal refinement";
+          const acousticAcceptable = isMajorModalCorrectionCandidate || normalRefinementAcceptable;
+          const acceptable = isMajorModalCorrectionCandidate
+            || (normalRefinementAcceptable && capabilityAdjustedObjectiveDb > 0.01);
+          const acceptanceReason = acceptable
+            ? `Accepted: ${candidateClassification} passed acceptance and capability checks.`
+            : !acousticAcceptable
+              ? `Rejected: normal refinement failed global improvement gate; modal gate ${region.kind !== "peak" ? "requires a peak" : region.severityDb < 4 ? "requires at least 4 dB severity" : isInsideProtectedNull ? "blocked by protected null" : "requires at least 1 dB local improvement"}.`
+              : "Rejected: capability-adjusted objective did not remain positive.";
+          if (collectDiagnostics) candidateAcceptanceDiagnostics.push({
+            action: "append",
+            classification: candidateClassification,
+            frequencyHz: region.centrePoint.frequency,
+            regionKind: region.kind,
+            severityDb: region.severityDb,
+            insideProtectedNull: isInsideProtectedNull,
+            localImprovementDb,
+            maximumDeviationReductionDb,
+            rmsReductionDb,
+            globalImprovement: { maximumDeviationReductionDb, rmsReductionDb },
+            normalRefinementAcceptable,
+            majorModalCorrectionAcceptable: isMajorModalCorrectionCandidate,
+            capabilityAdjustedObjectiveDb,
+            accepted: acceptable,
+            reason: acceptanceReason,
+          });
           if (acousticAcceptable && !acceptable) capabilityPenaltyRejectedCount++;
           if (acceptable) regionAppendCandidates.push({
             action: "append", filter: finalCandidate, replacedFilterIndex: null,
             oldGainDb: null, newGainDb: finalCandidate.gainDb, gainDeltaDb: finalCandidate.gainDb,
             oldQ: null, newQ: finalCandidate.Q, curve: nextCurve,
             maximumDeviationReductionDb, rmsReductionDb, localImprovementDb,
+            candidateClassification, acceptanceReason,
             capabilityPenaltyCostDb, incrementalCapabilityPenaltyCostDb, capabilityAdjustedObjectiveDb,
             gainBeforeBankLimiting, gainAfterBankLimiting, bankLimits: bankResult.limits,
             regionSameSignCount,
@@ -729,13 +761,46 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
               const capabilityPenaltyCostDb = capabilityPenaltyForBank(revisedFiltersForPenalty);
               const incrementalCapabilityPenaltyCostDb = Math.max(0, capabilityPenaltyCostDb - currentCapabilityPenaltyCostDb);
               const capabilityAdjustedObjectiveDb = maximumDeviationReductionDb + 0.35 * rmsReductionDb - incrementalCapabilityPenaltyCostDb;
-              const acousticAcceptable = localImprovementDb >= 0.05
+              const normalRefinementAcceptable = localImprovementDb >= 0.05
                 && revisedMetrics.maximumAbsoluteDeviationDb <= currentMetrics.maximumAbsoluteDeviationDb + 0.05
                 && (maximumDeviationReductionDb >= 0.10 || rmsReductionDb >= 0.10);
-              const acceptable = acousticAcceptable && capabilityAdjustedObjectiveDb > 0.01;
+              const isMajorModalCorrectionCandidate = region.kind === "peak"
+                && region.severityDb >= 4
+                && !isInsideProtectedNull
+                && localImprovementDb >= 1;
+              const candidateClassification = isMajorModalCorrectionCandidate ? "modal correction" : "normal refinement";
+              const acousticAcceptable = isMajorModalCorrectionCandidate || normalRefinementAcceptable;
+              const acceptable = isMajorModalCorrectionCandidate
+                || (normalRefinementAcceptable && capabilityAdjustedObjectiveDb > 0.01);
+              const acceptanceReason = acceptable
+                ? `Accepted: ${candidateClassification} passed acceptance and capability checks.`
+                : !acousticAcceptable
+                  ? `Rejected: normal refinement failed global improvement gate; modal gate ${region.kind !== "peak" ? "requires a peak" : region.severityDb < 4 ? "requires at least 4 dB severity" : isInsideProtectedNull ? "blocked by protected null" : "requires at least 1 dB local improvement"}.`
+                  : "Rejected: capability-adjusted objective did not remain positive.";
+              if (collectDiagnostics) candidateAcceptanceDiagnostics.push({
+                action: "revise",
+                classification: candidateClassification,
+                frequencyHz: region.centrePoint.frequency,
+                regionKind: region.kind,
+                severityDb: region.severityDb,
+                insideProtectedNull: isInsideProtectedNull,
+                localImprovementDb,
+                maximumDeviationReductionDb,
+                rmsReductionDb,
+                globalImprovement: { maximumDeviationReductionDb, rmsReductionDb },
+                normalRefinementAcceptable,
+                majorModalCorrectionAcceptable: isMajorModalCorrectionCandidate,
+                capabilityAdjustedObjectiveDb,
+                accepted: acceptable,
+                reason: acceptanceReason,
+              });
               if (acousticAcceptable && !acceptable) capabilityPenaltyRejectedCount++;
+              attempt.classification = candidateClassification;
+              attempt.localImprovementDb = localImprovementDb;
+              attempt.maximumDeviationReductionDb = maximumDeviationReductionDb;
+              attempt.rmsReductionDb = rmsReductionDb;
               attempt.passedRules = acceptable;
-              if (!acceptable) attempt.rejectionReason = "Did not meet complete-band acceptance rules";
+              if (!acceptable) attempt.rejectionReason = acceptanceReason;
               if (collectDiagnostics) revisionAttempts.push(attempt);
               if (acceptable) {
                 revisionPassedAcceptanceCount++;
@@ -745,6 +810,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
                   gainDeltaDb: revisedFilter.gainDb - existingFilter.gainDb,
                   oldQ: existingFilter.Q, newQ: existingFilter.Q, curve: revisedCurve,
                   maximumDeviationReductionDb, rmsReductionDb, localImprovementDb,
+                  candidateClassification, acceptanceReason,
                   capabilityPenaltyCostDb, incrementalCapabilityPenaltyCostDb, capabilityAdjustedObjectiveDb,
                   bankLimits: revisionResult.limits, regionSameSignCount,
                 });
@@ -802,6 +868,11 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       selectedFrequencyHz: chosen.filter.frequencyHz, gainDb: chosen.filter.gainDb, Q: chosen.filter.Q,
       oldGainDb: chosen.oldGainDb, newGainDb: chosen.newGainDb, gainDeltaDb: chosen.gainDeltaDb,
       oldQ: chosen.oldQ, newQ: chosen.newQ,
+      candidateClassification: chosen.candidateClassification,
+      localImprovementDb: chosen.localImprovementDb,
+      maximumDeviationReductionDb: chosen.maximumDeviationReductionDb,
+      rmsReductionDb: chosen.rmsReductionDb,
+      acceptanceReason: chosen.acceptanceReason,
       maximumDeviationBeforeDb: currentMetrics.maximumAbsoluteDeviationDb,
       maximumDeviationAfterDb: checkpoint.maximumAbsoluteDeviationDb,
       rmsBeforeDb: currentMetrics.rmsDeviationDb, rmsAfterDb: checkpoint.rmsDeviationDb,
@@ -1080,6 +1151,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       broadBelowTargetWorsening: selectedCheckpoint.broadBelowTargetWorsening,
     },
     checkpointSummaries,
+    candidateAcceptanceDiagnostics,
     worstResidualDiagnostics,
     selectionReason,
     lfCapabilityProtection: buildLfCapabilityProtectionDiagnostics(
