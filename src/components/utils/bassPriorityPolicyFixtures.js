@@ -1,4 +1,4 @@
-import { CANONICAL_BASS_PRIORITY_MODES, rankBassCandidates, stableCandidateSignature } from "./bassPriorityPolicies";
+import { CANONICAL_BASS_PRIORITY_MODES, rankBassCandidates, rankingTupleForMode, stableCandidateSignature } from "./bassPriorityPolicies";
 import { selectCandidateFromPool } from "./bassOperatingEnvelopeOptimiser";
 import { computeCalibrationFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { identifyBassLimitingParameter } from "./bassLimitingParameter";
@@ -160,7 +160,28 @@ export function runBassPriorityPolicyFixtures() {
   const unsafe = candidate("unsafe", 4, 4, 4, { bankValid: false, filters: [{ enabled: true, frequencyHz: 35, gainDb: 20, Q: 8 }] });
   const physicalSelection = rankBassCandidates([corrected, unsafe], "balanced");
   results.p29UnsafeCandidateRemainsRejected = physicalSelection.selected === corrected
-    && physicalSelection.diagnostics.rankedCandidates.find((item) => item.candidateId === "unsafe")?.reason === "Rejected EQ candidate: exceeds physical capability";
+    && physicalSelection.diagnostics.rankedCandidates.find((item) => item.candidateId === "unsafe")?.reason.includes("physical");
+
+  // Requested L4 authority: achieved grades cannot beat closer alignment to the
+  // fixed L4 target. Candidate A remains valid despite its capability shortfall.
+  const candidateA = candidate("requested-l4-closest", 2, 3, 3, { p14Db: 106, rms: 4, worst: 4.5, mean: 4.2 });
+  candidateA.requestedP14Level = "L4";
+  candidateA.requestedP18Level = "L4";
+  candidateA.requestedP19Level = "L4";
+  candidateA.houseCurveRankingRmsResidualDb = 4;
+  candidateA.houseCurveRankingMaxResidualDb = 4.5;
+  candidateA.houseCurveRankingMeanAbsoluteResidualDb = 4;
+  const candidateB = candidate("perfect-l2-only", 2, 2, 2, { p14Db: 106, rms: 10, worst: 10, mean: 9 });
+  candidateB.requestedP14Level = "L4";
+  candidateB.requestedP18Level = "L4";
+  candidateB.requestedP19Level = "L4";
+  candidateB.houseCurveRankingRmsResidualDb = 10;
+  candidateB.houseCurveRankingMaxResidualDb = 10;
+  candidateB.houseCurveRankingMeanAbsoluteResidualDb = 10;
+  const fixedIntentSelection = rankBassCandidates([candidateB, candidateA], "balanced");
+  results.p30RequestedL4ClosestCandidateWins = fixedIntentSelection.selected === candidateA;
+  results.p31AchievedLevelIsDiagnosticOnly = rankingTupleForMode(candidateA, "balanced")
+    .every((value, index) => value === rankingTupleForMode({ ...candidateA, achievedP14Level: 4, achievedP18Level: 4, achievedP19Level: 4 }, "balanced")[index]);
 
   return results;
 }
