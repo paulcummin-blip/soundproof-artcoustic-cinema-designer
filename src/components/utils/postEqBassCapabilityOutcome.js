@@ -15,18 +15,16 @@ export function buildPostEqBassCapabilityOutcome({
   const assessment = authority?.assessments?.[basis];
   const requestedResult = assessment?.levels?.[requestedLabel];
   const pairedComplete = requestedResult?.status && requestedResult.status !== "INCOMPLETE DATA";
-  const p14Level = pairedComplete
-    ? Number(authority?.achieved?.levelNumber ?? assessment?.achievedLevelNumber) || 0
-    : Number(scalarP14?.level) || 0;
+  const authorityAchievedValue = authority?.achieved?.levelNumber
+    ?? (authority?.achieved?.level ? Number(String(authority.achieved.level).replace("L", "")) : null);
+  const p14Level = authorityAchievedValue == null ? 0 : finiteLevel(authorityAchievedValue) ?? 0;
   const parameterLevels = {
     P14: finiteLevel(p14Level), P18: finiteLevel(achievedP18Level), P19: finiteLevel(achievedP19Level),
     ...(p20Available ? { P20: finiteLevel(achievedP20Level) } : {}),
   };
-  const completeLevels = Object.values(parameterLevels).filter(Number.isFinite);
-  const achievedLevel = completeLevels.length ? Math.min(...completeLevels) : p14Level;
-  const failedParameter = ["P14", "P18", "P19", "P20"]
-    .find((key) => Number.isFinite(parameterLevels[key]) && parameterLevels[key] < requested) || null;
-  const passesRequestedLevel = !failedParameter && (pairedComplete ? requestedResult.status === "PASS" : achievedLevel >= requested);
+  const achievedLevel = p14Level;
+  const failedParameter = achievedLevel < requested ? "P14" : null;
+  const passesRequestedLevel = achievedLevel >= requested;
   const requestedTargetSplDb = Number.isFinite(Number(authority?.requested?.targetSplDb))
     ? Number(authority.requested.targetSplDb)
     : Number.isFinite(Number(targetAnchorDb)) ? Number(targetAnchorDb) : null;
