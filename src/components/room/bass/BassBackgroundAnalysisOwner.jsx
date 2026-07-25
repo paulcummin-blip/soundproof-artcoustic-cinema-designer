@@ -13,6 +13,7 @@ const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
 import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
 import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
+import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
@@ -101,7 +102,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const optimisationResult = useMemo(() => {
     const selected = selectionAttempt.result;
     if (!selected) return null;
-    const result = {
+    const baseResult = {
       ...selected,
       ...BASS_OPTIMISER_VERSIONS,
       cacheKey,
@@ -109,11 +110,27 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       cacheRejectionReason: lifecycle.cacheRejectionReason || null,
       calibrationFingerprint: fingerprints.calibration,
     };
+    const canonicalResult = buildFinalOptimisedBassResponse({ optimisationResult: baseResult, selectedLayout: sources });
+    const authority = evaluateCanonicalBassAuthority({
+      canonicalResult,
+      activeSubs: sources,
+      usableLfHz: designEqSystemLimits.usableLfHz,
+      p14TargetBasis: requested.p14TargetBasis,
+      requestedLevel: requested.requestedLevel,
+    });
+    const selectedCandidate = authority ? { ...selected.selectedCandidate, ...authority } : selected.selectedCandidate;
+    const result = {
+      ...baseResult,
+      ...authority,
+      selectedCandidate,
+      selectedByMode: { ...baseResult.selectedByMode, balanced: selectedCandidate },
+      primaryLimitation: authority?.limitation || null,
+    };
     return {
       ...result,
       finalOptimisedBassResponse: buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources }),
     };
-  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, fingerprints.calibration, sources]);
+  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, fingerprints.calibration, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel]);
   const contract = useBassAnalysisContract({
     ...fingerprintInputs, subsForSimulation: sources, designEqSystemLimits, optimisationResult,
     detailedStatus, detailedProgress: lifecycle.progress, detailedElapsedMs: lifecycle.elapsedMs,

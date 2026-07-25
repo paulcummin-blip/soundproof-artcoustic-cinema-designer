@@ -264,6 +264,14 @@ export function createBassAnalysisResult() {
     selectedCandidate: null,
     bassAuthority: null,
     finalOptimisedBassResponse: null,
+    achievedP14Db: null,
+    achievedP14Level: null,
+    achievedP18FrequencyHz: null,
+    achievedP18Level: null,
+    achievedP19VariationDb: null,
+    achievedP19Level: null,
+    achievedP20VariationDb: null,
+    achievedP20Level: null,
     designRecommendation: null,
 
     provenance: {

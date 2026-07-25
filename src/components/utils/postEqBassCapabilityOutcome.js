@@ -15,8 +15,10 @@ export function buildPostEqBassCapabilityOutcome({
   const assessment = authority?.assessments?.[basis];
   const requestedResult = assessment?.levels?.[requestedLabel];
   const pairedComplete = requestedResult?.status && requestedResult.status !== "INCOMPLETE DATA";
+  const scalarComplete = Number.isFinite(Number(scalarP14?.value));
   const authorityAchievedValue = authority?.achieved?.levelNumber
-    ?? (authority?.achieved?.level ? Number(String(authority.achieved.level).replace("L", "")) : null);
+    ?? (authority?.achieved?.level ? Number(String(authority.achieved.level).replace("L", "")) : null)
+    ?? scalarP14?.level;
   const p14Level = authorityAchievedValue == null ? 0 : finiteLevel(authorityAchievedValue) ?? 0;
   const parameterLevels = {
     P14: finiteLevel(p14Level), P18: finiteLevel(achievedP18Level), P19: finiteLevel(achievedP19Level),
@@ -30,9 +32,12 @@ export function buildPostEqBassCapabilityOutcome({
     : Number.isFinite(Number(targetAnchorDb)) ? Number(targetAnchorDb) : null;
   const limitation = passesRequestedLevel ? null : {
     primary: failedParameter === "P14" ? "Subwoofer output capability" : `${failedParameter || "Bass"} performance at requested target`,
-    shortfallDb: failedParameter === "P14" ? authority?.limitation?.shortfallDb ?? requestedResult?.shortfallDb ?? null : null,
+    shortfallDb: failedParameter === "P14"
+      ? authority?.limitation?.shortfallDb ?? requestedResult?.shortfallDb
+        ?? (Number.isFinite(requestedTargetSplDb) && scalarComplete ? Math.max(0, requestedTargetSplDb - Number(scalarP14.value)) : null)
+      : null,
     limitingParameter: failedParameter,
-    limitingFrequency: failedParameter === "P14" ? requestedResult?.limitingFrequencyHz ?? null
+    limitingFrequency: failedParameter === "P14" ? requestedResult?.limitingFrequencyHz ?? scalarP14?.limitingFrequency ?? null
       : failedParameter === "P18" && Number.isFinite(achievedP18FrequencyHz) ? achievedP18FrequencyHz : null,
     reason: failedParameter === "P14" ? "Subwoofer output capability limited"
       : `${failedParameter || "Bass performance"} does not maintain the requested ${requestedLabel} target.`,
@@ -43,7 +48,13 @@ export function buildPostEqBassCapabilityOutcome({
     requested: { level: requestedLabel, targetSplDb: requestedTargetSplDb },
     achieved: {
       level: achievedLabel,
-      p14: authority?.achieved?.p14 ?? null,
+      p14: authority?.achieved?.p14 ?? (scalarComplete ? {
+        capabilityDb: Number(scalarP14.value),
+        minimumLevel: finiteLevel(scalarP14.minimumLevel),
+        recommendedLevel: finiteLevel(scalarP14.recommendedLevel),
+        limitingFrequencyHz: scalarP14.limitingFrequency ?? null,
+        headroomConsumedByEqDb: scalarP14.headroomConsumedByEqDb ?? null,
+      } : null),
       p18: { level: finiteLevel(achievedP18Level), extensionHz: Number.isFinite(achievedP18FrequencyHz) ? achievedP18FrequencyHz : null },
       p19: { level: finiteLevel(achievedP19Level), variationDb: Number.isFinite(achievedP19VariationDb) ? achievedP19VariationDb : null },
       p20: p20Available ? { level: finiteLevel(achievedP20Level), variationDb: Number.isFinite(achievedP20VariationDb) ? achievedP20VariationDb : null } : null,
@@ -65,7 +76,7 @@ export function buildPostEqBassCapabilityOutcome({
     maximumAvailableSplAfterEqDb: requestedResult?.worstCapabilityDb ?? scalarP14?.value ?? null,
     splShortfallDb: limitation?.shortfallDb ?? null,
     failureMessage: limitation ? `${requestedLabel} was not achieved; overall capability reached ${achievedLabel || "below L1"}.` : null,
-    authorityComplete: !!pairedComplete,
-    authoritySource: pairedComplete ? "position-aware-post-eq-design-authority" : "post-eq-product-capability-fallback",
+    authorityComplete: !!pairedComplete || scalarComplete,
+    authoritySource: pairedComplete ? "position-aware-post-eq-design-authority" : "post-eq-product-capability-authority",
   };
 }
