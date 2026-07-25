@@ -312,6 +312,7 @@ export function adaptCurrentBassOptimisationResult({
 
   // --- Selected candidate ---
   contract.selectedCandidate = buildCandidateRef(selectedCandidate);
+  contract.bassAuthority = selectedCandidate?.postEqCapabilityAssessment || null;
   contract.finalOptimisedBassResponse = finalResponse;
   contract.designRecommendation = optimisationResult?.primaryLimitation
     ? { ...optimisationResult.primaryLimitation }
@@ -373,16 +374,18 @@ export function adaptCurrentBassOptimisationResult({
     return detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED;
   }
 
-  // P14
-  const postEqP14 = selectedCandidate?.postEqCapabilityAssessment;
-  const p14Level = Number.isFinite(postEqP14?.achievedP14Level)
-    ? postEqP14.achievedP14Level
+  // P14 is the immutable designer-selected operating target. Hardware capability
+  // remains downstream in postEqCapabilityAssessment and never replaces this intent.
+  const requestedP14Level = Number(selectedCandidate?.designTarget?.requestedLevel);
+  const requestedP14TargetDb = Number(selectedCandidate?.designTarget?.targetAnchorDb);
+  const p14Level = Number.isFinite(requestedP14Level)
+    ? Math.max(1, Math.min(4, Math.round(requestedP14Level)))
     : selectedCandidate
-      ? (typeof selectedCandidate.achievedP14Level === "number" ? selectedCandidate.achievedP14Level : parseLegacyLevel(optimisationResult?.achievedP14Level))
-      : parseLegacyLevel(optimisationResult?.achievedP14Level);
-  const p14Value = Number.isFinite(postEqP14?.maximumAvailableSplAfterEqDb)
-    ? postEqP14.maximumAvailableSplAfterEqDb
-    : Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : (Number.isFinite(optimisationResult?.achievedP14Db) ? optimisationResult.achievedP14Db : null);
+      ? (typeof selectedCandidate.requestedP14Level === "number" ? selectedCandidate.requestedP14Level : parseLegacyLevel(selectedCandidate.requestedP14Level))
+      : parseLegacyLevel(optimisationResult?.requestedP14Level);
+  const p14Value = Number.isFinite(requestedP14TargetDb)
+    ? requestedP14TargetDb
+    : Number.isFinite(selectedCandidate?.requestedP14TargetDb) ? selectedCandidate.requestedP14TargetDb : null;
   const p14RecommendedLevel = selectedCandidate?.achievedP14RecommendedLevel ?? 0;
   const selectedP14TargetBasis = normalizeP14TargetBasis(selectedCandidate?.p14TargetBasis || p14TargetBasis);
   contract.productAnalysis.parameters.p14 = createBassParameterResult({

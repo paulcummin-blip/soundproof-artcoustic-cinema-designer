@@ -208,8 +208,9 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   });
   const pairedP14P18Summary = buildPairedP14P18CandidateSummary(pairedP14P18Authority);
   const postEqCapabilityAssessment = buildPostEqBassCapabilityOutcome({
-    authority: pairedP14P18Authority, requestedLevel: designTarget.requestedLevel,
-    targetAnchorDb, scalarP14: p14,
+    authority: pairedP14P18Authority, requestedLevel: designTarget.requestedLevel, targetAnchorDb, scalarP14: p14,
+    achievedP18Level, achievedP18FrequencyHz, achievedP19Level, achievedP19VariationDb,
+    achievedP20Level, achievedP20VariationDb, p20Available,
   });
   const meetsRequestedEnvelope = (postEqCapabilityAssessment.authorityComplete
     ? postEqCapabilityAssessment.passesRequestedLevel
