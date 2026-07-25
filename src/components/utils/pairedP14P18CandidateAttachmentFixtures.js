@@ -3,8 +3,9 @@ import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P
 import { rankBassCandidates } from "@/components/utils/bassPriorityPolicies";
 
 const summaryKeys = [
-  "status", "selectedTargetBasis", "minimumWinningLevel", "recommendedWinningLevel",
-  "selectedWinningLevel", "selectedP18ExtensionHz", "limitingFrequencyHz", "marginDb",
+  "status", "selectedTargetBasis", "requestedLevel", "requestedTargetSplDb",
+  "minimumAchievedLevel", "recommendedAchievedLevel", "selectedAchievedLevel",
+  "selectedP18ExtensionHz", "limitingFrequencyHz", "marginDb",
   "shortfallDb", "broadMiss", "severeNull", "authorityMethod", "authorityVersion", "schemaVersion",
 ];
 
@@ -29,10 +30,11 @@ export function runPairedP14P18CandidateAttachmentFixtures() {
   check("Summary has the exact required keys", JSON.stringify(Object.keys(summary)) === JSON.stringify(summaryKeys));
   check("Summary status comes from authority", summary.status === authority.status);
   check("Summary basis comes from authority", summary.selectedTargetBasis === authority.selectedTargetBasis);
-  check("Summary Minimum winner comes from authority", summary.minimumWinningLevel === authority.assessments.minimum.winningLevel);
-  check("Summary Recommended winner comes from authority", summary.recommendedWinningLevel === authority.assessments.recommended.winningLevel);
-  check("Summary selected winner comes from authority", summary.selectedWinningLevel === authority.assessments.recommended.winningLevel);
-  check("Summary selected extension comes from authority", summary.selectedP18ExtensionHz === authority.assessments.recommended.p18.extensionHz);
+  check("Summary requested intent comes from authority", summary.requestedLevel === authority.requested.level && summary.requestedTargetSplDb === authority.requested.targetSplDb);
+  check("Summary Minimum capability comes from authority", summary.minimumAchievedLevel === authority.assessments.minimum.achievedLevel);
+  check("Summary Recommended capability comes from authority", summary.recommendedAchievedLevel === authority.assessments.recommended.achievedLevel);
+  check("Summary selected capability comes from authority", summary.selectedAchievedLevel === authority.achieved.level);
+  check("Summary selected extension comes from authority", summary.selectedP18ExtensionHz === authority.achieved.p18.extensionHz);
   check("Summary limiting metrics come from authority", ["limitingFrequencyHz", "marginDb", "shortfallDb", "broadMiss", "severeNull"].every((key) => summary[key] === authority.limitingResult[key]));
   check("Summary identity comes from authority", summary.authorityMethod === authority.authority.method && summary.authorityVersion === authority.authority.version && summary.schemaVersion === authority.schemaVersion);
 

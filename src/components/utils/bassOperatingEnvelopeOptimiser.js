@@ -215,7 +215,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     ? postEqCapabilityAssessment.passesRequestedLevel
     : legacyMeetsRequestedEnvelope) && achievedP18Level >= request.p18.value && achievedP19Level >= request.p19.value;
   const rejectionReason = meetsRequestedEnvelope ? "" : [
-    postEqCapabilityAssessment.limitation, legacyRejectionReason,
+    postEqCapabilityAssessment.limitation?.reason, legacyRejectionReason,
   ].filter(Boolean).join("; ");
 
   return {
