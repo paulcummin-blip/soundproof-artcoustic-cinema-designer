@@ -1,6 +1,6 @@
-// optimiserRanking.js — Pure, deterministic fixed-intent ranking for bass optimiser candidates.
-// Every physically valid candidate is compared with the immutable requested house curve.
-// Achieved RP22 levels remain available for reporting but never influence fitness.
+// optimiserRanking.js — Pure, deterministic canonical ranking for bass optimiser candidates.
+// Every physically valid candidate is compared with the response-anchored house-curve shape.
+// Compliance grades and requested intent never influence fitness.
 
 const filterCount = (candidate) => {
   const bank = candidate?.generatedFilterBank;
@@ -49,7 +49,7 @@ export function selectBestCandidate(pool, priorityMode) {
   }
   return {
     selected: best,
-    selectionReason: `Selected by fixed designer-intent residual ranking from ${eligiblePool.length} physically valid candidates; achieved RP22 grades excluded.`,
+    selectionReason: `Selected by canonical shape-residual ranking from ${eligiblePool.length} physically valid candidates; compliance grades excluded.`,
   };
 }
 

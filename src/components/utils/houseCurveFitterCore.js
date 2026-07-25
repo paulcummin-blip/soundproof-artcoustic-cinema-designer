@@ -18,61 +18,13 @@ import { evaluateNearTargetProtection, isProtectedFrequency } from "@/components
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 import { evaluateSeatRegressionTolerance } from "@/components/utils/houseCurveSeatRegressionTolerance";
 import { classifyEqCorrectionRegion, curveSplAt, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
+import { compareHouseCurveMetrics } from "@/components/utils/houseCurveMetricComparison";
+
+export { compareHouseCurveMetrics };
 
 const isNumber = (v) => Number.isFinite(Number(v));
-
-const levelValue = (level) => {
-  const n = Number(level);
-  return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.round(n))) : 0;
-};
-const variationOr = (v) => Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
-const filterCount = (obj) => {
-  const bank = obj?.generatedFilterBank;
-  return Array.isArray(bank) ? bank.filter((f) => f?.enabled).length : 0;
-};
-
-// Shared comparator. House-curve trials expose RSP metrics, which are compared
-// first (maximum absolute residual, then RMS). Real-seat metrics are constraints
-// and tie-breakers; legacy callers without RSP metrics retain the old ordering.
 const WORST_EQUIV_DB = 0.05;
-const MEAN_EQUIV_DB = 0.05;
 const RMS_EPSILON_DB = 0.01;
-
-export function compareHouseCurveMetrics(a, b) {
-  if (!a) return b ? 1 : 0;
-  if (!b) return -1;
-  if (Number.isFinite(a.rspMaxDeviationDb) && Number.isFinite(b.rspMaxDeviationDb)) {
-    if (Math.abs(a.rspMaxDeviationDb - b.rspMaxDeviationDb) > WORST_EQUIV_DB) return a.rspMaxDeviationDb - b.rspMaxDeviationDb;
-    if (Number.isFinite(a.rspRmsDeviationDb) && Number.isFinite(b.rspRmsDeviationDb)
-      && Math.abs(a.rspRmsDeviationDb - b.rspRmsDeviationDb) > RMS_EPSILON_DB) return a.rspRmsDeviationDb - b.rspRmsDeviationDb;
-  }
-  // Legacy/worst-seat tie-breakers.
-  const aWorstLevel = levelValue(a.worstSeatP19Level ?? a.worstRealSeatHouseCurveLevel);
-  const bWorstLevel = levelValue(b.worstSeatP19Level ?? b.worstRealSeatHouseCurveLevel);
-  if (aWorstLevel !== bWorstLevel) return bWorstLevel - aWorstLevel;
-  // 2. Worst-seat maximum deviation (lower is better, within WORST_EQUIV_DB is equivalent)
-  const aWorstDev = variationOr(a.worstSeatMaxDeviationDb ?? a.worstRealSeatHouseCurveVariationDb);
-  const bWorstDev = variationOr(b.worstSeatMaxDeviationDb ?? b.worstRealSeatHouseCurveVariationDb);
-  if (Math.abs(aWorstDev - bWorstDev) > WORST_EQUIV_DB) return aWorstDev - bWorstDev;
-  // 3. Mean seat maximum deviation (skip if either side unavailable)
-  const aMean = a.meanSeatMaxDeviationDb;
-  const bMean = b.meanSeatMaxDeviationDb;
-  if (Number.isFinite(aMean) && Number.isFinite(bMean)) {
-    if (Math.abs(aMean - bMean) > MEAN_EQUIV_DB) return aMean - bMean;
-  }
-  // 4. RMS target error (skip if either side unavailable)
-  const aRms = a.rmsSeatTargetErrorDb;
-  const bRms = b.rmsSeatTargetErrorDb;
-  if (Number.isFinite(aRms) && Number.isFinite(bRms)) {
-    if (Math.abs(aRms - bRms) > RMS_EPSILON_DB) return aRms - bRms;
-  }
-  // 5. RSP P19 deviation (lower is better)
-  const aRspDev = variationOr(a.rspMaxDeviationDb ?? a.achievedP19VariationDb);
-  const bRspDev = variationOr(b.rspMaxDeviationDb ?? b.achievedP19VariationDb);
-  if (Math.abs(aRspDev - bRspDev) > RMS_EPSILON_DB) return aRspDev - bRspDev;
-  // Equivalent acoustic results use EQ cost only as the final tie-breaker.
-  return filterCount(a) - filterCount(b);
-}
 
 // P19 level from max abs deviation: L4 <=2, L3 <=3, L2 <=4, L1 <=5, else FAIL (0).
 export function houseCurveP19Level(deviationDb) {

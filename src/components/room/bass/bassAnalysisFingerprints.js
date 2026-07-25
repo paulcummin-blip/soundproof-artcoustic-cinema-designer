@@ -13,7 +13,7 @@
 //   - Every result carries a version prefix: "geo:v1:hash", "prod:v1:hash", "cal:v1:hash".
 //   - NaN, Infinity, and non-serializable values are coerced to null before hashing.
 
-export const FINGERPRINT_VERSION = 1;
+export const FINGERPRINT_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // 1. Stable serialization primitives
@@ -292,8 +292,8 @@ export function computeNormalizedTransferFingerprint(inputs) {
 // 4. Product fingerprint
 // ---------------------------------------------------------------------------
 
-// Geometry fingerprint + subwoofer model(s), quantity, product-specific
-// capability/tuning inputs, and requested output. Excludes priority mode,
+// Geometry fingerprint + subwoofer model(s), quantity, and product-specific
+// capability/tuning inputs. Excludes requested intent, priority mode,
 // graph display settings, and diagnostics visibility.
 export function computeProductFingerprint(inputs) {
   const i = inputs || {};
@@ -314,7 +314,6 @@ export function computeProductFingerprint(inputs) {
       globalEqHeadroomDb: num(i.splConfig?.globalEqHeadroomDb, 2),
       radiationMode: i.splConfig?.radiationMode || "half_space",
     },
-    requestedOutputDb: num(i.requestedOutputDb, 2),
     productDataVersion: i.productDataVersion ?? null,
     productCapabilities: i.productCapabilities ?? null,
   };
@@ -344,8 +343,8 @@ export function computeHouseCurveFingerprint(houseCurvePoints) {
 
 // Product fingerprint + house-curve fingerprint, EQ cut/boost constraints
 // (from the active fit profile config), assessment start/end frequencies,
-// target anchor/reference level, active fitting profile, requested output,
-// and usable LF limit. Excludes selected priority mode, graph smoothing/
+// active fitting profiles, and usable LF limit. Excludes selected intent,
+// priority mode, graph smoothing/
 // scale, and diagnostics visibility.
 //
 // Phase 2A: Uses live values from the selected candidate when available.
@@ -366,9 +365,7 @@ export function computeCalibrationFingerprint(inputs) {
     assessmentStartHz: num(i.assessmentStartHz, 3),
     assessmentEndHz: num(i.assessmentEndHz, 3),
     optimisationTransitionHz: num(i.optimisationTransitionHz, 3),
-    targetAnchorDb: num(i.targetAnchorDb, 2),
     activeFitProfile: i.activeFitProfile || null,
-    requestedOutputDb: num(i.requestedOutputDb, 2),
     usableLfHz: num(i.usableLfHz, 3),
     // Phase 2A: The sorted set of fit profiles the optimiser actually
     // evaluates, with their real named constraints (id, max aggregate boost,

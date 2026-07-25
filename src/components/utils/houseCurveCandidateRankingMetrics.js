@@ -1,9 +1,9 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 
-const requestKey = (candidate) => [
-  candidate?.requestedP14Level, candidate?.requestedP18Level, candidate?.requestedP19Level,
-  candidate?.requestedTargetSpl, candidate?.assessmentStartHz, candidate?.assessmentEndHz,
+const objectiveKey = (candidate) => [
+  candidate?.canonicalVerticalOffsetDb, candidate?.assessmentStartHz, candidate?.assessmentEndHz,
+  candidate?.correctionStartHz, candidate?.correctionEndHz,
 ].join("|");
 
 function outsideProtectedNulls(frequency, regions) {
@@ -38,10 +38,10 @@ export function annotateCandidatePoolForHouseCurveRanking(candidates) {
   source.forEach((candidate) => {
     if (candidate?.designEqFitProfile !== "house_curve") return;
     const regions = candidate?.houseCurveDiagnostics?.protectedNullRegions;
-    if (Array.isArray(regions)) nullsByRequest.set(requestKey(candidate), regions);
+    if (Array.isArray(regions)) nullsByRequest.set(objectiveKey(candidate), regions);
   });
   return source.map((candidate) => {
-    const protectedNullRegions = nullsByRequest.get(requestKey(candidate)) || [];
+    const protectedNullRegions = nullsByRequest.get(objectiveKey(candidate)) || candidate?.protectedNullRegions || [];
     const postEqMetrics = rankingMetrics(candidate?.finalPostEqCurve, candidate, protectedNullRegions);
     const preEqMetrics = rankingMetrics(preEqCurve(candidate), candidate, protectedNullRegions);
     return {

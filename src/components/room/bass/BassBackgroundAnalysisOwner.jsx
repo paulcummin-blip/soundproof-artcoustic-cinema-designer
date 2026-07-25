@@ -69,7 +69,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     productFingerprint: fingerprints.product,
     calibrationFingerprint: fingerprints.calibration,
     ...BASS_OPTIMISER_VERSIONS,
-    canonicalPriorityMode: "balanced-rp22-authority",
+    canonicalPriorityMode: "canonical-physics-eq",
     poolId: null,
   }), [cacheKey, fingerprints.geometry, fingerprints.product, fingerprints.calibration, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => {
@@ -96,7 +96,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
   }, [matchingResult, selectedPriorityMode]);
   useEffect(() => {
-    if (selectionAttempt.error) controller.reportMainThreadError(selectionAttempt.error, "Balanced RP22 selection");
+    if (selectionAttempt.error) controller.reportMainThreadError(selectionAttempt.error, "Canonical EQ selection");
   }, [controller, selectionAttempt.error]);
   const optimisationResult = useMemo(() => {
     const selected = selectionAttempt.result;
@@ -134,7 +134,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     const resultFingerprint = lifecycle.resultFingerprint;
     if (!resultFingerprint || !optimisationResult) return;
-    for (const stage of ["Balanced RP22 selection created", "Contract adapted", "Authoritative result published"]) {
+    for (const stage of ["Canonical EQ selection created", "Contract adapted", "Authoritative result published"]) {
       const key = `${resultFingerprint}:${stage}`;
       if (!publishedStagesRef.current.has(key)) {
         publishedStagesRef.current.add(key);

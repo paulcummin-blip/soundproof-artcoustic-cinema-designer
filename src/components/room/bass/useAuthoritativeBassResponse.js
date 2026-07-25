@@ -355,12 +355,11 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode,
     overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention,
     reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
-    splConfig, optimisationTransitionHz, requestedOutputDb: requested.requestedOutputDb,
+    splConfig, optimisationTransitionHz,
     houseCurveFingerprint: computeHouseCurveFingerprint(ARTCOUSTIC_HOUSE_CURVE),
-    assessmentStartHz: requested.requestedAssessmentStartHz, assessmentEndHz: requested.requestedAssessmentEndHz,
-    targetAnchorDb: requested.requestedTargetAnchorDb, activeFitProfile: requested.requestedFitProfile,
-    requestedLevel: requested.requestedLevel, p14TargetBasis,
-    usableLfHz: requested.requestedUsableLfHz, evaluatedProfiles: requested.evaluatedProfiles,
+    assessmentStartHz: 20, assessmentEndHz: 200,
+    activeFitProfile: null,
+    usableLfHz: designEqSystemLimits.usableLfHz, evaluatedProfiles: requested.evaluatedProfiles,
     productDataVersion: 3, productCapabilities,
   }), [roomDims, sources, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ,
     modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
@@ -375,7 +374,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     product: computeProductFingerprint(fingerprintInputs),
     calibration: computeCalibrationFingerprint(fingerprintInputs),
   }), [fingerprintInputs]);
-  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, requestedLevel: requested.requestedLevel, p14TargetBasis, perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, requested.requestedLevel, p14TargetBasis, perSeatRawCurves]);
+  const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, perSeatRawCurves]);
   const inputsValid = !!rspPosition && seatingPositions.length > 0 && rspRawCurve.length > 0 && sources.length > 0 && [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
 
   return {

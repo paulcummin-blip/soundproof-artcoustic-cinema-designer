@@ -1,129 +1,99 @@
 import { rankBassCandidates } from "@/components/utils/bassPriorityPolicies";
 import { displayBassCandidates } from "@/components/utils/bassCandidatePoolEligibility";
-import { identifyBassLimitingParameter } from "@/components/utils/bassLimitingParameter";
 
-const levelText = (value) => value > 0 ? `L${value}` : "FAIL";
-
-// Balanced RP22 authority selection reuses the stored candidate pool and never
-// runs fitting, physics, paired diagnostics, or bank evaluation.
+// Selects one canonical, physically valid EQ result. This function never fits,
+// evaluates compliance, or reads designer-selected RP22 intent.
 export function selectCandidateFromPool(pool) {
   const mode = "balanced";
   const perf = (typeof performance !== "undefined" && performance.now) ? () => performance.now() : () => Date.now();
-  const t0 = perf();
-  if (!pool || !pool.candidates || pool.candidates.length === 0) {
+  const startedAt = perf();
+  const candidates = Array.isArray(pool?.candidates) ? pool.candidates : [];
+  if (!candidates.length) {
     const emptySelection = rankBassCandidates([], mode);
     return {
-      selectedMode: mode, selectedCandidate: null, selectedFilters: [], finalPostEqCurve: [],
-      selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null,
-      achievedP18Level: "FAIL", achievedP18FrequencyHz: null,
-      achievedP19Level: "FAIL", achievedP19VariationDb: null,
-      selectedFitProfile: null, candidates: [], displayCandidates: [], rejectedCandidates: [], selectedByMode: {},
-      primaryLimitation: null, isBestCalibratedAttempt: true,
+      selectedMode: mode,
+      selectedCandidate: null,
+      selectedFilters: [],
+      finalPostEqCurve: [],
+      candidates: [],
+      displayCandidates: [],
+      rejectedCandidates: [],
+      selectedByMode: {},
       warningMessage: pool?.warningMessage || "A raw response curve and active subwoofer system are required.",
-      performanceSummary: {
-        ...pool?.performanceSummary,
-        selectedDiagnosticFitTimeMs: 0,
-        diagnosticsIncludedInCoreFits: true,
-        selectedRevisionCandidateCount: 0,
-      },
       selectionReason: emptySelection.diagnostics.selectionReason,
       selectionDiagnostics: emptySelection.diagnostics,
-      priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
+      performanceSummary: pool?.performanceSummary || null,
       poolId: pool?.poolId || null,
-      capabilityEnvelopeDiagnostics: pool?.capabilityEnvelopeDiagnostics || [],
-      designTarget: pool?.designTarget || null,
       generatedCandidateCount: pool?.generatedCandidateCount || 0,
       physicallyCredibleCount: pool?.physicallyCredibleCount || 0,
-      requestedEnvelopeValidCount: pool?.requestedEnvelopeValidCount || 0,
-      standardFitCount: pool?.standardFitCount || 0,
-      accuracyFitCount: pool?.accuracyFitCount || 0,
+      canonicalVerticalOffsetDb: pool?.canonicalVerticalOffsetDb ?? null,
+      canonicalHouseCurveShape: pool?.canonicalHouseCurveShape || [],
     };
   }
-  const selectablePool = Array.isArray(pool.selectablePool) && pool.selectablePool.length > 0 ? pool.selectablePool : pool.candidates;
+
+  const selectablePool = Array.isArray(pool.selectablePool) && pool.selectablePool.length
+    ? pool.selectablePool
+    : candidates;
   const activeSelection = rankBassCandidates(selectablePool, mode);
-  const selectedByMode = { balanced: activeSelection.selected };
   const selected = activeSelection.selected;
+  const endedAt = perf();
   if (!selected) {
     return {
-      selectedMode: mode, selectedCandidate: null, selectedFilters: [], finalPostEqCurve: [],
-      selectedP14TargetDb: null, achievedP14Level: "FAIL", achievedP14Db: null,
-      achievedP18Level: "FAIL", achievedP18FrequencyHz: null,
-      achievedP19Level: "FAIL", achievedP19VariationDb: null,
-      selectedFitProfile: null, candidates: pool.candidates, displayCandidates: [],
-      rejectedCandidates: pool.candidates, selectedByMode, primaryLimitation: null, isBestCalibratedAttempt: true,
+      selectedMode: mode,
+      selectedCandidate: null,
+      selectedFilters: [],
+      finalPostEqCurve: [],
+      candidates,
+      displayCandidates: candidates,
+      rejectedCandidates: candidates,
+      selectedByMode: {},
       warningMessage: activeSelection.diagnostics.selectionReason,
       selectionReason: activeSelection.diagnostics.selectionReason,
       selectionDiagnostics: activeSelection.diagnostics,
-      priorityRerankTimeMs: 0, heavyPoolReused: true, workerStarted: false,
+      performanceSummary: pool.performanceSummary || null,
       poolId: pool.poolId,
-      capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
-      designTarget: pool.designTarget || null,
     };
   }
-  const isBestCalibratedAttempt = selected.meetsRequestedEnvelope !== true;
-  const modeSelectionReason = activeSelection.diagnostics.selectionReason;
-  const t1 = perf();
+
   return {
     selectedMode: mode,
-    selectedP14TargetDb: selected.requestedTargetSpl,
     selectedCandidate: selected,
     selectedCandidateId: selected.candidateId,
     productionCandidateId: selected.candidateId,
     filterBankSignature: selected.filterBankSignature,
     postEqCurveSignature: selected.postEqCurveSignature,
+    rawResponseSignature: selected.rawResponseSignature,
     selectedFilters: selected.generatedFilterBank,
     finalPostEqCurve: selected.finalPostEqCurve,
-    achievedP14Level: selected.postEqCapabilityAssessment?.achievedP14LevelLabel || levelText(selected.achievedP14Level),
-    achievedP14Db: selected.postEqCapabilityAssessment?.maximumAvailableSplAfterEqDb ?? selected.achievedP14Db,
-    p14TargetBasis: selected.p14TargetBasis || pool.p14TargetBasis || "minimum",
-    achievedP18Level: levelText(selected.achievedP18Level),
-    achievedP18FrequencyHz: selected.achievedP18FrequencyHz,
-    achievedP19Level: levelText(selected.achievedP19Level),
-    achievedP19VariationDb: selected.achievedP19VariationDb,
-    officialP19VariationDb: selected.officialP19VariationDb,
-    correctableP19VariationDb: selected.correctableP19VariationDb,
-    achievedP20Level: selected.achievedP20Level,
-    achievedP20VariationDb: selected.achievedP20VariationDb,
-    worstP20SeatId: selected.worstP20SeatId,
-    perSeatP20Results: selected.perSeatP20Results,
-    assessmentAuthority: {
-      candidateId: selected.candidateId,
-      graphCandidateId: selected.candidateId,
-      filterBankCandidateId: selected.candidateId,
-      p19CandidateId: selected.candidateId,
-      p20CandidateIds: (selected.perSeatP20Results || []).map(() => selected.candidateId),
-    },
+    canonicalVerticalOffsetDb: selected.canonicalVerticalOffsetDb,
+    canonicalHouseCurveShape: selected.canonicalHouseCurveShape,
+    positiveEqDemandCurve: selected.positiveEqDemandCurve,
+    fitMetrics: selected.fitMetrics,
+    protectedNullRegions: selected.protectedNullRegions,
+    physicalValidation: selected.physicalValidation,
     selectedFitProfile: selected.designEqFitProfile || "standard",
     selectedFitProfileConfig: selected.designEqFitProfileConfig || null,
-    requestedP19ToleranceDb: selected.requestedP19ToleranceDb ?? null,
-    candidates: pool.candidates,
-    displayCandidates: displayBassCandidates(pool.candidates, selected),
-    rejectedCandidates: pool.candidates.filter((candidate) => !candidate.meetsRequestedEnvelope),
-    selectedByMode,
-    primaryLimitation: identifyBassLimitingParameter(selected),
-    isBestCalibratedAttempt,
-    warningMessage: isBestCalibratedAttempt ? `BEST CALIBRATED ATTEMPT — REQUESTED RP22 LEVEL ${selected.designTarget?.requestedLevel || selected.requestedP14Level} NOT ACHIEVED` : null,
+    candidates,
+    displayCandidates: displayBassCandidates(candidates, selected),
+    rejectedCandidates: candidates.filter((candidate) => candidate.physicalValidation?.passed === false),
+    selectedByMode: { balanced: selected },
+    primaryLimitation: null,
+    isBestCalibratedAttempt: false,
+    warningMessage: null,
     performanceSummary: {
       ...pool.performanceSummary,
-      contractAdaptationTimeMs: t1 - t0,
+      contractAdaptationTimeMs: endedAt - startedAt,
       selectedDiagnosticFitTimeMs: 0,
       diagnosticsIncludedInCoreFits: true,
-      selectedRevisionCandidateCount: Array.isArray(selected?.designEqRevisionDiagnostics?.attempts)
-        ? selected.designEqRevisionDiagnostics.attempts.length
-        : 0,
     },
-    selectionReason: modeSelectionReason,
+    selectionReason: activeSelection.diagnostics.selectionReason,
     selectionDiagnostics: activeSelection.diagnostics,
-    priorityRerankTimeMs: t1 - t0,
+    priorityRerankTimeMs: endedAt - startedAt,
     heavyPoolReused: true,
     workerStarted: false,
     poolId: pool.poolId,
-    capabilityEnvelopeDiagnostics: pool.capabilityEnvelopeDiagnostics || [],
-    designTarget: pool.designTarget || null,
-    postEqCapabilityAssessment: selected.postEqCapabilityAssessment || null,
     generatedCandidateCount: pool.generatedCandidateCount,
     physicallyCredibleCount: pool.physicallyCredibleCount,
-    requestedEnvelopeValidCount: pool.requestedEnvelopeValidCount,
     standardFitCount: pool.standardFitCount || 0,
     accuracyFitCount: pool.accuracyFitCount || 0,
     houseCurveFitCount: pool.houseCurveFitCount || 0,

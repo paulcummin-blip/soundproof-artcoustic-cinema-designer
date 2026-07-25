@@ -50,8 +50,7 @@ export function buildCandidateId(candidate) {
   const identity = [
     candidate.designEqFitProfile || "standard",
     candidateStartStrategy(candidate),
-    candidate.p14TargetBasis || "minimum",
-    candidate.requestedP14Level, candidate.requestedP18Level, candidate.requestedP19Level,
+    fixed(candidate.canonicalVerticalOffsetDb),
     fixed(candidate.assessmentStartHz), fixed(candidate.assessmentEndHz),
     buildFilterBankSignature(candidate), buildCurveSignature(candidate.finalPostEqCurve),
   ].join("|");
@@ -61,7 +60,7 @@ export function buildCandidateId(candidate) {
 export function buildBassResultCacheKey(calibrationFingerprint) {
   return [
     calibrationFingerprint || "cal:none",
-    "mode:balanced-rp22-authority",
+    "mode:canonical-physics-eq",
     `protocol:${BASS_OPTIMISER_PROTOCOL_VERSION}`,
     `pool:${BASS_OPTIMISER_POOL_VERSION}`,
     `engine:${HOUSE_CURVE_ENGINE_VERSION}`,

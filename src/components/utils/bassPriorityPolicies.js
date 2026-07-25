@@ -96,8 +96,7 @@ export function removeStrictlyDominatedBalancedFallbacks(candidates) {
 export function stableCandidateSignature(candidate) {
   if (typeof candidate?.candidateSignature === "string") return candidate.candidateSignature;
   return JSON.stringify({
-    request: [candidate?.requestedP14Level, candidate?.requestedP18Level, candidate?.requestedP19Level],
-    p14TargetBasis: candidate?.p14TargetBasis || "minimum",
+    canonicalVerticalOffsetDb: finiteOr(candidate?.canonicalVerticalOffsetDb, null),
     profile: candidate?.designEqFitProfile || "standard",
     filters: (candidate?.generatedFilterBank || []).map((filter) => [
       !!filter?.enabled, finiteOr(filter?.frequencyHz, null), finiteOr(filter?.gainDb, null), finiteOr(filter?.Q, null),
@@ -114,8 +113,8 @@ export function isBankAndBandValid(candidate) {
 
 const isAllL1 = (candidate) => candidate?.allAtLeastL1 === true && levels(candidate).every((score) => score >= 1);
 
-// Every mode ranks against the same immutable designer-selected target. Achieved
-// RP22 levels are reporting outputs and are deliberately absent from this tuple.
+// Every mode ranks against the same response-anchored canonical house-curve shape.
+// Compliance grades and designer intent are deliberately absent from this tuple.
 export function rankingTupleForMode(candidate, mode) {
   normalizeBassPriorityMode(mode);
   return [
@@ -208,7 +207,7 @@ export function rankBassCandidates(pool, mode) {
           ? `${canonicalMode}: generated house_curve candidate won the raw RSP maximum, RMS and mean-absolute residual ranking outside protected nulls.`
           : `${canonicalMode}: ${selected.designEqFitProfile || "standard"} beat house_curve on measured raw residual metrics (${selected.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${selected.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB vs ${houseCurveCandidate.houseCurveRankingMaxResidualDb?.toFixed?.(2) ?? "—"}/${houseCurveCandidate.houseCurveRankingRmsResidualDb?.toFixed?.(2) ?? "—"} dB).`
         : `${canonicalMode}: ERROR — no compatible generated house_curve candidate was available; no legacy accuracy fallback was accepted.`
-      : `${canonicalMode}: best match to the fixed requested house curve after physical EQ validation; achieved RP22 levels were excluded from selection.`
+      : `${canonicalMode}: best match to the response-anchored canonical house curve after physical EQ validation; compliance grades were excluded from selection.`
     : `${canonicalMode}: no bank-valid candidate with a valid assessment band was available.`;
   return {
     selected,
