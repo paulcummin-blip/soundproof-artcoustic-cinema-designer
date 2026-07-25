@@ -9,6 +9,7 @@ export function getRp22BassOperatingDefinitions(p14TargetBasis = "recommended") 
   const recommendedP14 = rp22ByNumber[14]?.thresholds || {};
   const p18 = rp22ByNumber[18]?.thresholds || {};
   const p19 = rp22ByNumber[19]?.thresholds || {};
+  const p20 = rp22ByNumber[20]?.thresholds || {};
   return LEVEL_KEYS.map((level, index) => ({
     level,
     value: index + 1,
@@ -18,5 +19,6 @@ export function getRp22BassOperatingDefinitions(p14TargetBasis = "recommended") 
     p18LimitHz: p18[level],
     p18CutoffDb: Number(recommendedP14[level]) - 3,
     p19ToleranceDb: p19[level],
+    p20ToleranceDb: p20[level],
   }));
 }

@@ -365,7 +365,6 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : null;
   const correctionStartHz = Number.isFinite(Number(options.correctionStartHz)) ? Number(options.correctionStartHz) : assessmentStartHz;
   const correctionEndHz = Number.isFinite(Number(options.correctionEndHz)) ? Number(options.correctionEndHz) : assessmentEndHz;
-  const capabilityPenaltyForBank = () => 0;
 
   const operationCounts = {
     curveEvaluationRequests: 0,
@@ -390,8 +389,6 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     protectedNullWorseningRejections: 0,
     mergedFilterOperations: 0,
     replacedFilterOperations: 0,
-    capabilityPenaltyRejections: 0,
-    capabilityPenaltySelectionChanges: 0,
     seatRegressionToleranceAccepted: 0,
     seatRegressionToleranceRejected: 0,
   };
@@ -450,14 +447,13 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     let bestTrialMetrics = null;
     let bestTrialFilters = null;
     let bestTrialTraceIndex = null;
-    const currentCapabilityPenaltyCostDb = 0;
 
     for (const region of regions) {
       const protectedNull = region.authority?.classification === "Null"
         || (region.kind === "valley" && isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions));
-      const { trials, productLimited, authority } = generateHouseCurveTrials({ ...region, protectedNull }, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
+      const { trials, productLimited: correctionUnavailable, authority } = generateHouseCurveTrials({ ...region, protectedNull }, filters, profile, activeSubs, usableLfHz, requestedSystemOutputDb);
       let regionAdmissible = false;
-      let regionBlockReason = protectedNull ? "protected-null" : productLimited ? "product-limited" : null;
+      let regionBlockReason = protectedNull ? "protected-null" : correctionUnavailable ? "correction-unavailable" : null;
       if (protectedNull) continue;
 
       for (const trial of trials) {
@@ -498,8 +494,6 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           metricsAfter: null,
           rspImprovementDb: null,
           seatImpact: null,
-          capabilityPenaltyCostDb: null,
-          incrementalCapabilityPenaltyCostDb: null,
           accepted: false,
           rejectionReason: null,
         };
@@ -543,12 +537,6 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         const rmsImproved = rmsImprovementDb > RMS_EPSILON_DB;
         const maxProtected = trialMetrics.rspMaxDeviationDb <= currentMetrics.rspMaxDeviationDb + WORST_EQUIV_DB;
         const objectiveImproved = maxImprovementDb > WORST_EQUIV_DB || (maxProtected && rmsImproved);
-        const capabilityPenaltyCostDb = capabilityPenaltyForBank(validation.filters);
-        const incrementalCapabilityPenaltyCostDb = Math.max(0, capabilityPenaltyCostDb - currentCapabilityPenaltyCostDb);
-        const capabilityAdjustedObjectiveDb = maxImprovementDb + 0.35 * rmsImprovementDb - incrementalCapabilityPenaltyCostDb;
-        trialEntry.capabilityPenaltyCostDb = capabilityPenaltyCostDb;
-        trialEntry.incrementalCapabilityPenaltyCostDb = incrementalCapabilityPenaltyCostDb;
-        trialEntry.capabilityAdjustedObjectiveDb = capabilityAdjustedObjectiveDb;
         if (!directionPass || !objectiveImproved || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
           trialEntry.rejectionReason = !directionPass
             ? physicalAction.reason || "correction direction opposed target-minus-current residual"
@@ -570,7 +558,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         // corrective boost. Incidental overlap from a credible neighbouring peak cut
         // is retained in the final physical response rather than blocking that cut.
         // P14/P18 are calculated only after the final EQ response. Candidate banks
-        // are constrained by the fixed +6 dB / -15 dB limits, not product capability.
+        // retain the fixed target while physical boost is capped by +6 dB and available source headroom.
         // Real seats constrain the RSP fit without becoming its primary objective.
         // Corrective cuts may use a controlled tolerance when they materially improve
         // the RSP, never target a protected null, and introduce no unsafe boost.
@@ -622,7 +610,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
             frequency: region.centrePoint.frequency,
             signedDeviationDb: region.centrePoint.deviationDb,
             requiredCorrectionDb,
-            permittedCorrectionDb: productLimited ? 0 : null,
+            permittedCorrectionDb: correctionUnavailable ? 0 : null,
             blockingReason: regionBlockReason,
           });
         }
@@ -646,7 +634,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     filters, metrics: currentMetrics, baselineWorstSeatDeviation,
     baselineRspMinimumSplDb, finalRspMinimumSplDb: rspMinimumInBand(currentMetrics),
     blockedResiduals, stopReason, bankEvalCount, operations, operationCounts, trace,
-    baselineRspMetrics, capabilityContext: null, capabilityPenaltyCostDb: 0,
+    baselineRspMetrics,
     seatRegressionToleranceDiagnostics: {
       baselineToleranceDb: 0.5,
       materialImprovementToleranceDb: 1,

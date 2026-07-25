@@ -6,7 +6,6 @@ import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { selectCandidateFromPool } from "@/components/utils/bassCandidatePoolSelection";
 import { calculateHouseCurveEqCurve } from "@/components/utils/houseCurveFitter";
 import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCurveFitterCore";
-import { retargetCandidateForRequest } from "@/components/utils/bassCandidateRequestRetargeting";
 import { summarizeCoreOperations } from "@/components/utils/bassOptimiserPerformance";
 import { annotateCandidatePoolForHouseCurveRanking } from "@/components/utils/houseCurveCandidateRankingMetrics";
 import { stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
@@ -49,7 +48,7 @@ function interpolateCorrection(combinedEqCurve, frequency) {
 }
 
 function makeRequests(definitions, requestedLevel) {
-  const requested = definitions.find((definition) => definition.value === requestedLevel) || definitions.at(-1);
+  const requested = definitions.find((definition) => definition.value === requestedLevel);
   return requested ? [{ p14: requested, p18: requested, p19: requested }] : [];
 }
 
@@ -63,13 +62,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   const combinedEqCurve = eq.combinedEqCurve || [];
   const capabilityLimitedFrequencies = eq.filters.filter((filter) => filter.enabled && filter.gainDb > 0 && filter.gainDb < 6).map((filter) => filter.frequencyHz);
 
-  // Candidate-specific P19 residual diagnostics — derived from the cached EQ
-  // result without re-running the fitter. The cached worstResidualDiagnostics
-  // were computed with whatever P19 tolerance the first request for this cache
-  // entry happened to carry. Each candidate recomputes requiredBoostToP19ToleranceDb
-  // and p19ToleranceCapabilityLimited from its own request.p19.p19ToleranceDb
-  // using the signedResidualDb and remainingPointBoostDb already stored in
-  // each diagnostic. The cached EQ result is never mutated.
+  // Candidate-specific P19 diagnostics are derived from the fixed request without re-running EQ.
   const candidateRequestedP19ToleranceDb = request.p19.p19ToleranceDb;
   const candidateWorstResidualDiagnostics = Array.isArray(eq.worstResidualDiagnostics)
     ? eq.worstResidualDiagnostics.map((diag) => {
@@ -113,9 +106,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
   const achievedP19VariationDb = officialP19.variationDbRaw;
   const achievedP19Level = levelFromValue(achievedP19VariationDb, definitions, "p19ToleranceDb", true);
 
-  // Seat-aware metrics: apply the candidate's exact EQ bank to each real seat's raw response.
-  // The EQ bank is the RSP-calibrated combinedEqCurve; it is applied identically to every seat.
-  // No per-seat EQ re-fitting is performed — Design EQ remains an RSP calibration engine.
+  // Apply the same RSP-calibrated EQ bank to every real seat; no per-seat re-fitting.
   const candidateTargetAnchorDb = targetAnchorDb;
   let worstRealSeatHouseCurveVariationDb = null;
   let worstRealSeatHouseCurveLevel = 0;
@@ -157,10 +148,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     achievedP19Level < request.p19.value && `P19 variation exceeds ±${request.p19.p19ToleranceDb} dB between ${assessmentStartHz}–${assessmentEndHz} Hz`,
   ].filter(Boolean).join("; ");
 
-  // Uniform seat metrics: calculate the same worst/mean/RMS metrics for every
-  // candidate profile using the identical 1/3-octave smoothing, assessment band,
-  // and target curve used by houseCurveFitterCore.js. When no real seats exist,
-  // calculate equivalent fallback values from the RSP.
+  // Calculate uniform fixed-target seat metrics for every EQ profile.
   const seatsForUniformMetrics = perSeatPostEqCurves.length > 0
     ? perSeatPostEqCurves
     : [{ seatId: "rsp", isPrimary: true, responseData: finalPostEqCurve }];
@@ -168,11 +156,7 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     seatsForUniformMetrics, assessmentStartHz, assessmentEndHz, candidateTargetAnchorDb, productionHouseCurveTarget
   );
 
-  // Normalised aggregate bank limits — comparable across all profiles.
-  // For house-curve, use eq.bankLimits. For Standard/Accuracy, derive from
-  // eq.bankDiagnostics.selectedBankLimits — including the real validation
-  // fields (boostLimitOk, cutLimitOk, sourceDomainHeadroomOk, allOk) from
-  // finalBankLimits. Never hardcode validation success.
+  // Normalise physical bank-limit diagnostics across all EQ profiles.
   const bankValidationResult = eq.designEqFitProfile === "house_curve"
     ? eq.bankLimits
     : eq.bankDiagnostics?.selectedBankLimits;
@@ -374,16 +358,25 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
   const preparationStart = perf();
   const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
   const designTarget = resolveRequestedRp22HouseCurveTarget(definitions, requestedLevel);
+  if (!designTarget.definitionAvailable || !Number.isFinite(designTarget.targetAnchorDb)) return stampPoolAuthority({
+    poolVersion: BASS_OPTIMISER_POOL_VERSION,
+    candidates: [], selectablePool: [], definitions, performanceSummary: null, poolId: null,
+    generatedCandidateCount: 0, physicallyCredibleCount: 0, requestedEnvelopeValidCount: 0,
+    standardFitCount: 0, accuracyFitCount: 0, houseCurveFitCount: 0,
+    generationStatus: "invalid-fixed-intent", missingInputs: ["designer-selected RP22 definition"],
+    warningMessage: `RP22 Level ${designTarget.requestedLevel} intent could not be resolved; no lower target was substituted.`,
+    designTarget,
+  });
   const requests = makeRequests(definitions, designTarget.requestedLevel);
   const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
   const responseTargetAnchorDb = designTarget.targetAnchorDb;
   const targetAnchorSource = designTarget.source;
-  const canonicalTargetCurve = buildCanonicalAbsoluteHouseCurveTarget({
+  const canonicalTargetCurve = Object.freeze(buildCanonicalAbsoluteHouseCurveTarget({
     frequencyGrid: rawCurve.map((point) => point.frequency),
     targetAnchorDb: responseTargetAnchorDb,
     correctionStartHz: domains.correctionStartHz,
     correctionEndHz: domains.correctionEndHz,
-  });
+  }).map((point) => Object.freeze(point)));
   const protectedNullRegions = identifyProtectedNullRegions(
     rawCurve, domains.correctionStartHz, domains.correctionEndHz, responseTargetAnchorDb,
     activeSubs, usableLfHz, null, canonicalTargetCurve,
@@ -418,7 +411,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     const cached = reuseCandidateEvaluations ? candidateEvaluationCache.get(evaluationKey) : null;
     if (cached) {
       reusedCandidateEvaluationCount++;
-      candidates.push(retargetCandidateForRequest(cached, request));
+      candidates.push(cached);
       return;
     }
     const seatStart = perf();
@@ -434,14 +427,14 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     const assessmentEndHz = domains.p19EndHz;
     const correctionStartHz = domains.correctionStartHz;
     const correctionEndHz = domains.correctionEndHz;
-    const requestCapabilityTargetDb = designTarget.targetAnchorDb;
+    const fixedIntentOutputDb = designTarget.targetAnchorDb;
     // Standard fit — generated first so its enabled filter bank can seed the
     // Accuracy fit. The seed guarantees the Accuracy result retains or improves
     // the Standard checkpoint's maximum house-curve deviation.
     taskIndex++;
     report("Core EQ fitting", taskIndex);
     const standardCacheKey = [
-      responseTargetAnchorDb, requestCapabilityTargetDb, correctionStartHz, correctionEndHz,
+      responseTargetAnchorDb, fixedIntentOutputDb, correctionStartHz, correctionEndHz,
       "standard", DESIGN_EQ_FIT_PROFILES.standard.fittingToleranceDb,
       DESIGN_EQ_FIT_PROFILES.standard.maximumCutDb,
       DESIGN_EQ_FIT_PROFILES.standard.maximumAggregateBoostDb,
@@ -451,7 +444,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     if (!standardEq) {
       const fitStart = perf();
       standardEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: requestCapabilityTargetDb,
+        requestedSystemOutputDb: fixedIntentOutputDb,
         targetAnchorDb: responseTargetAnchorDb,
         canonicalTargetCurve,
         protectedNullRegions,
@@ -474,7 +467,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     const standardSeedFilters = (standardEq.filters || []).filter((f) => f && f.enabled);
     const seedSignature = standardSeedFilters.map((f) => `${f.frequencyHz}:${f.gainDb}:${f.Q}`).join(",");
     const accuracyCacheKey = [
-      responseTargetAnchorDb, requestCapabilityTargetDb, correctionStartHz, correctionEndHz,
+      responseTargetAnchorDb, fixedIntentOutputDb, correctionStartHz, correctionEndHz,
       "accuracy", DESIGN_EQ_FIT_PROFILES.accuracy.fittingToleranceDb,
       DESIGN_EQ_FIT_PROFILES.accuracy.maximumCutDb,
       DESIGN_EQ_FIT_PROFILES.accuracy.maximumAggregateBoostDb,
@@ -484,7 +477,7 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     if (!accuracyEq) {
       const fitStart = perf();
       accuracyEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: requestCapabilityTargetDb,
+        requestedSystemOutputDb: fixedIntentOutputDb,
         targetAnchorDb: responseTargetAnchorDb,
         canonicalTargetCurve,
         protectedNullRegions,
@@ -506,14 +499,14 @@ export function generateCandidatePool({ rawCurve = [], activeSubs = [], usableLf
     taskIndex++;
     report("House-curve multi-start fits", taskIndex);
     const houseCurveCacheKey = [
-      responseTargetAnchorDb, requestCapabilityTargetDb, assessmentStartHz, assessmentEndHz, correctionStartHz, correctionEndHz,
+      responseTargetAnchorDb, fixedIntentOutputDb, assessmentStartHz, assessmentEndHz, correctionStartHz, correctionEndHz,
       "house_curve", `seed:${seedSignature}`,
     ].join(":");
     let houseCurveEq = coreFitCache.get(houseCurveCacheKey);
     if (!houseCurveEq) {
       const fitStart = perf();
       houseCurveEq = calculateHouseCurveEqCurve(rawCurve, preparedSeatCurves, usableLfHz, activeSubs, {
-        requestedSystemOutputDb: requestCapabilityTargetDb,
+        requestedSystemOutputDb: fixedIntentOutputDb,
         targetAnchorDb: responseTargetAnchorDb,
         canonicalTargetCurve,
         protectedNullRegions,

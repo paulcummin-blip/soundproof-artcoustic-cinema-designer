@@ -1,4 +1,5 @@
-import { peakingEqResponseDb } from "@/components/utils/designEqCalibration";
+import { peakingEqResponseDb } from "@/components/utils/designEqBankLimits";
+import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 
 function filterSignature(filter) {
   return `${filter?.enabled ? 1 : 0}:${filter?.frequencyHz}:${filter?.gainDb}:${filter?.Q}`;
@@ -8,7 +9,9 @@ export function prepareBankValidation(raw, activeSubs, usableLfHz, requestedSyst
   const frequencies = (raw || [])
     .filter((point) => point.frequency >= 20 && point.frequency <= 200)
     .map((point) => point.frequency);
-  const permittedBoostDb = frequencies.map(() => 6);
+  const permittedBoostDb = frequencies.map((frequency) => getSourceDomainBoostAllowance({
+    frequency, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb,
+  }).allowedBoostDb);
   return { frequencies, permittedBoostDb, filterResponses: new Map() };
 }
 
@@ -51,8 +54,8 @@ export function evaluatePreparedBankLimits(context, filters, profile, operationC
       maxAggregateCutHz = frequency;
     }
     if (aggregateDb > maximumAggregateBoostDb) boostLimitOk = false;
+    if (aggregateDb > context.permittedBoostDb[pointIndex] + 0.05) sourceDomainHeadroomOk = false;
     if (aggregateDb < aggregateCutFloorDb) cutLimitOk = false;
-
   }
   const limitingPermittedBoostDb = maxAggregateBoostIndex >= 0
     ? context.permittedBoostDb[maxAggregateBoostIndex]

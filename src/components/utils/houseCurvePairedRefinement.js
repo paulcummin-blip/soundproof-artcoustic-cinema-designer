@@ -37,8 +37,9 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
     return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: { valleyFrequencyHz: valley.frequency }, limitation: "valley boost rejected because its filter would spill into a protected cancellation region" };
   }
   if (enabledFilterCount > 8) return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: null, limitation: "ten-filter ceiling left no room for a paired operation" };
-  if (Math.max(peak.deviationDb, Math.abs(valley.deviationDb)) <= 3) {
-    return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: null, limitation: "fit residual already within 3 dB" };
+  const fittingToleranceDb = Number.isFinite(profile?.fittingToleranceDb) ? profile.fittingToleranceDb : 1;
+  if (Math.max(peak.deviationDb, Math.abs(valley.deviationDb)) <= fittingToleranceDb) {
+    return { filters, metrics, changed: false, bankEvaluationCount: 0, diagnostic: null, limitation: `fit residual already within ${fittingToleranceDb} dB` };
   }
   let bestFilters = filters;
   let bestMetrics = metrics;

@@ -1,7 +1,7 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
-export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v7-fixed-target-post-eq-capability";
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-response-target-v11-capability-independent-eq";
-export const BASS_RESULT_SCHEMA_VERSION = 6;
+export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v8-immutable-intent-authority";
+export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-response-target-v12-headroom-safe-fixed-intent";
+export const BASS_RESULT_SCHEMA_VERSION = 7;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 
 export const BASS_OPTIMISER_VERSIONS = Object.freeze({

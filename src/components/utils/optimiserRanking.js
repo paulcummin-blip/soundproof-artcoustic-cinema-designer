@@ -3,7 +3,8 @@
 // Existing candidate fields already contain numeric levels 1–4 (or 0 for fail); these are preserved.
 
 import { getDesignEqValleyThresholdValidation } from "@/components/utils/designEqCalibration";
-import { houseCurveP19Level, runHouseCurveFitterFixtures } from "@/components/utils/houseCurveFitter";
+import { houseCurveP19Level } from "@/components/utils/houseCurveFitter";
+import { runHouseCurveFitterFixtures } from "@/components/utils/houseCurveFitterFixtures";
 import { compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
 
 const levelValue = (level) => {

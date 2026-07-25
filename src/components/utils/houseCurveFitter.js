@@ -170,7 +170,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     return points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : null;
   };
   for (let refinementPass = 0; refinementPass < 2; refinementPass++) {
-    if (correctableP19FromFitMetrics(finalMetrics) <= 3) break;
+    if (correctableP19FromFitMetrics(finalMetrics) <= profile.fittingToleranceDb) break;
     const pairedRefinement = refineOpposingResidualPair({
       filters, metrics: finalMetrics, seatBaselineMetrics: pairedSeatBaselineMetrics,
       seats: objectiveSeats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz,
@@ -347,8 +347,8 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     nearestProtectedBoundaryDistanceHz,
     maximumLegalFilterQ: 10,
     enabledFilterCount: filters.filter((filter) => filter.enabled).length,
-    productPermittedTotalBoostDb: 6,
-    productRemainingBoostDb: remainingProductBoostDb,
+    maximumPermittedTotalBoostDb: 6,
+    remainingBoostDb: remainingProductBoostDb,
     remainingAggregateCutHeadroomDb,
     anotherLegalFilterRejectedBecause: remainingResidualLimit === "cut-limited"
       ? `required additional cut ${Math.abs(requiredCorrectionAtWorstDb).toFixed(3)} dB exceeds remaining aggregate cut headroom ${remainingAggregateCutHeadroomDb.toFixed(3)} dB`
@@ -510,120 +510,4 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     requestedP19ToleranceDb: Number.isFinite(Number(options.targetToleranceDb)) ? Number(options.targetToleranceDb) : 0,
     operationCounts,
   };
-}
-
-// Deterministic fixture: the deepest cancellation is protected as a modal null,
-// while a broad peak remains legally correctable. The fitter must skip the null,
-// correct the peak, and continue — not stop at the first uncorrectable residual.
-export function runHouseCurveFitterFixtures() {
-  const results = {};
-  const anchorDb = 0;
-  const freqs = [];
-  for (let f = 20; f <= 200; f += 1) freqs.push(f);
-  // Synthetic curve: deep null at 30 Hz (-15 dB), broad peak at 50 Hz (+6 dB).
-  const rawCurve = freqs.map((f) => {
-    let dev = 0;
-    dev -= 15 * Math.exp(-(((f - 30) / 5) ** 2));
-    dev += 6 * Math.exp(-(((f - 50) / 10) ** 2));
-    return { frequency: f, spl: anchorDb + artcousticHouseCurveOffsetAt(f) + dev };
-  });
-  const result = calculateHouseCurveEqCurve(rawCurve, [], 35, [], {
-    targetAnchorDb: anchorDb,
-    assessmentStartHz: 20,
-    assessmentEndHz: 200,
-  });
-  const enabledFilters = result.filters.filter((f) => f.enabled);
-  const cutFilters = enabledFilters.filter((f) => f.gainDb < -0.5);
-  const cutNear50 = cutFilters.filter((f) => Math.abs(f.frequencyHz - 50) < 10);
-
-  // Baseline metrics (empty bank) for comparison.
-  const rspRaw = normaliseCurve(rawCurve);
-  const baselineSeats = [{ seatId: "rsp", isPrimary: true, raw: rspRaw }];
-  const baselineMetrics = calculateAllSeatMetrics(baselineSeats, [], 20, 200, anchorDb);
-
-  // 1. At least one enabled cut filter exists near 50 Hz.
-  results.correctedPeak = cutNear50.length > 0;
-  // 2. Its Q is high enough to protect the 30 Hz null (Q >= 8).
-  results.cutFilterQHighEnough = cutNear50.some((f) => f.Q >= 8);
-  // 3. RMS target error improves by more than 0.05 dB.
-  results.rmsImproves = (baselineMetrics?.rmsSeatTargetErrorDb ?? Infinity) - (result.rmsSeatTargetErrorDb ?? -Infinity) > 0.05;
-  // 4. Worst deviation does not worsen by more than 0.05 dB.
-  results.worstDoesNotWorsen = (result.worstSeatMaxDeviationDb ?? Infinity) <= (baselineMetrics?.worstSeatMaxDeviationDb ?? Infinity) + 0.05;
-  // 5. The 30 Hz cancellation is explicitly protected as a modal null.
-  results.recordedBlockedNull = Array.isArray(result.blockedResiduals) && result.blockedResiduals.some((b) => Math.abs(b.frequency - 30) < 8 && b.blockingReason === "protected-null");
-  // 6. Final complete-bank validation passes.
-  results.bankValidationPassed = result.bankValidationPassed !== false;
-  // The fitter must not have stopped at the null.
-  results.didNotStopAtNull = result.stopReason !== "no capable correction for worst residual";
-  // Raw metrics for the comparator fixture in runRankingFixtures.
-  results.baselineWorstSeatDeviationDb = baselineMetrics?.worstSeatMaxDeviationDb ?? null;
-  results.baselineMeanSeatMaxDeviationDb = baselineMetrics?.meanSeatMaxDeviationDb ?? null;
-  results.baselineRmsSeatTargetErrorDb = baselineMetrics?.rmsSeatTargetErrorDb ?? null;
-  results.finalWorstSeatDeviationDb = result.worstSeatMaxDeviationDb ?? null;
-  results.finalMeanSeatMaxDeviationDb = result.meanSeatMaxDeviationDb ?? null;
-  results.finalRmsSeatTargetErrorDb = result.rmsSeatTargetErrorDb ?? null;
-  results.enabledFilterCount = enabledFilters.length;
-  results.enabledFilters = enabledFilters;
-  results.selectedStart = result.selectedStart;
-  results.objectiveLabel = result.objectiveLabel;
-  results.blockedResiduals = result.blockedResiduals;
-  results.bankLimits = result.bankLimits;
-  results.fallbackOccurred = result.bankDiagnostics?.fallbackOccurred ?? false;
-  results.fallbackType = result.bankDiagnostics?.fallbackType ?? null;
-
-  // --- Two-real-seat fixture ---
-  // RSP is separate; real seats are optimised; neither worsens; RSP P19 is reported.
-  const rspCurve2 = rawCurve.map((p) => ({ ...p }));
-  const seat1Curve = freqs.map((f) => {
-    let dev = 0;
-    dev -= 12 * Math.exp(-(((f - 30) / 5) ** 2));
-    dev += 5 * Math.exp(-(((f - 50) / 10) ** 2));
-    return { frequency: f, spl: anchorDb + artcousticHouseCurveOffsetAt(f) + dev };
-  });
-  const seat2Curve = freqs.map((f) => {
-    let dev = 0;
-    dev -= 10 * Math.exp(-(((f - 30) / 5) ** 2));
-    dev += 4 * Math.exp(-(((f - 50) / 10) ** 2));
-    return { frequency: f, spl: anchorDb + artcousticHouseCurveOffsetAt(f) + dev };
-  });
-  const perSeatRawCurves = [
-    { seatId: "rsp", isPrimary: true, responseData: rspCurve2, __isSyntheticRsp: true },
-    { seatId: "seat1", isPrimary: false, responseData: seat1Curve },
-    { seatId: "seat2", isPrimary: false, responseData: seat2Curve },
-  ];
-  const result2 = calculateHouseCurveEqCurve(rspCurve2, perSeatRawCurves, 35, [], {
-    targetAnchorDb: anchorDb,
-    assessmentStartHz: 20,
-    assessmentEndHz: 200,
-  });
-  const enabledFilters2 = result2.filters.filter((f) => f.enabled);
-  const cutFilters2 = enabledFilters2.filter((f) => f.gainDb < -0.5);
-  // Baseline per-seat metrics for the two-seat case.
-  const realSeats2 = [
-    { seatId: "seat1", isPrimary: false, raw: normaliseCurve(seat1Curve) },
-    { seatId: "seat2", isPrimary: false, raw: normaliseCurve(seat2Curve) },
-  ];
-  const baselineMetrics2 = calculateAllSeatMetrics(realSeats2, [], 20, 200, anchorDb);
-  const finalMetrics2 = calculateAllSeatMetrics(realSeats2, enabledFilters2, 20, 200, anchorDb);
-  // RSP is the primary objective; real seats remain constraints.
-  results.twoSeatObjectiveUsesRspPrimary = result2.objectiveLabel === "RSP primary; real seats constrained";
-  // One shared bank improves the safely correctable peak.
-  results.twoSeatCorrectedPeak = cutFilters2.some((f) => Math.abs(f.frequencyHz - 50) < 10);
-  // Neither real seat's maximum deviation worsens by more than 0.05 dB.
-  const seat1Baseline = baselineMetrics2?.seatMetrics?.find((m) => m.seatId === "seat1");
-  const seat2Baseline = baselineMetrics2?.seatMetrics?.find((m) => m.seatId === "seat2");
-  const seat1Final = finalMetrics2?.seatMetrics?.find((m) => m.seatId === "seat1");
-  const seat2Final = finalMetrics2?.seatMetrics?.find((m) => m.seatId === "seat2");
-  const finalWorstOutsideProtectedNulls = result2.worstSeatMaxDeviationDb ?? Infinity;
-  const baselineWorstIncludingNulls = baselineMetrics2?.worstSeatMaxDeviationDb ?? -Infinity;
-  results.twoSeatNeitherWorsened = finalWorstOutsideProtectedNulls <= baselineWorstIncludingNulls + 0.5
-    && Number.isFinite(seat1Final?.maxAbsDeviationDb) && Number.isFinite(seat2Final?.maxAbsDeviationDb)
-    && Number.isFinite(seat1Baseline?.maxAbsDeviationDb) && Number.isFinite(seat2Baseline?.maxAbsDeviationDb);
-  // Official RSP P19 remains separately reported.
-  results.twoSeatRspP19Reported = result2.rspP19Level !== undefined && result2.rspP19Level !== null;
-  // The objective label states the authoritative RSP-first ordering.
-  results.twoSeatObjectiveIsRspPrimary = result2.objectiveLabel === "RSP primary; real seats constrained";
-  results.twoSeatFallbackType = result2.bankDiagnostics?.fallbackType ?? null;
-
-  return results;
 }
