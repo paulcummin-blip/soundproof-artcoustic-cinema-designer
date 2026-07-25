@@ -10,7 +10,7 @@ export function buildPostEqBassCapabilityOutcome({
   const requestedResult = assessment?.levels?.[`L${requested}`];
   const pairedComplete = requestedResult?.status && requestedResult.status !== "INCOMPLETE DATA";
   const achievedLevel = pairedComplete
-    ? Number(assessment?.winningLevelNumber) || 0
+    ? Number(assessment?.achievedLevelNumber ?? assessment?.winningLevelNumber) || 0
     : Number(scalarP14?.level) || 0;
   const passesRequestedLevel = pairedComplete
     ? requestedResult.status === "PASS"

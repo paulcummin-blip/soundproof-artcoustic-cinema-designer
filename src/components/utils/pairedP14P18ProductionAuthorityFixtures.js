@@ -165,6 +165,28 @@ function runShadowParityFixtures() {
   });
 }
 
+function runRequestedAchievedSeparationFixtures() {
+  const targets = { L1: 109, L2: 112, L3: 115, L4: 118 };
+  const sameHardware = [1, 2, 3, 4].map((requestedLevel) => production({
+    activeSubs: [syntheticSub("s1", 112)],
+    requestedLevel,
+    requestedTargetSplDb: targets[`L${requestedLevel}`],
+  }));
+  const single = sameHardware[3];
+  const doubled = production({
+    activeSubs: [syntheticSub("s1", 112), syntheticSub("s2", 112)],
+    perSourceComplexTransfers: [transfer("s1"), transfer("s2")],
+    requestedLevel: 4,
+    requestedTargetSplDb: targets.L4,
+  });
+  return [
+    check("Requested level changes without changing achieved hardware capability", sameHardware.every((result, index) => result.requested.level === `L${index + 1}` && result.achieved.level === sameHardware[0].achieved.level), "requested L1-L4; stable achieved level", sameHardware.map((result) => `${result.requested.level}/${result.achieved.level}`).join(", ")),
+    check("Requested target envelope follows immutable intent", sameHardware.every((result, index) => result.requested.targetSplDb === targets[`L${index + 1}`] && result.limitingResult.level === `L${index + 1}`), "L1-L4 target and limiting result remain requested", sameHardware.map((result) => `${result.requested.level}:${result.requested.targetSplDb}`).join(", ")),
+    check("Additional subwoofer capability cannot change requested intent", doubled.requested.level === single.requested.level && doubled.achieved.levelNumber !== single.achieved?.levelNumber && doubled.limitation?.shortfallDb !== single.limitation?.shortfallDb, "requested L4 unchanged; achieved capability and shortfall improve", `${single.requested.level}/${single.achieved.level}/${single.limitation?.shortfallDb} -> ${doubled.requested.level}/${doubled.achieved.level}/${doubled.limitation?.shortfallDb}`),
+    check("Insufficient hardware reports the gap without downgrading intent", single.requested.level === "L4" && single.achieved.level === "L2" && single.limitation?.primary === "output capability" && single.limitation?.limitingParameter === "P14" && single.limitation?.shortfallDb === 6, "Requested L4, achieved L2, P14 output capability, 6 dB shortfall", `${single.requested.level}/${single.achieved.level}/${single.limitation?.limitingParameter}/${single.limitation?.shortfallDb}`),
+  ];
+}
+
 export function runPairedP14P18ProductionAuthorityFixtures() {
   const checks = [
     ...runLiveLayoutFixtures(),
@@ -175,6 +197,7 @@ export function runPairedP14P18ProductionAuthorityFixtures() {
     ...runIsolationAndDeterminismFixtures(),
     ...runValidationRejectionFixtures(),
     ...runShadowParityFixtures(),
+    ...runRequestedAchievedSeparationFixtures(),
   ];
   return {
     authority: { method: PAIRED_P14_P18_AUTHORITY_METHOD, version: PAIRED_P14_P18_AUTHORITY_VERSION, schemaVersion: PAIRED_P14_P18_CONTRACT_SCHEMA_VERSION },

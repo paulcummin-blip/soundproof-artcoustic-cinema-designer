@@ -6,8 +6,8 @@ import {
 } from "@/components/utils/shadowPairedP14P18Authority";
 
 export const PAIRED_P14_P18_AUTHORITY_METHOD = "position-aware-paired-p14-p18";
-export const PAIRED_P14_P18_AUTHORITY_VERSION = "1.0.0";
-export const PAIRED_P14_P18_CONTRACT_SCHEMA_VERSION = "paired-p14-p18-production-contract:v1";
+export const PAIRED_P14_P18_AUTHORITY_VERSION = "1.1.0";
+export const PAIRED_P14_P18_CONTRACT_SCHEMA_VERSION = "paired-p14-p18-production-contract:v2";
 export const PAIRED_ASSESSMENT_STATUSES = Object.freeze(["PASS", "FAIL", "INCOMPLETE DATA"]);
 
 const STATUS_VOCABULARY_VERSION = "paired-compliance-status:v1";
@@ -94,6 +94,9 @@ function buildAssessment(shadow) {
   const limitingLevel = winner || fallback;
   return {
     status: winner ? "PASS" : fallback ? "FAIL" : "INCOMPLETE DATA",
+    achievedLevel: winner?.level ?? null,
+    achievedLevelNumber: winner?.levelNumber ?? null,
+    // Legacy aliases retained for existing diagnostic consumers.
     winningLevel: winner?.level ?? null,
     winningLevelNumber: winner?.levelNumber ?? null,
     p14: {
@@ -134,13 +137,44 @@ function buildCoverage({ minimumShadow, recommendedShadow, activeSubs, transfers
   return { upperFrequencyHz, sharedFrequencyRangeHz, productDataRangeBySource, transferDataRangeBySource, missingRequiredFrequencies, missingDataReason: reason, activeSourceCount: activeSubs.length };
 }
 
-function selectedLevelResult(assessment) {
+function selectedLevelResult(assessment, requestedLevel = null) {
+  if (requestedLevel && assessment?.levels?.[requestedLevel]) return assessment.levels[requestedLevel];
   if (assessment.winningLevel) return assessment.levels[assessment.winningLevel];
   return LEVELS_DESC.map((level) => assessment.levels[level]).find((result) => result.status === "FAIL") || null;
 }
 
-function buildLimitingResult(assessment, shadow) {
-  const selected = selectedLevelResult(assessment);
+function normalizeRequestedLevel(value) {
+  const numeric = Number(String(value ?? 4).replace(/^L/i, ""));
+  return `L${Math.max(1, Math.min(4, Math.round(Number.isFinite(numeric) ? numeric : 4)))}`;
+}
+
+function buildAuthoritySeparation(assessment, requestedLevel, requestedTargetSplDb) {
+  const requestedResult = assessment?.levels?.[requestedLevel] || null;
+  const achievedLevel = assessment?.achievedLevel ?? null;
+  const requestedPassed = requestedResult?.status === "PASS";
+  const incomplete = !requestedResult || requestedResult.status === "INCOMPLETE DATA";
+  return {
+    requested: {
+      level: requestedLevel,
+      targetSplDb: finite(requestedTargetSplDb) ? Number(requestedTargetSplDb) : requestedResult?.targetDb ?? null,
+    },
+    achieved: {
+      level: achievedLevel,
+      levelNumber: assessment?.achievedLevelNumber ?? null,
+      p14: { ...assessment.p14 },
+      p18: { ...assessment.p18 },
+    },
+    limitation: requestedPassed ? null : {
+      primary: incomplete ? "incomplete data" : "output capability",
+      shortfallDb: requestedResult?.shortfallDb ?? null,
+      limitingParameter: incomplete ? null : "P14",
+      reason: incomplete ? requestedResult?.missingDataReason ?? null : "Subwoofer output capability limited",
+    },
+  };
+}
+
+function buildLimitingResult(assessment, shadow, requestedLevel = null) {
+  const selected = selectedLevelResult(assessment, requestedLevel);
   if (!selected) return { level: null, cutoffHz: null, targetDb: null, worstCapabilityDb: null, limitingFrequencyHz: null, marginDb: null, shortfallDb: null, broadMiss: null, severeNull: null, longestContiguousUnderTarget: null, smoothedUnderTargetRegions: [], unsmoothedUnderTargetRegions: [], heuristicCauses: [] };
   const longest = [...selected.unsmoothedUnderTargetRegions].sort((a, b) => Number(b.bandwidthOctaves) - Number(a.bandwidthOctaves) || Number(b.depthDb) - Number(a.depthDb))[0] || null;
   return {
@@ -197,24 +231,28 @@ export function calculatePairedP14P18ProductionAuthority(inputs = {}) {
   const recommended = buildAssessment(recommendedShadow);
   const selectedAssessment = selectedTargetBasis === "recommended" ? recommended : minimum;
   const selectedShadow = selectedTargetBasis === "recommended" ? recommendedShadow : minimumShadow;
+  const requestedLevel = normalizeRequestedLevel(inputs.requestedLevel);
+  const separation = buildAuthoritySeparation(selectedAssessment, requestedLevel, inputs.requestedTargetSplDb);
+  const requestedResult = selectedAssessment.levels[requestedLevel];
   const sourceDiagnostics = minimumShadow.sourceDiagnostics || recommendedShadow.sourceDiagnostics || [];
   const coverage = buildCoverage({ minimumShadow, recommendedShadow, activeSubs, transfers: perSourceComplexTransfers, upperFrequencyHz });
   const reason = selectedShadow.reason || coverage.missingDataReason || null;
   return {
     schemaVersion: PAIRED_P14_P18_CONTRACT_SCHEMA_VERSION,
     authority: { method: PAIRED_P14_P18_AUTHORITY_METHOD, version: PAIRED_P14_P18_AUTHORITY_VERSION, statusVocabularyVersion: STATUS_VOCABULARY_VERSION },
-    status: selectedAssessment.status,
+    status: requestedResult?.status ?? "INCOMPLETE DATA",
     reason,
     selectedTargetBasis,
+    ...separation,
     assessments: { minimum, recommended },
     curves: {
       rawDeliveredCurve: cleanCurve(selectedShadow.rawDeliveredCurve, ["re", "im", "energeticSpl"]),
       postEqDeliveredCurve: cleanCurve(selectedShadow.postEqDeliveredCurve, ["positiveEqCostDb"]),
       smoothedDeliveredCurve: cleanCurve(selectedShadow.smoothedDeliveredCurve, ["sampleCount", "lowerHz", "upperHz"]),
-      selectedTargetEnvelope: selectedLevelResult(selectedAssessment)?.targetEnvelope || [],
+      selectedTargetEnvelope: selectedLevelResult(selectedAssessment, requestedLevel)?.targetEnvelope || [],
     },
     coverage,
-    limitingResult: buildLimitingResult(selectedAssessment, selectedShadow),
+    limitingResult: buildLimitingResult(selectedAssessment, selectedShadow, requestedLevel),
     eqHeadroom: buildEqHeadroom(selectedShadow, upperFrequencyHz, inputs.selectedEqBankIdentity),
     sources: buildSourceResult(activeSubs, perSourceComplexTransfers, sourceDiagnostics),
     methodDiagnostics: {
@@ -251,6 +289,11 @@ export function validatePairedP14P18ProductionAuthorityResult(result) {
   if (result.authority?.version !== PAIRED_P14_P18_AUTHORITY_VERSION) errors.push("Unknown authority version.");
   if (result.authority?.statusVocabularyVersion !== STATUS_VOCABULARY_VERSION) errors.push("Unknown status vocabulary version.");
   if (!PAIRED_ASSESSMENT_STATUSES.includes(result.status)) errors.push("Unknown result status.");
+  if (!LEVELS.includes(result.requested?.level)) errors.push("Missing or invalid requested level.");
+  if (result.achieved?.level != null && !LEVELS.includes(result.achieved.level)) errors.push("Invalid achieved level.");
+  const selectedAssessment = result.assessments?.[result.selectedTargetBasis];
+  if (result.achieved?.level !== (selectedAssessment?.winningLevel ?? null)) errors.push("Achieved level does not match the highest passing level.");
+  if (result.status !== (selectedAssessment?.levels?.[result.requested?.level]?.status ?? "INCOMPLETE DATA")) errors.push("Result status does not describe the requested level.");
   ["minimum", "recommended"].forEach((basis) => {
     const assessment = result.assessments?.[basis];
     if (!assessment || !PAIRED_ASSESSMENT_STATUSES.includes(assessment.status)) errors.push(`Unknown or missing ${basis} assessment status.`);

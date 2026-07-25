@@ -199,6 +199,8 @@ export function buildCandidate({ request, rawCurve, activeSubs, usableLfHz, defi
     perSourceComplexTransfers,
     combinedEqCurve,
     targetBasis: p14TargetBasis,
+    requestedLevel: designTarget.requestedLevel,
+    requestedTargetSplDb: designTarget.targetAnchorDb,
     selectedEqBankIdentity: buildFilterBankSignature({ generatedFilterBank: eq.filters }),
     normalizedTransferFingerprint,
     calibrationFingerprint,
