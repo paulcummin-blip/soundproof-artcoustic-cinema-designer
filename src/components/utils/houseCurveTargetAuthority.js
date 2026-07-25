@@ -16,6 +16,18 @@ function localShoulderLevel(points, frequency) {
   return Number.isFinite(leftLevel) && Number.isFinite(rightLevel) ? (leftLevel + rightLevel) / 2 : null;
 }
 
+// Canonical vertical authority retained from the proven production Design EQ path:
+// third-octave response median across 150–200 Hz, falling back to the available
+// smoothed response only when that reference band is absent.
+export function deriveProductionEqVerticalAnchor(rawCurve) {
+  const smoothed = applyBassSmoothing(rawCurve || [], "third")
+    .map((point) => ({ frequency: Number(point?.frequency), spl: Number(point?.spl) }))
+    .filter((point) => Number.isFinite(point.frequency) && Number.isFinite(point.spl));
+  if (!smoothed.length) return null;
+  const referenceBand = smoothed.filter((point) => point.frequency >= 150 && point.frequency <= 200);
+  return median((referenceBand.length ? referenceBand : smoothed).map((point) => point.spl));
+}
+
 export function deriveResponseAnchoredTarget({ rawCurve, usableLfHz = null, startHz = 20, endHz = 200 }) {
   const rawPoints = (rawCurve || [])
     .map((point) => ({ frequency: Number(point?.frequency), spl: Number(point?.spl) }))

@@ -2,6 +2,7 @@ import { generateCanonicalCandidatePool } from "@/components/utils/canonicalBass
 import { selectCandidateFromPool } from "@/components/utils/bassCandidatePoolSelection";
 import { buildCurveSignature } from "@/components/room/bass/bassResultAuthority";
 import { computeCalibrationFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
+import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 
 const frequencies = Array.from({ length: 181 }, (_, index) => 20 + index);
 const gaussian = (frequency, centre, width, gain) => gain * Math.exp(-0.5 * ((frequency - centre) / width) ** 2);
@@ -23,6 +24,13 @@ const physicalInputs = {
 };
 
 export function runCanonicalBassEqFixtures() {
+  const smoothed = applyBassSmoothing(rawCurve, "third");
+  const legacyReferenceBand = smoothed.filter((point) => point.frequency >= 150 && point.frequency <= 200);
+  const sortedLegacyLevels = legacyReferenceBand.map((point) => point.spl).sort((a, b) => a - b);
+  const middle = Math.floor(sortedLegacyLevels.length / 2);
+  const previousProductionAnchorDb = sortedLegacyLevels.length % 2
+    ? sortedLegacyLevels[middle]
+    : (sortedLegacyLevels[middle - 1] + sortedLegacyLevels[middle]) / 2;
   const levels = [1, 2, 3, 4].map((requestedLevel) => {
     const pool = generateCanonicalCandidatePool({ ...physicalInputs, requestedLevel, requestedTargetSplDb: 100 + requestedLevel, targetBasis: requestedLevel % 2 ? "minimum" : "recommended" });
     const result = selectCandidateFromPool(pool);
@@ -45,6 +53,7 @@ export function runCanonicalBassEqFixtures() {
       postEqResponseSignature: candidate?.postEqCurveSignature ?? null,
       canonicalTargetShapeSignature: buildCurveSignature((candidate?.canonicalHouseCurveShape || []).map((point) => ({ frequency: point.frequency, spl: point.offsetDb }))),
       canonicalVerticalOffsetDb: candidate?.canonicalVerticalOffsetDb ?? null,
+      matchesPreviousProductionAnchor: candidate?.canonicalVerticalOffsetDb === previousProductionAnchorDb,
     };
   });
   const invariantKeys = ["workerFingerprintInput", "filterBankSignature", "rawResponseSignature", "postEqResponseSignature", "canonicalTargetShapeSignature", "canonicalVerticalOffsetDb"];
@@ -61,6 +70,8 @@ export function runCanonicalBassEqFixtures() {
   return {
     levels,
     invariant,
+    previousProductionAnchorDb,
+    canonicalAnchorMatchesPreviousProductionReference: levels.every((entry) => entry.matchesPreviousProductionAnchor),
     physicalChangeRecalculates: movedPool.poolId !== levels[0].poolId,
     physicalChangeMayChangeFilterBank: moved?.filterBankSignature !== selected?.filterBankSignature,
     maximumEnabledFilterBoostDb: Math.max(0, ...enabledFilters.map((filter) => filter.gainDb)),

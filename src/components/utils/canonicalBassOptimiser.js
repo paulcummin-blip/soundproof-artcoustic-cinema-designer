@@ -8,7 +8,7 @@ import { buildCurveSignature, stampPoolAuthority } from "@/components/room/bass/
 import { BASS_OPTIMISER_POOL_VERSION } from "@/components/room/bass/bassOptimiserWorkerProtocol";
 import {
   buildCanonicalAbsoluteHouseCurveTarget,
-  deriveResponseAnchoredTarget,
+  deriveProductionEqVerticalAnchor,
   resolveHouseCurveDomains,
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
@@ -143,9 +143,7 @@ export function generateCanonicalCandidatePool({
 
   const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
-  const verticalOffsetDb = deriveResponseAnchoredTarget({
-    rawCurve, startHz: domains.correctionStartHz, endHz: domains.correctionEndHz,
-  });
+  const verticalOffsetDb = deriveProductionEqVerticalAnchor(rawCurve);
   if (!Number.isFinite(verticalOffsetDb)) return stampPoolAuthority({
     poolVersion: BASS_OPTIMISER_POOL_VERSION, candidates: [], selectablePool: [], poolId: null,
     generatedCandidateCount: 0, physicallyCredibleCount: 0, generationStatus: "invalid-anchor",
