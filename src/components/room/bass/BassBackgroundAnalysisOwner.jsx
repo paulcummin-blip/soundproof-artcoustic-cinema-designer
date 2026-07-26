@@ -22,19 +22,20 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
 
-  // Drag-defer: poll the global drag flag so the heavy EQ worker only runs on
-  // pointer-up, not continuously during subwoofer dragging. Visual movement
-  // (raw response graph) still updates immediately via the live authority.
-  const [isDragging, setIsDragging] = React.useState(false);
-  React.useEffect(() => {
+  // Event-driven drag state: listen for drag-start/drag-end events so the
+  // heavy EQ worker only runs on pointer-up, not continuously during drag.
+  // No polling — purely event-driven.
+  const [isDragging, setIsDragging] = useState(false);
+  useEffect(() => {
     if (typeof window === "undefined") return;
-    const check = () => {
-      const dragging = !!window.__B44_IS_DRAGGING_SUB;
-      setIsDragging((prev) => (prev !== dragging ? dragging : prev));
+    const onStart = () => setIsDragging(true);
+    const onEnd = () => setIsDragging(false);
+    window.addEventListener("b44-bass-drag-start", onStart);
+    window.addEventListener("b44-bass-drag-end", onEnd);
+    return () => {
+      window.removeEventListener("b44-bass-drag-start", onStart);
+      window.removeEventListener("b44-bass-drag-end", onEnd);
     };
-    check();
-    const interval = setInterval(check, 100);
-    return () => clearInterval(interval);
   }, []);
   const retainedController = controllerRef.current;
   if (!retainedController

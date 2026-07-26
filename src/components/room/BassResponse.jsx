@@ -412,13 +412,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     };
   }, [splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
 
-  // Expose drag state — also sets a global flag so the background analysis owner
+  // Expose drag state — dispatches events so the background analysis owner
   // can defer the heavy EQ worker during drag and run it once on pointer-up.
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.__B44_setIsDraggingSub = (dragging) => {
         setIsDraggingSub(dragging);
-        window.__B44_IS_DRAGGING_SUB = dragging;
+        window.dispatchEvent(new CustomEvent(dragging ? 'b44-bass-drag-start' : 'b44-bass-drag-end'));
       };
     }
   }, []);
@@ -680,7 +680,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           <span style={{ fontSize: 11, fontWeight: 600, color: '#213428', fontFamily: 'monospace' }}>{p14TargetAnnotation.label}</span>
           <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>{p14TargetAnnotation.extension}</span>
         </div>}
-        {p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
+        {includeDiagnostics && p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
           const err = Math.abs(p14IntegrationDiagnostic.errorDb || 0);
           const pass = err <= 0.05;
           return (

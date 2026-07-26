@@ -255,62 +255,82 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
   if (localImprovementDb <= EPSILON_DB) return { reason: "local-fit: attempted correction did not reduce the centre residual", limits, nullWorseningDb, candidateCentre };
   const candidateQuality = quality(candidatePoints, protectedNullRegions);
 
-  // === Asymmetric acceptance: CUT filters get region-aware rules, BOOST filters keep strict rules ===
-  const isCutTrial = region.kind === "peak" || trial.filter.gainDb < 0;
+  // === Classify from proposed response change, not final stored gain ===
+  // A revision that reduces an existing cut (less negative gain) produces a
+  // positive incremental correction at the centre — treat it as a BOOST trial.
+  const incrementalCorrectionDb = correctionAt(region.centre.frequency, trial.filters) - correctionAt(region.centre.frequency, currentFilters);
+  const isCutTrial = incrementalCorrectionDb < -EPSILON_DB;
 
   if (isCutTrial) {
-    // CUT FILTER ACCEPTANCE — region-aware, allows local worsening up to 1.0 dB
-    // when the final point stays inside the ±3 dB target corridor.
+    // CUT FILTER ACCEPTANCE — region-aware
+    // Determine the filter influence region: points where the trial changes
+    // the response by at least 0.25 dB relative to the current filter bank.
+    const INFLUENCE_THRESHOLD_DB = 0.25;
+    const influenceIndices = [];
+    for (let i = 0; i < candidatePoints.length; i++) {
+      const freq = candidatePoints[i].frequency;
+      const change = correctionAt(freq, trial.filters) - correctionAt(freq, currentFilters);
+      if (Math.abs(change) >= INFLUENCE_THRESHOLD_DB) influenceIndices.push(i);
+    }
+    const influenceCurrent = influenceIndices.map((i) => currentPoints[i]).filter(Boolean);
+    const influenceCandidate = influenceIndices.map((i) => candidatePoints[i]).filter(Boolean);
 
-    // 1. No corrected point finishes more than 3 dB below the house curve
-    const belowTargetPoint = candidatePoints.find((point) =>
-      !isProtectedFrequency(point.frequency, protectedNullRegions) && point.residualDb < -3
-    );
-    if (belowTargetPoint) {
-      return { reason: `cut-below: ${belowTargetPoint.frequency.toFixed(2)} Hz finishes more than 3 dB below target`, limits, nullWorseningDb, candidateCentre, candidateQuality };
+    // === LOCAL conditions (inside influence region) ===
+
+    // L1. Positive residual area must reduce within the influence region
+    const currentPositiveArea = influenceCurrent.reduce((s, p) => s + Math.max(0, p.residualDb), 0);
+    const candidatePositiveArea = influenceCandidate.reduce((s, p) => s + Math.max(0, p.residualDb), 0);
+    if (candidatePositiveArea >= currentPositiveArea - EPSILON_DB) {
+      return { reason: "cut-area: positive residual area did not reduce within influence region", limits, nullWorseningDb, candidateCentre, candidateQuality };
     }
 
-    // 2. Allow local point worsening up to 1.0 dB when the final point remains
-    //    inside the ±3 dB corridor. Reject only if a point worsens beyond 1.0 dB
-    //    OR exits the ±3 dB corridor due to the correction.
-    const excessiveWorsening = candidatePoints.find((point, index) => {
+    // L2. Maximum positive residual must reduce by at least 0.75 dB within the influence region
+    const currentMaxPositive = Math.max(0, ...influenceCurrent.map((p) => p.residualDb));
+    const candidateMaxPositive = Math.max(0, ...influenceCandidate.map((p) => p.residualDb));
+    if (currentMaxPositive - candidateMaxPositive < 0.75 - EPSILON_DB) {
+      return { reason: "cut-peak: maximum positive residual did not reduce by 0.75 dB within influence region", limits, nullWorseningDb, candidateCentre, candidateQuality };
+    }
+
+    // L3. Filter-centre residual must improve (already checked as localImprovementDb above)
+
+    // L4. Local point worsening: allow up to 1.0 dB when final residual is within ±3 dB.
+    //     CRITICAL: Do NOT reject because an unrelated point was already below −3 dB.
+    //     Reject only when the cut:
+    //       - Moves a previously acceptable point from above −3 dB to below −3 dB, OR
+    //       - Worsens an existing non-protected point already below −3 dB by more than 0.50 dB
+    const badPoint = candidatePoints.find((point, index) => {
       const before = currentPoints[index];
       if (!before || isProtectedFrequency(point.frequency, protectedNullRegions)) return false;
-      const worsening = Math.abs(point.residualDb) - Math.abs(before.residualDb);
-      // Allow up to 1.0 dB worsening if the final point is within ±3 dB
-      if (Math.abs(point.residualDb) <= 3 && worsening <= 1.0) return false;
-      // Reject if worsening exceeds 1.0 dB or the point exits the ±3 dB corridor
-      return worsening > 1.0 || (Math.abs(before.residualDb) <= 3 && Math.abs(point.residualDb) > 3);
+      const wasAboveMinus3 = before.residualDb >= -3;
+      const isNowBelowMinus3 = point.residualDb < -3;
+      // Reject if the cut moves a point from above −3 dB to below −3 dB
+      if (wasAboveMinus3 && isNowBelowMinus3) return true;
+      // Reject if an existing below-3 point worsens by more than 0.50 dB
+      if (!wasAboveMinus3 && (before.residualDb - point.residualDb) > 0.50 + EPSILON_DB) return true;
+      return false;
     });
-    if (excessiveWorsening) {
-      return { reason: `cut-point: ${excessiveWorsening.frequency.toFixed(2)} Hz worsened beyond 1.0 dB or exited ±3 dB corridor`, limits, nullWorseningDb, candidateCentre, candidateQuality };
+    if (badPoint) {
+      return { reason: `cut-below: ${badPoint.frequency.toFixed(2)} Hz moved below −3 dB or worsened beyond 0.50 dB`, limits, nullWorseningDb, candidateCentre, candidateQuality };
     }
 
-    // 3. Positive residual area must reduce
-    const currentPositiveArea = currentPoints.reduce((sum, p) => sum + Math.max(0, p.residualDb), 0);
-    const candidatePositiveArea = candidatePoints.reduce((sum, p) => sum + Math.max(0, p.residualDb), 0);
-    if (candidatePositiveArea >= currentPositiveArea - EPSILON_DB) {
-      return { reason: "cut-area: positive residual area did not reduce", limits, nullWorseningDb, candidateCentre, candidateQuality };
-    }
+    // L5. Protected nulls must not worsen beyond existing tolerance (already checked above)
 
-    // 4. Maximum positive residual must reduce by at least 0.75 dB
-    const currentMaxPositive = Math.max(0, ...currentPoints.map((p) => p.residualDb));
-    const candidateMaxPositive = Math.max(0, ...candidatePoints.map((p) => p.residualDb));
-    if (currentMaxPositive - candidateMaxPositive < 0.75 - EPSILON_DB) {
-      return { reason: "cut-peak: maximum positive residual did not reduce by at least 0.75 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
-    }
+    // === GLOBAL conditions (across full correction range) ===
 
-    // 5. RMS target error must improve by at least 0.15 dB
+    // G1. Overall RMS target error must improve by at least 0.15 dB
     if (currentQuality.rmsResidualDb - candidateQuality.rmsResidualDb < 0.15 - EPSILON_DB) {
-      return { reason: "cut-rms: RMS target error did not improve by at least 0.15 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
+      return { reason: "cut-rms: overall RMS target error did not improve by at least 0.15 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
     }
 
-    // 6. Worst-seat maximum deviation must not worsen by more than 0.50 dB
+    // G2. Worst-seat maximum deviation must not worsen by more than 0.50 dB
     const seatWorseningDb = worstSeatDeviationWorsening(currentFilters, trial.filters, perSeatRawCurves,
       anchorDb, canonicalTargetCurve, correctionStartHz, correctionEndHz, protectedNullRegions);
     if (seatWorseningDb > 0.50 + EPSILON_DB) {
       return { reason: `cut-seat: worst-seat maximum deviation worsened by ${seatWorseningDb.toFixed(2)} dB`, limits, nullWorseningDb, candidateCentre, candidateQuality };
     }
+
+    // G3. Aggregate cut within −15 dB (already checked via bank limits above)
+    // G4. All physical filter validation (already checked via bank limits above)
 
     return { accepted: true, reason: null, limits, nullWorseningDb, candidateCentre, candidateQuality, localImprovementDb };
   }

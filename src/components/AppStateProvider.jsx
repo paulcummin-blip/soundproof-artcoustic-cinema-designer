@@ -1361,6 +1361,7 @@ function useDesignerState() {
       if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
       if (typeof p.rsp_mode === "string") setRspMode(p.rsp_mode);
       if (p.manual_rsp_y_m !== undefined) setManualRspY_m(typeof p.manual_rsp_y_m === "number" ? p.manual_rsp_y_m : null);
+      if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
 
       setAutosaveMeta(getAutosaveMeta());
       
@@ -1439,6 +1440,7 @@ function useDesignerState() {
       extraSurroundCount,
       rsp_mode: rspMode,
       manual_rsp_y_m: manualRspY_m,
+      designEqEnabled,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
@@ -1494,6 +1496,7 @@ function useDesignerState() {
     extraSurroundCount,
     rspMode,
     manualRspY_m,
+    designEqEnabled,
     roomElements
     ]);
 
@@ -1550,6 +1553,7 @@ function useDesignerState() {
       if (Array.isArray(p.roomElements)) setRoomElements(normaliseRoomElements(p.roomElements));
       if (p.overlays) setOverlays(p.overlays);
       if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
+      if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
 
       setAutosaveMeta(getAutosaveMeta());
       return true;
