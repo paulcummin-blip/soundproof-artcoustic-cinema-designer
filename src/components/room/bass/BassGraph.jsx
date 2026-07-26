@@ -437,7 +437,7 @@ export default function BassGraph({
                                 y={level.spl} 
                                 label={{ 
                                     value: level.level, 
-                                    position: 'right', 
+                                    position: 'insideTopRight', 
                                     fill: level.color, 
                                     className: 'font-body text-xs',
                                     offset: 5

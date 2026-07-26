@@ -388,15 +388,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // Shared transition frequency for graph markers and the optimiser validation path.
   const schroederFrequency = optimisationTransitionHz;
 
+  // Single dynamic selected-target guide — replaces the old static L1–L4 set.
+  // Only the user's selected P14 Bass SPL target is shown as a horizontal guide.
+  // The house curve itself (normalised to the selected P14 total) is the real
+  // frequency-shaped target; this line is a design-target marker + label.
   const rp22Levels = React.useMemo(() => {
-    const thresholds = splConfig?.selectedP14TargetBasis === "recommended" ? [114, 117, 120, 123] : [109, 112, 115, 118];
+    const basis = splConfig?.selectedP14TargetBasis === "recommended" ? "Recommended" : "Minimum";
+    const levelNum = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 4)));
+    const targetDb = Number.isFinite(selectedP14TargetDb) ? Math.round(selectedP14TargetDb) : null;
+    if (targetDb == null) return [];
     return [
-      { level: "L1", spl: thresholds[0], color: "#C1B6AD" },
-      { level: "L2", spl: thresholds[1], color: "#8B7F76" },
-      { level: "L3", spl: thresholds[2], color: "#625143" },
-      { level: "L4", spl: thresholds[3], color: "#213428" },
+      { level: `${basis} L${levelNum} · ${targetDb} dBC`, spl: targetDb, color: "#213428" },
     ];
-  }, [splConfig?.selectedP14TargetBasis]);
+  }, [splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level, selectedP14TargetDb]);
 
   // Expose drag state
   useEffect(() => {
