@@ -8,16 +8,26 @@
 //   - Runs zero simulations and zero optimiser runs.
 //   - Reads only from existing completed runtime data.
 //   - Interpolates from the actual canonical arrays (not graph pixels).
+//   - Applies the CURRENT selected P14 operating-level offset so the
+//     exported 34/75/100 Hz rows match the live graph.
+//   - Verifies the completed result matches the current active calibration
+//     fingerprint via the existing production authority check before
+//     exporting any canonical values.
 //   - Emits "INCOMPLETE" for any field that cannot be sourced from the live
 //     runtime instead of substituting synthetic data.
 //
-// It does NOT import or call any simulation, EQ, authority, scoring, cache,
-// worker, or graph module. The only imports are the P14 integration
-// diagnostic (a pure closed-form calculation over the house-curve shape) and
-// the curve/filter signature builders (pure hash helpers).
+// It does NOT import or call any simulation, EQ, scoring, cache, worker, or
+// graph module. The only imports are the P14 integration diagnostic (a pure
+// closed-form calculation over the house-curve shape), the production
+// authority validator, and the curve/filter signature builders (pure hash
+// helpers).
 
 import { diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCurveNormalisation";
-import { buildCurveSignature, buildFilterBankSignature } from "@/components/room/bass/bassResultAuthority";
+import {
+  buildCurveSignature,
+  buildFilterBankSignature,
+  validateCachedBassResult,
+} from "@/components/room/bass/bassResultAuthority";
 
 const PROBE_FREQS = [34, 75, 100];
 const INCOMPLETE = "INCOMPLETE";
@@ -88,6 +98,18 @@ export function buildLiveBassValidationReport({
   lines.push(`Source: current live project + current completed canonical result`);
   lines.push(`Note: read-only export. Zero simulations and zero optimiser runs triggered.`);
 
+  // ── 0. Result validity check ──
+  // Verify the completed result matches the current active calibration
+  // fingerprint using the existing production authority check before
+  // exporting any canonical values.
+  const authorityCheck = validateCachedBassResult(optimisationResult, { fingerprint: calibrationFingerprint });
+  const calibrationFingerprintMatches = !!(
+    optimisationResult?.calibrationFingerprint
+    && calibrationFingerprint
+    && optimisationResult.calibrationFingerprint === calibrationFingerprint
+  );
+  const resultIsValid = authorityCheck.valid && calibrationFingerprintMatches;
+
   // ── 1. Runtime inputs ──
   lines.push(sectionHeader("1. RUNTIME INPUTS"));
   lines.push(`Room dimensions: ${fmtCoord(roomDims?.widthM)} x ${fmtCoord(roomDims?.lengthM)} x ${fmtCoord(roomDims?.heightM)} m`);
@@ -118,55 +140,103 @@ export function buildLiveBassValidationReport({
   lines.push(`Required P18 extension Hz: ${extHz === null ? INCOMPLETE : extHz.toFixed(4)}`);
   lines.push(`Design EQ state: ${designEqEnabled ? "ENABLED" : "DISABLED"}`);
   lines.push(`Calibration fingerprint: ${calibrationFingerprint || INCOMPLETE}`);
+  lines.push(`Result calibration fingerprint: ${optimisationResult?.calibrationFingerprint || INCOMPLETE}`);
+  lines.push(`Production authority check: ${resultIsValid ? "VALID" : "INVALID"}`);
+  if (!resultIsValid) {
+    lines.push(`Authority mismatch reason: ${authorityCheck.reason || INCOMPLETE}`);
+    if (authorityCheck.message) {
+      lines.push(`Authority mismatch detail: ${authorityCheck.message}`);
+    }
+    if (!calibrationFingerprintMatches && calibrationFingerprint) {
+      lines.push(`Calibration fingerprint mismatch: result=${optimisationResult?.calibrationFingerprint || INCOMPLETE}, active=${calibrationFingerprint}`);
+    }
+  }
 
-  // ── 2. Exact live RSP rows at 34 / 75 / 100 Hz ──
-  lines.push(sectionHeader("2. EXACT LIVE RSP ROWS (interpolated from canonical arrays)"));
+  // ── 2. Operating-level offset resolution ──
+  // Resolve the P14 integration diagnostic to obtain the selected operating
+  // offset, then compute the operating-level offset applied to the live graph.
+  const houseCurveShape = finalBassResponse?.canonicalHouseCurveShape || null;
+  const canonicalVerticalOffsetDb = num(finalBassResponse?.canonicalVerticalOffsetDb);
+
+  let p14Diagnostic = null;
+  if (Array.isArray(houseCurveShape) && houseCurveShape.length > 0 && targetDb !== null && extHz !== null) {
+    p14Diagnostic = diagnoseHouseCurveP14Integration({
+      houseCurveShape,
+      selectedP14TargetDb: targetDb,
+      requiredExtensionHz: extHz,
+      upperLfeHz: 120,
+    });
+  }
+  const selectedOperatingOffsetDb = p14Diagnostic ? num(p14Diagnostic.operatingOffsetDb) : null;
+  const operatingLevelOffsetDb = (selectedOperatingOffsetDb !== null && canonicalVerticalOffsetDb !== null)
+    ? selectedOperatingOffsetDb - canonicalVerticalOffsetDb
+    : null;
+
+  lines.push(sectionHeader("2. OPERATING-LEVEL OFFSET"));
+  lines.push(`canonicalVerticalOffsetDb: ${canonicalVerticalOffsetDb === null ? INCOMPLETE : canonicalVerticalOffsetDb.toFixed(4)}`);
+  lines.push(`selected operatingOffsetDb: ${selectedOperatingOffsetDb === null ? INCOMPLETE : selectedOperatingOffsetDb.toFixed(4)}`);
+  lines.push(`applied operatingLevelOffsetDb: ${operatingLevelOffsetDb === null ? INCOMPLETE : operatingLevelOffsetDb.toFixed(4)}`);
+
+  // ── 3. Exact live RSP rows at 34 / 75 / 100 Hz ──
+  lines.push(sectionHeader("3. EXACT LIVE RSP ROWS (operating-level shifted to match graph)"));
   // Raw SPL source: authoritative.rspRawCurve (the live RSP curve from the current simulation)
-  // Target SPL source: finalBassResponse.canonicalTargetCurve
+  // Target SPL source: finalBassResponse.canonicalHouseCurveShape + p14Diagnostic.operatingOffsetDb
   // Post-EQ SPL source: finalBassResponse.canonicalPostEqRsp
+  // All shifted by operatingLevelOffsetDb (raw and post-EQ) or operatingOffsetDb (target).
   const rawCurve = Array.isArray(rawRspCurve) ? rawRspCurve : null;
-  const targetCurve = finalBassResponse?.canonicalTargetCurve || null;
   const postEqCurve = finalBassResponse?.canonicalPostEqRsp || null;
 
   lines.push(`Source arrays:`);
-  lines.push(`  Raw: authoritative.rspRawCurve (${Array.isArray(rawCurve) ? rawCurve.length : "n/a"} points)`);
-  lines.push(`  Target: finalBassResponse.canonicalTargetCurve (${Array.isArray(targetCurve) ? targetCurve.length : "n/a"} points)`);
-  lines.push(`  Post-EQ: finalBassResponse.canonicalPostEqRsp (${Array.isArray(postEqCurve) ? postEqCurve.length : "n/a"} points)`);
+  lines.push(`  Raw: authoritative.rspRawCurve (${Array.isArray(rawCurve) ? rawCurve.length : INCOMPLETE} points)`);
+  lines.push(`  Target: finalBassResponse.canonicalHouseCurveShape + operatingOffsetDb (${Array.isArray(houseCurveShape) ? houseCurveShape.length : INCOMPLETE} points)`);
+  lines.push(`  Post-EQ: finalBassResponse.canonicalPostEqRsp (${Array.isArray(postEqCurve) ? postEqCurve.length : INCOMPLETE} points)`);
 
-  lines.push("");
-  lines.push("Freq(Hz)  Raw SPL    Target SPL  EQ contrib  Post-EQ SPL  Residual");
-  lines.push("--------  --------   ----------  ----------  -----------  --------");
+  if (!resultIsValid) {
+    lines.push("");
+    lines.push(`Canonical values: ${INCOMPLETE} (result is stale, mismatched or incomplete)`);
+    lines.push(`Mismatch reason: ${authorityCheck.reason || INCOMPLETE}`);
+  } else {
+    lines.push("");
+    lines.push("Freq(Hz)  Raw SPL    Target SPL  EQ contrib  Post-EQ SPL  Residual");
+    lines.push("--------  --------   ----------  ----------  -----------  --------");
 
-  PROBE_FREQS.forEach((freq) => {
-    const raw = interpolateSpl(rawCurve, freq);
-    const target = interpolateSpl(targetCurve, freq);
-    const postEq = interpolateSpl(postEqCurve, freq);
-    const eqContrib = (raw !== null && postEq !== null) ? (postEq - raw) : null;
-    const residual = (postEq !== null && target !== null) ? (postEq - target) : null;
-    lines.push(
-      `${freq.toString().padStart(8)}  ${
-        (raw === null ? INCOMPLETE : raw.toFixed(4)).padStart(8)
-      }   ${
-        (target === null ? INCOMPLETE : target.toFixed(4)).padStart(10)
-      }  ${
-        (eqContrib === null ? INCOMPLETE : eqContrib.toFixed(4)).padStart(10)
-      }  ${
-        (postEq === null ? INCOMPLETE : postEq.toFixed(4)).padStart(11)
-      }  ${
-        (residual === null ? INCOMPLETE : residual.toFixed(4)).padStart(8)
-      }`
-    );
-  });
+    PROBE_FREQS.forEach((freq) => {
+      const rawBase = interpolateSpl(rawCurve, freq);
+      const targetBase = interpolateSpl(houseCurveShape, freq);
+      const postEqBase = interpolateSpl(postEqCurve, freq);
 
-  // ── 3. Final selected filter bank ──
-  lines.push(sectionHeader("3. FINAL SELECTED FILTER BANK"));
+      const shiftedRaw = (rawBase !== null && operatingLevelOffsetDb !== null) ? rawBase + operatingLevelOffsetDb : null;
+      const shiftedTarget = (targetBase !== null && selectedOperatingOffsetDb !== null) ? targetBase + selectedOperatingOffsetDb : null;
+      const shiftedPostEq = (postEqBase !== null && operatingLevelOffsetDb !== null) ? postEqBase + operatingLevelOffsetDb : null;
+
+      const eqContrib = (shiftedPostEq !== null && shiftedRaw !== null) ? shiftedPostEq - shiftedRaw : null;
+      const residual = (shiftedPostEq !== null && shiftedTarget !== null) ? shiftedPostEq - shiftedTarget : null;
+
+      lines.push(
+        `${freq.toString().padStart(8)}  ${
+          (shiftedRaw === null ? INCOMPLETE : shiftedRaw.toFixed(4)).padStart(8)
+        }   ${
+          (shiftedTarget === null ? INCOMPLETE : shiftedTarget.toFixed(4)).padStart(10)
+        }  ${
+          (eqContrib === null ? INCOMPLETE : eqContrib.toFixed(4)).padStart(10)
+        }  ${
+          (shiftedPostEq === null ? INCOMPLETE : shiftedPostEq.toFixed(4)).padStart(11)
+        }  ${
+          (residual === null ? INCOMPLETE : residual.toFixed(4)).padStart(8)
+        }`
+      );
+    });
+  }
+
+  // ── 4. Final selected filter bank ──
+  lines.push(sectionHeader("4. FINAL SELECTED FILTER BANK"));
   const filterBank = finalBassResponse?.canonicalFilterBank || null;
   const filterBankSignature = finalBassResponse?.filterBankSignature || null;
   const selectedCandidateId = finalBassResponse?.selectedCandidateId || selectedCandidate?.candidateId || null;
   const startType = selectedCandidate?.startStrategy || selectedCandidate?.designEqFitProfile || null;
 
-  if (!Array.isArray(filterBank) || filterBank.length === 0) {
-    lines.push(`Filter bank: ${INCOMPLETE} (no completed canonical result)`);
+  if (!resultIsValid || !Array.isArray(filterBank) || filterBank.length === 0) {
+    lines.push(`Filter bank: ${INCOMPLETE} (no valid completed canonical result)`);
   } else {
     lines.push(`Filter count: ${filterBank.length}`);
     lines.push("Idx  Freq(Hz)    Gain(dB)    Q        Enabled");
@@ -183,14 +253,13 @@ export function buildLiveBassValidationReport({
       );
     });
   }
-  lines.push(`Filter-bank signature: ${filterBankSignature || INCOMPLETE}`);
-  lines.push(`Selected candidate ID: ${selectedCandidateId || INCOMPLETE}`);
-  lines.push(`Start type: ${startType || INCOMPLETE}`);
+  lines.push(`Filter-bank signature: ${resultIsValid ? (filterBankSignature || INCOMPLETE) : INCOMPLETE}`);
+  lines.push(`Selected candidate ID: ${resultIsValid ? (selectedCandidateId || INCOMPLETE) : INCOMPLETE}`);
+  lines.push(`Start type: ${resultIsValid ? (startType || INCOMPLETE) : INCOMPLETE}`);
 
-  // ── 4. P14 integration proof ──
-  lines.push(sectionHeader("4. P14 INTEGRATION PROOF"));
-  const houseCurveShape = finalBassResponse?.canonicalHouseCurveShape || null;
-  if (!Array.isArray(houseCurveShape) || houseCurveShape.length === 0 || targetDb === null || extHz === null) {
+  // ── 5. P14 integration proof ──
+  lines.push(sectionHeader("5. P14 INTEGRATION PROOF"));
+  if (!resultIsValid || !p14Diagnostic) {
     lines.push(`selectedP14TargetDb: ${targetDb === null ? INCOMPLETE : targetDb.toFixed(4)}`);
     lines.push(`requiredExtensionHz: ${extHz === null ? INCOMPLETE : extHz.toFixed(4)}`);
     lines.push(`includedBands: ${INCOMPLETE}`);
@@ -198,37 +267,50 @@ export function buildLiveBassValidationReport({
     lines.push(`integratedCWeightedDb: ${INCOMPLETE}`);
     lines.push(`errorDb: ${INCOMPLETE}`);
   } else {
-    const diag = diagnoseHouseCurveP14Integration({
-      houseCurveShape,
-      selectedP14TargetDb: targetDb,
-      requiredExtensionHz: extHz,
-      upperLfeHz: 120,
-    });
-    lines.push(`selectedP14TargetDb: ${diag.selectedP14TargetDb !== null ? diag.selectedP14TargetDb.toFixed(4) : INCOMPLETE}`);
-    lines.push(`requiredExtensionHz: ${diag.requiredExtensionHz !== null ? diag.requiredExtensionHz.toFixed(4) : INCOMPLETE}`);
-    lines.push(`includedBands: ${Array.isArray(diag.includedBands) && diag.includedBands.length ? diag.includedBands.map((b) => `${b.frequencyHz} Hz`).join(", ") : INCOMPLETE}`);
-    lines.push(`operatingOffsetDb: ${diag.operatingOffsetDb !== null ? diag.operatingOffsetDb.toFixed(4) : INCOMPLETE}`);
-    lines.push(`integratedCWeightedDb: ${diag.integratedCWeightedDb !== null ? diag.integratedCWeightedDb.toFixed(4) : INCOMPLETE}`);
-    lines.push(`errorDb: ${diag.errorDb !== null ? diag.errorDb.toFixed(4) : INCOMPLETE}`);
+    lines.push(`selectedP14TargetDb: ${p14Diagnostic.selectedP14TargetDb !== null ? p14Diagnostic.selectedP14TargetDb.toFixed(4) : INCOMPLETE}`);
+    lines.push(`requiredExtensionHz: ${p14Diagnostic.requiredExtensionHz !== null ? p14Diagnostic.requiredExtensionHz.toFixed(4) : INCOMPLETE}`);
+    lines.push(`includedBands: ${Array.isArray(p14Diagnostic.includedBands) && p14Diagnostic.includedBands.length ? p14Diagnostic.includedBands.map((b) => `${b.frequencyHz} Hz`).join(", ") : INCOMPLETE}`);
+    lines.push(`operatingOffsetDb: ${p14Diagnostic.operatingOffsetDb !== null ? p14Diagnostic.operatingOffsetDb.toFixed(4) : INCOMPLETE}`);
+    lines.push(`integratedCWeightedDb: ${p14Diagnostic.integratedCWeightedDb !== null ? p14Diagnostic.integratedCWeightedDb.toFixed(4) : INCOMPLETE}`);
+    lines.push(`errorDb: ${p14Diagnostic.errorDb !== null ? p14Diagnostic.errorDb.toFixed(4) : INCOMPLETE}`);
   }
 
-  // ── 5. Runtime lifecycle evidence ──
-  lines.push(sectionHeader("5. RUNTIME LIFECYCLE EVIDENCE"));
+  // ── 6. Runtime lifecycle evidence ──
+  lines.push(sectionHeader("6. RUNTIME LIFECYCLE EVIDENCE"));
   const trace = Array.isArray(lifecycle?.lifecycleTrace) ? lifecycle.lifecycleTrace : [];
-  const workerStartCount = trace.filter((entry) => entry?.stage === "Worker created").length;
-  const workerCompletionCount = trace.filter((entry) => entry?.stage === "Job marked complete").length;
-  lines.push(`Worker start count: ${workerStartCount}`);
-  lines.push(`Worker completion count: ${workerCompletionCount}`);
+  const replacementRunCount = num(lifecycle?.replacementRunCount);
+  const traceWorkerStarts = trace.filter((entry) => entry?.stage === "Worker created").length;
+  const traceWorkerCompletions = trace.filter((entry) => entry?.stage === "Job marked complete").length;
+  // No explicit lifetime worker counters exist in the lifecycle object; only
+  // the bounded lifecycle trace is available. Label accurately — do not
+  // present bounded trace counts as lifetime totals.
+  lines.push(`Lifecycle trace worker starts: ${traceWorkerStarts}`);
+  lines.push(`Lifecycle trace worker completions: ${traceWorkerCompletions}`);
+  if (replacementRunCount !== null) {
+    lines.push(`Replacement run count: ${replacementRunCount}`);
+  }
 
+  // ── 7. Signatures ──
+  lines.push(sectionHeader("7. SIGNATURES"));
   const rawResponseSignature = finalBassResponse?.rawResponseSignature || null;
   const postEqCurveSignature = finalBassResponse?.postEqCurveSignature || null;
-  const targetSignature = Array.isArray(targetCurve) && targetCurve.length ? buildCurveSignature(targetCurve) : null;
   const fbSignature = filterBankSignature || (Array.isArray(filterBank) && filterBank.length ? buildFilterBankSignature({ generatedFilterBank: filterBank }) : null);
 
-  lines.push(`Raw response-shape signature: ${rawResponseSignature || INCOMPLETE}`);
-  lines.push(`Post-EQ response-shape signature: ${postEqCurveSignature || INCOMPLETE}`);
-  lines.push(`Target signature: ${targetSignature || INCOMPLETE}`);
-  lines.push(`Filter-bank signature: ${fbSignature || INCOMPLETE}`);
+  // Target signature: generated from the CURRENT selected P14 target curve
+  // after applying the selected operating offset (house-curve shape + operatingOffsetDb).
+  let targetSignature = null;
+  if (resultIsValid && Array.isArray(houseCurveShape) && houseCurveShape.length && selectedOperatingOffsetDb !== null) {
+    const shiftedTargetCurve = houseCurveShape.map((point) => ({
+      frequency: num(point?.frequency ?? point?.hz),
+      spl: (num(point?.spl ?? point?.offsetDb ?? point?.db) ?? 0) + selectedOperatingOffsetDb,
+    })).filter((p) => p.frequency !== null);
+    targetSignature = buildCurveSignature(shiftedTargetCurve);
+  }
+
+  lines.push(`Raw response-shape signature: ${resultIsValid ? (rawResponseSignature || INCOMPLETE) : INCOMPLETE}`);
+  lines.push(`Post-EQ response-shape signature: ${resultIsValid ? (postEqCurveSignature || INCOMPLETE) : INCOMPLETE}`);
+  lines.push(`Target signature (selected P14 target, operating-offset shifted): ${targetSignature || INCOMPLETE}`);
+  lines.push(`Filter-bank signature: ${resultIsValid ? (fbSignature || INCOMPLETE) : INCOMPLETE}`);
 
   lines.push("");
   lines.push("END OF REPORT");
