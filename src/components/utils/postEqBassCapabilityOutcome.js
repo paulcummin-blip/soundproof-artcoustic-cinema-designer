@@ -2,11 +2,15 @@ const finiteLevel = (value) => Number.isFinite(Number(value))
   ? Math.max(0, Math.min(4, Math.round(Number(value))))
   : null;
 
+// P18 required-extension assessment from bassDesignPhilosophyAuthority.
+// When provided, P18 pass/fail is determined against the required extension
+// at the selected operating level — never by walking to a lower winning level.
 export function buildPostEqBassCapabilityOutcome({
   authority, requestedLevel, targetAnchorDb, scalarP14,
   achievedP18Level, achievedP18FrequencyHz,
   achievedP19Level, achievedP19VariationDb,
   achievedP20Level, achievedP20VariationDb, p20Available = false,
+  p18RequiredExtensionAssessment = null,
 } = {}) {
   const fallbackRequested = Math.max(1, Math.min(4, Math.round(Number(requestedLevel) || 4)));
   const requestedLabel = authority?.requested?.level || `L${fallbackRequested}`;
@@ -20,26 +24,39 @@ export function buildPostEqBassCapabilityOutcome({
     ?? (authority?.achieved?.level ? Number(String(authority.achieved.level).replace("L", "")) : null)
     ?? scalarP14?.level;
   const p14Level = authorityAchievedValue == null ? 0 : finiteLevel(authorityAchievedValue) ?? 0;
+  const p18RequiredPass = p18RequiredExtensionAssessment?.passes;
+  const p18Pass = p18RequiredPass != null ? p18RequiredPass : (finiteLevel(achievedP18Level) >= requested);
   const parameterLevels = {
-    P14: finiteLevel(p14Level), P18: finiteLevel(achievedP18Level), P19: finiteLevel(achievedP19Level),
+    P14: finiteLevel(p14Level),
+    P18: p18RequiredPass != null ? (p18Pass ? requested : 0) : finiteLevel(achievedP18Level),
+    P19: finiteLevel(achievedP19Level),
     ...(p20Available ? { P20: finiteLevel(achievedP20Level) } : {}),
   };
   const achievedLevel = p14Level;
-  const failedParameter = achievedLevel < requested ? "P14" : null;
-  const passesRequestedLevel = achievedLevel >= requested;
+  const p14Failed = achievedLevel < requested;
+  const p18Failed = !p18Pass;
+  const failedParameter = p14Failed ? "P14" : (p18Failed ? "P18" : null);
+  const passesRequestedLevel = !p14Failed && !p18Failed;
   const requestedTargetSplDb = Number.isFinite(Number(authority?.requested?.targetSplDb))
     ? Number(authority.requested.targetSplDb)
     : Number.isFinite(Number(targetAnchorDb)) ? Number(targetAnchorDb) : null;
   const limitation = passesRequestedLevel ? null : {
-    primary: failedParameter === "P14" ? "Subwoofer output capability" : `${failedParameter || "Bass"} performance at requested target`,
+    primary: failedParameter === "P14" ? "Subwoofer output capability"
+      : failedParameter === "P18" ? "Low-frequency extension at selected operating level"
+      : `${failedParameter || "Bass"} performance at requested target`,
     shortfallDb: failedParameter === "P14"
       ? authority?.limitation?.shortfallDb ?? requestedResult?.shortfallDb
         ?? (Number.isFinite(requestedTargetSplDb) && scalarComplete ? Math.max(0, requestedTargetSplDb - Number(scalarP14.value)) : null)
-      : null,
+      : failedParameter === "P18" && p18RequiredExtensionAssessment
+        ? (Number.isFinite(p18RequiredExtensionAssessment.shortfallHz) ? Math.abs(p18RequiredExtensionAssessment.shortfallHz) : null)
+        : null,
     limitingParameter: failedParameter,
     limitingFrequency: failedParameter === "P14" ? requestedResult?.limitingFrequencyHz ?? scalarP14?.limitingFrequency ?? null
-      : failedParameter === "P18" && Number.isFinite(achievedP18FrequencyHz) ? achievedP18FrequencyHz : null,
+      : failedParameter === "P18" && p18RequiredExtensionAssessment
+        ? p18RequiredExtensionAssessment.achievedExtensionHz ?? achievedP18FrequencyHz ?? null
+        : (failedParameter === "P18" && Number.isFinite(achievedP18FrequencyHz) ? achievedP18FrequencyHz : null),
     reason: failedParameter === "P14" ? "Subwoofer output capability limited"
+      : failedParameter === "P18" ? `System does not maintain the selected operating level down to ${p18RequiredExtensionAssessment?.requiredExtensionHz ?? "the required"} Hz.`
       : `${failedParameter || "Bass performance"} does not maintain the requested ${requestedLabel} target.`,
   };
   const achievedLabel = achievedLevel > 0 ? `L${achievedLevel}` : null;
@@ -78,5 +95,8 @@ export function buildPostEqBassCapabilityOutcome({
     failureMessage: limitation ? `${requestedLabel} was not achieved; overall capability reached ${achievedLabel || "below L1"}.` : null,
     authorityComplete: !!pairedComplete || scalarComplete,
     authoritySource: pairedComplete ? "position-aware-post-eq-design-authority" : "post-eq-product-capability-authority",
+    p18RequiredExtensionAssessment: p18RequiredExtensionAssessment || null,
+    p14Pass: !p14Failed,
+    p18Pass: !p18Failed,
   };
 }

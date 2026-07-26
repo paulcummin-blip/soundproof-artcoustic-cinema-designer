@@ -25,7 +25,10 @@ export default function BassResultsSummary({ compact = false, showPriority = tru
         ? <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>
         : <span>{formatted.statusText}</span>}
     </div>
-    <BassCapabilitySummary capability={shared.contract?.selectedCandidate?.postEqCapabilityAssessment} />
+    <BassCapabilitySummary
+      capability={shared.contract?.selectedCandidate?.postEqCapabilityAssessment}
+      targetWarning={shared.contract?.selectedCandidate?.targetWarning}
+    />
     <BassDesignRecommendation recommendation={shared.contract?.designRecommendation} />
   </div>;
 }

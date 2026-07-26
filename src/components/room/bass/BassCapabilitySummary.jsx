@@ -1,18 +1,23 @@
-export default function BassCapabilitySummary({ capability }) {
-  if (!capability) return null;
-  const limitation = capability.limitation;
-  const basis = capability.requested?.targetBasis === "recommended" ? "Recommended" : "Minimum";
-  const targetDb = capability.requested?.targetSplDb;
-  const target = Number.isFinite(targetDb) ? `${basis} ${capability.requested?.level || "—"} · ${targetDb} dBC` : "—";
-  const availableDb = capability.maximumAvailableSplAfterEqDb;
+import BassTargetWarning from "@/components/room/bass/BassTargetWarning";
+
+export default function BassCapabilitySummary({ capability, targetWarning }) {
+  if (!capability && !targetWarning) return null;
+  const limitation = capability?.limitation;
+  const basis = capability?.requested?.targetBasis === "recommended" ? "Recommended" : "Minimum";
+  const targetDb = capability?.requested?.targetSplDb;
+  const target = Number.isFinite(targetDb) ? `${basis} ${capability?.requested?.level || "—"} · ${targetDb} dBC` : "—";
+  const availableDb = capability?.maximumAvailableSplAfterEqDb;
   return <div className="mt-2 rounded-md border border-border bg-card p-3 text-xs">
-    <div className="font-semibold text-foreground">P14 Bass SPL Authority</div>
-    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-      <div><span className="text-muted-foreground">Target:</span> {target}</div>
-      <div><span className="text-muted-foreground">Available capability:</span> {Number.isFinite(availableDb) ? `${availableDb.toFixed(1)} dBC` : "—"}</div>
-      <div><span className="text-muted-foreground">Result:</span> {capability.passesRequestedLevel ? "PASS" : "FAIL"}</div>
-      <div><span className="text-muted-foreground">Limitation:</span> {limitation ? "Subwoofer output capability" : "None"}</div>
-    </div>
-    {limitation && <div className="mt-2 font-medium text-destructive">Shortfall: {Number.isFinite(capability.shortfallDb) ? `${capability.shortfallDb.toFixed(1)} dB` : "—"}{Number.isFinite(capability.limitingFrequency) ? ` at ${capability.limitingFrequency.toFixed(1)} Hz` : ""}</div>}
+    {capability && <>
+      <div className="font-semibold text-foreground">P14 Bass SPL Authority</div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div><span className="text-muted-foreground">Target:</span> {target}</div>
+        <div><span className="text-muted-foreground">Available capability:</span> {Number.isFinite(availableDb) ? `${availableDb.toFixed(1)} dBC` : "—"}</div>
+        <div><span className="text-muted-foreground">Result:</span> {capability.passesRequestedLevel ? "PASS" : "FAIL"}</div>
+        <div><span className="text-muted-foreground">Limitation:</span> {limitation ? limitation.primary : "None"}</div>
+      </div>
+      {limitation && <div className="mt-2 font-medium text-destructive">Shortfall: {Number.isFinite(capability.shortfallDb) ? `${capability.shortfallDb.toFixed(1)} dB` : "—"}{Number.isFinite(capability.limitingFrequency) ? ` at ${capability.limitingFrequency.toFixed(1)} Hz` : ""}</div>}
+    </>}
+    <BassTargetWarning warning={targetWarning} />
   </div>;
 }

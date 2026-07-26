@@ -4,6 +4,7 @@ import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/co
 import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassCapabilityOutcome";
+import { assessP18AgainstRequiredExtension, requiredP14ExtensionHz, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
 
 const numericLevel = (label) => Number(String(label || "").replace("L", "")) || 0;
 
@@ -65,9 +66,21 @@ export function evaluateCanonicalBassAuthority({
   const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
   const requested = definitions.find((definition) => definition.value === requestedLevel) || definitions.at(-1);
   const selectedTargetDb = requested?.p14TargetDb ?? null;
+  const requiredExtensionHz = requiredP14ExtensionHz(p14TargetBasis, requestedLevel);
   const requestedP14Pass = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
     ? achievedP14Db >= selectedTargetDb
     : null;
+  // P18: assess the fixed post-EQ design against the required extension at the
+  // selected operating level. Do not lower the operating level or shorten the
+  // target curve to create a pass.
+  const p18RequiredExtensionAssessment = assessP18AgainstRequiredExtension({
+    rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
+    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
+    selectedP14TargetDb: selectedTargetDb,
+    requiredExtensionHz,
+    p18CutoffDb: requested?.p18CutoffDb,
+  });
+  const requestedP18Pass = p18RequiredExtensionAssessment?.passes ?? null;
   const postEqCapabilityAssessment = buildPostEqBassCapabilityOutcome({
     authority: { selectedTargetBasis: p14TargetBasis },
     requestedLevel,
@@ -80,6 +93,15 @@ export function evaluateCanonicalBassAuthority({
     achievedP20Level,
     achievedP20VariationDb,
     p20Available,
+    p18RequiredExtensionAssessment,
+  });
+  const targetWarning = buildBassTargetWarning({
+    p14Pass: requestedP14Pass,
+    p18Pass: requestedP18Pass,
+    p14ShortfallDb: Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb) ? selectedTargetDb - achievedP14Db : null,
+    p14LimitingFrequencyHz: p14?.limitingFrequency ?? null,
+    p18ShortfallHz: p18RequiredExtensionAssessment?.shortfallHz ?? null,
+    p18RequiredExtensionHz: requiredExtensionHz,
   });
 
   return {
@@ -122,5 +144,9 @@ export function evaluateCanonicalBassAuthority({
     p20Available,
     postEqCapabilityAssessment,
     limitation: postEqCapabilityAssessment.limitation,
+    requestedP18Pass,
+    p18RequiredExtensionAssessment,
+    requiredExtensionHz,
+    targetWarning,
   };
 }
