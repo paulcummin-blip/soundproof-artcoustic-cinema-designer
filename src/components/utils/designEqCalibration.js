@@ -703,6 +703,49 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     };
   }) : [];
 
+  // Seed selection — a physically valid checkpoint with enabled filters that
+  // improves RMS meaningfully without worsening max residual by more than a
+  // small acoustic tolerance. This seed may differ from the selected checkpoint
+  // (which is chosen purely by lowest max deviation) and is used to seed the
+  // Accuracy and house-curve fitters so they start from a useful correction
+  // rather than an empty bank.
+  const MAX_RESIDUAL_SEED_TOLERANCE_DB = 0.10;
+  const MIN_RMS_SEED_IMPROVEMENT_DB = 0.20;
+  const baselineRmsDeviationDb = baselineCheckpoint.rmsDeviationDb;
+  const baselineMaxDeviationDb = baselineCheckpoint.maximumAbsoluteDeviationDb;
+  const seedEligibleCheckpoints = finiteCheckpoints.filter((checkpoint) => {
+    if (checkpoint.filters.length === 0) return false;
+    if (checkpoint.broadBelowTargetWorsening) return false;
+    if (!Number.isFinite(baselineRmsDeviationDb) || !Number.isFinite(baselineMaxDeviationDb)) return false;
+    const rmsImprovementDb = baselineRmsDeviationDb - checkpoint.rmsDeviationDb;
+    const maxResidualWorseningDb = checkpoint.maximumAbsoluteDeviationDb - baselineMaxDeviationDb;
+    return rmsImprovementDb >= MIN_RMS_SEED_IMPROVEMENT_DB
+      && maxResidualWorseningDb <= MAX_RESIDUAL_SEED_TOLERANCE_DB;
+  }).sort((a, b) =>
+    a.rmsDeviationDb - b.rmsDeviationDb
+    || a.maximumAbsoluteDeviationDb - b.maximumAbsoluteDeviationDb
+    || a.filters.length - b.filters.length);
+  // Verify aggregate boost/cut limits for each seed-eligible checkpoint in
+  // rank order. Pick the first that passes all bank limits — physical
+  // validation and protected-null rules are already guaranteed by the
+  // checkpoint creation loop, so only the aggregate limit check remains.
+  let seedCheckpoint = null;
+  for (const checkpoint of seedEligibleCheckpoints) {
+    const limits = evaluateProvisionalBankLimits(
+      checkpoint.filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile,
+    );
+    if (limits.allOk) {
+      seedCheckpoint = checkpoint;
+      break;
+    }
+  }
+  const standardSeedFilters = seedCheckpoint
+    ? seedCheckpoint.filters.map((filter) => ({ ...filter }))
+    : [];
+  const seedSelectionReason = !collectDiagnostics ? null : seedCheckpoint
+    ? `Seed checkpoint selected: RMS improved by ${(baselineRmsDeviationDb - seedCheckpoint.rmsDeviationDb).toFixed(3)} dB vs baseline, max residual worsened by ${(seedCheckpoint.maximumAbsoluteDeviationDb - baselineMaxDeviationDb).toFixed(3)} dB (within ${MAX_RESIDUAL_SEED_TOLERANCE_DB} dB tolerance).`
+    : "No seed checkpoint qualified: no checkpoint with enabled filters met the RMS improvement and max residual tolerance criteria.";
+
   const selectedFilters = selectedCheckpoint.filters;
   const filterBank = emptyFilters(selectedFilters);
   const combinedEqCurve = raw.map((point) => ({
@@ -816,6 +859,16 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       minimumSpl: selectedCheckpoint.smoothedMinimumSpl,
       broadBelowTargetWorsening: selectedCheckpoint.broadBelowTargetWorsening,
     },
+    standardSeedFilters,
+    bestSeedFilters: standardSeedFilters,
+    seedCheckpoint: seedCheckpoint ? {
+      enabledFilterCount: seedCheckpoint.filters.length,
+      maximumAbsoluteDeviationDb: seedCheckpoint.maximumAbsoluteDeviationDb,
+      rmsDeviationDb: seedCheckpoint.rmsDeviationDb,
+      worstResidualFrequencyHz: seedCheckpoint.worstResidualFrequencyHz,
+      broadBelowTargetWorsening: seedCheckpoint.broadBelowTargetWorsening,
+    } : null,
+    seedSelectionReason,
     checkpointSummaries,
     detectedRegions,
     candidateAcceptanceDiagnostics,

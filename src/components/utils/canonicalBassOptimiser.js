@@ -180,7 +180,17 @@ export function generateCanonicalCandidatePool({
   eqResults.push(standardEq);
   completedTasks += 1;
   report("Canonical standard fit complete");
-  const seed = (standardEq.filters || []).filter((filter) => filter?.enabled);
+  // Seed the Accuracy and house-curve fitters from the standard fit's seed
+  // checkpoint — a physically valid checkpoint with enabled filters that
+  // improves RMS meaningfully without worsening max residual by more than a
+  // small tolerance. Falls back to the selected checkpoint filters only if no
+  // useful seed field exists. Never forces a seed when none qualified.
+  const seedSource = (standardEq.standardSeedFilters && standardEq.standardSeedFilters.length)
+    ? standardEq.standardSeedFilters
+    : (standardEq.bestSeedFilters && standardEq.bestSeedFilters.length)
+      ? standardEq.bestSeedFilters
+      : (standardEq.filters || []);
+  const seed = seedSource.filter((filter) => filter?.enabled);
   const accuracyEq = calculateDesignEqCurve(rawCurve, null, [], fitOptions("accuracy", seed));
   eqResults.push(accuracyEq);
   completedTasks += 1;
