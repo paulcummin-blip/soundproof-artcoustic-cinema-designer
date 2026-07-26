@@ -5,6 +5,7 @@
 import { DESIGN_EQ_FIT_PROFILES } from "@/components/utils/designEqCalibration";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { resolveRequestedRp22HouseCurveTarget } from "@/components/utils/requestedRp22HouseCurveAuthority";
+import { requiredP14ExtensionHz } from "@/components/utils/p14HouseCurveNormalisation";
 
 // The sorted set of fit profiles actually evaluated by the optimiser.
 // Derived from the same exported DESIGN_EQ_FIT_PROFILES used by
@@ -43,6 +44,7 @@ export function deriveRequestedCalibrationConfig({
     selectedP14TargetBasis: p14TargetBasis,
     selectedP14Level: requestedLevel,
     selectedP14TargetDb: targetSpl,
+    selectedP14RequiredExtensionHz: requiredP14ExtensionHz(p14TargetBasis, requestedLevel),
     requestedAssessmentStartHz: null,
     // Assessment end / transition — real input to generateCandidatePool.
     requestedAssessmentEndHz: transitionHz,

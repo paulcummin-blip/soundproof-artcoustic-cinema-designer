@@ -31,6 +31,7 @@ import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedN
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
+import { normaliseHouseCurveToP14Total } from "@/components/utils/p14HouseCurveNormalisation";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -303,9 +304,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const hasValidDetailedResult = !!designEqEnabled &&
     finalOptimisedBassAuthorityMatches(optimisationResult?.finalOptimisedBassResponse) && rspRawCurve.length > 0;
   const selectedP14TargetDb = authoritative.requested?.selectedP14TargetDb;
-  const canonicalVerticalOffsetDb = optimisationResult?.finalOptimisedBassResponse?.canonicalVerticalOffsetDb;
-  const operatingLevelOffsetDb = Number.isFinite(selectedP14TargetDb) && Number.isFinite(canonicalVerticalOffsetDb)
-    ? selectedP14TargetDb - canonicalVerticalOffsetDb
+  const selectedP14RequiredExtensionHz = authoritative.requested?.selectedP14RequiredExtensionHz;
+  const finalBassResponse = optimisationResult?.finalOptimisedBassResponse;
+  const canonicalVerticalOffsetDb = finalBassResponse?.canonicalVerticalOffsetDb;
+  const p14HouseCurveNormalisation = useMemo(() => normaliseHouseCurveToP14Total({
+    houseCurveShape: finalBassResponse?.canonicalHouseCurveShape,
+    selectedP14TargetDb,
+    requiredExtensionHz: selectedP14RequiredExtensionHz,
+    upperLfeHz: 120,
+  }), [finalBassResponse?.canonicalHouseCurveShape, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
+  const operatingLevelOffsetDb = Number.isFinite(p14HouseCurveNormalisation?.operatingCurveOffsetDb) && Number.isFinite(canonicalVerticalOffsetDb)
+    ? p14HouseCurveNormalisation.operatingCurveOffsetDb - canonicalVerticalOffsetDb
     : 0;
 
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
@@ -649,6 +658,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {graphStatusText}
         </div>
+        {p14HouseCurveNormalisation && <div className="mt-2 text-[10px] text-muted-foreground">
+          <div>P14 operating target: {p14HouseCurveNormalisation.selectedP14TargetDb} dBC total, C-weighted</div>
+          <div>Required extension: {p14HouseCurveNormalisation.requiredExtensionHz} Hz</div>
+        </div>}
         <BassEngineeringDetails
           enabled={includeDiagnostics}
           designEqEnabled={designEqEnabled}
