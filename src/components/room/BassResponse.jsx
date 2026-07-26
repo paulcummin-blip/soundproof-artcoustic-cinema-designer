@@ -34,6 +34,7 @@ import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeC
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
 import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTraceButton";
 import EqDiscoveryAuditPanel from "@/components/room/bass/EqDiscoveryAuditPanel";
+import Test11GentlePeakCutValidation from "@/components/room/bass/Test11GentlePeakCutValidation";
 import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCurveNormalisation";
 
 const IS_DEVELOPMENT_MODE = false;
@@ -755,6 +756,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
       {/* ── EQ Discovery Audit — engineering-only, below the Bass Response graph ── */}
       {includeDiagnostics && <EqDiscoveryAuditPanel />}
+
+      {/* ── TEST 11 — Gentle Peak-Cut Runtime Validation — engineering-only, read-only ── */}
+      {includeDiagnostics && <Test11GentlePeakCutValidation />}
 
       {/* ── Active Q Strategy Label (debug mode only) ── */}
       {IS_DEVELOPMENT_MODE && qStrategy === 'freq_dependent_cap' && (
