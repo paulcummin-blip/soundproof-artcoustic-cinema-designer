@@ -12,6 +12,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { getLatestDiagRun, getDiagRuns } from "./bassDiagTokenTrace";
 
 const UNAVAILABLE = "UNAVAILABLE";
 const MISSING = "MISSING";
@@ -236,6 +237,9 @@ export default function Test11GentlePeakCutValidation() {
     };
   }, [hasResult, sharedBassResults, optimisationResult, selectedCandidate]);
 
+  const diagRun = useMemo(() => getLatestDiagRun(), [open, sharedBassResults?.lifecycle?.resultFingerprint, sharedBassResults?.lifecycle?.activeJobId, acceptance.length]);
+  const allDiagRuns = useMemo(() => getDiagRuns(), [open, sharedBassResults?.lifecycle?.resultFingerprint, sharedBassResults?.lifecycle?.activeJobId, acceptance.length]);
+
   const renderRow = (row) => {
     const t = row.trial;
     const generated = row.generated;
@@ -363,6 +367,103 @@ export default function Test11GentlePeakCutValidation() {
               </div>
             </div>
           )}
+          {hasResult && diagRun && (() => {
+            const boolStr = (v) => v === true ? "true" : v === false ? "false" : MISSING;
+            const s = (name) => diagRun.stages?.[name];
+            const ts = (name) => { const t = s(name)?.ts; return t != null ? new Date(t).toISOString().split("T")[1].replace("Z", "") : MISSING; };
+            const onRetryStage = s("onRetry");
+            const autoStage = s("automatic-update");
+            const requestManualStage = s("requestManual");
+            const pendingStage = s("requestManual-pending-assigned") || s("updateInputs-pending-assigned");
+            const startPendingStage = s("startPending");
+            const postMessageStage = s("worker.postMessage");
+            const workerEventStage = s("worker-event-received");
+            const completedStage = s("worker-completed");
+            const checkboxValue = onRetryStage?.checkboxValueAtClick ?? autoStage?.checkboxValueAtClick ?? diagRun.checkboxClickValue;
+            const onRetryArg = onRetryStage?.onRetryArg;
+            const requestManualCd = requestManualStage?.requestManualCollectDiagnostics;
+            const requestManualForce = requestManualStage?.requestManualForce;
+            const pendingCd = pendingStage?.pendingCollectDiagnostics;
+            const pendingToken = pendingStage?.pendingToken;
+            const startPendingCd = startPendingStage?.startPendingCollectDiagnostics;
+            const startPendingToken = startPendingStage?.startPendingToken;
+            const postMessageCd = postMessageStage?.postMessageCollectDiagnostics;
+            const postMessageRequestId = postMessageStage?.postMessageRequestId;
+            const postMessageToken = postMessageStage?.postMessageToken;
+            const workerEventCd = workerEventStage?.workerEventCollectDiagnostics;
+            const workerEventRequestId = workerEventStage?.workerEventRequestId;
+            const workerEventToken = workerEventStage?.workerEventToken;
+            const completedRequestId = completedStage?.resultRequestId ?? completedStage?.completedRequestId;
+            const completedToken = completedStage?.resultToken ?? completedStage?.completedToken;
+            const allTokens = [diagRun.token, pendingToken, startPendingToken, postMessageToken, workerEventToken, completedToken].filter((t) => t != null);
+            const allRequestIds = [postMessageRequestId, workerEventRequestId, completedRequestId].filter((r) => r != null);
+            const tokensMatch = allTokens.length > 0 && allTokens.every((t) => t === allTokens[0]);
+            const requestIdsMatch = allRequestIds.length > 0 && allRequestIds.every((r) => r === allRequestIds[0]);
+            const allSameRun = tokensMatch && requestIdsMatch;
+            const cdValues = [
+              { stage: "1. Checkbox at click", value: checkboxValue },
+              { stage: "3. onRetry argument", value: onRetryArg },
+              { stage: "4. requestManual collectDiagnostics", value: requestManualCd },
+              { stage: "6. Pending collectDiagnostics", value: pendingCd },
+              { stage: "8. startPending collectDiagnostics", value: startPendingCd },
+              { stage: "10. worker.postMessage collectDiagnostics", value: postMessageCd },
+              { stage: "13. Worker event received collectDiagnostics", value: workerEventCd },
+            ];
+            const firstDiff = cdValues.find((v) => v.value != null && v.value !== true);
+            const firstDiffStage = firstDiff ? firstDiff.stage : "none";
+            const allTrue = cdValues.every((v) => v.value === true);
+            return (
+              <div style={{ border: "1px solid #DCDBD6", borderRadius: 6, background: "#FFF", padding: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#1B1A1A", fontFamily: "monospace", marginBottom: 6 }}>
+                  TEST 11E — RUN-CORRELATED collectDiagnostics DISPATCH TRACE
+                </div>
+                <div style={{ fontSize: 10, fontFamily: "monospace", color: "#1B1A1A", lineHeight: 1.6 }}>
+                  <div>Origin: <b>{diagRun.origin || MISSING}</b></div>
+                  <div>1. Checkbox includeDiagnostics at click: <b>{boolStr(checkboxValue)}</b></div>
+                  <div>2. Generated diagnostic request token: <b>{diagRun.token || MISSING}</b></div>
+                  <div>3. onRetry argument: <b>{onRetryArg === undefined ? MISSING : boolStr(onRetryArg)}</b></div>
+                  <div>4. requestManual collectDiagnostics argument: <b>{boolStr(requestManualCd)}</b></div>
+                  <div>5. requestManual force argument: <b>{boolStr(requestManualForce)}</b></div>
+                  <div>6. Pending collectDiagnostics after assignment: <b>{boolStr(pendingCd)}</b></div>
+                  <div>7. Pending diagnostic request token: <b>{pendingToken || MISSING}</b></div>
+                  <div>8. startPending collectDiagnostics: <b>{boolStr(startPendingCd)}</b></div>
+                  <div>9. startPending diagnostic request token: <b>{startPendingToken || MISSING}</b></div>
+                  <div>10. worker.postMessage collectDiagnostics: <b>{boolStr(postMessageCd)}</b></div>
+                  <div>11. worker.postMessage requestId: <b>{postMessageRequestId || MISSING}</b></div>
+                  <div>12. worker.postMessage diagnostic request token: <b>{postMessageToken || MISSING}</b></div>
+                  <div>13. Worker event received collectDiagnostics: <b>{boolStr(workerEventCd)}</b></div>
+                  <div>14. Worker event requestId: <b>{workerEventRequestId || MISSING}</b></div>
+                  <div>15. Worker event diagnostic request token: <b>{workerEventToken || MISSING}</b></div>
+                  <div>16. Completed result requestId: <b>{completedRequestId || MISSING}</b></div>
+                  <div>17. Completed result diagnostic request token: <b>{completedToken || MISSING}</b></div>
+                  <div style={{ marginTop: 4, fontWeight: 700, color: allSameRun ? "#16a34a" : "#dc2626" }}>
+                    18. All tokens and requestIds same run: <b>{allSameRun ? "YES ✓" : "NO ✗"}</b>
+                  </div>
+                  {allTokens.length > 0 && <div style={{ color: "#625143" }}>Token match: {tokensMatch ? "PASS" : "FAIL"} ({allTokens.length} tokens)</div>}
+                  {allRequestIds.length > 0 && <div style={{ color: "#625143" }}>RequestId match: {requestIdsMatch ? "PASS" : "FAIL"} ({allRequestIds.length} ids)</div>}
+                  <div style={{ marginTop: 6, fontWeight: 700, color: allTrue ? "#16a34a" : "#dc2626" }}>
+                    FIRST STAGE WHERE collectDiagnostics DIFFERS: {firstDiffStage === "none" ? "none — all true" : firstDiffStage}
+                  </div>
+                  <div style={{ marginTop: 8, fontWeight: 700 }}>Timestamps:</div>
+                  <div>Checkbox click: <b>{diagRun.checkboxClickTs != null ? new Date(diagRun.checkboxClickTs).toISOString().split("T")[1].replace("Z", "") : MISSING}</b></div>
+                  <div>requestManual: <b>{ts("requestManual")}</b></div>
+                  <div>worker.postMessage: <b>{ts("worker.postMessage")}</b></div>
+                  <div>Worker event received: <b>{ts("worker-event-received")}</b></div>
+                  <div>Worker completed: <b>{ts("worker-completed")}</b></div>
+                </div>
+                {allDiagRuns.length > 1 && (
+                  <div style={{ marginTop: 8, fontSize: 10, fontFamily: "monospace", color: "#625143" }}>
+                    <div style={{ fontWeight: 700, marginBottom: 2 }}>All recorded runs (latest at bottom):</div>
+                    {allDiagRuns.map((r) => (
+                      <div key={r.token} style={{ color: r.token === diagRun.token ? "#1B1A1A" : "#9CA3AF" }}>
+                        {r.token} | {r.origin || MISSING} | stages: {Object.keys(r.stages).join(", ") || "none"}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {!hasResult && (
             <div style={{ fontSize: 11, color: "#8B7F76", fontFamily: "monospace", padding: 12 }}>
               No completed canonical result available. Recalculate once with engineering diagnostics enabled.

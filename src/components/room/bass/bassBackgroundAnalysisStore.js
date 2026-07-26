@@ -9,6 +9,7 @@ import {
   validateOptimiserVersions,
 } from "./bassOptimiserWorkerProtocol";
 import { validateCachedBassResult } from "./bassResultAuthority";
+import { recordDiagStage } from "./bassDiagTokenTrace";
 
 export const BASS_BACKGROUND_SCHEMA_VERSION = bassOptimiserVersionSignature();
 export const BASS_BACKGROUND_DEBOUNCE_MS = 1000;
@@ -167,7 +168,7 @@ export class BassBackgroundAnalysisController {
     return true;
   }
 
-  updateInputs({ valid, fingerprint, legacyFingerprint = null, payload, identity = null, collectDiagnostics = false }) {
+  updateInputs({ valid, fingerprint, legacyFingerprint = null, payload, identity = null, collectDiagnostics = false, diagnosticToken = null }) {
     if (!valid || !fingerprint) {
       this.cancelActive();
       const staleResult = this.state.result || this.state.staleResult;
@@ -226,7 +227,8 @@ export class BassBackgroundAnalysisController {
       return { action: "cache_hit" };
     }
 
-    this.pending = { fingerprint, payload, identity, collectDiagnostics };
+    this.pending = { fingerprint, payload, identity, collectDiagnostics, diagnosticToken };
+    recordDiagStage(diagnosticToken, "updateInputs-pending-assigned", { pendingCollectDiagnostics: collectDiagnostics, pendingToken: diagnosticToken });
     const queuedAtMs = this.now();
     this.emit({
       status: staleResult ? "stale" : "queued",
@@ -242,7 +244,8 @@ export class BassBackgroundAnalysisController {
     return { action: "queued" };
   }
 
-  requestManual({ fingerprint, payload, identity = null, collectDiagnostics = false, force = false }) {
+  requestManual({ fingerprint, payload, identity = null, collectDiagnostics = false, force = false, diagnosticToken = null }) {
+    recordDiagStage(diagnosticToken, "requestManual", { requestManualCollectDiagnostics: collectDiagnostics, requestManualForce: force });
     if (!fingerprint) return { action: "idle" };
     if (!force && (this.state.status === "queued" || this.state.status === "calculating") && this.state.currentJobFingerprint === fingerprint) {
       return { action: "duplicate_ignored" };
@@ -250,7 +253,8 @@ export class BassBackgroundAnalysisController {
     if (!force) return this.updateInputs({ valid: true, fingerprint, payload, identity, collectDiagnostics });
     this.cancelActive();
     const staleResult = this.state.result || this.state.staleResult;
-    this.pending = { fingerprint, payload, identity, collectDiagnostics };
+    this.pending = { fingerprint, payload, identity, collectDiagnostics, diagnosticToken };
+    recordDiagStage(diagnosticToken, "requestManual-pending-assigned", { pendingCollectDiagnostics: this.pending.collectDiagnostics, pendingToken: this.pending.diagnosticToken });
     this.emit({
       status: staleResult ? "stale" : "queued", currentCalibrationFingerprint: fingerprint,
       currentJobFingerprint: fingerprint, resultFingerprint: null, queuedAtMs: this.now(),
@@ -270,7 +274,8 @@ export class BassBackgroundAnalysisController {
     if (this.activeRequest?.fingerprint === pending.fingerprint) return;
     const requestId = `bass-${++this.requestSequence}`;
     const startedAtMs = this.now();
-    this.activeRequest = { requestId, fingerprint: pending.fingerprint, identity: pending.identity, startedAtMs };
+    this.activeRequest = { requestId, fingerprint: pending.fingerprint, identity: pending.identity, startedAtMs, diagnosticToken: pending.diagnosticToken };
+    recordDiagStage(pending.diagnosticToken, "startPending", { startPendingCollectDiagnostics: !!pending.collectDiagnostics, startPendingToken: pending.diagnosticToken, startPendingRequestId: requestId });
     try {
       const worker = this.workerFactory();
       this.worker = worker;
@@ -279,7 +284,9 @@ export class BassBackgroundAnalysisController {
       worker.onmessage = (event) => this.handleWorkerMessage(event?.data || {});
       worker.onerror = (event) => this.handleWorkerError(event?.message || "Worker error", requestId, pending.fingerprint);
       worker.onmessageerror = () => this.handleWorkerError("Worker message could not be decoded", requestId, pending.fingerprint);
-      worker.postMessage({ requestId, fingerprint: pending.fingerprint, identity: pending.identity, ...BASS_OPTIMISER_VERSIONS, payload: pending.payload, collectDiagnostics: !!pending.collectDiagnostics, dispatchedAtMs: this.now() });
+      const postMessageData = { requestId, fingerprint: pending.fingerprint, identity: pending.identity, ...BASS_OPTIMISER_VERSIONS, payload: pending.payload, collectDiagnostics: !!pending.collectDiagnostics, dispatchedAtMs: this.now(), diagnosticToken: pending.diagnosticToken };
+      recordDiagStage(pending.diagnosticToken, "worker.postMessage", { postMessageCollectDiagnostics: postMessageData.collectDiagnostics, postMessageRequestId: postMessageData.requestId, postMessageToken: postMessageData.diagnosticToken });
+      worker.postMessage(postMessageData);
       this.stage("Worker request posted", { jobId: requestId });
       this.armHeartbeatTimer(requestId);
       this.terminalTimer = this.setTimer(() => this.handleWorkerError(`Bass analysis watchdog expired at: ${this.state.progressStage || "unknown stage"}`, requestId, pending.fingerprint), BASS_TERMINAL_WATCHDOG_MS);
@@ -291,6 +298,7 @@ export class BassBackgroundAnalysisController {
   handleWorkerMessage(message) {
     const active = this.activeRequest;
     if (!active || message.requestId !== active.requestId) return false;
+    recordDiagStage(active.diagnosticToken, "worker-event-received", { workerEventCollectDiagnostics: message.collectDiagnostics, workerEventRequestId: message.requestId, workerEventToken: message.diagnosticToken });
     if (message.fingerprint !== active.fingerprint) return this.handleIdentityMismatch(active, message, "fingerprint");
     const envelopeCompatibility = validateOptimiserVersions(message, BASS_OPTIMISER_VERSIONS);
     if (!envelopeCompatibility.valid) return this.handleCompatibilityMismatch(active, message, envelopeCompatibility.message);
@@ -317,7 +325,10 @@ export class BassBackgroundAnalysisController {
       engineVersion: message.engineVersion,
       resultSchemaVersion: message.resultSchemaVersion,
       calculationTimeMs: completedAtMs - active.startedAtMs, completedAtMs,
+      diagnosticToken: active.diagnosticToken,
+      workerRequestId: active.requestId,
     };
+    recordDiagStage(active.diagnosticToken, "worker-completed", { completedRequestId: active.requestId, completedToken: active.diagnosticToken, resultRequestId: result.workerRequestId, resultToken: result.diagnosticToken });
     const validation = validateCachedBassResult(result, { fingerprint: active.fingerprint });
     if (!validation.valid) return this.handleCompatibilityMismatch(active, message, `Rejected incompatible optimiser result: ${validation.message || validation.reason}`);
     this.stage("Main thread received result", { jobId: active.requestId });

@@ -1,4 +1,5 @@
 import React from "react";
+import { recordCheckboxClick } from "./bassDiagTokenTrace";
 
 export default function BackgroundAnalysisControls({ lifecycle, onRecalculate, disabled, includeDiagnostics, onDiagnosticsChange }) {
   return (
@@ -11,7 +12,7 @@ export default function BackgroundAnalysisControls({ lifecycle, onRecalculate, d
         Recalculate detailed EQ &amp; RP22
       </button>
       <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#625143", fontFamily: "monospace", cursor: "pointer" }}>
-        <input type="checkbox" checked={includeDiagnostics} onChange={(event) => onDiagnosticsChange(event.target.checked)} />
+        <input type="checkbox" checked={includeDiagnostics} onChange={(event) => { recordCheckboxClick(event.target.checked); onDiagnosticsChange(event.target.checked); }} />
         Include engineering diagnostics
       </label>
     </div>
