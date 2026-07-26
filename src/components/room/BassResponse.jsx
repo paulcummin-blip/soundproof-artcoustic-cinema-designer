@@ -31,7 +31,7 @@ import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedN
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
-import { normaliseHouseCurveToP14Total } from "@/components/utils/p14HouseCurveNormalisation";
+import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCurveNormalisation";
 
 const IS_DEVELOPMENT_MODE = false;
 
@@ -317,6 +317,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     ? p14HouseCurveNormalisation.operatingCurveOffsetDb - canonicalVerticalOffsetDb
     : 0;
 
+  // Development diagnostic — proves the rendered house curve integrates to the
+  // selected P14 target (e.g. 109 dBC for Minimum L1). Acceptance: |errorDb| <= 0.05 dB.
+  const p14IntegrationDiagnostic = useMemo(() => diagnoseHouseCurveP14Integration({
+    houseCurveShape: finalBassResponse?.canonicalHouseCurveShape,
+    selectedP14TargetDb,
+    requiredExtensionHz: selectedP14RequiredExtensionHz,
+    upperLfeHz: 120,
+  }), [finalBassResponse?.canonicalHouseCurveShape, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
+
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
     designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
     hasMatchingDetailedResult: hasValidDetailedResult, multiSeries, selectedSeatIds, showRealSeatOverlays,
@@ -388,24 +397,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // Shared transition frequency for graph markers and the optimiser validation path.
   const schroederFrequency = optimisationTransitionHz;
 
-  // Single dynamic selected-target guide — replaces the old static L1–L4 set.
-  // Only the user's selected P14 Bass SPL target is shown as a horizontal guide.
-  // The house curve itself (normalised to the selected P14 total) is the real
-  // frequency-shaped target; this line is a design-target marker + label.
-  const rp22Levels = React.useMemo(() => {
+  // P14 target annotation — displayed outside the plotted data area as a compact
+  // annotation block. 109 dBC is the integrated C-weighted P14 total, NOT a
+  // per-frequency SPL line. The shaped house curve is the actual graph target.
+  const p14TargetAnnotation = React.useMemo(() => {
     const basis = splConfig?.selectedP14TargetBasis === "recommended" ? "Recommended" : "Minimum";
-    const levelNum = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 4)));
+    const levelNum = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 1)));
     const targetDb = Number.isFinite(selectedP14TargetDb) ? Math.round(selectedP14TargetDb) : null;
-    if (targetDb == null) return [];
-    return [
-      { level: `${basis} L${levelNum} · ${targetDb} dBC`, spl: targetDb, color: "#213428" },
-    ];
-  }, [splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level, selectedP14TargetDb]);
+    const extensionHz = Number.isFinite(selectedP14RequiredExtensionHz) ? selectedP14RequiredExtensionHz : null;
+    if (targetDb == null || extensionHz == null) return null;
+    return {
+      label: `P14 target: ${basis} L${levelNum} · ${targetDb} dBC total`,
+      extension: `P18 requirement: ${extensionHz} Hz`,
+    };
+  }, [splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
 
-  // Expose drag state
+  // Expose drag state — also sets a global flag so the background analysis owner
+  // can defer the heavy EQ worker during drag and run it once on pointer-up.
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.__B44_setIsDraggingSub = (dragging) => setIsDraggingSub(dragging);
+      window.__B44_setIsDraggingSub = (dragging) => {
+        setIsDraggingSub(dragging);
+        window.__B44_IS_DRAGGING_SUB = dragging;
+      };
     }
   }, []);
 
@@ -630,7 +644,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               multiSeries={multiSeriesForGraph}
               responseData={(designEqEnabled ? multiSeriesForGraph.find((series) => series.id.endsWith("-eq")) : multiSeriesForGraph[0])?.data ?? []}
               schroederFrequency={schroederFrequency}
-              rp22Levels={rp22Levels}
+              rp22Levels={[]}
               toggles={{}}
               crossoverFrequency={80}
               showModeMarkers={showRoomModes}
@@ -662,10 +676,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {graphStatusText}
         </div>
-        {p14HouseCurveNormalisation && <div className="mt-2 text-[10px] text-muted-foreground">
-          <div>P14 operating target: {p14HouseCurveNormalisation.selectedP14TargetDb} dBC total, C-weighted</div>
-          <div>Required extension: {p14HouseCurveNormalisation.requiredExtensionHz} Hz</div>
+        {p14TargetAnnotation && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6, padding: '4px 10px', background: '#F8F8F7', border: '1px solid #DCDBD6', borderRadius: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#213428', fontFamily: 'monospace' }}>{p14TargetAnnotation.label}</span>
+          <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>{p14TargetAnnotation.extension}</span>
         </div>}
+        {p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
+          const err = Math.abs(p14IntegrationDiagnostic.errorDb || 0);
+          const pass = err <= 0.05;
+          return (
+            <div style={{ fontSize: 10, color: pass ? '#213428' : '#b45309', fontFamily: 'monospace', marginTop: 2 }}>
+              Integration check: {p14IntegrationDiagnostic.integratedCWeightedDb.toFixed(2)} dBC (target {p14IntegrationDiagnostic.selectedP14TargetDb} dBC, error {err.toFixed(3)} dB) {pass ? '✓' : '✗'}
+            </div>
+          );
+        })()}
         <BassEngineeringDetails
           enabled={includeDiagnostics}
           designEqEnabled={designEqEnabled}

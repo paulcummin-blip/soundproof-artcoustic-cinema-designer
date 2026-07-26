@@ -204,6 +204,35 @@ function priorDisposition(region, priorIterationTrace) {
   };
 }
 
+function worstSeatDeviationWorsening(currentFilters, candidateFilters, perSeatRawCurves,
+  anchorDb, canonicalTargetCurve, startHz, endHz, protectedNullRegions) {
+  const currentSeats = correctedSeats(perSeatRawCurves, currentFilters);
+  const candidateSeats = correctedSeats(perSeatRawCurves, candidateFilters);
+  let worstWorseningDb = 0;
+  for (let i = 0; i < currentSeats.length; i++) {
+    const currentSeat = currentSeats[i];
+    const candidateSeat = candidateSeats[i];
+    if (!currentSeat || !candidateSeat) continue;
+    let currentMaxDev = 0;
+    let candidateMaxDev = 0;
+    for (const point of currentSeat.responseData) {
+      if (point.frequency < startHz || point.frequency > endHz) continue;
+      if (isProtectedFrequency(point.frequency, protectedNullRegions)) continue;
+      const dev = Math.abs(point.spl - targetAt(point.frequency, anchorDb, canonicalTargetCurve));
+      if (dev > currentMaxDev) currentMaxDev = dev;
+    }
+    for (const point of candidateSeat.responseData) {
+      if (point.frequency < startHz || point.frequency > endHz) continue;
+      if (isProtectedFrequency(point.frequency, protectedNullRegions)) continue;
+      const dev = Math.abs(point.spl - targetAt(point.frequency, anchorDb, canonicalTargetCurve));
+      if (dev > candidateMaxDev) candidateMaxDev = dev;
+    }
+    const worsening = candidateMaxDev - currentMaxDev;
+    if (worsening > worstWorseningDb) worstWorseningDb = worsening;
+  }
+  return worstWorseningDb;
+}
+
 function rejectionForTrial({ trial, currentFilters, currentPoints, currentQuality, raw, perSeatRawCurves,
   region, protectedNullRegions, canonicalTargetCurve, anchorDb, assessmentStartHz, assessmentEndHz,
   correctionStartHz, correctionEndHz, activeSubs, usableLfHz, requestedSystemOutputDb, profile }) {
@@ -221,6 +250,72 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
     return { reason: `protected-null-overlap: predicted worsening ${nullWorseningDb.toFixed(3)} dB exceeds ${MAX_PROTECTED_NULL_WORSENING_DB.toFixed(1)} dB`, limits, nullWorseningDb };
   }
   const candidatePoints = rawResidualPoints(raw, trial.filters, correctionStartHz, correctionEndHz, anchorDb, canonicalTargetCurve);
+  const candidateCentre = candidatePoints.reduce((nearest, point) => Math.abs(point.frequency - region.centre.frequency) < Math.abs(nearest.frequency - region.centre.frequency) ? point : nearest);
+  const localImprovementDb = Math.abs(region.centre.residualDb) - Math.abs(candidateCentre.residualDb);
+  if (localImprovementDb <= EPSILON_DB) return { reason: "local-fit: attempted correction did not reduce the centre residual", limits, nullWorseningDb, candidateCentre };
+  const candidateQuality = quality(candidatePoints, protectedNullRegions);
+
+  // === Asymmetric acceptance: CUT filters get region-aware rules, BOOST filters keep strict rules ===
+  const isCutTrial = region.kind === "peak" || trial.filter.gainDb < 0;
+
+  if (isCutTrial) {
+    // CUT FILTER ACCEPTANCE — region-aware, allows local worsening up to 1.0 dB
+    // when the final point stays inside the ±3 dB target corridor.
+
+    // 1. No corrected point finishes more than 3 dB below the house curve
+    const belowTargetPoint = candidatePoints.find((point) =>
+      !isProtectedFrequency(point.frequency, protectedNullRegions) && point.residualDb < -3
+    );
+    if (belowTargetPoint) {
+      return { reason: `cut-below: ${belowTargetPoint.frequency.toFixed(2)} Hz finishes more than 3 dB below target`, limits, nullWorseningDb, candidateCentre, candidateQuality };
+    }
+
+    // 2. Allow local point worsening up to 1.0 dB when the final point remains
+    //    inside the ±3 dB corridor. Reject only if a point worsens beyond 1.0 dB
+    //    OR exits the ±3 dB corridor due to the correction.
+    const excessiveWorsening = candidatePoints.find((point, index) => {
+      const before = currentPoints[index];
+      if (!before || isProtectedFrequency(point.frequency, protectedNullRegions)) return false;
+      const worsening = Math.abs(point.residualDb) - Math.abs(before.residualDb);
+      // Allow up to 1.0 dB worsening if the final point is within ±3 dB
+      if (Math.abs(point.residualDb) <= 3 && worsening <= 1.0) return false;
+      // Reject if worsening exceeds 1.0 dB or the point exits the ±3 dB corridor
+      return worsening > 1.0 || (Math.abs(before.residualDb) <= 3 && Math.abs(point.residualDb) > 3);
+    });
+    if (excessiveWorsening) {
+      return { reason: `cut-point: ${excessiveWorsening.frequency.toFixed(2)} Hz worsened beyond 1.0 dB or exited ±3 dB corridor`, limits, nullWorseningDb, candidateCentre, candidateQuality };
+    }
+
+    // 3. Positive residual area must reduce
+    const currentPositiveArea = currentPoints.reduce((sum, p) => sum + Math.max(0, p.residualDb), 0);
+    const candidatePositiveArea = candidatePoints.reduce((sum, p) => sum + Math.max(0, p.residualDb), 0);
+    if (candidatePositiveArea >= currentPositiveArea - EPSILON_DB) {
+      return { reason: "cut-area: positive residual area did not reduce", limits, nullWorseningDb, candidateCentre, candidateQuality };
+    }
+
+    // 4. Maximum positive residual must reduce by at least 0.75 dB
+    const currentMaxPositive = Math.max(0, ...currentPoints.map((p) => p.residualDb));
+    const candidateMaxPositive = Math.max(0, ...candidatePoints.map((p) => p.residualDb));
+    if (currentMaxPositive - candidateMaxPositive < 0.75 - EPSILON_DB) {
+      return { reason: "cut-peak: maximum positive residual did not reduce by at least 0.75 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
+    }
+
+    // 5. RMS target error must improve by at least 0.15 dB
+    if (currentQuality.rmsResidualDb - candidateQuality.rmsResidualDb < 0.15 - EPSILON_DB) {
+      return { reason: "cut-rms: RMS target error did not improve by at least 0.15 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
+    }
+
+    // 6. Worst-seat maximum deviation must not worsen by more than 0.50 dB
+    const seatWorseningDb = worstSeatDeviationWorsening(currentFilters, trial.filters, perSeatRawCurves,
+      anchorDb, canonicalTargetCurve, correctionStartHz, correctionEndHz, protectedNullRegions);
+    if (seatWorseningDb > 0.50 + EPSILON_DB) {
+      return { reason: `cut-seat: worst-seat maximum deviation worsened by ${seatWorseningDb.toFixed(2)} dB`, limits, nullWorseningDb, candidateCentre, candidateQuality };
+    }
+
+    return { accepted: true, reason: null, limits, nullWorseningDb, candidateCentre, candidateQuality, localImprovementDb };
+  }
+
+  // === BOOST FILTER ACCEPTANCE — existing strict rules (unchanged) ===
   const materiallyWorsenedPoint = candidatePoints.find((point, index) => {
     const before = currentPoints[index];
     return before && !isProtectedFrequency(point.frequency, protectedNullRegions)
@@ -229,10 +324,6 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
   if (materiallyWorsenedPoint) {
     return { reason: `high-resolution-score: ${materiallyWorsenedPoint.frequency.toFixed(2)} Hz worsened by more than 0.50 dB`, limits, nullWorseningDb };
   }
-  const candidateCentre = candidatePoints.reduce((nearest, point) => Math.abs(point.frequency - region.centre.frequency) < Math.abs(nearest.frequency - region.centre.frequency) ? point : nearest);
-  const localImprovementDb = Math.abs(region.centre.residualDb) - Math.abs(candidateCentre.residualDb);
-  if (localImprovementDb <= EPSILON_DB) return { reason: "local-fit: attempted correction did not reduce the centre residual", limits, nullWorseningDb, candidateCentre };
-  const candidateQuality = quality(candidatePoints, protectedNullRegions);
   if (candidateQuality.maximumAbsoluteResidualDb > currentQuality.maximumAbsoluteResidualDb + 0.25) {
     return { reason: "high-resolution-score: maximum correctable residual worsened by more than 0.25 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
   }

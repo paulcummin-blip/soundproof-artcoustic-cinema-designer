@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import { selectCandidateFromPool } from "@/components/utils/bassOperatingEnvelopeOptimiser";
 import { useAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
@@ -21,6 +21,21 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const appState = useAppState();
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
+
+  // Drag-defer: poll the global drag flag so the heavy EQ worker only runs on
+  // pointer-up, not continuously during subwoofer dragging. Visual movement
+  // (raw response graph) still updates immediately via the live authority.
+  const [isDragging, setIsDragging] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const check = () => {
+      const dragging = !!window.__B44_IS_DRAGGING_SUB;
+      setIsDragging((prev) => (prev !== dragging ? dragging : prev));
+    };
+    check();
+    const interval = setInterval(check, 100);
+    return () => clearInterval(interval);
+  }, []);
   const retainedController = controllerRef.current;
   if (!retainedController
     || typeof retainedController.ensureProtocolCompatibility !== "function"
@@ -74,6 +89,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     poolId: null,
   }), [cacheKey, fingerprints.geometry, fingerprints.product, fingerprints.calibration, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => {
+    if (isDragging) return; // Defer heavy EQ calculation during drag; run once on pointer-up
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
     controller.updateInputs({
       valid: inputsValid,
@@ -83,7 +99,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       identity: requestIdentity,
       collectDiagnostics: includeDiagnostics,
     });
-  }, [controller, inputsValid, cacheKey, fingerprints.calibration, payload, requestIdentity, includeDiagnostics, OPTIMISER_VERSION_SIGNATURE]);
+  }, [controller, isDragging, inputsValid, cacheKey, fingerprints.calibration, payload, requestIdentity, includeDiagnostics, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";

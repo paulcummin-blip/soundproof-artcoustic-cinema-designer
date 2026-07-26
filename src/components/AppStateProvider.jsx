@@ -658,7 +658,7 @@ function useDesignerState() {
   ));
 
   const [designEqEnabled, setDesignEqEnabled] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.designEqEnabled === "boolean") ? __autosavePayload.designEqEnabled : false
+    (__autosavePayload && typeof __autosavePayload.designEqEnabled === "boolean") ? __autosavePayload.designEqEnabled : true
   ));
   const setDesignEqEnabledSafe = useCallback((v) => setDesignEqEnabled(!!v), []);
 
@@ -982,7 +982,7 @@ function useDesignerState() {
         globalEqHeadroomDb: autosaveConfig.globalEqHeadroomDb || 0,
         radiationMode: autosaveConfig.radiationMode || 'half-space',
         p13Mode: autosaveConfig.p13Mode || 'minimum',
-        p14Mode: autosaveConfig.p14Mode || 'minimum', bassTargetLevel: autosaveConfig.bassTargetLevel || 4, selectedP14TargetBasis: autosaveConfig.selectedP14TargetBasis || autosaveConfig.p14Mode || 'minimum', selectedP14Level: autosaveConfig.selectedP14Level || autosaveConfig.bassTargetLevel || 4,
+        p14Mode: autosaveConfig.p14Mode || 'minimum', bassTargetLevel: autosaveConfig.bassTargetLevel || 1, selectedP14TargetBasis: autosaveConfig.selectedP14TargetBasis || autosaveConfig.p14Mode || 'minimum', selectedP14Level: autosaveConfig.selectedP14Level || autosaveConfig.bassTargetLevel || 1,
         perRole: autosaveConfig.perRole || {},
         // Separate L/R and centre heights for center_only soundbar override mode
         lcrHeightM: autosaveConfig.lcrHeightM,
@@ -1758,9 +1758,12 @@ function useDesignerState() {
       globalEqHeadroomDb: 0,
       radiationMode: 'half-space',
       p13Mode: 'minimum',
-      p14Mode: 'minimum', bassTargetLevel: 4, selectedP14TargetBasis: 'minimum', selectedP14Level: 4,
+      p14Mode: 'minimum', bassTargetLevel: 1, selectedP14TargetBasis: 'minimum', selectedP14Level: 1,
       perRole: {}
     });
+
+    // Design EQ defaults to On for a new/reset project
+    setDesignEqEnabled(true);
 
     // Per-seat metrics
     setPerSeatMetrics({});

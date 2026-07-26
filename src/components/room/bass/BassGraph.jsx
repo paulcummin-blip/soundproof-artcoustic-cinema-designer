@@ -430,24 +430,6 @@ export default function BassGraph({
                     />
                     <Tooltip content={(props) => <CustomTooltip {...props} series={isMulti ? multiSeries : []} />} shared cursor={false} />
 
-                    {rewStyleMode && rp22Levels && rp22Levels.map(level => (
-                        Number.isFinite(level.spl) && (
-                            <ReferenceLine 
-                                key={level.level} 
-                                y={level.spl} 
-                                label={{ 
-                                    value: level.level, 
-                                    position: 'insideTopRight', 
-                                    fill: level.color, 
-                                    className: 'font-body text-xs',
-                                    offset: 5
-                                }} 
-                                stroke={level.color} 
-                                strokeDasharray="2 2" 
-                            />
-                        )
-                    ))}
-                    
                     {/* Schroeder frequency line (on-scale only) */}
                     {Number.isFinite(schroederFrequency) && schroederFrequency > 0 && schroederFrequency <= 200 && (
                         <ReferenceLine 

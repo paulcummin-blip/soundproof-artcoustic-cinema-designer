@@ -82,3 +82,50 @@ export function normaliseHouseCurveToP14Total({
     includedThirdOctaveBands,
   };
 }
+
+/**
+ * Development diagnostic — proves the rendered house curve integrates to the
+ * selected P14 target (e.g. 109 dBC for Minimum L1).
+ *
+ * Returns the exact object specified in the acceptance test:
+ *   { selectedP14TargetDb, requiredExtensionHz, includedBands,
+ *     operatingOffsetDb, integratedCWeightedDb, errorDb }
+ *
+ * Acceptance: |errorDb| <= 0.05 dB
+ */
+export function diagnoseHouseCurveP14Integration({
+  houseCurveShape,
+  selectedP14TargetDb,
+  requiredExtensionHz,
+  upperLfeHz = 120,
+} = {}) {
+  const result = normaliseHouseCurveToP14Total({
+    houseCurveShape,
+    selectedP14TargetDb,
+    requiredExtensionHz,
+    upperLfeHz,
+  });
+  if (!result) {
+    return {
+      selectedP14TargetDb: Number(selectedP14TargetDb) || null,
+      requiredExtensionHz: Number(requiredExtensionHz) || null,
+      includedBands: [],
+      operatingOffsetDb: null,
+      integratedCWeightedDb: null,
+      errorDb: null,
+    };
+  }
+  const errorDb = result.integratedCWeightedDb - result.selectedP14TargetDb;
+  return {
+    selectedP14TargetDb: result.selectedP14TargetDb,
+    requiredExtensionHz: result.requiredExtensionHz,
+    includedBands: result.includedThirdOctaveBands.map((band) => ({
+      frequencyHz: band.frequencyHz,
+      normalisedBandDb: band.normalisedBandDb,
+      weightedBandDb: band.weightedBandDb,
+    })),
+    operatingOffsetDb: result.operatingCurveOffsetDb,
+    integratedCWeightedDb: result.integratedCWeightedDb,
+    errorDb,
+  };
+}
