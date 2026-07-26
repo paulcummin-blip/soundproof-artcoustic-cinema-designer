@@ -103,7 +103,7 @@ function progressToNumber(detailedProgress) {
 }
 
 // Build a compact candidate reference (no large curve arrays duplicated).
-function buildCandidateRef(candidate) {
+function buildCandidateRef(candidate, collectDiagnostics = false) {
   if (!candidate) return null;
   const p20Value = Number.isFinite(candidate.achievedP20VariationDb) ? candidate.achievedP20VariationDb : null;
   const p20Level = p20Value == null
@@ -169,6 +169,13 @@ function buildCandidateRef(candidate) {
     })),
     meetsRequestedEnvelope: candidate.meetsRequestedEnvelope ?? null,
     filterCount: Array.isArray(candidate.generatedFilterBank) ? candidate.generatedFilterBank.filter((f) => f?.enabled).length : 0,
+    // Preserve the candidate acceptance diagnostics array ONLY when engineering
+    // diagnostics were requested. The array is passed through unchanged — never
+    // recalculated, transformed, or recreated. When diagnostics were not
+    // requested, the field is an empty array so the contract stays clean.
+    designEqCandidateAcceptanceDiagnostics: collectDiagnostics && Array.isArray(candidate.designEqCandidateAcceptanceDiagnostics)
+      ? candidate.designEqCandidateAcceptanceDiagnostics
+      : [],
   };
 }
 
@@ -269,6 +276,7 @@ export function adaptCurrentBassOptimisationResult({
   p14TargetBasis = "minimum",
   selectedP14Level = 4,
   selectedP14TargetDb = null,
+  collectDiagnostics = false,
 } = {}) {
   const contract = createBassAnalysisResult();
 
@@ -328,7 +336,7 @@ export function adaptCurrentBassOptimisationResult({
   contract.selectedMode = normalizeMode(rawMode);
 
   // --- Selected candidate ---
-  contract.selectedCandidate = buildCandidateRef(selectedCandidate);
+  contract.selectedCandidate = buildCandidateRef(selectedCandidate, collectDiagnostics);
   contract.bassAuthority = selectedCandidate?.postEqCapabilityAssessment || null;
   contract.finalOptimisedBassResponse = finalResponse;
   contract.achievedP14Db = selectedCandidate?.achievedP14Db ?? null;
@@ -375,10 +383,10 @@ export function adaptCurrentBassOptimisationResult({
 
   // --- Mode candidates ---
   const selectedByMode = optimisationResult?.selectedByMode || {};
-  contract.modeCandidates[BASS_MODE_BALANCED] = buildCandidateRef(selectedByMode.balanced || null);
-  contract.modeCandidates[BASS_MODE_HOUSE_CURVE_ACCURACY] = buildCandidateRef(selectedByMode.house_curve_accuracy || null);
-  contract.modeCandidates[BASS_MODE_DEPTH] = buildCandidateRef(selectedByMode.depth || null);
-  contract.modeCandidates[BASS_MODE_SPL] = buildCandidateRef(selectedByMode.spl || null);
+  contract.modeCandidates[BASS_MODE_BALANCED] = buildCandidateRef(selectedByMode.balanced || null, collectDiagnostics);
+  contract.modeCandidates[BASS_MODE_HOUSE_CURVE_ACCURACY] = buildCandidateRef(selectedByMode.house_curve_accuracy || null, collectDiagnostics);
+  contract.modeCandidates[BASS_MODE_DEPTH] = buildCandidateRef(selectedByMode.depth || null, collectDiagnostics);
+  contract.modeCandidates[BASS_MODE_SPL] = buildCandidateRef(selectedByMode.spl || null, collectDiagnostics);
 
   // --- Product analysis status ---
   contract.productAnalysis.status = mapProductAnalysisStatus(detailedStatus, hasResult);

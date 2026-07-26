@@ -153,6 +153,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     detailedStatus, detailedProgress: lifecycle.progress, detailedElapsedMs: lifecycle.elapsedMs,
     rspRawCurve, perSeatRawCurves, optimiserPriorityMode: selectedPriorityMode, ...requested,
     fingerprintsOverride: fingerprints, backgroundLifecycle: lifecycle,
+    collectDiagnostics: includeDiagnostics,
   });
   useEffect(() => {
     const currentFingerprint = contract?.job?.currentJobFingerprint || cacheKey || null;

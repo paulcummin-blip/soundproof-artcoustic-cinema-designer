@@ -55,6 +55,7 @@ export function useBassAnalysisContract({
   evaluatedProfiles,
   fingerprintsOverride,
   backgroundLifecycle,
+  collectDiagnostics = false,
 }) {
   // --- Phase 2A: Live calibration values from the selected candidate ---
   // Prefer values from the selected candidate when one exists. Otherwise use
@@ -160,11 +161,12 @@ export function useBassAnalysisContract({
     p14TargetBasis: selectedP14TargetBasis,
     selectedP14Level,
     selectedP14TargetDb,
+    collectDiagnostics,
   }), [optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
     rspRawCurve, perSeatRawCurves, designEqSystemLimits, subsForSimulation,
     optimiserPriorityMode, contractGeometryFp, contractProductFp, contractCalibrationFp,
     contractResponseDomain, fingerprintsOverride, backgroundLifecycle,
-    selectedP14TargetBasis, selectedP14Level, selectedP14TargetDb]);
+    selectedP14TargetBasis, selectedP14Level, selectedP14TargetDb, collectDiagnostics]);
 
   return bassAnalysisContract;
 }
