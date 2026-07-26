@@ -15,7 +15,8 @@ import {
 } from "../room/bass/bassOptimiserWorkerProtocol";
 
 self.onmessage = (e) => {
-  const { requestId, fingerprint, payload, collectDiagnostics, dispatchedAtMs, identity: requestedIdentity, diagnosticToken } = e.data || {};
+  const { requestId, fingerprint, payload, dispatchedAtMs, identity: requestedIdentity, diagnosticToken } = e.data || {};
+  const requestedCollectDiagnostics = e.data?.collectDiagnostics === true;
   const workerStartupTimeMs = Number.isFinite(dispatchedAtMs) ? Math.max(0, Date.now() - dispatchedAtMs) : 0;
   const identity = {
     ...(requestedIdentity || {}), fingerprint,
@@ -29,7 +30,7 @@ self.onmessage = (e) => {
       "Missing requestId or fingerprint in worker request",
       identity,
       diagnosticToken || null,
-      collectDiagnostics != null ? !!collectDiagnostics : null,
+      requestedCollectDiagnostics,
     ));
     return;
   }
@@ -37,7 +38,7 @@ self.onmessage = (e) => {
   try {
     const requestCompatibility = validateOptimiserVersions(e.data, BASS_OPTIMISER_VERSIONS);
     if (!requestCompatibility.valid) throw new Error(`Worker request incompatible: ${requestCompatibility.message}`);
-    self.postMessage(createProgressMessage(requestId, fingerprint, { phase: "Worker request received" }, identity, diagnosticToken || null, !!collectDiagnostics));
+    self.postMessage(createProgressMessage(requestId, fingerprint, { phase: "Worker request received" }, identity, diagnosticToken || null, requestedCollectDiagnostics));
     const pool = generateCandidatePool({
       rawCurve: payload?.rawCurve || [],
       activeSubs: payload?.activeSubs || [],
@@ -48,15 +49,15 @@ self.onmessage = (e) => {
       perSourceComplexTransfers: payload?.perSourceComplexTransfers || [],
       normalizedTransferFingerprint: payload?.normalizedTransferFingerprint || null,
       calibrationFingerprint: payload?.calibrationFingerprint || null,
-      collectDiagnostics: !!collectDiagnostics,
+      collectDiagnostics: requestedCollectDiagnostics,
       onProgress: (progress) => {
-        self.postMessage(createProgressMessage(requestId, fingerprint, progress, identity, diagnosticToken || null, !!collectDiagnostics));
+        self.postMessage(createProgressMessage(requestId, fingerprint, progress, identity, diagnosticToken || null, requestedCollectDiagnostics));
       },
     });
     pool.performanceSummary = { ...pool.performanceSummary, workerStartupTimeMs };
-    pool.__workerTrace__ = { receivedCollectDiagnostics: !!collectDiagnostics, receivedDiagnosticToken: diagnosticToken || null };
-    self.postMessage(createProgressMessage(requestId, fingerprint, { phase: "Worker result posted", poolId: pool.poolId }, { ...identity, poolId: pool.poolId }, diagnosticToken || null, !!collectDiagnostics));
-    self.postMessage(createCompleteMessage(requestId, fingerprint, pool, { ...identity, poolId: pool.poolId }, diagnosticToken || null, !!collectDiagnostics));
+    pool.__workerTrace__ = { receivedCollectDiagnostics: requestedCollectDiagnostics, receivedDiagnosticToken: diagnosticToken || null };
+    self.postMessage(createProgressMessage(requestId, fingerprint, { phase: "Worker result posted", poolId: pool.poolId }, { ...identity, poolId: pool.poolId }, diagnosticToken || null, requestedCollectDiagnostics));
+    self.postMessage(createCompleteMessage(requestId, fingerprint, pool, { ...identity, poolId: pool.poolId }, diagnosticToken || null, requestedCollectDiagnostics));
   } catch (err) {
     self.postMessage(createErrorMessage(
       requestId,
@@ -64,7 +65,7 @@ self.onmessage = (e) => {
       err?.message || String(err) || "Unknown worker calculation error",
       identity,
       diagnosticToken || null,
-      collectDiagnostics != null ? !!collectDiagnostics : null,
+      requestedCollectDiagnostics,
     ));
   }
 };
