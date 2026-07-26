@@ -256,6 +256,9 @@ export function createBassAnalysisResult() {
 
     selectedMode: BASS_MODE_BALANCED,
     selectedTargetBasis: "minimum",
+    selectedP14TargetBasis: "minimum",
+    selectedP14Level: 4,
+    selectedP14TargetDb: 118,
     bassTargets: {
       minimum: null,
       recommended: null,

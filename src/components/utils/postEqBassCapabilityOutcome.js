@@ -45,7 +45,7 @@ export function buildPostEqBassCapabilityOutcome({
   const achievedLabel = achievedLevel > 0 ? `L${achievedLevel}` : null;
 
   return {
-    requested: { level: requestedLabel, targetSplDb: requestedTargetSplDb },
+    requested: { level: requestedLabel, targetSplDb: requestedTargetSplDb, targetBasis: basis },
     achieved: {
       level: achievedLabel,
       p14: authority?.achieved?.p14 ?? (scalarComplete ? {

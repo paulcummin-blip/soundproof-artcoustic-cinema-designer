@@ -124,6 +124,11 @@ function buildCandidateRef(candidate) {
     achievedP14Db: Number.isFinite(candidate.postEqCapabilityAssessment?.maximumAvailableSplAfterEqDb)
       ? candidate.postEqCapabilityAssessment.maximumAvailableSplAfterEqDb
       : Number.isFinite(candidate.achievedP14Db) ? candidate.achievedP14Db : null,
+    selectedP14TargetBasis: candidate.selectedP14TargetBasis || candidate.p14TargetBasis || "minimum",
+    selectedP14Level: Number.isFinite(candidate.selectedP14Level) ? candidate.selectedP14Level : null,
+    selectedP14TargetDb: Number.isFinite(candidate.selectedP14TargetDb) ? candidate.selectedP14TargetDb : null,
+    availableP14CapabilityDb: Number.isFinite(candidate.availableP14CapabilityDb) ? candidate.availableP14CapabilityDb : null,
+    requestedP14Pass: typeof candidate.requestedP14Pass === "boolean" ? candidate.requestedP14Pass : null,
     achievedP14MinimumLevel: typeof candidate.achievedP14MinimumLevel === "number" ? candidate.achievedP14MinimumLevel : 0,
     achievedP14RecommendedLevel: typeof candidate.achievedP14RecommendedLevel === "number" ? candidate.achievedP14RecommendedLevel : 0,
     minimumLevel: typeof candidate.minimumLevel === "number" ? candidate.minimumLevel : 0,
@@ -258,6 +263,8 @@ export function adaptCurrentBassOptimisationResult({
   responseDomain = null,
   backgroundLifecycle = null,
   p14TargetBasis = "minimum",
+  selectedP14Level = 4,
+  selectedP14TargetDb = null,
 } = {}) {
   const contract = createBassAnalysisResult();
 
@@ -388,24 +395,28 @@ export function adaptCurrentBassOptimisationResult({
     return detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED;
   }
 
-  // P14 is achieved hardware capability after the completed canonical EQ bank's
-  // positive headroom demand. Requested intent remains separate in bassTargets.
-  const p14Level = typeof selectedCandidate?.achievedP14Level === "number"
-    ? selectedCandidate.achievedP14Level
-    : parseLegacyLevel(selectedCandidate?.achievedP14Level ?? optimisationResult?.achievedP14Level);
-  const p14Value = Number.isFinite(selectedCandidate?.achievedP14Db)
-    ? selectedCandidate.achievedP14Db
-    : Number.isFinite(optimisationResult?.achievedP14Db) ? optimisationResult.achievedP14Db : null;
-  const p14RecommendedLevel = selectedCandidate?.achievedP14RecommendedLevel ?? 0;
-  const selectedP14TargetBasis = normalizeP14TargetBasis(selectedCandidate?.p14TargetBasis || p14TargetBasis);
-  contract.productAnalysis.parameters.p14 = createBassParameterResult({
-    parameter: PARAM_P14, status: paramStatus(p14Level != null), level: p14Level, value: p14Value,
-    unit: "dBC", passedL1: p14Level != null ? p14Level >= 1 : null, isStale,
-    recommendedLevel: p14RecommendedLevel,
-    recommendedDetail: formatP14RecommendedDetail(p14RecommendedLevel),
-    targetBasis: selectedP14TargetBasis,
-    targetBasisDetail: formatP14TargetBasisDetail(selectedP14TargetBasis),
-  });
+  // P14 presents the selected operating target; fixed hardware capability remains separate.
+  const p14SelectedLevel = Math.max(1, Math.min(4, Math.round(Number(selectedP14Level) || 4)));
+  const p14Value = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : selectedCandidate?.selectedP14TargetDb ?? null;
+  const selectedP14TargetBasis = normalizeP14TargetBasis(p14TargetBasis);
+  const availableP14CapabilityDb = selectedCandidate?.availableP14CapabilityDb ?? selectedCandidate?.achievedP14Db ?? null;
+  const requestedP14Pass = Number.isFinite(availableP14CapabilityDb) && Number.isFinite(p14Value)
+    ? availableP14CapabilityDb >= p14Value
+    : null;
+  contract.productAnalysis.parameters.p14 = {
+    ...createBassParameterResult({
+      parameter: PARAM_P14, status: paramStatus(p14Value != null), level: requestedP14Pass === false ? 0 : p14SelectedLevel, value: p14Value,
+      unit: "dBC", passedL1: requestedP14Pass, isStale,
+      recommendedLevel: selectedCandidate?.achievedP14RecommendedLevel ?? 0,
+      recommendedDetail: formatP14RecommendedDetail(selectedCandidate?.achievedP14RecommendedLevel ?? 0),
+      targetBasis: selectedP14TargetBasis,
+      targetBasisDetail: formatP14TargetBasisDetail(selectedP14TargetBasis),
+    }),
+    selectedLevel: p14SelectedLevel,
+    selectedTargetDb: p14Value,
+    availableCapabilityDb: availableP14CapabilityDb,
+    pass: requestedP14Pass,
+  };
 
   // P18 — final selected-candidate authority is achieved post-EQ room extension.
   const authorityP18 = finalResponse?.finalSeatVariationData?.p18;
@@ -467,6 +478,9 @@ export function adaptCurrentBassOptimisationResult({
   // Build both target interpretations from the same selected candidate and acoustic result.
   contract.bassTargets = buildBassTargetViews(contract.productAnalysis.parameters, contract.selectedCandidate);
   contract.selectedTargetBasis = normalizeP14TargetBasis(p14TargetBasis);
+  contract.selectedP14TargetBasis = contract.selectedTargetBasis;
+  contract.selectedP14Level = p14SelectedLevel;
+  contract.selectedP14TargetDb = p14Value;
   const selectedTarget = contract.bassTargets[contract.selectedTargetBasis];
   contract.productAnalysis.parameters = {
     p14: selectedTarget.p14,

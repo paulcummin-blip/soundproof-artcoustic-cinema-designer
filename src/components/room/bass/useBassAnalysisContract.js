@@ -46,6 +46,7 @@ export function useBassAnalysisContract({
   // does not invent defaults.
   requestedAssessmentStartHz, requestedAssessmentEndHz,
   requestedTargetAnchorDb, requestedFitProfile,
+  selectedP14TargetBasis, selectedP14Level, selectedP14TargetDb,
   requestedOutputDb, requestedUsableLfHz,
   // Phase 2A: The sorted set of fit profiles the optimiser actually
   // evaluates, with their real named constraints. Derived from
@@ -156,11 +157,14 @@ export function useBassAnalysisContract({
     },
     responseDomain: contractResponseDomain,
     backgroundLifecycle,
-    p14TargetBasis: splConfig?.p14Mode === "recommended" ? "recommended" : "minimum",
+    p14TargetBasis: selectedP14TargetBasis,
+    selectedP14Level,
+    selectedP14TargetDb,
   }), [optimisationResult, detailedStatus, detailedProgress, detailedElapsedMs,
     rspRawCurve, perSeatRawCurves, designEqSystemLimits, subsForSimulation,
     optimiserPriorityMode, contractGeometryFp, contractProductFp, contractCalibrationFp,
-    contractResponseDomain, fingerprintsOverride, backgroundLifecycle, splConfig?.p14Mode]);
+    contractResponseDomain, fingerprintsOverride, backgroundLifecycle,
+    selectedP14TargetBasis, selectedP14Level, selectedP14TargetDb]);
 
   return bassAnalysisContract;
 }

@@ -110,27 +110,32 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   };
 
   // --- Multi-seat selection state ---
-  const resolveFallbackIds = (seats) => {
-    const first = seats?.[0];
-    if (first) return [first.id || `${first.x}-${first.y}`];
-    return [];
-  };
+  const responseSelectionKey = `bass-response-selection:${activeProjectId || "free"}`;
+  const [selectedSeatIds, setSelectedSeatIds] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(responseSelectionKey) || "null");
+      return Array.isArray(saved) && saved.length ? saved : ["rsp"];
+    } catch { return ["rsp"]; }
+  });
 
-  const [selectedSeatIds, setSelectedSeatIds] = useState(() => resolveFallbackIds(seatingPositions));
-
-  // Keep selectedSeatIds valid when seats change
+  // Keep RSP as the default; retain only an explicitly selected response while it remains valid.
   useEffect(() => {
     const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
-    const allIds = new Set(seats.map(s => s.id || `${s.x}-${s.y}`));
-    const still = selectedSeatIds.filter(id => allIds.has(id));
-    if (still.length === 0) {
-      setSelectedSeatIds(resolveFallbackIds(seats));
-    } else if (still.length !== selectedSeatIds.length) {
-      setSelectedSeatIds(still);
-    }
-  }, [seatingPositions]);
+    const validIds = new Set(["rsp", ...seats.map(s => s.id || `${s.x}-${s.y}`)]);
+    setSelectedSeatIds((current) => {
+      if (current.includes("rsp") || seats.length === 0) return current;
+      const still = current.filter((id) => validIds.has(id));
+      return still.length ? still : ["rsp"];
+    });
+  }, [seatingPositions, rspPosition]);
+  useEffect(() => {
+    try { localStorage.setItem(responseSelectionKey, JSON.stringify(selectedSeatIds)); } catch { /* presentation preference only */ }
+  }, [responseSelectionKey, selectedSeatIds]);
 
-  const selectSeat = (sid) => setSelectedSeatIds([sid]);
+  const selectSeat = (sid) => {
+    setShowRsp(false);
+    setSelectedSeatIds([sid]);
+  };
   const selectAllSeats = () => setSelectedSeatIds(orderedSeats.map((seat) => seat.id || `${seat.x}-${seat.y}`));
   const selectRsp = () => {
     setShowRsp(true);
@@ -297,14 +302,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   const hasValidDetailedResult = !!designEqEnabled &&
     finalOptimisedBassAuthorityMatches(optimisationResult?.finalOptimisedBassResponse) && rspRawCurve.length > 0;
+  const selectedP14TargetDb = authoritative.requested?.selectedP14TargetDb;
+  const canonicalVerticalOffsetDb = optimisationResult?.finalOptimisedBassResponse?.canonicalVerticalOffsetDb;
+  const operatingLevelOffsetDb = Number.isFinite(selectedP14TargetDb) && Number.isFinite(canonicalVerticalOffsetDb)
+    ? selectedP14TargetDb - canonicalVerticalOffsetDb
+    : 0;
 
   const multiSeriesForGraph = useMemo(() => buildBassGraphSeries({
     designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
     hasMatchingDetailedResult: hasValidDetailedResult, multiSeries, selectedSeatIds, showRealSeatOverlays,
     smoothingMode: bassSmoothingMode, overlayProductionSeries, showRewOverlay, rewOverlaySeries,
+    operatingLevelOffsetDb,
   }), [designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
     hasValidDetailedResult, multiSeries, selectedSeatIds, showRealSeatOverlays, bassSmoothingMode,
-    overlayProductionSeries, showRewOverlay, rewOverlaySeries]);
+    overlayProductionSeries, showRewOverlay, rewOverlaySeries, operatingLevelOffsetDb]);
 
   const graphStatusText = detailedEqStatusText({
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
@@ -369,14 +380,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const schroederFrequency = optimisationTransitionHz;
 
   const rp22Levels = React.useMemo(() => {
-    const thresholds = splConfig?.p14Mode === "recommended" ? [114, 117, 120, 123] : [109, 112, 115, 118];
+    const thresholds = splConfig?.selectedP14TargetBasis === "recommended" ? [114, 117, 120, 123] : [109, 112, 115, 118];
     return [
       { level: "L1", spl: thresholds[0], color: "#C1B6AD" },
       { level: "L2", spl: thresholds[1], color: "#8B7F76" },
       { level: "L3", spl: thresholds[2], color: "#625143" },
       { level: "L4", spl: thresholds[3], color: "#213428" },
     ];
-  }, [splConfig?.p14Mode]);
+  }, [splConfig?.selectedP14TargetBasis]);
 
   // Expose drag state
   useEffect(() => {

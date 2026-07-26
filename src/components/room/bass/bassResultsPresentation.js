@@ -45,15 +45,19 @@ function readyPill(key, parameter, result) {
   if (parameter?.level == null) return { label, resultText: "—", text: `${label} —`, level: "—" };
   const grade = parameter.level === 0 ? "FAIL" : `L${parameter.level}`;
   const value = formatBassParameterValue(key, parameter.value);
-  const basis = key === "p14" && parameter.targetBasis
-    ? ` — ${parameter.targetBasis === "recommended" ? "Recommended" : "Minimum"} target`
-    : "";
+  if (key === "p14") {
+    const basis = parameter.targetBasis === "recommended" ? "Recommended" : "Minimum";
+    const selectedLevel = parameter.selectedLevel || Math.max(1, parameter.level || 1);
+    const outcome = parameter.pass === false ? "FAIL" : parameter.pass === true ? "PASS" : "—";
+    const resultText = `${basis} L${selectedLevel}${value ? ` · ${value}` : ""} · ${outcome}`;
+    return { label: "P14 Bass SPL", resultText, text: `P14 Bass SPL ${resultText}`, level: outcome === "FAIL" ? "FAIL" : `L${selectedLevel}` };
+  }
   return {
     label,
-    resultText: `${grade}${value ? ` · ${value}` : ""}${basis}`,
-    text: `${label} ${grade}${value ? ` · ${value}` : ""}${basis}`,
+    resultText: `${grade}${value ? ` · ${value}` : ""}`,
+    text: `${label} ${grade}${value ? ` · ${value}` : ""}`,
     level: grade,
-    detail: key === "p14" ? parameter.targetBasisDetail : null,
+    detail: null,
   };
 }
 

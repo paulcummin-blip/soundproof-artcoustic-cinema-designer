@@ -32,14 +32,17 @@ export function deriveRequestedCalibrationConfig({
 }) {
   const transitionHz = Number.isFinite(optimisationTransitionHz) ? optimisationTransitionHz : null;
   const usableLfHz = Number.isFinite(designEqSystemLimits?.usableLfHz) ? designEqSystemLimits.usableLfHz : null;
-  const p14TargetBasis = "minimum";
-  const requestedLevel = Math.max(1, Math.min(4, Math.round(Number(splConfig?.bassTargetLevel) || 4)));
+  const p14TargetBasis = splConfig?.selectedP14TargetBasis === "recommended" ? "recommended" : "minimum";
+  const requestedLevel = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 4)));
   const target = resolveRequestedRp22HouseCurveTarget(getRp22BassOperatingDefinitions(p14TargetBasis), requestedLevel);
   const targetSpl = target.targetAnchorDb;
 
   return {
     p14TargetBasis,
     requestedLevel,
+    selectedP14TargetBasis: p14TargetBasis,
+    selectedP14Level: requestedLevel,
+    selectedP14TargetDb: targetSpl,
     requestedAssessmentStartHz: null,
     // Assessment end / transition — real input to generateCandidatePool.
     requestedAssessmentEndHz: transitionHz,

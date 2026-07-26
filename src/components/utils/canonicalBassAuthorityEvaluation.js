@@ -64,8 +64,12 @@ export function evaluateCanonicalBassAuthority({
 
   const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
   const requested = definitions.find((definition) => definition.value === requestedLevel) || definitions.at(-1);
+  const selectedTargetDb = requested?.p14TargetDb ?? null;
+  const requestedP14Pass = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
+    ? achievedP14Db >= selectedTargetDb
+    : null;
   const postEqCapabilityAssessment = buildPostEqBassCapabilityOutcome({
-    authority: null,
+    authority: { selectedTargetBasis: p14TargetBasis },
     requestedLevel,
     targetAnchorDb: requested?.p14TargetDb ?? null,
     scalarP14: p14,
@@ -79,6 +83,14 @@ export function evaluateCanonicalBassAuthority({
   });
 
   return {
+    selectedP14TargetBasis: p14TargetBasis,
+    selectedP14Level: requestedLevel,
+    selectedP14TargetDb: selectedTargetDb,
+    availableP14CapabilityDb: achievedP14Db,
+    requestedP14Pass,
+    p14MarginDb: Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb) ? achievedP14Db - selectedTargetDb : null,
+    maximumAchievableMinimumLevel: p14?.minimumLevel ?? 0,
+    maximumAchievableRecommendedLevel: p14?.recommendedLevel ?? 0,
     achievedP14Db,
     achievedP14Level,
     achievedP14MinimumLevel: p14?.minimumLevel ?? 0,

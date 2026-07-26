@@ -3,6 +3,11 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 
 export const NORMALIZED_ROOM_REFERENCE_DB = 94;
 
+const shiftCurve = (curve, offsetDb) => (curve || []).map((point) => ({
+  ...point,
+  spl: Number.isFinite(point?.spl) ? point.spl + offsetDb : point?.spl,
+}));
+
 const rawRspSeries = (rspRawCurve, smoothingMode) => ({
   id: "rsp-raw",
   kind: "raw",
@@ -71,7 +76,7 @@ function buildMaximumSplSeries(finalResponse, smoothingMode) {
 export function buildBassGraphSeries({
   designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve = [], optimisationResult,
   hasMatchingDetailedResult, multiSeries = [], selectedSeatIds = [], showRealSeatOverlays, smoothingMode = "none",
-  overlayProductionSeries, showRewOverlay, rewOverlaySeries,
+  overlayProductionSeries, showRewOverlay, rewOverlaySeries, operatingLevelOffsetDb = 0,
 }) {
   const finalResponse = optimisationResult?.finalOptimisedBassResponse;
   let series;
@@ -114,6 +119,10 @@ export function buildBassGraphSeries({
       if (target) series.push(target);
       const maximumSpl = buildMaximumSplSeries(finalResponse, smoothingMode);
       if (maximumSpl) series.push(maximumSpl);
+      const shiftedKinds = new Set(["raw", "post-eq", "house-curve", "real-seat-overlay"]);
+      series = series.map((item) => shiftedKinds.has(item.kind)
+        ? { ...item, data: shiftCurve(item.data, operatingLevelOffsetDb) }
+        : item);
     }
     if (overlayProductionSeries) series.push(overlayProductionSeries);
   }
