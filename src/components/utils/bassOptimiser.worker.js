@@ -52,6 +52,7 @@ self.onmessage = (e) => {
       },
     });
     pool.performanceSummary = { ...pool.performanceSummary, workerStartupTimeMs };
+    pool.__workerTrace__ = { receivedCollectDiagnostics: !!collectDiagnostics };
     self.postMessage(createProgressMessage(requestId, fingerprint, { phase: "Worker result posted", poolId: pool.poolId }, { ...identity, poolId: pool.poolId }));
     self.postMessage(createCompleteMessage(requestId, fingerprint, pool, { ...identity, poolId: pool.poolId }));
   } catch (err) {

@@ -4,7 +4,7 @@ import { calculateAllSeatMetricsFromCorrected } from "@/components/utils/houseCu
 import { annotateCandidatePoolForHouseCurveRanking } from "@/components/utils/houseCurveCandidateRankingMetrics";
 import { isPhysicallyCredibleBassCandidate } from "@/components/utils/bassCandidatePoolEligibility";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
-import { buildCurveSignature, stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
+import { buildCurveSignature, buildFilterBankSignature, stampPoolAuthority } from "@/components/room/bass/bassResultAuthority";
 import { BASS_OPTIMISER_POOL_VERSION } from "@/components/room/bass/bassOptimiserWorkerProtocol";
 import {
   buildCanonicalAbsoluteHouseCurveTarget,
@@ -212,6 +212,26 @@ export function generateCanonicalCandidatePool({
   const candidates = annotateCandidatePoolForHouseCurveRanking(eqResults.map((eq) => buildCanonicalCandidate({
     rawCurve, perSeatRawCurves: seats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
   })));
+  const __canonicalTrace__ = {
+    receivedCollectDiagnostics: collectDiagnostics,
+    profiles: eqResults.map((eq, i) => {
+      const candidate = candidates[i];
+      const eqTrace = eq.__designEqTrace__ || {};
+      return {
+        profile: eq.designEqFitProfile || (i === 0 ? "standard" : i === 1 ? "accuracy" : "house_curve"),
+        inputCollectDiagnostics: eqTrace.inputCollectDiagnostics ?? null,
+        detectedRegionCount: eqTrace.detectedRegionCount ?? null,
+        appendTrialCount: eqTrace.appendTrialCount ?? null,
+        revisionTrialCount: eqTrace.revisionTrialCount ?? null,
+        candidateAcceptanceDiagnosticsCount: eqTrace.candidateAcceptanceDiagnosticsCount ?? null,
+        finalEnabledFilterCount: (eq.filters || []).filter((f) => f.enabled).length,
+        finalFilterBankSignature: buildFilterBankSignature({ generatedFilterBank: eq.filters }),
+        stopReason: eqTrace.stopReason ?? eq.stopReason ?? null,
+        designEqCandidateAcceptanceDiagnosticsCountAfterMapping: Array.isArray(candidate?.designEqCandidateAcceptanceDiagnostics)
+          ? candidate.designEqCandidateAcceptanceDiagnostics.length : null,
+      };
+    }),
+  };
   const selectablePool = candidates.filter(isPhysicallyCredibleBassCandidate);
   const endedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   const poolId = `canonical:${buildCurveSignature(rawCurve)}:${activeSubs.length}:${seats.length}:${verticalOffsetDb.toFixed(4)}`;
@@ -238,6 +258,7 @@ export function generateCanonicalCandidatePool({
     warningMessage: null,
     canonical: true,
     diagnosticsIncluded,
+    __canonicalTrace__,
     canonicalVerticalOffsetDb: verticalOffsetDb,
     canonicalHouseCurveShape: targetShape,
     canonicalTargetCurve: targetCurve,

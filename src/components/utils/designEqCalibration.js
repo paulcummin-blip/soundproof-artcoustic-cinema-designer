@@ -928,6 +928,14 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       trendDb: interpolate(thirdOctave, point.frequency),
       appliedCorrectionDb: combinedEqCurve[index].spl,
     })) : [],
+    __designEqTrace__: {
+      inputCollectDiagnostics: collectDiagnostics,
+      detectedRegionCount: detectedRegions.length,
+      appendTrialCount: candidateAcceptanceDiagnostics.filter((d) => d.action === "append").length,
+      revisionTrialCount: candidateAcceptanceDiagnostics.filter((d) => d.action === "revise").length,
+      candidateAcceptanceDiagnosticsCount: candidateAcceptanceDiagnostics.length,
+      stopReason,
+    },
   };
 }
 

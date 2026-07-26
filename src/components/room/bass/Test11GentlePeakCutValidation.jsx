@@ -218,6 +218,24 @@ export default function Test11GentlePeakCutValidation() {
     };
   }, [hasResult, sharedBassResults, optimisationResult, acceptance]);
 
+  const designEqTrace = useMemo(() => {
+    if (!hasResult) return null;
+    const pool = sharedBassResults.lifecycle?.result?.pool || null;
+    const workerTrace = pool?.__workerTrace__ || null;
+    const canonicalTrace = pool?.__canonicalTrace__ || null;
+    const profiles = Array.isArray(canonicalTrace?.profiles) ? canonicalTrace.profiles : [];
+    return {
+      workerReceived: workerTrace?.receivedCollectDiagnostics ?? null,
+      generateCandidatePoolReceived: canonicalTrace?.receivedCollectDiagnostics ?? null,
+      generateCanonicalCandidatePoolReceived: canonicalTrace?.receivedCollectDiagnostics ?? null,
+      poolDiagnosticsIncluded: (pool && typeof pool.diagnosticsIncluded === "boolean") ? pool.diagnosticsIncluded : null,
+      profiles,
+      selectedCandidateId: optimisationResult?.selectedCandidateId || null,
+      selectedCandidateDiagCount: Array.isArray(selectedCandidate?.designEqCandidateAcceptanceDiagnostics)
+        ? selectedCandidate.designEqCandidateAcceptanceDiagnostics.length : null,
+    };
+  }, [hasResult, sharedBassResults, optimisationResult, selectedCandidate]);
+
   const renderRow = (row) => {
     const t = row.trial;
     const generated = row.generated;
@@ -295,6 +313,53 @@ export default function Test11GentlePeakCutValidation() {
                 <div style={{ marginTop: 6, fontWeight: 700, color: trace.firstZeroOrMissing === "none" ? "#16a34a" : "#dc2626" }}>
                   FIRST ZERO OR MISSING STAGE: {trace.firstZeroOrMissing}
                 </div>
+              </div>
+            </div>
+          )}
+          {hasResult && designEqTrace && (
+            <div style={{ border: "1px solid #DCDBD6", borderRadius: 6, background: "#FFF", padding: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#1B1A1A", fontFamily: "monospace", marginBottom: 6 }}>
+                TEST 11D — calculateDesignEqCurve PRODUCTION OUTPUT TRACE
+              </div>
+              <div style={{ fontSize: 10, fontFamily: "monospace", color: "#1B1A1A", lineHeight: 1.6, marginBottom: 8 }}>
+                <div>1. Worker event received collectDiagnostics: <b>{designEqTrace.workerReceived === null ? MISSING : String(designEqTrace.workerReceived)}</b></div>
+                <div>2. generateCandidatePool received collectDiagnostics: <b>{designEqTrace.generateCandidatePoolReceived === null ? MISSING : String(designEqTrace.generateCandidatePoolReceived)}</b></div>
+                <div>3. generateCanonicalCandidatePool received collectDiagnostics: <b>{designEqTrace.generateCanonicalCandidatePoolReceived === null ? MISSING : String(designEqTrace.generateCanonicalCandidatePoolReceived)}</b></div>
+              </div>
+              <div style={{ overflowX: "auto", marginBottom: 8 }}>
+                <table style={{ borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace", minWidth: 1200 }}>
+                  <thead>
+                    <tr>
+                      {["Profile", "4. input collectDiagnostics", "5. detected regions", "6. append trials", "7. revision trials", "8. acceptance diag before return", "9. final enabled filters", "10. filter-bank signature", "11. stop reason", "12. diag after buildCanonicalCandidate"].map((col) => (
+                        <th key={col} style={{ border: "1px solid #DCDBD6", padding: "4px 6px", textAlign: "left", background: "#EFEEEC", color: "#1B1A1A", whiteSpace: "nowrap" }}>{col}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designEqTrace.profiles.length === 0 ? (
+                      <tr><td colSpan={10} style={{ border: "1px solid #DCDBD6", padding: "4px 6px", color: "#9CA3AF" }}>— no profile trace —</td></tr>
+                    ) : designEqTrace.profiles.map((p, i) => (
+                      <tr key={i}>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap" }}>{p.profile || MISSING}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap" }}>{p.inputCollectDiagnostics === null ? MISSING : String(p.inputCollectDiagnostics)}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap" }}>{p.detectedRegionCount === null ? MISSING : p.detectedRegionCount}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap" }}>{p.appendTrialCount === null ? MISSING : p.appendTrialCount}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap" }}>{p.revisionTrialCount === null ? MISSING : p.revisionTrialCount}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap" }}>{p.candidateAcceptanceDiagnosticsCount === null ? MISSING : p.candidateAcceptanceDiagnosticsCount}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap" }}>{p.finalEnabledFilterCount}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{p.finalFilterBankSignature || MISSING}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{p.stopReason || MISSING}</td>
+                        <td style={{ border: "1px solid #DCDBD6", padding: "4px 6px", whiteSpace: "nowrap" }}>{p.designEqCandidateAcceptanceDiagnosticsCountAfterMapping === null ? MISSING : p.designEqCandidateAcceptanceDiagnosticsCountAfterMapping}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ fontSize: 10, fontFamily: "monospace", color: "#1B1A1A", lineHeight: 1.6 }}>
+                <div>13. Pool diagnosticsIncluded: <b>{designEqTrace.poolDiagnosticsIncluded === null ? MISSING : String(designEqTrace.poolDiagnosticsIncluded)}</b></div>
+                <div>14. Selected candidate ID: <b>{designEqTrace.selectedCandidateId || MISSING}</b></div>
+                <div>15. Selected candidate diagnostic count: <b>{designEqTrace.selectedCandidateDiagCount === null ? MISSING : designEqTrace.selectedCandidateDiagCount}</b></div>
+                <div>16. Worker runs caused by opening TEST 11: <b>{workerDeltaStarts === 0 && workerDeltaCompletions === 0 ? "0 ✓" : `${workerDeltaStarts} starts, ${workerDeltaCompletions} completions ✗`}</b></div>
               </div>
             </div>
           )}

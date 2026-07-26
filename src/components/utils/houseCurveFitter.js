@@ -509,5 +509,13 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     revisionDiagnostics: { attempts: [] },
     requestedP19ToleranceDb: Number.isFinite(Number(options.targetToleranceDb)) ? Number(options.targetToleranceDb) : 0,
     operationCounts,
+    __designEqTrace__: {
+      inputCollectDiagnostics: options.collectDiagnostics !== false,
+      detectedRegionCount: null,
+      appendTrialCount: null,
+      revisionTrialCount: null,
+      candidateAcceptanceDiagnosticsCount: 0,
+      stopReason,
+    },
   };
 }
