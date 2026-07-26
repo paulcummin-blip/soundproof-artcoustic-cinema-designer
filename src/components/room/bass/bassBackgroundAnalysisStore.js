@@ -244,7 +244,7 @@ export class BassBackgroundAnalysisController {
 
   requestManual({ fingerprint, payload, identity = null, collectDiagnostics = false, force = false }) {
     if (!fingerprint) return { action: "idle" };
-    if ((this.state.status === "queued" || this.state.status === "calculating") && this.state.currentJobFingerprint === fingerprint) {
+    if (!force && (this.state.status === "queued" || this.state.status === "calculating") && this.state.currentJobFingerprint === fingerprint) {
       return { action: "duplicate_ignored" };
     }
     if (!force) return this.updateInputs({ valid: true, fingerprint, payload, identity, collectDiagnostics });
