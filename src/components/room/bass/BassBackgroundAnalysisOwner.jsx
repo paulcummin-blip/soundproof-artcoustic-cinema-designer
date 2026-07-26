@@ -93,8 +93,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     if (isDragging) return; // Defer heavy EQ calculation during drag; run once on pointer-up
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
-    const autoToken = createDiagToken("automatic-update");
-    recordDiagStage(autoToken, "automatic-update", { collectDiagnostics: includeDiagnostics, checkboxValueAtClick: includeDiagnostics });
     controller.updateInputs({
       valid: inputsValid,
       fingerprint: cacheKey,
@@ -102,7 +100,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       payload,
       identity: requestIdentity,
       collectDiagnostics: includeDiagnostics,
-      diagnosticToken: autoToken,
     });
   }, [controller, isDragging, inputsValid, cacheKey, fingerprints.calibration, payload, requestIdentity, includeDiagnostics, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
@@ -186,11 +183,12 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       }
     }
   }, [controller, lifecycle.resultFingerprint, lifecycle.activeJobId, optimisationResult]);
-  const onRetry = useCallback((collectDiagnostics = false) => {
+  const onRetry = useCallback(() => {
+    const collectDiagnostics = !!includeDiagnostics;
     const manualToken = createDiagToken("manual-forced");
     recordDiagStage(manualToken, "onRetry", { onRetryArg: collectDiagnostics, checkboxValueAtClick: collectDiagnostics });
     return controller.requestManual({ fingerprint: cacheKey, payload, identity: requestIdentity, collectDiagnostics, force: true, diagnosticToken: manualToken });
-  }, [controller, cacheKey, payload, requestIdentity]);
+  }, [controller, cacheKey, payload, requestIdentity, includeDiagnostics]);
   const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

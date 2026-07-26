@@ -596,7 +596,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             {designEqEnabled && (
               <BackgroundAnalysisControls
                 lifecycle={detailedLifecycle}
-                onRecalculate={() => calculateDetailed?.(includeDiagnostics)}
+                onRecalculate={() => calculateDetailed?.()}
                 disabled={!detailedInputsValid || detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"}
                 includeDiagnostics={includeDiagnostics}
                 onDiagnosticsChange={setIncludeDiagnostics}

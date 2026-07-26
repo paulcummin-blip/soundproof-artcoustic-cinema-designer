@@ -15,6 +15,7 @@ const runs = new Map();
 const runOrder = [];
 let lastCheckboxClickTs = null;
 let lastCheckboxClickValue = null;
+let lastManualForcedToken = null;
 let tokenSeq = 0;
 
 export function createDiagToken(origin) {
@@ -32,8 +33,19 @@ export function createDiagToken(origin) {
   while (runOrder.length > MAX_RUNS) {
     const old = runOrder.shift();
     runs.delete(old);
+    if (lastManualForcedToken === old) lastManualForcedToken = null;
   }
+  if (origin === "manual-forced") lastManualForcedToken = token;
   return token;
+}
+
+export function getLastManualForcedToken() {
+  return lastManualForcedToken;
+}
+
+export function getManualForcedRun() {
+  if (!lastManualForcedToken) return null;
+  return runs.get(lastManualForcedToken) || null;
 }
 
 export function recordDiagStage(token, stage, data) {

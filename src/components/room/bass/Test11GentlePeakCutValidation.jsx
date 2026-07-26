@@ -12,7 +12,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
-import { getLatestDiagRun, getDiagRuns } from "./bassDiagTokenTrace";
+import { getManualForcedRun, getDiagRuns } from "./bassDiagTokenTrace";
 
 const UNAVAILABLE = "UNAVAILABLE";
 const MISSING = "MISSING";
@@ -237,7 +237,7 @@ export default function Test11GentlePeakCutValidation() {
     };
   }, [hasResult, sharedBassResults, optimisationResult, selectedCandidate]);
 
-  const diagRun = useMemo(() => getLatestDiagRun(), [open, sharedBassResults?.lifecycle?.resultFingerprint, sharedBassResults?.lifecycle?.activeJobId, acceptance.length]);
+  const diagRun = useMemo(() => getManualForcedRun(), [open, sharedBassResults?.lifecycle?.resultFingerprint, sharedBassResults?.lifecycle?.activeJobId, acceptance.length]);
   const allDiagRuns = useMemo(() => getDiagRuns(), [open, sharedBassResults?.lifecycle?.resultFingerprint, sharedBassResults?.lifecycle?.activeJobId, acceptance.length]);
 
   const renderRow = (row) => {
@@ -395,11 +395,13 @@ export default function Test11GentlePeakCutValidation() {
             const workerEventToken = workerEventStage?.workerEventToken;
             const completedRequestId = completedStage?.resultRequestId ?? completedStage?.completedRequestId;
             const completedToken = completedStage?.resultToken ?? completedStage?.completedToken;
+            const requiredStages = ["onRetry", "requestManual", "requestManual-pending-assigned", "startPending", "worker.postMessage", "worker-event-received", "worker-completed"];
+            const missingStages = requiredStages.filter((name) => !s(name));
             const allTokens = [diagRun.token, pendingToken, startPendingToken, postMessageToken, workerEventToken, completedToken].filter((t) => t != null);
             const allRequestIds = [postMessageRequestId, workerEventRequestId, completedRequestId].filter((r) => r != null);
-            const tokensMatch = allTokens.length > 0 && allTokens.every((t) => t === allTokens[0]);
-            const requestIdsMatch = allRequestIds.length > 0 && allRequestIds.every((r) => r === allRequestIds[0]);
-            const allSameRun = tokensMatch && requestIdsMatch;
+            const tokensMatch = allTokens.length === 6 && allTokens.every((t) => t === allTokens[0]);
+            const requestIdsMatch = allRequestIds.length === 3 && allRequestIds.every((r) => r === allRequestIds[0]);
+            const allSameRun = tokensMatch && requestIdsMatch && missingStages.length === 0;
             const cdValues = [
               { stage: "1. Checkbox at click", value: checkboxValue },
               { stage: "3. onRetry argument", value: onRetryArg },
@@ -409,9 +411,9 @@ export default function Test11GentlePeakCutValidation() {
               { stage: "10. worker.postMessage collectDiagnostics", value: postMessageCd },
               { stage: "13. Worker event received collectDiagnostics", value: workerEventCd },
             ];
-            const firstDiff = cdValues.find((v) => v.value != null && v.value !== true);
-            const firstDiffStage = firstDiff ? firstDiff.stage : "none";
-            const allTrue = cdValues.every((v) => v.value === true);
+            const firstDiff = cdValues.find((v) => v.value == null || v.value !== true);
+            const firstDiffStage = firstDiff ? firstDiff.stage : (missingStages.length > 0 ? `MISSING: ${missingStages.join(", ")}` : "none");
+            const allTrue = missingStages.length === 0 && cdValues.every((v) => v.value === true);
             return (
               <div style={{ border: "1px solid #DCDBD6", borderRadius: 6, background: "#FFF", padding: 10, marginBottom: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#1B1A1A", fontFamily: "monospace", marginBottom: 6 }}>
@@ -444,6 +446,11 @@ export default function Test11GentlePeakCutValidation() {
                   <div style={{ marginTop: 6, fontWeight: 700, color: allTrue ? "#16a34a" : "#dc2626" }}>
                     FIRST STAGE WHERE collectDiagnostics DIFFERS: {firstDiffStage === "none" ? "none — all true" : firstDiffStage}
                   </div>
+                  {missingStages.length > 0 && (
+                    <div style={{ color: "#dc2626", marginTop: 2 }}>
+                      MISSING STAGES: {missingStages.join(", ")}
+                    </div>
+                  )}
                   <div style={{ marginTop: 8, fontWeight: 700 }}>Timestamps:</div>
                   <div>Checkbox click: <b>{diagRun.checkboxClickTs != null ? new Date(diagRun.checkboxClickTs).toISOString().split("T")[1].replace("Z", "") : MISSING}</b></div>
                   <div>requestManual: <b>{ts("requestManual")}</b></div>
