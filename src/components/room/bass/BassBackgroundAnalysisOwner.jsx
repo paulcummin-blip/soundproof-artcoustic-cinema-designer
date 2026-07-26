@@ -190,8 +190,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         payload,
         identity: requestIdentity,
         collectDiagnostics: collectDiagnostics === true,
-        force,
-      });
+        force: force === true,
+        });
     },
     [controller, cacheKey, payload, requestIdentity]
   );
