@@ -333,6 +333,11 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     const acceptableCandidates = [];
     const gainScales = [1, 0.75, 0.5];
     const qMultipliers = [1, 1.5, 2, 3];
+    // Gentle peak-cut ladder: additional cut candidates derived from the
+    // fitter-smoothed region severity. Cuts only — never used for boosts
+    // or valleys. Tests whether a gentler cut than the raw-peak ladder
+    // provides can pass the acceptance gate.
+    const gentlePeakCutGainScales = [0.5, 0.75, 1.0];
     for (const region of regions) {
       const isInsideProtectedNull = isProtectedFrequency(region.centrePoint.frequency, protectedNullRegions);
       const rawCentreSpl = interpolate(raw, region.centrePoint.frequency);
@@ -390,11 +395,21 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       // Skip append when the filter bank is already at the 10-filter ceiling —
       // only gain revisions to existing filters are tested.
       if (filters.length < 10) {
-      for (const gainScale of gainScales) {
+      // Build the list of (baseGainDb, gainScale) pairs to evaluate.
+      // Peaks get the existing raw-peak ladder plus a gentle ladder
+      // derived from the smoothed region severity; valleys get only
+      // the existing ladder. The gentle ladder is cuts only.
+      const gainScaleEntries = isPeak
+        ? [
+            ...gainScales.map((gainScale) => ({ baseGainDb: baseCandidate.gainDb, gainScale })),
+            ...gentlePeakCutGainScales.map((gainScale) => ({ baseGainDb: -region.severityDb, gainScale })),
+          ]
+        : gainScales.map((gainScale) => ({ baseGainDb: baseCandidate.gainDb, gainScale }));
+      for (const { baseGainDb, gainScale } of gainScaleEntries) {
         for (const qMultiplier of qMultipliers) {
           const scaledCandidate = {
             ...baseCandidate,
-            gainDb: baseCandidate.gainDb * gainScale,
+            gainDb: baseGainDb * gainScale,
             Q: Math.max(0.5, Math.min(10, baseCandidate.Q * qMultiplier)),
           };
           const candidate = scaledCandidate.gainDb > 0
