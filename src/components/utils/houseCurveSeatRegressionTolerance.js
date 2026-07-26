@@ -13,11 +13,7 @@ export function resolveSeatRegressionToleranceDb(rspImprovementDb, {
   if (!safeCut || !Number.isFinite(rspImprovementDb) || rspImprovementDb < 3) {
     return CURRENT_BASELINE_TOLERANCE_DB;
   }
-  // Major peak corrections (>= 3 dB RSP improvement) need more seat regression
-  // room — a +5 dB modal peak at the RSP often corresponds to a valley at some
-  // seats, and cutting it worsens those seats. The previous 1.0/1.5 dB tolerance
-  // blocked all major cuts in multi-seat rooms, leaving the EQ bank empty.
-  return rspImprovementDb >= 5 ? 2.5 : 2;
+  return rspImprovementDb >= 5 ? 1.5 : 1;
 }
 
 export function evaluateSeatRegressionTolerance({

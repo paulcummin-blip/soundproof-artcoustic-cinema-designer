@@ -278,7 +278,8 @@ export default function BassGraph({
               .filter((point) => point.frequency >= xMin && point.frequency <= xMax)
               .map((point) => point.spl);
         const rp22Values = (rp22Levels || []).map((level) => level.spl);
-        const splValues = [...responseValues, ...rp22Values].filter((value) => Number.isFinite(value));
+        const p14RefValues = Number.isFinite(p14ReferenceDb) ? [p14ReferenceDb] : [];
+        const splValues = [...responseValues, ...rp22Values, ...p14RefValues].filter((value) => Number.isFinite(value));
 
         if (splValues.length > 0) {
           const dataMin = Math.min(...splValues);

@@ -26,8 +26,8 @@ import { diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCur
 import {
   buildCurveSignature,
   buildFilterBankSignature,
-  validateCachedBassResult,
 } from "@/components/room/bass/bassResultAuthority";
+import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 
 const PROBE_FREQS = [34, 75, 100];
 const INCOMPLETE = "INCOMPLETE";
@@ -99,16 +99,19 @@ export function buildLiveBassValidationReport({
   lines.push(`Note: read-only export. Zero simulations and zero optimiser runs triggered.`);
 
   // ── 0. Result validity check ──
-  // Verify the completed result matches the current active calibration
-  // fingerprint using the existing production authority check before
-  // exporting any canonical values.
-  const authorityCheck = validateCachedBassResult(optimisationResult, { fingerprint: calibrationFingerprint });
+  // The completed-result shape carries calibrationFingerprint (not a generic
+  // fingerprint field). Validate using the same canonical authority the live
+  // graph uses: finalOptimisedBassAuthorityMatches over the completed response.
+  // Do NOT call validateCachedBassResult with the calibration fingerprint as a
+  // generic fingerprint argument — that validator expects result.fingerprint,
+  // which is absent from this completed-result shape.
   const calibrationFingerprintMatches = !!(
     optimisationResult?.calibrationFingerprint
     && calibrationFingerprint
     && optimisationResult.calibrationFingerprint === calibrationFingerprint
   );
-  const resultIsValid = authorityCheck.valid && calibrationFingerprintMatches;
+  const canonicalAuthorityMatches = finalOptimisedBassAuthorityMatches(finalBassResponse);
+  const resultIsValid = calibrationFingerprintMatches && canonicalAuthorityMatches;
 
   // ── 1. Runtime inputs ──
   lines.push(sectionHeader("1. RUNTIME INPUTS"));
@@ -139,16 +142,17 @@ export function buildLiveBassValidationReport({
   lines.push(`Selected P14 target dBC: ${targetDb === null ? INCOMPLETE : targetDb.toFixed(4)}`);
   lines.push(`Required P18 extension Hz: ${extHz === null ? INCOMPLETE : extHz.toFixed(4)}`);
   lines.push(`Design EQ state: ${designEqEnabled ? "ENABLED" : "DISABLED"}`);
-  lines.push(`Calibration fingerprint: ${calibrationFingerprint || INCOMPLETE}`);
+  lines.push(`Active calibration fingerprint: ${calibrationFingerprint || INCOMPLETE}`);
   lines.push(`Result calibration fingerprint: ${optimisationResult?.calibrationFingerprint || INCOMPLETE}`);
-  lines.push(`Production authority check: ${resultIsValid ? "VALID" : "INVALID"}`);
+  lines.push(`Calibration fingerprint match: ${calibrationFingerprintMatches ? "PASS" : "FAIL"}`);
+  lines.push(`Canonical completed-result authority: ${canonicalAuthorityMatches ? "PASS" : "FAIL"}`);
+  lines.push(`Overall export authority: ${resultIsValid ? "VALID" : "INVALID"}`);
   if (!resultIsValid) {
-    lines.push(`Authority mismatch reason: ${authorityCheck.reason || INCOMPLETE}`);
-    if (authorityCheck.message) {
-      lines.push(`Authority mismatch detail: ${authorityCheck.message}`);
-    }
     if (!calibrationFingerprintMatches && calibrationFingerprint) {
       lines.push(`Calibration fingerprint mismatch: result=${optimisationResult?.calibrationFingerprint || INCOMPLETE}, active=${calibrationFingerprint}`);
+    }
+    if (!canonicalAuthorityMatches) {
+      lines.push(`Canonical authority mismatch: finalOptimisedBassResponse failed signature/candidate consistency check`);
     }
   }
 
@@ -194,7 +198,7 @@ export function buildLiveBassValidationReport({
   if (!resultIsValid) {
     lines.push("");
     lines.push(`Canonical values: ${INCOMPLETE} (result is stale, mismatched or incomplete)`);
-    lines.push(`Mismatch reason: ${authorityCheck.reason || INCOMPLETE}`);
+    lines.push(`Mismatch reason: ${!calibrationFingerprintMatches ? "calibration fingerprint mismatch" : "canonical authority mismatch"}`);
   } else {
     lines.push("");
     lines.push("Freq(Hz)  Raw SPL    Target SPL  EQ contrib  Post-EQ SPL  Residual");
