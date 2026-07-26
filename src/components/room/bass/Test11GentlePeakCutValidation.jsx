@@ -14,6 +14,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 
 const UNAVAILABLE = "UNAVAILABLE";
+const MISSING = "MISSING";
 const TARGET_FREQ_HZ = 76.69;
 const TARGET_FREQ_TOLERANCE_HZ = 3.0;
 const GENTLE_TARGET_GAINS = [-1.06, -1.59, -2.12];
@@ -142,6 +143,81 @@ export default function Test11GentlePeakCutValidation() {
 
   const hasResult = !!optimisationResult && !!selectedCandidate;
 
+  // --- DIAGNOSTIC PROPAGATION TRACE (read-only) ---
+  // Traces designEqCandidateAcceptanceDiagnostics from the worker pool through
+  // authority merge, adapter contract, bassResultsStore, and TEST 11. Uses only
+  // values present in the real completed production run. No inference, no
+  // recreation, no synthetic data. MISSING = field absent; 0 = array length zero.
+  const trace = useMemo(() => {
+    if (!hasResult) return null;
+    const lifecycle = sharedBassResults.lifecycle;
+    const pool = lifecycle?.result?.pool || null;
+    const poolCandidates = Array.isArray(pool?.candidates)
+      ? pool.candidates
+      : (Array.isArray(optimisationResult?.candidates) ? optimisationResult.candidates : []);
+    const optSelectedId = optimisationResult?.selectedCandidateId || null;
+    const selectedBeforeMerge = optSelectedId
+      ? (poolCandidates.find((c) => c?.candidateId === optSelectedId) || null)
+      : null;
+    const selectedAfterMerge = optimisationResult?.selectedCandidate || null;
+    const contractSelected = sharedBassResults.contract?.selectedCandidate || null;
+
+    const countFor = (c) => {
+      if (!c) return MISSING;
+      if (!Array.isArray(c.designEqCandidateAcceptanceDiagnostics)) return MISSING;
+      return c.designEqCandidateAcceptanceDiagnostics.length;
+    };
+    const boolStr = (v) => (v === true ? "true" : v === false ? "false" : MISSING);
+
+    const requested = sharedBassResults.authoritative?.includeDiagnostics;
+    const workerReceived = (pool && typeof pool.collectDiagnostics === "boolean") ? pool.collectDiagnostics : null;
+    const poolDiagIncluded = (pool && typeof pool.diagnosticsIncluded === "boolean") ? pool.diagnosticsIncluded : null;
+
+    const stages = [
+      { name: "Requested collectDiagnostics", bad: requested !== true },
+      { name: "Worker received collectDiagnostics", bad: workerReceived !== true },
+      { name: "Pool diagnosticsIncluded", bad: poolDiagIncluded !== true },
+      { name: "Pool candidate count", bad: poolCandidates.length === 0 },
+      { name: "Pool candidate diagnostics", bad: poolCandidates.every((c) => { const n = countFor(c); return n === MISSING || n === 0; }) },
+      { name: "Selected candidate ID before authority merge", bad: !optSelectedId },
+      { name: "Selected candidate before authority merge", bad: (() => { const n = countFor(selectedBeforeMerge); return n === MISSING || n === 0; })() },
+      { name: "Selected candidate after authority merge", bad: (() => { const n = countFor(selectedAfterMerge); return n === MISSING || n === 0; })() },
+      { name: "optimisationResult.selectedCandidate", bad: (() => { const n = countFor(selectedAfterMerge); return n === MISSING || n === 0; })() },
+      { name: "contract.selectedCandidate", bad: (() => { const n = countFor(contractSelected); return n === MISSING || n === 0; })() },
+      { name: "bassResultsStore optimisationResult", bad: (() => { const n = countFor(selectedAfterMerge); return n === MISSING || n === 0; })() },
+      { name: "TEST 11", bad: acceptance.length === 0 },
+    ];
+    const firstZeroOrMissing = stages.find((s) => s.bad)?.name || "none";
+
+    return {
+      requested: boolStr(requested),
+      workerReceived: boolStr(workerReceived),
+      poolDiagIncluded: boolStr(poolDiagIncluded),
+      poolCandidateCount: poolCandidates.length,
+      poolCandidates: poolCandidates.map((c) => ({
+        candidateId: c?.candidateId || MISSING,
+        profile: c?.designEqFitProfile || MISSING,
+        diagCount: countFor(c),
+      })),
+      selectedIdBeforeMerge: optSelectedId || MISSING,
+      selectedDiagCountBeforeMerge: countFor(selectedBeforeMerge),
+      selectedDiagCountAfterMerge: countFor(selectedAfterMerge),
+      optResultSelectedDiagCount: countFor(selectedAfterMerge),
+      contractSelectedDiagCount: countFor(contractSelected),
+      storeOptResultSelectedDiagCount: countFor(selectedAfterMerge),
+      test11DiagCount: acceptance.length,
+      heavyPoolReused: typeof optimisationResult?.heavyPoolReused === "boolean"
+        ? (optimisationResult.heavyPoolReused ? "Yes" : "No") : MISSING,
+      coreFitCount: pool?.performanceSummary?.profileCount
+        ?? optimisationResult?.performanceSummary?.profileCount
+        ?? MISSING,
+      finalFilterBankSig: optimisationResult?.finalOptimisedBassResponse?.filterBankSignature
+        || selectedAfterMerge?.filterBankSignature || MISSING,
+      graphFilterBankSig: optimisationResult?.finalOptimisedBassResponse?.filterBankSignature || MISSING,
+      firstZeroOrMissing,
+    };
+  }, [hasResult, sharedBassResults, optimisationResult, acceptance]);
+
   const renderRow = (row) => {
     const t = row.trial;
     const generated = row.generated;
@@ -183,6 +259,45 @@ export default function Test11GentlePeakCutValidation() {
 
       {open && (
         <div style={{ padding: "0 12px 12px 12px" }}>
+          {hasResult && trace && (
+            <div style={{ border: "1px solid #DCDBD6", borderRadius: 6, background: "#FFF", padding: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#1B1A1A", fontFamily: "monospace", marginBottom: 6 }}>
+                DIAGNOSTIC PROPAGATION TRACE
+              </div>
+              <div style={{ fontSize: 10, fontFamily: "monospace", color: "#1B1A1A", lineHeight: 1.6 }}>
+                <div>1. Requested collectDiagnostics: <b>{trace.requested}</b></div>
+                <div>2. Worker received collectDiagnostics: <b>{trace.workerReceived}</b></div>
+                <div>3. Pool diagnosticsIncluded: <b>{trace.poolDiagIncluded}</b></div>
+                <div>4. Pool candidate count: <b>{trace.poolCandidateCount}</b></div>
+                <div>5. Pool candidates:</div>
+                {trace.poolCandidates.length === 0 ? (
+                  <div style={{ paddingLeft: 16, color: "#9CA3AF" }}>— none —</div>
+                ) : (
+                  trace.poolCandidates.map((c, i) => (
+                    <div key={i} style={{ paddingLeft: 16 }}>
+                      <span style={{ color: "#625143" }}>
+                        candidate {c.candidateId} | profile {c.profile} | diagnostics {c.diagCount}
+                      </span>
+                    </div>
+                  ))
+                )}
+                <div>6. Selected candidate ID before authority merge: <b>{trace.selectedIdBeforeMerge}</b></div>
+                <div>7. Selected candidate diagnostic count before authority merge: <b>{trace.selectedDiagCountBeforeMerge}</b></div>
+                <div>8. Selected candidate diagnostic count after authority merge: <b>{trace.selectedDiagCountAfterMerge}</b></div>
+                <div>9. optimisationResult.selectedCandidate diagnostic count: <b>{trace.optResultSelectedDiagCount}</b></div>
+                <div>10. contract.selectedCandidate diagnostic count: <b>{trace.contractSelectedDiagCount}</b></div>
+                <div>11. bassResultsStore optimisationResult selected-candidate diagnostic count: <b>{trace.storeOptResultSelectedDiagCount}</b></div>
+                <div>12. TEST 11 diagnostic count: <b>{trace.test11DiagCount}</b></div>
+                <div>13. Heavy pool reused: <b>{trace.heavyPoolReused}</b></div>
+                <div>14. Core fit count: <b>{trace.coreFitCount}</b></div>
+                <div>15. Final filter-bank signature: <b>{trace.finalFilterBankSig}</b></div>
+                <div>16. Graph filter-bank signature: <b>{trace.graphFilterBankSig}</b></div>
+                <div style={{ marginTop: 6, fontWeight: 700, color: trace.firstZeroOrMissing === "none" ? "#16a34a" : "#dc2626" }}>
+                  FIRST ZERO OR MISSING STAGE: {trace.firstZeroOrMissing}
+                </div>
+              </div>
+            </div>
+          )}
           {!hasResult && (
             <div style={{ fontSize: 11, color: "#8B7F76", fontFamily: "monospace", padding: 12 }}>
               No completed canonical result available. Recalculate once with engineering diagnostics enabled.
