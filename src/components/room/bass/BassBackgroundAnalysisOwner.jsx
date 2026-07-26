@@ -14,7 +14,7 @@ import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
 import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
 import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
 import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
-import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
+
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
@@ -99,9 +99,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       legacyFingerprint: fingerprints.calibration,
       payload,
       identity: requestIdentity,
-      collectDiagnostics: includeDiagnostics,
+      collectDiagnostics: false,
     });
-  }, [controller, isDragging, inputsValid, cacheKey, fingerprints.calibration, payload, requestIdentity, includeDiagnostics, OPTIMISER_VERSION_SIGNATURE]);
+  }, [controller, isDragging, inputsValid, cacheKey, fingerprints.calibration, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
@@ -183,12 +183,18 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       }
     }
   }, [controller, lifecycle.resultFingerprint, lifecycle.activeJobId, optimisationResult]);
-  const onRetry = useCallback(() => {
-    const collectDiagnostics = !!includeDiagnostics;
-    const manualToken = createDiagToken("manual-forced");
-    recordDiagStage(manualToken, "onRetry", { onRetryArg: collectDiagnostics, checkboxValueAtClick: collectDiagnostics });
-    return controller.requestManual({ fingerprint: cacheKey, payload, identity: requestIdentity, collectDiagnostics, force: true, diagnosticToken: manualToken });
-  }, [controller, cacheKey, payload, requestIdentity, includeDiagnostics]);
+  const onRetry = useCallback(
+    ({ collectDiagnostics = false, force = true } = {}) => {
+      return controller.requestManual({
+        fingerprint: cacheKey,
+        payload,
+        identity: requestIdentity,
+        collectDiagnostics: collectDiagnostics === true,
+        force,
+      });
+    },
+    [controller, cacheKey, payload, requestIdentity]
+  );
   const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
