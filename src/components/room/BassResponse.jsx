@@ -410,6 +410,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return {
       label: `P14 target: ${basis} L${levelNum} · ${targetDb} dBC total`,
       extension: `P18 requirement: ${extensionHz} Hz`,
+      referenceLabel: `${basis} L${levelNum} · ${targetDb} dBC`,
+      referenceDb: targetDb,
     };
   }, [splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
 
@@ -662,6 +664,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               refDb={85}
               disableHighlight={false}
               renderToken={qStrategy}
+              p14ReferenceDb={p14TargetAnnotation?.referenceDb ?? null}
+              p14ReferenceLabel={p14TargetAnnotation?.referenceLabel ?? null}
             />
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>

@@ -82,7 +82,9 @@ export default function BassGraph({
   showAxialOnly = false,
   refDb = 85,
   disableHighlight = false,
-  renderToken = ''
+  renderToken = '',
+  p14ReferenceDb = null,
+  p14ReferenceLabel = null
 }) {
     const lastValidYDomainRef = React.useRef(null);
 
@@ -500,21 +502,24 @@ export default function BassGraph({
                       </>
                     )}
 
-                    {/* Reference Line (Always Visible) */}
-                    {Number.isFinite(refDb) && (
-                        <ReferenceLine 
-                            y={refDb} 
-                            stroke="#2563eb" 
+                    {/* Selected P14 reference guide — one horizontal line at the
+                        currently selected P14 target dBC. Switching the target
+                        moves and relabels this single line. It does not alter EQ,
+                        scoring, fingerprints, or simulations. */}
+                    {Number.isFinite(p14ReferenceDb) && p14ReferenceLabel && (
+                        <ReferenceLine
+                            y={p14ReferenceDb}
+                            stroke="#1B4332"
                             strokeWidth={1.5}
-                            strokeDasharray="4 4"
-                            label={{ 
-                              value: refDb === 0 ? `${refDb} dB (Relative)` : `${refDb} dB Reference`, 
-                              position: 'right', 
-                              fill: '#2563eb', 
+                            strokeDasharray="6 3"
+                            label={{
+                              value: p14ReferenceLabel,
+                              position: 'right',
+                              fill: '#1B4332',
                               className: 'font-body text-xs',
                               offset: 5
-                            }} 
-                          />
+                            }}
+                        />
                     )}
                     
                     {/* Schroeder frequency header label (top-right) */}
