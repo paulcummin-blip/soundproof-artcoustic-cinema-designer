@@ -215,6 +215,14 @@ export function generateCanonicalCandidatePool({
   const selectablePool = candidates.filter(isPhysicallyCredibleBassCandidate);
   const endedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   const poolId = `canonical:${buildCurveSignature(rawCurve)}:${activeSubs.length}:${seats.length}:${verticalOffsetDb.toFixed(4)}`;
+  // Mark diagnosticsIncluded: true ONLY when collectDiagnostics was requested
+  // AND the real production candidates actually carry acceptance diagnostic
+  // arrays. This is a cache-capability flag — it never changes EQ behaviour,
+  // ranking, targets, filters, or P14/P18/P19/P20.
+  const diagnosticsIncluded = !!collectDiagnostics && candidates.some((candidate) =>
+    Array.isArray(candidate?.designEqCandidateAcceptanceDiagnostics)
+    && candidate.designEqCandidateAcceptanceDiagnostics.length > 0
+  );
   return stampPoolAuthority({
     poolVersion: BASS_OPTIMISER_POOL_VERSION,
     candidates,
@@ -229,6 +237,7 @@ export function generateCanonicalCandidatePool({
     missingInputs: [],
     warningMessage: null,
     canonical: true,
+    diagnosticsIncluded,
     canonicalVerticalOffsetDb: verticalOffsetDb,
     canonicalHouseCurveShape: targetShape,
     canonicalTargetCurve: targetCurve,

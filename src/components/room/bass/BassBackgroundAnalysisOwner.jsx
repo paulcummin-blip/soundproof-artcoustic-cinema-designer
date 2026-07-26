@@ -119,6 +119,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const optimisationResult = useMemo(() => {
     const selected = selectionAttempt.result;
     if (!selected) return null;
+    const heavyPoolReused = lifecycle.cacheStatus === "hit";
     const baseResult = {
       ...selected,
       ...BASS_OPTIMISER_VERSIONS,
@@ -126,6 +127,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       cacheSource: lifecycle.cacheRejectionReason ? "rejected-stale" : lifecycle.cacheStatus === "hit" ? "restored" : "fresh",
       cacheRejectionReason: lifecycle.cacheRejectionReason || null,
       calibrationFingerprint: fingerprints.calibration,
+      heavyPoolReused,
+      selectionDiagnostics: selected.selectionDiagnostics
+        ? { ...selected.selectionDiagnostics, heavyPoolReused }
+        : selected.selectionDiagnostics,
     };
     const canonicalResult = buildFinalOptimisedBassResponse({ optimisationResult: baseResult, selectedLayout: sources });
     const authority = evaluateCanonicalBassAuthority({

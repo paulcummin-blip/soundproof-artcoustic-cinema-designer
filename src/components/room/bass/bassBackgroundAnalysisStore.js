@@ -198,7 +198,20 @@ export class BassBackgroundAnalysisController {
       }
     }
     const cached = cacheRead.result;
-    if (cached) {
+    // Cache-capability check: when diagnostics are requested, only reuse a
+    // cached heavy pool that actually carries diagnostic arrays. A pool
+    // generated without collectDiagnostics has diagnosticsIncluded !== true
+    // and must be regenerated once. The cache entry is NOT deleted — it
+    // remains valid for non-diagnostic runs. This check never changes EQ
+    // behaviour, ranking, targets, filters, or P14/P18/P19/P20.
+    if (cached && collectDiagnostics) {
+      const cachedPool = cached.pool;
+      if (!cachedPool || cachedPool.diagnosticsIncluded !== true) {
+        cacheRead = { result: null, status: "rejected-stale", reason: "diagnostics-not-included" };
+      }
+    }
+    const cachedResult = cacheRead.result;
+    if (cachedResult) {
       const completedAtMs = this.now();
       this.pending = null;
       this.emit({
@@ -207,8 +220,8 @@ export class BassBackgroundAnalysisController {
         queuedAtMs: completedAtMs, startedAtMs: completedAtMs, completedAtMs,
         elapsedMs: 0, cacheStatus: "hit", cacheRejectionReason: null, errorMessage: null,
         previousResultStale: false, progress: null, progressStage: "Cache restored",
-        result: cached, staleResult: null, terminalOutcome: "complete", workerStatus: "cache-restored",
-        requestIdentity: identity, returnedIdentity: cached.identity || identity, returnedFingerprint: fingerprint,
+        result: cachedResult, staleResult: null, terminalOutcome: "complete", workerStatus: "cache-restored",
+        requestIdentity: identity, returnedIdentity: cachedResult.identity || identity, returnedFingerprint: fingerprint,
       });
       return { action: "cache_hit" };
     }
