@@ -348,6 +348,9 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       const isPeak = physicalAuthority.classification === "Peak";
       if (collectDiagnostics) detectedRegions.push({
         iteration: operations + 1,
+        startHz: region.startHz,
+        centreHz: region.centrePoint.frequency,
+        endHz: region.endHz,
         frequencyHz: region.centrePoint.frequency,
         kind: region.kind,
         severityDb: region.severityDb,

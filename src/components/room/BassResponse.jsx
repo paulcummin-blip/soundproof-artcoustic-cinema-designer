@@ -32,6 +32,7 @@ import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
+import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTraceButton";
 import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCurveNormalisation";
 
 const IS_DEVELOPMENT_MODE = false;
@@ -599,7 +600,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 onDiagnosticsChange={setIncludeDiagnostics}
               />
             )}
-            {includeDiagnostics && <CopyLiveBassValidationButton />}
+            {includeDiagnostics && (
+              <>
+                <CopyLiveBassValidationButton />
+                <CopyEqForensicTraceButton />
+              </>
+            )}
           </div>
         </div>
 
