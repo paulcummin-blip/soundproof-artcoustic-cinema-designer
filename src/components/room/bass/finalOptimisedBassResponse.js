@@ -28,6 +28,8 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     canonicalHouseCurveShape: cloneCurve(candidate.canonicalHouseCurveShape),
     canonicalTargetCurve: cloneCurve(candidate.productionHouseCurveTarget),
     canonicalVerticalOffsetDb: candidate.canonicalVerticalOffsetDb ?? null,
+    operatingLevelOffsetDb: candidate.operatingLevelOffsetDb ?? 0,
+    rspBeforePeqAtOperatingLevel: cloneCurve(candidate.rspBeforePeqAtOperatingLevel),
     positiveEqDemandCurve: cloneCurve(candidate.positiveEqDemandCurve),
     fitMetrics: candidate.fitMetrics || null,
     protectedNullRegions: (candidate.protectedNullRegions || []).map((region) => ({ ...region })),

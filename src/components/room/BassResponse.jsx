@@ -318,9 +318,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     requiredExtensionHz: selectedP14RequiredExtensionHz,
     upperLfeHz: 120,
   }), [finalBassResponse?.canonicalHouseCurveShape, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
-  const operatingLevelOffsetDb = Number.isFinite(p14HouseCurveNormalisation?.operatingCurveOffsetDb) && Number.isFinite(canonicalVerticalOffsetDb)
-    ? p14HouseCurveNormalisation.operatingCurveOffsetDb - canonicalVerticalOffsetDb
-    : 0;
+  const operatingLevelOffsetDb = Number.isFinite(finalBassResponse?.operatingLevelOffsetDb)
+    ? finalBassResponse.operatingLevelOffsetDb
+    : (Number.isFinite(p14HouseCurveNormalisation?.operatingCurveOffsetDb) && Number.isFinite(canonicalVerticalOffsetDb)
+      ? p14HouseCurveNormalisation.operatingCurveOffsetDb - canonicalVerticalOffsetDb
+      : 0);
 
   // Development diagnostic — proves the rendered house curve integrates to the
   // selected P14 target (e.g. 109 dBC for Minimum L1). Acceptance: |errorDb| <= 0.05 dB.
@@ -681,6 +683,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               disableHighlight={false}
               renderToken={qStrategy}
               p14TotalDb={p14PresentationData.targetDb}
+              operatingLevelOffsetDb={operatingLevelOffsetDb}
             />
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>

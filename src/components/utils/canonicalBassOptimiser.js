@@ -12,7 +12,7 @@ import {
   resolveHouseCurveDomains,
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
-import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz } from "@/components/utils/p14HouseCurveNormalisation";
+import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput } from "@/components/utils/subwooferCapability";
 
@@ -55,7 +55,7 @@ function bankLimits(eq) {
   };
 }
 
-function buildCanonicalCandidate({ rawCurve, perSeatRawCurves, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions }) {
+function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb, perSeatRawCurves, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions }) {
   const perSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, eq.combinedEqCurve);
   const seatsForMetrics = perSeatPostEqCurves.length
     ? perSeatPostEqCurves
@@ -81,6 +81,8 @@ function buildCanonicalCandidate({ rawCurve, perSeatRawCurves, eq, domains, targ
     startStrategy: eq.designEqFitProfile === "house_curve" ? "multi-start" : "single",
     selectedStart: eq.selectedStart ?? null,
     rawResponseCurve: rawCurve.map((point) => ({ ...point })),
+    rspBeforePeqAtOperatingLevel: (levelNormalisedRawCurve || []).map((point) => ({ ...point })),
+    operatingLevelOffsetDb: Number.isFinite(operatingLevelOffsetDb) ? operatingLevelOffsetDb : 0,
     rawResponseSignature: buildCurveSignature(rawCurve),
     generatedFilterBank: eq.filters || [],
     finalPostEqCurve: eq.curve || [],
@@ -179,17 +181,43 @@ export function generateCanonicalCandidatePool({
     correctionStartHz: domains.correctionStartHz, correctionEndHz: domains.correctionEndHz,
   });
   const targetShape = targetCurve.map((point) => ({ frequency: point.frequency, offsetDb: point.spl - verticalOffsetDb }));
-  const protectedNullRegions = identifyProtectedNullRegions(
-    rawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
-    activeSubs, usableLfHz, null, targetCurve,
-  );
+  // Resolve seat curves and requested source-domain output before computing the
+  // operating-level offset (level-normalised seats are derived from these).
+  const seats = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
+    .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
   // Resolve the requested source-domain output from the existing approved product
   // authority. This is the LFE output level the headroom calculation subtracts
   // from the manufacturer capability curve. Falls back to 114 dB when no tuning
   // is configured on the sub objects.
   const requestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
-  const seats = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
-    .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
+  // ── Global operating-level offset ──
+  // The raw simulated RSP is at the physical maximum level. Before PEQ, a single
+  // scalar offset places the complete response at the selected P14 operating
+  // level (e.g. 109 dBC). This is system trim — it is NOT a PEQ filter, does not
+  // consume a filter-bank slot, and does not count towards the −15 dB PEQ cut
+  // limit. PEQ then corrects only the remaining shape residual relative to the
+  // fixed house-curve target.
+  const rawIntegratedLevelDbC = integrateRawResponseLevelDbC({
+    rawCurve, lowerHz: requiredExtensionHz, upperHz: 120,
+  });
+  const operatingLevelOffsetDb = Number.isFinite(rawIntegratedLevelDbC)
+    ? Number(selectedP14TargetDb) - rawIntegratedLevelDbC
+    : 0;
+  const levelNormalisedRawCurve = rawCurve.map((point) => ({
+    ...point,
+    spl: Number.isFinite(point.spl) ? point.spl + operatingLevelOffsetDb : point.spl,
+  }));
+  const levelNormalisedSeats = seats.map((seat) => ({
+    ...seat,
+    responseData: seat.responseData.map((point) => ({
+      ...point,
+      spl: Number.isFinite(point.spl) ? point.spl + operatingLevelOffsetDb : point.spl,
+    })),
+  }));
+  const protectedNullRegions = identifyProtectedNullRegions(
+    levelNormalisedRawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
+    activeSubs, usableLfHz, null, targetCurve,
+  );
   const totalTasks = FIT_PROFILES.length + 1;
   let completedTasks = 0;
   const report = (phase) => onProgress?.({ phase, completedTasks, totalTasks, completedRequests: completedTasks, totalRequests: totalTasks });
@@ -207,7 +235,7 @@ export function generateCanonicalCandidatePool({
     requestedSystemOutputDb,
   });
   const eqResults = [];
-  const standardEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, fitOptions("standard"));
+  const standardEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("standard"));
   eqResults.push(standardEq);
   completedTasks += 1;
   report("Canonical standard fit complete");
@@ -222,11 +250,11 @@ export function generateCanonicalCandidatePool({
       ? standardEq.bestSeedFilters
       : (standardEq.filters || []);
   const seed = seedSource.filter((filter) => filter?.enabled);
-  const accuracyEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, fitOptions("accuracy", seed));
+  const accuracyEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("accuracy", seed));
   eqResults.push(accuracyEq);
   completedTasks += 1;
   report("Canonical accuracy fit complete");
-  const houseEq = calculateHouseCurveEqCurve(rawCurve, seats, usableLfHz, activeSubs, {
+  const houseEq = calculateHouseCurveEqCurve(levelNormalisedRawCurve, levelNormalisedSeats, usableLfHz, activeSubs, {
     ...fitOptions("house_curve", seed),
     assessmentStartHz: domains.p19StartHz,
     assessmentEndHz: domains.p19EndHz,
@@ -241,7 +269,7 @@ export function generateCanonicalCandidatePool({
   report("Canonical house-curve fit complete");
 
   const candidates = annotateCandidatePoolForHouseCurveRanking(eqResults.map((eq) => buildCanonicalCandidate({
-    rawCurve, perSeatRawCurves: seats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
+    rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
   })));
   const __canonicalTrace__ = {
     receivedCollectDiagnostics: collectDiagnostics,
@@ -291,6 +319,7 @@ export function generateCanonicalCandidatePool({
     diagnosticsIncluded,
     __canonicalTrace__,
     canonicalVerticalOffsetDb: verticalOffsetDb,
+    operatingLevelOffsetDb,
     canonicalHouseCurveShape: targetShape,
     canonicalTargetCurve: targetCurve,
     protectedNullRegions,

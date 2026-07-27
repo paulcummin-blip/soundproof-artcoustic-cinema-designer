@@ -84,6 +84,33 @@ export function normaliseHouseCurveToP14Total({
 }
 
 /**
+ * C-weighted integrated level of a raw response curve over the P14 assessment
+ * band. Uses the same third-octave band centres and C-weighting as
+ * normaliseHouseCurveToP14Total so the raw response and the house-curve target
+ * are integrated on the same basis.
+ *
+ * Returns the integrated dBC value, or null when no valid bands are available.
+ */
+export function integrateRawResponseLevelDbC({ rawCurve, lowerHz, upperHz = 120 } = {}) {
+  const lower = Number(lowerHz);
+  const upper = Number(upperHz);
+  if (!Number.isFinite(lower) || !Number.isFinite(upper)) return null;
+  const bands = THIRD_OCTAVE_CENTRES_HZ
+    .filter((frequency) => frequency >= lower && frequency <= upper)
+    .map((frequency) => {
+      const rawSplDb = interpolateShape(rawCurve, frequency);
+      const cCorrectionDb = cWeightingCorrectionDb(frequency);
+      if (!Number.isFinite(rawSplDb) || !Number.isFinite(cCorrectionDb)) return null;
+      return { frequencyHz: frequency, rawSplDb, cWeightingCorrectionDb: cCorrectionDb };
+    })
+    .filter(Boolean);
+  if (!bands.length) return null;
+  const power = bands.reduce((sum, band) =>
+    sum + (10 ** ((band.rawSplDb + band.cWeightingCorrectionDb) / 10)), 0);
+  return 10 * Math.log10(power);
+}
+
+/**
  * Development diagnostic — proves the rendered house curve integrates to the
  * selected P14 target (e.g. 109 dBC for Minimum L1).
  *

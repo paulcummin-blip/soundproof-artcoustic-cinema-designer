@@ -125,8 +125,11 @@ export function buildBassGraphSeries({
       if (target) series.push(target);
       const maximumSpl = buildMaximumSplSeries(finalResponse, smoothingMode);
       if (maximumSpl) series.push(maximumSpl);
-      const shiftedKinds = new Set(["raw", "post-eq", "house-curve", "real-seat-overlay"]);
-      series = series.map((item) => shiftedKinds.has(item.kind)
+      // Only the raw (pre-PEQ) curve needs the operating-level shift — the
+      // post-EQ curve, house-curve target, and real-seat overlays from the
+      // fitter are already at the selected operating level because the fitter
+      // received the level-normalised raw curve.
+      series = series.map((item) => item.kind === "raw"
         ? { ...item, data: shiftCurve(item.data, operatingLevelOffsetDb) }
         : item);
     }

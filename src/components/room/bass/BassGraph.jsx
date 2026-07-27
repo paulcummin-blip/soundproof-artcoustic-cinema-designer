@@ -11,7 +11,7 @@ const hasFiniteValue = (value) =>
   value !== "" &&
   Number.isFinite(Number(value));
 
-const CustomTooltip = ({ active, payload, label, series = [] }) => {
+const CustomTooltip = ({ active, payload, label, series = [], operatingLevelOffsetDb = 0 }) => {
     if (!active || !payload?.length) return null;
     const row = payload[0]?.payload;
     const actualFreq = row?.frequency;
@@ -25,11 +25,15 @@ const CustomTooltip = ({ active, payload, label, series = [] }) => {
     const rawValue = raw ? row[`spl_${raw.id}`] : null;
     const postEqValue = postEq ? row[`spl_${postEq.id}`] : null;
     const houseCurveValue = houseCurve ? row[`spl_${houseCurve.id}`] : null;
-    const eqApplied = hasFiniteValue(rawValue) && hasFiniteValue(postEqValue) ? Number(postEqValue) - Number(rawValue) : null;
+    // rawValue is the level-normalised "RSP before PEQ" (raw + operatingLevelOffset).
+    // PEQ applied is the filter-bank response only, NOT the global level trim.
+    const rawSimulatedDb = hasFiniteValue(rawValue) ? Number(rawValue) - Number(operatingLevelOffsetDb) : null;
+    const peqAppliedDb = hasFiniteValue(rawValue) && hasFiniteValue(postEqValue) ? Number(postEqValue) - Number(rawValue) : null;
     const residual = hasFiniteValue(postEqValue) && hasFiniteValue(houseCurveValue) ? Number(postEqValue) - Number(houseCurveValue) : null;
     const fallbackValue = visibleSeries.length
       ? row[`spl_${visibleSeries[0].id}`]
       : payload.find((item) => hasFiniteValue(item?.value))?.value;
+    const hasLevelOffset = Number.isFinite(Number(operatingLevelOffsetDb)) && Number(operatingLevelOffsetDb) !== 0;
 
     return (
         <div className="bg-white/80 backdrop-blur-sm p-3 border border-[#DCDBD6] rounded-lg shadow-lg font-body">
@@ -40,8 +44,10 @@ const CustomTooltip = ({ active, payload, label, series = [] }) => {
                     return hasFiniteValue(value) ? <p key={item.id} style={{ color: item.color }}>{item.tooltipLabel || item.label || item.id}: {Number(value).toFixed(1)} dB</p> : null;
                   })
                 : hasFiniteValue(fallbackValue) && <p className="text-[#213428]">SPL: {Number(fallbackValue).toFixed(1)} dB</p>}
-            {hasFiniteValue(eqApplied) && <p className="text-[#3E4349]">EQ applied: {eqApplied >= 0 ? "+" : ""}{Number(eqApplied).toFixed(1)} dB</p>}
-            {hasFiniteValue(residual) && <p className="text-[#625143]">Residual: {residual >= 0 ? "+" : ""}{Number(residual).toFixed(1)} dB</p>}
+            {hasFiniteValue(rawSimulatedDb) && <p className="text-[#3E4349]">Raw simulated RSP: {Number(rawSimulatedDb).toFixed(1)} dB</p>}
+            {hasLevelOffset && <p className="text-[#3E4349]">Operating-level offset: {Number(operatingLevelOffsetDb) >= 0 ? "+" : ""}{Number(operatingLevelOffsetDb).toFixed(1)} dB</p>}
+            {hasFiniteValue(peqAppliedDb) && <p className="text-[#3E4349]">PEQ applied: {peqAppliedDb >= 0 ? "+" : ""}{Number(peqAppliedDb).toFixed(1)} dB</p>}
+            {hasFiniteValue(residual) && <p className="text-[#625143]">Final residual: {residual >= 0 ? "+" : ""}{Number(residual).toFixed(1)} dB</p>}
         </div>
     );
 };
@@ -84,7 +90,8 @@ export default function BassGraph({
   refDb = 85,
   disableHighlight = false,
   renderToken = '',
-  p14TotalDb = null
+  p14TotalDb = null,
+  operatingLevelOffsetDb = 0
 }) {
     const lastValidYDomainRef = React.useRef(null);
 
@@ -430,7 +437,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                         allowDecimals={false}
                     />
-                    <Tooltip content={(props) => <CustomTooltip {...props} series={isMulti ? multiSeries : []} />} shared cursor={false} />
+                    <Tooltip content={(props) => <CustomTooltip {...props} series={isMulti ? multiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} />} shared cursor={false} />
 
                     {/* Schroeder frequency line (on-scale only) */}
                     {Number.isFinite(schroederFrequency) && schroederFrequency > 0 && schroederFrequency <= 200 && (
