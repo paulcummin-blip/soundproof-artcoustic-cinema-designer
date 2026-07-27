@@ -15,6 +15,9 @@ const MAX_Q = 10;
 const MAX_PROTECTED_NULL_WORSENING_DB = 2;
 const RESIDUAL_THRESHOLD_DB = 1;
 const EPSILON_DB = 0.05;
+const CUT_PEAK_REDUCTION_DB = 0.5;
+const CUT_RMS_IMPROVEMENT_DB = 0.05;
+const CUT_SEAT_WORSENING_DB = 1.0;
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 const levelNumber = (level) => Number(String(level || "").replace("L", "")) || 0;
@@ -141,7 +144,7 @@ function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemO
   const isCut = requiredDb < 0;
   const requestedDb = isCut ? Math.max(-15, requiredDb) : Math.min(6, requiredDb);
   const gains = [1, 0.9, 0.75, 0.5, 0.25];
-  const qValues = [10, 8, 6, 5, 4];
+  const qValues = [10, 8, 6, 5, 4, 3, 2];
   const trials = [];
   if (filters.length < MAX_FILTERS) {
     for (const gainScale of gains) for (const Q of qValues) {
@@ -287,8 +290,8 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
     // L2. Maximum positive residual must reduce by at least 0.75 dB within the influence region
     const currentMaxPositive = Math.max(0, ...influenceCurrent.map((p) => p.residualDb));
     const candidateMaxPositive = Math.max(0, ...influenceCandidate.map((p) => p.residualDb));
-    if (currentMaxPositive - candidateMaxPositive < 0.75 - EPSILON_DB) {
-      return { reason: "cut-peak: maximum positive residual did not reduce by 0.75 dB within influence region", limits, nullWorseningDb, candidateCentre, candidateQuality };
+    if (currentMaxPositive - candidateMaxPositive < CUT_PEAK_REDUCTION_DB - EPSILON_DB) {
+      return { reason: `cut-peak: maximum positive residual did not reduce by ${CUT_PEAK_REDUCTION_DB} dB within influence region`, limits, nullWorseningDb, candidateCentre, candidateQuality };
     }
 
     // L3. Filter-centre residual must improve (already checked as localImprovementDb above)
@@ -305,8 +308,8 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
       const isNowBelowMinus3 = point.residualDb < -3;
       // Reject if the cut moves a point from above −3 dB to below −3 dB
       if (wasAboveMinus3 && isNowBelowMinus3) return true;
-      // Reject if an existing below-3 point worsens by more than 0.50 dB
-      if (!wasAboveMinus3 && (before.residualDb - point.residualDb) > 0.50 + EPSILON_DB) return true;
+      // Reject if an existing below-3 point worsens by more than CUT_SEAT_WORSENING_DB
+      if (!wasAboveMinus3 && (before.residualDb - point.residualDb) > CUT_SEAT_WORSENING_DB + EPSILON_DB) return true;
       return false;
     });
     if (badPoint) {
@@ -318,14 +321,14 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
     // === GLOBAL conditions (across full correction range) ===
 
     // G1. Overall RMS target error must improve by at least 0.15 dB
-    if (currentQuality.rmsResidualDb - candidateQuality.rmsResidualDb < 0.15 - EPSILON_DB) {
-      return { reason: "cut-rms: overall RMS target error did not improve by at least 0.15 dB", limits, nullWorseningDb, candidateCentre, candidateQuality };
+    if (currentQuality.rmsResidualDb - candidateQuality.rmsResidualDb < CUT_RMS_IMPROVEMENT_DB - EPSILON_DB) {
+      return { reason: `cut-rms: overall RMS target error did not improve by at least ${CUT_RMS_IMPROVEMENT_DB} dB`, limits, nullWorseningDb, candidateCentre, candidateQuality };
     }
 
     // G2. Worst-seat maximum deviation must not worsen by more than 0.50 dB
     const seatWorseningDb = worstSeatDeviationWorsening(currentFilters, trial.filters, perSeatRawCurves,
       anchorDb, canonicalTargetCurve, correctionStartHz, correctionEndHz, protectedNullRegions);
-    if (seatWorseningDb > 0.50 + EPSILON_DB) {
+    if (seatWorseningDb > CUT_SEAT_WORSENING_DB + EPSILON_DB) {
       return { reason: `cut-seat: worst-seat maximum deviation worsened by ${seatWorseningDb.toFixed(2)} dB`, limits, nullWorseningDb, candidateCentre, candidateQuality };
     }
 

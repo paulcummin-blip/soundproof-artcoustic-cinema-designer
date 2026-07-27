@@ -76,7 +76,7 @@ export function refineLegalUnprotectedPeak({ filters, rawCurve, targetCurve, pro
         });
         const realSeatsSafe = (metrics?.seatMetrics || []).filter((seat) => seat.seatId !== "rsp").every((seat) => {
           const baseline = baselineMetrics?.seatMetrics?.find((entry) => entry.seatId === seat.seatId);
-          return !baseline || seat.maxAbsDeviationDb <= baseline.maxAbsDeviationDb + 0.5;
+          return !baseline || seat.maxAbsDeviationDb <= baseline.maxAbsDeviationDb + 1.0;
         });
         if (!realSeatsSafe) continue;
         const candidate = { filters: proposed, quality: proposedQuality, rawPeakResidual, metrics, limits, frequencyHz: peak.frequency };

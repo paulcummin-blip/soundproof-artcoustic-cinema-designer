@@ -1,4 +1,7 @@
 const CURRENT_BASELINE_TOLERANCE_DB = 0.5;
+const CUT_BASE_TOLERANCE_DB = 1.0;
+const CUT_MATERIAL_IMPROVEMENT_TOLERANCE_DB = 1.5;
+const CUT_MAJOR_IMPROVEMENT_TOLERANCE_DB = 2.0;
 
 export function resolveSeatRegressionToleranceDb(rspImprovementDb, {
   isCorrectiveCut = false,
@@ -10,10 +13,19 @@ export function resolveSeatRegressionToleranceDb(rspImprovementDb, {
     && bankLimits?.boostLimitOk !== false
     && bankLimits?.sourceDomainHeadroomOk !== false;
 
-  if (!safeCut || !Number.isFinite(rspImprovementDb) || rspImprovementDb < 3) {
+  // Cuts do not consume output headroom and receive a more permissive acceptance
+  // path than boosts. A corrective cut that materially reduces a real peak may
+  // be accepted even when the RSP maximum residual improvement is modest.
+  if (!safeCut) {
     return CURRENT_BASELINE_TOLERANCE_DB;
   }
-  return rspImprovementDb >= 5 ? 1.5 : 1;
+  if (!Number.isFinite(rspImprovementDb) || rspImprovementDb < 1) {
+    return CUT_BASE_TOLERANCE_DB;
+  }
+  if (rspImprovementDb < 3) {
+    return CUT_MATERIAL_IMPROVEMENT_TOLERANCE_DB;
+  }
+  return rspImprovementDb >= 5 ? CUT_MAJOR_IMPROVEMENT_TOLERANCE_DB : CUT_MATERIAL_IMPROVEMENT_TOLERANCE_DB;
 }
 
 export function evaluateSeatRegressionTolerance({

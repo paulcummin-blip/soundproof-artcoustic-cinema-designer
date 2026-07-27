@@ -26,6 +26,15 @@ const isNumber = (v) => Number.isFinite(Number(v));
 const WORST_EQUIV_DB = 0.05;
 const RMS_EPSILON_DB = 0.01;
 
+// Cut acceptance — cuts get a more permissive acceptance path than boosts.
+// Cuts do not consume output headroom and may be accepted when they materially
+// reduce a real positive residual peak, even if the global maximum residual
+// does not change because a larger residual exists elsewhere.
+const CUT_INFLUENCE_THRESHOLD_DB = 0.25;
+const CUT_PEAK_REDUCTION_DB = 0.5;
+const CUT_AREA_REDUCTION_DB = 0.01;
+const CUT_RMS_TOLERANCE_DB = 0.01;
+
 // P19 level from max abs deviation: L4 <=2, L3 <=3, L2 <=4, L1 <=5, else FAIL (0).
 export function houseCurveP19Level(deviationDb) {
   if (!isNumber(deviationDb)) return 0;
@@ -307,6 +316,43 @@ function validateAndScaleTrial(proposedFilters, scalableFilterIndex, bankRaw, ac
   return result;
 }
 
+// Evaluate whether a cut trial materially reduces the positive residual within its
+// influence region on the 1/3-octave RSP scoring grid. Cuts do not consume output
+// headroom and may be accepted when they materially reduce a real peak, even if the
+// global maximum residual does not change because a larger residual exists elsewhere.
+function evaluateCutInfluenceAcceptance(currentMetrics, trialMetrics, protectedNullRegions) {
+  const currentPoints = currentMetrics?.rspResidualPoints || [];
+  const trialPoints = trialMetrics?.rspResidualPoints || [];
+  if (!currentPoints.length || !trialPoints.length) return false;
+  const trialByFreq = new Map(trialPoints.map((p) => [p.frequency, p]));
+  let currentMaxPositive = 0;
+  let trialMaxPositive = 0;
+  let currentPositiveArea = 0;
+  let trialPositiveArea = 0;
+  let inInfluence = false;
+  for (const current of currentPoints) {
+    const after = trialByFreq.get(current.frequency);
+    if (!after) continue;
+    if (isProtectedFrequency(current.frequency, protectedNullRegions)) continue;
+    const change = after.deviationDb - current.deviationDb;
+    if (Math.abs(change) < CUT_INFLUENCE_THRESHOLD_DB) continue;
+    inInfluence = true;
+    if (current.deviationDb > 0) {
+      currentMaxPositive = Math.max(currentMaxPositive, current.deviationDb);
+      currentPositiveArea += current.deviationDb;
+    }
+    if (after.deviationDb > 0) {
+      trialMaxPositive = Math.max(trialMaxPositive, after.deviationDb);
+      trialPositiveArea += after.deviationDb;
+    }
+  }
+  if (!inInfluence) return false;
+  const peakReduced = currentMaxPositive - trialMaxPositive >= CUT_PEAK_REDUCTION_DB;
+  const areaReduced = trialPositiveArea < currentPositiveArea - CUT_AREA_REDUCTION_DB;
+  const rmsImproved = (currentMetrics.rspRmsDeviationDb ?? Infinity) - (trialMetrics.rspRmsDeviationDb ?? -Infinity) > CUT_RMS_TOLERANCE_DB;
+  return peakReduced && areaReduced && rmsImproved;
+}
+
 // Run a single-start optimisation loop. Returns { filters, metrics, baselineWorstSeatDeviation,
 // blockedResiduals, stopReason, bankEvalCount, operations }.
 export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, options = {}) {
@@ -488,13 +534,17 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
         trialEntry.rspImprovementDb = maxImprovementDb;
         const rmsImproved = rmsImprovementDb > RMS_EPSILON_DB;
         const maxProtected = trialMetrics.rspMaxDeviationDb <= currentMetrics.rspMaxDeviationDb + WORST_EQUIV_DB;
-        const objectiveImproved = maxImprovementDb > WORST_EQUIV_DB || (maxProtected && rmsImproved);
-        if (!directionPass || !objectiveImproved || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0) {
+        const isCutTrial = Number(trial.filter?.gainDb) < 0;
+        const cutInfluenceAccepted = isCutTrial && evaluateCutInfluenceAcceptance(currentMetrics, trialMetrics, protectedNullRegions);
+        const objectiveImproved = maxImprovementDb > WORST_EQUIV_DB || (maxProtected && rmsImproved) || cutInfluenceAccepted;
+        if (!directionPass || (!cutInfluenceAccepted && (!objectiveImproved || compareHouseCurveMetrics(trialMetrics, currentMetrics) >= 0))) {
           trialEntry.rejectionReason = !directionPass
             ? physicalAction.reason || "correction direction opposed target-minus-current residual"
-            : !maxProtected ? "maximum correctable deviation increased"
-              : !rmsImproved && maxImprovementDb <= WORST_EQUIV_DB ? "neither maximum residual nor weighted RMS improved"
-                : "not strictly better than current";
+            : !objectiveImproved
+              ? isCutTrial
+                ? "cut did not materially reduce positive residual in influence region"
+                : "neither maximum residual nor weighted RMS improved"
+              : "not strictly better than current";
           iterationEntry.trials.push(trialEntry);
           continue;
         }
@@ -542,10 +592,15 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           trialEntry.acceptedAfterSeatToleranceAdjustment = true;
         }
         trialEntry.accepted = true;
-        trialEntry.acceptanceReason = maxImprovementDb > WORST_EQUIV_DB ? "reduced maximum absolute RSP residual" : "held maximum residual while reducing RSP RMS";
+        trialEntry.acceptanceReason = cutInfluenceAccepted
+          ? "cut materially reduced positive residual in influence region"
+          : maxImprovementDb > WORST_EQUIV_DB ? "reduced maximum absolute RSP residual" : "held maximum residual while reducing RSP RMS";
         iterationEntry.trials.push(trialEntry);
         const acousticComparison = bestTrial ? compareHouseCurveMetrics(trialMetrics, bestTrialMetrics) : -1;
-        if (!bestTrial || acousticComparison < 0) {
+        const cutPreferable = cutInfluenceAccepted && bestTrial
+          && Math.abs(trialMetrics.rspMaxDeviationDb - bestTrialMetrics.rspMaxDeviationDb) <= 0.1
+          && trialMetrics.rspRmsDeviationDb < bestTrialMetrics.rspRmsDeviationDb - RMS_EPSILON_DB;
+        if (!bestTrial || acousticComparison < 0 || cutPreferable) {
           bestTrial = trial;
           bestTrialMetrics = trialMetrics;
           bestTrialFilters = validation.filters;
