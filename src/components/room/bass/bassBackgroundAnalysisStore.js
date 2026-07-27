@@ -365,6 +365,17 @@ export class BassBackgroundAnalysisController {
       const warningMessage = pool.warningMessage || `Bass analysis failed: ${pool.generationStatus}`;
       return this.handleTerminalFailure(active, warningMessage, pool.generationStatus);
     }
+    // Terminal outcome: complete generation with zero candidates. This is a
+    // legitimate physical rejection, not a compatibility mismatch. Without
+    // this intercept, validateCachedBassResult would classify it as
+    // "candidate-pool-empty" and trigger a compatibility retry.
+    if (pool && Array.isArray(pool.candidates) && pool.candidates.length === 0) {
+      const missingInputs = Array.isArray(pool.missingInputs) ? pool.missingInputs : [];
+      const warningMessage = missingInputs.length
+        ? `Bass analysis rejected: missing mandatory input${missingInputs.length > 1 ? "s" : ""} ${missingInputs.join(", ")}`
+        : (pool.warningMessage || "No physically valid EQ candidate generated");
+      return this.handleTerminalFailure(active, warningMessage, "no-candidates");
+    }
     const completedAtMs = this.now();
     const returnedIdentity = message.identity || active.identity;
     const result = {
@@ -382,6 +393,16 @@ export class BassBackgroundAnalysisController {
     recordDiagStage(active.diagnosticToken, "worker-completed", { completedRequestId: active.requestId, completedToken: active.diagnosticToken, resultRequestId: result.workerRequestId, resultToken: result.diagnosticToken });
     const validation = validateCachedBassResult(result, { fingerprint: active.fingerprint });
     if (!validation.valid) return this.handleCompatibilityMismatch(active, message, `Rejected incompatible optimiser result: ${validation.message || validation.reason}`);
+    // Terminal outcome: complete generation with candidates but zero
+    // selectable (physically credible) candidates. All generated EQ banks
+    // violated product capability or bank limits. Treat as terminal — do not
+    // retry automatically. Manual retry remains available via requestManual.
+    const poolSelectable = Array.isArray(pool.selectablePool) ? pool.selectablePool : [];
+    const poolPhysicallyCredible = Number.isFinite(pool.physicallyCredibleCount) ? pool.physicallyCredibleCount : poolSelectable.length;
+    if (poolSelectable.length === 0 || poolPhysicallyCredible === 0) {
+      const warningMessage = pool.warningMessage || "No physically valid EQ candidate — all generated banks exceeded product capability or bank limits";
+      return this.handleTerminalFailure(active, warningMessage, "no-selectable-candidates");
+    }
     this.stage("Main thread received result", { jobId: active.requestId });
     this.stage("Fingerprint validated", { jobId: active.requestId });
     this.cache.set(active.fingerprint, result);
