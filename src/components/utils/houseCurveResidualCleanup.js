@@ -1,6 +1,8 @@
 import {
   buildCurveFromBank,
+  countSameSignFiltersInRegion,
   evaluateProvisionalBankLimits,
+  isNearDuplicate,
   limitBoostForCapability,
   normaliseCurve,
   peakingEqResponseDb,
@@ -161,6 +163,7 @@ function proposedBanks(region, filters, activeSubs, usableLfHz, requestedSystemO
         const halfWidth = region.centre.frequency / (2 * Q);
         filter = limitBoostForCapability({ ...filter, startHz: filter.frequencyHz - halfWidth, endHz: filter.frequencyHz + halfWidth }, activeSubs, usableLfHz, requestedSystemOutputDb);
       }
+      if (Math.abs(filter.gainDb) <= 0.1 || isNearDuplicate(filter, filters) || countSameSignFiltersInRegion(filter, filters) >= 2) continue;
       trials.push({ action: "append", changedFilterIndex: filters.length, filter, filters: [...filters, filter] });
     }
   }
