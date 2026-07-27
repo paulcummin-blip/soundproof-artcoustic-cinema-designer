@@ -12,6 +12,8 @@ import {
   resolveHouseCurveDomains,
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
+import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz } from "@/components/utils/p14HouseCurveNormalisation";
+import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 
@@ -133,6 +135,7 @@ export function generateCanonicalCandidatePool({
   rawCurve = [], activeSubs = [], usableLfHz = null, transitionHz = 120,
   correctionEndHz = 200, perSeatRawCurves = [], collectDiagnostics = false,
   onProgress = null, reuseExactHouseCurveEvaluations = true,
+  selectedP14TargetDb = 109, p14TargetBasis = "minimum", p14TargetLevel = 1,
 } = {}) {
   const missingInputs = [!rawCurve.length && "rawCurve", !activeSubs.length && "activeSubs"].filter(Boolean);
   if (missingInputs.length) return stampPoolAuthority({
@@ -143,7 +146,28 @@ export function generateCanonicalCandidatePool({
 
   const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
-  const verticalOffsetDb = deriveProductionEqVerticalAnchor(rawCurve);
+
+  // ── Fixed house target: P14-normalised global vertical offset ──
+  // The Artcoustic house-curve shape is shifted vertically by exactly one
+  // global offset so that the complete applicable curve C-weighted power-sums
+  // to the selected P14 target (e.g. 109 dBC for Minimum L1). This offset is
+  // computed once and never changes during fitting — it is not moved by the
+  // product model, subwoofer quantity, available headroom, current response
+  // shape, P18/P19 results, or fitter failure.
+  const houseCurveShape = [15, 20, 25, 31.5, 40, 50, 63, 80, 100, 120, 150, 200, 400]
+    .map((f) => ({ frequency: f, offsetDb: artcousticHouseCurveOffsetAt(f) }));
+  const requiredExtensionHz = requiredP14ExtensionHz(p14TargetBasis, p14TargetLevel);
+  const p14Normalisation = normaliseHouseCurveToP14Total({
+    houseCurveShape,
+    selectedP14TargetDb: Number(selectedP14TargetDb),
+    requiredExtensionHz,
+    upperLfeHz: 120,
+  });
+  let verticalOffsetDb = p14Normalisation?.operatingCurveOffsetDb;
+  if (!Number.isFinite(verticalOffsetDb)) {
+    // Fallback: response-anchored offset (existing approved authority).
+    verticalOffsetDb = deriveProductionEqVerticalAnchor(rawCurve);
+  }
   if (!Number.isFinite(verticalOffsetDb)) return stampPoolAuthority({
     poolVersion: BASS_OPTIMISER_POOL_VERSION, candidates: [], selectablePool: [], poolId: null,
     generatedCandidateCount: 0, physicallyCredibleCount: 0, generationStatus: "invalid-anchor",

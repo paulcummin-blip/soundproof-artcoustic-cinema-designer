@@ -1,5 +1,4 @@
 import { getApprovedContinuousSplDb, getSubwooferCurve } from "@/components/models/speakers/registry";
-import { buildMaximumDeliverableSplAtRspDb, calculateAvailableP14Capability } from "@/components/utils/productCapabilityEnvelope";
 
 export const P14_MINIMUM_THRESHOLDS = Object.freeze({ L1: 109, L2: 112, L3: 115, L4: 118 });
 export const P14_RECOMMENDED_THRESHOLDS = Object.freeze({ L1: 114, L2: 117, L3: 120, L4: 123 });
@@ -198,89 +197,6 @@ export function assessP14Capability({ activeSubs = [], productCapabilityDb = nul
     eqHeadroomDiagnostics,
     protectedNullDirectEffectDb: 0,
     source: "weighted-frequency-dependent-approved-continuous-lfe-capability-post-eq",
-  };
-}
-
-// ── Product-aware P14 capability ──
-// P14 is based on the physically deliverable post-EQ system. The fixed house-curve
-// shape is shifted vertically against the frequency-dependent product capability
-// envelope. The highest operating level at which the house curve does not exceed
-// the envelope is the available P14 capability. C-weighted power-sum the
-// supported curve to obtain availableP14CapabilityDbC.
-//
-// Cuts consume zero product-output headroom. Only positive EQ boost reduces the
-// available capability, and only at the frequencies where it is applied.
-export function assessProductAwareP14Capability({
-  activeSubs = [],
-  rawRoomResponse = [],
-  combinedEqCurve = [],
-  requestedSystemOutputDb = null,
-  targetBasis = "minimum",
-  assessmentStartHz = 20,
-  assessmentEndHz = 120,
-} = {}) {
-  const normalizedTargetBasis = normalizeP14TargetBasis(targetBasis);
-
-  // Build the frequency-dependent maximum deliverable SPL at the RSP.
-  const maximumDeliverableSpl = buildMaximumDeliverableSplAtRspDb(rawRoomResponse, activeSubs, requestedSystemOutputDb);
-  if (!maximumDeliverableSpl || !maximumDeliverableSpl.length) return null;
-
-  // Calculate the available P14 capability by shifting the house curve vertically.
-  const capability = calculateAvailableP14Capability(maximumDeliverableSpl, assessmentStartHz, assessmentEndHz);
-  if (!capability) return null;
-
-  // The product capability before EQ is the C-weighted power-sum of the raw
-  // capability envelope (without subtracting any EQ boost).
-  const rawCapability = calculateAvailableP14Capability(
-    maximumDeliverableSpl.map((point) => ({ ...point, spl: point.rawSplDb + point.availableHeadroomDb })),
-    assessmentStartHz, assessmentEndHz,
-  );
-
-  // The maximum positive EQ boost is the largest positive value in the combined EQ curve.
-  const eqHeadroomDiagnostics = analyseP14EqHeadroom(combinedEqCurve);
-  const maximumPositiveEqBoostDb = eqHeadroomDiagnostics.maximumInBandPositiveEqBoostDb;
-
-  // The available P14 capability already accounts for the product envelope.
-  // Positive EQ boost that pushes the response above the envelope would be
-  // caught by the EQ bank limits, so the available capability is the envelope limit.
-  const availableP14CapabilityDbC = capability.availableP14CapabilityDbC;
-
-  return {
-    p14CapabilityDb: availableP14CapabilityDbC,
-    limitingFrequency: capability.limitingFrequencyHz,
-    rawCapabilityDb: rawCapability?.availableP14CapabilityDbC ?? null,
-    eqHeadroomConsumedDb: maximumPositiveEqBoostDb,
-    headroomConsumedByEqDb: maximumPositiveEqBoostDb,
-    safetyMarginDb: 0, // No additional safety margin — the envelope IS the safety limit
-    capabilityCurve: capability.supportCurve,
-    limitingFrequencyRegion: null,
-    regionalCapability: null,
-    value: availableP14CapabilityDbC,
-    formatted: formatP14Capability(availableP14CapabilityDbC),
-    level: gradeP14ForBasis(availableP14CapabilityDbC, normalizedTargetBasis),
-    targetBasis: normalizedTargetBasis,
-    targetBasisLabel: formatP14BasisLabel(normalizedTargetBasis),
-    minimumLevel: gradeP14Minimum(availableP14CapabilityDbC),
-    recommendedLevel: gradeP14Recommended(availableP14CapabilityDbC),
-    productCapabilityBeforeEqDb: rawCapability?.availableP14CapabilityDbC ?? null,
-    productCapabilityBeforeEqDbC: rawCapability?.availableP14CapabilityDbC ?? null,
-    availableP14CapabilityDbC,
-    maximumPositiveEqBoostDb,
-    maximumAggregateEqBoostDb: maximumPositiveEqBoostDb,
-    capabilityRemainingAfterEqDb: availableP14CapabilityDbC,
-    limitingFrequencyHz: capability.limitingFrequencyHz,
-    limitingHeadroomDb: capability.limitingHeadroomDb,
-    assessmentRangeHz: eqHeadroomDiagnostics.assessmentRangeHz,
-    maximumInBandPositiveEqBoostDb: eqHeadroomDiagnostics.maximumInBandPositiveEqBoostDb,
-    maximumInBandPositiveEqBoostFrequencyHz: eqHeadroomDiagnostics.maximumInBandPositiveEqBoostFrequencyHz,
-    wholeBankMaximumPositiveEqBoostDb: eqHeadroomDiagnostics.wholeBankMaximumPositiveEqBoostDb,
-    wholeBankMaximumPositiveEqBoostFrequencyHz: eqHeadroomDiagnostics.wholeBankMaximumPositiveEqBoostFrequencyHz,
-    wholeBankMaximumExcludedFromP14: eqHeadroomDiagnostics.wholeBankMaximumExcludedFromP14,
-    eqHeadroomDiagnostics,
-    protectedNullDirectEffectDb: 0,
-    maximumDeliverableSpl,
-    supportedCurve: capability.supportCurve,
-    source: "product-aware-frequency-dependent-capability-envelope",
   };
 }
 

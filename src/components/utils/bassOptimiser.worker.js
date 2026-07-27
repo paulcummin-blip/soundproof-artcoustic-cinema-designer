@@ -50,6 +50,9 @@ self.onmessage = (e) => {
       perSourceComplexTransfers: payload?.perSourceComplexTransfers || [],
       normalizedTransferFingerprint: payload?.normalizedTransferFingerprint || null,
       calibrationFingerprint: payload?.calibrationFingerprint || null,
+      selectedP14TargetDb: payload?.selectedP14TargetDb ?? 109,
+      p14TargetBasis: payload?.p14TargetBasis ?? "minimum",
+      p14TargetLevel: payload?.p14TargetLevel ?? 1,
       collectDiagnostics: requestedCollectDiagnostics,
       onProgress: (progress) => {
         self.postMessage(createProgressMessage(requestId, fingerprint, progress, identity, diagnosticToken || null, requestedCollectDiagnostics));

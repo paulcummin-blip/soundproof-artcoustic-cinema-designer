@@ -154,6 +154,8 @@ export function isProtectedFrequency(frequency, regions) {
   return (regions || []).some((region) => frequency >= region.startHz && frequency <= region.endHz);
 }
 
+const NEAR_TARGET_INFLUENCE_THRESHOLD_DB = 0.25;
+
 export function evaluateNearTargetProtection(baselinePoints, candidatePoints, maximumResidualImprovementDb, protectedNullRegions = []) {
   const candidateByFrequency = new Map((candidatePoints || []).map((point) => [point.frequency, point]));
   const violations = [];
@@ -161,9 +163,14 @@ export function evaluateNearTargetProtection(baselinePoints, candidatePoints, ma
     if (isProtectedFrequency(before.frequency, protectedNullRegions) || Math.abs(before.deviationDb) > 1) continue;
     const after = candidateByFrequency.get(before.frequency);
     if (!after) continue;
+    // Only evaluate frequencies materially influenced by this candidate.
+    // A cut at 50 Hz must not be rejected because an unrelated near-target
+    // point at 80 Hz happened to cross ±3 dB for an unrelated reason.
+    const changeDb = Math.abs(after.deviationDb - before.deviationDb);
+    if (changeDb < NEAR_TARGET_INFLUENCE_THRESHOLD_DB) continue;
     const afterAbs = Math.abs(after.deviationDb);
     let reason = null;
-    if (afterAbs > 3 + 1e-9) reason = `near-target point exceeded ±3 dB while maximum residual improved ${maximumResidualImprovementDb.toFixed(2)} dB`;
+    if (afterAbs > 3 + 1e-9) reason = `influenced near-target point exceeded ±3 dB while maximum residual improved ${maximumResidualImprovementDb.toFixed(2)} dB`;
     if (reason) violations.push({ frequency: before.frequency, beforeResidualDb: before.deviationDb, afterResidualDb: after.deviationDb, reason });
   }
   return { passed: violations.length === 0, violations };
