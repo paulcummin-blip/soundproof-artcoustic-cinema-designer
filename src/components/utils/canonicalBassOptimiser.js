@@ -14,9 +14,92 @@ import {
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
 import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { getCurrentSystemSourceOutput } from "@/components/utils/subwooferCapability";
+import { getCurrentSystemSourceOutput, getSystemSourceCapability } from "@/components/utils/subwooferCapability";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
+
+// ── Source reference tolerance ──
+// The raw response peak should be within this tolerance of the system capability
+// to confirm the simulation was run at the same source level as
+// baseRequestedSystemOutputDb. Room gain can push the peak above the capability,
+// so the tolerance is generous on the high side. On the low side, the peak should
+// not be far below the capability (which would indicate the simulation was run at
+// a lower level than the capability curve).
+const SOURCE_REFERENCE_TOLERANCE_DB = 6;
+
+/**
+ * Verify that the raw simulated response was generated at baseRequestedSystemOutputDb.
+ * The simulation engine uses the sub's capability curve as the source curve, so the
+ * raw response peak should be close to the system capability. If the raw response
+ * and baseRequestedSystemOutputDb do not refer to the same source operating level,
+ * the operating offset would be calculated from mismatched authorities.
+ *
+ * Returns { consistent: boolean, message: string }.
+ */
+function verifyRawResponseSourceReference(rawCurve, activeSubs, baseRequestedSystemOutputDb) {
+  if (!Array.isArray(rawCurve) || !rawCurve.length) {
+    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (empty raw curve)" };
+  }
+  if (!Number.isFinite(baseRequestedSystemOutputDb)) {
+    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (no configured source output)" };
+  }
+  // Compute the system capability at the peak frequency of the raw curve.
+  const rawPeak = rawCurve.reduce((max, point) => Number.isFinite(point?.spl) && point.spl > max ? point.spl : max, -Infinity);
+  if (!Number.isFinite(rawPeak)) {
+    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (no finite raw SPL)" };
+  }
+  // Find the frequency of the raw peak.
+  const peakPoint = rawCurve.find((point) => Number.isFinite(point?.spl) && point.spl === rawPeak);
+  const peakFrequencyHz = peakPoint?.frequency;
+  if (!Number.isFinite(peakFrequencyHz)) {
+    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (no peak frequency)" };
+  }
+  const systemCapabilityDb = getSystemSourceCapability(activeSubs, peakFrequencyHz);
+  if (!Number.isFinite(systemCapabilityDb)) {
+    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (no system capability)" };
+  }
+  // The raw response peak should be close to the system capability (within tolerance).
+  // Room gain can push the peak above the capability, so allow generous tolerance.
+  const deltaDb = rawPeak - systemCapabilityDb;
+  if (Math.abs(deltaDb) > SOURCE_REFERENCE_TOLERANCE_DB) {
+    return {
+      consistent: false,
+      message: `BLOCKED: raw response and source-output references do not match (raw peak ${rawPeak.toFixed(1)} dB vs capability ${systemCapabilityDb.toFixed(1)} dB at ${peakFrequencyHz.toFixed(1)} Hz, delta ${deltaDb.toFixed(1)} dB)`,
+    };
+  }
+  return { consistent: true, message: null };
+}
+
+/**
+ * Clamp a positive global operating-level offset to the maximum safe scalar
+ * increase supported by the selected subwoofer system. The applied positive
+ * offset must not exceed the least available frequency-dependent source
+ * headroom within the required P14 operating band. Negative offsets (level
+ * reduction) apply completely — they increase available headroom.
+ *
+ * Uses the existing approved product authority only (getSystemSourceCapability).
+ */
+function clampPositiveOperatingOffset(requestedOffsetDb, activeSubs, baseRequestedSystemOutputDb, requiredExtensionHz) {
+  if (!Number.isFinite(requestedOffsetDb)) return 0;
+  // Negative or zero offsets apply completely.
+  if (requestedOffsetDb <= 0) return requestedOffsetDb;
+  // Positive offsets: determine the maximum safe scalar increase.
+  if (!Number.isFinite(baseRequestedSystemOutputDb)) return 0;
+  // Sample the system capability across the P14 operating band.
+  const bandFrequencies = [20, 25, 31.5, 40, 50, 63, 80, 100, 120]
+    .filter((f) => f >= requiredExtensionHz && f <= 120);
+  let maxSafePositiveOffset = Infinity;
+  for (const frequency of bandFrequencies) {
+    const capabilityDb = getSystemSourceCapability(activeSubs, frequency);
+    if (!Number.isFinite(capabilityDb)) continue;
+    const headroomAtFrequency = capabilityDb - baseRequestedSystemOutputDb;
+    maxSafePositiveOffset = Math.min(maxSafePositiveOffset, headroomAtFrequency);
+  }
+  if (!Number.isFinite(maxSafePositiveOffset)) return 0;
+  // If the base output already exceeds capability everywhere, can't increase.
+  if (maxSafePositiveOffset <= 0) return 0;
+  return Math.min(requestedOffsetDb, maxSafePositiveOffset);
+}
 
 function interpolateCorrection(curve, frequency) {
   if (!Array.isArray(curve) || !curve.length) return 0;
@@ -55,7 +138,7 @@ function bankLimits(eq) {
   };
 }
 
-function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb, perSeatRawCurves, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions }) {
+function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb, perSeatRawCurves, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb }) {
   const perSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, eq.combinedEqCurve);
   const seatsForMetrics = perSeatPostEqCurves.length
     ? perSeatPostEqCurves
@@ -181,15 +264,29 @@ export function generateCanonicalCandidatePool({
     correctionStartHz: domains.correctionStartHz, correctionEndHz: domains.correctionEndHz,
   });
   const targetShape = targetCurve.map((point) => ({ frequency: point.frequency, offsetDb: point.spl - verticalOffsetDb }));
-  // Resolve seat curves and requested source-domain output before computing the
-  // operating-level offset (level-normalised seats are derived from these).
+  // Resolve seat curves before computing the operating-level offset.
   const seats = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
     .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
-  // Resolve the requested source-domain output from the existing approved product
-  // authority. This is the LFE output level the headroom calculation subtracts
-  // from the manufacturer capability curve. Falls back to 114 dB when no tuning
-  // is configured on the sub objects.
-  const requestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
+  // ── Source output before and after global trim ──
+  // baseRequestedSystemOutputDb is the configured LFE output level (the level
+  // the headroom calculation subtracts from the manufacturer capability curve).
+  // Falls back to 114 dB when no tuning is configured on the sub objects.
+  const baseRequestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
+  // ── Raw response source reference check ──
+  // The raw simulated response must have been generated at baseRequestedSystemOutputDb.
+  // The simulation engine uses the sub's capability curve as the source curve, so
+  // the raw response peak should be close to the system capability. If the raw
+  // response and baseRequestedSystemOutputDb do not refer to the same source
+  // operating level, the operating offset would be calculated from mismatched
+  // authorities — block and return an error.
+  const sourceReferenceCheck = verifyRawResponseSourceReference(rawCurve, activeSubs, baseRequestedSystemOutputDb);
+  if (!sourceReferenceCheck.consistent) {
+    return stampPoolAuthority({
+      poolVersion: BASS_OPTIMISER_POOL_VERSION, candidates: [], selectablePool: [], poolId: null,
+      generatedCandidateCount: 0, physicallyCredibleCount: 0, generationStatus: "blocked-source-mismatch",
+      missingInputs: ["rawResponseSourceReference"], warningMessage: sourceReferenceCheck.message,
+    });
+  }
   // ── Global operating-level offset ──
   // The raw simulated RSP is at the physical maximum level. Before PEQ, a single
   // scalar offset places the complete response at the selected P14 operating
@@ -200,18 +297,29 @@ export function generateCanonicalCandidatePool({
   const rawIntegratedLevelDbC = integrateRawResponseLevelDbC({
     rawCurve, lowerHz: requiredExtensionHz, upperHz: 120,
   });
-  const operatingLevelOffsetDb = Number.isFinite(rawIntegratedLevelDbC)
+  const requestedOperatingLevelOffsetDb = Number.isFinite(rawIntegratedLevelDbC)
     ? Number(selectedP14TargetDb) - rawIntegratedLevelDbC
     : 0;
+  // ── Applied offset: negative offsets apply completely; positive offsets are
+  // physically limited by the least available frequency-dependent source
+  // headroom within the required P14 operating band. ──
+  const appliedOperatingLevelOffsetDb = clampPositiveOperatingOffset(
+    requestedOperatingLevelOffsetDb, activeSubs, baseRequestedSystemOutputDb, requiredExtensionHz,
+  );
+  // The operating source output after global trim — this is the level the PEQ
+  // headroom calculation must use (NOT the pre-trim base output).
+  const operatingSystemOutputDb = Number.isFinite(baseRequestedSystemOutputDb)
+    ? Number(baseRequestedSystemOutputDb) + appliedOperatingLevelOffsetDb
+    : appliedOperatingLevelOffsetDb;
   const levelNormalisedRawCurve = rawCurve.map((point) => ({
     ...point,
-    spl: Number.isFinite(point.spl) ? point.spl + operatingLevelOffsetDb : point.spl,
+    spl: Number.isFinite(point.spl) ? point.spl + appliedOperatingLevelOffsetDb : point.spl,
   }));
   const levelNormalisedSeats = seats.map((seat) => ({
     ...seat,
     responseData: seat.responseData.map((point) => ({
       ...point,
-      spl: Number.isFinite(point.spl) ? point.spl + operatingLevelOffsetDb : point.spl,
+      spl: Number.isFinite(point.spl) ? point.spl + appliedOperatingLevelOffsetDb : point.spl,
     })),
   }));
   const protectedNullRegions = identifyProtectedNullRegions(
@@ -232,7 +340,7 @@ export function generateCanonicalCandidatePool({
     assessmentEndHz: domains.correctionEndHz,
     collectDiagnostics,
     initialFilters,
-    requestedSystemOutputDb,
+    requestedSystemOutputDb: operatingSystemOutputDb,
   });
   const eqResults = [];
   const standardEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("standard"));
@@ -269,7 +377,7 @@ export function generateCanonicalCandidatePool({
   report("Canonical house-curve fit complete");
 
   const candidates = annotateCandidatePoolForHouseCurveRanking(eqResults.map((eq) => buildCanonicalCandidate({
-    rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
+    rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
   })));
   const __canonicalTrace__ = {
     receivedCollectDiagnostics: collectDiagnostics,
@@ -319,7 +427,10 @@ export function generateCanonicalCandidatePool({
     diagnosticsIncluded,
     __canonicalTrace__,
     canonicalVerticalOffsetDb: verticalOffsetDb,
-    operatingLevelOffsetDb,
+    operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
+    requestedOperatingLevelOffsetDb,
+    baseRequestedSystemOutputDb,
+    operatingSystemOutputDb,
     canonicalHouseCurveShape: targetShape,
     canonicalTargetCurve: targetCurve,
     protectedNullRegions,

@@ -97,9 +97,16 @@ export function buildBassGraphSeries({
     const selectedRawSeats = selectedRealIds.map((id) => multiSeries.find((item) => item.id === id)).filter(Boolean);
     const postEqBySeat = new Map((finalResponse?.postEqPerSeatCurves || []).map((seat) => [seat.seatId, seat]));
     const seatValidationActive = selectedRawSeats.length > 0;
+    // Blue curve authority: use the stored rspBeforePeqAtOperatingLevel when
+    // available (the level-normalised curve from the optimiser). Do NOT
+    // independently reconstruct the same curve with a separate render-time shift.
+    const storedRspBeforePeq = finalResponse?.rspBeforePeqAtOperatingLevel;
+    const hasStoredBlueCurve = Array.isArray(storedRspBeforePeq) && storedRspBeforePeq.length > 0;
     series = seatValidationActive
       ? selectedRawSeats.map((seat) => ({ ...seat, id: `${seat.id}-raw`, kind: "raw", label: `${seat.id} before EQ`, tooltipLabel: `${seat.id} before EQ`, strokeDasharray: "6 4", strokeWidth: 1.5, data: applyBassSmoothing(seat.data, smoothingMode) }))
-      : (rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : []);
+      : (hasStoredBlueCurve
+        ? [{ id: "rsp-raw", kind: "raw", label: "RSP before PEQ", tooltipLabel: "RSP before PEQ at operating level", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }]
+        : (rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : []));
     if (hasMatchingDetailedResult && finalResponse?.postEqRspCurve?.length) {
       if (seatValidationActive) {
         series.push(...selectedRawSeats.map((seat, index) => {
@@ -125,13 +132,14 @@ export function buildBassGraphSeries({
       if (target) series.push(target);
       const maximumSpl = buildMaximumSplSeries(finalResponse, smoothingMode);
       if (maximumSpl) series.push(maximumSpl);
-      // Only the raw (pre-PEQ) curve needs the operating-level shift — the
-      // post-EQ curve, house-curve target, and real-seat overlays from the
-      // fitter are already at the selected operating level because the fitter
-      // received the level-normalised raw curve.
-      series = series.map((item) => item.kind === "raw"
-        ? { ...item, data: shiftCurve(item.data, operatingLevelOffsetDb) }
-        : item);
+      // When using the stored blue curve, it is already at the operating level —
+      // no render-time shift needed. Only apply the shift when falling back to
+      // the unnormalised rspRawCurve (legacy path without stored curve).
+      if (!hasStoredBlueCurve) {
+        series = series.map((item) => item.kind === "raw"
+          ? { ...item, data: shiftCurve(item.data, operatingLevelOffsetDb) }
+          : item);
+      }
     }
     if (overlayProductionSeries) series.push(overlayProductionSeries);
   }
