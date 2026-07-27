@@ -46,11 +46,17 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
   if (!candidate || !Array.isArray(exactTarget) || !exactTarget.length) return null;
   const startHz = candidate.correctionStartHz;
   const endHz = candidate.correctionEndHz;
+  const p14TotalDb = Number.isFinite(optimisationResult?.selectedP14TargetDb)
+    ? Math.round(optimisationResult.selectedP14TargetDb)
+    : null;
+  const label = p14TotalDb != null
+    ? `House-curve target · ${p14TotalDb} dBC total`
+    : `Absolute house-curve target — correction band ${Math.round(startHz)}–${Math.round(endHz)} Hz`;
   return {
     id: "house-curve",
     kind: "house-curve",
-    label: `Absolute house-curve target — correction band ${Math.round(startHz)}–${Math.round(endHz)} Hz`,
-    tooltipLabel: "Absolute house-curve target",
+    label,
+    tooltipLabel: `House-curve target · correction band ${Math.round(startHz)}–${Math.round(endHz)} Hz`,
     color: "#625143",
     strokeWidth: 2.25,
     strokeDasharray: "10 5",

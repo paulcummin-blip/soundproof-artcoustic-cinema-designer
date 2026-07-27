@@ -31,6 +31,7 @@ import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedN
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
+import P14PresentationHeader from "@/components/room/bass/P14PresentationHeader";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
 import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTraceButton";
 import EqDiscoveryAuditPanel from "@/components/room/bass/EqDiscoveryAuditPanel";
@@ -401,22 +402,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // Shared transition frequency for graph markers and the optimiser validation path.
   const schroederFrequency = optimisationTransitionHz;
 
-  // P14 target annotation — displayed outside the plotted data area as a compact
-  // annotation block. 109 dBC is the integrated C-weighted P14 total, NOT a
-  // per-frequency SPL line. The shaped house curve is the actual graph target.
-  const p14TargetAnnotation = React.useMemo(() => {
-    const basis = splConfig?.selectedP14TargetBasis === "recommended" ? "Recommended" : "Minimum";
-    const levelNum = Math.max(1, Math.min(4, Math.round(Number(splConfig?.selectedP14Level) || 1)));
-    const targetDb = Number.isFinite(selectedP14TargetDb) ? Math.round(selectedP14TargetDb) : null;
-    const extensionHz = Number.isFinite(selectedP14RequiredExtensionHz) ? selectedP14RequiredExtensionHz : null;
-    if (targetDb == null || extensionHz == null) return null;
-    return {
-      label: `P14 target: ${basis} L${levelNum} · ${targetDb} dBC total`,
-      extension: `P18 requirement: ${extensionHz} Hz`,
-      referenceLabel: `${basis} L${levelNum} · ${targetDb} dBC`,
-      referenceDb: targetDb,
-    };
-  }, [splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level, selectedP14TargetDb, selectedP14RequiredExtensionHz]);
+  // P14 presentation — the selected P14 dBC value is an integrated C-weighted
+  // total, NOT a per-frequency SPL target. The header cards and assessment-band
+  // marker communicate this clearly. No horizontal P14 line is drawn on the graph.
+  const p14PresentationData = React.useMemo(() => {
+    const basis = authoritative.requested?.p14TargetBasis || splConfig?.selectedP14TargetBasis || "minimum";
+    const levelNum = authoritative.requested?.requestedLevel || Number(splConfig?.selectedP14Level) || 1;
+    const targetDb = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : null;
+    const availableCapability = optimisationResult?.availableP14CapabilityDb ?? null;
+    const p19Variation = optimisationResult?.achievedP19VariationDb ?? null;
+    const p19Level = optimisationResult?.achievedP19Level ?? null;
+    return { basis, levelNum, targetDb, availableCapability, p19Variation, p19Level };
+  }, [authoritative.requested, splConfig?.selectedP14TargetBasis, splConfig?.selectedP14Level,
+    selectedP14TargetDb, optimisationResult?.availableP14CapabilityDb,
+    optimisationResult?.achievedP19VariationDb, optimisationResult?.achievedP19Level]);
 
   // Expose drag state — dispatches events so the background analysis owner
   // can defer the heavy EQ worker during drag and run it once on pointer-up.
@@ -613,6 +612,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
 
 
+        <P14PresentationHeader
+          selectedP14TargetDb={p14PresentationData.targetDb}
+          selectedP14Level={p14PresentationData.levelNum}
+          selectedP14TargetBasis={p14PresentationData.basis}
+          availableP14CapabilityDb={p14PresentationData.availableCapability}
+          achievedP19VariationDb={p14PresentationData.p19Variation}
+          achievedP19Level={p14PresentationData.p19Level}
+        />
+
         <SeatResponseScopeControls
           rspPosition={rspPosition}
           orderedSeats={orderedSeats}
@@ -672,8 +680,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               refDb={85}
               disableHighlight={false}
               renderToken={qStrategy}
-              p14ReferenceDb={p14TargetAnnotation?.referenceDb ?? null}
-              p14ReferenceLabel={p14TargetAnnotation?.referenceLabel ?? null}
+              p14TotalDb={p14PresentationData.targetDb}
             />
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
@@ -690,9 +697,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
           {graphStatusText}
         </div>
-        {p14TargetAnnotation && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6, padding: '4px 10px', background: '#F8F8F7', border: '1px solid #DCDBD6', borderRadius: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#213428', fontFamily: 'monospace' }}>{p14TargetAnnotation.label}</span>
-          <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>{p14TargetAnnotation.extension}</span>
+        {p14PresentationData.targetDb != null && <div style={{ marginTop: 6, padding: '4px 10px', background: '#F8F8F7', border: '1px solid #DCDBD6', borderRadius: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#213428', fontFamily: 'monospace' }}>
+            P14 target: {p14PresentationData.basis === "recommended" ? "Recommended" : "Minimum"} L{Math.max(1, Math.min(4, Math.round(p14PresentationData.levelNum)))} · {Math.round(p14PresentationData.targetDb)} dBC total
+          </span>
+          {Number.isFinite(selectedP14RequiredExtensionHz) && (
+            <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace', marginLeft: 16 }}>
+              P18 requirement: {selectedP14RequiredExtensionHz} Hz
+            </span>
+          )}
+        </div>}
+        {p14PresentationData.targetDb != null && <div style={{ fontSize: 10, color: '#625143', fontFamily: 'monospace', marginTop: 4, fontStyle: 'italic' }}>
+          The shaped target integrates to {Math.round(p14PresentationData.targetDb)} dBC total. Individual frequencies are not required to reach {Math.round(p14PresentationData.targetDb)} dB.
         </div>}
         {includeDiagnostics && p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
           const err = Math.abs(p14IntegrationDiagnostic.errorDb || 0);

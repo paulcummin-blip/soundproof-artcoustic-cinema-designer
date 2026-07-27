@@ -1,8 +1,9 @@
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea } from 'recharts';
 import { mergeBassGraphSeries } from '@/components/room/bass/bassGraphSeriesAlignment';
 import BassModeMarkers from '@/components/room/bass/BassModeMarkers';
 import ProtectedNullOverlay from '@/components/room/bass/ProtectedNullOverlay';
+import { P14_EQ_ASSESSMENT_RANGE_HZ } from '@/components/utils/p14CapabilityAuthority';
 
 const hasFiniteValue = (value) =>
   value !== null &&
@@ -83,8 +84,7 @@ export default function BassGraph({
   refDb = 85,
   disableHighlight = false,
   renderToken = '',
-  p14ReferenceDb = null,
-  p14ReferenceLabel = null
+  p14TotalDb = null
 }) {
     const lastValidYDomainRef = React.useRef(null);
 
@@ -278,8 +278,7 @@ export default function BassGraph({
               .filter((point) => point.frequency >= xMin && point.frequency <= xMax)
               .map((point) => point.spl);
         const rp22Values = (rp22Levels || []).map((level) => level.spl);
-        const p14RefValues = Number.isFinite(p14ReferenceDb) ? [p14ReferenceDb] : [];
-        const splValues = [...responseValues, ...rp22Values, ...p14RefValues].filter((value) => Number.isFinite(value));
+        const splValues = [...responseValues, ...rp22Values].filter((value) => Number.isFinite(value));
 
         if (splValues.length > 0) {
           const dataMin = Math.min(...splValues);
@@ -503,22 +502,26 @@ export default function BassGraph({
                       </>
                     )}
 
-                    {/* Selected P14 reference guide — one horizontal line at the
-                        currently selected P14 target dBC. Switching the target
-                        moves and relabels this single line. It does not alter EQ,
-                        scoring, fingerprints, or simulations. */}
-                    {Number.isFinite(p14ReferenceDb) && p14ReferenceLabel && (
-                        <ReferenceLine
-                            y={p14ReferenceDb}
-                            stroke="#1B4332"
-                            strokeWidth={1.5}
-                            strokeDasharray="6 3"
+                    {/* P14 assessment band — subtle shaded marker along the X-axis
+                        covering the centrally defined P14 assessment band. This is
+                        a presentation-only marker; it does not alter curves, Y-axis
+                        scaling, EQ, or any RP22 calculation. */}
+                    {Number.isFinite(p14TotalDb) && (
+                        <ReferenceArea
+                            x1={P14_EQ_ASSESSMENT_RANGE_HZ.lowerHz}
+                            x2={P14_EQ_ASSESSMENT_RANGE_HZ.upperHz}
+                            fill="#213428"
+                            fillOpacity={0.04}
+                            stroke="#213428"
+                            strokeOpacity={0.15}
+                            strokeDasharray="3 3"
+                            ifOverflow="extendDomain"
                             label={{
-                              value: p14ReferenceLabel,
-                              position: 'right',
-                              fill: '#1B4332',
-                              className: 'font-body text-xs',
-                              offset: 5
+                              value: `P14 integration band · Σ ${Math.round(p14TotalDb)} dBC`,
+                              position: 'insideBottom',
+                              fill: '#625143',
+                              fontSize: 9,
+                              className: 'font-body',
                             }}
                         />
                     )}
