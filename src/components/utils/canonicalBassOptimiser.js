@@ -15,6 +15,7 @@ import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitPr
 import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability } from "@/components/utils/subwooferCapability";
+import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 
@@ -316,6 +317,74 @@ export function generateCanonicalCandidatePool({
     rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
   }));
+
+  // ── Partial-bank salvage ──
+  // When a generated bank fails validation, create sanitised and cut-only
+  // candidates from the same filters. Safe cuts are retained; unsafe boosts
+  // are removed. One impossible boost does not discard unrelated valid cuts.
+  const salvagedCandidates = [];
+  const salvageDiagnosticsByProfile = {};
+  for (let i = 0; i < eqResults.length; i++) {
+    const eq = eqResults[i];
+    const baseProfile = eq.designEqFitProfile || (i === 0 ? "standard" : i === 1 ? "accuracy" : "house_curve");
+    const eqBankFails = eq.physicalEqAuthorityPassed === false
+      || (eq.designEqFitProfile === "house_curve"
+        ? (eq.bankLimits?.allOk === false || eq.bankValidationPassed === false)
+        : eq.bankDiagnostics?.selectedBankLimits?.allOk === false);
+    if (!eqBankFails) continue;
+    const salvageProfile = baseProfile === "house_curve"
+      ? { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: false, maximumCutDb: 15 }
+      : (DESIGN_EQ_FIT_PROFILES[baseProfile] || DESIGN_EQ_FIT_PROFILES.standard);
+    const salvage = salvagePartialBank({
+      filters: eq.filters || [],
+      rawCurve: levelNormalisedRawCurve,
+      activeSubs,
+      usableLfHz,
+      requestedSystemOutputDb: operatingSystemOutputDb,
+      profile: salvageProfile,
+      protectedNullRegions,
+      canonicalTargetCurve: targetCurve,
+      anchorDb: verticalOffsetDb,
+    });
+    salvageDiagnosticsByProfile[baseProfile] = salvage.diagnostics;
+    if (salvage.sanitisedFilters.length > 0 && salvage.sanitisedBankLimits.allOk) {
+      const sanitisedEq = buildSalvageEqResult({
+        originalEq: eq,
+        salvageFilters: salvage.sanitisedFilters,
+        bankLimits: salvage.sanitisedBankLimits,
+        profileMarker: `${baseProfile}_sanitised`,
+        rawCurve: levelNormalisedRawCurve,
+        canonicalTargetCurve: targetCurve,
+        protectedNullRegions,
+        stopReason: `salvaged sanitised bank — ${salvage.sanitisedFilters.length} filter(s) retained`,
+      });
+      salvagedCandidates.push(buildCanonicalCandidate({
+        rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
+        perSeatRawCurves: levelNormalisedSeats, eq: sanitisedEq, domains, targetCurve, targetShape,
+        verticalOffsetDb, protectedNullRegions,
+        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+      }));
+    }
+    if (salvage.cutOnlyFilters.length > 0 && salvage.cutOnlyBankLimits.allOk) {
+      const cutOnlyEq = buildSalvageEqResult({
+        originalEq: eq,
+        salvageFilters: salvage.cutOnlyFilters,
+        bankLimits: salvage.cutOnlyBankLimits,
+        profileMarker: `${baseProfile}_cut_only`,
+        rawCurve: levelNormalisedRawCurve,
+        canonicalTargetCurve: targetCurve,
+        protectedNullRegions,
+        stopReason: `salvaged cut-only bank — ${salvage.cutOnlyFilters.length} cut filter(s) retained`,
+      });
+      salvagedCandidates.push(buildCanonicalCandidate({
+        rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
+        perSeatRawCurves: levelNormalisedSeats, eq: cutOnlyEq, domains, targetCurve, targetShape,
+        verticalOffsetDb, protectedNullRegions,
+        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+      }));
+    }
+  }
+
   // Identity candidate — a valid no-EQ fallback. Uses the level-normalised
   // raw response as both the pre-EQ and post-EQ curve. No filters, no EQ
   // correction, zero headroom consumption. Physically credible by definition.
@@ -357,7 +426,7 @@ export function generateCanonicalCandidatePool({
     rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
   });
-  const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, identityCandidate]);
+  const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, ...salvagedCandidates, identityCandidate]);
   const __canonicalTrace__ = {
     receivedCollectDiagnostics: collectDiagnostics,
     profiles: eqResults.map((eq, i) => {
@@ -377,8 +446,28 @@ export function generateCanonicalCandidatePool({
           ? candidate.designEqCandidateAcceptanceDiagnostics.length : null,
       };
     }),
+    salvagedCandidateCount: salvagedCandidates.length,
+    salvageDiagnosticsByProfile,
   };
-  const selectablePool = candidates.filter(isPhysicallyCredibleBassCandidate);
+  const rawSelectablePool = candidates.filter(isPhysicallyCredibleBassCandidate);
+  // Minimum improvement guard: salvaged candidates must materially improve
+  // at least one ranking metric versus identity to remain selectable.
+  const identityForGuard = candidates.find((c) => c.designEqFitProfile === "identity");
+  const identityRmsForGuard = identityForGuard?.houseCurveRankingRmsResidualDb;
+  const identityMaxForGuard = identityForGuard?.houseCurveRankingMaxResidualDb;
+  const MIN_SALVAGE_IMPROVEMENT_DB = 0.05;
+  const isSalvagedProfile = (profile) => typeof profile === "string"
+    && (profile.endsWith("_sanitised") || profile.endsWith("_cut_only"));
+  const selectablePool = rawSelectablePool.filter((candidate) => {
+    if (!isSalvagedProfile(candidate.designEqFitProfile)) return true;
+    const rms = candidate.houseCurveRankingRmsResidualDb;
+    const max = candidate.houseCurveRankingMaxResidualDb;
+    const rmsImprovement = Number.isFinite(identityRmsForGuard) && Number.isFinite(rms)
+      ? identityRmsForGuard - rms : 0;
+    const maxImprovement = Number.isFinite(identityMaxForGuard) && Number.isFinite(max)
+      ? identityMaxForGuard - max : 0;
+    return rmsImprovement > MIN_SALVAGE_IMPROVEMENT_DB || maxImprovement > MIN_SALVAGE_IMPROVEMENT_DB;
+  });
   const eqSelectableCount = selectablePool.filter((c) => c.designEqFitProfile !== "identity").length;
   const identityOnlyFallback = eqSelectableCount === 0 && selectablePool.length > 0;
   const endedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -409,6 +498,7 @@ export function generateCanonicalCandidatePool({
       : null,
     canonical: true,
     diagnosticsIncluded,
+    salvageDiagnostics: salvageDiagnosticsByProfile,
     __canonicalTrace__,
     canonicalVerticalOffsetDb: verticalOffsetDb,
     operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,

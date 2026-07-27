@@ -81,7 +81,10 @@ export function selectCandidateFromPool(pool) {
     isBestCalibratedAttempt: false,
     warningMessage: selected.designEqFitProfile === "identity"
       ? "No physically valid EQ bank was available. Results show the achieved response without Design EQ."
-      : null,
+      : (typeof selected.designEqFitProfile === "string"
+        && (selected.designEqFitProfile.endsWith("_sanitised") || selected.designEqFitProfile.endsWith("_cut_only")))
+        ? "A physically safe partial EQ bank was applied. Some target corrections were omitted because they exceeded product or protected-null limits."
+        : null,
     performanceSummary: {
       ...pool.performanceSummary,
       contractAdaptationTimeMs: endedAt - startedAt,

@@ -118,10 +118,15 @@ export function buildBassGraphSeries({
             strokeWidth: 2.25, data: applyBassSmoothing(postEq.responseData, smoothingMode) };
         }).filter(Boolean));
       } else {
-        const isIdentityCandidate = optimisationResult?.selectedCandidate?.designEqFitProfile === "identity";
+        const selectedProfile = optimisationResult?.selectedCandidate?.designEqFitProfile;
+        const isIdentityCandidate = selectedProfile === "identity";
+        const isSalvagedCandidate = typeof selectedProfile === "string"
+          && (selectedProfile.endsWith("_sanitised") || selectedProfile.endsWith("_cut_only"));
         series.push({ id: "rsp-eq", kind: "post-eq",
           label: isIdentityCandidate ? "RSP after EQ (No EQ applied)" : "RSP after EQ",
-          tooltipLabel: isIdentityCandidate ? "RSP after EQ — no Design EQ applied" : "RSP after EQ",
+          tooltipLabel: isIdentityCandidate ? "RSP after EQ — no Design EQ applied"
+            : isSalvagedCandidate ? "RSP after EQ — partial EQ bank applied"
+            : "RSP after EQ",
           candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
           color: "#16A34A", strokeWidth: 2.5, data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode) });
         if (showRealSeatOverlays) series.push(...finalResponse.postEqPerSeatCurves
@@ -153,8 +158,13 @@ export function buildBassGraphSeries({
 export function detailedEqStatusText({ designEqEnabled, hasMatchingDetailedResult, detailedStatus, optimisationResult, error }) {
   if (!designEqEnabled) return "Showing product-independent normalized room response (94 dB flat reference) — not predicted product SPL";
   if (hasMatchingDetailedResult) {
-    if (optimisationResult?.selectedCandidate?.designEqFitProfile === "identity") {
+    const selectedProfile = optimisationResult?.selectedCandidate?.designEqFitProfile;
+    if (selectedProfile === "identity") {
       return "No physically valid EQ bank was available. Results show the achieved response without Design EQ.";
+    }
+    if (typeof selectedProfile === "string"
+      && (selectedProfile.endsWith("_sanitised") || selectedProfile.endsWith("_cut_only"))) {
+      return "A physically safe partial EQ bank was applied. Some target corrections were omitted because they exceeded product or protected-null limits.";
     }
     return optimisationResult?.isBestCalibratedAttempt
       ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED"
