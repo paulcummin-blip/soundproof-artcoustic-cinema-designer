@@ -14,6 +14,7 @@ import {
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
 import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz } from "@/components/utils/p14HouseCurveNormalisation";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
+import { getCurrentSystemSourceOutput } from "@/components/utils/subwooferCapability";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 
@@ -182,6 +183,11 @@ export function generateCanonicalCandidatePool({
     rawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
     activeSubs, usableLfHz, null, targetCurve,
   );
+  // Resolve the requested source-domain output from the existing approved product
+  // authority. This is the LFE output level the headroom calculation subtracts
+  // from the manufacturer capability curve. Falls back to 114 dB when no tuning
+  // is configured on the sub objects.
+  const requestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
   const seats = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
     .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
   const totalTasks = FIT_PROFILES.length + 1;
@@ -198,9 +204,10 @@ export function generateCanonicalCandidatePool({
     assessmentEndHz: domains.correctionEndHz,
     collectDiagnostics,
     initialFilters,
+    requestedSystemOutputDb,
   });
   const eqResults = [];
-  const standardEq = calculateDesignEqCurve(rawCurve, null, [], fitOptions("standard"));
+  const standardEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, fitOptions("standard"));
   eqResults.push(standardEq);
   completedTasks += 1;
   report("Canonical standard fit complete");
@@ -215,11 +222,11 @@ export function generateCanonicalCandidatePool({
       ? standardEq.bestSeedFilters
       : (standardEq.filters || []);
   const seed = seedSource.filter((filter) => filter?.enabled);
-  const accuracyEq = calculateDesignEqCurve(rawCurve, null, [], fitOptions("accuracy", seed));
+  const accuracyEq = calculateDesignEqCurve(rawCurve, usableLfHz, activeSubs, fitOptions("accuracy", seed));
   eqResults.push(accuracyEq);
   completedTasks += 1;
   report("Canonical accuracy fit complete");
-  const houseEq = calculateHouseCurveEqCurve(rawCurve, seats, null, [], {
+  const houseEq = calculateHouseCurveEqCurve(rawCurve, seats, usableLfHz, activeSubs, {
     ...fitOptions("house_curve", seed),
     assessmentStartHz: domains.p19StartHz,
     assessmentEndHz: domains.p19EndHz,

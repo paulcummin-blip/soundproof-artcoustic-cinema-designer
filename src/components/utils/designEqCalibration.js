@@ -105,10 +105,18 @@ function findRegions(points, kind, peakThresholdDb = 2, valleyThresholdDb = 2) {
     const endHz = current[current.length - 1].frequency;
     const width = octaveWidth(startHz, endHz);
     if (width >= minimumWidth) {
-      const centrePoint = current.reduce((best, point) => kind === "peak"
-        ? (point.deviationDb > best.deviationDb ? point : best)
-        : (point.deviationDb < best.deviationDb ? point : best));
-      regions.push({ kind, startHz, endHz, widthOctaves: width, centrePoint, severityDb: Math.abs(centrePoint.deviationDb) });
+      const subRegions = splitBroadRegionAtValleys(current, kind, minimumWidth);
+      for (const subRegion of subRegions) {
+        const subStartHz = subRegion[0].frequency;
+        const subEndHz = subRegion[subRegion.length - 1].frequency;
+        const subWidth = octaveWidth(subStartHz, subEndHz);
+        if (subWidth >= minimumWidth) {
+          const centrePoint = subRegion.reduce((best, point) => kind === "peak"
+            ? (point.deviationDb > best.deviationDb ? point : best)
+            : (point.deviationDb < best.deviationDb ? point : best));
+          regions.push({ kind, startHz: subStartHz, endHz: subEndHz, widthOctaves: subWidth, centrePoint, severityDb: Math.abs(centrePoint.deviationDb) });
+        }
+      }
     }
     current = [];
   };
@@ -146,6 +154,46 @@ export function getDesignEqValleyThresholdValidation() {
 function qForRegion(region) {
   const bandwidthHz = Math.max(region.endHz - region.startHz, 0.01);
   return Math.max(0.5, Math.min(10, region.centrePoint.frequency / bandwidthHz));
+}
+
+// Split a broad residual region at local valleys (for peaks) or local peaks
+// (for valleys) so the optimiser discovers multiple candidate centres within
+// a single broad region instead of collapsing it to one worst-frequency filter.
+// Only splits at significant dips/rises (>= 1 dB) and only keeps sub-regions
+// that meet the minimum width. Falls back to the original region if no valid
+// sub-regions are produced.
+function splitBroadRegionAtValleys(points, kind, minimumWidth) {
+  if (points.length < 5) return [points];
+  const splitIndices = [];
+  for (let i = 2; i < points.length - 2; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const next = points[i + 1];
+    if (kind === "peak") {
+      if (curr.deviationDb <= prev.deviationDb && curr.deviationDb <= next.deviationDb) {
+        const higherNeighbor = Math.max(prev.deviationDb, next.deviationDb);
+        if (higherNeighbor - curr.deviationDb >= 1.0) splitIndices.push(i);
+      }
+    } else {
+      if (curr.deviationDb >= prev.deviationDb && curr.deviationDb >= next.deviationDb) {
+        const lowerNeighbor = Math.min(prev.deviationDb, next.deviationDb);
+        if (curr.deviationDb - lowerNeighbor >= 1.0) splitIndices.push(i);
+      }
+    }
+  }
+  if (!splitIndices.length) return [points];
+  const subRegions = [];
+  let start = 0;
+  for (const splitIndex of splitIndices) {
+    subRegions.push(points.slice(start, splitIndex + 1));
+    start = splitIndex;
+  }
+  subRegions.push(points.slice(start));
+  const validSubRegions = subRegions.filter((subRegion) => {
+    if (subRegion.length < 2) return false;
+    return octaveWidth(subRegion[0].frequency, subRegion[subRegion.length - 1].frequency) >= minimumWidth;
+  });
+  return validSubRegions.length > 0 ? validSubRegions : [points];
 }
 
 function completeBandResidualMetrics(trend, assessmentStartHz, assessmentEndHz, anchorDb) {
