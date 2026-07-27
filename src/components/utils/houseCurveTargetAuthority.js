@@ -94,6 +94,21 @@ export function resolveHouseCurveDomains(frequencyGrid, configuredCorrectionEndH
   };
 }
 
+// Build a fixed absolute house target normalised to the selected P14 total.
+// The target at each frequency is:
+//   targetHouseCurveDb(f) = selectedP14TargetDb + artcousticHouseCurveOffsetAt(f)
+// This target is immutable — it is not modified by product model, subwoofer
+// quantity, lack of headroom, P18/P19 failure, budget, or current response shape.
+export function buildP14AnchoredHouseCurveTarget({ frequencyGrid, selectedP14TargetDb, correctionStartHz, correctionEndHz }) {
+  if (!Number.isFinite(selectedP14TargetDb)) return [];
+  return buildCanonicalAbsoluteHouseCurveTarget({
+    frequencyGrid,
+    targetAnchorDb: selectedP14TargetDb,
+    correctionStartHz,
+    correctionEndHz,
+  });
+}
+
 export function buildCanonicalAbsoluteHouseCurveTarget({ frequencyGrid, targetAnchorDb, correctionStartHz, correctionEndHz }) {
   if (!Number.isFinite(targetAnchorDb)) return [];
   return (frequencyGrid || [])

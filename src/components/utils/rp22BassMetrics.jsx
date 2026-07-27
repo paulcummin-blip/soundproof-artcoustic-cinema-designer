@@ -13,6 +13,8 @@ import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/d
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { getSpeakerModelMeta, getSubwooferCurve } from "@/components/models/speakers/registry";
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
+import { buildMaximumDeliverableSplAtRspDb, assessProductAwareP18Extension } from "@/components/utils/productCapabilityEnvelope";
+import { buildP14AnchoredHouseCurveTarget } from "@/components/utils/houseCurveTargetAuthority";
 export { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 export { applyDesignEqCurve, calculateDesignEqCurve };
@@ -329,6 +331,90 @@ export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqC
     formatted: winningTarget ? `${Math.round(winningTarget.extensionHz)} Hz` : null,
     productCapability: product, source: "post-eq-rsp-worst-seat-achieved-extension",
     note: "Achieved in-room extension from post-EQ RSP, conservatively bounded by product capability and worst-seat post-EQ response." };
+}
+
+// ── Product-aware P18 achieved extension ──
+// P18 is assessed at the selected P14 operating level. The fixed house target
+// is normalised to the selected P14 target. The post-EQ response is compared
+// against this target. Starting from the upper bass, move downward. Find the
+// lowest contiguous frequency at which the achieved response remains within
+// the -3 dB extension rule. Confirm that this frequency is achieved without
+// exceeding the product capability envelope.
+//
+// A frequency does NOT qualify for P18 when:
+// - It exists only at a lower operating volume.
+// - It is below target because product headroom has run out.
+// - It relies on EQ boost beyond the product envelope.
+// - It is a protected room null.
+export function computeProductAwareP18Extension({
+  rspPostEqCurve,
+  activeSubs = [],
+  requestedSystemOutputDb = null,
+  selectedP14TargetDb,
+  protectedNullRegions = [],
+  frequencyGrid = null,
+  assessmentStartHz = 20,
+  assessmentEndHz = 120,
+  p14TargetBasis = "minimum",
+}) {
+  if (!Array.isArray(rspPostEqCurve) || !rspPostEqCurve.length) return null;
+
+  // Build the frequency grid from the post-EQ curve if not provided.
+  const grid = frequencyGrid || rspPostEqCurve
+    .map((p) => Number(p?.frequency))
+    .filter(isNum)
+    .sort((a, b) => a - b);
+
+  // Build the fixed house target normalised to the selected P14 target.
+  const targetHouseCurve = buildP14AnchoredHouseCurveTarget({
+    frequencyGrid: grid,
+    selectedP14TargetDb,
+    correctionStartHz: assessmentStartHz,
+    correctionEndHz: assessmentEndHz,
+  });
+
+  // Build the product capability envelope at the RSP.
+  // Use the post-EQ curve as the raw response for the envelope (the post-EQ
+  // response is what the system actually delivers; the envelope tells us the
+  // max the system can deliver at each frequency).
+  const maximumDeliverableSpl = buildMaximumDeliverableSplAtRspDb(rspPostEqCurve, activeSubs, requestedSystemOutputDb);
+
+  // Assess the product-aware P18 extension.
+  const extension = assessProductAwareP18Extension({
+    postEqResponse: rspPostEqCurve,
+    maximumDeliverableSpl,
+    targetHouseCurve,
+    protectedNullRegions,
+    assessmentStartHz,
+    assessmentEndHz,
+    extensionToleranceDb: 3,
+  });
+
+  if (!extension) return null;
+
+  // Grade the achieved extension against the RP22 P18 thresholds.
+  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
+  const achievedHz = extension.achievedExtensionHz;
+  const winningTarget = definitions.slice().reverse().find((definition) => isNum(achievedHz) && achievedHz <= definition.p18LimitHz) || null;
+
+  return {
+    targets: definitions.map((definition) => ({
+      level: definition.level,
+      cutoffDb: definition.p18CutoffDb,
+      limitHz: definition.p18LimitHz,
+      extensionHz: achievedHz,
+      passesFrequency: isNum(achievedHz) && achievedHz <= definition.p18LimitHz,
+    })),
+    level: winningTarget?.level || null,
+    value: achievedHz,
+    formatted: isNum(achievedHz) ? `${Math.round(achievedHz)} Hz` : null,
+    failureFrequencyHz: extension.failureFrequencyHz,
+    failureReason: extension.failureReason,
+    productCapabilityEnvelope: maximumDeliverableSpl,
+    targetHouseCurve,
+    source: "product-aware-p18-at-p14-operating-level",
+    note: "P18 assessed at the selected P14 operating level against the product capability envelope.",
+  };
 }
 
 // Legacy in-room extension helper retained for non-authoritative simulation consumers.
