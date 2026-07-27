@@ -17,6 +17,7 @@ import {
 self.onmessage = (e) => {
   const { requestId, fingerprint, payload, dispatchedAtMs, identity: requestedIdentity, diagnosticToken } = e.data || {};
   const requestedCollectDiagnostics = e.data?.collectDiagnostics === true;
+  const requestOrigin = e.data?.origin || "unknown";
   const workerStartupTimeMs = Number.isFinite(dispatchedAtMs) ? Math.max(0, Date.now() - dispatchedAtMs) : 0;
   const identity = {
     ...(requestedIdentity || {}), fingerprint,
@@ -55,7 +56,7 @@ self.onmessage = (e) => {
       },
     });
     pool.performanceSummary = { ...pool.performanceSummary, workerStartupTimeMs };
-    pool.__workerTrace__ = { receivedCollectDiagnostics: requestedCollectDiagnostics, receivedDiagnosticToken: diagnosticToken || null };
+    pool.__workerTrace__ = { receivedCollectDiagnostics: requestedCollectDiagnostics, receivedDiagnosticToken: diagnosticToken || null, requestOrigin };
     self.postMessage(createProgressMessage(requestId, fingerprint, { phase: "Worker result posted", poolId: pool.poolId }, { ...identity, poolId: pool.poolId }, diagnosticToken || null, requestedCollectDiagnostics));
     self.postMessage(createCompleteMessage(requestId, fingerprint, pool, { ...identity, poolId: pool.poolId }, diagnosticToken || null, requestedCollectDiagnostics));
   } catch (err) {

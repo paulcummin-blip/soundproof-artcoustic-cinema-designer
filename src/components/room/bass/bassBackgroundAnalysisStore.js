@@ -109,6 +109,7 @@ export class BassBackgroundAnalysisController {
     this.activeRequest = null;
     this.pending = null;
     this.requestSequence = 0;
+    this.manualAuthorityFingerprint = null;
     this.protocolSignature = bassOptimiserVersionSignature();
   }
 
@@ -182,6 +183,12 @@ export class BassBackgroundAnalysisController {
       return { action: "idle" };
     }
 
+    if (fingerprint !== this.manualAuthorityFingerprint) {
+      this.manualAuthorityFingerprint = null;
+    } else if (this.state.status === "queued" || this.state.status === "calculating" || this.state.status === "ready") {
+      return { action: "manual_authority_preserved" };
+    }
+
     if (this.state.currentCalibrationFingerprint === fingerprint) {
       if (this.state.status === "queued" || this.state.status === "calculating") return { action: "duplicate_ignored" };
       if (this.state.status === "ready" && this.state.resultFingerprint === fingerprint) return { action: "already_ready" };
@@ -251,16 +258,18 @@ export class BassBackgroundAnalysisController {
       return { action: "duplicate_ignored" };
     }
     if (!force) return this.updateInputs({ valid: true, fingerprint, payload, identity, collectDiagnostics });
-    this.clearQueuedTimer();
-    this.cancelActive();
-    this.pending = {
+    const manualRequest = {
       fingerprint,
       payload,
       identity,
       collectDiagnostics: collectDiagnostics === true,
+      origin: "manual-forced",
     };
+    this.clearQueuedTimer();
+    this.pending = null;
+    this.cancelActive();
+    this.manualAuthorityFingerprint = fingerprint;
     const staleResult = this.state.result || this.state.staleResult;
-    recordDiagStage(diagnosticToken, "requestManual-pending-assigned", { pendingCollectDiagnostics: this.pending.collectDiagnostics, pendingToken: diagnosticToken });
     this.emit({
       status: staleResult ? "stale" : "queued", currentCalibrationFingerprint: fingerprint,
       currentJobFingerprint: fingerprint, resultFingerprint: null, queuedAtMs: this.now(),
@@ -269,49 +278,67 @@ export class BassBackgroundAnalysisController {
       progressStage: null, result: null, staleResult, terminalOutcome: null, workerStatus: "queued",
       requestIdentity: identity, returnedIdentity: null, returnedFingerprint: null,
     });
-    this.startPending();
+    this.startRequest(manualRequest);
     return { action: "refresh_started" };
   }
 
   startPending() {
     this.clearQueuedTimer();
-    const pending = this.pending;
-    if (!pending || !this.workerFactory) return;
-    if (this.activeRequest?.fingerprint === pending.fingerprint) return;
+    const pendingRequest = this.pending;
+    this.pending = null;
+    if (!pendingRequest) return;
+    this.startRequest({
+      ...pendingRequest,
+      collectDiagnostics: false,
+      origin: "automatic-update",
+    });
+  }
+
+  startRequest(request) {
+    if (!request || !this.workerFactory) return;
     const requestId = `bass-${++this.requestSequence}`;
     const startedAtMs = this.now();
-    this.activeRequest = { requestId, fingerprint: pending.fingerprint, identity: pending.identity, startedAtMs };
-    recordDiagStage(null, "startPending", { startPendingCollectDiagnostics: pending.collectDiagnostics === true, startPendingRequestId: requestId });
+    this.activeRequest = {
+      requestId,
+      fingerprint: request.fingerprint,
+      identity: request.identity,
+      startedAtMs,
+      collectDiagnostics: request.collectDiagnostics === true,
+      origin: request.origin,
+    };
+    recordDiagStage(null, "startRequest", { startRequestCollectDiagnostics: this.activeRequest.collectDiagnostics, startRequestOrigin: this.activeRequest.origin, startRequestId: requestId });
     try {
       const worker = this.workerFactory();
       this.worker = worker;
-      this.emit({ status: "calculating", activeJobId: requestId, startedAtMs, elapsedMs: 0, terminalOutcome: null, workerStatus: "active", requestIdentity: pending.identity });
+      this.emit({ status: "calculating", activeJobId: requestId, startedAtMs, elapsedMs: 0, terminalOutcome: null, workerStatus: "active", requestIdentity: request.identity });
       this.stage("Worker created", { jobId: requestId });
       worker.onmessage = (event) => this.handleWorkerMessage(event?.data || {});
-      worker.onerror = (event) => this.handleWorkerError(event?.message || "Worker error", requestId, pending.fingerprint);
-      worker.onmessageerror = () => this.handleWorkerError("Worker message could not be decoded", requestId, pending.fingerprint);
+      worker.onerror = (event) => this.handleWorkerError(event?.message || "Worker error", requestId, request.fingerprint);
+      worker.onmessageerror = () => this.handleWorkerError("Worker message could not be decoded", requestId, request.fingerprint);
       const workerRequest = {
         requestId,
-        fingerprint: pending.fingerprint,
-        identity: pending.identity,
+        fingerprint: request.fingerprint,
+        identity: request.identity,
         ...BASS_OPTIMISER_VERSIONS,
-        payload: pending.payload,
-        collectDiagnostics: pending.collectDiagnostics === true,
+        payload: request.payload,
+        collectDiagnostics: request.collectDiagnostics === true,
+        origin: request.origin,
         dispatchedAtMs: this.now(),
       };
-      recordDiagStage(null, "worker.postMessage", { postMessageCollectDiagnostics: workerRequest.collectDiagnostics, postMessageRequestId: workerRequest.requestId });
+      recordDiagStage(null, "worker.postMessage", { postMessageCollectDiagnostics: workerRequest.collectDiagnostics, postMessageOrigin: workerRequest.origin, postMessageRequestId: workerRequest.requestId });
       worker.postMessage(workerRequest);
       this.stage("Worker request posted", { jobId: requestId });
       this.armHeartbeatTimer(requestId);
-      this.terminalTimer = this.setTimer(() => this.handleWorkerError(`Bass analysis watchdog expired at: ${this.state.progressStage || "unknown stage"}`, requestId, pending.fingerprint), BASS_TERMINAL_WATCHDOG_MS);
+      this.terminalTimer = this.setTimer(() => this.handleWorkerError(`Bass analysis watchdog expired at: ${this.state.progressStage || "unknown stage"}`, requestId, request.fingerprint), BASS_TERMINAL_WATCHDOG_MS);
     } catch (error) {
-      this.handleWorkerError(error?.message || String(error), requestId, pending.fingerprint);
+      this.handleWorkerError(error?.message || String(error), requestId, request.fingerprint);
     }
   }
 
   handleWorkerMessage(message) {
     const active = this.activeRequest;
     if (!active || message.requestId !== active.requestId) return false;
+    if (message.collectDiagnostics !== active.collectDiagnostics) return false;
     recordDiagStage(active.diagnosticToken, "worker-event-received", { workerEventCollectDiagnostics: message.collectDiagnostics, workerEventRequestId: message.requestId, workerEventToken: message.diagnosticToken });
     if (message.fingerprint !== active.fingerprint) return this.handleIdentityMismatch(active, message, "fingerprint");
     const envelopeCompatibility = validateOptimiserVersions(message, BASS_OPTIMISER_VERSIONS);
