@@ -118,7 +118,10 @@ export function buildBassGraphSeries({
             strokeWidth: 2.25, data: applyBassSmoothing(postEq.responseData, smoothingMode) };
         }).filter(Boolean));
       } else {
-        series.push({ id: "rsp-eq", kind: "post-eq", label: "RSP after EQ", tooltipLabel: "RSP after EQ",
+        const isIdentityCandidate = optimisationResult?.selectedCandidate?.designEqFitProfile === "identity";
+        series.push({ id: "rsp-eq", kind: "post-eq",
+          label: isIdentityCandidate ? "RSP after EQ (No EQ applied)" : "RSP after EQ",
+          tooltipLabel: isIdentityCandidate ? "RSP after EQ — no Design EQ applied" : "RSP after EQ",
           candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
           color: "#16A34A", strokeWidth: 2.5, data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode) });
         if (showRealSeatOverlays) series.push(...finalResponse.postEqPerSeatCurves
@@ -149,9 +152,14 @@ export function buildBassGraphSeries({
 
 export function detailedEqStatusText({ designEqEnabled, hasMatchingDetailedResult, detailedStatus, optimisationResult, error }) {
   if (!designEqEnabled) return "Showing product-independent normalized room response (94 dB flat reference) — not predicted product SPL";
-  if (hasMatchingDetailedResult) return optimisationResult?.isBestCalibratedAttempt
-    ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED"
-    : "BASS OPTIMISER VALIDATION ACTIVE — showing matching product-aware EQ result";
+  if (hasMatchingDetailedResult) {
+    if (optimisationResult?.selectedCandidate?.designEqFitProfile === "identity") {
+      return "No physically valid EQ bank was available. Results show the achieved response without Design EQ.";
+    }
+    return optimisationResult?.isBestCalibratedAttempt
+      ? "BEST CALIBRATED ATTEMPT — LEVEL 1 NOT ACHIEVED"
+      : "BASS OPTIMISER VALIDATION ACTIVE — showing matching product-aware EQ result";
+  }
   if (detailedStatus === "CALCULATING") return "Calculating detailed EQ… showing current product-aware RSP before EQ";
   if (detailedStatus === "QUEUED") return "Detailed EQ queued… showing current product-aware RSP before EQ";
   if (detailedStatus === "OUT_OF_DATE") return "Design changed — recalculating detailed EQ… stale result hidden";

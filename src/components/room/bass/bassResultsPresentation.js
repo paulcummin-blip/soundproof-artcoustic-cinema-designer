@@ -82,7 +82,8 @@ export function formatBassResults(result, nowMs = Date.now(), seatId = null) {
   let statusText = "Waiting for complete design";
   if (isQueued) statusText = "Analysis queued";
   if (isUpdating) statusText = `Updating bass analysis · ${elapsedSeconds} s`;
-  if (isReady) statusText = result?.job?.cacheStatus === "hit" ? "Restored from cache" : "Analysis ready";
+  if (isReady) statusText = result?.job?.message
+    || (result?.job?.cacheStatus === "hit" ? "Restored from cache" : "Analysis ready");
   if (status === "error") statusText = result?.job?.errorMessage || "Analysis failed · Retry";
 
   return {

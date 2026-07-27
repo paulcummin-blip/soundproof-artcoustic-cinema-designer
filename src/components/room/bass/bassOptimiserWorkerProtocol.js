@@ -1,7 +1,7 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
-export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v12-canonical-physics-eq-operating-trim-no-source-ref";
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v16-operating-level-trim-no-source-ref";
-export const BASS_RESULT_SCHEMA_VERSION = 11;
+export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v13-canonical-physics-eq-operating-trim-no-source-ref-identity-fallback";
+export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v17-operating-level-trim-no-source-ref-identity-fallback";
+export const BASS_RESULT_SCHEMA_VERSION = 12;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 
 export const BASS_OPTIMISER_VERSIONS = Object.freeze({

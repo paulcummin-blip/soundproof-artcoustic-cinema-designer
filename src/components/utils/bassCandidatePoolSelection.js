@@ -79,7 +79,9 @@ export function selectCandidateFromPool(pool) {
     selectedByMode: { balanced: selected },
     primaryLimitation: null,
     isBestCalibratedAttempt: false,
-    warningMessage: null,
+    warningMessage: selected.designEqFitProfile === "identity"
+      ? "No physically valid EQ bank was available. Results show the achieved response without Design EQ."
+      : null,
     performanceSummary: {
       ...pool.performanceSummary,
       contractAdaptationTimeMs: endedAt - startedAt,

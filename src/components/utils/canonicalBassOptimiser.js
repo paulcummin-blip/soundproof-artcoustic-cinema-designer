@@ -312,10 +312,52 @@ export function generateCanonicalCandidatePool({
   completedTasks += 1;
   report("Canonical house-curve fit complete");
 
-  const candidates = annotateCandidatePoolForHouseCurveRanking(eqResults.map((eq) => buildCanonicalCandidate({
+  const eqCandidates = eqResults.map((eq) => buildCanonicalCandidate({
     rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
-  })));
+  }));
+  // Identity candidate — a valid no-EQ fallback. Uses the level-normalised
+  // raw response as both the pre-EQ and post-EQ curve. No filters, no EQ
+  // correction, zero headroom consumption. Physically credible by definition.
+  const identityEq = {
+    designEqFitProfile: "identity",
+    designEqFitProfileConfig: null,
+    selectedStart: "identity",
+    filters: [],
+    curve: levelNormalisedRawCurve.map((point) => ({ ...point })),
+    combinedEqCurve: [],
+    fitterHouseCurveTarget: targetCurve,
+    physicalEqAuthorityPassed: true,
+    physicalAuthorityViolations: [],
+    bankLimits: { allOk: true, boostLimitOk: true, cutLimitOk: true, sourceDomainHeadroomOk: true, maxAggregateBoostDb: 0, maxAggregateBoostHz: null, maxAggregateCutDb: 0, maxAggregateCutHz: null },
+    bankDiagnostics: { selectedBankLimits: { allOk: true, boostLimitOk: true, cutLimitOk: true, sourceDomainHeadroomOk: true, maxAggregateBoostDb: 0, maxAggregateBoostHz: null, maxAggregateCutDb: 0, maxAggregateCutHz: null } },
+    bankValidationPassed: true,
+    rspObjectiveMaxDeviationDb: null,
+    rspMaxDeviationDb: null,
+    rspRmsDeviationDb: null,
+    rspMeanSignedResidualDb: null,
+    rspShapeRmsDeviationDb: null,
+    iterationTrace: [],
+    detectedRegions: [],
+    candidateAcceptanceDiagnostics: [],
+    candidateSelectionDiagnostics: [],
+    filterDecisionDiagnostics: [],
+    rejectedEqCandidates: [],
+    seatToleranceAdjustedCandidates: [],
+    seatRegressionToleranceDiagnostics: null,
+    stopReason: "identity — no EQ applied",
+    selectionReason: "Identity candidate — no EQ applied",
+    houseCurveDiagnostics: null,
+    worstSeatMaxDeviationDb: null,
+    meanSeatMaxDeviationDb: null,
+    rmsSeatTargetErrorDb: null,
+    perSeatMetrics: [],
+  };
+  const identityCandidate = buildCanonicalCandidate({
+    rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
+    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+  });
+  const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, identityCandidate]);
   const __canonicalTrace__ = {
     receivedCollectDiagnostics: collectDiagnostics,
     profiles: eqResults.map((eq, i) => {
@@ -337,6 +379,8 @@ export function generateCanonicalCandidatePool({
     }),
   };
   const selectablePool = candidates.filter(isPhysicallyCredibleBassCandidate);
+  const eqSelectableCount = selectablePool.filter((c) => c.designEqFitProfile !== "identity").length;
+  const identityOnlyFallback = eqSelectableCount === 0 && selectablePool.length > 0;
   const endedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   const poolId = `canonical:${buildCurveSignature(rawCurve)}:${activeSubs.length}:${seats.length}:${verticalOffsetDb.toFixed(4)}`;
   // Mark diagnosticsIncluded: true ONLY when collectDiagnostics was requested
@@ -357,9 +401,12 @@ export function generateCanonicalCandidatePool({
     standardFitCount: 1,
     accuracyFitCount: 1,
     houseCurveFitCount: 1,
+    identityFitCount: 1,
     generationStatus: "complete",
     missingInputs: [],
-    warningMessage: null,
+    warningMessage: identityOnlyFallback
+      ? "No physically valid EQ bank was available. Results show the achieved response without Design EQ."
+      : null,
     canonical: true,
     diagnosticsIncluded,
     __canonicalTrace__,
