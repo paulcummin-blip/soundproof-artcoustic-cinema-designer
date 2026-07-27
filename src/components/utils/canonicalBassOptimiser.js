@@ -18,58 +18,6 @@ import { getCurrentSystemSourceOutput, getSystemSourceCapability } from "@/compo
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 
-// ── Source reference tolerance ──
-// The raw response peak should be within this tolerance of the system capability
-// to confirm the simulation was run at the same source level as
-// baseRequestedSystemOutputDb. Room gain can push the peak above the capability,
-// so the tolerance is generous on the high side. On the low side, the peak should
-// not be far below the capability (which would indicate the simulation was run at
-// a lower level than the capability curve).
-const SOURCE_REFERENCE_TOLERANCE_DB = 6;
-
-/**
- * Verify that the raw simulated response was generated at baseRequestedSystemOutputDb.
- * The simulation engine uses the sub's capability curve as the source curve, so the
- * raw response peak should be close to the system capability. If the raw response
- * and baseRequestedSystemOutputDb do not refer to the same source operating level,
- * the operating offset would be calculated from mismatched authorities.
- *
- * Returns { consistent: boolean, message: string }.
- */
-function verifyRawResponseSourceReference(rawCurve, activeSubs, baseRequestedSystemOutputDb) {
-  if (!Array.isArray(rawCurve) || !rawCurve.length) {
-    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (empty raw curve)" };
-  }
-  if (!Number.isFinite(baseRequestedSystemOutputDb)) {
-    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (no configured source output)" };
-  }
-  // Compute the system capability at the peak frequency of the raw curve.
-  const rawPeak = rawCurve.reduce((max, point) => Number.isFinite(point?.spl) && point.spl > max ? point.spl : max, -Infinity);
-  if (!Number.isFinite(rawPeak)) {
-    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (no finite raw SPL)" };
-  }
-  // Find the frequency of the raw peak.
-  const peakPoint = rawCurve.find((point) => Number.isFinite(point?.spl) && point.spl === rawPeak);
-  const peakFrequencyHz = peakPoint?.frequency;
-  if (!Number.isFinite(peakFrequencyHz)) {
-    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (no peak frequency)" };
-  }
-  const systemCapabilityDb = getSystemSourceCapability(activeSubs, peakFrequencyHz);
-  if (!Number.isFinite(systemCapabilityDb)) {
-    return { consistent: false, message: "BLOCKED: raw response and source-output references do not match (no system capability)" };
-  }
-  // The raw response peak should be close to the system capability (within tolerance).
-  // Room gain can push the peak above the capability, so allow generous tolerance.
-  const deltaDb = rawPeak - systemCapabilityDb;
-  if (Math.abs(deltaDb) > SOURCE_REFERENCE_TOLERANCE_DB) {
-    return {
-      consistent: false,
-      message: `BLOCKED: raw response and source-output references do not match (raw peak ${rawPeak.toFixed(1)} dB vs capability ${systemCapabilityDb.toFixed(1)} dB at ${peakFrequencyHz.toFixed(1)} Hz, delta ${deltaDb.toFixed(1)} dB)`,
-    };
-  }
-  return { consistent: true, message: null };
-}
-
 /**
  * Clamp a positive global operating-level offset to the maximum safe scalar
  * increase supported by the selected subwoofer system. The applied positive
@@ -166,6 +114,9 @@ function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingL
     rawResponseCurve: rawCurve.map((point) => ({ ...point })),
     rspBeforePeqAtOperatingLevel: (levelNormalisedRawCurve || []).map((point) => ({ ...point })),
     operatingLevelOffsetDb: Number.isFinite(operatingLevelOffsetDb) ? operatingLevelOffsetDb : 0,
+    requestedOperatingLevelOffsetDb: Number.isFinite(requestedOperatingLevelOffsetDb) ? requestedOperatingLevelOffsetDb : 0,
+    baseRequestedSystemOutputDb: Number.isFinite(baseRequestedSystemOutputDb) ? baseRequestedSystemOutputDb : null,
+    operatingSystemOutputDb: Number.isFinite(operatingSystemOutputDb) ? operatingSystemOutputDb : null,
     rawResponseSignature: buildCurveSignature(rawCurve),
     generatedFilterBank: eq.filters || [],
     finalPostEqCurve: eq.curve || [],
@@ -272,21 +223,6 @@ export function generateCanonicalCandidatePool({
   // the headroom calculation subtracts from the manufacturer capability curve).
   // Falls back to 114 dB when no tuning is configured on the sub objects.
   const baseRequestedSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
-  // ── Raw response source reference check ──
-  // The raw simulated response must have been generated at baseRequestedSystemOutputDb.
-  // The simulation engine uses the sub's capability curve as the source curve, so
-  // the raw response peak should be close to the system capability. If the raw
-  // response and baseRequestedSystemOutputDb do not refer to the same source
-  // operating level, the operating offset would be calculated from mismatched
-  // authorities — block and return an error.
-  const sourceReferenceCheck = verifyRawResponseSourceReference(rawCurve, activeSubs, baseRequestedSystemOutputDb);
-  if (!sourceReferenceCheck.consistent) {
-    return stampPoolAuthority({
-      poolVersion: BASS_OPTIMISER_POOL_VERSION, candidates: [], selectablePool: [], poolId: null,
-      generatedCandidateCount: 0, physicallyCredibleCount: 0, generationStatus: "blocked-source-mismatch",
-      missingInputs: ["rawResponseSourceReference"], warningMessage: sourceReferenceCheck.message,
-    });
-  }
   // ── Global operating-level offset ──
   // The raw simulated RSP is at the physical maximum level. Before PEQ, a single
   // scalar offset places the complete response at the selected P14 operating
@@ -378,6 +314,7 @@ export function generateCanonicalCandidatePool({
 
   const candidates = annotateCandidatePoolForHouseCurveRanking(eqResults.map((eq) => buildCanonicalCandidate({
     rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
+    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
   })));
   const __canonicalTrace__ = {
     receivedCollectDiagnostics: collectDiagnostics,

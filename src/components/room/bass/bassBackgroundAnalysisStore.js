@@ -192,6 +192,7 @@ export class BassBackgroundAnalysisController {
     if (this.state.currentCalibrationFingerprint === fingerprint) {
       if (this.state.status === "queued" || this.state.status === "calculating") return { action: "duplicate_ignored" };
       if (this.state.status === "ready" && this.state.resultFingerprint === fingerprint) return { action: "already_ready" };
+      if (this.state.status === "error") return { action: "error_preserved" };
     }
 
     this.cancelActive("superseded");
@@ -355,6 +356,15 @@ export class BassBackgroundAnalysisController {
     if (message.type === "error") return this.handleWorkerError(message.error || "Unknown worker calculation error", message.requestId, message.fingerprint);
     if (message.type !== "complete") return false;
     if (active.fingerprint !== this.state.currentCalibrationFingerprint) return this.handleIdentityMismatch(active, message, "currentCalibrationFingerprint");
+    const pool = message[BASS_OPTIMISER_POOL_PROPERTY];
+    // Terminal failure: the optimiser returned an explicit non-complete generation
+    // status (e.g. invalid-inputs, invalid-anchor). This is NOT a compatibility
+    // mismatch — do not retry. Clear the Updating state immediately and surface
+    // the warning message so the UI shows the failure reason.
+    if (pool && pool.generationStatus && pool.generationStatus !== "complete") {
+      const warningMessage = pool.warningMessage || `Bass analysis failed: ${pool.generationStatus}`;
+      return this.handleTerminalFailure(active, warningMessage, pool.generationStatus);
+    }
     const completedAtMs = this.now();
     const returnedIdentity = message.identity || active.identity;
     const result = {
@@ -427,6 +437,18 @@ export class BassBackgroundAnalysisController {
     this.terminateWorker();
     this.pending = null;
     this.emit({ status: "error", terminalOutcome: "error", workerStatus: "error", errorMessage: `${error} (last stage: ${lastStage})`, elapsedMs, completedAtMs: this.now(), result: null, resultFingerprint: null });
+    return true;
+  }
+
+  handleTerminalFailure(active, errorMessage, generationStatus) {
+    const elapsedMs = this.now() - active.startedAtMs;
+    this.stage("Job terminal failure", { jobId: active.requestId, terminalOutcome: generationStatus || "error" });
+    this.terminateWorker();
+    this.pending = null;
+    this.emit({
+      status: "error", terminalOutcome: generationStatus || "error", workerStatus: "error",
+      errorMessage, elapsedMs, completedAtMs: this.now(), result: null, resultFingerprint: null,
+    });
     return true;
   }
 
