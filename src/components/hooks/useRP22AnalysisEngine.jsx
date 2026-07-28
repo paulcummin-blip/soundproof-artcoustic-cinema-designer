@@ -396,7 +396,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
   // system cannot be boosted below the worst sub's usable LF limit.
   const appState = useAppState();
   const subwoofers = appState?.subwoofers ?? null;
-  const designEqSystemLimits = (() => {
+  // Memoised so that activeSubs keeps a stable reference across renders that
+  // don't actually change the committed subwoofer array (e.g. transient sub
+  // drag ticks). Without this, the IIFE recreates activeSubs every render and
+  // invalidates the RP22 useMemo dependency below, triggering ~1 full RP22
+  // analysis per pointer-move frame.
+  const designEqSystemLimits = useMemo(() => {
     const activeSubs = (Array.isArray(subwoofers) ? subwoofers : []).filter((sub) => sub?.enabled !== false);
     const usableLfValues = activeSubs
       .map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.model))?.approvedUsableLfHzMinus6dB)
@@ -405,7 +410,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       activeSubs,
       usableLfHz: usableLfValues.length ? Math.max(...usableLfValues) : null,
     };
-  })();
+  }, [subwoofers]);
   const designEqUsableLfHz = designEqSystemLimits.usableLfHz;
   // RP22 P14 is always post-EQ — it does not follow the Bass Response graph's visual
   // raw/EQ toggle (that toggle is display-only). See computeParam14LfeCapability call below.
