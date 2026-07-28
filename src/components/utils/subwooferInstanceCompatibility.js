@@ -140,7 +140,15 @@ export function applyCountChange(instances, group, newCount, cfg, roomDims) {
   const stillNeeded = slotsToFill - reEnabled;
   if (stillNeeded <= 0) return afterReEnable;
 
-  const model = String(cfg?.model || "SUB2-12").trim();
+  // Model resolution for new instances:
+  // 1. CFG model (explicitly selected or mirrored from a single-model group)
+  // 2. First enabled instance's model (for mixed groups — never SUB2-12)
+  // 3. SUB2-12 draft (only when truly empty with no model info)
+  const cfgModel = String(cfg?.model || "").trim();
+  const firstEnabledModel = enabledGroupInstances.length > 0
+    ? String(enabledGroupInstances[0].model || "").trim()
+    : "";
+  const model = cfgModel || firstEnabledModel || "SUB2-12";
   const widthM = Number(roomDims?.widthM) || 4.5;
   const lengthM = Number(roomDims?.lengthM) || 6.0;
   const placementMode = String(cfg?.placementMode || "default").trim();

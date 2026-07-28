@@ -94,9 +94,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
               <div className="col-span-7">
                 <Select
-                  value={frontSubsCfg?.model ?? "SUB2-12"}
-                  disabled={disabled || (frontSubsCfg?.count ?? 0) === 0}
+                  value={compat.frontModelDisplay ?? undefined}
+                  disabled={disabled}
                   onValueChange={(model) => {
+                    if (model === "__mixed__") return;
                     if (compat.hasCanonicalInstances) {
                       compat.setFrontSubModel(model);
                     } else if (appState?.setFrontSubsCfg) {
@@ -108,6 +109,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     <SelectValue placeholder="Select model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__mixed__" disabled>Mixed</SelectItem>
                     <SelectItem value="SUB2-12">SUB2-12</SelectItem>
                     <SelectItem value="SUB3-12">SUB3-12</SelectItem>
                     <SelectItem value="SUB4-12">SUB4-12</SelectItem>
@@ -125,7 +127,6 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                       appState.setFrontSubsCfg(prev => ({ ...prev, count: Number(v) }));
                     }
                   }}
-                  disabled={!frontSubsCfg?.model}
                 >
                   <SelectTrigger className="h-10 w-[90px] px-3 justify-between bg-white border-[#DCDBD6]">
                     <SelectValue placeholder="0" className="text-2xl font-semibold" style={{ color: "#213428" }} />
@@ -239,9 +240,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
               <div className="col-span-7">
                 <Select
-                  value={rearSubsCfg?.model ?? "SUB2-12"}
-                  disabled={disabled || (rearSubsCfg?.count ?? 0) === 0}
+                  value={compat.rearModelDisplay ?? undefined}
+                  disabled={disabled}
                   onValueChange={(model) => {
+                    if (model === "__mixed__") return;
                     if (compat.hasCanonicalInstances) {
                       compat.setRearSubModel(model);
                     } else if (appState?.setRearSubsCfg) {
@@ -253,6 +255,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                     <SelectValue placeholder="Select model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__mixed__" disabled>Mixed</SelectItem>
                     <SelectItem value="SUB2-12">SUB2-12</SelectItem>
                     <SelectItem value="SUB3-12">SUB3-12</SelectItem>
                     <SelectItem value="SUB4-12">SUB4-12</SelectItem>
@@ -270,7 +273,6 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                       appState.setRearSubsCfg(prev => ({ ...prev, count: Number(v) }));
                     }
                   }}
-                  disabled={!rearSubsCfg?.model}
                 >
                   <SelectTrigger className="h-10 w-[90px] px-3 justify-between bg-white border-[#DCDBD6]">
                     <SelectValue placeholder="0" className="text-2xl font-semibold" style={{ color: "#213428" }} />

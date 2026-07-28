@@ -19,16 +19,16 @@
 //   instances in that legacyGroup (front or rear). This is the only way
 //   instance models change via the Front/Rear controls.
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   applyModelChange,
   applyCountChange,
   applyBottomHeightChange,
   applyPlacementPreset,
   mirrorInstancesToCfg,
+  INSTANCE_STATUS,
+  MIGRATION_STATE,
 } from "@/components/utils/subwooferInstanceCompatibility";
-import { isValidInstanceArray } from "@/components/utils/subwooferInstanceMigration";
-import { MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibility";
 
 /**
  * @param {Object} appState - From useAppState()
@@ -41,7 +41,30 @@ import { MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibili
  */
 export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg) {
   const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
-  const hasCanonical = isValidInstanceArray(instances);
+  const status = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
+  // A valid empty instance array is authoritative but editable.
+  // hasCanonical is driven by status, not array length.
+  const hasCanonical = status === INSTANCE_STATUS.VALID;
+
+  // Display-only model value for the Front/Rear model selector.
+  //   null        → no enabled instances and no CFG model (show placeholder)
+  //   "<model>"   → all enabled instances share one model
+  //   "__mixed__" → enabled instances have different models
+  const frontModelDisplay = useMemo(() => {
+    const enabled = instances.filter((i) => i?.legacyGroup === "front" && i.enabled !== false);
+    if (enabled.length === 0) return String(frontSubsCfg?.model || "").trim() || null;
+    const models = new Set(enabled.map((i) => String(i.model || "").trim()).filter(Boolean));
+    if (models.size === 1) return [...models][0];
+    return "__mixed__";
+  }, [instances, frontSubsCfg]);
+
+  const rearModelDisplay = useMemo(() => {
+    const enabled = instances.filter((i) => i?.legacyGroup === "rear" && i.enabled !== false);
+    if (enabled.length === 0) return String(rearSubsCfg?.model || "").trim() || null;
+    const models = new Set(enabled.map((i) => String(i.model || "").trim()).filter(Boolean));
+    if (models.size === 1) return [...models][0];
+    return "__mixed__";
+  }, [instances, rearSubsCfg]);
 
   const commit = useCallback((nextInstances, nextFrontCfg, nextRearCfg) => {
     if (typeof appState?.setSubwooferInstances === "function") {
@@ -70,18 +93,25 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
   }, [frontSubsCfg, rearSubsCfg]);
 
   // --- Model change: applies to ALL instances in the group ---
+  // When no enabled instances exist, mirrorInstancesToCfg sets model to null.
+  // Preserve the explicitly selected model in CFG so future instance creation
+  // uses it. "__mixed__" is never saved as a product model.
   const setFrontSubModel = useCallback((model) => {
     if (!hasCanonical) return;
     const next = applyModelChange(instances, "front", model);
     const cfgs = mirrorBoth(next);
-    commit(next, cfgs.front, null);
+    const enabledFront = next.filter((i) => i?.legacyGroup === "front" && i.enabled !== false);
+    const frontCfg = enabledFront.length === 0 ? { ...cfgs.front, model } : cfgs.front;
+    commit(next, frontCfg, null);
   }, [hasCanonical, instances, mirrorBoth, commit]);
 
   const setRearSubModel = useCallback((model) => {
     if (!hasCanonical) return;
     const next = applyModelChange(instances, "rear", model);
     const cfgs = mirrorBoth(next);
-    commit(next, null, cfgs.rear);
+    const enabledRear = next.filter((i) => i?.legacyGroup === "rear" && i.enabled !== false);
+    const rearCfg = enabledRear.length === 0 ? { ...cfgs.rear, model } : cfgs.rear;
+    commit(next, null, rearCfg);
   }, [hasCanonical, instances, mirrorBoth, commit]);
 
   // --- Count change ---
@@ -136,6 +166,8 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
 
   return {
     hasCanonicalInstances: hasCanonical,
+    frontModelDisplay,
+    rearModelDisplay,
     setFrontSubModel,
     setRearSubModel,
     setFrontSubCount,
