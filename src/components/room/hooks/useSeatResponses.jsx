@@ -2,12 +2,15 @@
 import { useMemo } from 'react';
 import { useAppState } from '../../AppStateProvider';
 import { simulateResponseWithExtrasWrapper } from '@/components/bass/bassSimulationEngine';
+import { INSTANCE_STATUS } from '@/components/utils/subwooferInstanceCompatibility';
 
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 
 export const useSeatResponses = () => {
   const appState = useAppState();
   const { subwoofers, seatingPositions, dimensions, roomDims, mlpY_m } = appState || {};
+  const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
+  const isBlocked = instanceStatus === INSTANCE_STATUS.ERROR || instanceStatus === INSTANCE_STATUS.UNINITIALISED;
 
   // Normalise + validate subs, but keep full object shape (wrapper expects .position)
   const simSubs = useMemo(() => {
@@ -54,6 +57,7 @@ export const useSeatResponses = () => {
   }, [mlpY_m, dims.width]);
 
   const seatResponses = useMemo(() => {
+    if (isBlocked) return [];
     if (simSubs.length === 0) return [];
     const hasRsp = rspCoord && isNum(rspCoord.x) && isNum(rspCoord.y);
     if (seatsSafe.length === 0 && !hasRsp) return [];
@@ -100,7 +104,7 @@ export const useSeatResponses = () => {
       }));
     }
   // stringify to avoid stale results when arrays mutate in place
-  }, [JSON.stringify(seatsSafe), JSON.stringify(simSubs), dims.width, dims.length, dims.height, rspCoord]);
+  }, [JSON.stringify(seatsSafe), JSON.stringify(simSubs), dims.width, dims.length, dims.height, rspCoord, isBlocked]);
 
   return seatResponses;
 };

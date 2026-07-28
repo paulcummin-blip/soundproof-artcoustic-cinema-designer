@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BEST_SUB_LAYOUT_CONSTANTS as C } from "@/components/room/bass/best-layout/bestSubLayoutConstants";
 import { computeBestSubLayoutFingerprint } from "@/components/room/bass/best-layout/bestSubLayoutFingerprint";
+import { useAppState } from "@/components/AppStateProvider";
+import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 
 export function useBestSubLayoutRecommendations({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs, finalOptimisedBassResponse }) {
+  const appState = useAppState();
+  const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
+  const isBlocked = instanceStatus === INSTANCE_STATUS.ERROR || instanceStatus === INSTANCE_STATUS.UNINITIALISED;
   const [state, setState] = useState({ status: "idle", result: null, error: null, isUpdating: false, measuredEndToEndMs: null });
   const workerRef = useRef(null), timerRef = useRef(null), requestRef = useRef(0), activeRef = useRef(null);
   const fingerprint = useMemo(() => {
+    if (isBlocked) return null;
     const validRoom = Number(roomDims?.widthM) > 0 && Number(roomDims?.lengthM) > 0 && Number(roomDims?.heightM) > 0;
     const hasSeats = Array.isArray(seatingPositions) && seatingPositions.some((seat) => Number.isFinite(seat?.x) && Number.isFinite(seat?.y));
     const hasRsp = Number.isFinite(rspPosition?.x) && Number.isFinite(rspPosition?.y);
     return validRoom && physicsOptions && (hasSeats || hasRsp) ? `${computeBestSubLayoutFingerprint({ roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs })}|post-eq:${finalOptimisedBassResponse?.selectedCandidateId || "none"}:${finalOptimisedBassResponse?.postEqCurveSignature || "none"}` : null;
-  }, [roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs, finalOptimisedBassResponse?.selectedCandidateId, finalOptimisedBassResponse?.postEqCurveSignature]);
+  }, [isBlocked, roomDims, seatingPositions, rspPosition, physicsOptions, sourceHeights, roomElements, currentSubs, finalOptimisedBassResponse?.selectedCandidateId, finalOptimisedBassResponse?.postEqCurveSignature]);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);

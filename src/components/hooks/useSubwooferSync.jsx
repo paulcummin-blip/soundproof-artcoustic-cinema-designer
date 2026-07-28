@@ -54,7 +54,10 @@ export function useSubwooferSync({ appState }) {
             String(s.model) === String(c.model) &&
             Math.abs((s.x ?? 0) - (c.x ?? 0)) < 0.001 &&
             Math.abs((s.y ?? 0) - (c.y ?? 0)) < 0.001 &&
-            Math.abs((s.z ?? 0) - (c.z ?? 0)) < 0.001
+            Math.abs((s.z ?? 0) - (c.z ?? 0)) < 0.001 &&
+            Math.abs((s.gainDb ?? 0) - (c.gainDb ?? 0)) < 0.001 &&
+            Math.abs((s.delay ?? 0) - (c.delay ?? 0)) < 0.001 &&
+            (s.polarity ?? 1) === (c.polarity ?? 1)
           );
         });
       if (!same) setSubwoofers(adapted);

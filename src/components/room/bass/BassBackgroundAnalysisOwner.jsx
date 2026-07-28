@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -71,8 +71,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     ...basePayload,
     perSourceComplexTransfers: normalizedTransferReady ? normalizedLive.result?.perSourceRspComplexTransfers || [] : [],
     normalizedTransferFingerprint: normalizedTransferReady ? normalizedLive.geometryFingerprint : null,
-    calibrationFingerprint: fingerprints.calibration,
-  }), [basePayload, normalizedTransferReady, normalizedLive.result, normalizedLive.geometryFingerprint, fingerprints.calibration]);
+    calibrationFingerprint: fingerprints?.calibration ?? null,
+  }), [basePayload, normalizedTransferReady, normalizedLive.result, normalizedLive.geometryFingerprint, fingerprints]);
   const inputsValid = baseInputsValid && normalizedTransferReady;
   const sharedAuthoritative = useMemo(() => ({
     ...authoritative,
@@ -80,18 +80,18 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     normalizedPhysicsOptions,
   }), [authoritative, normalizedLive, normalizedPhysicsOptions]);
 
-  const cacheKey = useMemo(() => buildBassResultCacheKey(fingerprints.calibration), [fingerprints.calibration, OPTIMISER_VERSION_SIGNATURE]);
+  const cacheKey = useMemo(() => fingerprints ? buildBassResultCacheKey(fingerprints.calibration) : null, [fingerprints, OPTIMISER_VERSION_SIGNATURE]);
   const requestIdentity = useMemo(() => ({
     fingerprint: cacheKey,
-    geometryFingerprint: fingerprints.geometry,
-    productFingerprint: fingerprints.product,
-    calibrationFingerprint: fingerprints.calibration,
+    geometryFingerprint: fingerprints?.geometry ?? null,
+    productFingerprint: fingerprints?.product ?? null,
+    calibrationFingerprint: fingerprints?.calibration ?? null,
     ...BASS_OPTIMISER_VERSIONS,
     canonicalPriorityMode: "canonical-physics-eq",
     poolId: null,
-  }), [cacheKey, fingerprints.geometry, fingerprints.product, fingerprints.calibration, OPTIMISER_VERSION_SIGNATURE]);
+  }), [cacheKey, fingerprints, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => {
-    if (isDragging) return; // Defer heavy EQ calculation during drag; run once on pointer-up
+    if (isDragging || !fingerprints) return; // Defer during drag; skip when analysis is blocked
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);
     controller.updateInputs({
       valid: inputsValid,
@@ -101,7 +101,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       identity: requestIdentity,
       collectDiagnostics: false,
     });
-  }, [controller, isDragging, inputsValid, cacheKey, fingerprints.calibration, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE]);
+  }, [controller, isDragging, inputsValid, cacheKey, fingerprints, payload, requestIdentity, OPTIMISER_VERSION_SIGNATURE]);
   useEffect(() => () => { controller.dispose(); scopeRef.current?.clear(); }, [controller]);
 
   const detailedStatus = LEGACY_STATUS[lifecycle.status] || "IDLE";
@@ -162,6 +162,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     collectDiagnostics: includeDiagnostics,
   });
   useEffect(() => {
+    if (!fingerprints) {
+      markBassAuthorityBlocked(scopeId);
+      return;
+    }
     const currentFingerprint = contract?.job?.currentJobFingerprint || cacheKey || null;
     if (contract?.job?.status === "error") {
       markBassAuthorityFailed(scopeId, currentFingerprint, contract?.job?.errorMessage);
@@ -169,7 +173,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
     if (!publishCompletedBassContract(scopeId, contract)) markBassAuthorityUpdating(scopeId, currentFingerprint);
     syncPersistentBassAuthority(scopeId, currentFingerprint, contract);
-  }, [scopeId, cacheKey, contract]);
+  }, [scopeId, cacheKey, contract, fingerprints]);
 
   const publishedStagesRef = useRef(new Set());
   useEffect(() => {

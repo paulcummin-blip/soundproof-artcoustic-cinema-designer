@@ -77,6 +77,19 @@ export function markBassAuthorityFailed(projectId, currentFingerprint, errorMess
   });
 }
 
+export function markBassAuthorityBlocked(projectId) {
+  const previous = memoryByProject.get(projectKey(projectId)) || emptyAuthority(projectId);
+  setMemory(projectId, {
+    ...previous,
+    status: "blocked",
+    currentFingerprint: null,
+    contract: null,
+    staleContract: null,
+    errorMessage: null,
+    exportable: false,
+  });
+}
+
 export function syncPersistentBassAuthority(projectId, currentFingerprint, contract) {
   const key = projectKey(projectId);
   if (key === "free") return Promise.resolve(null);

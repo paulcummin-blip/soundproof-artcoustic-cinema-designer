@@ -344,8 +344,14 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride: strategy,
     });
   }, [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy, analysisBlocked]);
-  const simulationResults = useMemo(() => runSimulation(qStrategy), [runSimulation, qStrategy]);
-  const { rspRawCurve, perSeatRawCurves } = useMemo(() => buildAuthoritativeResponseCurves(simulationResults.seatResponses), [simulationResults.seatResponses]);
+  const simulationResults = useMemo(() => {
+    if (analysisBlocked) return null;
+    return runSimulation(qStrategy);
+  }, [runSimulation, qStrategy, analysisBlocked]);
+  const { rspRawCurve, perSeatRawCurves } = useMemo(() => {
+    if (!simulationResults) return { rspRawCurve: [], perSeatRawCurves: [] };
+    return buildAuthoritativeResponseCurves(simulationResults.seatResponses);
+  }, [simulationResults]);
   const designEqSystemLimits = useMemo(() => {
     const usable = sources.map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.modelKey))?.approvedUsableLfHzMinus6dB).filter(Number.isFinite);
     return { activeSubs: sources, usableLfHz: usable.length ? Math.max(...usable) : null };
@@ -382,15 +388,24 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention,
     reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
     splConfig, optimisationTransitionHz, requested, productCapabilities]);
-  const fingerprints = useMemo(() => ({
-    geometry: computeGeometryFingerprint(fingerprintInputs),
-    product: computeProductFingerprint(fingerprintInputs),
-    calibration: computeCalibrationFingerprint(fingerprintInputs),
-  }), [fingerprintInputs]);
+  const fingerprints = useMemo(() => {
+    if (analysisBlocked) return null;
+    return {
+      geometry: computeGeometryFingerprint(fingerprintInputs),
+      product: computeProductFingerprint(fingerprintInputs),
+      calibration: computeCalibrationFingerprint(fingerprintInputs),
+    };
+  }, [fingerprintInputs, analysisBlocked]);
   const payload = useMemo(() => ({ rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, perSeatRawCurves }), [rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, perSeatRawCurves]);
   const inputsValid = !!rspPosition && seatingPositions.length > 0 && rspRawCurve.length > 0 && sources.length > 0 && [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
+  const blockedReason = analysisBlocked
+    ? (instanceStatus === INSTANCE_STATUS.ERROR ? "subwoofer_instance_error" : "subwoofer_instances_uninitialised")
+    : null;
 
   return {
+    status: analysisBlocked ? "blocked" : "ready",
+    reason: blockedReason,
+    exportable: !analysisBlocked && inputsValid,
     roomDims, seatingPositions, splConfig, rspPosition, sources, subsForSimulation: sources, simulationResults,
     frontSubsLive, rearSubsLive,
     rspRawCurve, perSeatRawCurves, designEqSystemLimits, optimisationTransitionHz, requested,

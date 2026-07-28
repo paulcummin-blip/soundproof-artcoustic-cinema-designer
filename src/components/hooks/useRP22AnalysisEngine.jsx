@@ -16,6 +16,7 @@ import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
 import { useSeatResponses } from "@/components/room/hooks/useSeatResponses";
+import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import {
   computeTransitionFrequencyHz,
   computeParam14LfeCapability,
@@ -396,6 +397,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
   // system cannot be boosted below the worst sub's usable LF limit.
   const appState = useAppState();
   const subwoofers = appState?.subwoofers ?? null;
+  const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
+  const bassAnalysisBlocked = instanceStatus === INSTANCE_STATUS.ERROR || instanceStatus === INSTANCE_STATUS.UNINITIALISED;
   // Memoised so that activeSubs keeps a stable reference across renders that
   // don't actually change the committed subwoofer array (e.g. transient sub
   // drag ticks). Without this, the IIFE recreates activeSubs every render and
@@ -860,6 +863,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         : (primarySeats.length > 0 && primarySeats[0]?.id) ||
           (safeSeats[0]?.id) ||
           null;
+    if (bassAnalysisBlocked) {
+      bassP14 = null; bassP18 = null; bassP19 = null; bassP20 = null;
+    } else
     try {
       const transitionHz = computeTransitionFrequencyHz({
         widthM: dimensions?.widthM ?? dimensions?.width,
@@ -1644,6 +1650,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     includeBassAnalysis,
     designEqUsableLfHz,
     designEqSystemLimits.activeSubs,
+    bassAnalysisBlocked,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };
