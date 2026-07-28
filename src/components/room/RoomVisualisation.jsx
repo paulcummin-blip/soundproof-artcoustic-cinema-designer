@@ -342,6 +342,14 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const draftRearSubsRef = useRef(null);
   const isDraggingSubRef = useRef(false);
   const idleCommitTimerRef = useRef(null);
+  // Seat draft (transient positions during seat drag — no state writes)
+  const draftSeatsRef = useRef(null);
+  const isDraggingSeatRef = useRef(false);
+  const [seatDragTick, setSeatDragTick] = useState(0);
+  // Speaker draft (transient positions during speaker drag — no state writes)
+  const draftSpeakersRef = useRef(null);
+  const isDraggingSpeakerDraftRef = useRef(false);
+  const [speakerDragTick, setSpeakerDragTick] = useState(0);
   const _lastValidDraftFrontSubsRef = useRef(null);
   const _lastValidDraftRearSubsRef = useRef(null);
   // Absolute HUD position in canvas pixels (top-left of the HUD card)
@@ -1139,12 +1147,11 @@ const byId = useEntitiesById({
   });
 
   const { handleSeatDrag, isSnapping: isSeatSnapping, clearSnap: clearSeatSnap, clearSeatDragBaseline } = useSeatDragHandler({
-    onSetSeatingPositions,
     canvasToRoom,
     lengthM,
     seatDragStartRef,
-    setSeatingBlockOffset: appState?.setSeatingBlockOffset,
-    setRowCentersM: appState?.setRowCentersM,
+    draftSeatsRef,
+    setSeatDragTick,
   });
 
   // Room element drag info (structured, only visible during roomElement drag)
@@ -1288,6 +1295,65 @@ const byId = useEntitiesById({
     draftFrontSubsRef, draftRearSubsRef,
     setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
   });
+
+  // Commit draft seat positions to real state once on pointer release
+  const commitDraftSeatPositions = useCallback(() => {
+    if (!draftSeatsRef.current || !onSetSeatingPositions) return;
+    const draftSeats = draftSeatsRef.current;
+    onSetSeatingPositions(draftSeats);
+
+    // Sync seatingBlockOffset and rowCentersM from the committed positions
+    if (appState?.setSeatingBlockOffset || appState?.setRowCentersM) {
+      const row1Seats = draftSeats.filter(s => s.rowNumber === 1);
+      const refSeats = row1Seats.length > 0 ? row1Seats : [draftSeats[0]];
+      const newRow1Y = Math.round(
+        (refSeats.reduce((sum, s) => sum + (Number(s.y) || 0), 0) / refSeats.length) * 100
+      ) / 100;
+
+      if (appState.setSeatingBlockOffset && Number.isFinite(newRow1Y)) {
+        appState.setSeatingBlockOffset(newRow1Y);
+      }
+
+      if (appState.setRowCentersM) {
+        const rowMap = new Map();
+        draftSeats.forEach(s => {
+          const rn = s.rowNumber;
+          if (!Number.isInteger(rn)) return;
+          if (!rowMap.has(rn)) rowMap.set(rn, []);
+          rowMap.get(rn).push(Number(s.y) || 0);
+        });
+        if (rowMap.size > 0) {
+          const sortedRows = Array.from(rowMap.keys()).sort((a, b) => a - b);
+          const centers = sortedRows.map(rn => {
+            const ys = rowMap.get(rn);
+            const avg = ys.reduce((a, b) => a + b, 0) / ys.length;
+            return Math.round(avg * 100) / 100;
+          });
+          appState.setRowCentersM(centers);
+        }
+      }
+    }
+  }, [onSetSeatingPositions, appState]);
+
+  // Commit draft speaker positions to real state once on pointer release
+  const commitDraftSpeakerPositions = useCallback(() => {
+    if (!draftSpeakersRef.current || !onSetSpeakers) return;
+    const draftSpeakers = draftSpeakersRef.current;
+    const draftMap = new Map(draftSpeakers.map(s => [s.id, s]));
+    onSetSpeakers(prev =>
+      prev.map(s => {
+        const draft = draftMap.get(s.id);
+        if (!draft) return s;
+        return {
+          ...s,
+          position: draft.position,
+          ...(draft.meta !== undefined ? { meta: draft.meta } : {}),
+          ...(draft.positionSource !== undefined ? { positionSource: draft.positionSource } : {}),
+          ...(draft.isOnRearWall !== undefined ? { isOnRearWall: draft.isOnRearWall } : {}),
+        };
+      })
+    );
+  }, [onSetSpeakers]);
 
   // Mouse handling — delegated to extracted hook
   const { handleMouseMove } = useRoomCanvasMouseMove({

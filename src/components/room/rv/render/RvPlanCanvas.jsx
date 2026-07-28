@@ -132,6 +132,12 @@ export default function RvPlanCanvas({
   subDragTick,  // incremented on every sub draft update — forces re-read of draft refs
   lastValidDraftFrontSubs,
   lastValidDraftRearSubs,
+  // Seat draft (transient positions during seat drag)
+  draftSeatsRef,
+  seatDragTick,
+  // Speaker draft (transient positions during speaker drag)
+  draftSpeakersRef,
+  speakerDragTick,
   // Speaker layer props
   aimAtMLP,
   aimFrontWidesAtMLP,
@@ -196,6 +202,33 @@ export default function RvPlanCanvas({
       orientation: rearSubsCfg?.orientation ?? "vertical"
     })) : subs;
   }, [dragging, draftRearSubsRef, lastValidDraftRearSubs, rearSubs, rearSubsCfg, subDragTick]);
+
+  // Draft-aware seats: read from draftSeatsRef during drag, fall back to committed
+  const seatsLive = useMemo(() => {
+    if (dragging && Array.isArray(draftSeatsRef?.current)) {
+      return draftSeatsRef.current;
+    }
+    return seatingPositions;
+  }, [dragging, draftSeatsRef, seatingPositions, seatDragTick]);
+
+  // Draft-aware speakers: merge draft positions into visiblePlanSpeakers during drag
+  const speakersLive = useMemo(() => {
+    if (!dragging || !Array.isArray(draftSpeakersRef?.current) || !Array.isArray(visiblePlanSpeakers)) {
+      return visiblePlanSpeakers;
+    }
+    const draftMap = new Map(draftSpeakersRef.current.map(p => [p.id, p]));
+    return visiblePlanSpeakers.map(s => {
+      const draft = draftMap.get(s.id);
+      if (!draft) return s;
+      return {
+        ...s,
+        position: draft.position,
+        ...(draft.meta !== undefined ? { meta: draft.meta } : {}),
+        ...(draft.positionSource !== undefined ? { positionSource: draft.positionSource } : {}),
+        ...(draft.isOnRearWall !== undefined ? { isOnRearWall: draft.isOnRearWall } : {}),
+      };
+    });
+  }, [dragging, draftSpeakersRef, visiblePlanSpeakers, speakerDragTick]);
 
   return (
     <div
@@ -508,7 +541,7 @@ export default function RvPlanCanvas({
             })()}
 
             {/* Layer 9: Draggable Seating Positions */}
-            <RvSeatLayer seatingPositions={seatingPositions} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
+            <RvSeatLayer seatingPositions={seatsLive} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
 
             {/* Seat snap-to-zero indicator */}
             {isSeatSnapping && mlpPoint && (() => {
@@ -543,7 +576,7 @@ export default function RvPlanCanvas({
 
             {/* Layer 10: Draggable Speakers */}
             <RvSpeakerLayer
-              speakers={visiblePlanSpeakers}
+              speakers={speakersLive}
               toPx={toPx}
               scale={scale}
               mlp={mlp}

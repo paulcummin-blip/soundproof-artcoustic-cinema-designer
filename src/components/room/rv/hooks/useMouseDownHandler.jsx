@@ -39,6 +39,13 @@ export function useMouseDownHandler({
   seatDragStartRef,
   // Current seating positions — needed to capture baseline y values
   seatingPositions,
+  // Draft refs for seat/speaker drag (transient positions, no state writes)
+  draftSeatsRef,
+  isDraggingSeatRef,
+  draftSpeakersRef,
+  isDraggingSpeakerDraftRef,
+  // Full placedSpeakers array — needed to seed draftSpeakersRef on speaker drag start
+  placedSpeakers,
 }) {
   const handleMouseDown = useCallback(
     (e, id, type) => {
@@ -194,6 +201,12 @@ export function useMouseDownHandler({
         }
         // Zero offset — seat drag uses baseline, not cursor offset
         dragOffsetRoomRef.current = { x: 0, y: 0 };
+
+        // Initialize draft seats from current committed positions
+        if (draftSeatsRef) {
+          draftSeatsRef.current = (Array.isArray(seatingPositions) ? seatingPositions : []).map(s => ({ ...s }));
+        }
+        if (isDraggingSeatRef) isDraggingSeatRef.current = true;
       } else if (type === "sub" && target.position) {
         // Detect wall first so we can align the Y offset with the first drag frame.
         // On front/rear walls, Y is pinned by useSubDragHandler (finalY = halfD+EPS or
@@ -398,6 +411,15 @@ export function useMouseDownHandler({
           isDraggingFW.current = true;
         }
 
+        // Initialize draft speakers from current committed positions
+        if (draftSpeakersRef) {
+          draftSpeakersRef.current = (Array.isArray(placedSpeakers) ? placedSpeakers : []).map(s => ({
+            ...s,
+            position: s.position ? { ...s.position } : s.position,
+          }));
+        }
+        if (isDraggingSpeakerDraftRef) isDraggingSpeakerDraftRef.current = true;
+
         // Capture pointer on the target element
         try {
           if (e.target && typeof e.target.setPointerCapture === 'function') {
@@ -421,7 +443,7 @@ export function useMouseDownHandler({
         }
       }
     },
-    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomElements, seatDragStartRef, seatingPositions]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomElements, seatDragStartRef, seatingPositions, placedSpeakers]
   );
 
   return { handleMouseDown };

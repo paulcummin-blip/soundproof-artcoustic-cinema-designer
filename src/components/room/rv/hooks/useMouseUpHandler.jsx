@@ -34,6 +34,14 @@ export function useMouseUpHandler({
   commitDraftSubPositions,
   _lastValidDraftFrontSubsRef,
   _lastValidDraftRearSubsRef,
+  // Seat draft commit
+  isDraggingSeatRef,
+  draftSeatsRef,
+  commitDraftSeatPositions,
+  // Speaker draft commit
+  isDraggingSpeakerDraftRef,
+  draftSpeakersRef,
+  commitDraftSpeakerPositions,
 }) {
   const handleMouseUp = useCallback((e) => {
     // TEMPORARY P18/P19 trace: RSP uses setManualRspY_m on pointer move; this handler has no separate RSP commit setter.
@@ -84,7 +92,16 @@ export function useMouseUpHandler({
        isDraggingSubRef.current = false;
        draftFrontSubsRef.current = null;
        draftRearSubsRef.current = null;
-     }
+       }
+
+       // Commit draft seat positions if seats were being dragged
+       if (isDraggingSeatRef?.current) {
+       if (typeof commitDraftSeatPositions === 'function') {
+         commitDraftSeatPositions();
+       }
+       if (draftSeatsRef) draftSeatsRef.current = null;
+       isDraggingSeatRef.current = false;
+       }
 
      // Release pointer capture
      if ((dragType === 'speaker' || dragType === 'projector') && e?.target) {
@@ -97,9 +114,21 @@ export function useMouseUpHandler({
        }
      }
 
+     // Commit draft speaker positions if speakers were being dragged (BEFORE clamping)
+     if (isDraggingSpeakerDraftRef?.current) {
+       if (typeof commitDraftSpeakerPositions === 'function') {
+         commitDraftSpeakerPositions();
+       }
+     }
+
      // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
+     // Read from draftSpeakersRef (which has the latest draft position) if available,
+     // otherwise fall back to byId (committed).
      if (dragType === 'speaker' && draggedItemId) {
-      const spk = byId.get(draggedItemId);
+      const draftSpk = (draftSpeakersRef?.current && Array.isArray(draftSpeakersRef.current))
+        ? draftSpeakersRef.current.find(s => s.id === draggedItemId)
+        : null;
+      const spk = draftSpk || byId.get(draggedItemId);
       if (spk) {
         const canonicalRole = getCanonicalRole(spk.role);
         const isOverhead = typeof canonicalRole === "string" && canonicalRole.startsWith("T");
@@ -156,9 +185,13 @@ export function useMouseUpHandler({
           ));
         }
       }
-    }
+      }
 
-    isAnyDraggingRef.current = false;
+      // Clear speaker draft ref after commit + clamping
+      if (isDraggingSpeakerDraftRef) isDraggingSpeakerDraftRef.current = false;
+      if (draftSpeakersRef) draftSpeakersRef.current = null;
+
+      isAnyDraggingRef.current = false;
 
     setDragState({
       dragging: false,
@@ -175,7 +208,7 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions]);
 
   return { handleMouseUp };
 }

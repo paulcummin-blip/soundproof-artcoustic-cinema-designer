@@ -16,8 +16,11 @@ import { solveSpeakerDragConstraints } from "@/components/room/rv/utils/solveSpe
 export function useSpeakerDragUpdate({
   // lookup
   byId,
-  // state updater
+  // state updater (used for commit on pointer-up, NOT during drag)
   onSetSpeakers,
+  // draft ref — transient positions during drag (no state writes)
+  draftSpeakersRef,
+  setSpeakerDragTick,
   // coordinate helpers
   canvasToRoom,
   // refs
@@ -189,30 +192,30 @@ export function useSpeakerDragUpdate({
         spk.meta = { ...(spk.meta || {}), ...metaFields };
       }
 
-      // ── write to state ────────────────────────────────────────────────
-      if (finalPositions.length > 0) {
+      // ── write to draft ref (NOT state) ─────────────────────────────────
+      // During drag, positions are stored in draftSpeakersRef only.
+      // commitDraftSpeakerPositions writes to onSetSpeakers once on pointer-up.
+      if (finalPositions.length > 0 && draftSpeakersRef?.current && Array.isArray(draftSpeakersRef.current)) {
         if (globalThis.__B44_LOGS)
-          console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role, count: finalPositions.length });
+          console.log("[DRAG] APPLY: writing to draftSpeakersRef", { speakerId, role: spk?.role, count: finalPositions.length });
 
         const updatedMap = new Map(finalPositions.map(p => [p.id, p]));
 
-        onSetSpeakers(prev =>
-          prev.map(s => {
-            const upd = updatedMap.get(s.id);
-            if (!upd) return s;
-            // Guard: never write a non-finite position — an invalid position causes the speaker
-            // to fail isRenderableSpeaker and vanish from the plan view.
-            const pos = upd.position;
-            if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return s;
-            return {
-              ...s,
-              position: upd.position,
-              ...(upd.meta        !== undefined ? { meta: upd.meta }               : {}),
-              ...(upd.positionSource !== undefined ? { positionSource: upd.positionSource } : {}),
-              ...(upd.isOnRearWall !== undefined ? { isOnRearWall: upd.isOnRearWall } : {}),
-            };
-          })
-        );
+        draftSpeakersRef.current = draftSpeakersRef.current.map(s => {
+          const upd = updatedMap.get(s.id);
+          if (!upd) return s;
+          // Guard: never write a non-finite position
+          const pos = upd.position;
+          if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return s;
+          return {
+            ...s,
+            position: upd.position,
+            ...(upd.meta        !== undefined ? { meta: upd.meta }               : {}),
+            ...(upd.positionSource !== undefined ? { positionSource: upd.positionSource } : {}),
+            ...(upd.isOnRearWall !== undefined ? { isOnRearWall: upd.isOnRearWall } : {}),
+          };
+        });
+        setSpeakerDragTick(n => n + 1);
       }
 
       // ── update last-interaction timestamp ─────────────────────────────
@@ -223,7 +226,7 @@ export function useSpeakerDragUpdate({
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      byId, onSetSpeakers, canvasToRoom, widthM, lengthM, screenCenterX_m, centerX_m,
+      byId, onSetSpeakers, draftSpeakersRef, setSpeakerDragTick, canvasToRoom, widthM, lengthM, screenCenterX_m, centerX_m,
       constraintZones, frontWideZones, overheadZones, sideSurroundVisualSpanM,
       rearSurroundVisualLanes, mlp, mlpDotY_m, freeMoveLcr,
       getModelDimsM, getCanonicalRole, getSpeakerDims, rsRearCorridor,
