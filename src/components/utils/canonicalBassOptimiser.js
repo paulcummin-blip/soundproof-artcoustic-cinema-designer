@@ -324,13 +324,31 @@ export function generateCanonicalCandidatePool({
   // are removed. One impossible boost does not discard unrelated valid cuts.
   const salvagedCandidates = [];
   const salvageDiagnosticsByProfile = {};
+  const salvageTriggerDiagnosticsByProfile = {};
   for (let i = 0; i < eqResults.length; i++) {
     const eq = eqResults[i];
     const baseProfile = eq.designEqFitProfile || (i === 0 ? "standard" : i === 1 ? "accuracy" : "house_curve");
-    const eqBankFails = eq.physicalEqAuthorityPassed === false
-      || (eq.designEqFitProfile === "house_curve"
-        ? (eq.bankLimits?.allOk === false || eq.bankValidationPassed === false)
-        : eq.bankDiagnostics?.selectedBankLimits?.allOk === false);
+    // ── Explicit validation authority ──
+    // A normal full-bank candidate is proven valid only when physical authority
+    // is explicitly passed AND the profile-specific bank result is explicitly
+    // true. Missing/undefined validation metadata is NOT proof of safety — it
+    // triggers salvage so the bank is revalidated from first principles.
+    const profileBankAllOk = eq.designEqFitProfile === "house_curve"
+      ? eq.bankLimits?.allOk
+      : eq.bankDiagnostics?.selectedBankLimits?.allOk;
+    const normalBankIsProvenValid =
+      eq.physicalEqAuthorityPassed === true
+      && (eq.bankValidationPassed === true || profileBankAllOk === true);
+    const eqBankFails = !normalBankIsProvenValid;
+    salvageTriggerDiagnosticsByProfile[baseProfile] = {
+      designEqFitProfile: eq.designEqFitProfile,
+      physicalEqAuthorityPassed: eq.physicalEqAuthorityPassed,
+      bankValidationPassed: eq.bankValidationPassed,
+      profileBankAllOk,
+      normalBankIsProvenValid,
+      eqBankFails,
+      salvageInvoked: eqBankFails,
+    };
     if (!eqBankFails) continue;
     const salvageProfile = baseProfile === "house_curve"
       ? { ...DESIGN_EQ_FIT_PROFILES.accuracy, id: "house_curve", preserveP14: false, maximumCutDb: 15 }
@@ -448,6 +466,7 @@ export function generateCanonicalCandidatePool({
     }),
     salvagedCandidateCount: salvagedCandidates.length,
     salvageDiagnosticsByProfile,
+    salvageTriggerDiagnosticsByProfile,
   };
   const rawSelectablePool = candidates.filter(isPhysicallyCredibleBassCandidate);
   // Minimum improvement guard: salvaged candidates must materially improve
