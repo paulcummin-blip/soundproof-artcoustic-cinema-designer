@@ -66,13 +66,15 @@ export function buildAuthoritativeBassSources({ frontSubsLive, rearSubsLive, fro
     const y = Number(position?.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     const id = item?.id ?? `${group}-sub-${POSITION_LABELS[index] ?? index}`;
-    const settingsById = cfg?.settingsById || {};
-    let settings = settingsById[id];
-    if (!settings && Object.keys(settingsById).length === 1) settings = settingsById[Object.keys(settingsById)[0]];
-    settings ||= {};
+    // Stage 1: Canonical instance calibration — NOT CFG settingsById.
+    // The item comes from bassInputAdapter which carries gainDb, delay,
+    // polarity, model, and enabled from the canonical subwooferInstances.
     const resolvedGroup = resolveSubGroup(id, group);
     const resolvedIndex = id?.includes("-right") || id?.includes("-2") ? 1 : index;
     const modelKey = item?.modelKey ?? item?.model ?? "SUB2-12";
+    const instGainDb = Number(item?.gainDb);
+    const instDelayMs = Number(item?.delay ?? item?.delayMs);
+    const instPolarity = item?.polarity ?? 1;
     return {
       id,
       modelKey,
@@ -81,9 +83,9 @@ export function buildAuthoritativeBassSources({ frontSubsLive, rearSubsLive, fro
       y,
       z: Number.isFinite(Number(position?.z)) ? Number(position.z) : 0.35,
       tuning: {
-        gainDb: Number.isFinite(settings.gainDb) ? settings.gainDb : 0,
-        delayMs: (Number.isFinite(settings.delayMs) ? settings.delayMs : 0) + resolveAutoDelay(id, resolvedGroup, resolvedIndex),
-        polarity: settings.polarity === "invert" ? 180 : 0,
+        gainDb: Number.isFinite(instGainDb) ? instGainDb : 0,
+        delayMs: (Number.isFinite(instDelayMs) ? instDelayMs : 0) + resolveAutoDelay(id, resolvedGroup, resolvedIndex),
+        polarity: instPolarity === -1 ? 180 : 0,
       },
     };
   };

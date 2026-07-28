@@ -2,6 +2,8 @@
 // Coordinates are in metres and represent cabinet centres, matching the saved
 // room-plan subwoofer objects.
 
+import { generateStableId } from "@/components/utils/subwooferInstanceMigration";
+
 export const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
 
 // Only front and rear placements are supported by the app's subwoofer config.
@@ -168,37 +170,73 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
   const instances = Array.isArray(currentInstances) ? currentInstances : [];
   const frontSources = (layout?.sources || []).filter((s) => s.placement === "front");
   const rearSources = (layout?.sources || []).filter((s) => s.placement === "rear");
-  const otherInstances = instances.filter((inst) => inst?.legacyGroup !== "front" && inst?.legacyGroup !== "rear");
 
-  const updateGroup = (group, sources, cfg) => {
-    const groupInstances = instances.filter((inst) => inst?.legacyGroup === group);
-    const sorted = sources.slice().sort((a, b) => (Number(a.x) - Number(b.x)) || (Number(a.y) - Number(b.y)));
-    const result = [];
-    for (let i = 0; i < sorted.length; i++) {
-      const rec = sorted[i];
-      const existing = groupInstances[i];
-      if (existing) {
-        // Update position only — preserve everything else
-        result.push({
-          ...existing,
+  // Sort recommended sources by x then y for deterministic assignment
+  const sortSources = (sources) =>
+    sources.slice().sort((a, b) => (Number(a.x) - Number(b.x)) || (Number(a.y) - Number(b.y)));
+  const sortedFront = sortSources(frontSources);
+  const sortedRear = sortSources(rearSources);
+
+  // Build a set of all existing IDs for uniqueness checking
+  const existingIds = new Set(instances.filter((i) => i?.id).map((i) => i.id));
+
+  // Track which indices in the original array belong to each group
+  const frontIndices = [];
+  const rearIndices = [];
+  const otherIndices = [];
+  instances.forEach((inst, i) => {
+    if (inst?.legacyGroup === "front") frontIndices.push(i);
+    else if (inst?.legacyGroup === "rear") rearIndices.push(i);
+    else otherIndices.push(i);
+  });
+
+  // Build updated instances for a group, preserving original array positions
+  const updateGroupInPlace = (groupIndices, sortedSources, cfg) => {
+    const result = new Map(); // index → updated instance
+    const usedIndices = new Set();
+
+    // Match sorted sources to existing group instances by index order
+    for (let s = 0; s < sortedSources.length; s++) {
+      const rec = sortedSources[s];
+      const origIdx = groupIndices[s];
+      if (origIdx !== undefined) {
+        // Update existing instance position only — preserve ID, model, calibration
+        result.set(origIdx, {
+          ...instances[origIdx],
           position: {
             x: Number(rec.x),
             y: Number(rec.y),
           },
           positionSource: "user",
         });
-      } else {
-        // Create new instance for this group
-        const model = String(cfg?.model || "SUB2-12").trim();
-        result.push({
-          id: `migrated-${group}-${i}`,
+        usedIndices.add(origIdx);
+      }
+    }
+
+    // Disable excess group instances that don't have a matching source
+    for (let i = sortedSources.length; i < groupIndices.length; i++) {
+      const origIdx = groupIndices[i];
+      result.set(origIdx, { ...instances[origIdx], enabled: false });
+      usedIndices.add(origIdx);
+    }
+
+    // If we need MORE instances than exist, create new ones (appended at end)
+    const newInstances = [];
+    if (sortedSources.length > groupIndices.length) {
+      const model = String(cfg?.model || "SUB2-12").trim();
+      for (let i = groupIndices.length; i < sortedSources.length; i++) {
+        const rec = sortedSources[i];
+        newInstances.push({
+          id: generateStableId(existingIds, null),
           model,
           enabled: true,
           position: { x: Number(rec.x), y: Number(rec.y) },
-          bottomHeightM: Number(cfg?.bottomHeightM) || 0.05,
-          rotationDeg: group === "front" ? 0 : 180,
+          bottomHeightM: Number.isFinite(Number(cfg?.bottomHeightM))
+            ? Math.max(0, Math.min(2.5, Number(cfg.bottomHeightM)))
+            : 0.05,
+          rotationDeg: 0,
           positionSource: "user",
-          legacyGroup: group,
+          legacyGroup: null,
           symmetryLinkId: null,
           gainDb: 0,
           delayMs: 0,
@@ -206,17 +244,25 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
         });
       }
     }
-    // Disable extra instances that don't have a matching recommendation source
-    for (let i = sorted.length; i < groupInstances.length; i++) {
-      result.push({ ...groupInstances[i], enabled: false });
-    }
-    return result;
+
+    return { result, newInstances };
   };
 
-  const updatedFront = updateGroup("front", frontSources, frontSubsCfg);
-  const updatedRear = updateGroup("rear", rearSources, rearSubsCfg);
+  const frontResult = updateGroupInPlace(frontIndices, sortedFront, frontSubsCfg);
+  const rearResult = updateGroupInPlace(rearIndices, sortedRear, rearSubsCfg);
 
-  return [...updatedFront, ...updatedRear, ...otherInstances];
+  // Reassemble preserving original order: walk the original array,
+  // replacing entries that were updated, keeping others unchanged
+  const next = instances.map((inst, i) => {
+    if (frontResult.result.has(i)) return frontResult.result.get(i);
+    if (rearResult.result.has(i)) return rearResult.result.get(i);
+    return inst;
+  });
+
+  // Append newly created instances at the end
+  next.push(...frontResult.newInstances, ...rearResult.newInstances);
+
+  return next;
 }
 
 /**

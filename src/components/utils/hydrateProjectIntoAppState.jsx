@@ -9,6 +9,7 @@ import {
   bassInputAdapter,
   validateInstances,
 } from "@/components/utils/subwooferInstanceMigration";
+import { MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibility";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -250,25 +251,40 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       heightM: Number(p?.room_height) || 2.4,
     };
 
+    // Distinguish: field absent, valid empty array, malformed present array
+    const instancesAbsent = rawInstances == null;
     const instancesPresent = Array.isArray(rawInstances) && rawInstances.length > 0;
+    const instancesEmptyValid = Array.isArray(rawInstances) && rawInstances.length === 0;
     const validation = validateInstances(rawInstances);
 
     if (instancesPresent && !validation.valid) {
-      // Rule C: malformed instances — explicit error, do NOT replace from CFG.
+      // Rule C: malformed instances — clear ALL subwoofer state, block analysis,
+      // expose error, do NOT substitute CFG, do NOT autosave.
       const errMsg = `[subwooferInstanceMigration] Rule C: project "${p?.id || p?.name || "?"}" has malformed subwooferInstances. ` +
         `Errors: ${validation.errors.join("; ")}. ` +
-        `Instances were NOT replaced from CFG. Please fix the project data manually.`;
+        `Instances were cleared. CFG was NOT substituted. Bass/RP22 analysis is blocked for this project.`;
       console.error(errMsg);
-      // Emit a window event so the UI can surface the error if desired.
+      // Emit a window event so the UI can surface the error
       if (typeof window !== "undefined") {
         try {
           window.dispatchEvent(new CustomEvent("subwoofer-instance-migration-error", {
-            detail: { projectId: p?.id, errors: validation.errors },
+            detail: { projectId: p?.id, errors: validation.errors, fatal: true },
           }));
         } catch { /* ignore */ }
       }
-      // Do NOT set subwooferInstances or subwoofers — leave state as-is.
-      // The user must fix the project data.
+      // Clear subwooferInstances and runtime subwoofers — do NOT retain previous
+      // project's state. Loading Project B after malformed Project A must never
+      // retain Project A subwoofers.
+      if (typeof appState?.setSubwooferInstances === "function") {
+        appState.setSubwooferInstances([]);
+      }
+      if (typeof appState?.setSubwoofers === "function") {
+        appState.setSubwoofers([]);
+      }
+      // Set migration state to ERROR so autosave and analysis are blocked
+      if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+        appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.ERROR);
+      }
     } else if (instancesPresent && validation.valid) {
       // Rule A/D: valid persisted instances — use directly, ignore CFG for analysis.
       if (typeof appState?.setSubwooferInstances === "function") {
@@ -277,8 +293,24 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       if (typeof appState?.setSubwoofers === "function") {
         appState.setSubwoofers(bassInputAdapter(rawInstances));
       }
+      // Already persisted — no migration needed
+      if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+        appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
+      }
+    } else if (instancesEmptyValid) {
+      // Valid empty array — project intentionally has zero subwoofers
+      if (typeof appState?.setSubwooferInstances === "function") {
+        appState.setSubwooferInstances([]);
+      }
+      if (typeof appState?.setSubwoofers === "function") {
+        appState.setSubwoofers([]);
+      }
+      if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+        appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
+      }
     } else {
       // Rule B: instances absent — normalise from CFG once into runtime instances.
+      // Do NOT autosave merely because migration occurred.
       const frontCfgForNorm = isCfgUsable(frontCfgRaw) ? frontCfgRaw : deriveCfgFromSubs(frontSubs);
       const rearCfgForNorm = isCfgUsable(rearCfgRaw) ? rearCfgRaw : deriveCfgFromSubs(rearSubs);
       if (frontCfgForNorm || rearCfgForNorm) {
@@ -290,10 +322,25 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
           if (typeof appState?.setSubwoofers === "function") {
             appState.setSubwoofers(bassInputAdapter(migrated));
           }
+          // Mark as runtime_migrated — autosave must ignore this change
+          if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+            appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.RUNTIME_MIGRATED);
+          }
+        } else {
+          if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+            appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
+          }
         }
       } else if (subsList.length && typeof appState?.setSubwoofers === "function") {
         // Fallback: no instances and no usable CFG — use legacy subsList.
         appState.setSubwoofers(subsList);
+        if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+          appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
+        }
+      } else {
+        if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+          appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
+        }
       }
     }
   }

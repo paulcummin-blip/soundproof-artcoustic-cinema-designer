@@ -1301,44 +1301,48 @@ const byId = useEntitiesById({
     }
 
     // 2. Commit to canonical subwooferInstances[] — update position.x/y only.
-    //    Match instances by legacyGroup + index within group. All other fields
-    //    (id, model, enabled, bottomHeightM, gainDb, delayMs, polarity) survive.
+    //    Walk the ORIGINAL array in order, matching by legacyGroup + index within
+    //    group. Use Number.isFinite() (NOT Number() || prev) so x=0 and y=0 are
+    //    valid coordinates. All other fields (id, model, enabled, bottomHeightM,
+    //    gainDb, delayMs, polarity) survive byte-equivalent for untouched instances.
+    //    Do NOT regroup the array — preserve original order.
     const setSubwooferInstances = appState?.setSubwooferInstances;
     if (typeof setSubwooferInstances === "function") {
       const currentInstances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
       if (currentInstances.length > 0) {
-        // Build group → [instance] index maps
-        const frontInstances = currentInstances.filter(inst => inst?.legacyGroup === "front");
-        const rearInstances = currentInstances.filter(inst => inst?.legacyGroup === "rear");
-        const otherInstances = currentInstances.filter(inst => !inst?.legacyGroup || (inst.legacyGroup !== "front" && inst.legacyGroup !== "rear"));
+        // Build per-group index counters to match draft entries to instances
+        const frontDraft = draftFrontSubsRef.current;
+        const rearDraft = draftRearSubsRef.current;
+        let frontIdx = 0;
+        let rearIdx = 0;
 
-        const updateGroup = (instances, draft, group) => {
-          if (!draft || !instances.length) return instances;
-          return instances.map((inst, i) => {
-            const draftSub = draft[i];
-            if (!draftSub) return inst;
-            return {
-              ...inst,
-              position: {
-                x: Number(draftSub.position?.x) || inst.position?.x || 0,
-                y: Number(draftSub.position?.y) || inst.position?.y || 0,
-              },
-              positionSource: "user",
-            };
-          });
-        };
+        const next = currentInstances.map((inst) => {
+          if (!inst) return inst;
+          const group = inst.legacyGroup;
+          const draft = group === "front" ? frontDraft : group === "rear" ? rearDraft : null;
+          if (!draft) return inst; // Not a front/rear instance — untouched
 
-        let updatedFront = frontInstances;
-        let updatedRear = rearInstances;
-        if (draftFrontSubsRef.current) {
-          updatedFront = updateGroup(frontInstances, draftFrontSubsRef.current, "front");
-        }
-        if (draftRearSubsRef.current) {
-          updatedRear = updateGroup(rearInstances, draftRearSubsRef.current, "rear");
-        }
+          const draftSub = draft[group === "front" ? frontIdx : rearIdx];
+          if (group === "front") frontIdx++;
+          else rearIdx++;
 
-        // Reassemble in original order: front, rear, other
-        const next = [...updatedFront, ...updatedRear, ...otherInstances];
+          if (!draftSub) return inst; // No matching draft entry — untouched
+
+          const dx = Number(draftSub.position?.x);
+          const dy = Number(draftSub.position?.y);
+          const prevX = Number(inst.position?.x);
+          const prevY = Number(inst.position?.y);
+
+          return {
+            ...inst,
+            position: {
+              x: Number.isFinite(dx) ? dx : (Number.isFinite(prevX) ? prevX : 0),
+              y: Number.isFinite(dy) ? dy : (Number.isFinite(prevY) ? prevY : 0),
+            },
+            positionSource: "user",
+          };
+        });
+
         setSubwooferInstances(next);
       }
     }

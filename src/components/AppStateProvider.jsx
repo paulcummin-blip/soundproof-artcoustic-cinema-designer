@@ -518,6 +518,10 @@ function useDesignerState() {
   // exist, useSubwooferSync normalises from CFG into this array (runtime
   // only — persists on the next normal project save).
   const [subwooferInstances, setSubwooferInstances] = useState([]);
+  // Stage 1: Migration state tracks whether runtime instances were created
+  // from a legacy CFG migration (to prevent autosave on the initial change).
+  // Values: "none", "runtime_migrated", "persisted", "error"
+  const [subwooferInstanceMigrationState, setSubwooferInstanceMigrationState] = useState("none");
   const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
     (!__isFreeUse && __autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
       model: "SUB2-12",

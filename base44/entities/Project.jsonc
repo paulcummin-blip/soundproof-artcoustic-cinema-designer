@@ -160,7 +160,7 @@
     },
     "subwooferInstances": {
       "type": "array",
-      "description": "Canonical subwoofer instance array. Each item: {id, model, enabled, position:{x,y,z}, rotationDeg, positionSource, legacyGroup, symmetryLinkId, gainDb, delayMs, polarity}. Authority for bass analysis; front_subs_cfg/rear_subs_cfg remain as compatibility metadata.",
+      "description": "Canonical subwoofer instance array \u2014 the sole authority for bass analysis. Each item: {id, model, enabled, position:{x,y}, bottomHeightM, rotationDeg, positionSource, legacyGroup, symmetryLinkId, gainDb, delayMs, polarity}. position.z is NOT stored \u2014 derive centreZ = bottomHeightM + cabinetHeightM/2 at boundaries. front_subs_cfg/rear_subs_cfg remain as compatibility metadata only.",
       "items": {
         "type": "object"
       }
@@ -272,11 +272,11 @@
     },
     "front_subs_cfg": {
       "type": "object",
-      "description": "Front subwoofer configuration"
+      "description": "Front subwoofer configuration (legacy compatibility metadata \u2014 not analysis authority)"
     },
     "rear_subs_cfg": {
       "type": "object",
-      "description": "Rear subwoofer configuration"
+      "description": "Rear subwoofer configuration (legacy compatibility metadata \u2014 not analysis authority)"
     },
     "spl_config": {
       "type": "object",

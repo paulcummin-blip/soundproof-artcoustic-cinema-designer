@@ -47,7 +47,7 @@ const WALL_BUFFER_M = 0.01;
 /**
  * Resolve cabinet height in metres for a given model.
  */
-function getCabinetHeightM(model, orientation) {
+export function getCabinetHeightM(model, orientation) {
   try {
     const meta = getSpeakerModelMeta(model, orientation) || {};
     const h = Number(meta.heightM);
@@ -60,7 +60,7 @@ function getCabinetHeightM(model, orientation) {
 /**
  * Resolve cabinet width in metres for a given model.
  */
-function getCabinetWidthM(model) {
+export function getCabinetWidthM(model) {
   try {
     const dims = subDimsMM?.[model];
     const w = Number(dims?.w);
@@ -73,7 +73,7 @@ function getCabinetWidthM(model) {
 /**
  * Resolve cabinet depth in metres for a given model.
  */
-function getCabinetDepthM(model) {
+export function getCabinetDepthM(model) {
   try {
     const dims = subDimsMM?.[model];
     const d = Number(dims?.d);
@@ -280,6 +280,11 @@ export function bassInputAdapter(instances) {
 /**
  * Validate a subwooferInstances array and return detailed diagnostics.
  *
+ * Distinguishes:
+ *   - field absent (not an array) → invalid
+ *   - valid empty array → valid (project intentionally has zero subwoofers)
+ *   - malformed present array → invalid with detailed errors
+ *
  * @param {Array} instances
  * @returns {{valid: boolean, errors: string[]}}
  */
@@ -288,20 +293,30 @@ export function validateInstances(instances) {
   if (!Array.isArray(instances)) {
     return { valid: false, errors: ["subwooferInstances is not an array"] };
   }
+  // Empty array is valid — project intentionally has zero subwoofers.
   if (instances.length === 0) {
-    return { valid: false, errors: ["subwooferInstances is empty"] };
+    return { valid: true, errors: [] };
   }
+  const seenIds = new Set();
   instances.forEach((inst, i) => {
     if (!inst || typeof inst !== "object") {
       errors.push(`instance[${i}] is not an object`);
       return;
     }
+    // Missing or empty ID
     if (typeof inst.id !== "string" || inst.id.trim().length === 0) {
       errors.push(`instance[${i}].id is missing or not a non-empty string`);
+    } else if (seenIds.has(inst.id)) {
+      // Duplicate ID
+      errors.push(`instance[${i}].id is duplicate: "${inst.id}"`);
+    } else {
+      seenIds.add(inst.id);
     }
+    // Missing model
     if (typeof inst.model !== "string" || inst.model.trim().length === 0) {
       errors.push(`instance[${i}].model is missing or not a non-empty string`);
     }
+    // Position x/y must be finite
     const pos = inst.position;
     if (!pos || typeof pos !== "object") {
       errors.push(`instance[${i}].position is missing or not an object`);
@@ -313,14 +328,54 @@ export function validateInstances(instances) {
         errors.push(`instance[${i}].position.y is not finite`);
       }
     }
+    // bottomHeightM must be finite
     if (!Number.isFinite(Number(inst.bottomHeightM))) {
       errors.push(`instance[${i}].bottomHeightM is not finite`);
     }
-    if (typeof inst.enabled !== "boolean" && inst.enabled !== undefined) {
-      errors.push(`instance[${i}].enabled is not boolean or undefined`);
+    // enabled must be boolean
+    if (typeof inst.enabled !== "boolean") {
+      errors.push(`instance[${i}].enabled is not boolean`);
+    }
+    // gainDb must be finite
+    if (!Number.isFinite(Number(inst.gainDb))) {
+      errors.push(`instance[${i}].gainDb is not finite`);
+    }
+    // delayMs must be finite
+    if (!Number.isFinite(Number(inst.delayMs))) {
+      errors.push(`instance[${i}].delayMs is not finite`);
+    }
+    // polarity must be 1 or -1
+    if (inst.polarity !== 1 && inst.polarity !== -1) {
+      errors.push(`instance[${i}].polarity is not 1 or -1 (got ${inst.polarity})`);
+    }
+    // legacyGroup must be "front", "rear", or null/undefined
+    if (inst.legacyGroup != null && inst.legacyGroup !== "front" && inst.legacyGroup !== "rear") {
+      errors.push(`instance[${i}].legacyGroup is malformed: "${inst.legacyGroup}"`);
     }
   });
   return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Generate a globally-unique stable ID for a new subwoofer instance.
+ * Uses a prefix based on the legacy group and increments a counter until
+ * an unused ID is found. The existingIds Set is mutated to include the new ID.
+ *
+ * @param {Set<string>} existingIds - Set of all current instance IDs
+ * @param {string|null} group - Legacy group ("front", "rear", or null)
+ * @returns {string} A unique ID
+ */
+export function generateStableId(existingIds, group) {
+  const prefix = group ? `sub-${group}-` : "sub-";
+  let n = 1;
+  while (true) {
+    const id = `${prefix}${n}`;
+    if (!existingIds || !existingIds.has(id)) {
+      if (existingIds) existingIds.add(id);
+      return id;
+    }
+    n++;
+  }
 }
 
 /**
