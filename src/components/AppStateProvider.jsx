@@ -9,6 +9,27 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { useRspState } from "@/components/state/useRspState";
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
+import { validateInstances, bassInputAdapter } from "@/components/utils/subwooferInstanceMigration";
+
+// Stage 2: Restore canonical subwoofer instances from a local autosave payload.
+// Valid (including []) wins → VALID. Malformed → ERROR + clear. Absent → UNINITIALISED
+// (useSubwooferSync normalises from CFG once, setting RUNTIME_MIGRATED).
+// Never reconstruct a modern record from CFG in this helper.
+const restoreSubwooferInstancesFromAutosave = (payload) => {
+  if (!payload || !Object.prototype.hasOwnProperty.call(payload, "subwooferInstances")) {
+    return { instances: [], status: INSTANCE_STATUS.UNINITIALISED, migration: MIGRATION_STATE.NONE };
+  }
+  const raw = payload.subwooferInstances;
+  if (!Array.isArray(raw)) {
+    return { instances: [], status: INSTANCE_STATUS.ERROR, migration: MIGRATION_STATE.NONE };
+  }
+  const validation = validateInstances(raw);
+  if (!validation.valid) {
+    return { instances: [], status: INSTANCE_STATUS.ERROR, migration: MIGRATION_STATE.NONE };
+  }
+  // Valid (including empty []) — already persisted to local storage
+  return { instances: raw, status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.PERSISTED };
+};
 
 const enforceOnePrimary = (seats, dims, mlpBasis = "front") => {
   if (!Array.isArray(seats) || seats.length === 0) return seats;
@@ -512,20 +533,24 @@ function useDesignerState() {
       ? normaliseRoomElements(__autosavePayload.roomElements)
       : []
   ));
-  const [subwoofers, setSubwoofers] = useState([]);
-  // Stage 1: subwooferInstances is the canonical persisted authority.
-  // On load, if project.subwooferInstances exists it is hydrated here and
-  // appState.subwoofers is derived via bassInputAdapter. When no instances
-  // exist, useSubwooferSync normalises from CFG into this array (runtime
-  // only — persists on the next normal project save).
-  const [subwooferInstances, setSubwooferInstances] = useState([]);
+  // Stage 2: Restore canonical subwoofer instances from local autosave.
+  // Valid (including []) wins → VALID + runtime subwoofers derived. Malformed →
+  // ERROR + clear. Absent → UNINITIALISED (useSubwooferSync normalises from CFG
+  // once, setting RUNTIME_MIGRATED). Never reconstruct a modern record from CFG.
+  const __restoredSubs = restoreSubwooferInstancesFromAutosave(__autosavePayload);
+  const [subwoofers, setSubwoofers] = useState(
+    __restoredSubs.status === INSTANCE_STATUS.VALID && __restoredSubs.instances.length > 0
+      ? bassInputAdapter(__restoredSubs.instances)
+      : []
+  );
+  const [subwooferInstances, setSubwooferInstances] = useState(__restoredSubs.instances);
   // Authority status — distinguishes absent from valid empty from error.
   // Do NOT use array length alone to determine authority.
   // Values: "uninitialised", "absent_legacy", "valid", "error"
-  const [subwooferInstancesStatus, setSubwooferInstancesStatus] = useState(INSTANCE_STATUS.UNINITIALISED);
+  const [subwooferInstancesStatus, setSubwooferInstancesStatus] = useState(__restoredSubs.status);
   // Migration state tracks the autosave lifecycle for runtime-migrated instances.
   // Values: "none", "runtime_migrated", "persisted"
-  const [subwooferInstanceMigrationState, setSubwooferInstanceMigrationState] = useState(MIGRATION_STATE.NONE);
+  const [subwooferInstanceMigrationState, setSubwooferInstanceMigrationState] = useState(__restoredSubs.migration);
   const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
     (!__isFreeUse && __autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
       model: "SUB2-12",
@@ -1394,6 +1419,11 @@ function useDesignerState() {
   const autosaveTimerRef = useRef(null);
 
   useEffect(() => {
+    // Stage 2: Skip automatic local save while instances are runtime-migrated
+    // (no genuine edit yet). A deliberate compatibility action transitions
+    // migration state to NONE, which re-runs this effect and allows normal save.
+    if (subwooferInstanceMigrationState === MIGRATION_STATE.RUNTIME_MIGRATED) return;
+
     // Build payload (ONLY what we need to restore the room session)
     const payload = {
       roomDims,
@@ -1419,6 +1449,11 @@ function useDesignerState() {
         orientation: rearSubsCfg?.orientation || "vertical",
         placementMode: rearSubsCfg?.placementMode || "default"
       },
+      // Stage 2: Persist canonical subwoofer instances only when status is VALID.
+      // Never persist for UNINITIALISED or ERROR.
+      ...(subwooferInstancesStatus === INSTANCE_STATUS.VALID
+        ? { subwooferInstances: Array.isArray(subwooferInstances) ? subwooferInstances : [] }
+        : {}),
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
       screen,
@@ -1511,7 +1546,10 @@ function useDesignerState() {
     rspMode,
     manualRspY_m,
     designEqEnabled,
-    roomElements
+    roomElements,
+    subwooferInstances,
+    subwooferInstancesStatus,
+    subwooferInstanceMigrationState
     ]);
 
   const restoreAutosave = useCallback(() => {
@@ -1554,6 +1592,18 @@ function useDesignerState() {
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
       if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
+      // Stage 2: Restore canonical subwoofer instances from local autosave.
+      if (Object.prototype.hasOwnProperty.call(p, "subwooferInstances")) {
+        const restored = restoreSubwooferInstancesFromAutosave(p);
+        setSubwooferInstances(restored.instances);
+        setSubwoofers(
+          restored.status === INSTANCE_STATUS.VALID && restored.instances.length > 0
+            ? bassInputAdapter(restored.instances)
+            : []
+        );
+        setSubwooferInstancesStatus(restored.status);
+        setSubwooferInstanceMigrationState(restored.migration);
+      }
       if (p.splConfig && typeof p.splConfig === "object") setSplConfig(p.splConfig);
       if (typeof p.screenHeight === "number") setScreenHeight(p.screenHeight);
       if (typeof p.seatingRows === "number") setSeatingRows(p.seatingRows);
@@ -1606,6 +1656,11 @@ function useDesignerState() {
         orientation: rearSubsCfg?.orientation || "vertical",
         placementMode: rearSubsCfg?.placementMode || "default"
       },
+      // Stage 2: Persist canonical subwoofer instances only when status is VALID.
+      // Never persist for UNINITIALISED or ERROR.
+      ...(subwooferInstancesStatus === INSTANCE_STATUS.VALID
+        ? { subwooferInstances: Array.isArray(subwooferInstances) ? subwooferInstances : [] }
+        : {}),
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
       screen,
@@ -1639,7 +1694,7 @@ function useDesignerState() {
     } catch (e) {
       console.warn("Autosave failed:", e);
     }
-  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, splConfig]);
+  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, splConfig, subwooferInstances, subwooferInstancesStatus]);
 
   const clearWorkingCopy = useCallback(() => {
     try {
@@ -1714,6 +1769,14 @@ function useDesignerState() {
       placedSpeakers: [],
       lastUpdated: timeNowMs()
     });
+
+    // Stage 2: Reset canonical subwoofer authority before CFG mirrors.
+    // Canonical array [], status VALID, migration NONE, runtime subwoofers []
+    // must be set before writing zero-count CFG mirrors.
+    setSubwooferInstances([]);
+    setSubwoofers([]);
+    setSubwooferInstancesStatus(INSTANCE_STATUS.VALID);
+    setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
 
     // Subs
     setFrontSubsCfg({
