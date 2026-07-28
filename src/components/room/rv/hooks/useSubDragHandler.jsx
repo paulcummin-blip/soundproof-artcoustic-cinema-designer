@@ -39,9 +39,6 @@ export function useSubDragHandler({
     }
     if (!sub || !draftArray) return;
 
-    const wall = draggedSubWallRef.current;
-    if (!wall) return;
-
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
 
     // Apply pointer-to-sub offset captured at drag start so the sub moves
@@ -59,33 +56,23 @@ export function useSubDragHandler({
     const halfD = d / 2;
     const EPS = 0.01;
 
-    let finalX = anchoredX;
-    let finalY = anchoredY;
+    // Free movement: clamp to room bounds only (no wall pinning).
+    const minX = halfW + EPS;
+    const maxX = widthM - halfW - EPS;
+    const minY = halfD + EPS;
+    const maxY = lengthM - halfD - EPS;
 
-    // Pin to wall using center-safe positioning (account for sub depth/width)
-    if (wall === 'front') {
-      finalY = halfD + EPS;
-      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
-    } else if (wall === 'rear') {
-      // Rear-specific corner-safe clamping
-      const minX = halfW + EPS;
-      const maxX = widthM - halfW - EPS;
-      const rearPinnedY = lengthM - halfD - EPS;
+    let finalX = Math.max(minX, Math.min(maxX, anchoredX));
+    let finalY = Math.max(minY, Math.min(maxY, anchoredY));
 
-      finalY = rearPinnedY;
-      finalX = Math.max(minX, Math.min(maxX, rawX));
-
-      // Safety: if finalX is invalid, fallback to previous or center
-      if (!Number.isFinite(finalX)) {
-        const prevX = sub.position?.x;
-        finalX = Number.isFinite(prevX) ? prevX : (minX + maxX) / 2;
-      }
-    } else if (wall === 'left') {
-      finalX = halfW + EPS;
-      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
-    } else if (wall === 'right') {
-      finalX = widthM - halfW - EPS;
-      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
+    // Safety: if final position is invalid, fallback to previous or center
+    if (!Number.isFinite(finalX)) {
+      const prevX = sub.position?.x;
+      finalX = Number.isFinite(prevX) ? prevX : (minX + maxX) / 2;
+    }
+    if (!Number.isFinite(finalY)) {
+      const prevY = sub.position?.y;
+      finalY = Number.isFinite(prevY) ? prevY : (minY + maxY) / 2;
     }
 
     // Final validation: never write invalid positions
@@ -119,7 +106,7 @@ export function useSubDragHandler({
     // No config commit during mousemove — draft refs are the live render source.
     // commitDraftSubPositions() is called once on mouseup via useMouseUpHandler.
   }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM,
-      draggedSubTypeRef, draggedSubWallRef, draftFrontSubsRef, draftRearSubsRef,
+      draggedSubTypeRef, draftFrontSubsRef, draftRearSubsRef,
       setSubDragTick]);
 
   return { handleSubDrag };
