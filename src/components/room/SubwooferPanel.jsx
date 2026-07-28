@@ -13,6 +13,7 @@ import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { useActiveProjectId } from '@/components/state/project-session';
 import { resolveBestSubLayoutContextId } from '@/components/room/bass/best-layout/bestSubLayoutContext';
 import { useSubwooferCompatibilityActions } from '@/components/hooks/useSubwooferCompatibilityActions';
+import SubwooferInstanceList from '@/components/room/bass/SubwooferInstanceList';
 
 function rectsOverlap(a, b) {
   return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
@@ -315,6 +316,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 {subWarnings.rear[0]}
               </div>
             )}
+          </div>
+
+          <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
+            <SubwooferInstanceList appState={appState} />
           </div>
 
           <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
