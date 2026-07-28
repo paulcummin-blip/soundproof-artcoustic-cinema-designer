@@ -16,7 +16,7 @@ export default function RvRenderSubwoofers({
 }) {
   if (!hasRoomRect) return null;
 
-  const subsToRender = Array.isArray(rearSubs) ? rearSubs : [];
+  const subsToRender = Array.isArray(rearSubs) ? rearSubs.filter((s) => s?.enabled !== false) : [];
   if (!subsToRender.length) return null;
 
   return (

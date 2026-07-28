@@ -259,7 +259,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
 
   // Front subs — always returns a plain array
   const subItems = useMemo(() => {
-    const safeSubs = Array.isArray(frontSubs) ? frontSubs : [];
+    const safeSubs = Array.isArray(frontSubs) ? frontSubs.filter((s) => s?.enabled !== false) : [];
     return safeSubs.map((s, i) => {
       const orientation = s?.orientation || frontSubsCfg?.orientation;
       const meta = getSpeakerModelMeta(s?.model, orientation);

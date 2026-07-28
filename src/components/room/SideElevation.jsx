@@ -615,7 +615,7 @@ export default function SideElevation({
 
           {/* Front subwoofers — side profile, sourced from frontSubs (same as FrontElevation / Plan View) */}
           {(() => {
-            const safeSubs = Array.isArray(frontSubs) ? frontSubs : [];
+            const safeSubs = Array.isArray(frontSubs) ? frontSubs.filter((s) => s?.enabled !== false) : [];
             if (!safeSubs.length) return null;
             const isDraggingFront = liveSubDrag?.group === 'front';
             return (
@@ -687,7 +687,7 @@ export default function SideElevation({
 
           {/* Rear subwoofers — side profile, mirroring front sub style, against rear wall */}
           {(() => {
-            const safeRearSubs = Array.isArray(rearSubs) ? rearSubs : [];
+            const safeRearSubs = Array.isArray(rearSubs) ? rearSubs.filter((s) => s?.enabled !== false) : [];
             if (!safeRearSubs.length) return null;
             const isDraggingRear = liveSubDrag?.group === 'rear';
             return (
