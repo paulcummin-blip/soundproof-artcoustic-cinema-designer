@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 const levelText = (level) => Number.isFinite(level) ? (level > 0 ? `L${level}` : "FAIL") : "—";
 
-export default function Rp22RecommendationCard({ title, layout, onClick, onApply, isApplied, isRecalculating, applying, applyError }) {
+export default function Rp22RecommendationCard({ title, layout, onClick, onApply, isApplied, isRecalculating, applying, applyError, unsupported }) {
   if (!layout) return null;
   const m = layout.metrics;
   return (
@@ -29,7 +29,14 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
         <p className="mt-2 text-[10px] leading-relaxed text-[#8A7B6A]">Predicted from the placement model. Apply this layout to recalculate the bass response.</p>
       </button>
 
-      {isApplied && (
+      {unsupported && (
+        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+          <p className="text-[11px] font-medium text-amber-800">Exact application of this side-wall layout is not currently supported.</p>
+          <p className="mt-1 text-[10px] text-amber-700">View the layout details for reference, or choose a front/rear layout to apply.</p>
+        </div>
+      )}
+
+      {isApplied && !unsupported && (
         <div className="mt-3 rounded-md border border-[#213428]/30 bg-white/70 p-3">
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-[#213428]" />
@@ -41,9 +48,9 @@ export default function Rp22RecommendationCard({ title, layout, onClick, onApply
         </div>
       )}
 
-      {applyError && <p className="mt-2 text-[11px] text-red-700">{applyError}</p>}
+      {applyError && !unsupported && <p className="mt-2 text-[11px] text-red-700">{applyError}</p>}
 
-      {!isApplied && (
+      {!isApplied && !unsupported && (
         <Button type="button" size="sm" className="mt-3 w-full bg-[#213428] text-white hover:bg-[#3E4349]" onClick={(e) => { e.stopPropagation(); onApply?.(layout); }} disabled={applying}>
           {applying ? "Applying…" : "Apply recommended positions"}
         </Button>

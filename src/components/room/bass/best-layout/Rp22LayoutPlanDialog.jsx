@@ -5,7 +5,7 @@ import { wallRelativeDimensions } from "@/components/room/bass/best-layout/apply
 
 const levelText = (level) => Number.isFinite(level) ? (level > 0 ? `L${level}` : "FAIL") : "—";
 
-export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomDims, onApply, isApplied, applyError, applying }) {
+export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomDims, onApply, isApplied, applyError, applying, unsupported }) {
   if (!layout) return null;
   const width = Number(roomDims?.widthM) || 1;
   const length = Number(roomDims?.lengthM) || 1;
@@ -41,11 +41,17 @@ export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomD
           })}
         </div>
       </div>
-      {applyError && <p className="text-[11px] text-red-700">{applyError}</p>}
+      {unsupported && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
+          <p className="text-[11px] font-medium text-amber-800">Exact application of this side-wall layout is not currently supported.</p>
+          <p className="mt-1 text-[10px] text-amber-700">This layout uses side-wall positions (left/right) which the app cannot apply. View the coordinates for reference, or choose a front/rear layout to apply.</p>
+        </div>
+      )}
+      {applyError && !unsupported && <p className="text-[11px] text-red-700">{applyError}</p>}
       <DialogFooter className="gap-2 pt-2">
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={applying}>Cancel</Button>
-        <Button type="button" onClick={() => onApply(layout)} className="bg-[#213428] text-white hover:bg-[#3E4349]" disabled={applying || isApplied}>
-          {applying ? "Applying…" : isApplied ? "Applied" : "Apply recommended positions"}
+        <Button type="button" onClick={() => onApply(layout)} className="bg-[#213428] text-white hover:bg-[#3E4349]" disabled={applying || isApplied || unsupported}>
+          {applying ? "Applying…" : isApplied ? "Applied" : unsupported ? "Not supported" : "Apply recommended positions"}
         </Button>
       </DialogFooter>
     </DialogContent>

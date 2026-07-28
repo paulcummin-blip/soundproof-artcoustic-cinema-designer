@@ -16,20 +16,18 @@ const roundCoord = (value) => Number(Number(value || 0).toFixed(6));
 function unorderedGroupMatch(currentGroup, recommendedGroup, tolerance) {
   if (currentGroup.length !== recommendedGroup.length) return false;
   if (currentGroup.length === 0) return true;
+  // Only x and y are compared. z is derived differently for current subs
+  // (centre height = bottomHeightM + cabinetHeight/2) vs recommendation sources
+  // (bottom height = sourceHeights.front), so z cannot be directly compared.
   const used = new Array(currentGroup.length).fill(false);
   return recommendedGroup.every((candidate) => {
     const cx = roundCoord(candidate.x);
     const cy = roundCoord(candidate.y);
-    const cz = Number.isFinite(candidate.z) ? roundCoord(candidate.z) : null;
     for (let index = 0; index < currentGroup.length; index += 1) {
       if (used[index]) continue;
       const dx = Math.abs(roundCoord(currentGroup[index].x) - cx);
       const dy = Math.abs(roundCoord(currentGroup[index].y) - cy);
       if (dx > tolerance || dy > tolerance) continue;
-      if (cz !== null && Number.isFinite(currentGroup[index].z)) {
-        const dz = Math.abs(roundCoord(currentGroup[index].z) - cz);
-        if (dz > tolerance) continue;
-      }
       used[index] = true;
       return true;
     }
@@ -38,9 +36,18 @@ function unorderedGroupMatch(currentGroup, recommendedGroup, tolerance) {
 }
 
 /**
- * Compare two arrays of sources. Matches count, placement group, x, y, and z
- * (where present). Uses unordered matching within each placement group so
- * identical subs in a different order still match.
+ * Check if a layout contains unsupported placement values (left/right).
+ * Only front and rear placements can be applied to the app's subwoofer config.
+ */
+export function hasUnsupportedPlacement(layout) {
+  if (!layout?.sources) return false;
+  return layout.sources.some((s) => !SUPPORTED_PLACEMENTS.includes(s?.placement));
+}
+
+/**
+ * Compare two arrays of sources. Matches count, placement group, x, and y.
+ * z is not compared because current subs use centre height while recommendation
+ * sources use bottom height (see comment in unorderedGroupMatch).
  */
 export function coordinatesMatch(currentSources, recommendationSources, tolerance = COORDINATE_TOLERANCE_M) {
   const current = Array.isArray(currentSources) ? currentSources : [];
