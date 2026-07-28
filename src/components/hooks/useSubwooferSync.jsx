@@ -16,6 +16,8 @@ import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibili
  */
 export function useSubwooferSync({ appState }) {
   const status = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
+  const frontOrientation = appState?.frontSubsCfg?.orientation ?? null;
+  const rearOrientation = appState?.rearSubsCfg?.orientation ?? null;
 
   useEffect(() => {
     const setSubwoofers = appState?.setSubwoofers;
@@ -42,7 +44,7 @@ export function useSubwooferSync({ appState }) {
     // -----------------------------------------------------------------------
     if (status === INSTANCE_STATUS.VALID) {
       const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
-      const adapted = bassInputAdapter(instances);
+      const adapted = bassInputAdapter(instances, { frontOrientation, rearOrientation });
       const current = Array.isArray(appState?.subwoofers) ? appState.subwoofers : [];
       const same =
         adapted.length === current.length &&
@@ -68,5 +70,7 @@ export function useSubwooferSync({ appState }) {
     appState?.setSubwoofers,
     status,
     appState?.subwooferInstances,
+    frontOrientation,
+    rearOrientation,
   ]);
 }

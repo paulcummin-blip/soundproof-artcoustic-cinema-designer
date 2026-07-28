@@ -95,14 +95,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               <div className="col-span-7">
                 <Select
                   value={compat.frontModelDisplay ?? undefined}
-                  disabled={disabled}
+                  disabled={disabled || !compat.hasCanonicalInstances}
                   onValueChange={(model) => {
                     if (model === "__mixed__") return;
-                    if (compat.hasCanonicalInstances) {
-                      compat.setFrontSubModel(model);
-                    } else if (appState?.setFrontSubsCfg) {
-                      appState.setFrontSubsCfg(prev => ({ ...prev, model }));
-                    }
+                    compat.setFrontSubModel(model);
                   }}
                 >
                   <SelectTrigger className="h-10 w-full px-3 justify-between bg-white border-[#DCDBD6]">
@@ -120,12 +116,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               <div className="col-span-5">
                 <Select
                   value={String(frontSubsCfg?.count ?? 0)}
+                  disabled={disabled || !compat.hasCanonicalInstances}
                   onValueChange={(v) => {
-                    if (compat.hasCanonicalInstances) {
-                      compat.setFrontSubCount(Number(v));
-                    } else if (appState?.setFrontSubsCfg) {
-                      appState.setFrontSubsCfg(prev => ({ ...prev, count: Number(v) }));
-                    }
+                    compat.setFrontSubCount(Number(v));
                   }}
                 >
                   <SelectTrigger className="h-10 w-[90px] px-3 justify-between bg-white border-[#DCDBD6]">
@@ -145,13 +138,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <label className="block text-[12px] text-[#625143] mb-1">Sub bottom height (m)</label>
                 <HeightInput
                   value={frontSubsCfg?.bottomHeightM ?? (frontSubsCfg?.mountMode === "wall" ? 0.80 : 0.05)}
+                  disabled={disabled || !compat.hasCanonicalInstances}
                   onChange={(raw) => {
                     const clamped = Math.max(0, Math.min(2.5, raw));
-                    if (compat.hasCanonicalInstances) {
-                      compat.setFrontBottomHeight(clamped);
-                    } else if (appState?.setFrontSubsCfg) {
-                      appState.setFrontSubsCfg(prev => ({ ...prev, bottomHeightM: clamped }));
-                    }
+                    compat.setFrontBottomHeight(clamped);
                   }}
                   className="h-10 w-full bg-white border-[#DCDBD6]"
                 />
@@ -167,26 +157,20 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <div className="relative z-10 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (appState?.setFrontSubsCfg) {
-                        appState.setFrontSubsCfg(prev => ({ ...prev, orientation: "vertical" }));
-                      }
-                    }}
+                    disabled={!compat.hasCanonicalInstances}
+                    onClick={() => compat.setFrontOrientation("vertical")}
                     className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
                       (frontSubsCfg?.orientation ?? "vertical") === "vertical"
                         ? "bg-[#213428] text-white border-[#213428]"
                         : "bg-white text-[#213428] border-[#DCDBD6]"
                     }`}
-                    >
-                     Vertical
+                  >
+                   Vertical
                     </button>
                     <button
                      type="button"
-                    onClick={() => {
-                      if (appState?.setFrontSubsCfg) {
-                        appState.setFrontSubsCfg(prev => ({ ...prev, orientation: "horizontal" }));
-                      }
-                    }}
+                    disabled={!compat.hasCanonicalInstances}
+                    onClick={() => compat.setFrontOrientation("horizontal")}
                     className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
                       (frontSubsCfg?.orientation ?? "vertical") === "horizontal"
                         ? "bg-[#213428] text-white border-[#213428]"
@@ -241,14 +225,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               <div className="col-span-7">
                 <Select
                   value={compat.rearModelDisplay ?? undefined}
-                  disabled={disabled}
+                  disabled={disabled || !compat.hasCanonicalInstances}
                   onValueChange={(model) => {
                     if (model === "__mixed__") return;
-                    if (compat.hasCanonicalInstances) {
-                      compat.setRearSubModel(model);
-                    } else if (appState?.setRearSubsCfg) {
-                      appState.setRearSubsCfg(prev => ({ ...prev, model }));
-                    }
+                    compat.setRearSubModel(model);
                   }}
                 >
                   <SelectTrigger className="h-10 w-full px-3 justify-between bg-white border-[#DCDBD6]">
@@ -266,12 +246,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               <div className="col-span-5">
                 <Select
                   value={String(rearSubsCfg?.count ?? 0)}
+                  disabled={disabled || !compat.hasCanonicalInstances}
                   onValueChange={(v) => {
-                    if (compat.hasCanonicalInstances) {
-                      compat.setRearSubCount(Number(v));
-                    } else if (appState?.setRearSubsCfg) {
-                      appState.setRearSubsCfg(prev => ({ ...prev, count: Number(v) }));
-                    }
+                    compat.setRearSubCount(Number(v));
                   }}
                 >
                   <SelectTrigger className="h-10 w-[90px] px-3 justify-between bg-white border-[#DCDBD6]">
@@ -291,13 +268,10 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <label className="block text-[12px] text-[#625143] mb-1">Sub bottom height (m)</label>
                 <HeightInput
                   value={rearSubsCfg?.bottomHeightM ?? (rearSubsCfg?.mountMode === "wall" ? 0.80 : 0.05)}
+                  disabled={disabled || !compat.hasCanonicalInstances}
                   onChange={(raw) => {
                     const clamped = Math.max(0, Math.min(2.5, raw));
-                    if (compat.hasCanonicalInstances) {
-                      compat.setRearBottomHeight(clamped);
-                    } else if (appState?.setRearSubsCfg) {
-                      appState.setRearSubsCfg(prev => ({ ...prev, bottomHeightM: clamped }));
-                    }
+                    compat.setRearBottomHeight(clamped);
                   }}
                   className="h-10 w-full bg-white border-[#DCDBD6]"
                 />
@@ -310,34 +284,28 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <div className="relative z-10 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (appState?.setRearSubsCfg) {
-                        appState.setRearSubsCfg(prev => ({ ...prev, orientation: "vertical" }));
-                      }
-                    }}
+                    disabled={!compat.hasCanonicalInstances}
+                    onClick={() => compat.setRearOrientation("vertical")}
                     className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
                       (rearSubsCfg?.orientation ?? "vertical") === "vertical"
                         ? "bg-[#213428] text-white border-[#213428]"
                         : "bg-white text-[#213428] border-[#DCDBD6]"
                     }`}
-                    >
-                     Vertical
+                  >
+                   Vertical
                     </button>
                     <button
                      type="button"
-                     onClick={() => {
-                       if (appState?.setRearSubsCfg) {
-                         appState.setRearSubsCfg(prev => ({ ...prev, orientation: "horizontal" }));
-                       }
-                     }}
-                     className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
-                       (rearSubsCfg?.orientation ?? "vertical") === "horizontal"
-                         ? "bg-[#213428] text-white border-[#213428]"
-                         : "bg-white text-[#213428] border-[#DCDBD6]"
-                     }`}
+                    disabled={!compat.hasCanonicalInstances}
+                    onClick={() => compat.setRearOrientation("horizontal")}
+                    className={`cursor-pointer pointer-events-auto relative z-10 shrink-0 px-3 py-1 text-[12px] rounded border ${
+                      (rearSubsCfg?.orientation ?? "vertical") === "horizontal"
+                        ? "bg-[#213428] text-white border-[#213428]"
+                        : "bg-white text-[#213428] border-[#DCDBD6]"
+                    }`}
                     >
                      Horizontal
-                    </button>
+                     </button>
                 </div>
               </div>
             )}

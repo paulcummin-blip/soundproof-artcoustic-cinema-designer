@@ -80,7 +80,7 @@ export function applyModelChange(instances, group, newModel) {
   const model = String(newModel || "").trim();
   if (!model) return instances;
   return instances.map((inst) =>
-    inst?.legacyGroup === group ? { ...inst, model } : inst
+    inst?.legacyGroup === group && inst.enabled !== false ? { ...inst, model } : inst
   );
 }
 
@@ -194,7 +194,7 @@ export function applyBottomHeightChange(instances, group, newBottomHeightM) {
   if (!Number.isFinite(h)) return instances;
   const clamped = Math.max(0, Math.min(2.5, h));
   return instances.map((inst) =>
-    inst?.legacyGroup === group ? { ...inst, bottomHeightM: clamped } : inst
+    inst?.legacyGroup === group && inst.enabled !== false ? { ...inst, bottomHeightM: clamped } : inst
   );
 }
 
@@ -243,6 +243,63 @@ export function applyPlacementPreset(instances, group, cfg, roomDims) {
       positionSource: "default",
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Stable-ID actions — act on a single instance by exact id
+// ---------------------------------------------------------------------------
+
+/**
+ * Patch canonical fields on a single instance by exact id.
+ * Preserves array order and all untouched instances.
+ */
+export function patchInstanceById(instances, id, patch) {
+  if (!id || !patch || typeof patch !== "object") return instances;
+  return instances.map((inst) =>
+    inst?.id === id ? { ...inst, ...patch } : inst
+  );
+}
+
+/**
+ * Update position {x, y} on a single instance by exact id.
+ */
+export function updateInstancePositionById(instances, id, position) {
+  if (!id || !position) return instances;
+  const x = Number(position?.x);
+  const y = Number(position?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return instances;
+  return instances.map((inst) =>
+    inst?.id === id ? { ...inst, position: { x, y } } : inst
+  );
+}
+
+/**
+ * Move a single instance between front/rear groups by exact id.
+ * Preserves id, model, enabled, and calibration. Only changes legacyGroup
+ * and group-facing rotationDeg (front=0, rear=180) when the group changes.
+ */
+export function moveInstanceGroupById(instances, id, newGroup) {
+  if (!id || (newGroup !== "front" && newGroup !== "rear")) return instances;
+  return instances.map((inst) => {
+    if (inst?.id !== id) return inst;
+    if (inst.legacyGroup === newGroup) return inst;
+    const groupRotation = newGroup === "front" ? 0 : 180;
+    return {
+      ...inst,
+      legacyGroup: newGroup,
+      rotationDeg: inst.rotationDeg === groupRotation ? inst.rotationDeg : groupRotation,
+    };
+  });
+}
+
+/**
+ * Set enabled state on a single instance by exact id.
+ */
+export function setInstanceEnabledById(instances, id, enabled) {
+  if (!id) return instances;
+  return instances.map((inst) =>
+    inst?.id === id ? { ...inst, enabled: !!enabled } : inst
+  );
 }
 
 // ---------------------------------------------------------------------------

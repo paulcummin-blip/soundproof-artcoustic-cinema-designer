@@ -90,10 +90,11 @@ export function getCabinetDepthM(model) {
  * @param {Object} inst — instance with bottomHeightM and model
  * @returns {number} centre Z in metres
  */
-export function deriveCentreZ(inst) {
+export function deriveCentreZ(inst, orientationOverride) {
   const bottom = Number(inst?.bottomHeightM);
   const safeBottom = Number.isFinite(bottom) ? Math.max(0, bottom) : 0;
-  const cabinetH = getCabinetHeightM(inst?.model, inst?.orientation);
+  const orientation = orientationOverride ?? inst?.orientation;
+  const cabinetH = getCabinetHeightM(inst?.model, orientation);
   return safeBottom + cabinetH / 2;
 }
 
@@ -227,8 +228,10 @@ export function normaliseLegacySubwoofers(frontSubsCfg, rearSubsCfg, roomDims, s
  * @param {Array} instances - subwooferInstances array
  * @returns {Array} Flat array for bass engine consumption
  */
-export function bassInputAdapter(instances) {
+export function bassInputAdapter(instances, orientationMeta) {
   if (!Array.isArray(instances)) return [];
+  const frontOrientation = orientationMeta?.frontOrientation ?? null;
+  const rearOrientation = orientationMeta?.rearOrientation ?? null;
 
   return instances
     .filter((inst) => inst && inst.enabled !== false)
@@ -236,9 +239,12 @@ export function bassInputAdapter(instances) {
       const pos = inst.position || {};
       const group = inst.legacyGroup || null;
       const role = group === "front" ? `SUBF${i + 1}` : group === "rear" ? `SUBR${i + 1}` : `SUB${i + 1}`;
+      // Resolve group-facing orientation from CFG metadata (orientation stays
+      // in CFG; only used here for deriveCentreZ/getCabinetHeightM).
+      const orientation = group === "front" ? frontOrientation : group === "rear" ? rearOrientation : null;
 
       // Derive centre Z from bottomHeightM + cabinet height / 2
-      const centreZ = deriveCentreZ(inst);
+      const centreZ = deriveCentreZ(inst, orientation);
 
       return {
         id: inst.id,
@@ -257,6 +263,7 @@ export function bassInputAdapter(instances) {
         y: Number(pos.y) || 0,
         z: centreZ,
         rotationDeg: inst.rotationDeg ?? 0,
+        orientation,
         bottomHeightM: Number(inst.bottomHeightM) || 0,
         // Tuning for fingerprint normalizeSourceGeometry
         tuning: {
