@@ -955,6 +955,11 @@ const byId = useEntitiesById({
     meterToCanvasY,
     seatDragStartRef,
     seatingPositions,
+    draftSeatsRef,
+    isDraggingSeatRef,
+    draftSpeakersRef,
+    isDraggingSpeakerDraftRef,
+    placedSpeakers,
   });
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
@@ -1122,6 +1127,8 @@ const byId = useEntitiesById({
     aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, lcrAngleInfo,
     CORNER_CLEAR_M, BACKWALL_HYSTERESIS_M, SURROUND_WALL_GAP_M, SIDE_ALLOW_OVERHANG,
     WALL_BUFFER_M, EPS, timeNowMs,
+    draftSpeakersRef,
+    setSpeakerDragTick,
   });
 
   // ── Layer 3: lightweight wrapper (~5 lines) ───────────────────────────────
@@ -1392,6 +1399,12 @@ const byId = useEntitiesById({
     isDraggingRef: props.isDraggingRef,
     widthM, getModelDimsM, commitDraftSubPositions,
     _lastValidDraftFrontSubsRef, _lastValidDraftRearSubsRef,
+    isDraggingSeatRef,
+    draftSeatsRef,
+    commitDraftSeatPositions,
+    isDraggingSpeakerDraftRef,
+    draftSpeakersRef,
+    commitDraftSpeakerPositions,
   });
 
   // Wrap mouseup so mlpDragActiveRef is always cleared, regardless of drag type
@@ -1704,8 +1717,23 @@ useEffect(() => {
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
+  // Rendering-only draft speaker collection — merges draft positions into placedSpeakers
+  // for visual rendering (overhead icons, etc.). Never enters analysis dependencies.
+  const renderSpeakers = useMemo(() => {
+    if (!Array.isArray(draftSpeakersRef.current)) {
+      return placedSpeakers;
+    }
+    const draftById = new Map(
+      draftSpeakersRef.current.map((speaker) => [speaker.id, speaker])
+    );
+    return placedSpeakers.map((speaker) => {
+      const draft = draftById.get(speaker.id);
+      return draft || speaker;
+    });
+  }, [placedSpeakers, speakerDragTick]);
+
   // Overhead speaker icons — extracted to hook
-  const overheadIconElements = useOverheadIconElements({ placedSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
+  const overheadIconElements = useOverheadIconElements({ placedSpeakers: renderSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
 
   // Front-wide zone rendering helper — extracted to hook
   const renderFrontWideZones = useRenderFrontWideZones({
@@ -1976,6 +2004,10 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         subDragTick={subDragTick}
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
+        draftSeatsRef={draftSeatsRef}
+        seatDragTick={seatDragTick}
+        draftSpeakersRef={draftSpeakersRef}
+        speakerDragTick={speakerDragTick}
         dragImpact={{ baseline: baselineRp22, live: liveRp22, baselineP20Results, currentP20Results, isActive: !!dragging, cardVisible: showLiveImpactCard && liveImpactMode !== 'off' }}
         onAcceptBaseline={acceptBaseline}
         onDismissCard={dismissCard}

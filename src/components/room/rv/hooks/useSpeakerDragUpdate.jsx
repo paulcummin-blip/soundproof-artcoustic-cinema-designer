@@ -188,8 +188,6 @@ export function useSpeakerDragUpdate({
         if (target) {
           target.meta = { ...(target.meta || spk.meta || {}), ...metaFields };
         }
-        // Also mutate the live spk.meta so calling code sees it (existing behaviour)
-        spk.meta = { ...(spk.meta || {}), ...metaFields };
       }
 
       // ── write to draft ref (NOT state) ─────────────────────────────────

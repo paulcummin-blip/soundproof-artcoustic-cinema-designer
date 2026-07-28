@@ -114,82 +114,56 @@ export function useMouseUpHandler({
        }
      }
 
-     // Commit draft speaker positions if speakers were being dragged (BEFORE clamping)
+     // Commit draft speaker positions if speakers were being dragged.
+     // Apply final release constraints (overhead zones, front-wide side walls) and
+     // positionSource: "user" to the draft, then commit once — no second onSetSpeakers call.
      if (isDraggingSpeakerDraftRef?.current) {
+       if (dragType === 'speaker' && draggedItemId && Array.isArray(draftSpeakersRef?.current)) {
+         const draftSpk = draftSpeakersRef.current.find(s => s.id === draggedItemId);
+         if (draftSpk) {
+           const canonicalRole = getCanonicalRole(draftSpk.role);
+           const isOverhead = typeof canonicalRole === "string" && canonicalRole.startsWith("T");
+           const isFrontWide = canonicalRole === 'LW' || canonicalRole === 'RW';
+
+           let finalPosition = draftSpk.position;
+
+           if (isOverhead && overheadZones?.status === 'ok') {
+             let zone = null;
+             if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) zone = overheadZones.front;
+             else if (['TML', 'TMR'].includes(canonicalRole)) zone = overheadZones.mid;
+             else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) zone = overheadZones.rear;
+
+             if (zone && Number.isFinite(finalPosition?.x) && Number.isFinite(finalPosition?.y)) {
+               const clampedX = Math.min(Math.max(finalPosition.x, zone.xMin), zone.xMax);
+               const clampedY = Math.min(Math.max(finalPosition.y, zone.yMin), zone.yMax);
+               finalPosition = { ...finalPosition, x: clampedX, y: clampedY };
+             }
+           } else if (isFrontWide) {
+             const W = widthM || 0;
+             const dims = getModelDimsM(draftSpk.model);
+             const targetX = sideWallX(W, dims, canonicalRole === 'LW' ? 'L' : 'R');
+             if (Number.isFinite(targetX)) {
+               finalPosition = { ...finalPosition, x: targetX };
+             }
+           }
+
+           // Write final position + positionSource into the draft, then commit once
+           draftSpeakersRef.current = draftSpeakersRef.current.map(s =>
+             s.id === draggedItemId
+               ? { ...s, position: finalPosition, positionSource: 'user' }
+               : s
+           );
+         }
+       }
+
        if (typeof commitDraftSpeakerPositions === 'function') {
          commitDraftSpeakerPositions();
        }
      }
 
-     // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
-     // Read from draftSpeakersRef (which has the latest draft position) if available,
-     // otherwise fall back to byId (committed).
-     if (dragType === 'speaker' && draggedItemId) {
-      const draftSpk = (draftSpeakersRef?.current && Array.isArray(draftSpeakersRef.current))
-        ? draftSpeakersRef.current.find(s => s.id === draggedItemId)
-        : null;
-      const spk = draftSpk || byId.get(draggedItemId);
-      if (spk) {
-        const canonicalRole = getCanonicalRole(spk.role);
-        const isOverhead = typeof canonicalRole === "string" && canonicalRole.startsWith("T");
-        const isFrontWide = canonicalRole === 'LW' || canonicalRole === 'RW';
-
-        if (isOverhead && overheadZones?.status === 'ok') {
-          let zone = null;
-          if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
-            zone = overheadZones.front;
-          } else if (['TML', 'TMR'].includes(canonicalRole)) {
-            zone = overheadZones.mid;
-          } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
-            zone = overheadZones.rear;
-          }
-
-          if (zone && Number.isFinite(spk.position?.x) && Number.isFinite(spk.position?.y)) {
-            const clampedX = Math.min(Math.max(spk.position.x, zone.xMin), zone.xMax);
-            const clampedY = Math.min(Math.max(spk.position.y, zone.yMin), zone.yMax);
-
-            if (Math.abs(clampedX - spk.position.x) > 0.001 || Math.abs(clampedY - spk.position.y) > 0.001) {
-              onSetSpeakers(prev => prev.map(s =>
-                s.id === draggedItemId
-                  ? { ...s, position: { ...s.position, x: clampedX, y: clampedY }, positionSource: 'user' }
-                  : s
-              ));
-            } else {
-              onSetSpeakers(prev => prev.map(s =>
-                s.id === draggedItemId
-                  ? { ...s, positionSource: 'user' }
-                  : s
-              ));
-            }
-          } else {
-            onSetSpeakers(prev => prev.map(s =>
-              s.id === draggedItemId
-                ? { ...s, positionSource: 'user' }
-                : s
-            ));
-          }
-        } else if (isFrontWide) {
-          const W = widthM || 0;
-          const dims = getModelDimsM(spk.model);
-          const targetX = sideWallX(W, dims, canonicalRole === 'LW' ? 'L' : 'R');
-          onSetSpeakers(prev => prev.map(s =>
-            s.id === draggedItemId
-              ? { ...s, position: { ...s.position, x: targetX }, positionSource: 'user' }
-              : s
-          ));
-        } else {
-          onSetSpeakers(prev => prev.map(s =>
-            s.id === draggedItemId
-              ? { ...s, positionSource: 'user' }
-              : s
-          ));
-        }
-      }
-      }
-
-      // Clear speaker draft ref after commit + clamping
-      if (isDraggingSpeakerDraftRef) isDraggingSpeakerDraftRef.current = false;
-      if (draftSpeakersRef) draftSpeakersRef.current = null;
+     // Clear speaker draft ref after commit
+     if (isDraggingSpeakerDraftRef) isDraggingSpeakerDraftRef.current = false;
+     if (draftSpeakersRef) draftSpeakersRef.current = null;
 
       isAnyDraggingRef.current = false;
 
