@@ -2,12 +2,12 @@ import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import Rp22RecommendationCard from "@/components/room/bass/best-layout/Rp22RecommendationCard";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
-import { coordinatesMatch, validateRecommendationCoordinates, checkPositionConflicts } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { coordinatesMatch, validateRecommendationLayout, buildAppliedConfigs } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 const levelText = (level) => Number.isFinite(level) ? (level > 0 ? `L${level}` : "FAIL") : "—";
 const cloneConfig = (config) => ({ ...config, positions: (config?.positions || []).map((position) => ({ ...position })) });
 
-export default function Rp22PlacementRecommendation({ roomDims, currentLayout, currentQuantityBest, upgradeBest, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, roomElements, isRecalculating }) {
+export default function Rp22PlacementRecommendation({ roomDims, currentLayout, currentQuantityBest, upgradeBest, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating }) {
   const [selected, setSelected] = useState(null);
   const [previous, setPrevious] = useState(null);
   const [applyError, setApplyError] = useState(null);
@@ -15,58 +15,35 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
 
   const currentSources = useMemo(() => {
     if (!currentLayout?.sources) return [];
-    return currentLayout.sources.map((source) => ({ x: source.x, y: source.y }));
+    return currentLayout.sources.map((source) => ({ x: source.x, y: source.y, z: source.z, placement: source.placement }));
   }, [currentLayout?.sources]);
 
   const isLayoutApplied = (layout) => {
     if (!layout?.sources) return false;
-    const recommendedSources = layout.sources.map((source) => ({ x: source.x, y: source.y }));
+    const recommendedSources = layout.sources.map((source) => ({ x: source.x, y: source.y, z: source.z, placement: source.placement }));
     return coordinatesMatch(currentSources, recommendedSources);
   };
 
-  const verifiedP19 = currentLayout?.metrics?.responseAuthority === "final-post-eq" ? currentLayout.metrics.p19Level : null;
-  const verifiedP20 = currentLayout?.metrics?.responseAuthority === "final-post-eq" ? currentLayout.metrics.p20Level : null;
-  const currentIsVerified = currentLayout?.metrics?.responseAuthority === "final-post-eq";
-
   const apply = (layout) => {
     setApplyError(null);
-    // Atomic validation: check all coordinates before changing anything.
-    const validation = validateRecommendationCoordinates(layout, roomDims);
+    // Validate before changing any state.
+    const validation = validateRecommendationLayout(layout, roomDims);
     if (!validation.valid) {
       setApplyError(validation.reason);
-      return;
-    }
-    const conflictCheck = checkPositionConflicts(layout, roomElements, roomDims);
-    if (conflictCheck.conflicts) {
-      setApplyError(conflictCheck.reason);
       return;
     }
     setApplying(true);
     // Save previous config for undo.
     setPrevious({ front: cloneConfig(frontSubsCfg), rear: cloneConfig(rearSubsCfg) });
-    const frontSources = layout.sources.filter((source) => source.placement !== "rear");
-    const rearSources = layout.sources.filter((source) => source.placement === "rear");
-    const activeModel = Number(frontSubsCfg?.count) > 0 ? frontSubsCfg?.model : rearSubsCfg?.model;
-    setFrontSubsCfg?.((config) => ({
-      ...config,
-      model: frontSources.length && !Number(config?.count) ? activeModel : config?.model,
-      count: frontSources.length,
-      placementMode: "manual",
-      isManual: true,
-      positions: frontSources.map(({ x, y, z }) => ({ x, y, z })),
-    }));
-    setRearSubsCfg?.((config) => ({
-      ...config,
-      model: rearSources.length && !Number(config?.count) ? activeModel : config?.model,
-      count: rearSources.length,
-      placementMode: "manual",
-      isManual: true,
-      positions: rearSources.map(({ x, y, z }) => ({ x, y, z })),
-    }));
+    // Build complete next-state configs with merged positions.
+    const nextConfigs = buildAppliedConfigs(layout, frontSubsCfg, rearSubsCfg);
+    // Apply both configs within the same event.
+    setFrontSubsCfg?.(nextConfigs.front);
+    setRearSubsCfg?.(nextConfigs.rear);
     // Close dialog if open.
     setSelected(null);
-    // Clear applying state after a tick (the recalculation is triggered by the config change).
-    setTimeout(() => setApplying(false), 500);
+    // Clear applying state after the state updates are committed.
+    setTimeout(() => setApplying(false), 600);
   };
 
   const undo = () => {
@@ -85,9 +62,9 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
     <div className="mt-4 space-y-3 rounded-lg border-2 border-[#213428] bg-[#F3F1EC] p-4">
       <div>
         <h5 className="text-[14px] font-semibold text-[#1B1A1A]">RP22 Subwoofer Placement Recommendations</h5>
-        <p className="mt-1 text-[11px] text-[#625143]">Based on recognised RP22 placement patterns and predicted room response. Apply a layout to calculate verified RP22 results.</p>
+        <p className="mt-1 text-[11px] text-[#625143]">Based on recognised RP22 placement patterns and predicted room response. Apply a layout to recalculate the bass response.</p>
       </div>
-      <CurrentLayout layout={currentLayout} isRecalculating={isRecalculating} isVerified={currentIsVerified} />
+      <CurrentLayout layout={currentLayout} isRecalculating={isRecalculating} />
       {currentQuantityBest && (
         <Rp22RecommendationCard
           title="Improved placement with existing quantity"
@@ -95,9 +72,8 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
           onClick={openDialog}
           onApply={apply}
           isApplied={currentQuantityApplied}
-          verifiedP19={currentQuantityApplied ? verifiedP19 : null}
-          verifiedP20={currentQuantityApplied ? verifiedP20 : null}
-          isRecalculating={currentQuantityApplied && (isRecalculating || !currentIsVerified)}
+          isRecalculating={currentQuantityApplied && isRecalculating}
+          applying={applying}
           applyError={currentQuantityApplied ? null : applyError}
         />
       )}
@@ -109,9 +85,8 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
           onClick={openDialog}
           onApply={apply}
           isApplied={upgradeApplied}
-          verifiedP19={upgradeApplied ? verifiedP19 : null}
-          verifiedP20={upgradeApplied ? verifiedP20 : null}
-          isRecalculating={upgradeApplied && (isRecalculating || !currentIsVerified)}
+          isRecalculating={upgradeApplied && isRecalculating}
+          applying={applying}
           applyError={upgradeApplied ? null : applyError}
         />
       )}
@@ -125,15 +100,14 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
         onApply={apply}
         isApplied={selected ? isLayoutApplied(selected) : false}
         applyError={applyError}
+        applying={applying}
       />
     </div>
   );
 }
 
-function CurrentLayout({ layout, isRecalculating, isVerified }) {
+function CurrentLayout({ layout, isRecalculating }) {
   const metrics = layout.metrics;
-  const p19Text = isVerified ? levelText(metrics.p19Level) : isRecalculating ? "…" : levelText(metrics.p19Level);
-  const p20Text = isVerified ? levelText(metrics.p20Level) : isRecalculating ? "…" : levelText(metrics.p20Level);
   return (
     <div className="rounded-lg border border-[#D9D5CE] bg-white/70 p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Current subwoofer layout</div>
@@ -145,11 +119,10 @@ function CurrentLayout({ layout, isRecalculating, isVerified }) {
         <span className="text-2xl font-semibold text-[#213428]">{metrics.placementGrade}</span>
       </div>
       <div className="mt-3 flex gap-5 text-xs">
-        <span><b>{isVerified ? "Verified P19" : "Predicted P19"}</b> {p19Text}</span>
-        <span><b>{isVerified ? "Verified P20" : "Predicted P20"}</b> {p20Text}</span>
+        <span><b>Predicted P19</b> {isRecalculating ? "…" : levelText(metrics.p19Level)}</span>
+        <span><b>Predicted P20</b> {isRecalculating ? "…" : levelText(metrics.p20Level)}</span>
       </div>
       {isRecalculating && <p className="mt-1 text-[10px] text-[#625143]">Recalculating bass response…</p>}
-      {isVerified && !isRecalculating && <p className="mt-1 text-[10px] text-[#8A7B6A]">Verified result from the canonical bass engine.</p>}
     </div>
   );
 }
