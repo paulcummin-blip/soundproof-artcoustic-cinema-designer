@@ -155,10 +155,16 @@ export function buildAppliedConfigs(layout, frontSubsCfg, rearSubsCfg) {
 
 /**
  * Build updated subwooferInstances[] from a recommendation layout.
- * Matches existing instances by legacyGroup + index, updating position.x/y only.
- * Preserves IDs, models, enabled, bottomHeightM, gainDb, delayMs, polarity.
- * If the recommendation has more sources than instances in a group, new instances
- * are created with the CFG model. If fewer, extra instances are disabled (not deleted).
+ *
+ * Enabled-state matching:
+ *   1. Existing ENABLEED instances are updated first (position only)
+ *   2. DISABLED instances may be re-enabled if extra recommended positions are required
+ *   3. New instances are created only after disabled compatible instances are exhausted
+ *   4. Matched instances must be enabled
+ *   5. Excess enabled instances are disabled (not deleted)
+ *   6. Existing IDs, models, calibration, and original array order survive
+ *   7. New front instances use legacyGroup "front" and rotationDeg 0
+ *   8. New rear instances use legacyGroup "rear" and rotationDeg 180
  *
  * @param {Object} layout - Recommendation layout with sources[]
  * @param {Array} currentInstances - Existing subwooferInstances[]
@@ -180,51 +186,74 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
   // Build a set of all existing IDs for uniqueness checking
   const existingIds = new Set(instances.filter((i) => i?.id).map((i) => i.id));
 
-  // Track which indices in the original array belong to each group
-  const frontIndices = [];
-  const rearIndices = [];
-  const otherIndices = [];
-  instances.forEach((inst, i) => {
-    if (inst?.legacyGroup === "front") frontIndices.push(i);
-    else if (inst?.legacyGroup === "rear") rearIndices.push(i);
-    else otherIndices.push(i);
-  });
+  // Track which indices in the original array belong to each group,
+  // split into enabled and disabled for priority matching.
+  const buildGroupIndices = (group) => {
+    const enabled = [];
+    const disabled = [];
+    instances.forEach((inst, i) => {
+      if (inst?.legacyGroup === group) {
+        if (inst.enabled !== false) enabled.push(i);
+        else disabled.push(i);
+      }
+    });
+    return { enabled, disabled, all: [...enabled, ...disabled] };
+  };
+
+  const frontIdx = buildGroupIndices("front");
+  const rearIdx = buildGroupIndices("rear");
 
   // Build updated instances for a group, preserving original array positions
-  const updateGroupInPlace = (groupIndices, sortedSources, cfg, group) => {
+  const updateGroupInPlace = (groupIdx, sortedSources, cfg, group) => {
     const result = new Map(); // index → updated instance
-    const usedIndices = new Set();
 
-    // Match sorted sources to existing group instances by index order
-    for (let s = 0; s < sortedSources.length; s++) {
-      const rec = sortedSources[s];
-      const origIdx = groupIndices[s];
-      if (origIdx !== undefined) {
-        // Update existing instance position only — preserve ID, model, calibration
-        result.set(origIdx, {
-          ...instances[origIdx],
-          position: {
-            x: Number(rec.x),
-            y: Number(rec.y),
-          },
-          positionSource: "user",
-        });
-        usedIndices.add(origIdx);
+    // Phase 1: Match sorted sources to existing ENABLED instances first
+    let sourceIdx = 0;
+    for (let e = 0; e < groupIdx.enabled.length && sourceIdx < sortedSources.length; e++) {
+      const origIdx = groupIdx.enabled[e];
+      const rec = sortedSources[sourceIdx];
+      result.set(origIdx, {
+        ...instances[origIdx],
+        position: { x: Number(rec.x), y: Number(rec.y) },
+        positionSource: "user",
+        enabled: true,
+      });
+      sourceIdx++;
+    }
+
+    // Phase 2: Re-enable DISABLED instances for remaining sources
+    for (let d = 0; d < groupIdx.disabled.length && sourceIdx < sortedSources.length; d++) {
+      const origIdx = groupIdx.disabled[d];
+      const rec = sortedSources[sourceIdx];
+      result.set(origIdx, {
+        ...instances[origIdx],
+        position: { x: Number(rec.x), y: Number(rec.y) },
+        positionSource: "user",
+        enabled: true,
+      });
+      sourceIdx++;
+    }
+
+    // Phase 3: Disable excess enabled instances that don't have a matching source
+    const totalMatched = sortedSources.length;
+    const totalGroup = groupIdx.all.length;
+    if (totalMatched < totalGroup) {
+      // How many enabled instances were matched vs how many exist
+      const enabledMatched = Math.min(groupIdx.enabled.length, totalMatched);
+      // Disable remaining enabled instances that weren't matched
+      for (let e = enabledMatched; e < groupIdx.enabled.length; e++) {
+        const origIdx = groupIdx.enabled[e];
+        if (!result.has(origIdx)) {
+          result.set(origIdx, { ...instances[origIdx], enabled: false });
+        }
       }
     }
 
-    // Disable excess group instances that don't have a matching source
-    for (let i = sortedSources.length; i < groupIndices.length; i++) {
-      const origIdx = groupIndices[i];
-      result.set(origIdx, { ...instances[origIdx], enabled: false });
-      usedIndices.add(origIdx);
-    }
-
-    // If we need MORE instances than exist, create new ones (appended at end)
+    // Phase 4: Create new instances only if disabled were exhausted
     const newInstances = [];
-    if (sortedSources.length > groupIndices.length) {
+    if (sourceIdx < sortedSources.length) {
       const model = String(cfg?.model || "SUB2-12").trim();
-      for (let i = groupIndices.length; i < sortedSources.length; i++) {
+      for (let i = sourceIdx; i < sortedSources.length; i++) {
         const rec = sortedSources[i];
         newInstances.push({
           id: generateStableId(existingIds, group),
@@ -248,8 +277,8 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
     return { result, newInstances };
   };
 
-  const frontResult = updateGroupInPlace(frontIndices, sortedFront, frontSubsCfg, "front");
-  const rearResult = updateGroupInPlace(rearIndices, sortedRear, rearSubsCfg, "rear");
+  const frontResult = updateGroupInPlace(frontIdx, sortedFront, frontSubsCfg, "front");
+  const rearResult = updateGroupInPlace(rearIdx, sortedRear, rearSubsCfg, "rear");
 
   // Reassemble preserving original order: walk the original array,
   // replacing entries that were updated, keeping others unchanged

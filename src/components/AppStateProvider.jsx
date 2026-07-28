@@ -8,7 +8,7 @@ import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { useRspState } from "@/components/state/useRspState";
-import { MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibility";
+import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 
 const enforceOnePrimary = (seats, dims, mlpBasis = "front") => {
   if (!Array.isArray(seats) || seats.length === 0) return seats;
@@ -519,9 +519,12 @@ function useDesignerState() {
   // exist, useSubwooferSync normalises from CFG into this array (runtime
   // only — persists on the next normal project save).
   const [subwooferInstances, setSubwooferInstances] = useState([]);
-  // Stage 1: Migration state tracks whether runtime instances were created
-  // from a legacy CFG migration (to prevent autosave on the initial change).
-  // Values: "none", "runtime_migrated", "persisted", "error"
+  // Authority status — distinguishes absent from valid empty from error.
+  // Do NOT use array length alone to determine authority.
+  // Values: "uninitialised", "absent_legacy", "valid", "error"
+  const [subwooferInstancesStatus, setSubwooferInstancesStatus] = useState(INSTANCE_STATUS.UNINITIALISED);
+  // Migration state tracks the autosave lifecycle for runtime-migrated instances.
+  // Values: "none", "runtime_migrated", "persisted"
   const [subwooferInstanceMigrationState, setSubwooferInstanceMigrationState] = useState(MIGRATION_STATE.NONE);
   const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
     (!__isFreeUse && __autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
@@ -1814,6 +1817,7 @@ function useDesignerState() {
     rowEarHeights, setRowEarHeights,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
     subwooferInstances, setSubwooferInstances,
+    subwooferInstancesStatus, setSubwooferInstancesStatus,
     subwooferInstanceMigrationState, setSubwooferInstanceMigrationState,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     subWarnings, setSubWarnings, 
@@ -1911,6 +1915,7 @@ function useDesignerState() {
     rowEarHeights, setRowEarHeights,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
     subwooferInstances, setSubwooferInstances,
+    subwooferInstancesStatus, setSubwooferInstancesStatus,
     subwooferInstanceMigrationState, setSubwooferInstanceMigrationState,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     subWarnings, setSubWarnings, 

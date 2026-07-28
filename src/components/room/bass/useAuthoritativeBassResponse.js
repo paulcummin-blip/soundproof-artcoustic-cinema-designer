@@ -7,6 +7,7 @@ import { BASS_NORMALIZED_PHYSICS_DEFAULTS as DEFAULTS } from "./bassPhysicsDefau
 import { deriveRequestedCalibrationConfig } from "./requestedCalibrationConfig";
 import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
 import { computeCalibrationFingerprint, computeGeometryFingerprint, computeHouseCurveFingerprint, computeProductFingerprint } from "./bassAnalysisFingerprints";
+import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 
 const POSITION_LABELS = ["left", "right"];
 const clampAbsorption = (value) => Math.max(0, Math.min(0.95, Number(value) || 0.30));
@@ -270,6 +271,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const frontSubsCfg = appState?.frontSubsCfg;
   const rearSubsCfg = appState?.rearSubsCfg;
   const splConfig = appState?.splConfig;
+  const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
   const rspPosition = useMemo(() => buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m), [roomDims?.widthM, appState?.mlpY_m]);
 
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
@@ -314,7 +316,13 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const autoAlignDelays = useMemo(() => buildAuthoritativeAutoAlignDelays({
     enabled: autoAlignEnabled, rspPosition, frontSubsLive, rearSubsLive, frontSubsCfg, rearSubsCfg,
   }), [autoAlignEnabled, rspPosition, frontSubsLive, rearSubsLive, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.count, rearSubsCfg?.positions]);
-  const sources = useMemo(() => buildAuthoritativeBassSources({ frontSubsLive, rearSubsLive, frontSubsCfg, rearSubsCfg, autoAlignDelays }), [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById, autoAlignDelays]);
+  // ERROR GATE: When instance status is ERROR or UNINITIALISED, produce zero sources.
+  // This blocks all downstream analysis: no worker jobs, no fingerprints, no cache.
+  const analysisBlocked = instanceStatus === INSTANCE_STATUS.ERROR || instanceStatus === INSTANCE_STATUS.UNINITIALISED;
+  const sources = useMemo(() => {
+    if (analysisBlocked) return [];
+    return buildAuthoritativeBassSources({ frontSubsLive, rearSubsLive, frontSubsCfg, rearSubsCfg, autoAlignDelays });
+  }, [frontSubsLive, rearSubsLive, autoAlignDelays, analysisBlocked]);
   const physics = useMemo(() => ({
     surfaceAbsorption, roomDamping, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode,
     modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter,
@@ -330,9 +338,12 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, debugModalHSign,
     reflectionGainScale, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
     rewModalBandwidthScale, bassSmoothingMode]);
-  const runSimulation = useCallback((strategy = qStrategy) => simulateAuthoritativeBassResponse({
-    roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride: strategy,
-  }), [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy]);
+  const runSimulation = useCallback((strategy = qStrategy) => {
+    if (analysisBlocked) return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] } };
+    return simulateAuthoritativeBassResponse({
+      roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride: strategy,
+    });
+  }, [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy, analysisBlocked]);
   const simulationResults = useMemo(() => runSimulation(qStrategy), [runSimulation, qStrategy]);
   const { rspRawCurve, perSeatRawCurves } = useMemo(() => buildAuthoritativeResponseCurves(simulationResults.seatResponses), [simulationResults.seatResponses]);
   const designEqSystemLimits = useMemo(() => {

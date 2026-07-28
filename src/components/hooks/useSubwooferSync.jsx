@@ -2,44 +2,45 @@ import { useEffect } from "react";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { bassInputAdapter, isValidInstanceArray } from "@/components/utils/subwooferInstanceMigration";
+import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const WALL_BUFFER_M = 0.01;
 const SUB_WIDTH_FALLBACK_M = 0.50;
 
 /**
- * Syncs the subwoofer placement array from frontSubsCfg / rearSubsCfg config objects.
- * Extracted from RoomDesignerWithState.
+ * Syncs appState.subwoofers from the canonical authority.
  *
- * AUTHORITY GATE:
- *   When valid subwooferInstances exist (Rule A), CFG is NOT the analysis authority.
- *   This effect does NOT overwrite appState.subwoofers from CFG. Instead,
- *   appState.subwoofers is derived from instances via bassInputAdapter.
+ * AUTHORITY STATE MACHINE (subwooferInstancesStatus):
+ *   valid:         subwooferInstances → bassInputAdapter → appState.subwoofers
+ *   absent_legacy: perform one legacy migration from CFG (or consume the
+ *                  migration already completed during hydration)
+ *   error:         clear runtime subwoofers and do nothing
+ *   uninitialised: clear runtime subwoofers and do nothing (wait for hydration)
  *
- *   When instances are absent (Rule B), this effect runs normally to populate
- *   appState.subwoofers from CFG for backward compatibility. The one-time
- *   normalisation in hydrateProjectIntoAppState will create runtime instances
- *   from CFG on the next load.
- *
- *   The destructive reverse-sync path (subwoofers → subwooferInstances) has
- *   been REMOVED. Valid instances are never regenerated from CFG.
+ * CFG is NEVER read as an authority after valid instance status is established.
  */
 export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rearSubsCfg }) {
+  const status = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
+
   useEffect(() => {
     const setSubwoofers = appState?.setSubwoofers;
     if (typeof setSubwoofers !== "function") return;
 
     // -----------------------------------------------------------------------
-    // RESPONSIBILITY A: Valid canonical instances → bassInputAdapter → subwoofers
+    // ERROR or UNINITIALISED: clear runtime subwoofers, do nothing
     // -----------------------------------------------------------------------
-    // When valid subwooferInstances exist (including a valid empty array),
-    // derive appState.subwoofers from instances via bassInputAdapter.
-    // CFG is NOT interpreted. CFG changes do NOT flow into instances here.
-    // Explicit UI action handlers (useSubwooferCompatibilityActions) update
-    // instances at the actual control event.
+    if (status === INSTANCE_STATUS.ERROR || status === INSTANCE_STATUS.UNINITIALISED) {
+      const current = Array.isArray(appState?.subwoofers) ? appState.subwoofers : [];
+      if (current.length > 0) setSubwoofers([]);
+      return;
+    }
+
     // -----------------------------------------------------------------------
-    const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
-    if (isValidInstanceArray(instances)) {
+    // VALID: subwooferInstances → bassInputAdapter → appState.subwoofers
+    // -----------------------------------------------------------------------
+    if (status === INSTANCE_STATUS.VALID) {
+      const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
       const adapted = bassInputAdapter(instances);
       const current = Array.isArray(appState?.subwoofers) ? appState.subwoofers : [];
       const same =
@@ -60,13 +61,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
     }
 
     // -----------------------------------------------------------------------
-    // RESPONSIBILITY B: Legacy migration — instances absent (not an array)
-    // -----------------------------------------------------------------------
-    // Only runs when subwooferInstances is absent (null/undefined). This
-    // rebuilds appState.subwoofers from CFG for backward compatibility.
-    // The one-time normalisation in hydrateProjectIntoAppState creates
-    // runtime instances from CFG on the next load.
-    // A valid empty array is handled by branch A above and never reaches here.
+    // ABSENT_LEGACY: perform one legacy migration from CFG
     // -----------------------------------------------------------------------
 
     // --- LEGACY PATH: instances absent, rebuild from CFG (Rule B) ---
@@ -215,6 +210,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
     });
   }, [
     appState?.setSubwoofers,
+    status,
     appState?.subwooferInstances,
     appState?.roomDims?.widthM, appState?.roomDims?.lengthM,
     stableDimensions?.width, stableDimensions?.length,

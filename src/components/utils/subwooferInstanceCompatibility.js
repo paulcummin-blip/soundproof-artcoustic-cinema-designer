@@ -19,6 +19,14 @@ export const MIGRATION_STATE = {
   NONE: "none",
   RUNTIME_MIGRATED: "runtime_migrated",
   PERSISTED: "persisted",
+};
+
+// Authority status — distinguishes absent from valid empty from error.
+// Do NOT use array length alone to determine authority.
+export const INSTANCE_STATUS = {
+  UNINITIALISED: "uninitialised",
+  ABSENT_LEGACY: "absent_legacy",
+  VALID: "valid",
   ERROR: "error",
 };
 
@@ -77,31 +85,61 @@ export function applyModelChange(instances, group, newModel) {
 }
 
 /**
- * Update the count of instances in a legacy group.
- * - Decrease: disable excess instances (keep in place, preserve order)
- * - Increase: append new instances with unique stable IDs
+ * Update the ENABLED count of instances in a legacy group.
+ * "Quantity" means enabled instances — disabled instances are preserved
+ * but not counted.
+ *
+ * Increase:
+ *   1. Re-enable existing disabled group instances first
+ *   2. Create new instances only if still required
+ *
+ * Decrease:
+ *   1. Keep the first requested enabled instances
+ *   2. Disable only the excess enabled instances
+ *   3. Preserve all IDs, models and calibration
+ *
+ * Count zero disables the group, not destroys its data.
  */
 export function applyCountChange(instances, group, newCount, cfg, roomDims) {
   const count = Math.max(0, Math.floor(Number(newCount) || 0));
-  const groupIndices = [];
-  instances.forEach((inst, i) => {
-    if (inst?.legacyGroup === group) groupIndices.push(i);
-  });
-  const currentGroupCount = groupIndices.length;
+  const groupInstances = instances.filter((inst) => inst?.legacyGroup === group);
+  const enabledGroupInstances = groupInstances.filter((inst) => inst.enabled !== false);
+  const currentEnabledCount = enabledGroupInstances.length;
 
-  if (count === currentGroupCount) return instances;
+  if (count === currentEnabledCount) return instances;
 
-  if (count < currentGroupCount) {
-    // Disable excess instances — preserve array order
-    return instances.map((inst, i) => {
-      if (inst?.legacyGroup === group && groupIndices.indexOf(i) >= count) {
-        return { ...inst, enabled: false };
+  if (count < currentEnabledCount) {
+    // Disable excess enabled instances — preserve array order and all data
+    let disableCounter = 0;
+    const toDisable = currentEnabledCount - count;
+    return instances.map((inst) => {
+      if (inst?.legacyGroup === group && inst.enabled !== false) {
+        if (disableCounter < toDisable) {
+          disableCounter++;
+          return { ...inst, enabled: false };
+        }
       }
       return inst;
     });
   }
 
-  // count > currentGroupCount: add new instances at the end
+  // count > currentEnabledCount: need more enabled instances
+  const slotsToFill = count - currentEnabledCount;
+
+  // Step 1: Re-enable existing disabled group instances first
+  let reEnabled = 0;
+  const afterReEnable = instances.map((inst) => {
+    if (inst?.legacyGroup === group && inst.enabled === false && reEnabled < slotsToFill) {
+      reEnabled++;
+      return { ...inst, enabled: true };
+    }
+    return inst;
+  });
+
+  // Step 2: Create new instances only if still required
+  const stillNeeded = slotsToFill - reEnabled;
+  if (stillNeeded <= 0) return afterReEnable;
+
   const model = String(cfg?.model || "SUB2-12").trim();
   const widthM = Number(roomDims?.widthM) || 4.5;
   const lengthM = Number(roomDims?.lengthM) || 6.0;
@@ -115,11 +153,12 @@ export function applyCountChange(instances, group, newCount, cfg, roomDims) {
     ? Math.max(0, Math.min(2.5, Number(cfg.bottomHeightM)))
     : 0.05;
 
-  const existingIds = new Set(instances.filter((i) => i?.id).map((i) => i.id));
+  const existingIds = new Set(afterReEnable.filter((i) => i?.id).map((i) => i.id));
   const newInstances = [];
-  for (let i = currentGroupCount; i < count; i++) {
+  for (let i = 0; i < stillNeeded; i++) {
+    const totalEnabled = currentEnabledCount + reEnabled + i;
     const xs = getDefaultXs(widthM, count, placementMode);
-    const x = Math.max(minX, Math.min(maxX, xs[i] ?? widthM * 0.5));
+    const x = Math.max(minX, Math.min(maxX, xs[totalEnabled] ?? widthM * 0.5));
     newInstances.push({
       id: generateStableId(existingIds, group),
       model,
@@ -136,7 +175,7 @@ export function applyCountChange(instances, group, newCount, cfg, roomDims) {
     });
   }
 
-  return [...instances, ...newInstances];
+  return [...afterReEnable, ...newInstances];
 }
 
 /**
@@ -157,6 +196,17 @@ export function applyBottomHeightChange(instances, group, newBottomHeightM) {
 export function applyEnableChange(instances, group, enabled) {
   return instances.map((inst) =>
     inst?.legacyGroup === group ? { ...inst, enabled: !!enabled } : inst
+  );
+}
+
+/**
+ * Update orientation for instances in a legacy group.
+ * Only the orientation field is changed; IDs, positions, calibration survive.
+ */
+export function applyOrientationChange(instances, group, orientation) {
+  const orient = String(orientation || "vertical").trim();
+  return instances.map((inst) =>
+    inst?.legacyGroup === group ? { ...inst, orientation: orient } : inst
   );
 }
 
@@ -235,12 +285,14 @@ export function mirrorInstancesToCfg(instances, currentFrontCfg, currentRearCfg)
       y: Number(inst.position?.y) || 0,
     }));
     const bottomHeightM = Number(groupInstances[0]?.bottomHeightM);
+    const orientation = groupInstances[0]?.orientation ?? currentCfg?.orientation ?? "vertical";
     return {
       ...(currentCfg || {}),
       model,
       count: groupInstances.length,
       positions,
       bottomHeightM: Number.isFinite(bottomHeightM) ? bottomHeightM : (currentCfg?.bottomHeightM ?? 0.05),
+      orientation,
     };
   };
 

@@ -9,7 +9,7 @@ import {
   bassInputAdapter,
   validateInstances,
 } from "@/components/utils/subwooferInstanceMigration";
-import { MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibility";
+import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -43,6 +43,18 @@ const parseMaybe = (val, fallback) => {
  */
 export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   if (!p) return;
+
+  // HYDRATION PROTECTION: At the start of every project load, clear previous
+  // subwoofer state so a previous project never leaks into the next project.
+  if (typeof appState?.setSubwooferInstancesStatus === "function") {
+    appState.setSubwooferInstancesStatus(INSTANCE_STATUS.UNINITIALISED);
+  }
+  if (typeof appState?.setSubwooferInstances === "function") {
+    appState.setSubwooferInstances([]);
+  }
+  if (typeof appState?.setSubwoofers === "function") {
+    appState.setSubwoofers([]);
+  }
 
   const {
     setScreen,
@@ -264,7 +276,6 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
         `Errors: ${validation.errors.join("; ")}. ` +
         `Instances were cleared. CFG was NOT substituted. Bass/RP22 analysis is blocked for this project.`;
       console.error(errMsg);
-      // Emit a window event so the UI can surface the error
       if (typeof window !== "undefined") {
         try {
           window.dispatchEvent(new CustomEvent("subwoofer-instance-migration-error", {
@@ -272,18 +283,19 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
           }));
         } catch { /* ignore */ }
       }
-      // Clear subwooferInstances and runtime subwoofers — do NOT retain previous
-      // project's state. Loading Project B after malformed Project A must never
-      // retain Project A subwoofers.
+      // Clear subwooferInstances and runtime subwoofers
       if (typeof appState?.setSubwooferInstances === "function") {
         appState.setSubwooferInstances([]);
       }
       if (typeof appState?.setSubwoofers === "function") {
         appState.setSubwoofers([]);
       }
-      // Set migration state to ERROR so autosave and analysis are blocked
+      // Set authority status to ERROR — blocks analysis and autosave
+      if (typeof appState?.setSubwooferInstancesStatus === "function") {
+        appState.setSubwooferInstancesStatus(INSTANCE_STATUS.ERROR);
+      }
       if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
-        appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.ERROR);
+        appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
       }
     } else if (instancesPresent && validation.valid) {
       // Rule A/D: valid persisted instances — use directly, ignore CFG for analysis.
@@ -292,6 +304,9 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       }
       if (typeof appState?.setSubwoofers === "function") {
         appState.setSubwoofers(bassInputAdapter(rawInstances));
+      }
+      if (typeof appState?.setSubwooferInstancesStatus === "function") {
+        appState.setSubwooferInstancesStatus(INSTANCE_STATUS.VALID);
       }
       // Already persisted — no migration needed
       if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
@@ -304,6 +319,9 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       }
       if (typeof appState?.setSubwoofers === "function") {
         appState.setSubwoofers([]);
+      }
+      if (typeof appState?.setSubwooferInstancesStatus === "function") {
+        appState.setSubwooferInstancesStatus(INSTANCE_STATUS.VALID);
       }
       if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
         appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
@@ -322,11 +340,22 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
           if (typeof appState?.setSubwoofers === "function") {
             appState.setSubwoofers(bassInputAdapter(migrated));
           }
-          // Mark as runtime_migrated — autosave must ignore this change
+          // Authority status is VALID (instances are now canonical)
+          if (typeof appState?.setSubwooferInstancesStatus === "function") {
+            appState.setSubwooferInstancesStatus(INSTANCE_STATUS.VALID);
+          }
+          // Mark as runtime_migrated — autosave must ignore this initial change
           if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
             appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.RUNTIME_MIGRATED);
           }
         } else {
+          // Migration produced zero instances — valid empty
+          if (typeof appState?.setSubwooferInstances === "function") {
+            appState.setSubwooferInstances([]);
+          }
+          if (typeof appState?.setSubwooferInstancesStatus === "function") {
+            appState.setSubwooferInstancesStatus(INSTANCE_STATUS.VALID);
+          }
           if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
             appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
           }
@@ -334,10 +363,20 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       } else if (subsList.length && typeof appState?.setSubwoofers === "function") {
         // Fallback: no instances and no usable CFG — use legacy subsList.
         appState.setSubwoofers(subsList);
+        if (typeof appState?.setSubwooferInstancesStatus === "function") {
+          appState.setSubwooferInstancesStatus(INSTANCE_STATUS.ABSENT_LEGACY);
+        }
         if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
           appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
         }
       } else {
+        // No instances, no CFG, no legacy subs — valid empty
+        if (typeof appState?.setSubwooferInstances === "function") {
+          appState.setSubwooferInstances([]);
+        }
+        if (typeof appState?.setSubwooferInstancesStatus === "function") {
+          appState.setSubwooferInstancesStatus(INSTANCE_STATUS.VALID);
+        }
         if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
           appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
         }

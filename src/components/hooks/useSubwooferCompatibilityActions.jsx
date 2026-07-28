@@ -25,6 +25,7 @@ import {
   applyCountChange,
   applyBottomHeightChange,
   applyPlacementPreset,
+  applyOrientationChange,
   mirrorInstancesToCfg,
 } from "@/components/utils/subwooferInstanceCompatibility";
 import { isValidInstanceArray } from "@/components/utils/subwooferInstanceMigration";
@@ -54,12 +55,13 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     if (typeof appState?.setRearSubsCfg === "function" && nextRearCfg) {
       appState.setRearSubsCfg(nextRearCfg);
     }
-    // A genuine user edit transitions runtime_migrated → persisted so autosave can fire
+    // A genuine user edit transitions runtime_migrated → none so autosave can fire.
+    // "persisted" is only set after a successful save, not on edit.
     if (
       appState?.subwooferInstanceMigrationState === MIGRATION_STATE.RUNTIME_MIGRATED &&
       typeof appState?.setSubwooferInstanceMigrationState === "function"
     ) {
-      appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
+      appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
     }
   }, [appState]);
 
@@ -133,6 +135,23 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     commit(next, null, rearCfg);
   }, [hasCanonical, instances, rearSubsCfg, appState?.roomDims, mirrorBoth, commit]);
 
+  // --- Orientation change ---
+  const setFrontOrientation = useCallback((orientation) => {
+    if (!hasCanonical) return;
+    const next = applyOrientationChange(instances, "front", orientation);
+    const cfgs = mirrorBoth(next);
+    const frontCfg = { ...cfgs.front, orientation };
+    commit(next, frontCfg, null);
+  }, [hasCanonical, instances, mirrorBoth, commit]);
+
+  const setRearOrientation = useCallback((orientation) => {
+    if (!hasCanonical) return;
+    const next = applyOrientationChange(instances, "rear", orientation);
+    const cfgs = mirrorBoth(next);
+    const rearCfg = { ...cfgs.rear, orientation };
+    commit(next, null, rearCfg);
+  }, [hasCanonical, instances, mirrorBoth, commit]);
+
   return {
     hasCanonicalInstances: hasCanonical,
     setFrontSubModel,
@@ -143,5 +162,7 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     setRearBottomHeight,
     applyFrontPlacementPreset,
     applyRearPlacementPreset,
+    setFrontOrientation,
+    setRearOrientation,
   };
 }
