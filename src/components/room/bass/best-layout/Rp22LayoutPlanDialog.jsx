@@ -48,9 +48,21 @@ export default function Rp22LayoutPlanDialog({ open, onOpenChange, layout, roomD
         </div>
       )}
       {applyError && !unsupported && <p className="text-[11px] text-red-700">{applyError}</p>}
-      <DialogFooter className="gap-2 pt-2">
+      <DialogFooter className="grid w-full grid-cols-2 gap-3 pt-3 sm:grid-cols-2">
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={applying}>Cancel</Button>
-        <Button type="button" onClick={() => onApply(layout)} className="bg-[#213428] text-white hover:bg-[#3E4349]" disabled={applying || isApplied || unsupported}>
+        <Button
+          type="button"
+          onClick={() => onApply(layout)}
+          disabled={applying || isApplied || unsupported}
+          style={{
+            backgroundColor: "#213428",
+            color: "#FFFFFF",
+            borderColor: "#213428",
+            opacity: 1,
+            visibility: "visible",
+            display: "inline-flex",
+          }}
+        >
           {applying ? "Applying…" : isApplied ? "Applied" : unsupported ? "Not supported" : "Apply recommended positions"}
         </Button>
       </DialogFooter>
