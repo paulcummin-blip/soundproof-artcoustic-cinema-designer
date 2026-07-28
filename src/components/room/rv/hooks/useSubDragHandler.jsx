@@ -88,19 +88,6 @@ export function useSubDragHandler({
       subInDraft.position.y = finalY;
 
       setSubDragTick((n) => n + 1);
-
-      // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
-      // by excluding the dragged stable id.
-      if (draftArray.length === 2) {
-        const other = draftArray.find(s => s?.id !== subId);
-        const mirrorX = widthM - finalX;
-        const clampedMirrorX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, mirrorX));
-
-        if (other && Number.isFinite(clampedMirrorX)) {
-          other.position.x = clampedMirrorX;
-          other.position.y = finalY;
-        }
-      }
     }
 
     // No config commit during mousemove — draft refs are the live render source.
