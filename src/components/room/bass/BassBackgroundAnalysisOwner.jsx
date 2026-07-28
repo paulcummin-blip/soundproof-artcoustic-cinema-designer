@@ -58,6 +58,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     designEqSystemLimits, optimisationTransitionHz, requested, fingerprintInputs,
     fingerprints, payload: basePayload, inputsValid: baseInputsValid, includeDiagnostics,
   } = authoritative;
+  const calibrationFingerprint = fingerprints?.calibration ?? null;
   const normalizedPhysicsOptions = useNormalizedPhysicsOptions(authoritative);
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims,
@@ -80,7 +81,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     normalizedPhysicsOptions,
   }), [authoritative, normalizedLive, normalizedPhysicsOptions]);
 
-  const cacheKey = useMemo(() => fingerprints ? buildBassResultCacheKey(fingerprints.calibration) : null, [fingerprints, OPTIMISER_VERSION_SIGNATURE]);
+  const cacheKey = useMemo(() => fingerprints ? buildBassResultCacheKey(calibrationFingerprint) : null, [fingerprints, OPTIMISER_VERSION_SIGNATURE]);
   const requestIdentity = useMemo(() => ({
     fingerprint: cacheKey,
     geometryFingerprint: fingerprints?.geometry ?? null,
@@ -96,7 +97,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     controller.updateInputs({
       valid: inputsValid,
       fingerprint: cacheKey,
-      legacyFingerprint: fingerprints.calibration,
+      legacyFingerprint: calibrationFingerprint,
       payload,
       identity: requestIdentity,
       collectDiagnostics: false,
@@ -127,7 +128,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       cacheKey,
       cacheSource: lifecycle.cacheRejectionReason ? "rejected-stale" : lifecycle.cacheStatus === "hit" ? "restored" : "fresh",
       cacheRejectionReason: lifecycle.cacheRejectionReason || null,
-      calibrationFingerprint: fingerprints.calibration,
+      calibrationFingerprint: calibrationFingerprint,
       heavyPoolReused,
       selectionDiagnostics: selected.selectionDiagnostics
         ? { ...selected.selectionDiagnostics, heavyPoolReused }
@@ -153,7 +154,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       ...result,
       finalOptimisedBassResponse: buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources }),
     };
-  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, fingerprints.calibration, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel]);
+  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel]);
   const contract = useBassAnalysisContract({
     ...fingerprintInputs, subsForSimulation: sources, designEqSystemLimits, optimisationResult,
     detailedStatus, detailedProgress: lifecycle.progress, detailedElapsedMs: lifecycle.elapsedMs,
@@ -199,6 +200,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     },
     [controller, cacheKey, payload, requestIdentity]
   );
-  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: fingerprints.calibration, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
+  const value = scopeRef.current.replace({ scopeId, contract, lifecycle, selectedPriorityMode, optimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onRetry, authoritative: sharedAuthoritative });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
