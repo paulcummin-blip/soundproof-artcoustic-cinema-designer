@@ -1,26 +1,63 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useSubwooferCompatibilityActions } from '@/components/hooks/useSubwooferCompatibilityActions';
 
 /**
  * SubwooferInstanceList
  *
- * Display-only view of canonical subwooferInstances, grouped by design group
- * (front / rear). Reads exclusively from appState.subwooferInstances — never
- * from front_subs_cfg / rear_subs_cfg.
+ * View + position editing of canonical subwooferInstances, grouped by design
+ * group (front / rear). Reads exclusively from appState.subwooferInstances.
  *
- * Stage 2B.1: visibility only. No controls, no mutations, no drag wiring.
+ * Stage 2B.3: X/Y position editing via updateInstancePosition (canonical-first
+ * commit). Model, quantity, drag, symmetry, and recommendation logic untouched.
  */
-function formatPos(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '—';
-  return `${n.toFixed(2)} m`;
+
+function PositionInput({ label, value, onCommit, disabled }) {
+  const [draft, setDraft] = useState(() => (Number.isFinite(Number(value)) ? String(Number(value).toFixed(2)) : ''));
+
+  // Sync external changes (drag, recommendation) into the field when not focused.
+  const external = Number.isFinite(Number(value)) ? Number(value).toFixed(2) : '';
+  const [focused, setFocused] = useState(false);
+
+  React.useEffect(() => {
+    if (!focused) {
+      setDraft(external);
+    }
+  }, [external, focused]);
+
+  const commit = () => {
+    const n = Number(draft);
+    if (Number.isFinite(n)) {
+      onCommit(n);
+    } else {
+      setDraft(external);
+    }
+  };
+
+  return (
+    <label className="flex items-center gap-1 text-[#625143]">
+      <span className="text-[10px] font-medium">{label}</span>
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        value={draft}
+        disabled={disabled}
+        onFocus={() => setFocused(true)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => { setFocused(false); commit(); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
+        className="w-14 h-6 px-1 text-[11px] text-center bg-white border border-[#DCDBD6] rounded focus:border-[#213428] focus:outline-none disabled:opacity-50"
+      />
+    </label>
+  );
 }
 
-function InstanceRow({ instance, selected, onSelect }) {
+function InstanceRow({ instance, selected, onSelect, onPositionChange, canEdit }) {
   const id = instance?.id ?? '—';
   const model = instance?.model ?? '—';
   const enabled = instance?.enabled !== false;
-  const x = formatPos(instance?.position?.x);
-  const y = formatPos(instance?.position?.y);
+  const px = Number(instance?.position?.x);
+  const py = Number(instance?.position?.y);
 
   return (
     <div
@@ -48,15 +85,25 @@ function InstanceRow({ instance, selected, onSelect }) {
           {enabled ? 'On' : 'Off'}
         </span>
       </div>
-      <div className="ml-auto flex gap-3 text-[#625143]">
-        <span>X: <span className="text-[#1B1A1A] font-medium">{x}</span></span>
-        <span>Y: <span className="text-[#1B1A1A] font-medium">{y}</span></span>
+      <div className="ml-auto flex gap-2" onClick={(e) => e.stopPropagation()}>
+        <PositionInput
+          label="X"
+          value={px}
+          disabled={!canEdit || !enabled}
+          onCommit={(n) => onPositionChange(id, { x: n, y: py })}
+        />
+        <PositionInput
+          label="Y"
+          value={py}
+          disabled={!canEdit || !enabled}
+          onCommit={(n) => onPositionChange(id, { x: px, y: n })}
+        />
       </div>
     </div>
   );
 }
 
-function GroupSection({ title, instances, selectedSubId, onSelect }) {
+function GroupSection({ title, instances, selectedSubId, onSelect, onPositionChange, canEdit }) {
   if (!instances || instances.length === 0) {
     return (
       <div>
@@ -77,6 +124,8 @@ function GroupSection({ title, instances, selectedSubId, onSelect }) {
             instance={inst}
             selected={selectedSubId != null && inst?.id === selectedSubId}
             onSelect={() => onSelect(inst?.id ?? null)}
+            onPositionChange={onPositionChange}
+            canEdit={canEdit}
           />
         ))}
       </div>
@@ -90,6 +139,17 @@ export default function SubwooferInstanceList({ appState }) {
     : [];
   const selectedSubId = appState?.selectedSubId ?? null;
   const setSelectedSubId = appState?.setSelectedSubId;
+
+  const compat = useSubwooferCompatibilityActions(
+    appState,
+    appState?.frontSubsCfg,
+    appState?.rearSubsCfg
+  );
+  const canEdit = compat.hasCanonicalInstances;
+
+  const handlePositionChange = (id, position) => {
+    compat.updateInstancePosition(id, position);
+  };
 
   const { frontInstances, rearInstances, otherInstances } = useMemo(() => {
     const front = [];
@@ -120,7 +180,7 @@ export default function SubwooferInstanceList({ appState }) {
   return (
     <div className="mt-4 border-t border-[#DCDBD6] pt-3">
       <h5 className="text-[13px] font-semibold text-[#1B1A1A] mb-2">
-        Instances <span className="text-[#625143] font-normal">(display only)</span>
+        Instances <span className="text-[#625143] font-normal">(position editable)</span>
       </h5>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <GroupSection
@@ -128,12 +188,16 @@ export default function SubwooferInstanceList({ appState }) {
           instances={frontInstances}
           selectedSubId={selectedSubId}
           onSelect={setSelectedSubId}
+          onPositionChange={handlePositionChange}
+          canEdit={canEdit}
         />
         <GroupSection
           title="Rear"
           instances={rearInstances}
           selectedSubId={selectedSubId}
           onSelect={setSelectedSubId}
+          onPositionChange={handlePositionChange}
+          canEdit={canEdit}
         />
       </div>
       {otherInstances.length > 0 && (
@@ -143,6 +207,8 @@ export default function SubwooferInstanceList({ appState }) {
             instances={otherInstances}
             selectedSubId={selectedSubId}
             onSelect={setSelectedSubId}
+            onPositionChange={handlePositionChange}
+            canEdit={canEdit}
           />
         </div>
       )}
