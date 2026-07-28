@@ -94,6 +94,9 @@ export function serializeProject(input = {}) {
     frontSubsCfg = null,
     rearSubsCfg = null,
 
+    // Stage 1: Canonical subwoofer instance array (new authority)
+    subwooferInstances = null,
+
     // P12 result (from app state, written by LCRPanel)
     p12Mode = null,
     p12Level = null,
@@ -214,6 +217,8 @@ export function serializeProject(input = {}) {
     spl_speaker_nodes: asArray(speakerNodes),
     room_elements: asArray(roomElements),
     subwoofers: asArray(subwoofers),
+    // Stage 1: Persist canonical subwoofer instances.
+    subwooferInstances: Array.isArray(subwooferInstances) ? subwooferInstances : [],
 
     // Sub configs must be objects to match Project schema.
     // Normalise shape so all paths (SubwooferSelector, AppStateProvider, DB restore)

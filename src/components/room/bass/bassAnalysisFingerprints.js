@@ -13,7 +13,10 @@
 //   - Every result carries a version prefix: "geo:v1:hash", "prod:v1:hash", "cal:v1:hash".
 //   - NaN, Infinity, and non-serializable values are coerced to null before hashing.
 
-export const FINGERPRINT_VERSION = 2;
+// Stage 1 subwoofer instance migration: bump from 2 to 3 so old CFG-keyed
+// cache entries safely miss. New fingerprints carry v3, which encodes the
+// v2_instance_ cache version requirement.
+export const FINGERPRINT_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // 1. Stable serialization primitives

@@ -4,6 +4,11 @@
 // Do not add logic here; keep it a pure pass-through to existing setters.
 
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
+import {
+  normaliseLegacySubwoofers,
+  bassInputAdapter,
+  isValidInstanceArray,
+} from "@/components/utils/subwooferInstanceMigration";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -221,7 +226,46 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
 
     setFrontSubsCfg(isCfgUsable(frontCfgRaw) ? frontCfgRaw : (deriveCfgFromSubs(frontSubs) || defaultInactive));
     setRearSubsCfg(isCfgUsable(rearCfgRaw) ? rearCfgRaw : (deriveCfgFromSubs(rearSubs) || defaultInactive));
-    if (typeof appState?.setSubwoofers === "function" && subsList.length) appState.setSubwoofers(subsList);
+
+    // Stage 1: Subwoofer instance migration.
+    // Authority rules:
+    //   A) project.subwooferInstances exists and is valid → use directly.
+    //   B) subwooferInstances missing/empty, valid CFG exists → normalise CFG into runtime instances.
+    //   C) subwooferInstances exists but is malformed → do not silently replace; fall back to CFG normalisation.
+    //   D) both sources exist and disagree → subwooferInstances wins; CFG remains compatibility data only.
+    // Migration does NOT save automatically — instances persist on the next normal project save.
+    const rawInstances = parseProjectJson(p?.subwooferInstances, null);
+    const roomDimsForNorm = {
+      widthM: Number(p?.room_width) || 4.5,
+      lengthM: Number(p?.room_length) || 6.0,
+      heightM: Number(p?.room_height) || 2.4,
+    };
+    let resolvedInstances = null;
+    if (Array.isArray(rawInstances) && isValidInstanceArray(rawInstances)) {
+      // Rule A: valid persisted instances — use directly, ignore CFG for analysis.
+      resolvedInstances = rawInstances;
+    } else {
+      // Rule B/C: normalise from CFG (or subsList) into runtime instances.
+      const frontCfgForNorm = isCfgUsable(frontCfgRaw) ? frontCfgRaw : deriveCfgFromSubs(frontSubs);
+      const rearCfgForNorm = isCfgUsable(rearCfgRaw) ? rearCfgRaw : deriveCfgFromSubs(rearSubs);
+      if (frontCfgForNorm || rearCfgForNorm) {
+        resolvedInstances = normaliseLegacySubwoofers(frontCfgForNorm, rearCfgForNorm, roomDimsForNorm, null);
+      }
+    }
+
+    if (resolvedInstances && resolvedInstances.length > 0) {
+      if (typeof appState?.setSubwooferInstances === "function") {
+        appState.setSubwooferInstances(resolvedInstances);
+      }
+      // Populate appState.subwoofers from instances via adapter so the bass
+      // engine consumes instance-derived data, not CFG-reconstructed data.
+      if (typeof appState?.setSubwoofers === "function") {
+        appState.setSubwoofers(bassInputAdapter(resolvedInstances));
+      }
+    } else if (subsList.length && typeof appState?.setSubwoofers === "function") {
+      // Fallback: no instances could be resolved, use legacy subsList.
+      appState.setSubwoofers(subsList);
+    }
   }
 
   // 9) SPEAKER ROLES + SPL NODES

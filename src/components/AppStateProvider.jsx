@@ -512,6 +512,12 @@ function useDesignerState() {
       : []
   ));
   const [subwoofers, setSubwoofers] = useState([]);
+  // Stage 1: subwooferInstances is the canonical persisted authority.
+  // On load, if project.subwooferInstances exists it is hydrated here and
+  // appState.subwoofers is derived via bassInputAdapter. When no instances
+  // exist, useSubwooferSync normalises from CFG into this array (runtime
+  // only — persists on the next normal project save).
+  const [subwooferInstances, setSubwooferInstances] = useState([]);
   const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
     (!__isFreeUse && __autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
       model: "SUB2-12",
@@ -1802,6 +1808,7 @@ function useDesignerState() {
     mlpBasis, setMlpBasis, autoSeatByRP23, setAutoSeatByRP23,
     rowEarHeights, setRowEarHeights,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
+    subwooferInstances, setSubwooferInstances,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     subWarnings, setSubWarnings, 
     aimAtMLP, setAimAtMLP, overheadOffsetM, setOverheadOffsetM,
@@ -1897,6 +1904,7 @@ function useDesignerState() {
     mlpBasis, setMlpBasis, autoSeatByRP23, setAutoSeatByRP23,
     rowEarHeights, setRowEarHeights,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
+    subwooferInstances, setSubwooferInstances,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     subWarnings, setSubWarnings, 
     aimAtMLP, setAimAtMLP, overheadOffsetM, setOverheadOffsetM,

@@ -153,7 +153,14 @@
     },
     "subwoofers": {
       "type": "array",
-      "description": "Subwoofer config array",
+      "description": "Subwoofer config array (legacy, superseded by subwooferInstances)",
+      "items": {
+        "type": "object"
+      }
+    },
+    "subwooferInstances": {
+      "type": "array",
+      "description": "Canonical subwoofer instance array. Each item: {id, model, enabled, position:{x,y,z}, rotationDeg, positionSource, legacyGroup, symmetryLinkId, gainDb, delayMs, polarity}. Authority for bass analysis; front_subs_cfg/rear_subs_cfg remain as compatibility metadata.",
       "items": {
         "type": "object"
       }

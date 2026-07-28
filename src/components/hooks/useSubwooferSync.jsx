@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { subwoofersToInstances } from "@/components/utils/subwooferInstanceMigration";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const WALL_BUFFER_M = 0.01;
@@ -11,6 +12,34 @@ const SUB_WIDTH_FALLBACK_M = 0.50;
  * Extracted from RoomDesignerWithState.
  */
 export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rearSubsCfg }) {
+  // Stage 1: After the existing CFG → subwoofers sync, also sync subwoofers →
+  // subwooferInstances for persistence. This ensures that when the user edits
+  // via legacy Front/Rear controls or drag, the instance array stays current
+  // and will be saved on the next normal project save.
+  useEffect(() => {
+    const setSubwooferInstances = appState?.setSubwooferInstances;
+    if (typeof setSubwooferInstances !== "function") return;
+    const subs = Array.isArray(appState?.subwoofers) ? appState.subwoofers : [];
+    if (subs.length === 0) return;
+    const existing = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+    const next = subwoofersToInstances(subs, existing);
+    // Only update if the instance array actually changed (avoid loops)
+    const same =
+      next.length === existing.length &&
+      next.every((inst, i) => {
+        const ex = existing[i];
+        if (!ex) return false;
+        return (
+          String(inst.id) === String(ex.id) &&
+          String(inst.model) === String(ex.model) &&
+          inst.enabled === ex.enabled &&
+          Math.abs((inst.position?.x ?? 0) - (ex.position?.x ?? 0)) < 0.001 &&
+          Math.abs((inst.position?.y ?? 0) - (ex.position?.y ?? 0)) < 0.001 &&
+          Math.abs((inst.position?.z ?? 0) - (ex.position?.z ?? 0)) < 0.001
+        );
+      });
+    if (!same) setSubwooferInstances(next);
+  }, [appState?.subwoofers, appState?.subwooferInstances, appState?.setSubwooferInstances]);
   useEffect(() => {
     const setSubwoofers = appState?.setSubwoofers;
     if (typeof setSubwoofers !== "function") return;

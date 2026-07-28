@@ -3,6 +3,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Project } from "@/entities/Project";
 import { serializeProject } from "@/components/utils/serializeProject";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
+// Stage 1: subwooferInstances is the new canonical authority for bass analysis.
+// deriveSubwoofersFromCfg remains as a legacy fallback only.
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 
@@ -108,6 +110,7 @@ appState, // Pass appState directly for setters
       sevenBedLayoutType,
       frontSubsCfg: liveFrontSubsCfg,
       rearSubsCfg: liveRearSubsCfg,
+      subwooferInstances: appState?.subwooferInstances ?? null,
       lcrAimMode,
       enableFrontWides,
       free_move_lcr: !!freeMoveLcr,
@@ -128,6 +131,7 @@ appState, // Pass appState directly for setters
     return projectData;
   }, [
     projectNameState, appState, frontSubsCfg, rearSubsCfg, screen,
+    appState?.subwooferInstances,
     seatingPositions, seatsPerRowByRow, rowSpacingM, placedSpeakers,
     roomElements, dolbyPreset, overlays, frozenTabs, sevenBedLayoutType,
     lcrAimMode, enableFrontWides, freeMoveLcr,
@@ -280,6 +284,7 @@ appState, // Pass appState directly for setters
           sevenBedLayoutType: p?.seven_bed_layout_type || "rears",
           frontSubsCfg: loadedFrontSubsCfg,
           rearSubsCfg: loadedRearSubsCfg,
+          subwooferInstances: _parseMaybe(p?.subwooferInstances, null),
           lcrAimMode: p?.lcr_aim_mode || "angled",
           enableFrontWides: !!p?.enable_front_wides,
           free_move_lcr: !!p?.free_move_lcr,
@@ -544,6 +549,7 @@ appState, // Pass appState directly for setters
   sevenBedLayoutType,
   appState.frontSubsCfg,
   appState.rearSubsCfg,
+  appState?.subwooferInstances,
   lcrAimMode,
   enableFrontWides,
   appState.roomDims,
