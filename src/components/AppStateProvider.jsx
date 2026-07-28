@@ -8,6 +8,7 @@ import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { useRspState } from "@/components/state/useRspState";
+import { MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibility";
 
 const enforceOnePrimary = (seats, dims, mlpBasis = "front") => {
   if (!Array.isArray(seats) || seats.length === 0) return seats;
@@ -521,7 +522,7 @@ function useDesignerState() {
   // Stage 1: Migration state tracks whether runtime instances were created
   // from a legacy CFG migration (to prevent autosave on the initial change).
   // Values: "none", "runtime_migrated", "persisted", "error"
-  const [subwooferInstanceMigrationState, setSubwooferInstanceMigrationState] = useState("none");
+  const [subwooferInstanceMigrationState, setSubwooferInstanceMigrationState] = useState(MIGRATION_STATE.NONE);
   const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
     (!__isFreeUse && __autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
       model: "SUB2-12",
@@ -1813,6 +1814,7 @@ function useDesignerState() {
     rowEarHeights, setRowEarHeights,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
     subwooferInstances, setSubwooferInstances,
+    subwooferInstanceMigrationState, setSubwooferInstanceMigrationState,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     subWarnings, setSubWarnings, 
     aimAtMLP, setAimAtMLP, overheadOffsetM, setOverheadOffsetM,
@@ -1909,6 +1911,7 @@ function useDesignerState() {
     rowEarHeights, setRowEarHeights,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
     subwooferInstances, setSubwooferInstances,
+    subwooferInstanceMigrationState, setSubwooferInstanceMigrationState,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     subWarnings, setSubWarnings, 
     aimAtMLP, setAimAtMLP, overheadOffsetM, setOverheadOffsetM,

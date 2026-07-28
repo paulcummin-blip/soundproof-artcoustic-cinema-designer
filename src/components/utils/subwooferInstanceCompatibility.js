@@ -224,7 +224,12 @@ export function mirrorInstancesToCfg(instances, currentFrontCfg, currentRearCfg)
         positions: [],
       };
     }
-    const model = String(groupInstances[0]?.model || "SUB2-12").trim();
+    // Mixed-model rule: if instances in this group have different models,
+    // do NOT collapse to the first model. Set model to null (mixed) so the
+    // UI can indicate a mixed group. Only a single-model group mirrors its
+    // model into CFG. Passive mirroring never alters instance models.
+    const models = new Set(groupInstances.map((inst) => String(inst.model || "").trim()));
+    const model = models.size === 1 ? [...models][0] : null;
     const positions = groupInstances.map((inst) => ({
       x: Number(inst.position?.x) || 0,
       y: Number(inst.position?.y) || 0,

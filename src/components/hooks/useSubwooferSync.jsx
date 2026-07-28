@@ -1,15 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { bassInputAdapter, isValidInstanceArray } from "@/components/utils/subwooferInstanceMigration";
-import {
-  applyModelChange,
-  applyCountChange,
-  applyBottomHeightChange,
-  applyPlacementPreset,
-  mirrorInstancesToCfg,
-  detectCfgChanges,
-} from "@/components/utils/subwooferInstanceCompatibility";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const WALL_BUFFER_M = 0.01;
@@ -33,87 +25,22 @@ const SUB_WIDTH_FALLBACK_M = 0.50;
  *   been REMOVED. Valid instances are never regenerated from CFG.
  */
 export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rearSubsCfg }) {
-  const prevFrontCfgRef = useRef(frontSubsCfg);
-  const prevRearCfgRef = useRef(rearSubsCfg);
-
   useEffect(() => {
     const setSubwoofers = appState?.setSubwoofers;
-    const setSubwooferInstances = appState?.setSubwooferInstances;
-    const setFrontSubsCfg = appState?.setFrontSubsCfg;
-    const setRearSubsCfg = appState?.setRearSubsCfg;
     if (typeof setSubwoofers !== "function") return;
 
-    // AUTHORITY GATE: If valid subwooferInstances exist, derive subwoofers from
-    // instances via bassInputAdapter. CFG must NOT overwrite.
+    // -----------------------------------------------------------------------
+    // RESPONSIBILITY A: Valid canonical instances → bassInputAdapter → subwoofers
+    // -----------------------------------------------------------------------
+    // When valid subwooferInstances exist (including a valid empty array),
+    // derive appState.subwoofers from instances via bassInputAdapter.
+    // CFG is NOT interpreted. CFG changes do NOT flow into instances here.
+    // Explicit UI action handlers (useSubwooferCompatibilityActions) update
+    // instances at the actual control event.
+    // -----------------------------------------------------------------------
     const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
     if (isValidInstanceArray(instances)) {
-      // Detect CFG changes and dispatch compatibility actions to instances
-      const frontChanges = detectCfgChanges(prevFrontCfgRef.current, frontSubsCfg);
-      const rearChanges = detectCfgChanges(prevRearCfgRef.current, rearSubsCfg);
-
-      let updatedInstances = instances;
-      let frontChanged = false;
-      let rearChanged = false;
-
-      if (frontChanges.model) {
-        updatedInstances = applyModelChange(updatedInstances, "front", frontSubsCfg.model);
-        frontChanged = true;
-      }
-      if (frontChanges.count) {
-        updatedInstances = applyCountChange(updatedInstances, "front", frontSubsCfg.count, frontSubsCfg, appState.roomDims);
-        frontChanged = true;
-      }
-      if (frontChanges.bottomHeightM) {
-        updatedInstances = applyBottomHeightChange(updatedInstances, "front", frontSubsCfg.bottomHeightM);
-        frontChanged = true;
-      }
-      if (frontChanges.placementMode) {
-        updatedInstances = applyPlacementPreset(updatedInstances, "front", frontSubsCfg, appState.roomDims);
-        frontChanged = true;
-      }
-
-      if (rearChanges.model) {
-        updatedInstances = applyModelChange(updatedInstances, "rear", rearSubsCfg.model);
-        rearChanged = true;
-      }
-      if (rearChanges.count) {
-        updatedInstances = applyCountChange(updatedInstances, "rear", rearSubsCfg.count, rearSubsCfg, appState.roomDims);
-        rearChanged = true;
-      }
-      if (rearChanges.bottomHeightM) {
-        updatedInstances = applyBottomHeightChange(updatedInstances, "rear", rearSubsCfg.bottomHeightM);
-        rearChanged = true;
-      }
-      if (rearChanges.placementMode) {
-        updatedInstances = applyPlacementPreset(updatedInstances, "rear", rearSubsCfg, appState.roomDims);
-        rearChanged = true;
-      }
-
-      if (frontChanged || rearChanged) {
-        if (typeof setSubwooferInstances === "function") {
-          setSubwooferInstances(updatedInstances);
-        }
-        // Mirror instances → CFG for positions (preserves placementMode, isManual)
-        const mirrored = mirrorInstancesToCfg(updatedInstances, frontSubsCfg, rearSubsCfg);
-        if (frontChanged && typeof setFrontSubsCfg === "function") {
-          setFrontSubsCfg(mirrored.front);
-          prevFrontCfgRef.current = mirrored.front;
-        } else {
-          prevFrontCfgRef.current = frontSubsCfg;
-        }
-        if (rearChanged && typeof setRearSubsCfg === "function") {
-          setRearSubsCfg(mirrored.rear);
-          prevRearCfgRef.current = mirrored.rear;
-        } else {
-          prevRearCfgRef.current = rearSubsCfg;
-        }
-      } else {
-        prevFrontCfgRef.current = frontSubsCfg;
-        prevRearCfgRef.current = rearSubsCfg;
-      }
-
-      // Always derive subwoofers from (possibly updated) instances
-      const adapted = bassInputAdapter(updatedInstances);
+      const adapted = bassInputAdapter(instances);
       const current = Array.isArray(appState?.subwoofers) ? appState.subwoofers : [];
       const same =
         adapted.length === current.length &&
@@ -129,12 +56,18 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
           );
         });
       if (!same) setSubwoofers(adapted);
-      return; // Do NOT run CFG → subwoofers when instances are canonical
+      return;
     }
 
-    // Update refs for legacy path too
-    prevFrontCfgRef.current = frontSubsCfg;
-    prevRearCfgRef.current = rearSubsCfg;
+    // -----------------------------------------------------------------------
+    // RESPONSIBILITY B: Legacy migration — instances absent (not an array)
+    // -----------------------------------------------------------------------
+    // Only runs when subwooferInstances is absent (null/undefined). This
+    // rebuilds appState.subwoofers from CFG for backward compatibility.
+    // The one-time normalisation in hydrateProjectIntoAppState creates
+    // runtime instances from CFG on the next load.
+    // A valid empty array is handled by branch A above and never reaches here.
+    // -----------------------------------------------------------------------
 
     // --- LEGACY PATH: instances absent, rebuild from CFG (Rule B) ---
     const widthM = Number(appState?.roomDims?.widthM) || Number(stableDimensions?.width) || 4.5;

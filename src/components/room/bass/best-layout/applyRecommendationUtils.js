@@ -191,7 +191,7 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
   });
 
   // Build updated instances for a group, preserving original array positions
-  const updateGroupInPlace = (groupIndices, sortedSources, cfg) => {
+  const updateGroupInPlace = (groupIndices, sortedSources, cfg, group) => {
     const result = new Map(); // index → updated instance
     const usedIndices = new Set();
 
@@ -227,16 +227,16 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
       for (let i = groupIndices.length; i < sortedSources.length; i++) {
         const rec = sortedSources[i];
         newInstances.push({
-          id: generateStableId(existingIds, null),
+          id: generateStableId(existingIds, group),
           model,
           enabled: true,
           position: { x: Number(rec.x), y: Number(rec.y) },
           bottomHeightM: Number.isFinite(Number(cfg?.bottomHeightM))
             ? Math.max(0, Math.min(2.5, Number(cfg.bottomHeightM)))
             : 0.05,
-          rotationDeg: 0,
+          rotationDeg: group === "front" ? 0 : 180,
           positionSource: "user",
-          legacyGroup: null,
+          legacyGroup: group,
           symmetryLinkId: null,
           gainDb: 0,
           delayMs: 0,
@@ -248,8 +248,8 @@ export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, re
     return { result, newInstances };
   };
 
-  const frontResult = updateGroupInPlace(frontIndices, sortedFront, frontSubsCfg);
-  const rearResult = updateGroupInPlace(rearIndices, sortedRear, rearSubsCfg);
+  const frontResult = updateGroupInPlace(frontIndices, sortedFront, frontSubsCfg, "front");
+  const rearResult = updateGroupInPlace(rearIndices, sortedRear, rearSubsCfg, "rear");
 
   // Reassemble preserving original order: walk the original array,
   // replacing entries that were updated, keeping others unchanged

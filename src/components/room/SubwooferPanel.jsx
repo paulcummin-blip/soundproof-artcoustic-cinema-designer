@@ -12,6 +12,7 @@ import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { useActiveProjectId } from '@/components/state/project-session';
 import { resolveBestSubLayoutContextId } from '@/components/room/bass/best-layout/bestSubLayoutContext';
+import { useSubwooferCompatibilityActions } from '@/components/hooks/useSubwooferCompatibilityActions';
 
 function rectsOverlap(a, b) {
   return a.left < b.right && a.right > b.left && a.bottom < b.top && a.top > b.bottom;
@@ -60,6 +61,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
   const seats = appState?.seatingPositions;
   const activeProjectId = useActiveProjectId();
   const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims: roomDimensions });
+  const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
   const hasLcrSubClash = useMemo(() => hasFrontLcrSubClash({
     speakers: appState?.speakerSystem?.placedSpeakers,
     frontSubs: appState?.subwoofers,
@@ -95,7 +97,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   value={frontSubsCfg?.model ?? "SUB2-12"}
                   disabled={disabled || (frontSubsCfg?.count ?? 0) === 0}
                   onValueChange={(model) => {
-                    if (appState?.setFrontSubsCfg) {
+                    if (compat.hasCanonicalInstances) {
+                      compat.setFrontSubModel(model);
+                    } else if (appState?.setFrontSubsCfg) {
                       appState.setFrontSubsCfg(prev => ({ ...prev, model }));
                     }
                   }}
@@ -115,7 +119,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <Select
                   value={String(frontSubsCfg?.count ?? 0)}
                   onValueChange={(v) => {
-                    if (appState?.setFrontSubsCfg) {
+                    if (compat.hasCanonicalInstances) {
+                      compat.setFrontSubCount(Number(v));
+                    } else if (appState?.setFrontSubsCfg) {
                       appState.setFrontSubsCfg(prev => ({ ...prev, count: Number(v) }));
                     }
                   }}
@@ -139,11 +145,11 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <HeightInput
                   value={frontSubsCfg?.bottomHeightM ?? (frontSubsCfg?.mountMode === "wall" ? 0.80 : 0.05)}
                   onChange={(raw) => {
-                    if (appState?.setFrontSubsCfg) {
-                      appState.setFrontSubsCfg(prev => ({
-                        ...prev,
-                        bottomHeightM: Math.max(0, Math.min(2.5, raw))
-                      }));
+                    const clamped = Math.max(0, Math.min(2.5, raw));
+                    if (compat.hasCanonicalInstances) {
+                      compat.setFrontBottomHeight(clamped);
+                    } else if (appState?.setFrontSubsCfg) {
+                      appState.setFrontSubsCfg(prev => ({ ...prev, bottomHeightM: clamped }));
                     }
                   }}
                   className="h-10 w-full bg-white border-[#DCDBD6]"
@@ -236,7 +242,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                   value={rearSubsCfg?.model ?? "SUB2-12"}
                   disabled={disabled || (rearSubsCfg?.count ?? 0) === 0}
                   onValueChange={(model) => {
-                    if (appState?.setRearSubsCfg) {
+                    if (compat.hasCanonicalInstances) {
+                      compat.setRearSubModel(model);
+                    } else if (appState?.setRearSubsCfg) {
                       appState.setRearSubsCfg(prev => ({ ...prev, model }));
                     }
                   }}
@@ -256,7 +264,9 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <Select
                   value={String(rearSubsCfg?.count ?? 0)}
                   onValueChange={(v) => {
-                    if (appState?.setRearSubsCfg) {
+                    if (compat.hasCanonicalInstances) {
+                      compat.setRearSubCount(Number(v));
+                    } else if (appState?.setRearSubsCfg) {
                       appState.setRearSubsCfg(prev => ({ ...prev, count: Number(v) }));
                     }
                   }}
@@ -280,11 +290,11 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
                 <HeightInput
                   value={rearSubsCfg?.bottomHeightM ?? (rearSubsCfg?.mountMode === "wall" ? 0.80 : 0.05)}
                   onChange={(raw) => {
-                    if (appState?.setRearSubsCfg) {
-                      appState.setRearSubsCfg(prev => ({
-                        ...prev,
-                        bottomHeightM: Math.max(0, Math.min(2.5, raw))
-                      }));
+                    const clamped = Math.max(0, Math.min(2.5, raw));
+                    if (compat.hasCanonicalInstances) {
+                      compat.setRearBottomHeight(clamped);
+                    } else if (appState?.setRearSubsCfg) {
+                      appState.setRearSubsCfg(prev => ({ ...prev, bottomHeightM: clamped }));
                     }
                   }}
                   className="h-10 w-full bg-white border-[#DCDBD6]"
