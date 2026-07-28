@@ -80,7 +80,7 @@ export function applyModelChange(instances, group, newModel) {
   const model = String(newModel || "").trim();
   if (!model) return instances;
   return instances.map((inst) =>
-    inst?.legacyGroup === group && inst.enabled !== false ? { ...inst, model } : inst
+    inst?.legacyGroup === group ? { ...inst, model } : inst
   );
 }
 
@@ -126,21 +126,9 @@ export function applyCountChange(instances, group, newCount, cfg, roomDims) {
   // count > currentEnabledCount: need more enabled instances
   const slotsToFill = count - currentEnabledCount;
 
-  // Step 1: Re-enable existing disabled group instances first
-  let reEnabled = 0;
-  const afterReEnable = instances.map((inst) => {
-    if (inst?.legacyGroup === group && inst.enabled === false && reEnabled < slotsToFill) {
-      reEnabled++;
-      return { ...inst, enabled: true };
-    }
-    return inst;
-  });
-
-  // Step 2: Create new instances only if still required
-  const stillNeeded = slotsToFill - reEnabled;
-  if (stillNeeded <= 0) return afterReEnable;
-
-  // Model resolution for new instances:
+  // Resolve the current group model — used for both re-enabled and newly
+  // created instances so restoration never creates a Mixed active group
+  // from stale disabled history.
   // 1. CFG model (explicitly selected or mirrored from a single-model group)
   // 2. First enabled instance's model (for mixed groups — never SUB2-12)
   // 3. SUB2-12 draft (only when truly empty with no model info)
@@ -149,6 +137,22 @@ export function applyCountChange(instances, group, newCount, cfg, roomDims) {
     ? String(enabledGroupInstances[0].model || "").trim()
     : "";
   const model = cfgModel || firstEnabledModel || "SUB2-12";
+
+  // Step 1: Re-enable existing disabled group instances first.
+  // Patch the model to the current group model so restoration cannot
+  // create a Mixed active group from stale disabled history.
+  let reEnabled = 0;
+  const afterReEnable = instances.map((inst) => {
+    if (inst?.legacyGroup === group && inst.enabled === false && reEnabled < slotsToFill) {
+      reEnabled++;
+      return { ...inst, enabled: true, model };
+    }
+    return inst;
+  });
+
+  // Step 2: Create new instances only if still required
+  const stillNeeded = slotsToFill - reEnabled;
+  if (stillNeeded <= 0) return afterReEnable;
   const widthM = Number(roomDims?.widthM) || 4.5;
   const lengthM = Number(roomDims?.lengthM) || 6.0;
   const placementMode = String(cfg?.placementMode || "default").trim();
