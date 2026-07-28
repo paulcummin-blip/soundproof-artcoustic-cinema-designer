@@ -7,6 +7,7 @@ import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFrom
 // deriveSubwoofersFromCfg remains as a legacy fallback only.
 import { parseProjectJson } from "@/components/roomdesigner/RoomDesignerHelpers";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
+import { INSTANCE_STATUS, MIGRATION_STATE } from "@/components/utils/subwooferInstanceCompatibility";
 
 // Hook to encapsulate project loading, saving, and state management
 export function useProjectLoader(
@@ -428,6 +429,29 @@ appState, // Pass appState directly for setters
       }
     };
 
+    // --- Authority gate: block autosave when instance status is not VALID ---
+    const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
+    if (instanceStatus === INSTANCE_STATUS.UNINITIALISED || instanceStatus === INSTANCE_STATUS.ERROR) {
+      setAutosaveStatus("idle");
+      return;
+    }
+
+    // --- Migration gate: RUNTIME_MIGRATED → re-baseline, do not save ---
+    // Hydration migrated CFG to instances, changing the serialized payload.
+    // Re-baseline the signature so this migration change doesn't trigger a save.
+    // A genuine user edit transitions migrationState to NONE (via compat handlers),
+    // which re-runs this effect and allows normal autosave.
+    const migrationState = appState?.subwooferInstanceMigrationState ?? MIGRATION_STATE.NONE;
+    if (migrationState === MIGRATION_STATE.RUNTIME_MIGRATED) {
+      let baselineSig = "";
+      try { baselineSig = computeSig(buildProjectData()); } catch { baselineSig = String(Date.now()); }
+      r.lastSavedSig = baselineSig;
+      r.lastQueuedSig = baselineSig;
+      r.dirty = false;
+      setAutosaveStatus("saved");
+      return;
+    }
+
     const trySaveNow = async () => {
       if (!effectiveProjectId) return;
       if (isHydratingRef.current) return;
@@ -475,6 +499,10 @@ appState, // Pass appState directly for setters
         r.lastSaveAt = Date.now();
         r.dirty = false;
         setAutosaveStatus("saved");
+        // Successful save → transition migration state to PERSISTED
+        if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+          appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
+        }
       } catch (e) {
         if (globalThis.__B44_LOGS) console.error("Error during autosave:", e);
         setAutosaveStatus("error");
@@ -568,7 +596,9 @@ appState, // Pass appState directly for setters
   appState.splConfig,
   freeMoveLcr,
   appState?.globalSurroundModel,
-  appState?.extraSurroundCount]
+  appState?.extraSurroundCount,
+  appState?.subwooferInstancesStatus,
+  appState?.subwooferInstanceMigrationState]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults
@@ -764,6 +794,10 @@ appState, // Pass appState directly for setters
         rMS.dirty = false;
 
         setAutosaveStatus("saved");
+        // Successful manual save → transition migration state to PERSISTED
+        if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+          appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
+        }
         return { success: true };
       } else {
         setAutosaveStatus("error");
