@@ -256,20 +256,76 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     //
     // D) Both sources exist and disagree → subwooferInstances wins; CFG
     //    remains compatibility data only.
-    const rawInstances = parseProjectJson(p?.subwooferInstances, null);
     const roomDimsForNorm = {
       widthM: Number(p?.room_width) || 4.5,
       lengthM: Number(p?.room_length) || 6.0,
       heightM: Number(p?.room_height) || 2.4,
     };
 
-    // Distinguish: field absent, valid empty array, malformed present array
-    const instancesAbsent = rawInstances == null;
+    // Detect field presence directly from the project object BEFORE parsing.
+    // parseProjectJson swallows parse errors (returns fallback), so we cannot
+    // distinguish "field absent" from "field present but unparseable" after
+    // parsing. Malformed-present data must never migrate from CFG.
+    const instanceFieldPresent =
+      Object.prototype.hasOwnProperty.call(p, "subwooferInstances") &&
+      p.subwooferInstances !== undefined &&
+      p.subwooferInstances !== null;
+
+    let rawInstances = null;
+    let parseFailed = false;
+    if (instanceFieldPresent) {
+      const raw = p.subwooferInstances;
+      if (Array.isArray(raw)) {
+        rawInstances = raw;
+      } else if (typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            rawInstances = parsed;
+          } else {
+            parseFailed = true;
+          }
+        } catch {
+          parseFailed = true;
+        }
+      } else {
+        // object, number, boolean, etc. — not a valid instances array
+        parseFailed = true;
+      }
+    }
+
+    // Distinguish: field absent, parse failed, valid empty array, malformed present array
+    const instancesAbsent = !instanceFieldPresent;
     const instancesPresent = Array.isArray(rawInstances) && rawInstances.length > 0;
     const instancesEmptyValid = Array.isArray(rawInstances) && rawInstances.length === 0;
     const validation = validateInstances(rawInstances);
 
-    if (instancesPresent && !validation.valid) {
+    if (parseFailed) {
+      // Rule C (parse failure): field present but unparseable or not an array — ERROR.
+      // Do NOT substitute CFG, do NOT migrate, do NOT autosave.
+      const errMsg = `[subwooferInstanceMigration] Rule C: project "${p?.id || p?.name || "?"}" has subwooferInstances field present but unparseable or not an array. ` +
+        `Instances were cleared. CFG was NOT substituted. Bass/RP22 analysis is blocked for this project.`;
+      console.error(errMsg);
+      if (typeof window !== "undefined") {
+        try {
+          window.dispatchEvent(new CustomEvent("subwoofer-instance-migration-error", {
+            detail: { projectId: p?.id, errors: ["subwooferInstances present but unparseable or not an array"], fatal: true },
+          }));
+        } catch { /* ignore */ }
+      }
+      if (typeof appState?.setSubwooferInstances === "function") {
+        appState.setSubwooferInstances([]);
+      }
+      if (typeof appState?.setSubwoofers === "function") {
+        appState.setSubwoofers([]);
+      }
+      if (typeof appState?.setSubwooferInstancesStatus === "function") {
+        appState.setSubwooferInstancesStatus(INSTANCE_STATUS.ERROR);
+      }
+      if (typeof appState?.setSubwooferInstanceMigrationState === "function") {
+        appState.setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
+      }
+    } else if (instancesPresent && !validation.valid) {
       // Rule C: malformed instances — clear ALL subwoofer state, block analysis,
       // expose error, do NOT substitute CFG, do NOT autosave.
       const errMsg = `[subwooferInstanceMigration] Rule C: project "${p?.id || p?.name || "?"}" has malformed subwooferInstances. ` +

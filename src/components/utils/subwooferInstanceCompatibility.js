@@ -109,13 +109,13 @@ export function applyCountChange(instances, group, newCount, cfg, roomDims) {
   if (count === currentEnabledCount) return instances;
 
   if (count < currentEnabledCount) {
-    // Disable excess enabled instances — preserve array order and all data
-    let disableCounter = 0;
-    const toDisable = currentEnabledCount - count;
+    // Keep the first `count` enabled instances; disable the rest.
+    // Preserves array order, IDs, models, and calibration.
+    let enabledSeen = 0;
     return instances.map((inst) => {
       if (inst?.legacyGroup === group && inst.enabled !== false) {
-        if (disableCounter < toDisable) {
-          disableCounter++;
+        enabledSeen++;
+        if (enabledSeen > count) {
           return { ...inst, enabled: false };
         }
       }
