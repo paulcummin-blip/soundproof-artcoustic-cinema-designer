@@ -569,7 +569,9 @@ function useDesignerState() {
       : []
   ));
   // Stage 2: Restore canonical subwoofer instances from local autosave (four-way).
-  const __restoredSubs = restoreSubwooferInstancesFromAutosave(__autosavePayload);
+  // Lazy initialiser — restoreSubwooferInstancesFromAutosave (which calls loadAutosave
+  // + bassInputAdapter) must run ONCE on first render, not on every render.
+  const [__restoredSubs] = useState(() => restoreSubwooferInstancesFromAutosave(__autosavePayload));
   const [subwoofers, setSubwoofers] = useState(__restoredSubs.subwoofers);
   const [subwooferInstances, setSubwooferInstances] = useState(__restoredSubs.instances);
   // Authority status — distinguishes absent from valid empty from error.
