@@ -494,6 +494,7 @@ export default function RvPlanCanvas({
                         handleMouseUp(e);
                       };
 
+                      const isSelected = appState?.selectedSubId != null && subId === appState.selectedSubId;
                       return (
                         <g
                           key={subId}
@@ -527,6 +528,20 @@ export default function RvPlanCanvas({
                             opacity={0.8}
                             pointerEvents="none"
                           />
+                          {isSelected && (
+                            <rect
+                              x={cx - w / 2 - 4}
+                              y={cy - d / 2 - 4}
+                              width={w + 8}
+                              height={d + 8}
+                              rx={2}
+                              ry={2}
+                              fill="none"
+                              stroke="#213428"
+                              strokeWidth={2}
+                              pointerEvents="none"
+                            />
+                          )}
                         </g>
                       );
                     })}

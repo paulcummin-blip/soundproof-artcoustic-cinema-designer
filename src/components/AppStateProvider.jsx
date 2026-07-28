@@ -608,6 +608,9 @@ function useDesignerState() {
     }
   ));
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
+  // Stage 2B.2: Display-only subwoofer instance selection (stable canonical ID).
+  // Used to highlight the selected instance in the room view. No mutation authority.
+  const [selectedSubId, setSelectedSubId] = useState(null);
   // LCR aim is derived exclusively from lcrAimMode — not a separate independent flag.
   // aimAtMLP is kept for non-LCR callers (surrounds, overheads) and defaults to false
   // so it does not independently influence LCR yaw.
@@ -1924,7 +1927,8 @@ function useDesignerState() {
     subwooferInstancesStatus, setSubwooferInstancesStatus,
     subwooferInstanceMigrationState, setSubwooferInstanceMigrationState,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
-    subWarnings, setSubWarnings, 
+    subWarnings, setSubWarnings,
+    selectedSubId, setSelectedSubId,
     aimAtMLP, setAimAtMLP, overheadOffsetM, setOverheadOffsetM,
     overheadMode, setOverheadMode, rowTarget, setRowTarget,
     overlays, setOverlays, speakerSystem, setSpeakerSystem,
@@ -2022,7 +2026,8 @@ function useDesignerState() {
     subwooferInstancesStatus, setSubwooferInstancesStatus,
     subwooferInstanceMigrationState, setSubwooferInstanceMigrationState,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
-    subWarnings, setSubWarnings, 
+    subWarnings, setSubWarnings,
+    selectedSubId, setSelectedSubId,
     aimAtMLP, setAimAtMLP, overheadOffsetM, setOverheadOffsetM,
     overheadMode, setOverheadMode, rowTarget, setRowTarget,
     overlays, setOverlays, speakerSystem, setSpeakerSystem, 

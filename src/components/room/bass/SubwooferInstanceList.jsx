@@ -15,7 +15,7 @@ function formatPos(value) {
   return `${n.toFixed(2)} m`;
 }
 
-function InstanceRow({ instance }) {
+function InstanceRow({ instance, selected, onSelect }) {
   const id = instance?.id ?? '—';
   const model = instance?.model ?? '—';
   const enabled = instance?.enabled !== false;
@@ -23,7 +23,14 @@ function InstanceRow({ instance }) {
   const y = formatPos(instance?.position?.y);
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded border border-[#E7E4DF] bg-white/60 text-[11px]">
+    <div
+      onClick={onSelect}
+      className={`flex items-center gap-2 px-2 py-1.5 rounded border text-[11px] cursor-pointer transition-colors ${
+        selected
+          ? 'border-[#213428] bg-[#213428]/8 ring-1 ring-[#213428]/30'
+          : 'border-[#E7E4DF] bg-white/60 hover:border-[#213428]/40 hover:bg-white'
+      }`}
+    >
       <div className="shrink-0 w-20 truncate font-mono text-[#625143]" title={id}>
         {id}
       </div>
@@ -49,7 +56,7 @@ function InstanceRow({ instance }) {
   );
 }
 
-function GroupSection({ title, instances }) {
+function GroupSection({ title, instances, selectedSubId, onSelect }) {
   if (!instances || instances.length === 0) {
     return (
       <div>
@@ -65,7 +72,12 @@ function GroupSection({ title, instances }) {
       </h6>
       <div className="space-y-1">
         {instances.map((inst) => (
-          <InstanceRow key={inst?.id ?? `inst-${Math.random()}`} instance={inst} />
+          <InstanceRow
+            key={inst?.id ?? `inst-${Math.random()}`}
+            instance={inst}
+            selected={selectedSubId != null && inst?.id === selectedSubId}
+            onSelect={() => onSelect(inst?.id ?? null)}
+          />
         ))}
       </div>
     </div>
@@ -76,6 +88,8 @@ export default function SubwooferInstanceList({ appState }) {
   const instances = Array.isArray(appState?.subwooferInstances)
     ? appState.subwooferInstances
     : [];
+  const selectedSubId = appState?.selectedSubId ?? null;
+  const setSelectedSubId = appState?.setSelectedSubId;
 
   const { frontInstances, rearInstances, otherInstances } = useMemo(() => {
     const front = [];
@@ -109,12 +123,27 @@ export default function SubwooferInstanceList({ appState }) {
         Instances <span className="text-[#625143] font-normal">(display only)</span>
       </h5>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <GroupSection title="Front" instances={frontInstances} />
-        <GroupSection title="Rear" instances={rearInstances} />
+        <GroupSection
+          title="Front"
+          instances={frontInstances}
+          selectedSubId={selectedSubId}
+          onSelect={setSelectedSubId}
+        />
+        <GroupSection
+          title="Rear"
+          instances={rearInstances}
+          selectedSubId={selectedSubId}
+          onSelect={setSelectedSubId}
+        />
       </div>
       {otherInstances.length > 0 && (
         <div className="mt-2">
-          <GroupSection title="Other" instances={otherInstances} />
+          <GroupSection
+            title="Other"
+            instances={otherInstances}
+            selectedSubId={selectedSubId}
+            onSelect={setSelectedSubId}
+          />
         </div>
       )}
     </div>
