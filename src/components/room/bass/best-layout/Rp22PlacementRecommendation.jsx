@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import Rp22RecommendationCard from "@/components/room/bass/best-layout/Rp22RecommendationCard";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
-import { coordinatesMatch, validateRecommendationLayout, buildAppliedConfigs, hasUnsupportedPlacement } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { coordinatesMatch, validateRecommendationLayout, buildAppliedConfigs, buildAppliedInstances, hasUnsupportedPlacement } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 const levelText = (level) => Number.isFinite(level) ? (level > 0 ? `L${level}` : "FAIL") : "—";
 const cloneConfig = (config) => ({ ...config, positions: (config?.positions || []).map((position) => ({ ...position })) });
@@ -35,7 +35,7 @@ function traceSubs(label, subs) {
   console.groupEnd();
 }
 
-export default function Rp22PlacementRecommendation({ roomDims, currentLayout, currentQuantityBest, upgradeBest, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, currentSubs }) {
+export default function Rp22PlacementRecommendation({ roomDims, currentLayout, currentQuantityBest, upgradeBest, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, currentSubs, subwooferInstances, setSubwooferInstances }) {
   const [selected, setSelected] = useState(null);
   const [previous, setPrevious] = useState(null);
   const [applyError, setApplyError] = useState(null);
@@ -79,6 +79,13 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
     // Apply both configs within the same event.
     setFrontSubsCfg?.(nextConfigs.front);
     setRearSubsCfg?.(nextConfigs.rear);
+    // Also update canonical subwooferInstances[] — update coordinates for
+    // matched instances by legacyGroup + index. IDs, models, enabled, gain,
+    // delay, polarity, and bottomHeightM are preserved.
+    if (typeof setSubwooferInstances === "function" && Array.isArray(subwooferInstances)) {
+      const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg);
+      setSubwooferInstances(nextInstances);
+    }
     // Close dialog if open.
     setSelected(null);
     // Clear applying state after the state updates are committed.

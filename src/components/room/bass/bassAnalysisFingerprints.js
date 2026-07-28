@@ -14,8 +14,10 @@
 //   - NaN, Infinity, and non-serializable values are coerced to null before hashing.
 
 // Stage 1 subwoofer instance migration: bump from 2 to 3 so old CFG-keyed
-// cache entries safely miss. New fingerprints carry v3, which encodes the
-// v2_instance_ cache version requirement.
+// cache entries safely miss. This is NOT equivalent to v2_instance — it is a
+// new fingerprint version that, combined with the instanceAuthorityVersion
+// in completedBassResultPersistence.js, forms an explicit instance-authority
+// cache namespace. Old CFG results always miss.
 export const FINGERPRINT_VERSION = 3;
 
 // ---------------------------------------------------------------------------

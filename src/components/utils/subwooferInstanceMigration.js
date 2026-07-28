@@ -1,42 +1,107 @@
 // subwooferInstanceMigration.js — Stage 1: Legacy-to-instance normalisation and adapter.
 //
-// This module provides two pure functions:
-//   normaliseLegacySubwoofers(frontSubsCfg, rearSubsCfg, roomDims, stableDimensions)
-//     Converts legacy front_subs_cfg / rear_subs_cfg into the canonical
-//     subwooferInstances[] array. Used on project load when no persisted
-//     instances exist. Does NOT save — the result lives in runtime memory
-//     and persists on the next normal project save.
+// Canonical instance shape (stored):
+//   {
+//     id: string,           — stable identifier, never regenerated from CFG
+//     model: string,        — independent per-instance model (mixed models allowed)
+//     enabled: boolean,     — false = filtered before engine
+//     position: { x, y },    — cabinet centre XY in metres (NO z — see bottomHeightM)
+//     bottomHeightM: number, — canonical stored height: cabinet BOTTOM from floor
+//     rotationDeg: number,
+//     positionSource: "user" | "default",
+//     legacyGroup: "front" | "rear" | null, — compatibility metadata only
+//     symmetryLinkId: string | null,
+//     gainDb: number,
+//     delayMs: number,
+//     polarity: number,      — 1 or -1
+//   }
 //
-//   bassInputAdapter(instances)
-//     Converts active subwooferInstances[] into the flat structure expected
-//     by the existing bass engine (appState.subwoofers format). Produces
-//     both root-level x/y/z (for fingerprints) and position: {x, y, z}
-//     (for useSeatResponses and rendering). Disabled instances are
-//     filtered before reaching the engine.
+// At rendering and engine boundaries, derive centre/acoustic height:
+//   centreZ = bottomHeightM + cabinetHeightM / 2
 //
-//   subwoofersToInstances(subwoofers, existingInstances)
-//     Syncs appState.subwoofers back into instance format for persistence.
-//     Preserves existing instance IDs and metadata where possible.
+// Authority rules:
+//   A) Valid subwooferInstances exist → instances are canonical. CFG cannot
+//      overwrite IDs, models, positions, enabled state, or calibration.
+//   B) Instances absent → normalise legacy CFG once into runtime instances.
+//      Do NOT autosave merely because migration occurred.
+//   C) Instances present but malformed → report an explicit migration/load
+//      error. Do NOT silently replace from CFG.
 //
 // Coordinate convention:
 //   origin = front-left-floor room corner
 //   x = cabinet centre from left wall
 //   y = cabinet centre from front wall
-//   z = cabinet centre height from floor
+//   bottomHeightM = cabinet bottom from floor
 //   rotationDeg = 0 faces front wall, clockwise positive
-//
-// legacyGroup is temporary compatibility metadata only. Dragging a subwoofer
-// must not change legacyGroup.
 
 import { subDimsMM } from "@/components/data/subwooferData";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
+export const INSTANCE_AUTHORITY_VERSION = 1;
+
 const SUB_WIDTH_FALLBACK_M = 0.50;
+const SUB_HEIGHT_FALLBACK_M = 0.50;
+const SUB_DEPTH_FALLBACK_M = 0.30;
 const WALL_BUFFER_M = 0.01;
 
 /**
+ * Resolve cabinet height in metres for a given model.
+ */
+function getCabinetHeightM(model, orientation) {
+  try {
+    const meta = getSpeakerModelMeta(model, orientation) || {};
+    const h = Number(meta.heightM);
+    return Number.isFinite(h) && h > 0 ? h : SUB_HEIGHT_FALLBACK_M;
+  } catch {
+    return SUB_HEIGHT_FALLBACK_M;
+  }
+}
+
+/**
+ * Resolve cabinet width in metres for a given model.
+ */
+function getCabinetWidthM(model) {
+  try {
+    const dims = subDimsMM?.[model];
+    const w = Number(dims?.w);
+    return Number.isFinite(w) && w > 0 ? w / 1000 : SUB_WIDTH_FALLBACK_M;
+  } catch {
+    return SUB_WIDTH_FALLBACK_M;
+  }
+}
+
+/**
+ * Resolve cabinet depth in metres for a given model.
+ */
+function getCabinetDepthM(model) {
+  try {
+    const dims = subDimsMM?.[model];
+    const d = Number(dims?.d);
+    return Number.isFinite(d) && d > 0 ? d / 1000 : SUB_DEPTH_FALLBACK_M;
+  } catch {
+    return SUB_DEPTH_FALLBACK_M;
+  }
+}
+
+/**
+ * Derive centre Z (acoustic centre height) from bottomHeightM and model.
+ * This is the boundary function — used at rendering and engine boundaries only.
+ *
+ * @param {Object} inst — instance with bottomHeightM and model
+ * @returns {number} centre Z in metres
+ */
+export function deriveCentreZ(inst) {
+  const bottom = Number(inst?.bottomHeightM);
+  const safeBottom = Number.isFinite(bottom) ? Math.max(0, bottom) : 0;
+  const cabinetH = getCabinetHeightM(inst?.model, inst?.orientation);
+  return safeBottom + cabinetH / 2;
+}
+
+/**
  * Normalise legacy front_subs_cfg / rear_subs_cfg into subwooferInstances[].
- * Replicates the geometry logic from useSubwooferSync but outputs instance format.
+ * Used on project load when no persisted instances exist (Rule B).
+ * Does NOT save — the result lives in runtime memory and persists on the
+ * next normal project save.
  *
  * @param {Object} frontSubsCfg - Legacy front sub config
  * @param {Object} rearSubsCfg - Legacy rear sub config
@@ -57,34 +122,14 @@ export function normaliseLegacySubwoofers(frontSubsCfg, rearSubsCfg, roomDims, s
   const getQty = (cfg) =>
     Math.max(0, Number(cfg?.count ?? cfg?.qty ?? 0) || 0);
 
-  const getSubWidthM = (model) => {
-    try {
-      const dims = subDimsMM?.[model];
-      const w = Number(dims?.w);
-      return Number.isFinite(w) && w > 0 ? w / 1000 : SUB_WIDTH_FALLBACK_M;
-    } catch {
-      return SUB_WIDTH_FALLBACK_M;
-    }
-  };
-
-  const getDepthM = (model) => {
-    try {
-      const dims = subDimsMM?.[model];
-      const d = Number(dims?.d);
-      return Number.isFinite(d) && d > 0 ? d / 1000 : 0.30;
-    } catch {
-      return 0.30;
-    }
-  };
-
   const buildGroup = (cfg, group) => {
     if (!cfg) return [];
     const qty = getQty(cfg);
     if (qty === 0 || !cfg.model) return [];
 
     const model = String(cfg.model).trim();
-    const subWidth = getSubWidthM(model);
-    const depthM = getDepthM(model);
+    const subWidth = getCabinetWidthM(model);
+    const depthM = getCabinetDepthM(model);
     const halfD = depthM / 2;
     const halfW = subWidth / 2;
     const EPS = 0.01;
@@ -92,18 +137,13 @@ export function normaliseLegacySubwoofers(frontSubsCfg, rearSubsCfg, roomDims, s
     const minX = WALL_BUFFER_M + halfW;
     const maxX = widthM - WALL_BUFFER_M - halfW;
 
-    // Z calculation: bottom height + cabinet height / 2
-    const subMeta = getSpeakerModelMeta(model, cfg?.orientation) || {};
-    const subHeight = Number(subMeta.heightM);
-    const resolvedSubHeight =
-      Number.isFinite(subHeight) && subHeight > 0 ? subHeight : 0.50;
+    // bottomHeightM is the canonical stored height
     const rawBottom = Number(cfg?.bottomHeightM);
-    const bottom = Number.isFinite(rawBottom)
+    const bottomHeightM = Number.isFinite(rawBottom)
       ? Math.max(0, Math.min(2.5, rawBottom))
       : cfg?.mountMode === "wall"
         ? 0.80
         : 0.05;
-    const z = bottom + resolvedSubHeight / 2;
 
     // Y pinning
     const yPinned =
@@ -121,14 +161,12 @@ export function normaliseLegacySubwoofers(frontSubsCfg, rearSubsCfg, roomDims, s
         const span = Math.max(0.01, widthM - margin * 2);
         return Array.from({ length: qty }, (_, i) => margin + span * (i / (qty - 1)));
       }
-      // Other placement modes
       if (qty === 1) return [widthM * 0.5];
       if (placementMode === "quarter") return [widthM * 0.25, widthM * 0.75];
       if (placementMode === "corners") return [minX, maxX];
       if (placementMode === "midpoint") return [widthM * 0.5];
       if (placementMode === "sixth") return [widthM / 6, (widthM * 5) / 6];
       if (placementMode === "asymmetric") return [widthM * 0.32, widthM * 0.78];
-      // Fallback
       const margin = widthM * 0.15;
       const span = Math.max(0.01, widthM - margin * 2);
       return Array.from({ length: qty }, (_, i) => margin + span * (i / (qty - 1)));
@@ -141,21 +179,20 @@ export function normaliseLegacySubwoofers(frontSubsCfg, rearSubsCfg, roomDims, s
       const savedX = Number(saved?.x);
       const savedY = Number(saved?.y);
 
-      // Priority: saved cfg position > computed default
       const pickedX = Number.isFinite(savedX) ? savedX : Number(defaultsX[i]);
       const finalX = Math.max(minX, Math.min(maxX, pickedX));
       const finalY = Number.isFinite(savedY)
         ? Math.max(WALL_BUFFER_M, Math.min(lengthM - WALL_BUFFER_M, savedY))
         : yPinned;
 
-      // Determine positionSource
       const positionSource = Number.isFinite(savedX) ? "user" : "default";
 
       return {
         id: `migrated-${group}-${i}`,
         model,
         enabled: true,
-        position: { x: finalX, y: finalY, z },
+        position: { x: finalX, y: finalY },
+        bottomHeightM,
         rotationDeg: group === "front" ? 0 : 180,
         positionSource,
         legacyGroup: group,
@@ -175,12 +212,17 @@ export function normaliseLegacySubwoofers(frontSubsCfg, rearSubsCfg, roomDims, s
 
 /**
  * Convert active subwooferInstances[] into the flat structure expected by
- * the existing bass engine. Disabled instances are filtered out.
+ * the existing bass engine. This is the PRODUCTION BASS ADAPTER.
  *
- * Output format matches appState.subwoofers with both root-level x/y/z
- * (for fingerprints) and position: {x, y, z} (for useSeatResponses and
- * rendering). Also includes group, role, isSub, bottomHeightM, and tuning
- * for backward compatibility with all existing consumers.
+ * Disabled instances are filtered out before reaching the engine.
+ * Per-instance models and calibration survive unchanged.
+ *
+ * Output format matches appState.subwoofers with:
+ *   - root-level x/y/z (for fingerprints)
+ *   - position: {x, y, z} (for useSeatResponses and rendering)
+ *   - bottomHeightM (for SubwooferPanel clash detection)
+ *   - tuning (for fingerprint normalizeSourceGeometry)
+ *   - root-level gain/delay/polarity (for useSeatResponses)
  *
  * @param {Array} instances - subwooferInstances array
  * @returns {Array} Flat array for bass engine consumption
@@ -195,18 +237,8 @@ export function bassInputAdapter(instances) {
       const group = inst.legacyGroup || null;
       const role = group === "front" ? `SUBF${i + 1}` : group === "rear" ? `SUBR${i + 1}` : `SUB${i + 1}`;
 
-      // Derive bottomHeightM from z and model for SubwooferPanel clash detection
-      let bottomHeightM = null;
-      if (Number.isFinite(pos.z)) {
-        try {
-          const meta = getSpeakerModelMeta(inst.model) || {};
-          const h = Number(meta.heightM);
-          const subH = Number.isFinite(h) && h > 0 ? h : 0.50;
-          bottomHeightM = pos.z - subH / 2;
-        } catch {
-          bottomHeightM = pos.z - 0.25;
-        }
-      }
+      // Derive centre Z from bottomHeightM + cabinet height / 2
+      const centreZ = deriveCentreZ(inst);
 
       return {
         id: inst.id,
@@ -214,18 +246,18 @@ export function bassInputAdapter(instances) {
         group,
         role,
         isSub: true,
-        enabled: inst.enabled !== false,
+        enabled: true,
         position: {
           x: Number(pos.x) || 0,
           y: Number(pos.y) || 0,
-          z: Number(pos.z) || 0,
+          z: centreZ,
         },
         // Root-level x/y/z for fingerprint normalizeSourceGeometry
         x: Number(pos.x) || 0,
         y: Number(pos.y) || 0,
-        z: Number(pos.z) || 0,
+        z: centreZ,
         rotationDeg: inst.rotationDeg ?? 0,
-        bottomHeightM,
+        bottomHeightM: Number(inst.bottomHeightM) || 0,
         // Tuning for fingerprint normalizeSourceGeometry
         tuning: {
           gainDb: inst.gainDb ?? 0,
@@ -246,70 +278,59 @@ export function bassInputAdapter(instances) {
 }
 
 /**
- * Sync appState.subwoofers back into instance format for persistence.
- * Preserves existing instance IDs and metadata where possible.
+ * Validate a subwooferInstances array and return detailed diagnostics.
  *
- * @param {Array} subwoofers - appState.subwoofers array
- * @param {Array} existingInstances - Current subwooferInstances (for ID preservation)
- * @returns {Array} subwooferInstances array
+ * @param {Array} instances
+ * @returns {{valid: boolean, errors: string[]}}
  */
-export function subwoofersToInstances(subwoofers, existingInstances) {
-  if (!Array.isArray(subwoofers)) return [];
-
-  const existingById = new Map();
-  if (Array.isArray(existingInstances)) {
-    existingInstances.forEach((inst) => {
-      if (inst?.id) existingById.set(inst.id, inst);
-    });
+export function validateInstances(instances) {
+  const errors = [];
+  if (!Array.isArray(instances)) {
+    return { valid: false, errors: ["subwooferInstances is not an array"] };
   }
-
-  return subwoofers.map((sub, i) => {
-    const pos = sub?.position || {};
-    const group = sub?.group || sub?.legacyGroup || null;
-    const id = sub?.id || `sub-${group || "x"}-${i}`;
-
-    // Try to preserve existing instance metadata
-    const existing = existingById.get(id);
-
-    return {
-      id,
-      model: sub?.model || existing?.model || "SUB2-12",
-      enabled: sub?.enabled !== false,
-      position: {
-        x: Number(pos.x) || 0,
-        y: Number(pos.y) || 0,
-        z: Number(pos.z) || 0,
-      },
-      rotationDeg: sub?.rotationDeg ?? existing?.rotationDeg ?? (group === "rear" ? 180 : 0),
-      positionSource: sub?.positionSource || existing?.positionSource || "default",
-      legacyGroup: group,
-      symmetryLinkId: sub?.symmetryLinkId ?? existing?.symmetryLinkId ?? null,
-      gainDb: sub?.gainDb ?? existing?.gainDb ?? 0,
-      delayMs: sub?.delay ?? sub?.delayMs ?? existing?.delayMs ?? 0,
-      polarity: sub?.polarity ?? existing?.polarity ?? 1,
-    };
+  if (instances.length === 0) {
+    return { valid: false, errors: ["subwooferInstances is empty"] };
+  }
+  instances.forEach((inst, i) => {
+    if (!inst || typeof inst !== "object") {
+      errors.push(`instance[${i}] is not an object`);
+      return;
+    }
+    if (typeof inst.id !== "string" || inst.id.trim().length === 0) {
+      errors.push(`instance[${i}].id is missing or not a non-empty string`);
+    }
+    if (typeof inst.model !== "string" || inst.model.trim().length === 0) {
+      errors.push(`instance[${i}].model is missing or not a non-empty string`);
+    }
+    const pos = inst.position;
+    if (!pos || typeof pos !== "object") {
+      errors.push(`instance[${i}].position is missing or not an object`);
+    } else {
+      if (!Number.isFinite(Number(pos.x))) {
+        errors.push(`instance[${i}].position.x is not finite`);
+      }
+      if (!Number.isFinite(Number(pos.y))) {
+        errors.push(`instance[${i}].position.y is not finite`);
+      }
+    }
+    if (!Number.isFinite(Number(inst.bottomHeightM))) {
+      errors.push(`instance[${i}].bottomHeightM is not finite`);
+    }
+    if (typeof inst.enabled !== "boolean" && inst.enabled !== undefined) {
+      errors.push(`instance[${i}].enabled is not boolean or undefined`);
+    }
   });
+  return { valid: errors.length === 0, errors };
 }
 
 /**
- * Validate that a subwooferInstances array is well-formed.
- * Returns true if every element has a finite position and a non-empty model.
+ * Quick boolean check for backward compatibility.
+ * Returns true if every element has a finite position (x, y), a finite
+ * bottomHeightM, and a non-empty model.
  *
  * @param {Array} instances
  * @returns {boolean}
  */
 export function isValidInstanceArray(instances) {
-  if (!Array.isArray(instances) || instances.length === 0) return false;
-  return instances.every((inst) => {
-    if (!inst || typeof inst !== "object") return false;
-    const pos = inst.position;
-    if (!pos || typeof pos !== "object") return false;
-    return (
-      Number.isFinite(Number(pos.x)) &&
-      Number.isFinite(Number(pos.y)) &&
-      Number.isFinite(Number(pos.z)) &&
-      typeof inst.model === "string" &&
-      inst.model.trim().length > 0
-    );
-  });
+  return validateInstances(instances).valid;
 }

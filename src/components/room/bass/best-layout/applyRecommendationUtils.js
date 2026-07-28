@@ -152,6 +152,74 @@ export function buildAppliedConfigs(layout, frontSubsCfg, rearSubsCfg) {
 }
 
 /**
+ * Build updated subwooferInstances[] from a recommendation layout.
+ * Matches existing instances by legacyGroup + index, updating position.x/y only.
+ * Preserves IDs, models, enabled, bottomHeightM, gainDb, delayMs, polarity.
+ * If the recommendation has more sources than instances in a group, new instances
+ * are created with the CFG model. If fewer, extra instances are disabled (not deleted).
+ *
+ * @param {Object} layout - Recommendation layout with sources[]
+ * @param {Array} currentInstances - Existing subwooferInstances[]
+ * @param {Object} frontSubsCfg - Legacy front config (for model fallback on new instances)
+ * @param {Object} rearSubsCfg - Legacy rear config (for model fallback on new instances)
+ * @returns {Array} Updated subwooferInstances[]
+ */
+export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, rearSubsCfg) {
+  const instances = Array.isArray(currentInstances) ? currentInstances : [];
+  const frontSources = (layout?.sources || []).filter((s) => s.placement === "front");
+  const rearSources = (layout?.sources || []).filter((s) => s.placement === "rear");
+  const otherInstances = instances.filter((inst) => inst?.legacyGroup !== "front" && inst?.legacyGroup !== "rear");
+
+  const updateGroup = (group, sources, cfg) => {
+    const groupInstances = instances.filter((inst) => inst?.legacyGroup === group);
+    const sorted = sources.slice().sort((a, b) => (Number(a.x) - Number(b.x)) || (Number(a.y) - Number(b.y)));
+    const result = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const rec = sorted[i];
+      const existing = groupInstances[i];
+      if (existing) {
+        // Update position only — preserve everything else
+        result.push({
+          ...existing,
+          position: {
+            x: Number(rec.x),
+            y: Number(rec.y),
+          },
+          positionSource: "user",
+        });
+      } else {
+        // Create new instance for this group
+        const model = String(cfg?.model || "SUB2-12").trim();
+        result.push({
+          id: `migrated-${group}-${i}`,
+          model,
+          enabled: true,
+          position: { x: Number(rec.x), y: Number(rec.y) },
+          bottomHeightM: Number(cfg?.bottomHeightM) || 0.05,
+          rotationDeg: group === "front" ? 0 : 180,
+          positionSource: "user",
+          legacyGroup: group,
+          symmetryLinkId: null,
+          gainDb: 0,
+          delayMs: 0,
+          polarity: 1,
+        });
+      }
+    }
+    // Disable extra instances that don't have a matching recommendation source
+    for (let i = sorted.length; i < groupInstances.length; i++) {
+      result.push({ ...groupInstances[i], enabled: false });
+    }
+    return result;
+  };
+
+  const updatedFront = updateGroup("front", frontSources, frontSubsCfg);
+  const updatedRear = updateGroup("rear", rearSources, rearSubsCfg);
+
+  return [...updatedFront, ...updatedRear, ...otherInstances];
+}
+
+/**
  * Compute wall-relative distances for a source position.
  * All distances are in metres from the cabinet centre to the wall.
  */

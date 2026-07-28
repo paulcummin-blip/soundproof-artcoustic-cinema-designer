@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
-import { subwoofersToInstances } from "@/components/utils/subwooferInstanceMigration";
+import { bassInputAdapter, isValidInstanceArray } from "@/components/utils/subwooferInstanceMigration";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const WALL_BUFFER_M = 0.01;
@@ -10,39 +10,50 @@ const SUB_WIDTH_FALLBACK_M = 0.50;
 /**
  * Syncs the subwoofer placement array from frontSubsCfg / rearSubsCfg config objects.
  * Extracted from RoomDesignerWithState.
+ *
+ * AUTHORITY GATE:
+ *   When valid subwooferInstances exist (Rule A), CFG is NOT the analysis authority.
+ *   This effect does NOT overwrite appState.subwoofers from CFG. Instead,
+ *   appState.subwoofers is derived from instances via bassInputAdapter.
+ *
+ *   When instances are absent (Rule B), this effect runs normally to populate
+ *   appState.subwoofers from CFG for backward compatibility. The one-time
+ *   normalisation in hydrateProjectIntoAppState will create runtime instances
+ *   from CFG on the next load.
+ *
+ *   The destructive reverse-sync path (subwoofers → subwooferInstances) has
+ *   been REMOVED. Valid instances are never regenerated from CFG.
  */
 export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rearSubsCfg }) {
-  // Stage 1: After the existing CFG → subwoofers sync, also sync subwoofers →
-  // subwooferInstances for persistence. This ensures that when the user edits
-  // via legacy Front/Rear controls or drag, the instance array stays current
-  // and will be saved on the next normal project save.
-  useEffect(() => {
-    const setSubwooferInstances = appState?.setSubwooferInstances;
-    if (typeof setSubwooferInstances !== "function") return;
-    const subs = Array.isArray(appState?.subwoofers) ? appState.subwoofers : [];
-    if (subs.length === 0) return;
-    const existing = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
-    const next = subwoofersToInstances(subs, existing);
-    // Only update if the instance array actually changed (avoid loops)
-    const same =
-      next.length === existing.length &&
-      next.every((inst, i) => {
-        const ex = existing[i];
-        if (!ex) return false;
-        return (
-          String(inst.id) === String(ex.id) &&
-          String(inst.model) === String(ex.model) &&
-          inst.enabled === ex.enabled &&
-          Math.abs((inst.position?.x ?? 0) - (ex.position?.x ?? 0)) < 0.001 &&
-          Math.abs((inst.position?.y ?? 0) - (ex.position?.y ?? 0)) < 0.001 &&
-          Math.abs((inst.position?.z ?? 0) - (ex.position?.z ?? 0)) < 0.001
-        );
-      });
-    if (!same) setSubwooferInstances(next);
-  }, [appState?.subwoofers, appState?.subwooferInstances, appState?.setSubwooferInstances]);
   useEffect(() => {
     const setSubwoofers = appState?.setSubwoofers;
     if (typeof setSubwoofers !== "function") return;
+
+    // AUTHORITY GATE: If valid subwooferInstances exist, derive subwoofers from
+    // instances via bassInputAdapter. CFG must NOT overwrite.
+    const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+    if (isValidInstanceArray(instances)) {
+      const adapted = bassInputAdapter(instances);
+      // Only write if the adapted array actually differs from current subwoofers
+      const current = Array.isArray(appState?.subwoofers) ? appState.subwoofers : [];
+      const same =
+        adapted.length === current.length &&
+        adapted.every((s, i) => {
+          const c = current[i];
+          if (!c) return false;
+          return (
+            String(s.id) === String(c.id) &&
+            String(s.model) === String(c.model) &&
+            Math.abs((s.x ?? 0) - (c.x ?? 0)) < 0.001 &&
+            Math.abs((s.y ?? 0) - (c.y ?? 0)) < 0.001 &&
+            Math.abs((s.z ?? 0) - (c.z ?? 0)) < 0.001
+          );
+        });
+      if (!same) setSubwoofers(adapted);
+      return; // Do NOT run CFG → subwoofers when instances are canonical
+    }
+
+    // --- LEGACY PATH: instances absent, rebuild from CFG (Rule B) ---
     const widthM = Number(appState?.roomDims?.widthM) || Number(stableDimensions?.width) || 4.5;
     const lengthM = Number(appState?.roomDims?.lengthM) || Number(stableDimensions?.length) || 6.0;
     const normQty = (q) => Math.max(0, Math.min(8, Number(q?.count ?? q?.qty ?? q) || 0));
@@ -51,14 +62,6 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
     const rearModel = normModel(rearSubsCfg?.model);
     const frontQty = normQty(frontSubsCfg);
     const rearQty = normQty(rearSubsCfg);
-    const hasPlacedSubs = Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0;
-    const cfgExplicitNone =
-      (frontSubsCfg && Object.prototype.hasOwnProperty.call(frontSubsCfg, "model") &&
-        Object.prototype.hasOwnProperty.call(frontSubsCfg, "count") &&
-        !String(frontSubsCfg.model || "").trim() && Number(frontSubsCfg.count) === 0) &&
-      (rearSubsCfg && Object.prototype.hasOwnProperty.call(rearSubsCfg, "model") &&
-        Object.prototype.hasOwnProperty.call(rearSubsCfg, "count") &&
-        !String(rearSubsCfg.model || "").trim() && Number(rearSubsCfg.count) === 0);
 
     if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
       setSubwoofers((prev) => (Array.isArray(prev) && prev.length ? [] : prev));
@@ -196,6 +199,7 @@ export function useSubwooferSync({ appState, stableDimensions, frontSubsCfg, rea
     });
   }, [
     appState?.setSubwoofers,
+    appState?.subwooferInstances,
     appState?.roomDims?.widthM, appState?.roomDims?.lengthM,
     stableDimensions?.width, stableDimensions?.length,
     frontSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.positions, frontSubsCfg?.placementMode, frontSubsCfg?.isManual, frontSubsCfg?.mountMode, frontSubsCfg?.bottomHeightM,

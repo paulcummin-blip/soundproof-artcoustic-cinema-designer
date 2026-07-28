@@ -1,3 +1,5 @@
+import { INSTANCE_AUTHORITY_VERSION } from "@/components/utils/subwooferInstanceMigration";
+
 export const COMPLETED_BASS_CACHE_VERSION = 1;
 
 export function isCompletedBassContract(contract) {
@@ -13,6 +15,7 @@ export function compactCompletedBassContract(contract) {
   if (!isCompletedBassContract(contract)) return null;
   return {
     version: contract.version,
+    instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
     analysisId: contract.analysisId,
     fingerprints: contract.fingerprints,
     job: { ...contract.job, status: "complete" },
@@ -42,6 +45,7 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
   const matching = fingerprint ? bounded[fingerprint] || null : null;
   return {
     version: COMPLETED_BASS_CACHE_VERSION,
+    instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
     currentFingerprint: fingerprint,
     status: matching && !forceUpdating ? "complete" : fingerprint ? "updating" : "uncalculated",
     completedByFingerprint: bounded,
@@ -49,12 +53,39 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
   };
 }
 
+/**
+ * Resolve the persisted bass authority for a project.
+ *
+ * Cache isolation: records without the correct instanceAuthorityVersion are
+ * treated as stale and rejected. Old CFG-keyed results always miss.
+ */
 export function resolvePersistedBassAuthority(projectId, persisted) {
   const state = persisted && typeof persisted === "object" ? persisted : {};
+
+  // Cache isolation: reject records without the correct authority version.
+  if (state.instanceAuthorityVersion !== INSTANCE_AUTHORITY_VERSION) {
+    return {
+      projectId: String(projectId || "free"),
+      status: "uncalculated",
+      currentFingerprint: null,
+      contract: null,
+      staleContract: null,
+      exportable: false,
+    };
+  }
+
   const currentFingerprint = state.currentFingerprint || null;
   const snapshots = state.completedByFingerprint || {};
-  const current = state.status === "complete" && currentFingerprint ? snapshots[currentFingerprint] || null : null;
-  const staleContract = Object.values(snapshots)
+
+  // Also reject individual snapshots that lack the authority version.
+  const validSnapshots = Object.fromEntries(
+    Object.entries(snapshots).filter(
+      ([, snap]) => snap?.instanceAuthorityVersion === INSTANCE_AUTHORITY_VERSION
+    )
+  );
+
+  const current = state.status === "complete" && currentFingerprint ? validSnapshots[currentFingerprint] || null : null;
+  const staleContract = Object.values(validSnapshots)
     .filter((snapshot) => snapshot !== current && isCompletedBassContract(snapshot))
     .sort((left, right) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))[0] || null;
   return {

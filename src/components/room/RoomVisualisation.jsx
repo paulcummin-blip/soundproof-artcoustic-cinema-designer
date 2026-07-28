@@ -1263,7 +1263,12 @@ const byId = useEntitiesById({
     rebaseline,
   } = useLiveImpactBaseline({ dragging, liveRp22, currentP20Results });
 
-  // Helper to commit draft sub positions to real state
+  // Helper to commit draft sub positions to real state.
+  // On release, this commits to BOTH:
+  //   1. Legacy CFG (frontSubsCfg/rearSubsCfg) for backward compatibility
+  //   2. Canonical subwooferInstances[] — updating position.x/y for matched
+  //      instances by legacyGroup + index. IDs, models, enabled state, gain,
+  //      delay, polarity, and bottomHeightM are preserved unchanged.
   const commitDraftSubPositions = useCallback(() => {
     const labels = ['left', 'right'];
     const toPositions = (draft, group) => draft.map((s, i) => ({
@@ -1273,6 +1278,7 @@ const byId = useEntitiesById({
       z: s.position.z ?? 0,
     }));
 
+    // 1. Commit to legacy CFG (backward compatibility mirror)
     if (draftFrontSubsRef.current && onSetFrontSubs) {
       const positions = toPositions(draftFrontSubsRef.current, 'front');
       onSetFrontSubs(prev => ({
@@ -1293,7 +1299,50 @@ const byId = useEntitiesById({
         isManual: true,
       }));
     }
-  }, [onSetFrontSubs, onSetRearSubs]);
+
+    // 2. Commit to canonical subwooferInstances[] — update position.x/y only.
+    //    Match instances by legacyGroup + index within group. All other fields
+    //    (id, model, enabled, bottomHeightM, gainDb, delayMs, polarity) survive.
+    const setSubwooferInstances = appState?.setSubwooferInstances;
+    if (typeof setSubwooferInstances === "function") {
+      const currentInstances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+      if (currentInstances.length > 0) {
+        // Build group → [instance] index maps
+        const frontInstances = currentInstances.filter(inst => inst?.legacyGroup === "front");
+        const rearInstances = currentInstances.filter(inst => inst?.legacyGroup === "rear");
+        const otherInstances = currentInstances.filter(inst => !inst?.legacyGroup || (inst.legacyGroup !== "front" && inst.legacyGroup !== "rear"));
+
+        const updateGroup = (instances, draft, group) => {
+          if (!draft || !instances.length) return instances;
+          return instances.map((inst, i) => {
+            const draftSub = draft[i];
+            if (!draftSub) return inst;
+            return {
+              ...inst,
+              position: {
+                x: Number(draftSub.position?.x) || inst.position?.x || 0,
+                y: Number(draftSub.position?.y) || inst.position?.y || 0,
+              },
+              positionSource: "user",
+            };
+          });
+        };
+
+        let updatedFront = frontInstances;
+        let updatedRear = rearInstances;
+        if (draftFrontSubsRef.current) {
+          updatedFront = updateGroup(frontInstances, draftFrontSubsRef.current, "front");
+        }
+        if (draftRearSubsRef.current) {
+          updatedRear = updateGroup(rearInstances, draftRearSubsRef.current, "rear");
+        }
+
+        // Reassemble in original order: front, rear, other
+        const next = [...updatedFront, ...updatedRear, ...otherInstances];
+        setSubwooferInstances(next);
+      }
+    }
+  }, [onSetFrontSubs, onSetRearSubs, appState?.setSubwooferInstances, appState?.subwooferInstances]);
 
   // Sub drag — delegated to hook (instantiated here so commitDraftSubPositions is in scope)
   const { handleSubDrag } = useSubDragHandler({
