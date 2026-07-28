@@ -33,6 +33,12 @@ const restoreSubwooferInstancesFromAutosave = (payload) => {
     return { instances: [], status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.NONE, subwoofers: [] };
   }
 
+  // Orientation metadata for bassInputAdapter — derived from CFG, not stored per instance.
+  const orientationMeta = {
+    frontOrientation: payload.frontSubsCfg?.orientation ?? null,
+    rearOrientation: payload.rearSubsCfg?.orientation ?? null,
+  };
+
   const hasField = Object.prototype.hasOwnProperty.call(payload, "subwooferInstances");
 
   if (hasField) {
@@ -47,7 +53,7 @@ const restoreSubwooferInstancesFromAutosave = (payload) => {
     }
     // Case 2: Field present + valid (including empty []). Adapt only enabled instances.
     const enabled = raw.filter((i) => i?.enabled !== false);
-    const subwoofers = enabled.length > 0 ? bassInputAdapter(enabled) : [];
+    const subwoofers = enabled.length > 0 ? bassInputAdapter(enabled, orientationMeta) : [];
     return { instances: raw, status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.PERSISTED, subwoofers };
   }
 
@@ -58,7 +64,7 @@ const restoreSubwooferInstancesFromAutosave = (payload) => {
     const roomDims = payload.roomDims || { widthM: 4.5, lengthM: 6.0, heightM: 2.4 };
     const migrated = normaliseLegacySubwoofers(frontCfg, rearCfg, roomDims, null);
     const enabled = migrated.filter((i) => i?.enabled !== false);
-    const subwoofers = enabled.length > 0 ? bassInputAdapter(enabled) : [];
+    const subwoofers = enabled.length > 0 ? bassInputAdapter(enabled, orientationMeta) : [];
     return { instances: migrated, status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.RUNTIME_MIGRATED, subwoofers };
   }
 
