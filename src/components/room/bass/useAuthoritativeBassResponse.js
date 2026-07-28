@@ -345,7 +345,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     });
   }, [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy, analysisBlocked]);
   const simulationResults = useMemo(() => {
-    if (analysisBlocked) return null;
+    if (analysisBlocked) return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] } };
     return runSimulation(qStrategy);
   }, [runSimulation, qStrategy, analysisBlocked]);
   const { rspRawCurve, perSeatRawCurves } = useMemo(() => {
