@@ -9,26 +9,61 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { useRspState } from "@/components/state/useRspState";
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
-import { validateInstances, bassInputAdapter } from "@/components/utils/subwooferInstanceMigration";
+import { validateInstances, bassInputAdapter, normaliseLegacySubwoofers } from "@/components/utils/subwooferInstanceMigration";
 
 // Stage 2: Restore canonical subwoofer instances from a local autosave payload.
-// Valid (including []) wins → VALID. Malformed → ERROR + clear. Absent → UNINITIALISED
-// (useSubwooferSync normalises from CFG once, setting RUNTIME_MIGRATED).
-// Never reconstruct a modern record from CFG in this helper.
+// Four-way logic:
+//   1. No payload / fresh scratch → [] + VALID + NONE + subwoofers []
+//   2. Field present + valid (incl. []) → instances win + VALID + PERSISTED + adapt enabled
+//   3. Field present + malformed → clear + ERROR + NONE + subwoofers [] (never CFG fallback)
+//   4. Field absent + usable legacy CFG → normaliseLegacySubwoofers once + VALID + RUNTIME_MIGRATED + adapt
+//   5. Field absent + no usable CFG → [] + VALID + NONE + subwoofers []
+// Disagreeing CFG is display compatibility only. Never reconstruct a modern record from CFG
+// outside the single normaliseLegacySubwoofers call in case 4.
+const isCfgUsableForMigration = (cfg) => {
+  if (!cfg || typeof cfg !== "object") return false;
+  const hasModel = typeof cfg.model === "string" && cfg.model.trim().length > 0;
+  const hasCount = Number.isFinite(Number(cfg.count)) && Number(cfg.count) > 0;
+  return hasModel || hasCount;
+};
+
 const restoreSubwooferInstancesFromAutosave = (payload) => {
-  if (!payload || !Object.prototype.hasOwnProperty.call(payload, "subwooferInstances")) {
-    return { instances: [], status: INSTANCE_STATUS.UNINITIALISED, migration: MIGRATION_STATE.NONE };
+  // Case 1: No payload / fresh scratch session
+  if (!payload) {
+    return { instances: [], status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.NONE, subwoofers: [] };
   }
-  const raw = payload.subwooferInstances;
-  if (!Array.isArray(raw)) {
-    return { instances: [], status: INSTANCE_STATUS.ERROR, migration: MIGRATION_STATE.NONE };
+
+  const hasField = Object.prototype.hasOwnProperty.call(payload, "subwooferInstances");
+
+  if (hasField) {
+    const raw = payload.subwooferInstances;
+    // Case 3: Field present but malformed (not an array or validation fails)
+    if (!Array.isArray(raw)) {
+      return { instances: [], status: INSTANCE_STATUS.ERROR, migration: MIGRATION_STATE.NONE, subwoofers: [] };
+    }
+    const validation = validateInstances(raw);
+    if (!validation.valid) {
+      return { instances: [], status: INSTANCE_STATUS.ERROR, migration: MIGRATION_STATE.NONE, subwoofers: [] };
+    }
+    // Case 2: Field present + valid (including empty []). Adapt only enabled instances.
+    const enabled = raw.filter((i) => i?.enabled !== false);
+    const subwoofers = enabled.length > 0 ? bassInputAdapter(enabled) : [];
+    return { instances: raw, status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.PERSISTED, subwoofers };
   }
-  const validation = validateInstances(raw);
-  if (!validation.valid) {
-    return { instances: [], status: INSTANCE_STATUS.ERROR, migration: MIGRATION_STATE.NONE };
+
+  // Field absent — try legacy CFG migration (case 4)
+  const frontCfg = payload.frontSubsCfg;
+  const rearCfg = payload.rearSubsCfg;
+  if (isCfgUsableForMigration(frontCfg) || isCfgUsableForMigration(rearCfg)) {
+    const roomDims = payload.roomDims || { widthM: 4.5, lengthM: 6.0, heightM: 2.4 };
+    const migrated = normaliseLegacySubwoofers(frontCfg, rearCfg, roomDims, null);
+    const enabled = migrated.filter((i) => i?.enabled !== false);
+    const subwoofers = enabled.length > 0 ? bassInputAdapter(enabled) : [];
+    return { instances: migrated, status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.RUNTIME_MIGRATED, subwoofers };
   }
-  // Valid (including empty []) — already persisted to local storage
-  return { instances: raw, status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.PERSISTED };
+
+  // Case 5: Field absent + no usable CFG → fresh-like state
+  return { instances: [], status: INSTANCE_STATUS.VALID, migration: MIGRATION_STATE.NONE, subwoofers: [] };
 };
 
 const enforceOnePrimary = (seats, dims, mlpBasis = "front") => {
@@ -533,16 +568,9 @@ function useDesignerState() {
       ? normaliseRoomElements(__autosavePayload.roomElements)
       : []
   ));
-  // Stage 2: Restore canonical subwoofer instances from local autosave.
-  // Valid (including []) wins → VALID + runtime subwoofers derived. Malformed →
-  // ERROR + clear. Absent → UNINITIALISED (useSubwooferSync normalises from CFG
-  // once, setting RUNTIME_MIGRATED). Never reconstruct a modern record from CFG.
+  // Stage 2: Restore canonical subwoofer instances from local autosave (four-way).
   const __restoredSubs = restoreSubwooferInstancesFromAutosave(__autosavePayload);
-  const [subwoofers, setSubwoofers] = useState(
-    __restoredSubs.status === INSTANCE_STATUS.VALID && __restoredSubs.instances.length > 0
-      ? bassInputAdapter(__restoredSubs.instances)
-      : []
-  );
+  const [subwoofers, setSubwoofers] = useState(__restoredSubs.subwoofers);
   const [subwooferInstances, setSubwooferInstances] = useState(__restoredSubs.instances);
   // Authority status — distinguishes absent from valid empty from error.
   // Do NOT use array length alone to determine authority.
@@ -1592,18 +1620,18 @@ function useDesignerState() {
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
       if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
-      // Stage 2: Restore canonical subwoofer instances from local autosave.
-      if (Object.prototype.hasOwnProperty.call(p, "subwooferInstances")) {
-        const restored = restoreSubwooferInstancesFromAutosave(p);
-        setSubwooferInstances(restored.instances);
-        setSubwoofers(
-          restored.status === INSTANCE_STATUS.VALID && restored.instances.length > 0
-            ? bassInputAdapter(restored.instances)
-            : []
-        );
-        setSubwooferInstancesStatus(restored.status);
-        setSubwooferInstanceMigrationState(restored.migration);
-      }
+      // Stage 2: Restore canonical subwoofer instances — four-way logic.
+      // Clear prior canonical/runtime/error state before applying the next payload
+      // so projects/sessions cannot leak.
+      setSubwooferInstances([]);
+      setSubwoofers([]);
+      setSubwooferInstancesStatus(INSTANCE_STATUS.UNINITIALISED);
+      setSubwooferInstanceMigrationState(MIGRATION_STATE.NONE);
+      const restored = restoreSubwooferInstancesFromAutosave(p);
+      setSubwooferInstances(restored.instances);
+      setSubwoofers(restored.subwoofers);
+      setSubwooferInstancesStatus(restored.status);
+      setSubwooferInstanceMigrationState(restored.migration);
       if (p.splConfig && typeof p.splConfig === "object") setSplConfig(p.splConfig);
       if (typeof p.screenHeight === "number") setScreenHeight(p.screenHeight);
       if (typeof p.seatingRows === "number") setSeatingRows(p.seatingRows);
@@ -1691,6 +1719,11 @@ function useDesignerState() {
     };
     try {
       saveAutosave(payload);
+      // Stage 2: Only after saveAutosave succeeds may state become PERSISTED.
+      // Do not mark persisted on failure.
+      if (subwooferInstancesStatus === INSTANCE_STATUS.VALID) {
+        setSubwooferInstanceMigrationState(MIGRATION_STATE.PERSISTED);
+      }
     } catch (e) {
       console.warn("Autosave failed:", e);
     }
