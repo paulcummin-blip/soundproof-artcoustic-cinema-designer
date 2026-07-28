@@ -72,6 +72,7 @@ import FrontElevation from "@/components/room/FrontElevation";
 import SideElevation from "@/components/room/SideElevation";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
 import { useElevationDragHandlers } from "@/components/roomdesigner/hooks/useElevationDragHandlers";
+import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 
 // Safe lazy imports that work with both named and default exports
 const RoomDimensions = React.lazy(() =>
@@ -1490,6 +1491,7 @@ function RoomDesignerWithState() {
   }, [placedSpeakers, stableDimensions, _seatingPositions, seatingArrangementBasis, _isFrozen, setSpeakers, mlpAnchorEffective]);
 
   // Elevation drag callbacks — extracted to keep this file under the line limit
+  const compat = useSubwooferCompatibilityActions(appState, _frontSubsCfg, _rearSubsCfg);
   const { handleLcrSpeakerMoved, handleFrontSubMoved } = useElevationDragHandlers({
     setSpeakers,
     setSubwoofers,
@@ -1497,6 +1499,7 @@ function RoomDesignerWithState() {
     placedSpeakers,
     appState,
     _frontSubsCfg,
+    compat,
   });
 
   // Manual Save Project function now just calls the one from useProjectLoader
@@ -1825,8 +1828,8 @@ function RoomDesignerWithState() {
                           return s;
                         }));
                       }}
-                      onFrontSubHeightChange={(bottomHeightM) => setFrontSubsCfg(prev => ({ ...prev, bottomHeightM }))}
-                      onRearSubHeightChange={(bottomHeightM) => setRearSubsCfg(prev => ({ ...prev, bottomHeightM }))}
+                      onFrontSubHeightChange={(bottomHeightM) => compat.setFrontBottomHeight(bottomHeightM)}
+                      onRearSubHeightChange={(bottomHeightM) => compat.setRearBottomHeight(bottomHeightM)}
                     />
                   </>
                 )}

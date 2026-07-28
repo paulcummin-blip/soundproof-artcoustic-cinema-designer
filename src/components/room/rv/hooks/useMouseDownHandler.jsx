@@ -273,7 +273,7 @@ export function useMouseDownHandler({
           (Array.isArray(subs) && subs.length > 0)
             ? subs.map((s, idx) => ({
                 ...s,
-                id: `${group}-sub-${idx}`,
+                id: s.id || `${group}-sub-${idx}`,
                 position: s.position ? { ...s.position } : { x: widthM / 2, y: defaultY, z: 0 },
                 _subType: group,
               }))
@@ -305,77 +305,33 @@ export function useMouseDownHandler({
           return [...arr].sort((a, b) => a.position.x - b.position.x);
         };
 
-        // --- Remap subIndex after sorting ---
-        // The rendered id (e.g. "front-sub-1") maps to the UNSORTED array order.
-        // After sorting, the same physical sub may be at a different index.
-        // We must update `id` to match its new sorted position so that
-        // useSubDragHandler parses the correct index from the canonical id.
-        const mClickedFront = typeof id === 'string' && id.match(/^front-sub-(\d+)$/);
-        const mClickedRear  = typeof id === 'string' && id.match(/^rear-sub-(\d+)$/);
+        // --- Sort drafts by X, preserving stable canonical IDs ---
+        // The clicked id is the sub's stable canonical id (or a generated
+        // front-sub-N/rear-sub-N id when seeding from CFG fallback). Stable IDs
+        // are never rewritten — useSubDragHandler resolves the dragged entry by
+        // exact id, not group index. Paired visual movement may update both
+        // stable ids in the draft.
+        const clickedFrontSub = seedFront.find(s => s?.id === id) || null;
+        const sortedFront = sortByX(seedFront);
+        draftFrontSubsRef.current = sortedFront.map(s => ({ ...s, position: { ...s.position } }));
 
-        if (mClickedFront) {
-          const originalIndex = Number(mClickedFront[1]);
-          // Capture the clicked sub object from the unsorted seed (by original index)
-          const clickedSubObj = seedFront[originalIndex];
-          // Sort and assign draft
-          const sortedFront = sortByX(seedFront);
-          draftFrontSubsRef.current = sortedFront.map(s => ({ ...s, position: { ...s.position } }));
-          // Find the new index of the clicked sub in the sorted array (by position.x identity)
-          if (clickedSubObj) {
-            const newIndex = sortedFront.findIndex(
-              s => s === clickedSubObj || (
-                Number.isFinite(clickedSubObj.position?.x) &&
-                Math.abs(s.position.x - clickedSubObj.position.x) < 0.0001
-              )
-            );
-            if (newIndex !== -1 && newIndex !== originalIndex) {
-              // Rewrite id so useSubDragHandler uses the correct sorted index
-              id = `front-sub-${newIndex}`;
-            }
-            // Recalculate dragOffsetRoomRef from the selected sorted draft sub.
-            // This must happen AFTER sorting and id remap so the offset matches
-            // the physical sub that handleSubDrag will actually move.
-            const remappedIndex = newIndex !== -1 ? newIndex : originalIndex;
-            const selectedDraftSub = draftFrontSubsRef.current[remappedIndex];
-            if (selectedDraftSub?.position) {
-              dragOffsetRoomRef.current = {
-                x: selectedDraftSub.position.x - cursorRoom.x,
-                y: 0, // front wall: y is always pinned by handleSubDrag
-              };
-            }
-          }
-        } else {
-          draftFrontSubsRef.current = sortByX(seedFront).map(s => ({ ...s, position: { ...s.position } }));
-        }
+        const clickedRearSub = seedRear.find(s => s?.id === id) || null;
+        const sortedRear = sortByX(seedRear);
+        draftRearSubsRef.current = sortedRear.map(s => ({ ...s, position: { ...s.position } }));
 
-        if (mClickedRear) {
-          const originalIndex = Number(mClickedRear[1]);
-          const clickedSubObj = seedRear[originalIndex];
-          const sortedRear = sortByX(seedRear);
-          draftRearSubsRef.current = sortedRear.map(s => ({ ...s, position: { ...s.position } }));
-          if (clickedSubObj) {
-            const newIndex = sortedRear.findIndex(
-              s => s === clickedSubObj || (
-                Number.isFinite(clickedSubObj.position?.x) &&
-                Math.abs(s.position.x - clickedSubObj.position.x) < 0.0001
-              )
-            );
-            if (newIndex !== -1 && newIndex !== originalIndex) {
-              id = `rear-sub-${newIndex}`;
-            }
-            // Recalculate dragOffsetRoomRef from the selected sorted draft sub.
-            const remappedIndex = newIndex !== -1 ? newIndex : originalIndex;
-            const selectedDraftSub = draftRearSubsRef.current[remappedIndex];
-            if (selectedDraftSub?.position) {
-              dragOffsetRoomRef.current = {
-                x: selectedDraftSub.position.x - cursorRoom.x,
-                y: 0, // rear wall: y is always pinned by handleSubDrag
-              };
-            }
-          }
-        } else if (!mClickedFront) {
-          // Not a front or rear sub click — still sort rear draft for consistency
-          draftRearSubsRef.current = sortByX(seedRear).map(s => ({ ...s, position: { ...s.position } }));
+        // Recalculate dragOffsetRoomRef from the clicked draft sub (now in sorted order).
+        const clickedDraftSub = clickedFrontSub
+          ? draftFrontSubsRef.current.find(s => s?.id === clickedFrontSub.id)
+          : clickedRearSub
+            ? draftRearSubsRef.current.find(s => s?.id === clickedRearSub.id)
+            : null;
+        if (clickedDraftSub?.position) {
+          const _xIsPinned = draggedSubWallRef.current === 'left' || draggedSubWallRef.current === 'right';
+          const _yIsPinned = draggedSubWallRef.current === 'front' || draggedSubWallRef.current === 'rear';
+          dragOffsetRoomRef.current = {
+            x: _xIsPinned ? 0 : (clickedDraftSub.position.x - cursorRoom.x),
+            y: _yIsPinned ? 0 : (clickedDraftSub.position.y - cursorRoom.y),
+          };
         }
 
         // Signal BassResponse that dragging started

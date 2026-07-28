@@ -5,14 +5,20 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 /**
  * Provides drag callbacks for the Front Elevation and Side Elevation views.
  * Extracted from RoomDesigner to keep that file under the line limit.
+ *
+ * Stage 2: Subwoofer moves commit via the canonical-first commitInstances API.
+ * The canonical array is written once, then both CFG mirrors are derived.
+ * X updates canonical position.x only. Z (centre height) is converted to
+ * bottomHeightM using the targeted instance's own model and the front group
+ * orientation. Never store centre z in position.
  */
 export function useElevationDragHandlers({
   setSpeakers,
-  setSubwoofers,
   stableDimensions,
   placedSpeakers,
   appState,
   _frontSubsCfg,
+  compat,
 }) {
   const handleLcrSpeakerMoved = useCallback(({ role, newX, newZ, axis }) => {
     const rW = stableDimensions.widthM || stableDimensions.width || 4.5;
@@ -62,58 +68,43 @@ export function useElevationDragHandlers({
     }
   }, [setSpeakers, stableDimensions.widthM, stableDimensions.width, placedSpeakers, appState?.updateGlobalSpl]);
 
-  const handleFrontSubMoved = useCallback(({ index, newX, newZ, axis }) => {
-    const roomW = stableDimensions.widthM || stableDimensions.width || 4.5;
+  const handleFrontSubMoved = useCallback(({ movedBySubId, axis }) => {
+    if (!compat?.hasCanonicalInstances) return;
+    const currentInstances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+    if (currentInstances.length === 0 || !movedBySubId) return;
 
-    setSubwoofers(prev => {
-      if (!Array.isArray(prev)) return prev;
-      const frontSubs = prev.filter(s => s?.group === 'front');
-      const isPaired = frontSubs.length === 2;
-      let frontCount = -1;
-      return prev.map(sub => {
-        if (sub?.group !== 'front') return sub;
-        frontCount++;
-        if (axis === 'x' && isPaired) {
-          const mirrorX = roomW - newX;
-          const thisX = frontCount === index ? newX : mirrorX;
-          return { ...sub, position: { ...(sub.position || {}), x: thisX } };
-        }
-        if (axis === 'z' && isPaired) {
-          return { ...sub, position: { ...(sub.position || {}), z: newZ } };
-        }
-        if (frontCount !== index) return sub;
-        return { ...sub, position: { ...(sub.position || {}), ...(axis === 'x' ? { x: newX } : {}), ...(axis === 'z' ? { z: newZ } : {}) } };
-      });
+    const frontOrientation = _frontSubsCfg?.orientation ?? null;
+
+    let changed = false;
+    const next = currentInstances.map((inst) => {
+      if (!inst || inst.enabled === false || inst.legacyGroup !== 'front') return inst;
+      const moved = movedBySubId[inst.id];
+      if (!moved) return inst;
+      const patch = {};
+      if (axis === 'x' && Number.isFinite(Number(moved.x))) {
+        patch.position = { ...inst.position, x: Number(moved.x) };
+        patch.positionSource = 'user';
+      }
+      if (axis === 'z' && Number.isFinite(Number(moved.z))) {
+        // Convert centre z to bottomHeightM using the instance's own model
+        // and the front group orientation. Never store centre z in position.
+        const meta = getSpeakerModelMeta(inst.model, frontOrientation) || {};
+        const subH = Number(meta.heightM);
+        const resolvedH = Number.isFinite(subH) && subH > 0 ? subH : 0.50;
+        patch.bottomHeightM = Math.max(0, Number(moved.z) - resolvedH / 2);
+      }
+      if (Object.keys(patch).length === 0) return inst;
+      changed = true;
+      return { ...inst, ...patch };
     });
 
-    if (axis === 'x' && typeof appState?.setFrontSubsCfg === 'function') {
-      appState.setFrontSubsCfg(prev => {
-        const frontCount = (appState?.subwoofers || []).filter(s => s?.group === 'front').length;
-        const isPaired = frontCount === 2;
-        const positions = Array.isArray(prev?.positions) ? [...prev.positions] : [];
-        if (isPaired) {
-          while (positions.length < 2) positions.push({});
-          const mirrorX = roomW - newX;
-          positions[index] = { ...(positions[index] || {}), x: newX };
-          positions[1 - index] = { ...(positions[1 - index] || {}), x: mirrorX };
-        } else {
-          while (positions.length <= index) positions.push({});
-          positions[index] = { ...(positions[index] || {}), x: newX };
-        }
-        return { ...prev, positions, isManual: true };
-      });
-    }
+    if (!changed) return;
 
-    if (axis === 'z' && typeof appState?.setFrontSubsCfg === 'function') {
-      const model = _frontSubsCfg?.model || '';
-      const orientation = _frontSubsCfg?.orientation;
-      const meta = getSpeakerModelMeta(model, orientation) || {};
-      const subH = Number(meta.heightM);
-      const resolvedH = Number.isFinite(subH) && subH > 0 ? subH : 0.50;
-      const bottomHeightM = Math.max(0, newZ - resolvedH / 2);
-      appState.setFrontSubsCfg(prev => ({ ...prev, bottomHeightM }));
-    }
-  }, [setSubwoofers, appState?.setFrontSubsCfg, _frontSubsCfg, _frontSubsCfg?.orientation, stableDimensions.widthM, stableDimensions.width, appState?.subwoofers]);
+    // One canonical-first commit: instances once, then both CFG mirrors derived.
+    compat.commitInstances(next, {
+      front: { placementMode: 'manual', isManual: true },
+    });
+  }, [compat, appState?.subwooferInstances, _frontSubsCfg, _frontSubsCfg?.orientation]);
 
   return { handleLcrSpeakerMoved, handleFrontSubMoved };
 }

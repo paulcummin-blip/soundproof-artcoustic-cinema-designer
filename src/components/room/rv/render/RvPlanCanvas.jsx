@@ -175,10 +175,11 @@ export default function RvPlanCanvas({
     } else {
       subs = frontSubs;
     }
-    // Enrich with model and orientation from frontSubsCfg
+    // Enrich with orientation from frontSubsCfg; preserve each sub's own model
+    // (CFG model is fallback only — never collapse mixed models).
     return Array.isArray(subs) ? subs.map(sub => ({
       ...sub,
-      model: frontSubsCfg?.model,
+      model: sub.model || frontSubsCfg?.model,
       orientation: frontSubsCfg?.orientation ?? "vertical"
     })) : subs;
   }, [dragging, draftFrontSubsRef, lastValidDraftFrontSubs, frontSubs, frontSubsCfg, subDragTick]);
@@ -195,10 +196,11 @@ export default function RvPlanCanvas({
     } else {
       subs = rearSubs;
     }
-    // Enrich with model and orientation from rearSubsCfg
+    // Enrich with orientation from rearSubsCfg; preserve each sub's own model
+    // (CFG model is fallback only — never collapse mixed models).
     return Array.isArray(subs) ? subs.map(sub => ({
       ...sub,
-      model: rearSubsCfg?.model,
+      model: sub.model || rearSubsCfg?.model,
       orientation: rearSubsCfg?.orientation ?? "vertical"
     })) : subs;
   }, [dragging, draftRearSubsRef, lastValidDraftRearSubs, rearSubs, rearSubsCfg, subDragTick]);
@@ -466,7 +468,7 @@ export default function RvPlanCanvas({
                     {subArray.map((sub, i) => {
                        if (!hasPos(sub)) return null;
                        const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model, sub.orientation ?? "vertical");
-                      const subId = `${groupPrefix}-sub-${i}`;
+                      const subId = sub.id || `${groupPrefix}-sub-${i}`;
                       const [cx, cy] = toPx(sub.position.x, sub.position.y);
                       const w = subWm * scale;
                       const d = subDm * scale;

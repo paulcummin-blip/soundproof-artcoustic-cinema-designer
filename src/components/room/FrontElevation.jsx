@@ -102,11 +102,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     }
   }, [clientToRoom, isDraggingRef]);
 
-  const handleSubMouseDown = useCallback((e, subIndex, speakerMX, speakerMZ) => {
+  const handleSubMouseDown = useCallback((e, subIndex, subId, speakerMX, speakerMZ) => {
     e.preventDefault();
     const start = clientToRoom(e.clientX, e.clientY);
     if (!start) return;
-    dragRef.current = { type: 'sub', subIndex, speakerMX, speakerMZ, startRoomX: start.mX, startRoomZ: start.mZ, axisLocked: null };
+    dragRef.current = { type: 'sub', subIndex, subId, speakerMX, speakerMZ, startRoomX: start.mX, startRoomZ: start.mZ, axisLocked: null };
     if (isDraggingRef) isDraggingRef.current = true;
     document.body.style.cursor = 'grabbing';
   }, [clientToRoom, isDraggingRef]);
@@ -192,11 +192,21 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const onMouseUp = () => {
       const drag = dragRef.current;
       if (!drag) return;
-      // Commit final sub position once on mouseup
+      // Commit final sub position(s) once on mouseup by exact stable id.
+      // If the paired front sub visually moved, patch both exact ids in one commit.
       if (drag.type === 'sub') {
-        const finalPos = liveDragSubsRef.current?.[drag.subIndex];
-        if (finalPos && drag.axisLocked) {
-          onSubMovedRef.current?.({ index: drag.subIndex, newX: finalPos.x, newZ: finalPos.z, axis: drag.axisLocked });
+        const liveMap = liveDragSubsRef.current;
+        if (liveMap && drag.axisLocked) {
+          const movedBySubId = {};
+          subItemsRef.current.forEach((sub, i) => {
+            const live = liveMap[i];
+            if (live && sub?.id) {
+              movedBySubId[sub.id] = { x: live.x, z: live.z };
+            }
+          });
+          if (Object.keys(movedBySubId).length > 0) {
+            onSubMovedRef.current?.({ movedBySubId, axis: drag.axisLocked });
+          }
         }
         liveDragSubsRef.current = null;
         setLiveDragSubs(null);
@@ -260,7 +270,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const liveOverride = liveDragSubs?.[i];
       const x = liveOverride ? liveOverride.x : baseX;
       const z = liveOverride ? liveOverride.z : baseZ;
-      return { x, z, wM, hM, label: "SUB", index: i };
+      return { x, z, wM, hM, label: "SUB", index: i, id: s?.id };
     });
   }, [frontSubs, roomW, liveDragSubs]);
   // Keep snap refs current on every render
@@ -662,7 +672,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 label: sub.label,
                 zM: sub.z,
                 labelInsideBox: true,
-                onMouseDown: onFrontSubMoved ? (e) => handleSubMouseDown(e, i, sub.x, sub.z) : undefined,
+                onMouseDown: onFrontSubMoved ? (e) => handleSubMouseDown(e, i, sub.id, sub.x, sub.z) : undefined,
               })}
               {subHCm !== null && (
                 <text x={subDimX} y={subCy - 4} textAnchor="start" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">

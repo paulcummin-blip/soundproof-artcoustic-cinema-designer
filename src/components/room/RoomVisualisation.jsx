@@ -57,6 +57,7 @@ import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHand
 import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate";
 import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
 import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
+import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler";
 import { useMlpDragHandler } from "@/components/room/rv/hooks/useMlpDragHandler";
 import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
@@ -198,6 +199,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   } = props;
 
   const appState = useAppState();
+  const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
   const sharedBassResults = useOptionalSharedBassResults();
   const currentBassContract = sharedBassResults?.contract || null;
   const currentP19Result = currentBassContract?.productAnalysis?.parameters?.p19 || null;
@@ -1269,84 +1271,59 @@ const byId = useEntitiesById({
   //   2. Canonical subwooferInstances[] — updating position.x/y for matched
   //      instances by legacyGroup + index. IDs, models, enabled state, gain,
   //      delay, polarity, and bottomHeightM are preserved unchanged.
+  // Commit draft sub positions to real state on pointer release.
+  // Stage 2: Build one next canonical array by exact stable id, then call
+  // commitInstances once. The canonical array is written first, then both CFG
+  // mirrors are derived from that exact next array. No CFG-first writes and no
+  // separate setSubwooferInstances call. Disabled instances are preserved
+  // byte-equivalent. Blocked unless canonical status is VALID.
   const commitDraftSubPositions = useCallback(() => {
-    const labels = ['left', 'right'];
-    const toPositions = (draft, group) => draft.map((s, i) => ({
-      id: `${group}-sub-${labels[i] ?? i}`,
-      x: s.position.x,
-      y: s.position.y,
-      z: s.position.z ?? 0,
-    }));
+    if (!compat?.hasCanonicalInstances) return;
+    const currentInstances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+    if (currentInstances.length === 0) return;
 
-    // 1. Commit to legacy CFG (backward compatibility mirror)
-    if (draftFrontSubsRef.current && onSetFrontSubs) {
-      const positions = toPositions(draftFrontSubsRef.current, 'front');
-      onSetFrontSubs(prev => ({
-        ...prev,
-        positions,
-        count: Array.isArray(positions) ? positions.length : 0,
-        placementMode: 'manual',
-        isManual: true,
-      }));
+    // Build a map of draft positions by exact stable id.
+    const draftById = new Map();
+    if (Array.isArray(draftFrontSubsRef.current)) {
+      draftFrontSubsRef.current.forEach((s) => { if (s?.id) draftById.set(s.id, s); });
     }
-    if (draftRearSubsRef.current && onSetRearSubs) {
-      const positions = toPositions(draftRearSubsRef.current, 'rear');
-      onSetRearSubs(prev => ({
-        ...prev,
-        positions,
-        count: Array.isArray(positions) ? positions.length : 0,
-        placementMode: 'manual',
-        isManual: true,
-      }));
+    if (Array.isArray(draftRearSubsRef.current)) {
+      draftRearSubsRef.current.forEach((s) => { if (s?.id) draftById.set(s.id, s); });
     }
+    if (draftById.size === 0) return;
 
-    // 2. Commit to canonical subwooferInstances[] — update position.x/y only.
-    //    Walk the ORIGINAL array in order, matching by legacyGroup + index within
-    //    group. Use Number.isFinite() (NOT Number() || prev) so x=0 and y=0 are
-    //    valid coordinates. All other fields (id, model, enabled, bottomHeightM,
-    //    gainDb, delayMs, polarity) survive byte-equivalent for untouched instances.
-    //    Do NOT regroup the array — preserve original order.
-    const setSubwooferInstances = appState?.setSubwooferInstances;
-    if (typeof setSubwooferInstances === "function") {
-      const currentInstances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
-      if (currentInstances.length > 0) {
-        // Build per-group index counters to match draft entries to instances
-        const frontDraft = draftFrontSubsRef.current;
-        const rearDraft = draftRearSubsRef.current;
-        let frontIdx = 0;
-        let rearIdx = 0;
+    // Build one next canonical array by exact id. Update only x/y and
+    // positionSource for draft entries; preserve all unrelated and disabled
+    // instances byte-equivalent. Do not regroup — preserve original order.
+    let changed = false;
+    const next = currentInstances.map((inst) => {
+      if (!inst || inst.enabled === false) return inst;
+      const draft = draftById.get(inst.id);
+      if (!draft) return inst;
+      const dx = Number(draft.position?.x);
+      const dy = Number(draft.position?.y);
+      const prevX = Number(inst.position?.x);
+      const prevY = Number(inst.position?.y);
+      const newX = Number.isFinite(dx) ? dx : (Number.isFinite(prevX) ? prevX : 0);
+      const newY = Number.isFinite(dy) ? dy : (Number.isFinite(prevY) ? prevY : 0);
+      if (newX === prevX && newY === prevY && inst.positionSource === "user") return inst;
+      changed = true;
+      return {
+        ...inst,
+        position: { x: newX, y: newY },
+        positionSource: "user",
+      };
+    });
 
-        const next = currentInstances.map((inst) => {
-          if (!inst) return inst;
-          const group = inst.legacyGroup;
-          const draft = group === "front" ? frontDraft : group === "rear" ? rearDraft : null;
-          if (!draft) return inst; // Not a front/rear instance — untouched
+    if (!changed) return;
 
-          const draftSub = draft[group === "front" ? frontIdx : rearIdx];
-          if (group === "front") frontIdx++;
-          else rearIdx++;
-
-          if (!draftSub) return inst; // No matching draft entry — untouched
-
-          const dx = Number(draftSub.position?.x);
-          const dy = Number(draftSub.position?.y);
-          const prevX = Number(inst.position?.x);
-          const prevY = Number(inst.position?.y);
-
-          return {
-            ...inst,
-            position: {
-              x: Number.isFinite(dx) ? dx : (Number.isFinite(prevX) ? prevX : 0),
-              y: Number.isFinite(dy) ? dy : (Number.isFinite(prevY) ? prevY : 0),
-            },
-            positionSource: "user",
-          };
-        });
-
-        setSubwooferInstances(next);
-      }
-    }
-  }, [onSetFrontSubs, onSetRearSubs, appState?.setSubwooferInstances, appState?.subwooferInstances]);
+    // One canonical-first commit: instances once, then both CFG mirrors derived
+    // from the same next array.
+    compat.commitInstances(next, {
+      front: { placementMode: "manual", isManual: true },
+      rear: { placementMode: "manual", isManual: true },
+    });
+  }, [compat, appState?.subwooferInstances]);
 
   // Sub drag — delegated to hook (instantiated here so commitDraftSubPositions is in scope)
   const { handleSubDrag } = useSubDragHandler({

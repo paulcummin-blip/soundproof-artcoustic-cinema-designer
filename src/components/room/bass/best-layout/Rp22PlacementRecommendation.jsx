@@ -2,10 +2,9 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import Rp22RecommendationCard from "@/components/room/bass/best-layout/Rp22RecommendationCard";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
-import { coordinatesMatch, validateRecommendationLayout, buildAppliedConfigs, buildAppliedInstances, hasUnsupportedPlacement } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { coordinatesMatch, validateRecommendationLayout, buildAppliedInstances, hasUnsupportedPlacement } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 const levelText = (level) => Number.isFinite(level) ? (level > 0 ? `L${level}` : "FAIL") : "—";
-const cloneConfig = (config) => ({ ...config, positions: (config?.positions || []).map((position) => ({ ...position })) });
 
 /**
  * Trace subwoofer objects before/after Apply to prove tuning preservation.
@@ -35,8 +34,11 @@ function traceSubs(label, subs) {
   console.groupEnd();
 }
 
-export default function Rp22PlacementRecommendation({ roomDims, currentLayout, currentQuantityBest, upgradeBest, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, currentSubs, subwooferInstances, setSubwooferInstances }) {
+export default function Rp22PlacementRecommendation({ roomDims, currentLayout, currentQuantityBest, upgradeBest, frontSubsCfg, rearSubsCfg, setFrontSubsCfg, setRearSubsCfg, isRecalculating, currentSubs, subwooferInstances, commitInstances, hasCanonicalInstances }) {
   const [selected, setSelected] = useState(null);
+  // previous stores the COMPLETE prior canonical instance array for undo,
+  // not only CFG. Restore with one canonical-first commit. Preserve disabled
+  // history, order, IDs, mixed models and calibration.
   const [previous, setPrevious] = useState(null);
   const [applyError, setApplyError] = useState(null);
   const [applying, setApplying] = useState(false);
@@ -62,6 +64,11 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
 
   const apply = (layout) => {
     setApplyError(null);
+    // Status must be VALID; otherwise application is blocked.
+    if (!hasCanonicalInstances) {
+      setApplyError("Subwoofer instances are not valid. Cannot apply recommendation.");
+      return;
+    }
     // Validate before changing any state.
     const validation = validateRecommendationLayout(layout, roomDims);
     if (!validation.valid) {
@@ -72,20 +79,16 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
     traceSubs("BEFORE Apply", currentSubs);
     applyCountRef.current += 1;
     setApplying(true);
-    // Save previous config for undo.
-    setPrevious({ front: cloneConfig(frontSubsCfg), rear: cloneConfig(rearSubsCfg) });
-    // Build complete next-state configs with merged positions.
-    const nextConfigs = buildAppliedConfigs(layout, frontSubsCfg, rearSubsCfg);
-    // Apply both configs within the same event.
-    setFrontSubsCfg?.(nextConfigs.front);
-    setRearSubsCfg?.(nextConfigs.rear);
-    // Also update canonical subwooferInstances[] — update coordinates for
-    // matched instances by legacyGroup + index. IDs, models, enabled, gain,
-    // delay, polarity, and bottomHeightM are preserved.
-    if (typeof setSubwooferInstances === "function" && Array.isArray(subwooferInstances)) {
-      const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg);
-      setSubwooferInstances(nextInstances);
-    }
+    // Save the COMPLETE prior canonical instance array for undo (not only CFG).
+    setPrevious({ instances: Array.isArray(subwooferInstances) ? subwooferInstances.map((i) => ({ ...i })) : [] });
+    // Build the next canonical instance array from the recommendation layout.
+    const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg);
+    // One canonical-first commit: instances once, then both CFG mirrors derive
+    // afterward. No direct CFG-first setters.
+    commitInstances(nextInstances, {
+      front: { placementMode: "manual", isManual: true },
+      rear: { placementMode: "manual", isManual: true },
+    });
     // Close dialog if open.
     setSelected(null);
     // Clear applying state after the state updates are committed.
@@ -96,8 +99,9 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, c
     if (!previous) return;
     traceSubs("BEFORE Undo", currentSubs);
     applyCountRef.current += 1;
-    setFrontSubsCfg?.(previous.front);
-    setRearSubsCfg?.(previous.rear);
+    // Restore the complete prior canonical instance array with one canonical-first
+    // commit. Preserve disabled history, order, IDs, mixed models and calibration.
+    commitInstances(previous.instances);
     setPrevious(null);
     setApplyError(null);
   };

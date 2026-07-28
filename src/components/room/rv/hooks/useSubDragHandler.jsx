@@ -24,23 +24,20 @@ export function useSubDragHandler({
   // config is committed once on mouseup via useMouseUpHandler, not during drag.
 }) {
   const handleSubDrag = useCallback((subId, newCanvasPos) => {
-    // subId is canonical: "front-sub-0", "rear-sub-1", etc.
-    // byId may not contain these generated IDs, so resolve subType and subIndex directly.
-    const mId = String(subId).match(/^(front|rear)-sub-(\d+)$/);
-    if (!mId) return;
-
-    const subType = mId[1]; // "front" or "rear"
-    const subIndex = Number(mId[2]);
-
-    // Still attempt byId for position/model data; fall back to draft array entry
-    const sub = byId.get(subId) || (
-      subType === 'front'
-        ? draftFrontSubsRef.current?.[subIndex]
-        : draftRearSubsRef.current?.[subIndex]
-    );
-    if (!sub) return;
-    const draftArray = subType === 'front' ? draftFrontSubsRef.current : draftRearSubsRef.current;
-    if (!draftArray) return;
+    // subId is the sub's stable canonical id (or a generated front-sub-N/rear-sub-N
+    // id when seeding from CFG fallback). Resolve the dragged draft entry by exact
+    // stable id, not group index.
+    let draftArray = null;
+    let sub = null;
+    if (Array.isArray(draftFrontSubsRef.current)) {
+      sub = draftFrontSubsRef.current.find(s => s?.id === subId);
+      if (sub) draftArray = draftFrontSubsRef.current;
+    }
+    if (!sub && Array.isArray(draftRearSubsRef.current)) {
+      sub = draftRearSubsRef.current.find(s => s?.id === subId);
+      if (sub) draftArray = draftRearSubsRef.current;
+    }
+    if (!sub || !draftArray) return;
 
     const wall = draggedSubWallRef.current;
     if (!wall) return;
@@ -96,8 +93,8 @@ export function useSubDragHandler({
       return;
     }
 
-    // subIndex already resolved above from canonical ID
-    const subInDraft = draftArray[subIndex];
+    // Resolve the dragged draft entry by exact stable id (already found above as `sub`)
+    const subInDraft = sub;
 
     if (subInDraft) {
       subInDraft.position.x = finalX;
@@ -106,14 +103,15 @@ export function useSubDragHandler({
       setSubDragTick((n) => n + 1);
 
       // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
+      // by excluding the dragged stable id.
       if (draftArray.length === 2) {
-        const otherIndex = subIndex === 0 ? 1 : 0;
+        const other = draftArray.find(s => s?.id !== subId);
         const mirrorX = widthM - finalX;
         const clampedMirrorX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, mirrorX));
 
-        if (Number.isFinite(clampedMirrorX) && draftArray[otherIndex]) {
-          draftArray[otherIndex].position.x = clampedMirrorX;
-          draftArray[otherIndex].position.y = finalY;
+        if (other && Number.isFinite(clampedMirrorX)) {
+          other.position.x = clampedMirrorX;
+          other.position.y = finalY;
         }
       }
     }

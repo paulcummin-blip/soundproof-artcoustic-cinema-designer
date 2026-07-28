@@ -347,6 +347,8 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
               setRearSubsCfg={appState?.setRearSubsCfg}
               subwooferInstances={appState?.subwooferInstances}
               setSubwooferInstances={appState?.setSubwooferInstances}
+              commitInstances={compat.commitInstances}
+              hasCanonicalInstances={compat.hasCanonicalInstances}
             />
           </div>
         </div>

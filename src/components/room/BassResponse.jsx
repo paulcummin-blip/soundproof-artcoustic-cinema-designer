@@ -37,11 +37,14 @@ import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTrac
 import EqDiscoveryAuditPanel from "@/components/room/bass/EqDiscoveryAuditPanel";
 import Test11GentlePeakCutValidation from "@/components/room/bass/Test11GentlePeakCutValidation";
 import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCurveNormalisation";
+import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 
 const IS_DEVELOPMENT_MODE = false;
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings }) {
-  const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = useAppState();
+  const appState = useAppState();
+  const { setFrontSubsCfg, setRearSubsCfg, designEqEnabled, setDesignEqEnabled } = appState;
+  const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
   const sharedBassResults = useSharedBassResults();
   const authoritative = sharedBassResults.authoritative;
   const {
@@ -76,6 +79,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     if (autoAlignDelays[canonicalId] != null) return autoAlignDelays[canonicalId];
     return autoAlignDelays[`sub-${group}-${index + 1}`] ?? 0;
   };
+
+  // Enabled canonical instances per group, enriched with auto-delay readout.
+  // Rendered with their exact stable ids and canonical gainDb/delayMs/polarity.
+  const frontTuningInstances = useMemo(() => {
+    const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+    return instances
+      .filter((i) => i?.legacyGroup === "front" && i?.enabled !== false)
+      .map((inst, i) => ({
+        ...inst,
+        autoDelayMs: resolveAutoDelayForSub(`front-sub-${["left", "right"][i] ?? i}`, "front", i),
+      }));
+  }, [appState?.subwooferInstances, autoAlignDelays]);
+
+  const rearTuningInstances = useMemo(() => {
+    const instances = Array.isArray(appState?.subwooferInstances) ? appState.subwooferInstances : [];
+    return instances
+      .filter((i) => i?.legacyGroup === "rear" && i?.enabled !== false)
+      .map((inst, i) => ({
+        ...inst,
+        autoDelayMs: resolveAutoDelayForSub(`rear-sub-${["left", "right"][i] ?? i}`, "rear", i),
+      }));
+  }, [appState?.subwooferInstances, autoAlignDelays]);
 
   // Safe number conversion and formatting
   const toNum = (v) => {
@@ -969,32 +994,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
       {/* Sub Tuning Controls */}
       <div className="space-y-4">
-        {frontSubsCfg?.count > 0 && (
+        {frontTuningInstances.length > 0 && (
           <div>
             <div className="text-sm font-medium text-[#1B1A1A] mb-3">Front Subwoofer Tuning</div>
             <SubTuningControls
-              subsCfg={frontSubsCfg}
+              instances={frontTuningInstances}
               groupLabel="Front"
-              autoAlignDelays={autoAlignDelays}
               showManualDelay={true}
-              onSettingsChange={(newSettings) => {
-                setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
-              }}
+              onCalibrationChange={(instanceId, calibration) => compat.setInstanceCalibration(instanceId, calibration)}
             />
           </div>
         )}
 
-        {rearSubsCfg?.count > 0 && (
+        {rearTuningInstances.length > 0 && (
           <div>
             <div className="text-sm font-medium text-[#1B1A1A] mb-3">Rear Subwoofer Tuning</div>
             <SubTuningControls
-              subsCfg={rearSubsCfg}
+              instances={rearTuningInstances}
               groupLabel="Rear"
-              autoAlignDelays={autoAlignDelays}
               showManualDelay={true}
-              onSettingsChange={(newSettings) => {
-                setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
-              }}
+              onCalibrationChange={(instanceId, calibration) => compat.setInstanceCalibration(instanceId, calibration)}
             />
           </div>
         )}
