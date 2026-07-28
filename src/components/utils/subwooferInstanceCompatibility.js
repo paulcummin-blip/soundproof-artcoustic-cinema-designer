@@ -200,17 +200,6 @@ export function applyEnableChange(instances, group, enabled) {
 }
 
 /**
- * Update orientation for instances in a legacy group.
- * Only the orientation field is changed; IDs, positions, calibration survive.
- */
-export function applyOrientationChange(instances, group, orientation) {
-  const orient = String(orientation || "vertical").trim();
-  return instances.map((inst) =>
-    inst?.legacyGroup === group ? { ...inst, orientation: orient } : inst
-  );
-}
-
-/**
  * Apply a placement preset to instances in a legacy group.
  * Updates coordinates only — IDs, models, enabled, calibration survive.
  */
@@ -285,14 +274,12 @@ export function mirrorInstancesToCfg(instances, currentFrontCfg, currentRearCfg)
       y: Number(inst.position?.y) || 0,
     }));
     const bottomHeightM = Number(groupInstances[0]?.bottomHeightM);
-    const orientation = groupInstances[0]?.orientation ?? currentCfg?.orientation ?? "vertical";
     return {
       ...(currentCfg || {}),
       model,
       count: groupInstances.length,
       positions,
       bottomHeightM: Number.isFinite(bottomHeightM) ? bottomHeightM : (currentCfg?.bottomHeightM ?? 0.05),
-      orientation,
     };
   };
 

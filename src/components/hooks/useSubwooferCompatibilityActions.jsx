@@ -25,7 +25,6 @@ import {
   applyCountChange,
   applyBottomHeightChange,
   applyPlacementPreset,
-  applyOrientationChange,
   mirrorInstancesToCfg,
 } from "@/components/utils/subwooferInstanceCompatibility";
 import { isValidInstanceArray } from "@/components/utils/subwooferInstanceMigration";
@@ -135,23 +134,6 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     commit(next, null, rearCfg);
   }, [hasCanonical, instances, rearSubsCfg, appState?.roomDims, mirrorBoth, commit]);
 
-  // --- Orientation change ---
-  const setFrontOrientation = useCallback((orientation) => {
-    if (!hasCanonical) return;
-    const next = applyOrientationChange(instances, "front", orientation);
-    const cfgs = mirrorBoth(next);
-    const frontCfg = { ...cfgs.front, orientation };
-    commit(next, frontCfg, null);
-  }, [hasCanonical, instances, mirrorBoth, commit]);
-
-  const setRearOrientation = useCallback((orientation) => {
-    if (!hasCanonical) return;
-    const next = applyOrientationChange(instances, "rear", orientation);
-    const cfgs = mirrorBoth(next);
-    const rearCfg = { ...cfgs.rear, orientation };
-    commit(next, null, rearCfg);
-  }, [hasCanonical, instances, mirrorBoth, commit]);
-
   return {
     hasCanonicalInstances: hasCanonical,
     setFrontSubModel,
@@ -162,7 +144,5 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     setRearBottomHeight,
     applyFrontPlacementPreset,
     applyRearPlacementPreset,
-    setFrontOrientation,
-    setRearOrientation,
   };
 }
