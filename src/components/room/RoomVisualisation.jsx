@@ -299,6 +299,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
   const [subDragTick, setSubDragTick] = useState(0);
+  const [subSnapState, setSubSnapState] = useState(null);
   const rvWrapRef = useRef(null);
   const { dragging, draggedItemId, dragType } = dragState;
   const [draggingRole, setDraggingRole] = useState(null);
@@ -1331,6 +1332,7 @@ const byId = useEntitiesById({
     draggedSubTypeRef, draggedSubWallRef, dragOffsetRoomRef,
     draftFrontSubsRef, draftRearSubsRef,
     setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
+    setSubSnapState,
   });
 
   // Commit draft seat positions to real state once on pointer release
@@ -1442,6 +1444,11 @@ const byId = useEntitiesById({
     mlpDragActiveRef.current = false;
     _handleMouseUpRaw(e);
   }, [_handleMouseUpRaw]);
+
+  // Clear drag-time sub symmetry snap guide when no sub is being dragged
+  useEffect(() => {
+    if (!dragging || dragType !== "sub") setSubSnapState(null);
+  }, [dragging, dragType]);
 
   // Window-level drag cleanup — fires for ALL drag types when mouse is released outside the SVG
   useEffect(() => {
@@ -2032,6 +2039,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         speakerTooltip={speakerTooltip}
         hudPosition={hudBasePosPx}
         subDragTick={subDragTick}
+        subSnapState={subSnapState}
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
         lastValidDraftRearSubs={_lastValidDraftRearSubsRef.current}
         draftSeatsRef={draftSeatsRef}

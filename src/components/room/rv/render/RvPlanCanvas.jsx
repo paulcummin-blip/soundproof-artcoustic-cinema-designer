@@ -19,6 +19,7 @@ import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
 import RvMlpDragDims from "@/components/room/rv/render/RvMlpDragDims";
+import RvSubSymmetryGuide from "@/components/room/rv/render/RvSubSymmetryGuide";
 
 export default function RvPlanCanvas({
   svgRef,
@@ -130,6 +131,7 @@ export default function RvPlanCanvas({
   speakerTooltip,
   hudPosition,  // canvas-pixel position of the HUD card (hudBasePosPx from parent)
   subDragTick,  // incremented on every sub draft update — forces re-read of draft refs
+  subSnapState,  // drag-time symmetry snap guide state (null when inactive)
   lastValidDraftFrontSubs,
   lastValidDraftRearSubs,
   // Seat draft (transient positions during seat drag)
@@ -556,6 +558,17 @@ export default function RvPlanCanvas({
                 </>
               );
             })()}
+
+            {/* Stage 2B.4: drag-time subwoofer symmetry snap guide */}
+            <RvSubSymmetryGuide
+              subSnapState={subSnapState}
+              draggedItemId={draggedItemId}
+              frontLive={frontLive}
+              rearLive={rearLive}
+              toPx={toPx}
+              widthM={widthM}
+              lengthM={lengthM}
+            />
 
             {/* Layer 9: Draggable Seating Positions */}
             <RvSeatLayer seatingPositions={seatsLive} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />

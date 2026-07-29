@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { findSymmetrySnap } from "@/components/room/rv/utils/subSymmetrySnap";
 
 /**
  * useSubDragHandler
@@ -20,6 +21,7 @@ export function useSubDragHandler({
   draftFrontSubsRef,
   draftRearSubsRef,
   setSubDragTick,
+  setSubSnapState,
   // idleCommitTimerRef and commitDraftSubPositions intentionally omitted:
   // config is committed once on mouseup via useMouseUpHandler, not during drag.
 }) {
@@ -80,6 +82,30 @@ export function useSubDragHandler({
       return;
     }
 
+    // Stage 2B.4 — drag-time symmetry snap assistance.
+    // Snaps the dragged sub to the mirrored position of an enabled partner in
+    // the same group when within threshold. No permanent lock, no linked
+    // movement; the partner is never moved. Final stored coordinates remain
+    // independent.
+    let snapResult = null;
+    try {
+      snapResult = findSymmetrySnap({
+        draggedSub: sub,
+        draftArray,
+        widthM,
+        lengthM,
+        candidateX: finalX,
+        candidateY: finalY,
+      });
+    } catch (_) { /* snap is best-effort, never blocks drag */ }
+    if (snapResult) {
+      finalX = snapResult.snappedX;
+      finalY = snapResult.snappedY;
+    }
+    if (typeof setSubSnapState === "function") {
+      setSubSnapState(snapResult);
+    }
+
     // Resolve the dragged draft entry by exact stable id (already found above as `sub`)
     const subInDraft = sub;
 
@@ -94,7 +120,7 @@ export function useSubDragHandler({
     // commitDraftSubPositions() is called once on mouseup via useMouseUpHandler.
   }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM,
       draggedSubTypeRef, draftFrontSubsRef, draftRearSubsRef,
-      setSubDragTick]);
+      setSubDragTick, setSubSnapState]);
 
   return { handleSubDrag };
 }
