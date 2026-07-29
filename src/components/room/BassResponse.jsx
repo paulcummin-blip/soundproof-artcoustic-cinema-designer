@@ -181,6 +181,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [overlayProduction, setOverlayProduction] = useState(false);
   const [showRsp, setShowRsp] = useState(true);
   const [showRealSeatOverlays, setShowRealSeatOverlays] = useState(false);
+  // EQ response overlay toggles — control visibility of raw and post-EQ traces
+  const [showRawResponse, setShowRawResponse] = useState(true);
+  const [showOptimisedResponse, setShowOptimisedResponse] = useState(true);
 
   // Modal Resonance Line Toggles — display-only, session-only state. Does not affect
   // bass calculation, SPL response, or mode generation; only filters which resonance
@@ -366,6 +369,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   }), [designEqEnabled, showHouseCurve, normalizedSeries, rspRawCurve, optimisationResult,
     hasValidDetailedResult, multiSeries, selectedSeatIds, showRealSeatOverlays, bassSmoothingMode,
     overlayProductionSeries, showRewOverlay, rewOverlaySeries, operatingLevelOffsetDb]);
+
+  const visibleMultiSeries = useMemo(() => {
+    if (!designEqEnabled) return multiSeriesForGraph;
+    return multiSeriesForGraph.filter((series) => {
+      if (series.kind === "raw") return showRawResponse;
+      if (series.kind === "post-eq") return showOptimisedResponse;
+      return true;
+    });
+  }, [multiSeriesForGraph, designEqEnabled, showRawResponse, showOptimisedResponse]);
 
   const graphStatusText = detailedEqStatusText({
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
@@ -601,6 +613,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show house curve:</span>
               <Switch checked={showHouseCurve} onCheckedChange={setHouseCurveOverride} />
             </div>
+            {designEqEnabled && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={showRawResponse} onChange={(e) => setShowRawResponse(e.target.checked)} style={{ cursor: 'pointer' }} />
+                  Raw
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={showOptimisedResponse} onChange={(e) => setShowOptimisedResponse(e.target.checked)} style={{ cursor: 'pointer' }} />
+                  Optimised
+                </label>
+              </div>
+            )}
             {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Show real-seat overlays:</span>
@@ -659,9 +683,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         />
 
         {/* Fixed curve key — derived from series metadata so the key, graph and tooltip cannot drift apart */}
-        {multiSeriesForGraph.length > 0 && (() => {
-          const primaryCurves = multiSeriesForGraph.filter(s => s.kind === "raw" || s.kind === "post-eq" || s.kind === "maximum-spl" || s.kind === "house-curve" || s.kind === "normalized-target");
-          const realSeatOverlays = multiSeriesForGraph.filter(s => s.kind === "real-seat-overlay");
+        {visibleMultiSeries.length > 0 && (() => {
+          const primaryCurves = visibleMultiSeries.filter(s => s.kind === "raw" || s.kind === "post-eq" || s.kind === "maximum-spl" || s.kind === "house-curve" || s.kind === "normalized-target");
+          const realSeatOverlays = visibleMultiSeries.filter(s => s.kind === "real-seat-overlay");
           if (primaryCurves.length === 0) return null;
           return (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", marginBottom: 8, padding: "6px 10px", background: "#F8F8F7", border: "1px solid #DCDBD6", borderRadius: 6 }}>
@@ -686,10 +710,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         })()}
 
         <div className="mt-4">
-          {multiSeriesForGraph.length > 0 ? (
+          {visibleMultiSeries.length > 0 ? (
             <BassGraph
-              multiSeries={multiSeriesForGraph}
-              responseData={(designEqEnabled ? multiSeriesForGraph.find((series) => series.id.endsWith("-eq")) : multiSeriesForGraph[0])?.data ?? []}
+              multiSeries={visibleMultiSeries}
+              responseData={(designEqEnabled ? visibleMultiSeries.find((series) => series.id.endsWith("-eq")) : visibleMultiSeries[0])?.data ?? []}
               schroederFrequency={schroederFrequency}
               rp22Levels={[]}
               toggles={{}}
@@ -701,7 +725,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               rewStyleMode={true}
               yDomain={graphScaleMode === 'rew_fixed' ? [70, 140] : undefined}
               xDomain={graphScaleMode === 'rew_fixed'
-                ? (multiSeriesForGraph[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200])
+                ? (visibleMultiSeries[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200])
                 : [15, 200]}
               showAxialOnly={false}
               refDb={85}
