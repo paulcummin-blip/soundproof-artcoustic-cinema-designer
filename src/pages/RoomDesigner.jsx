@@ -64,6 +64,7 @@ import { useInRoomDepths } from "@/components/hooks/useInRoomDepths";
 import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
 import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
+import ViewModeLayout from "@/components/roomdesigner/ViewModeLayout";
 import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerControlsPanel";
@@ -302,6 +303,8 @@ function RoomDesignerWithState() {
   const [leftPanelView, setLeftPanelView] = useState('plan'); // 'plan' | 'front' | 'side'
   const [rightPanelView, setRightPanelView] = useState('controls'); // 'controls' | 'isometric' | 'data'
   const [sideElevationWall, setSideElevationWall] = useState('right'); // 'left' | 'right'
+  // Workspace view mode: 'split' (default) | 'plan' | 'technical'. Presentation only.
+  const [viewMode, setViewMode] = useState('split');
 
   // --- bed rears required? (SBL/SBR) ---
   const layoutMajor = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) || 5;
@@ -1670,9 +1673,12 @@ function RoomDesignerWithState() {
         onNewProject={handleNewProject}
         onSaveToExistingProject={handleSaveToExistingProject}
         existingProjects={existingProjects}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
       />
 
-      <ResizableTwoColumnLayout
+      <ViewModeLayout
+        viewMode={viewMode}
         initialLeftWidth={720}
         minLeftWidth={480}
         minRightWidth={420}
