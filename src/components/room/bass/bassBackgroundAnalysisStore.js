@@ -185,7 +185,7 @@ export class BassBackgroundAnalysisController {
 
     if (fingerprint !== this.manualAuthorityFingerprint) {
       this.manualAuthorityFingerprint = null;
-    } else if (this.state.status === "queued" || this.state.status === "calculating" || this.state.status === "ready") {
+    } else if (this.state.status === "queued" || this.state.status === "calculating" || this.state.status === "ready" || this.state.status === "stale") {
       return { action: "manual_authority_preserved" };
     }
 
@@ -270,6 +270,11 @@ export class BassBackgroundAnalysisController {
     this.pending = null;
     this.cancelActive();
     this.manualAuthorityFingerprint = fingerprint;
+    // Bypass the LRU cache for a forced manual recalculation so the worker
+    // MUST produce a genuinely fresh result with the current live EQ code.
+    // Normal cache reuse for automatic renders is unaffected — the cache
+    // is repopulated when the worker completes.
+    this.cache.entries.delete(fingerprint);
     const staleResult = this.state.result || this.state.staleResult;
     this.emit({
       status: staleResult ? "stale" : "queued", currentCalibrationFingerprint: fingerprint,
