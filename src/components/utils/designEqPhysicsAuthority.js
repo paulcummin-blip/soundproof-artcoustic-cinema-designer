@@ -27,8 +27,19 @@ export function classifyEqCorrectionRegion({ frequency, rawSpl, currentSpl, targ
   const currentResidualDb = finite(currentSpl) && finite(targetSpl) ? Number(currentSpl) - Number(targetSpl) : rawResidualDb;
   if (protectedNull) return { classification: "Null", expectedAction: "Protect", rawResidualDb, currentResidualDb,
     reason: "Deep narrow cancellation region is protected from corrective EQ." };
-  if ((finite(rawResidualDb) && rawResidualDb > PEAK_CLASSIFICATION_THRESHOLD_DB)
-    || (finite(currentResidualDb) && currentResidualDb > PEAK_CLASSIFICATION_THRESHOLD_DB)) {
+  // Width-aware peak classification (Sound Proof design prediction mode):
+  // A local raw peak inside a broad deficit should not veto corrective boost.
+  // Broad regions (>= 1/3 octave) are evaluated by the resulting corrected
+  // response, not by a single raw sample. Only narrow (high-Q) positive
+  // residuals above the threshold are treated as true modal peaks (cut-only).
+  // This preserves narrow peak protection while allowing broad deficits to
+  // receive boost up to the +6 dB EQ limit, predicting what a competent
+  // cinema calibrator would achieve.
+  const isBroadRegion = finite(widthOctaves) && widthOctaves >= 1 / 3;
+  const trendShowsPeak = finite(currentResidualDb) && currentResidualDb > PEAK_CLASSIFICATION_THRESHOLD_DB;
+  const rawPeakVetoesBoost = finite(rawResidualDb) && rawResidualDb > PEAK_CLASSIFICATION_THRESHOLD_DB
+    && !isBroadRegion;
+  if (trendShowsPeak || rawPeakVetoesBoost) {
     return { classification: "Peak", expectedAction: "Cut", rawResidualDb, currentResidualDb,
       reason: "Positive response residual exceeds the peak threshold and may only receive attenuation." };
   }
