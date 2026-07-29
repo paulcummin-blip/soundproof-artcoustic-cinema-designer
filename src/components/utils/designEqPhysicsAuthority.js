@@ -3,6 +3,12 @@ import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection
 
 const finite = (value) => Number.isFinite(Number(value));
 
+// Peak classification threshold (dB). Response residuals above this value
+// are treated as modal peaks (cut-only). Small positive deviations below
+// this threshold remain eligible for normal corrective boost so broad
+// deficits below the house curve are not blocked by minor local variation.
+const PEAK_CLASSIFICATION_THRESHOLD_DB = 2.5;
+
 export function curveSplAt(curve, frequency) {
   const points = (Array.isArray(curve) ? curve : []).filter((point) => finite(point?.frequency) && finite(point?.spl));
   if (!points.length || !finite(frequency)) return null;
@@ -21,9 +27,10 @@ export function classifyEqCorrectionRegion({ frequency, rawSpl, currentSpl, targ
   const currentResidualDb = finite(currentSpl) && finite(targetSpl) ? Number(currentSpl) - Number(targetSpl) : rawResidualDb;
   if (protectedNull) return { classification: "Null", expectedAction: "Protect", rawResidualDb, currentResidualDb,
     reason: "Deep narrow cancellation region is protected from corrective EQ." };
-  if ((finite(rawResidualDb) && rawResidualDb > 1) || (finite(currentResidualDb) && currentResidualDb > 1)) {
+  if ((finite(rawResidualDb) && rawResidualDb > PEAK_CLASSIFICATION_THRESHOLD_DB)
+    || (finite(currentResidualDb) && currentResidualDb > PEAK_CLASSIFICATION_THRESHOLD_DB)) {
     return { classification: "Peak", expectedAction: "Cut", rawResidualDb, currentResidualDb,
-      reason: "Positive response residual is treated as a modal peak and may only receive attenuation." };
+      reason: "Positive response residual exceeds the peak threshold and may only receive attenuation." };
   }
   const narrowDeepDeficit = finite(currentResidualDb) && currentResidualDb <= -10 && finite(widthOctaves) && widthOctaves < 1 / 3;
   if (narrowDeepDeficit) return { classification: "Null", expectedAction: "Protect", rawResidualDb, currentResidualDb,
