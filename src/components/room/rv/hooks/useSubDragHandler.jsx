@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { findSymmetrySnap } from "@/components/room/rv/utils/subSymmetrySnap";
+import { deriveSubWallOrientation, subHalfExtents } from "@/components/room/rv/utils/subWallOrientation";
 
 /**
  * useSubDragHandler
@@ -54,18 +55,43 @@ export function useSubDragHandler({
     const dims = getModelDimsM(sub.model);
     const w = (Number.isFinite(dims.widthM) && dims.widthM > 0) ? dims.widthM : 0.50;
     const d = (Number.isFinite(dims.depthM) && dims.depthM > 0) ? dims.depthM : 0.30;
-    const halfW = w / 2;
-    const halfD = d / 2;
     const EPS = 0.01;
 
-    // Free movement: clamp to room bounds only (no wall pinning).
-    const minX = halfW + EPS;
-    const maxX = widthM - halfW - EPS;
-    const minY = halfD + EPS;
-    const maxY = lengthM - halfD - EPS;
+    // Stage 2B.5 — wall-aware cabinet orientation.
+    // Derive cabinet rotation from the raw candidate position, then compute
+    // rotation-aware half-extents for 10 mm wall-clearance clamping. Two-pass
+    // (re-derive from clamped position) so clamping into a wall zone converges.
+    // Physical placement only — does not affect acoustic source or bass sim.
+    let _orient = deriveSubWallOrientation({
+      x: anchoredX, y: anchoredY, widthM, lengthM, subWidthM: w, subDepthM: d,
+    });
+    let _ext = subHalfExtents(w, d, _orient.rotationDeg);
+
+    let minX = _ext.halfX + EPS;
+    let maxX = widthM - _ext.halfX - EPS;
+    let minY = _ext.halfY + EPS;
+    let maxY = lengthM - _ext.halfY - EPS;
 
     let finalX = Math.max(minX, Math.min(maxX, anchoredX));
     let finalY = Math.max(minY, Math.min(maxY, anchoredY));
+
+    // Re-derive orientation from the clamped position (clamping may have moved
+    // the sub into a wall zone) and re-clamp once if the rotation changed.
+    let finalRot = deriveSubWallOrientation({
+      x: finalX, y: finalY, widthM, lengthM, subWidthM: w, subDepthM: d,
+    }).rotationDeg;
+    if (finalRot !== _orient.rotationDeg) {
+      _ext = subHalfExtents(w, d, finalRot);
+      minX = _ext.halfX + EPS;
+      maxX = widthM - _ext.halfX - EPS;
+      minY = _ext.halfY + EPS;
+      maxY = lengthM - _ext.halfY - EPS;
+      finalX = Math.max(minX, Math.min(maxX, anchoredX));
+      finalY = Math.max(minY, Math.min(maxY, anchoredY));
+      finalRot = deriveSubWallOrientation({
+        x: finalX, y: finalY, widthM, lengthM, subWidthM: w, subDepthM: d,
+      }).rotationDeg;
+    }
 
     // Safety: if final position is invalid, fallback to previous or center
     if (!Number.isFinite(finalX)) {
@@ -112,6 +138,7 @@ export function useSubDragHandler({
     if (subInDraft) {
       subInDraft.position.x = finalX;
       subInDraft.position.y = finalY;
+      subInDraft.rotationDeg = finalRot;
 
       setSubDragTick((n) => n + 1);
     }

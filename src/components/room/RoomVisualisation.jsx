@@ -1303,15 +1303,19 @@ const byId = useEntitiesById({
       if (!draft) return inst;
       const dx = Number(draft.position?.x);
       const dy = Number(draft.position?.y);
+      const dRot = Number(draft.rotationDeg);
       const prevX = Number(inst.position?.x);
       const prevY = Number(inst.position?.y);
+      const prevRot = Number(inst.rotationDeg) || 0;
       const newX = Number.isFinite(dx) ? dx : (Number.isFinite(prevX) ? prevX : 0);
       const newY = Number.isFinite(dy) ? dy : (Number.isFinite(prevY) ? prevY : 0);
-      if (newX === prevX && newY === prevY && inst.positionSource === "user") return inst;
+      const newRot = Number.isFinite(dRot) ? dRot : prevRot;
+      if (newX === prevX && newY === prevY && newRot === prevRot && inst.positionSource === "user") return inst;
       changed = true;
       return {
         ...inst,
         position: { x: newX, y: newY },
+        rotationDeg: newRot,
         positionSource: "user",
       };
     });

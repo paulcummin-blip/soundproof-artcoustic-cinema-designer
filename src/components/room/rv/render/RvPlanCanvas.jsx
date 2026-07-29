@@ -20,6 +20,7 @@ import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
 import RvMlpDragDims from "@/components/room/rv/render/RvMlpDragDims";
 import RvSubSymmetryGuide from "@/components/room/rv/render/RvSubSymmetryGuide";
+import { getSubRotationDeg } from "@/components/room/rv/utils/subWallOrientation";
 
 export default function RvPlanCanvas({
   svgRef,
@@ -474,6 +475,11 @@ export default function RvPlanCanvas({
                       const [cx, cy] = toPx(sub.position.x, sub.position.y);
                       const w = subWm * scale;
                       const d = subDm * scale;
+                      // Stage 2B.5 — wall-aware cabinet orientation (0° front/rear, 90° side walls).
+                      // Physical placement only; does not affect acoustic source or bass simulation.
+                      const rot = getSubRotationDeg(sub, subWm, subDm, widthM, lengthM);
+                      const hitW = rot === 90 ? d : w;
+                      const hitH = rot === 90 ? w : d;
 
                       const handlePointerDown = (e) => {
                         e.preventDefault();
@@ -510,40 +516,42 @@ export default function RvPlanCanvas({
                           onPointerCancel={handlePointerUp}
                         >
                           <rect
-                            x={cx - w / 2}
-                            y={cy - d / 2}
-                            width={w}
-                            height={d}
+                            x={cx - hitW / 2}
+                            y={cy - hitH / 2}
+                            width={hitW}
+                            height={hitH}
                             fill="transparent"
                             pointerEvents="all"
                           />
-                          <rect
-                            x={cx - w / 2}
-                            y={cy - d / 2}
-                            width={w}
-                            height={d}
-                            rx={0}
-                            ry={0}
-                            fill="#1a1a1a"
-                            stroke="none"
-                            strokeWidth={0}
-                            opacity={0.8}
-                            pointerEvents="none"
-                          />
-                          {isSelected && (
+                          <g transform={rot ? `rotate(${rot} ${cx} ${cy})` : undefined} pointerEvents="none">
                             <rect
-                              x={cx - w / 2 - 4}
-                              y={cy - d / 2 - 4}
-                              width={w + 8}
-                              height={d + 8}
-                              rx={2}
-                              ry={2}
-                              fill="none"
-                              stroke="#213428"
-                              strokeWidth={2}
+                              x={cx - w / 2}
+                              y={cy - d / 2}
+                              width={w}
+                              height={d}
+                              rx={0}
+                              ry={0}
+                              fill="#1a1a1a"
+                              stroke="none"
+                              strokeWidth={0}
+                              opacity={0.8}
                               pointerEvents="none"
                             />
-                          )}
+                            {isSelected && (
+                              <rect
+                                x={cx - w / 2 - 4}
+                                y={cy - d / 2 - 4}
+                                width={w + 8}
+                                height={d + 8}
+                                rx={2}
+                                ry={2}
+                                fill="none"
+                                stroke="#213428"
+                                strokeWidth={2}
+                                pointerEvents="none"
+                              />
+                            )}
+                          </g>
                         </g>
                       );
                     })}
