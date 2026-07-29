@@ -265,6 +265,7 @@ export class BassBackgroundAnalysisController {
       identity,
       collectDiagnostics: collectDiagnostics === true,
       origin: "manual-forced",
+      diagnosticToken: diagnosticToken || null,
     };
     this.clearQueuedTimer();
     this.pending = null;
@@ -311,6 +312,7 @@ export class BassBackgroundAnalysisController {
       startedAtMs,
       collectDiagnostics: request.collectDiagnostics === true,
       origin: request.origin,
+      diagnosticToken: request.diagnosticToken || null,
     };
     recordDiagStage(null, "startRequest", { startRequestCollectDiagnostics: this.activeRequest.collectDiagnostics, startRequestOrigin: this.activeRequest.origin, startRequestId: requestId });
     try {
@@ -329,6 +331,7 @@ export class BassBackgroundAnalysisController {
         payload: request.payload,
         collectDiagnostics: request.collectDiagnostics === true,
         origin: request.origin,
+        diagnosticToken: request.diagnosticToken || null,
         dispatchedAtMs: this.now(),
       };
       recordDiagStage(null, "worker.postMessage", { postMessageCollectDiagnostics: workerRequest.collectDiagnostics, postMessageOrigin: workerRequest.origin, postMessageRequestId: workerRequest.requestId });
@@ -392,7 +395,7 @@ export class BassBackgroundAnalysisController {
       engineVersion: message.engineVersion,
       resultSchemaVersion: message.resultSchemaVersion,
       calculationTimeMs: completedAtMs - active.startedAtMs, completedAtMs,
-      diagnosticToken: active.diagnosticToken,
+      diagnosticToken: active.diagnosticToken || message.diagnosticToken || null,
       workerRequestId: active.requestId,
     };
     recordDiagStage(active.diagnosticToken, "worker-completed", { completedRequestId: active.requestId, completedToken: active.diagnosticToken, resultRequestId: result.workerRequestId, resultToken: result.diagnosticToken });

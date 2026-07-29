@@ -9,6 +9,7 @@ import LiveResultAuthorityDiagnostic, { shouldShowLiveResultAuthorityDiagnostic 
 import ExactHouseCurveCaseCaptureButton from "./ExactHouseCurveCaseCaptureButton";
 import BassCapabilityReceiptDiagnostic from "./BassCapabilityReceiptDiagnostic";
 import DesignEqLifecycleDiagnostic from "./DesignEqLifecycleDiagnostic";
+import DesignEqDiagnosticTrace from "./DesignEqDiagnosticTrace";
 
 export default function BassEngineeringDetails({ enabled, designEqEnabled, result, rspPosition, seatingPositions, contract, detailedStatus, rspRawCurve, perSeatRawCurves, priorityMode, onPriorityChange, systemLimits, multiSeries, runtimeCapture, smoothingMode, lifecycle, graphCandidateId, graphFilterBankSignature, graphSeries, transitionFrequencyHz, normalizedTransferResult }) {
   if (!enabled) return null;
@@ -39,6 +40,15 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
         profileConfig={result.selectedCandidate?.designEqFitProfileConfig}
       />
       <DesignEqLifecycleDiagnostic result={result} rspRawCurve={rspRawCurve} graphCandidateId={graphCandidateId} graphFilterBankSignature={graphFilterBankSignature} />
+      <DesignEqDiagnosticTrace
+        diagnosticToken={lifecycle?.result?.diagnosticToken || result?.diagnosticToken || null}
+        lifecycle={lifecycle}
+        result={lifecycle?.result || null}
+        optimisationResult={result}
+        contract={contract}
+        rspRawCurve={rspRawCurve}
+        collectDiagnostics={enabled}
+      />
       <SourceDomainCapabilityDiagnostic activeSubs={systemLimits.activeSubs} rawCurve={baseCurve} postEqCurve={result.finalPostEqCurve} usableLfHz={systemLimits.usableLfHz} optimisationResult={result} />
     </>}
     <ProductionVectorCaptureTest10 capture={runtimeCapture} designEqEnabled={designEqEnabled} smoothingMode={smoothingMode} />

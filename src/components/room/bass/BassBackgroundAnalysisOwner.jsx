@@ -8,6 +8,7 @@ import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore"
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
 import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
+import { createDiagToken } from "./bassDiagTokenTrace";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -190,12 +191,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [controller, lifecycle.resultFingerprint, lifecycle.activeJobId, optimisationResult]);
   const onRetry = useCallback(
     ({ collectDiagnostics = false, force = true } = {}) => {
+      const diagnosticToken = collectDiagnostics ? createDiagToken("manual-forced") : null;
       return controller.requestManual({
         fingerprint: cacheKey,
         payload,
         identity: requestIdentity,
         collectDiagnostics: collectDiagnostics === true,
         force: force === true,
+        diagnosticToken,
         });
     },
     [controller, cacheKey, payload, requestIdentity]
