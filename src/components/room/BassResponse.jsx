@@ -617,11 +617,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
                   <input type="checkbox" checked={showRawResponse} onChange={(e) => setShowRawResponse(e.target.checked)} style={{ cursor: 'pointer' }} />
-                  Raw
+                  Before EQ
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#625143', fontFamily: 'monospace', cursor: 'pointer' }}>
                   <input type="checkbox" checked={showOptimisedResponse} onChange={(e) => setShowOptimisedResponse(e.target.checked)} style={{ cursor: 'pointer' }} />
-                  Optimised
+                  After EQ
                 </label>
               </div>
             )}

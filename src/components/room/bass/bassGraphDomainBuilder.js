@@ -105,7 +105,7 @@ export function buildBassGraphSeries({
     series = seatValidationActive
       ? selectedRawSeats.map((seat) => ({ ...seat, id: `${seat.id}-raw`, kind: "raw", label: `${seat.id} before EQ`, tooltipLabel: `${seat.id} before EQ`, strokeDasharray: "6 4", strokeWidth: 1.5, data: applyBassSmoothing(seat.data, smoothingMode) }))
       : (hasStoredBlueCurve
-        ? [{ id: "rsp-raw", kind: "raw", label: "RSP before PEQ", tooltipLabel: "RSP before PEQ at operating level", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }]
+        ? [{ id: "rsp-raw", kind: "raw", label: "RSP before EQ", tooltipLabel: "RSP before EQ at operating level", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }]
         : (rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : []));
     if (hasMatchingDetailedResult && finalResponse?.postEqRspCurve?.length) {
       if (seatValidationActive) {
