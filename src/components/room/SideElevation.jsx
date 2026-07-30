@@ -10,6 +10,7 @@ import { useAppState } from "@/components/AppStateProvider";
 import { useResolvedSpeakerLayout } from "@/components/room/rv/utils/resolveActiveSpeakerLayout";
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
 import { getCanonicalRole as getCanonicalRoleShared } from "@/components/utils/surroundRoleMap";
+import C322ResolverAuditPanel from "@/components/room/C322ResolverAuditPanel";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -490,6 +491,18 @@ export default function SideElevation({
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           preserveAspectRatio="xMidYMid meet"
         >
+          {/* C3.22 RESOLVER DECISION AUDIT PANEL */}
+          {import.meta.env.DEV && (
+            <foreignObject x={300} y={10} width={440} height={470} style={{ overflow: 'visible' }}>
+              <C322ResolverAuditPanel
+                placedSpeakers={placedSpeakers}
+                appState={appState}
+                dolbyLayout={dolbyLayout}
+                getCanonicalRoleFn={getCanonicalRoleShared}
+                getSpeakerVisibility={getSpeakerVisibility}
+              />
+            </foreignObject>
+          )}
           {/* C3.18 TEMP AUDIT PANEL */}
           {import.meta.env.DEV && (
             <foreignObject x={10} y={10} width={280} height={260} style={{ overflow: 'visible' }}>
