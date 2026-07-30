@@ -12,7 +12,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
-import { getManualForcedRun, getDiagRuns } from "./bassDiagTokenTrace";
+import { getManualForcedRun, getDiagRuns, getDiagStageEvent } from "./bassDiagTokenTrace";
 
 const UNAVAILABLE = "UNAVAILABLE";
 const MISSING = "MISSING";
@@ -369,7 +369,7 @@ export default function Test11GentlePeakCutValidation() {
           )}
           {hasResult && diagRun && (() => {
             const boolStr = (v) => v === true ? "true" : v === false ? "false" : MISSING;
-            const s = (name) => diagRun.stages?.[name];
+            const s = (name) => getDiagStageEvent(diagRun.token, name);
             const ts = (name) => { const t = s(name)?.ts; return t != null ? new Date(t).toISOString().split("T")[1].replace("Z", "") : MISSING; };
             const onRetryStage = s("onRetry");
             const autoStage = s("automatic-update");
@@ -463,7 +463,7 @@ export default function Test11GentlePeakCutValidation() {
                     <div style={{ fontWeight: 700, marginBottom: 2 }}>All recorded runs (latest at bottom):</div>
                     {allDiagRuns.map((r) => (
                       <div key={r.token} style={{ color: r.token === diagRun.token ? "#1B1A1A" : "#9CA3AF" }}>
-                        {r.token} | {r.origin || MISSING} | stages: {Object.keys(r.stages).join(", ") || "none"}
+                        {r.token} | {r.origin || MISSING} | stages: {r.events.map((e) => e.stage).join(", ") || "none"}
                       </div>
                     ))}
                   </div>

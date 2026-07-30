@@ -426,46 +426,18 @@ function buildP19AuthorityTrace(contract) {
   };
 }
 
-// Build the lifecycle trace from the real bassDiagTokenTrace data for this token.
-// Only includes stages actually recorded for this exact token.
+// Build the lifecycle trace from the real bassDiagTokenTrace ordered event list.
+// Only includes events actually recorded for this exact token. Events are
+// already ordered (append-only); this maps them to the trace format.
 function buildLifecycleTrace(diagnosticToken) {
   if (!diagnosticToken) return [];
   const run = getDiagRun(diagnosticToken);
-  if (!run?.stages) return [];
-  const stageOrder = [
-    "token-created",
-    "requestManual",
-    "startRequest",
-    "worker.postMessage",
-    "worker-event-received",
-    "worker-completed",
-    "main-thread-accepted",
-    "result-published",
-    "contract-published",
-  ];
-  const stages = run.stages;
-  const result = [];
-  for (const stageName of stageOrder) {
-    const entry = stages[stageName];
-    if (entry) {
-      result.push({
-        stage: stageName,
-        atMs: num(entry.ts),
-        requestId: entry.requestId || entry.startRequestId || entry.postMessageRequestId || entry.completedRequestId || entry.acceptedRequestId || entry.publishedRequestId || null,
-      });
-    }
-  }
-  // Include any stages not in the predefined order (defensive).
-  for (const [stageName, entry] of Object.entries(stages)) {
-    if (!stageOrder.includes(stageName)) {
-      result.push({
-        stage: stageName,
-        atMs: num(entry.ts),
-        requestId: entry.requestId || null,
-      });
-    }
-  }
-  return result;
+  if (!run?.events) return [];
+  return run.events.map((event) => ({
+    stage: event.stage,
+    atMs: num(event.ts),
+    requestId: event.workerRequestId || null,
+  }));
 }
 
 // Main entry — build the complete run-correlated diagnostic object.

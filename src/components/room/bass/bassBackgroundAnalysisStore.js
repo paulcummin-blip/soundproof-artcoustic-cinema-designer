@@ -236,7 +236,7 @@ export class BassBackgroundAnalysisController {
     }
 
     this.pending = { fingerprint, payload, identity, collectDiagnostics, diagnosticToken };
-    recordDiagStage(diagnosticToken, "updateInputs-pending-assigned", { pendingCollectDiagnostics: collectDiagnostics, pendingToken: diagnosticToken });
+    recordDiagStage(diagnosticToken, "pending-assigned", { collectDiagnostics, pendingToken: diagnosticToken });
     const queuedAtMs = this.now();
     this.emit({
       status: staleResult ? "stale" : "queued",
@@ -253,7 +253,7 @@ export class BassBackgroundAnalysisController {
   }
 
   requestManual({ fingerprint, payload, identity = null, collectDiagnostics = false, force = false, diagnosticToken = null }) {
-    recordDiagStage(diagnosticToken, "requestManual", { requestManualCollectDiagnostics: collectDiagnostics, requestManualForce: force });
+    recordDiagStage(diagnosticToken, "requestManual", { collectDiagnostics, force });
     if (!fingerprint) return { action: "idle" };
     if (!force && (this.state.status === "queued" || this.state.status === "calculating") && this.state.currentJobFingerprint === fingerprint) {
       return { action: "duplicate_ignored" };
@@ -314,7 +314,7 @@ export class BassBackgroundAnalysisController {
       origin: request.origin,
       diagnosticToken: request.diagnosticToken || null,
     };
-    recordDiagStage(request.diagnosticToken, "startRequest", { startRequestCollectDiagnostics: this.activeRequest.collectDiagnostics, startRequestOrigin: this.activeRequest.origin, startRequestId: requestId });
+    recordDiagStage(request.diagnosticToken, "startRequest", { workerRequestId: requestId, collectDiagnostics: this.activeRequest.collectDiagnostics, origin: this.activeRequest.origin });
     try {
       const worker = this.workerFactory();
       this.worker = worker;
@@ -334,7 +334,7 @@ export class BassBackgroundAnalysisController {
         diagnosticToken: request.diagnosticToken || null,
         dispatchedAtMs: this.now(),
       };
-      recordDiagStage(request.diagnosticToken, "worker.postMessage", { postMessageCollectDiagnostics: workerRequest.collectDiagnostics, postMessageOrigin: workerRequest.origin, postMessageRequestId: workerRequest.requestId });
+      recordDiagStage(request.diagnosticToken, "worker-posted", { workerRequestId: workerRequest.requestId, collectDiagnostics: workerRequest.collectDiagnostics, origin: workerRequest.origin });
       worker.postMessage(workerRequest);
       this.stage("Worker request posted", { jobId: requestId });
       this.armHeartbeatTimer(requestId);
@@ -348,7 +348,17 @@ export class BassBackgroundAnalysisController {
     const active = this.activeRequest;
     if (!active || message.requestId !== active.requestId) return false;
     if (message.collectDiagnostics !== active.collectDiagnostics) return false;
-    recordDiagStage(active.diagnosticToken, "worker-event-received", { workerEventCollectDiagnostics: message.collectDiagnostics, workerEventRequestId: message.requestId, workerEventToken: message.diagnosticToken });
+    recordDiagStage(active.diagnosticToken, "worker-received", { workerRequestId: message.requestId, returnedToken: message.diagnosticToken || null, collectDiagnostics: message.collectDiagnostics });
+    // Worker token validation: if diagnostics were requested and the returned
+    // token does not match the active request token, reject the result. Do not
+    // silently replace a missing or mismatched returned token with the active
+    // token. Record the exact rejection reason. Normal non-diagnostic
+    // calculations are unaffected (no token is created when disabled).
+    if (active.collectDiagnostics && message.diagnosticToken !== active.diagnosticToken) {
+      const reason = `Diagnostic token mismatch: expected ${active.diagnosticToken}, received ${message.diagnosticToken || "null"}`;
+      recordDiagStage(active.diagnosticToken, "worker-result-rejected", { workerRequestId: message.requestId, reason, returnedToken: message.diagnosticToken || null });
+      return this.handleCompatibilityMismatch(active, message, reason, "diagnostic-token-mismatch");
+    }
     if (message.fingerprint !== active.fingerprint) return this.handleIdentityMismatch(active, message, "fingerprint");
     const envelopeCompatibility = validateOptimiserVersions(message, BASS_OPTIMISER_VERSIONS);
     if (!envelopeCompatibility.valid) return this.handleCompatibilityMismatch(active, message, envelopeCompatibility.message);
@@ -400,8 +410,7 @@ export class BassBackgroundAnalysisController {
       diagnosticToken: active.diagnosticToken || message.diagnosticToken || null,
       workerRequestId: active.requestId,
     };
-    recordDiagStage(active.diagnosticToken, "worker-completed", { completedRequestId: active.requestId, completedToken: active.diagnosticToken, resultRequestId: result.workerRequestId, resultToken: result.diagnosticToken });
-    recordDiagStage(active.diagnosticToken, "main-thread-accepted", { acceptedRequestId: active.requestId, acceptedToken: active.diagnosticToken, validationValid: true });
+    recordDiagStage(active.diagnosticToken, "worker-completed", { workerRequestId: active.requestId, collectDiagnostics: active.collectDiagnostics });
     const validation = validateCachedBassResult(result, { fingerprint: active.fingerprint });
     if (!validation.valid) return this.handleCompatibilityMismatch(active, message, `Rejected incompatible optimiser result: ${validation.message || validation.reason}`);
     // Terminal outcome: complete generation with candidates but zero
@@ -414,6 +423,9 @@ export class BassBackgroundAnalysisController {
       const warningMessage = pool.warningMessage || "No physically valid EQ candidate — all generated banks exceeded product capability or bank limits";
       return this.handleTerminalFailure(active, warningMessage, "no-selectable-candidates");
     }
+    // All validation passed (identity, versions, fingerprint, pool, selectable
+    // candidates). Record worker-result-validated only now — not before.
+    recordDiagStage(active.diagnosticToken, "worker-result-validated", { workerRequestId: active.requestId, validationValid: true });
     this.stage("Main thread received result", { jobId: active.requestId });
     this.stage("Fingerprint validated", { jobId: active.requestId });
     this.cache.set(active.fingerprint, result);
@@ -428,7 +440,7 @@ export class BassBackgroundAnalysisController {
       errorMessage: null, previousResultStale: false, progressStage: "Job marked complete",
       lifecycleTrace: [...this.state.lifecycleTrace, { stage: "Job marked complete", atMs: completedAtMs, jobId: active.requestId }],
     });
-    recordDiagStage(active.diagnosticToken, "result-published", { publishedRequestId: active.requestId, publishedToken: active.diagnosticToken, resultFingerprint: active.fingerprint });
+    recordDiagStage(active.diagnosticToken, "result-published", { workerRequestId: active.requestId, resultFingerprint: active.fingerprint });
     return true;
   }
 

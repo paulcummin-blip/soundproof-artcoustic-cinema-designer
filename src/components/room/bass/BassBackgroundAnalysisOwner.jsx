@@ -119,6 +119,18 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     if (selectionAttempt.error) controller.reportMainThreadError(selectionAttempt.error, "Canonical EQ selection");
   }, [controller, selectionAttempt.error]);
+  // Record candidate-selection-accepted only after the pool contains a valid
+  // selectable result. Guard with a Set so unrelated React renders do not
+  // overwrite or duplicate the stage for the same token.
+  const candidateAcceptedTokensRef = useRef(new Set());
+  useEffect(() => {
+    if (!optimisationResult?.selectedCandidate) return;
+    const token = lifecycle?.result?.diagnosticToken || null;
+    if (!token) return;
+    if (candidateAcceptedTokensRef.current.has(token)) return;
+    candidateAcceptedTokensRef.current.add(token);
+    recordDiagStage(token, "candidate-selection-accepted", { workerRequestId: lifecycle?.result?.workerRequestId || null, selectedCandidateId: optimisationResult.selectedCandidateId || null });
+  }, [optimisationResult, lifecycle?.result?.diagnosticToken, lifecycle?.result?.workerRequestId]);
   const optimisationResult = useMemo(() => {
     const selected = selectionAttempt.result;
     if (!selected) return null;
@@ -151,8 +163,24 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       selectedByMode: { ...baseResult.selectedByMode, balanced: selectedCandidate },
       primaryLimitation: authority?.limitation || null,
     };
+    // Compact diagnostic identity object — only captured run identity fields.
+    // No candidate, filter, curve, or P19 diagnostic content in Stage B.
+    const diagnosticIdentity = matchingResult ? {
+      diagnosticToken: matchingResult.diagnosticToken || null,
+      collectDiagnostics: matchingResult.collectDiagnostics === true,
+      workerRequestId: matchingResult.workerRequestId || null,
+      startedAtMs: Number.isFinite(matchingResult.startedAtMs) ? matchingResult.startedAtMs : null,
+      completedAtMs: Number.isFinite(matchingResult.completedAtMs) ? matchingResult.completedAtMs : null,
+      inputFingerprint: matchingResult.fingerprint || null,
+      cacheKey: cacheKey || null,
+      protocolVersion: matchingResult.protocolVersion || null,
+      poolVersion: matchingResult.poolVersion || null,
+      engineVersion: matchingResult.engineVersion || null,
+      resultSchemaVersion: matchingResult.resultSchemaVersion || null,
+    } : null;
     return {
       ...result,
+      diagnosticIdentity,
       finalOptimisedBassResponse: buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources }),
     };
   }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel]);
@@ -174,10 +202,13 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       markBassAuthorityFailed(scopeId, currentFingerprint, contract?.job?.errorMessage);
       return;
     }
-    if (!publishCompletedBassContract(scopeId, contract)) markBassAuthorityUpdating(scopeId, currentFingerprint);
+    const published = publishCompletedBassContract(scopeId, contract);
+    if (!published) markBassAuthorityUpdating(scopeId, currentFingerprint);
     syncPersistentBassAuthority(scopeId, currentFingerprint, contract);
+    // Record contract-published ONLY when publishCompletedBassContract returned
+    // true — not when authority is merely marked updating.
     const publishedToken = lifecycle?.result?.diagnosticToken || null;
-    if (publishedToken && !publishedContractTokensRef.current.has(publishedToken)) {
+    if (published && publishedToken && !publishedContractTokensRef.current.has(publishedToken)) {
       publishedContractTokensRef.current.add(publishedToken);
       recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: currentFingerprint });
     }

@@ -365,6 +365,12 @@ export function adaptCurrentBassOptimisationResult({
   }
 
   // --- Provenance ---
+  // --- Diagnostic identity (Stage B) ---
+  // Compact identity object from the selected optimisation result. Only
+  // captured run identity fields — no candidate, filter, curve, or P19
+  // diagnostic content.
+  contract.diagnosticIdentity = optimisationResult?.diagnosticIdentity || null;
+
   contract.provenance.poolId = poolId;
   contract.provenance.candidateSignature = buildProvenanceSignature(selectedCandidate, poolId);
   contract.provenance.filterBankSignature = finalResponse?.filterBankSignature || optimisationResult?.filterBankSignature || selectedCandidate?.filterBankSignature || null;

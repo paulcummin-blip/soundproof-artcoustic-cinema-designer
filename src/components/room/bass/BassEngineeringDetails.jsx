@@ -40,16 +40,7 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
         profileConfig={result.selectedCandidate?.designEqFitProfileConfig}
       />
       <DesignEqLifecycleDiagnostic result={result} rspRawCurve={rspRawCurve} graphCandidateId={graphCandidateId} graphFilterBankSignature={graphFilterBankSignature} />
-      <DesignEqDiagnosticTrace
-        diagnosticToken={lifecycle?.result?.diagnosticToken || result?.diagnosticToken || null}
-        lifecycle={lifecycle}
-        result={lifecycle?.result || null}
-        optimisationResult={result}
-        contract={contract}
-        rspRawCurve={rspRawCurve}
-        graphRspEqSeries={graphSeries?.find((s) => s?.id === "rsp-eq")?.data || null}
-        collectDiagnostics={true}
-      />
+      {/* Stage B: DesignEqDiagnosticTrace quarantined until Stages C and D complete. */}
       <SourceDomainCapabilityDiagnostic activeSubs={systemLimits.activeSubs} rawCurve={baseCurve} postEqCurve={result.finalPostEqCurve} usableLfHz={systemLimits.usableLfHz} optimisationResult={result} />
     </>}
     <ProductionVectorCaptureTest10 capture={runtimeCapture} designEqEnabled={designEqEnabled} smoothingMode={smoothingMode} />
