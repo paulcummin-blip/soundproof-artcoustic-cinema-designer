@@ -69,6 +69,7 @@ export function rolesForLayout({ dolbyLayout = "5.1", useWidesInsteadOfRears = f
 
   const parts = String(dolbyLayout).split(".");
   const major = parseInt(parts[0], 10) || 5;
+  const heights = parseInt(parts[2], 10) || 0;
 
   // LCR always present
   roles.add("FL");
@@ -100,6 +101,26 @@ export function rolesForLayout({ dolbyLayout = "5.1", useWidesInsteadOfRears = f
     roles.add("SBR");
     roles.add("LW");
     roles.add("RW");
+  }
+
+  // Overhead (Atmos) channels — canonical Dolby role authority.
+  // Mirrors AppStateProvider.getSpeakerVisibilityFor so the resolver,
+  // Plan View, and speaker config UI share one source of truth.
+  if (heights === 2) {
+    roles.add("TML");
+    roles.add("TMR");
+  } else if (heights === 4) {
+    roles.add("TFL");
+    roles.add("TFR");
+    roles.add("TRL");
+    roles.add("TRR");
+  } else if (heights === 6) {
+    roles.add("TFL");
+    roles.add("TFR");
+    roles.add("TML");
+    roles.add("TMR");
+    roles.add("TRL");
+    roles.add("TRR");
   }
 
   return Array.from(roles);
