@@ -13,7 +13,16 @@
 //
 // SUBSCRIPTION:
 //   subscribeDiagRuns(listener) + getDiagRunsSnapshot() are suitable for
-//   useSyncExternalStore. Listeners are notified on every event append.
+//   useSyncExternalStore. The snapshot is cached and stable — the exact same
+//   reference is returned while state has not changed. A new immutable snapshot
+//   is built only on mutation (token creation, event append, eviction, clear).
+//   Listeners are notified only after the cached snapshot has been replaced.
+//
+// IMMUTABILITY:
+//   Public getters (getDiagRun, getDiagRuns, getLatestDiagRun, getManualForcedRun)
+//   return immutable external snapshots from the same canonical cached source as
+//   getDiagRunsSnapshot(). Consumers cannot mutate internal state through them:
+//   the outer array, run objects, and event arrays are all frozen.
 
 const MAX_RUNS = 10;
 const runs = new Map();
@@ -23,9 +32,34 @@ let lastCheckboxClickTs = null;
 let lastCheckboxClickValue = null;
 let lastManualForcedToken = null;
 let tokenSeq = 0;
+let cachedSnapshot = null;
 
 function notify() {
   listeners.forEach((listener) => listener());
+}
+
+// Build a fully frozen immutable snapshot of all runs and their event arrays.
+// Event objects are already frozen at creation time; this freezes the containing
+// run objects, event arrays, and the outer array so consumers cannot mutate
+// internal state through the snapshot.
+function buildSnapshot() {
+  const arr = runOrder.map((t) => {
+    const run = runs.get(t);
+    if (!run) return null;
+    return Object.freeze({
+      ...run,
+      events: Object.freeze([...run.events]),
+    });
+  }).filter(Boolean);
+  return Object.freeze(arr);
+}
+
+// Rebuild the cached snapshot, then notify subscribers. Called after every
+// mutation (token creation, event append, run eviction, clear). Subscribers
+// are notified only after the cached snapshot has been replaced.
+function invalidateSnapshot() {
+  cachedSnapshot = buildSnapshot();
+  notify();
 }
 
 // Extract worker request ID from common data field names.
@@ -61,7 +95,7 @@ export function createDiagToken(origin) {
     if (lastManualForcedToken === old) lastManualForcedToken = null;
   }
   if (origin === "manual-forced") lastManualForcedToken = token;
-  notify();
+  invalidateSnapshot();
   return token;
 }
 
@@ -71,7 +105,7 @@ export function getLastManualForcedToken() {
 
 export function getManualForcedRun() {
   if (!lastManualForcedToken) return null;
-  return runs.get(lastManualForcedToken) || null;
+  return getDiagRun(lastManualForcedToken);
 }
 
 // Append an immutable event snapshot to the token's ordered event list.
@@ -94,7 +128,7 @@ export function recordDiagStage(token, stage, data = {}) {
     ...data,
   });
   run.events = [...run.events, event];
-  notify();
+  invalidateSnapshot();
 }
 
 export function recordCheckboxClick(value) {
@@ -102,18 +136,23 @@ export function recordCheckboxClick(value) {
   lastCheckboxClickValue = value;
 }
 
+// --- Public getters: return immutable external snapshots ---
+// All getters source from the same canonical cached snapshot as
+// getDiagRunsSnapshot(), so they agree and cannot leak mutable internal state.
+
 export function getDiagRuns() {
-  return runOrder.map((t) => runs.get(t)).filter(Boolean);
+  return getDiagRunsSnapshot();
 }
 
 export function getDiagRun(token) {
   if (!token) return null;
-  return runs.get(token) || null;
+  const snap = getDiagRunsSnapshot();
+  return snap.find((r) => r.token === token) || null;
 }
 
 export function getLatestDiagRun() {
-  if (runOrder.length === 0) return null;
-  return runs.get(runOrder[runOrder.length - 1]) || null;
+  const snap = getDiagRunsSnapshot();
+  return snap.length > 0 ? snap[snap.length - 1] : null;
 }
 
 // Backward-compatible stage accessor: returns the first event matching stageName.
@@ -126,7 +165,7 @@ export function getDiagStageEvent(token, stageName) {
 export function clearDiagRuns() {
   runs.clear();
   runOrder.length = 0;
-  notify();
+  invalidateSnapshot();
 }
 
 // --- Subscription mechanism for useSyncExternalStore ---
@@ -137,9 +176,8 @@ export function subscribeDiagRuns(listener) {
 }
 
 export function getDiagRunsSnapshot() {
-  return runOrder.map((t) => {
-    const run = runs.get(t);
-    if (!run) return null;
-    return { ...run, events: [...run.events] };
-  }).filter(Boolean);
+  if (cachedSnapshot === null) {
+    cachedSnapshot = buildSnapshot();
+  }
+  return cachedSnapshot;
 }

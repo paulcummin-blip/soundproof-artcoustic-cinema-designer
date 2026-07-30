@@ -440,7 +440,7 @@ export class BassBackgroundAnalysisController {
       errorMessage: null, previousResultStale: false, progressStage: "Job marked complete",
       lifecycleTrace: [...this.state.lifecycleTrace, { stage: "Job marked complete", atMs: completedAtMs, jobId: active.requestId }],
     });
-    recordDiagStage(active.diagnosticToken, "result-published", { workerRequestId: active.requestId, resultFingerprint: active.fingerprint });
+    recordDiagStage(active.diagnosticToken, "background-result-published", { workerRequestId: active.requestId, resultFingerprint: active.fingerprint });
     return true;
   }
 

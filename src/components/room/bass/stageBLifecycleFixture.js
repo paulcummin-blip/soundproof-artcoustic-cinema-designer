@@ -35,8 +35,8 @@ const REQUIRED_ORDER = [
   "worker-received",
   "worker-completed",
   "worker-result-validated",
+  "background-result-published",
   "candidate-selection-accepted",
-  "result-published",
   "contract-published",
 ];
 
