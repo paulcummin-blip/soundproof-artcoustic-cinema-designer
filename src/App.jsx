@@ -17,6 +17,7 @@ import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
 import AdminDatasetManager from './pages/AdminDatasetManager';
 import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
+import StageBValidation from './pages/StageBValidation';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -68,6 +69,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/rp22-config" element={<AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." />} />
         <Route path="/admin/audit-log" element={<AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." />} />
         <Route path="/admin/billing" element={<AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." />} />
+        <Route path="/admin/stage-b-validation" element={<StageBValidation />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </LayoutWrapper>
