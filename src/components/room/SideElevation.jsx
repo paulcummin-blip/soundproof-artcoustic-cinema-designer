@@ -1109,6 +1109,12 @@ export default function SideElevation({
               const svgHalfW = Math.max(7, (widthM / roomL) * drawW / 2);
               const svgBodyH  = Math.max(10, (0.15 / roomH) * drawH); // ~15cm visual depth, min 10px
               const svgBodyTop = svgGrille - svgBodyH;               // above ceiling
+              console.log("[T CEILING TRACE]", {
+                role, y: spk.y, z: spk.z, roomH, roomL,
+                cx, grille: svgGrille, svgHalfW, svgBodyH, svgBodyTop,
+                rectX: cx - svgHalfW, rectY: svgBodyTop,
+                rectW: svgHalfW * 2, rectH: svgBodyH
+              });
               return (
                 <g key={`spk-${i}`} opacity={0.92}>
                   {/* Body above ceiling */}
