@@ -6,6 +6,10 @@ import {
   Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon,
   Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon,
 } from "../report/SpeakerFaceIcons";
+import { useAppState } from "@/components/AppStateProvider";
+import { useResolvedSpeakerLayout } from "@/components/room/rv/utils/resolveActiveSpeakerLayout";
+import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
+import { getCanonicalRole as getCanonicalRoleShared } from "@/components/utils/surroundRoleMap";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -94,6 +98,22 @@ export default function SideElevation({
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
 
+  // --- Canonical resolvers: single source of truth for active speakers + projector ---
+  const appState = useAppState();
+  const dolbyLayout = appState?.dolbyLayout || "5.1";
+  const getSpeakerVisibility = appState?.getSpeakerVisibility || (() => true);
+  const resolvedSpeakers = useResolvedSpeakerLayout({
+    placedSpeakers,
+    appState,
+    dolbyLayout,
+    getCanonicalRoleFn: getCanonicalRoleShared,
+    getSpeakerVisibility,
+  });
+  const projectorPos = useMemo(
+    () => resolveProjectorPosition(roomElements, { heightM: roomH }),
+    [roomElements, roomH]
+  );
+
   // --- SVG layout constants (same approach as FrontElevation) ---
   const SVG_W    = 640;
   const PADDING  = 36;
@@ -137,11 +157,7 @@ export default function SideElevation({
   const frameTopM    = screenTopM + borderM;      // top of frame (above viewable)
   const frameBottomM = Math.max(0, screenFloorM - borderM); // bottom of frame (below viewable)
 
-  // --- Projector ---
-  const projectorEl = useMemo(() => {
-    if (!Array.isArray(roomElements)) return null;
-    return roomElements.find(el => el?.type === 'projector') ?? null;
-  }, [roomElements]);
+  // --- Projector: resolved via shared resolver (projectorPos) ---
 
   // --- Doors / windows: only show elements on the viewed wall ---
   const openingEls = useMemo(() => {
@@ -195,8 +211,8 @@ export default function SideElevation({
 
   // --- Speakers: LCR + surround y/z markers, filtered to viewed wall ---
   const speakerMarkers = useMemo(() => {
-    if (!Array.isArray(placedSpeakers)) return [];
-    return placedSpeakers
+    if (!Array.isArray(resolvedSpeakers)) return [];
+    return resolvedSpeakers
       .filter(s => {
         if (!Number.isFinite(s?.position?.y) || !Number.isFinite(s?.position?.z)) return false;
         const role = String(s.role || '').toUpperCase();
@@ -214,15 +230,15 @@ export default function SideElevation({
         y: s.position.y,
         z: s.position.z,
       }));
-  }, [placedSpeakers, wall]);
+  }, [resolvedSpeakers, wall]);
 
   // Rear-wall surround roles (overlap in side elevation)
   const REAR_ROLES = new Set(['SBL','SBR','SCL','SCR','SC']);
 
   // Group rear-wall speakers by similar height — filtered to viewed wall side
   const rearWallGroups = useMemo(() => {
-    if (!Array.isArray(placedSpeakers)) return [];
-    const rearSpks = placedSpeakers.filter(s => {
+    if (!Array.isArray(resolvedSpeakers)) return [];
+    const rearSpks = resolvedSpeakers.filter(s => {
       const role = String(s?.role || '').toUpperCase();
       if (!REAR_ROLES.has(role)) return false;
       if (!Number.isFinite(s?.position?.z)) return false;
@@ -242,7 +258,7 @@ export default function SideElevation({
       }
     });
     return groups;
-  }, [placedSpeakers]);
+  }, [resolvedSpeakers]);
 
   // Hatch count for floor line
   const hatchCount = Math.floor(drawW / 14) + 1;
@@ -410,8 +426,8 @@ export default function SideElevation({
     const u = String(r || '').toUpperCase();
     return ['LW','RW','SL','SR','SBL','SBR'].includes(u) || /^(SL|SR)\d+$/.test(u);
   };
-  speakersForSnapRef.current = Array.isArray(placedSpeakers)
-    ? placedSpeakers
+  speakersForSnapRef.current = Array.isArray(resolvedSpeakers)
+    ? resolvedSpeakers
         .filter(s => isDraggableSideRole(s?.role) && Number.isFinite(s?.position?.z))
         .map(s => ({ role: String(s.role).toUpperCase(), z: s.position.z }))
     : [];
@@ -542,8 +558,8 @@ export default function SideElevation({
           {/* Front-stage speakers — architectural side profile, wall-filtered */}
           {(() => {
             const LCR_ROLES = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
-            const allLcr = Array.isArray(placedSpeakers)
-              ? placedSpeakers.filter(s => LCR_ROLES.has(String(s?.role || '').toUpperCase()))
+            const allLcr = Array.isArray(resolvedSpeakers)
+              ? resolvedSpeakers.filter(s => LCR_ROLES.has(String(s?.role || '').toUpperCase()))
               : [];
             if (!allLcr.length) return null;
 
@@ -1116,8 +1132,8 @@ export default function SideElevation({
           {/* Magnetic snap guide — same style as Front Elevation */}
           {activeSnapZ !== null && (() => {
             // AFF: bottom of dragged cabinet at snapped height
-            const draggedSp = liveSpeakerDrag && Array.isArray(placedSpeakers)
-              ? placedSpeakers.find(s => String(s?.role || '').toUpperCase() === liveSpeakerDrag.role)
+            const draggedSp = liveSpeakerDrag && Array.isArray(resolvedSpeakers)
+              ? resolvedSpeakers.find(s => String(s?.role || '').toUpperCase() === liveSpeakerDrag.role)
               : null;
             const snapMeta = draggedSp ? (getSpeakerModelMeta(draggedSp.model) || {}) : {};
             const snapItemHM = Number(snapMeta.heightM) > 0 ? Number(snapMeta.heightM) : 0.27;
@@ -1149,37 +1165,39 @@ export default function SideElevation({
             );
           })()}
 
-          {/* Projector */}
-          {projectorEl && (() => {
-            const pY = Number.isFinite(projectorEl.y_lens_m) ? projectorEl.y_lens_m : null;
-            const pZ = Number.isFinite(projectorEl.z_lens_m) ? projectorEl.z_lens_m : roomH - 0.3;
-            if (pY === null) return null;
-            const pBodyD = Number(projectorEl.body_depth_m) || 0.30;
-            const pBodyH = Number(projectorEl.body_height_m) || 0.12;
-            const px  = rx(pY);
-            const pz  = rz(pZ);
+          {/* Projector — consumes shared resolver, body centred on lensY */}
+          {projectorPos && projectorPos.lensY !== null && (() => {
+            const pY = projectorPos.lensY;
+            const pZ = projectorPos.lensZ;
+            const pBodyD = projectorPos.bodyDepthM;
+            const pBodyH = projectorPos.bodyHeightM;
+            // Body centred on lensY: front edge = lensY - bodyDepth/2
+            const bodyFrontY = projectorPos.bodyFrontY;
+            const lensXpx  = rx(pY);           // lens position (beam origin)
+            const bodyXpx = rx(bodyFrontY);   // body front edge (rect origin)
+            const lensYpx  = rz(pZ);           // lens height (vertical centre)
             const pbW = (pBodyD / roomL) * drawW;
             const pbH = (pBodyH / roomH) * drawH;
             return (
               <g opacity={0.88}>
                 <rect
-                  x={px} y={pz - pbH / 2}
+                  x={bodyXpx} y={lensYpx - pbH / 2}
                   width={pbW} height={pbH}
                   fill={PROJ_FILL} stroke="#222" strokeWidth={0.9} rx={1.5} />
 
                 {/* Height dim — right of body, clear of body edge */}
-                <text x={px + pbW + 10} y={pz + 3}
+                <text x={bodyXpx + pbW + 10} y={lensYpx + 3}
                   fontSize={7} fill={DIM_COLOR} textAnchor="start">
                   {pZ.toFixed(2)}m
                 </text>
-                {/* Beam lines to screen */}
+                {/* Beam lines to screen — originate from lens, not body edge */}
                 <line
-                  x1={px} y1={pz}
+                  x1={lensXpx} y1={lensYpx}
                   x2={rx(screenFrontY)} y2={rz(screenTopM)}
                   stroke="#B45309" strokeWidth={0.6}
                   strokeDasharray="5 3" opacity={0.55} />
                 <line
-                  x1={px} y1={pz}
+                  x1={lensXpx} y1={lensYpx}
                   x2={rx(screenFrontY)} y2={rz(screenFloorM)}
                   stroke="#B45309" strokeWidth={0.6}
                   strokeDasharray="5 3" opacity={0.55} />
@@ -1216,15 +1234,15 @@ export default function SideElevation({
                     </g>
                   );
                 })}
-                {/* Projector throw lines */}
-                {projectorEl && Number.isFinite(projectorEl.y_lens_m) && Number.isFinite(projectorEl.z_lens_m) && (
+                {/* Projector throw lines — from shared resolver */}
+                {projectorPos && projectorPos.lensY !== null && (
                   <g>
                     <line
-                      x1={rx(projectorEl.y_lens_m)} y1={rz(projectorEl.z_lens_m)}
+                      x1={rx(projectorPos.lensY)} y1={rz(projectorPos.lensZ)}
                       x2={stx} y2={sTop}
                       stroke="#B45309" strokeWidth={0.8} strokeDasharray="6 2" opacity={0.8} fill="none" />
                     <line
-                      x1={rx(projectorEl.y_lens_m)} y1={rz(projectorEl.z_lens_m)}
+                      x1={rx(projectorPos.lensY)} y1={rz(projectorPos.lensZ)}
                       x2={stx} y2={sBot}
                       stroke="#B45309" strokeWidth={0.8} strokeDasharray="6 2" opacity={0.8} fill="none" />
                   </g>

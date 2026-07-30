@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
+
 export default function RvRoomElementsLayer({
   hasRoomRect,
   roomElements,
@@ -18,24 +20,21 @@ export default function RvRoomElementsLayer({
 }) {
   if (!hasRoomRect) return null;
 
+  // Canonical projector position — shared resolver consumed by both
+  // Plan View and Side Elevation so they can never diverge.
+  const projectorPos = resolveProjectorPosition(roomElements, { widthM, lengthM });
+
   const LABEL_INSET_M = 0.10;   // 10cm inside the room
 
   const normalizeElement = (el) => {
     // --- PROJECTOR: dedicated branch ---
     if (el?.type === 'projector') {
-      const bodyW = Number(el?.body_width_m) || Number(el?.length_m) || 0.46;
-      const bodyD = Number(el?.body_depth_m) || Number(el?.thickness_m) || 0.517;
-      const lensX = Number.isFinite(Number(el?.x_lens_m)) ? Number(el.x_lens_m) : (Number(el?.pos_m) || 0) + bodyW / 2;
-      const lensY = Number.isFinite(Number(el?.y_lens_m)) ? Number(el.y_lens_m) : null;
-
-      // For rear-wall rendering: rectM.y = lengthM - T - offsetM
-      // We want the body front edge at lensY - bodyD/2 (body centred on lens Y in plan)
-      // So: offsetM = lengthM - (lensY - bodyD/2) - bodyD
-      //             = lengthM - lensY - bodyD/2
-      // We'll pass lensY as a special field and compute offsetM in the render block.
-      // The body left edge in X is lensX - bodyW/2.
-      const posM = lensX - bodyW / 2; // left edge of body in room X coords
+      // Consume the shared resolver — body centred on lensY in plan view.
       const label = String(el?.label || '').trim();
+      const bodyW = projectorPos?.bodyWidthM ?? (Number(el?.body_width_m) || Number(el?.length_m) || 0.46);
+      const bodyD = projectorPos?.bodyDepthM ?? (Number(el?.body_depth_m) || Number(el?.thickness_m) || 0.517);
+      const posM = projectorPos?.bodyLeftX ?? (Number.isFinite(Number(el?.x_lens_m)) ? Number(el.x_lens_m) : (Number(el?.pos_m) || 0) + bodyW / 2) - bodyW / 2;
+      const lensY = projectorPos?.lensY ?? (Number.isFinite(Number(el?.y_lens_m)) ? Number(el.y_lens_m) : null);
 
       return {
         ...el,
@@ -197,8 +196,10 @@ export default function RvRoomElementsLayer({
         if (e.wall === 'front') {
           rectM = { x: p, y: offset, w: L, h: T };
         } else if (e.wall === 'rear') {
-          // Projector: position body so it is centred on lensY in plan view
-          if (element?.type === 'projector' && Number.isFinite(e.__lensY)) {
+          // Projector: consume shared resolver for body-front Y (centred on lensY)
+          if (element?.type === 'projector' && projectorPos?.bodyFrontY !== null && projectorPos?.bodyFrontY !== undefined) {
+            rectM = { x: p, y: projectorPos.bodyFrontY, w: L, h: T };
+          } else if (element?.type === 'projector' && Number.isFinite(e.__lensY)) {
             const bodyFrontY = e.__lensY - T / 2;
             rectM = { x: p, y: bodyFrontY, w: L, h: T };
           } else {
