@@ -896,61 +896,33 @@ export default function SideElevation({
             if (REAR_ROLES.has(role)) return null; // drawn separately as side-profile
 
             if (isCeiling) {
-              // Side-profile ceiling insert: body sits ABOVE ceiling line, grille flush with ceiling
+              // Side-profile ceiling insert: body sits ABOVE ceiling line, grille flush with ceiling.
+              // Visual sizing prioritises legibility over true cabinet depth (which is too small to read).
               const meta = getSpeakerModelMeta(spk.model) || {};
               const widthM = Number(meta.widthM) > 0 ? Number(meta.widthM) : 0.165;
-              const depthM = 0.074;
               const svgGrille = rz(roomH);                          // ceiling line
-              const svgBodyTop = svgGrille - (depthM / roomH) * drawH; // above ceiling
-              const svgBodyH   = svgGrille - svgBodyTop;
-              const svgHalfW   = Math.max(4, (widthM / roomL) * drawW / 2);
               const cx = rx(spk.y);
-              // TEMP C3.3 instrumentation — remove after audit
-              try {
-                console.log("[C3.3 CEILING SPEAKER]", {
-                  role: spk.role,
-                  roleUpper: String(spk.role || "").toUpperCase(),
-                  model: spk.model,
-                  y: spk.y,
-                  z: spk.z,
-                  roomH,
-                  roomL,
-                  drawH,
-                  drawW,
-                  offsetX,
-                  offsetY,
-                  cx,
-                  svgGrille,
-                  svgBodyTop,
-                  svgBodyH,
-                  svgHalfW,
-                  rectWidth: svgHalfW * 2,
-                  rectHeight: svgBodyH,
-                  rectX: cx - svgHalfW,
-                  rectY: svgBodyTop,
-                  insideSvgX: (cx - svgHalfW) >= 0 && (cx + svgHalfW) <= SVG_W,
-                  insideSvgY: svgBodyTop >= 0 && (svgBodyTop + svgBodyH) <= SVG_H,
-                  ceilingLineAtOffsetY: svgGrille === offsetY,
-                  returnsJsx: true,
-                });
-              } catch (e) {}
+              // Minimum visible symbol: enforce floor on body height + half-width
+              const svgHalfW = Math.max(7, (widthM / roomL) * drawW / 2);
+              const svgBodyH  = Math.max(10, (0.15 / roomH) * drawH); // ~15cm visual depth, min 10px
+              const svgBodyTop = svgGrille - svgBodyH;               // above ceiling
               return (
-                <g key={`spk-${i}`} opacity={0.88}>
+                <g key={`spk-${i}`} opacity={0.92}>
                   {/* Body above ceiling */}
                   <rect
                     x={cx - svgHalfW} y={svgBodyTop}
                     width={svgHalfW * 2} height={svgBodyH}
-                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.5} rx={1} />
+                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.6} rx={1.5} />
                   {/* Grille line flush with ceiling */}
                   <line
                     x1={cx - svgHalfW} y1={svgGrille}
                     x2={cx + svgHalfW} y2={svgGrille}
-                    stroke="#fff" strokeWidth={1} opacity={0.6} />
-                  {/* Label above body */}
+                    stroke="#fff" strokeWidth={1.2} opacity={0.7} />
+                  {/* Label inside room, just below ceiling — clear of dimension lines */}
                   <text
-                    x={cx} y={svgBodyTop - 3}
-                    textAnchor="middle" fontSize={6}
-                    fill={SPK_COLOR} fontWeight={600}>
+                    x={cx} y={svgGrille + 9}
+                    textAnchor="middle" fontSize={7}
+                    fill={SPK_COLOR} fontWeight={700}>
                     {spk.role}
                   </text>
                 </g>
