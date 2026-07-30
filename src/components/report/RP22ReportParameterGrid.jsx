@@ -408,7 +408,7 @@ export default function RP22ReportParameterGrid({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+    <div className="rp22-params-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
       {RP22_PARAMS.map(param => {
         const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
         const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)

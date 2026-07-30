@@ -273,6 +273,7 @@ export default function ReportPrintStyles() {
                 }
 
                 .rp22-report .rp22-params-grid {
+                    grid-template-columns: 1fr !important;
                     break-inside: auto;
                     page-break-inside: auto;
                 }

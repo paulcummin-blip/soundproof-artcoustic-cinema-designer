@@ -1321,7 +1321,7 @@ function RP22ReportInner() {
                         {/* ── Sightlines & Viewing Angles (final page) ── */}
                         {canRenderSightlinePage && sightlineScreenMetrics && sightlineRowData.length > 0 && (
                             <>
-                                <section id="pdf-sightlines" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                <section id="pdf-sightlines" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
                                     <SightlineGraphic
                                         projectName={app?.projectName || ''}
                                         clientName={app?.clientName || ''}
