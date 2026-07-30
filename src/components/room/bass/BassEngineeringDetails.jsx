@@ -9,7 +9,7 @@ import LiveResultAuthorityDiagnostic, { shouldShowLiveResultAuthorityDiagnostic 
 import ExactHouseCurveCaseCaptureButton from "./ExactHouseCurveCaseCaptureButton";
 import BassCapabilityReceiptDiagnostic from "./BassCapabilityReceiptDiagnostic";
 import DesignEqLifecycleDiagnostic from "./DesignEqLifecycleDiagnostic";
-import DesignEqDiagnosticTrace, { shouldShowDesignEqDiagnosticTrace } from "./DesignEqDiagnosticTrace";
+import DesignEqDiagnosticTrace from "./DesignEqDiagnosticTrace";
 
 export default function BassEngineeringDetails({ enabled, designEqEnabled, result, rspPosition, seatingPositions, contract, detailedStatus, rspRawCurve, perSeatRawCurves, priorityMode, onPriorityChange, systemLimits, multiSeries, runtimeCapture, smoothingMode, lifecycle, graphCandidateId, graphFilterBankSignature, graphSeries, transitionFrequencyHz, normalizedTransferResult }) {
   if (!enabled) return null;

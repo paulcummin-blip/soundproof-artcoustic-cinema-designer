@@ -163,6 +163,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     fingerprintsOverride: fingerprints, backgroundLifecycle: lifecycle,
     collectDiagnostics: includeDiagnostics,
   });
+  const publishedContractTokensRef = useRef(new Set());
   useEffect(() => {
     if (!fingerprints) {
       markBassAuthorityBlocked(scopeId);
@@ -176,7 +177,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     if (!publishCompletedBassContract(scopeId, contract)) markBassAuthorityUpdating(scopeId, currentFingerprint);
     syncPersistentBassAuthority(scopeId, currentFingerprint, contract);
     const publishedToken = lifecycle?.result?.diagnosticToken || null;
-    if (publishedToken) recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: currentFingerprint });
+    if (publishedToken && !publishedContractTokensRef.current.has(publishedToken)) {
+      publishedContractTokensRef.current.add(publishedToken);
+      recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: currentFingerprint });
+    }
   }, [scopeId, cacheKey, contract, fingerprints]);
 
   const publishedStagesRef = useRef(new Set());

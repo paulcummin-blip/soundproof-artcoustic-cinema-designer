@@ -168,7 +168,7 @@ export default function DesignEqDiagnosticTrace({ diagnosticToken, lifecycle, re
           <table style={{ minWidth: 1200, fontSize: 9, fontFamily: "monospace", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #DCDBD6", color: "#625143" }}>
-                {["Candidate ID", "Profile", "Origin", "Seed", "Bank valid", "Selectable", "Exclusion reason", "Filters", "Σ|gain| dB", "RMS resid", "Max resid", "Mean|resid|", "Mean resid", "Worst seat", "Mean seat", "Rank", "Selected", "Selection reason"].map((h) => (
+                {["Candidate ID", "Profile", "Seed", "Bank valid", "Selectable", "Exclusion reason", "Filters", "Σ|gain| dB", "RMS resid", "Max resid", "Mean|resid|", "Mean resid", "Worst seat", "Mean seat", "Rank", "Selected", "Selection reason"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "2px 4px", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -178,7 +178,6 @@ export default function DesignEqDiagnosticTrace({ diagnosticToken, lifecycle, re
                 <tr key={c.candidateId || c.fitProfile || "unknown"} style={{ borderBottom: "1px solid #F0EFEA", color: "#1B1A1A", background: c.selectedFlag ? "#f0fdf4" : "transparent" }}>
                   <td style={{ padding: "2px 4px", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{c.candidateId || "—"}</td>
                   <td style={{ padding: "2px 4px" }}>{c.fitProfile || "—"}</td>
-                  <td style={{ padding: "2px 4px" }}>{c.origin || "—"}</td>
                   <td style={{ padding: "2px 4px" }}>{c.startingBankOrSeed || "—"}</td>
                   <td style={{ padding: "2px 4px" }}>{c.bankValidStatus === true ? "✓" : c.bankValidStatus === false ? "✗" : "—"}</td>
                   <td style={{ padding: "2px 4px" }}>{c.selectableStatus ? "✓" : "✗"}</td>

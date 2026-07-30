@@ -12,14 +12,18 @@
 //   - No constant substitution when worker-version fields are absent.
 //   - Ranking comes from selectionDiagnostics.rankedCandidates, not array position.
 //   - Rejection status uses three explicit states: accepted / rejected / unknown.
+//   - `rejected === false` is NOT proof of acceptance — only explicit
+//     `decision === "Accepted"` or `accepted === true` means accepted.
 //   - Curve signatures are computed from their actual corresponding curves.
+//   - Filter response contributions use the EXACT production peakingEqResponseDb
+//     function — never an approximation.
 
-import { buildFilterBankSignature, buildCurveSignature } from "./bassResultAuthority";
+import { buildCurveSignature } from "./bassResultAuthority";
+import { peakingEqResponseDb } from "@/components/utils/designEqBankLimits";
 import { getDiagRun } from "./bassDiagTokenTrace";
 
 const isNum = (v) => Number.isFinite(Number(v));
 const num = (v) => isNum(v) ? Number(v) : null;
-const fixed = (v, d = 2) => isNum(v) ? Number(v).toFixed(d) : null;
 
 // Interpolate a curve at an arbitrary frequency (read-only, same approach as production).
 function interpolateCurve(curve, frequency) {
@@ -37,22 +41,36 @@ function interpolateCurve(curve, frequency) {
   return null;
 }
 
-// Derive candidate origin from the fit profile name (read-only mapping).
-function deriveOrigin(profile) {
-  if (!profile) return null;
-  if (profile === "standard") return "standard";
-  if (profile === "accuracy") return "accuracy";
-  if (profile === "house_curve") return "house_curve";
-  if (profile === "identity") return "identity";
-  if (typeof profile === "string" && profile.endsWith("_sanitised")) return "sanitised";
-  if (typeof profile === "string" && profile.endsWith("_cut_only")) return "cut_only";
-  return profile;
+// Adapt a graph series into the {frequency, spl} format expected by buildCurveSignature.
+// Does NOT change any values — only maps the actual plotted point shape. Handles
+// {frequency, spl}, {x, y}, and {freq, db} without altering the underlying numbers.
+function adaptGraphSeriesToCurveSignatureInput(series) {
+  if (!Array.isArray(series) || !series.length) return [];
+  return series.map((point) => {
+    if (!point || typeof point !== "object") return null;
+    const frequency = Number.isFinite(Number(point.frequency)) ? Number(point.frequency)
+      : Number.isFinite(Number(point.x)) ? Number(point.x)
+      : Number.isFinite(Number(point.freq)) ? Number(point.freq)
+      : null;
+    const spl = Number.isFinite(Number(point.spl)) ? Number(point.spl)
+      : Number.isFinite(Number(point.y)) ? Number(point.y)
+      : Number.isFinite(Number(point.db)) ? Number(point.db)
+      : null;
+    if (frequency == null || spl == null) return null;
+    return { frequency, spl };
+  }).filter(Boolean);
 }
 
-// Determine if a candidate is in the selectable pool.
-function isSelectable(candidate, selectablePool) {
-  if (!candidate?.candidateId || !Array.isArray(selectablePool)) return false;
-  return selectablePool.some((c) => c?.candidateId === candidate.candidateId);
+// Three-state rejection: accepted / rejected / unknown.
+// Uses ONLY explicit production decision fields. `rejected === false` is NOT
+// proof of acceptance — it only means rejection was not explicitly recorded.
+function rejectionStatus(entry) {
+  if (!entry) return "unknown";
+  if (entry.decision === "Accepted") return "accepted";
+  if (entry.decision === "Rejected") return "rejected";
+  if (entry.accepted === true) return "accepted";
+  if (entry.rejected === true) return "rejected";
+  return "unknown";
 }
 
 // Compute total absolute EQ gain from a filter bank (read-only).
@@ -61,20 +79,9 @@ function totalAbsoluteGain(filters) {
   return filters.filter((f) => f?.enabled).reduce((sum, f) => sum + Math.abs(Number(f.gainDb) || 0), 0);
 }
 
-// Three-state rejection: accepted / rejected / unknown.
-// Uses the explicit `decision` field from filterDecisionDiagnostics when available.
-// For detected regions without an explicit decision, returns "unknown".
-function rejectionStatus(entry) {
-  if (!entry) return "unknown";
-  if (entry.decision === "Accepted") return "accepted";
-  if (entry.decision === "Rejected") return "rejected";
-  if (entry.rejected === true) return "rejected";
-  if (entry.rejected === false) return "accepted";
-  return "unknown";
-}
-
 // Build the candidate pool diagnostics section.
 // Ranking comes from selectionDiagnostics.rankedCandidates, NOT array position.
+// Exclusion reasons use ONLY stored production fields — no synthetic fallback text.
 function buildCandidatePoolDiagnostics(pool, optimisationResult) {
   const candidates = Array.isArray(pool?.candidates) ? pool.candidates : [];
   const selectablePool = Array.isArray(pool?.selectablePool) ? pool.selectablePool : [];
@@ -84,14 +91,13 @@ function buildCandidatePoolDiagnostics(pool, optimisationResult) {
   const rankedCandidates = Array.isArray(selectionDiagnostics.rankedCandidates) ? selectionDiagnostics.rankedCandidates : [];
   const selectedCandidateId = optimisationResult?.selectedCandidateId || null;
 
-  // Build a rank lookup from the real rankedCandidates array.
   const rankByCandidateId = new Map();
-  for (const rc of rankedCandidates) {
-    if (rc?.candidateId) rankByCandidateId.set(rc.candidateId, rc.rank ?? null);
-  }
   const selectionReasonByCandidateId = new Map();
   for (const rc of rankedCandidates) {
-    if (rc?.candidateId) selectionReasonByCandidateId.set(rc.candidateId, rc.reason || null);
+    if (rc?.candidateId) {
+      rankByCandidateId.set(rc.candidateId, rc.rank ?? null);
+      selectionReasonByCandidateId.set(rc.candidateId, rc.reason || null);
+    }
   }
 
   return candidates.map((candidate) => {
@@ -101,7 +107,7 @@ function buildCandidatePoolDiagnostics(pool, optimisationResult) {
       : profile;
     const salvageInfo = baseProfile ? (salvageDiagnostics[baseProfile] || null) : null;
     const triggerInfo = baseProfile ? (salvageTrigger[baseProfile] || null) : null;
-    const selectable = isSelectable(candidate, selectablePool);
+    const selectable = selectablePool.some((c) => c?.candidateId === candidate?.candidateId);
     const filters = Array.isArray(candidate?.generatedFilterBank) ? candidate.generatedFilterBank : [];
     const enabledFilters = filters.filter((f) => f?.enabled);
     const candidateId = candidate?.candidateId || null;
@@ -109,23 +115,20 @@ function buildCandidatePoolDiagnostics(pool, optimisationResult) {
     const storedReason = candidateId ? (selectionReasonByCandidateId.get(candidateId) ?? null) : null;
 
     // Exclusion reason from actual stored fields only — no synthetic fallback text.
+    // When no reason was recorded by the production path, return null.
     let exclusionReason = null;
     if (!selectable) {
       if (candidate?.physicalValidation?.passed === false) {
-        exclusionReason = candidate?.physicalValidation?.reason || candidate?.physicalValidation?.message || "physical-validation-failed";
-      } else if (candidate?.meetsRequestedEnvelope === false) {
-        exclusionReason = "requested-envelope-not-met";
+        exclusionReason = candidate?.physicalValidation?.reason || candidate?.physicalValidation?.message || null;
       } else if (candidate?.bankValidationResult?.allOk === false) {
-        exclusionReason = candidate?.bankValidationResult?.reason || "bank-validation-failed";
-      } else {
-        exclusionReason = "not-in-selectable-pool";
+        exclusionReason = candidate?.bankValidationResult?.reason || null;
       }
+      // No synthetic fallback labels — return null when no reason was recorded.
     }
 
     return {
       candidateId,
       fitProfile: profile,
-      origin: deriveOrigin(profile),
       startingBankOrSeed: candidate?.selectedStart ?? null,
       startStrategy: candidate?.startStrategy || null,
       fallbackOrSalvagePath: salvageInfo ? {
@@ -152,22 +155,23 @@ function buildCandidatePoolDiagnostics(pool, optimisationResult) {
   });
 }
 
-// Build the region and filter diagnostics section from the selected candidate.
-// Uses three-state rejection: accepted / rejected / unknown.
-function buildRegionAndFilterDiagnostics(selectedCandidate) {
-  if (!selectedCandidate) return [];
-  const candidateId = selectedCandidate.candidateId || null;
-  const detectedRegions = Array.isArray(selectedCandidate.designEqDetectedRegions) ? selectedCandidate.designEqDetectedRegions : [];
-  const filterDecisions = Array.isArray(selectedCandidate.designEqFilterDecisionDiagnostics) ? selectedCandidate.designEqFilterDecisionDiagnostics : [];
-  const rejectedCandidates = Array.isArray(selectedCandidate.rejectedEqCandidates) ? selectedCandidate.rejectedEqCandidates : [];
-  const protectedNullRegions = Array.isArray(selectedCandidate.protectedNullRegions) ? selectedCandidate.protectedNullRegions : [];
+// Build region and filter diagnostics for a SINGLE candidate.
+// Captures detected regions, primary decisions, rejected proposals, and
+// protected null regions from the actual stored production diagnostic arrays.
+function buildCandidateRegionAndFilterDiagnostics(candidate) {
+  if (!candidate) return [];
+  const candidateId = candidate.candidateId || null;
+  const fitProfile = candidate.designEqFitProfile || null;
+  const detectedRegions = Array.isArray(candidate.designEqDetectedRegions) ? candidate.designEqDetectedRegions : [];
+  const filterDecisions = Array.isArray(candidate.designEqFilterDecisionDiagnostics) ? candidate.designEqFilterDecisionDiagnostics : [];
+  const rejectedCandidates = Array.isArray(candidate.rejectedEqCandidates) ? candidate.rejectedEqCandidates : [];
+  const protectedNullRegions = Array.isArray(candidate.protectedNullRegions) ? candidate.protectedNullRegions : [];
 
   const rows = [];
 
-  // Detected regions — these are detection-stage entries, no accept/reject decision.
   for (const region of detectedRegions) {
     rows.push({
-      candidateId,
+      candidateId, fitProfile,
       stage: "primary",
       provenance: "detected region",
       centreFrequencyHz: num(region?.centreHz ?? region?.centreFrequencyHz ?? region?.centerFrequencyHz ?? region?.frequencyHz),
@@ -198,10 +202,9 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
     });
   }
 
-  // Filter decision diagnostics — these have explicit `decision: "Accepted"|"Rejected"`.
   for (const filter of filterDecisions) {
     rows.push({
-      candidateId,
+      candidateId, fitProfile,
       stage: filter?.stage || "primary",
       provenance: filter?.provenance || "filter decision",
       centreFrequencyHz: num(filter?.frequencyHz ?? filter?.centreFrequencyHz),
@@ -232,10 +235,9 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
     });
   }
 
-  // Rejected EQ candidates — explicitly rejected.
   for (const rejected of rejectedCandidates) {
     rows.push({
-      candidateId,
+      candidateId, fitProfile,
       stage: rejected?.stage || "primary",
       provenance: rejected?.provenance || "rejected candidate",
       centreFrequencyHz: num(rejected?.frequencyHz ?? rejected?.centreFrequencyHz),
@@ -266,10 +268,9 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
     });
   }
 
-  // Protected null regions — protected from corrective EQ.
   for (const region of protectedNullRegions) {
     rows.push({
-      candidateId,
+      candidateId, fitProfile,
       stage: "primary",
       provenance: "protected null",
       centreFrequencyHz: num(region?.frequencyHz ?? region?.centreFrequencyHz ?? region?.centerFrequencyHz),
@@ -303,48 +304,31 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
   return rows;
 }
 
-// Compute the filter response contribution at a specific frequency.
-// Read-only: evaluates each enabled filter's transfer function at the frequency.
-function filterResponseAtFrequency(filter, frequency) {
-  if (!filter?.enabled || !Number.isFinite(filter.frequencyHz) || !Number.isFinite(frequency)) return null;
-  const f0 = Number(filter.frequencyHz);
-  const gain = Number(filter.gainDb) || 0;
-  const q = Number(filter.Q) || 1;
-  if (q <= 0) return null;
-  // Standard peaking filter magnitude response (read-only evaluation).
-  const ratio = frequency / f0;
-  const term = (ratio * ratio - 1) / (ratio / q);
-  const magnitude = 1 / Math.sqrt(1 + term * term);
-  // gain is the boost at f0; at other frequencies it's scaled by the magnitude.
-  const dbAtFreq = gain * (1 - magnitude) * (gain > 0 ? 1 : 1);
-  // For a peaking filter: gain_dB(f) = gain * (1 - |H(f)|) is not quite right.
-  // Use the standard formula: H(f) = 1 + (A-1) * |P(f)| where P is the peaking response.
-  // Simplified: the contribution at frequency f relative to f0.
-  const a = Math.pow(10, gain / 40);
-  const w = 1 / q;
-  const s = ratio;
-  const b0 = 1 + w * a;
-  const b1 = -2 * (1 - w * a) * Math.cos(Math.PI * Math.log2(s));
-  const b2 = 1 - w * a;
-  // This is getting complex; use a simpler approximation for diagnostic purposes.
-  // The key insight: we only need to know which filters MATERIALLY contribute.
-  const contributionDb = gain * Math.exp(-Math.pow(Math.log2(ratio) * q, 2) / 2);
-  return Number.isFinite(contributionDb) ? contributionDb : null;
+// Build the region and filter diagnostics section covering EVERY pool candidate.
+// Each row preserves the real candidate ID and fit profile.
+function buildRegionAndFilterDiagnostics(pool) {
+  const candidates = Array.isArray(pool?.candidates) ? pool.candidates : [];
+  const allRows = [];
+  for (const candidate of candidates) {
+    allRows.push(...buildCandidateRegionAndFilterDiagnostics(candidate));
+  }
+  return allRows;
 }
 
 // List every filter materially contributing at a specific frequency.
+// Uses the EXACT production peakingEqResponseDb — never an approximation.
 function contributingFiltersAtFrequency(filters, frequency, thresholdDb = 0.1) {
   if (!Array.isArray(filters) || !Number.isFinite(frequency)) return [];
   return filters
     .filter((f) => f?.enabled)
     .map((f) => {
-      const contribution = filterResponseAtFrequency(f, frequency);
+      const contribution = peakingEqResponseDb(frequency, f);
       return {
         frequencyHz: num(f.frequencyHz),
         Q: num(f.Q),
         gainDb: num(f.gainDb),
-        contributionDb: num(contribution),
-        material: Math.abs(contribution || 0) >= thresholdDb,
+        contributionDb: Number.isFinite(contribution) ? contribution : null,
+        material: Number.isFinite(contribution) && Math.abs(contribution) >= thresholdDb,
       };
     })
     .filter((f) => f.material);
@@ -352,6 +336,7 @@ function contributingFiltersAtFrequency(filters, frequency, thresholdDb = 0.1) {
 
 // Build the final authority trace section.
 // Curve signatures are computed from their ACTUAL corresponding curves.
+// Graph series is adapted into {frequency, spl} without changing values.
 function buildFinalAuthorityTrace(optimisationResult, rspRawCurve, graphRspEqSeries) {
   const selected = optimisationResult?.selectedCandidate;
   if (!selected) return null;
@@ -373,12 +358,13 @@ function buildFinalAuthorityTrace(optimisationResult, rspRawCurve, graphRspEqSer
   const postEqRspCurve = Array.isArray(finalResponse?.postEqRspCurve) ? finalResponse.postEqRspCurve : [];
   const postEqRspCurveSignature = buildCurveSignature(postEqRspCurve);
 
-  // Signature 4: actual graph rsp-eq series after graph-domain construction and display smoothing
-  // Computed from the series supplied to the graph, NOT copied from the selected candidate.
-  const graphRspEqData = Array.isArray(graphRspEqSeries) ? graphRspEqSeries : [];
-  const plottedRspEqSeriesSignature = buildCurveSignature(graphRspEqData);
+  // Signature 4: actual graph rsp-eq series after graph-domain construction and display smoothing.
+  // Adapt the real plotted series into the signature input without changing its values.
+  const graphRspEqAdapted = adaptGraphSeriesToCurveSignatureInput(graphRspEqSeries);
+  const plottedRspEqSeriesSignature = buildCurveSignature(graphRspEqAdapted);
 
-  // Frequency-specific traces for 111 Hz and 140 Hz
+  // Frequency-specific traces for 111 Hz and 140 Hz.
+  // Filter contributions use the EXACT production peakingEqResponseDb.
   const frequencyTraces = {};
   for (const freq of [111, 140]) {
     const beforeEq = interpolateCurve(rspRawCurve, freq);
@@ -415,34 +401,33 @@ function buildFinalAuthorityTrace(optimisationResult, rspRawCurve, graphRspEqSer
   };
 }
 
-// Build the P19 authority trace from the published contract.
-// Takes P19 from contract.productAnalysis.parameters.p19 — the authoritative published result.
-function buildP19AuthorityTrace(contract, optimisationResult) {
+// Build the P19 authority trace from the published contract ONLY.
+// Uses contract.productAnalysis.parameters.p19. Does not substitute p19.value
+// for variationDbRaw unless the production contract explicitly establishes
+// they are the same field. Fields not exposed in the contract return null.
+function buildP19AuthorityTrace(contract) {
   const p19 = contract?.productAnalysis?.parameters?.p19;
   if (!p19) return null;
-  const selectedCandidate = optimisationResult?.selectedCandidate;
-  const finalResponse = optimisationResult?.finalOptimisedBassResponse;
-  const finalPostEqCurve = Array.isArray(selectedCandidate?.finalPostEqCurve) ? selectedCandidate.finalPostEqCurve : [];
-  const targetCurve = Array.isArray(selectedCandidate?.productionHouseCurveTarget) ? selectedCandidate.productionHouseCurveTarget : [];
-  const worstFrequencyHz = num(selectedCandidate?.officialP19WorstFrequencyHz ?? finalResponse?.finalSeatVariationData?.p19?.worstFrequencyHz);
-
   return {
     value: num(p19.value),
     unit: p19.unit || null,
     level: num(p19.level),
-    variationDbRaw: num(p19.value),
-    worstFrequencyHz,
-    assessmentBand: `${selectedCandidate?.assessmentStartHz ?? null}–${selectedCandidate?.assessmentEndHz ?? null} Hz`,
-    sourceCurveIdentity: p19.parameter || "P19",
-    postEqSplAtWorstFrequencyDb: num(interpolateCurve(finalPostEqCurve, worstFrequencyHz)),
-    targetSplAtWorstFrequencyDb: num(interpolateCurve(targetCurve, worstFrequencyHz)),
-    selectedCandidateId: optimisationResult?.selectedCandidateId || selectedCandidate?.candidateId || null,
+    // The published P19 contract does not expose variationDbRaw separately.
+    // Do not substitute p19.value for variationDbRaw.
+    variationDbRaw: null,
+    worstFrequencyHz: null,
+    assessmentBand: null,
+    sourceCurveIdentity: null,
+    postEqSplAtWorstFrequencyDb: null,
+    targetSplAtWorstFrequencyDb: null,
+    selectedCandidateId: contract?.selectedCandidateId || null,
     status: p19.status || null,
     passedL1: p19.passedL1 ?? null,
   };
 }
 
 // Build the lifecycle trace from the real bassDiagTokenTrace data for this token.
+// Only includes stages actually recorded for this exact token.
 function buildLifecycleTrace(diagnosticToken) {
   if (!diagnosticToken) return [];
   const run = getDiagRun(diagnosticToken);
@@ -467,18 +452,16 @@ function buildLifecycleTrace(diagnosticToken) {
         stage: stageName,
         atMs: num(entry.ts),
         requestId: entry.requestId || entry.startRequestId || entry.postMessageRequestId || entry.completedRequestId || entry.acceptedRequestId || entry.publishedRequestId || null,
-        data: entry,
       });
     }
   }
-  // Also include any stages not in the predefined order (defensive).
+  // Include any stages not in the predefined order (defensive).
   for (const [stageName, entry] of Object.entries(stages)) {
     if (!stageOrder.includes(stageName)) {
       result.push({
         stage: stageName,
         atMs: num(entry.ts),
         requestId: entry.requestId || null,
-        data: entry,
       });
     }
   }
@@ -503,7 +486,6 @@ export function buildDesignEqRunDiagnostics({
   if (!diagnosticToken) return null;
 
   const pool = result?.pool || optimisationResult?.pool || null;
-  const selectedCandidate = optimisationResult?.selectedCandidate || null;
 
   // Identity section — uses captured run fields only. No constant substitution.
   // No derived timestamps. Reports missing data as null.
@@ -516,24 +498,15 @@ export function buildDesignEqRunDiagnostics({
     poolVersion: result?.poolVersion || null,
     engineVersion: result?.engineVersion || null,
     resultSchemaVersion: result?.resultSchemaVersion || null,
-    startedAtMs: num(result?.startedAtMs) || null,
-    completedAtMs: num(result?.completedAtMs) || null,
+    startedAtMs: num(result?.startedAtMs),
+    completedAtMs: num(result?.completedAtMs),
     collectDiagnostics: result?.collectDiagnostics === true,
   };
 
-  // Candidate pool diagnostics — ranking from selectionDiagnostics.rankedCandidates
   const candidatePoolDiagnostics = buildCandidatePoolDiagnostics(pool, optimisationResult);
-
-  // Region and filter diagnostics — three-state rejection
-  const regionAndFilterDiagnostics = buildRegionAndFilterDiagnostics(selectedCandidate);
-
-  // Final authority trace — curve signatures from actual curves
+  const regionAndFilterDiagnostics = buildRegionAndFilterDiagnostics(pool);
   const finalAuthorityTrace = buildFinalAuthorityTrace(optimisationResult, rspRawCurve, graphRspEqSeries);
-
-  // P19 authority from the published contract
-  const p19AuthorityTrace = buildP19AuthorityTrace(contract, optimisationResult);
-
-  // Lifecycle trace from the real bassDiagTokenTrace data
+  const p19AuthorityTrace = buildP19AuthorityTrace(contract);
   const lifecycleTrace = buildLifecycleTrace(diagnosticToken);
 
   return {
@@ -547,8 +520,9 @@ export function buildDesignEqRunDiagnostics({
     poolGenerationStatus: pool?.generationStatus || null,
     generatedCandidateCount: pool?.generatedCandidateCount ?? null,
     physicallyCredibleCount: pool?.physicallyCredibleCount ?? null,
-    selectedCandidateId: optimisationResult?.selectedCandidateId || selectedCandidate?.candidateId || null,
+    selectedCandidateId: optimisationResult?.selectedCandidateId || optimisationResult?.selectedCandidate?.candidateId || null,
     selectionReason: optimisationResult?.selectionDiagnostics?.selectionReason || optimisationResult?.selectionReason || null,
-    builtAtMs: Date.now(),
+    // UI JSON construction time — NOT captured run evidence. Labelled explicitly.
+    uiJsonConstructedAtMs: Date.now(),
   };
 }
