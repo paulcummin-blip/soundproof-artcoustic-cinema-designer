@@ -10,7 +10,6 @@ import { useAppState } from "@/components/AppStateProvider";
 import { useResolvedSpeakerLayout } from "@/components/room/rv/utils/resolveActiveSpeakerLayout";
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
 import { getCanonicalRole as getCanonicalRoleShared } from "@/components/utils/surroundRoleMap";
-import C322ResolverAuditPanel from "@/components/room/C322ResolverAuditPanel";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -235,39 +234,6 @@ export default function SideElevation({
       }));
   }, [resolvedSpeakers, wall]);
 
-  // --- C3.18 TEMP AUDIT: trace T* objects through the filter ---
-  const tAudit = useMemo(() => {
-    const list = Array.isArray(resolvedSpeakers) ? resolvedSpeakers : [];
-    const tObjs = list.filter(s => /^T[A-Z]/.test(String(s?.role || '').trim().toUpperCase()));
-    const tMarkers = speakerMarkers.filter(m => /^T[A-Z]/.test(String(m.role || '').trim().toUpperCase()));
-    const traces = tObjs.map(s => {
-      const raw = s?.role;
-      const trimmed = String(raw || '').trim();
-      const upper = trimmed.toUpperCase();
-      const matches = /^T[A-Z]/.test(upper);
-      const py = s?.position?.y;
-      const pz = s?.position?.z;
-      const px = s?.position?.x;
-      return {
-        raw, trimmed, upper, matches,
-        x: Number.isFinite(px) ? px : null,
-        y: Number.isFinite(py) ? py : null,
-        z: Number.isFinite(pz) ? pz : null,
-        yValid: Number.isFinite(py),
-        zValid: Number.isFinite(pz),
-      };
-    });
-    return {
-      resolvedCount: list.length,
-      tCount: tObjs.length,
-      markerCount: speakerMarkers.length,
-      tMarkerCount: tMarkers.length,
-      tRoles: tObjs.map(s => String(s?.role || '').trim().toUpperCase()),
-      tMarkerRoles: tMarkers.map(m => String(m.role || '').trim().toUpperCase()),
-      traces,
-    };
-  }, [resolvedSpeakers, speakerMarkers]);
-
   // Rear-wall surround roles (overlap in side elevation)
   const REAR_ROLES = new Set(['SBL','SBR','SCL','SCR','SC']);
 
@@ -491,60 +457,6 @@ export default function SideElevation({
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           preserveAspectRatio="xMidYMid meet"
         >
-          {/* C3.22 RESOLVER DECISION AUDIT PANEL */}
-          {import.meta.env.DEV && (
-            <foreignObject x={300} y={10} width={440} height={470} style={{ overflow: 'visible' }}>
-              <C322ResolverAuditPanel
-                placedSpeakers={placedSpeakers}
-                appState={appState}
-                dolbyLayout={dolbyLayout}
-                getCanonicalRoleFn={getCanonicalRoleShared}
-                getSpeakerVisibility={getSpeakerVisibility}
-              />
-            </foreignObject>
-          )}
-          {/* C3.18 TEMP AUDIT PANEL */}
-          {import.meta.env.DEV && (
-            <foreignObject x={10} y={10} width={280} height={260} style={{ overflow: 'visible' }}>
-              <div style={{ width: 260, maxHeight: 240, overflow: 'auto', background: 'rgba(255,255,255,0.96)', border: '1px solid #213428', borderRadius: 4, padding: 6, fontFamily: 'monospace', fontSize: 9, color: '#1B1A1A', pointerEvents: 'none' }}>
-                <div style={{ fontWeight: 700, marginBottom: 3 }}>C3.18 T* AUDIT</div>
-                <div>resolvedSpeakers: count: {tAudit.resolvedCount}</div>
-                <div>Overhead candidates: {tAudit.tRoles.length ? tAudit.tRoles.join(' / ') : 'NONE'}</div>
-                <div style={{ borderTop: '1px solid #ccc', margin: '3px 0' }} />
-                <div>speakerMarkers: count: {tAudit.markerCount}</div>
-                <div>Overhead markers: {tAudit.tMarkerRoles.length ? tAudit.tMarkerRoles.join(' / ') : 'NONE'}</div>
-                <div style={{ borderTop: '1px solid #ccc', margin: '3px 0' }} />
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8 }}>
-                  <thead>
-                    <tr style={{ background: '#eee' }}>
-                      <th style={{ textAlign: 'left', padding: '1px 2px' }}>TEST</th>
-                      <th style={{ textAlign: 'left', padding: '1px 2px' }}>EXPECTED</th>
-                      <th style={{ textAlign: 'left', padding: '1px 2px' }}>ACTUAL</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td>resolved T* count</td><td>6</td><td>{tAudit.tCount}</td></tr>
-                    <tr><td>marker T* count</td><td>6</td><td>{tAudit.tMarkerCount}</td></tr>
-                    <tr><td>role field</td><td>TFL/TFR</td><td>{tAudit.tCount ? 'present' : '—'}</td></tr>
-                    <tr><td>regex match</td><td>true</td><td>{tAudit.traces.every(t => t.matches) ? 'true' : 'false'}</td></tr>
-                    <tr><td>position y/z</td><td>valid</td><td>{tAudit.traces.every(t => t.yValid && t.zValid) ? 'valid' : 'INVALID'}</td></tr>
-                  </tbody>
-                </table>
-                <div style={{ borderTop: '1px solid #ccc', margin: '3px 0' }} />
-                <div style={{ fontWeight: 700, marginBottom: 2 }}>ROLE TRACE</div>
-                {tAudit.traces.length === 0 && <div>No T* objects in resolvedSpeakers</div>}
-                {tAudit.traces.map((t, i) => (
-                  <div key={i} style={{ marginBottom: 3, borderLeft: '2px solid #213428', paddingLeft: 4 }}>
-                    <div>raw role: {JSON.stringify(t.raw)}</div>
-                    <div>trimmed: {JSON.stringify(t.trimmed)}</div>
-                    <div>uppercase: {JSON.stringify(t.upper)}</div>
-                    <div>matches /^T[A-Z]/: {String(t.matches)}</div>
-                    <div>position: x:{t.x} y:{t.y} z:{t.z}</div>
-                  </div>
-                ))}
-              </div>
-            </foreignObject>
-          )}
           {/* Title */}
           <text x={offsetX + drawW / 2} y={14}
             textAnchor="middle" fontSize={10} fontWeight={600}
@@ -1190,16 +1102,16 @@ export default function SideElevation({
 
             if (isCeiling) {
               // Side-profile ceiling insert: body extends upward into ceiling void.
-              // Uses actual selected speaker dimensions. Bottom edge 10mm below ceiling line.
+              // Bottom edge 10mm below ceiling line; body extends upward from there.
               const meta = getSpeakerModelMeta(spk.model) || {};
               const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.165;
-              const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.10;
+              const spkHeightM = 0.10; // C3.24: vertical cabinet depth (no verified cabinet-depth value)
               const GAP_BELOW_CEILING_M = 0.01; // 10mm below ceiling line
               const cx = rx(spk.y);
               const svgHalfW = Math.max(4, (spkWidthM / roomL) * drawW / 2);
-              // Bottom of speaker body = 10mm below ceiling
+              // Bottom of speaker body = 10mm below ceiling; top extends upward into void
               const bodyBottomM = roomH - GAP_BELOW_CEILING_M;
-              const bodyTopM = bodyBottomM - spkHeightM;
+              const bodyTopM = bodyBottomM + spkHeightM;
               const svgBodyBottom = rz(bodyBottomM);
               const svgBodyTop = rz(bodyTopM);
               const svgBodyH = Math.max(3, svgBodyBottom - svgBodyTop);
