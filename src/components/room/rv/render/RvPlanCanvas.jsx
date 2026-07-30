@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useLayoutEffect, useState } from "react";
 import { hasPos } from "@/components/room/rv/RenderPrimitives";
 import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import SvgDefs from "@/components/room/SvgDefs";
@@ -234,6 +234,89 @@ export default function RvPlanCanvas({
       };
     });
   }, [dragging, draftSpeakersRef, visiblePlanSpeakers, speakerDragTick]);
+
+  // C3.26 temporary renderer audit. Read-only instrumentation; remove after diagnosis.
+  const c326ShowOverheads = !!(
+    overlaysForRendering?.OVERHEADS_2 ||
+    overlaysForRendering?.OVERHEADS_4 ||
+    overlaysForRendering?.OVERHEADS_6
+  );
+  const c326LayoutParts = String(dolbyLayout || "5.1").split(".");
+  const c326OverheadCount = c326LayoutParts.length >= 3
+    ? parseInt(c326LayoutParts[2], 10) || 0
+    : 0;
+  const c326Config =
+    c326OverheadCount === 2 ? ".2" :
+    c326OverheadCount === 4 ? ".4" :
+    c326OverheadCount === 6 ? ".6" : "off";
+
+  const c326ZoneShapeCount = (zone) => {
+    if (!zone || !zone.active || typeof toPx !== "function") return 0;
+    const [, y0px] = toPx(0, zone.y1);
+    const [, y1px] = toPx(0, zone.y2);
+    if (!(Math.abs(y1px - y0px) > 0)) return 0;
+    const pieces = Array.isArray(zone.pieces) && zone.pieces.length
+      ? zone.pieces
+      : [{ x1: zone.x1, x2: zone.x2 }];
+    return pieces.filter((piece) => {
+      const [x0px] = toPx(piece.x1, 0);
+      const [x1px] = toPx(piece.x2, 0);
+      return Math.abs(x1px - x0px) > 0;
+    }).length;
+  };
+
+  const c326FrontZoneCount = c326ZoneShapeCount(overheadZones?.frontZone);
+  const c326MiddleZoneCount = c326ZoneShapeCount(overheadZones?.midZone);
+  const c326RearZoneCount = c326ZoneShapeCount(overheadZones?.backZone);
+  const c326TotalDrawableShapes =
+    c326Config === ".2" ? c326MiddleZoneCount :
+    c326Config === ".4" ? c326FrontZoneCount + c326RearZoneCount :
+    c326Config === ".6" ? c326FrontZoneCount + c326MiddleZoneCount + c326RearZoneCount : 0;
+
+  const [c326RenderResult, setC326RenderResult] = useState({
+    returnedNull: true,
+    svgElementsProduced: 0,
+  });
+
+  useLayoutEffect(() => {
+    const overheadGroup = svgRef?.current?.querySelector?.('[data-layer="overhead-bands"]') || null;
+    const next = {
+      returnedNull: overheadGroup === null,
+      svgElementsProduced: overheadGroup
+        ? overheadGroup.querySelectorAll("rect,path,polygon,polyline,circle,ellipse,line").length
+        : 0,
+    };
+    setC326RenderResult((previous) =>
+      previous.returnedNull === next.returnedNull &&
+      previous.svgElementsProduced === next.svgElementsProduced
+        ? previous
+        : next
+    );
+  }, [svgRef, c326ShowOverheads, c326Config, overheadZones, c326TotalDrawableShapes]);
+
+  const c326OverheadZonesType = overheadZones === null
+    ? "null"
+    : Array.isArray(overheadZones)
+      ? "array"
+      : typeof overheadZones;
+  const c326OverheadZoneKeys = overheadZones && typeof overheadZones === "object"
+    ? Object.keys(overheadZones).join(", ")
+    : "";
+
+  let c326ReasonHidden = "not hidden by renderer";
+  if (!c326ShowOverheads) {
+    c326ReasonHidden = "no overhead overlay toggle enabled";
+  } else if (c326Config === "off") {
+    c326ReasonHidden = "unsupported/off parsed overhead config";
+  } else if (!overheadZones || overheadZones.status !== "ok") {
+    c326ReasonHidden = "overheadZones status: " + String(overheadZones?.status || "absent");
+  } else if (c326TotalDrawableShapes === 0) {
+    c326ReasonHidden = "no active drawable zone pieces";
+  } else if (c326RenderResult.returnedNull) {
+    c326ReasonHidden = "active renderer returned no overhead-bands group";
+  } else if (c326RenderResult.svgElementsProduced === 0) {
+    c326ReasonHidden = "active renderer produced no drawable SVG elements";
+  }
 
   return (
     <div
@@ -726,8 +809,50 @@ export default function RvPlanCanvas({
           />
         )}
 
+      </div>
 
+      {/* C3.26 temporary HTML audit panel — outside the SVG/canvas drawing area. */}
+      <div
+        data-testid="c326-overhead-renderer-audit"
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          margin: "12px",
+          padding: "12px",
+          border: "1px solid #92400e",
+          background: "#fffbeb",
+          color: "#451a03",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          fontSize: "12px",
+          lineHeight: 1.5,
+          whiteSpace: "normal",
+        }}
+      >
+        <strong>ACTIVE RENDER PATHS</strong><br />
+        RvZonesAndOverlays mounted: true<br />
+        ZoneComponents.OVERHEADS mounted: false<br /><br />
 
+        <strong>RUNTIME INPUTS</strong><br />
+        dolbyLayout: {String(dolbyLayout)}<br />
+        parsed overhead count: {c326OverheadCount}<br />
+        OVERHEADS_2: {String(!!overlaysForRendering?.OVERHEADS_2)}<br />
+        OVERHEADS_4: {String(!!overlaysForRendering?.OVERHEADS_4)}<br />
+        OVERHEADS_6: {String(!!overlaysForRendering?.OVERHEADS_6)}<br />
+        showOverheads in RvZonesAndOverlays: {String(c326ShowOverheads)}<br />
+        showOverheads in useZoneComponents: {String(c326ShowOverheads)}<br /><br />
+
+        <strong>OVERHEAD ZONE COMPUTATION</strong><br />
+        overheadZones type: {c326OverheadZonesType}<br />
+        overheadZones keys: {c326OverheadZoneKeys || "(none)"}<br />
+        front zone count: {c326FrontZoneCount}<br />
+        middle zone count: {c326MiddleZoneCount}<br />
+        rear zone count: {c326RearZoneCount}<br />
+        total drawable shapes: {c326TotalDrawableShapes}<br /><br />
+
+        <strong>ACTIVE RENDER RESULT</strong><br />
+        renderer selected: RvZonesAndOverlays<br />
+        returned null: {String(c326RenderResult.returnedNull)}<br />
+        SVG elements produced: {c326RenderResult.svgElementsProduced}<br />
+        reason hidden: {c326ReasonHidden}
       </div>
     </div>
   );
