@@ -350,7 +350,7 @@ function speakersShallowEqual(a = [], b = []) {
   return true;
 }
 
-const AppStateContext = createContext(null);
+export const AppStateContext = createContext(null);
 
 export function useAppState() {
   const ctx = useContext(AppStateContext);
