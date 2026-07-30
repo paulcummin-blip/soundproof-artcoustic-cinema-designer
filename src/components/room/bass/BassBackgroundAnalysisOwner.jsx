@@ -119,18 +119,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   useEffect(() => {
     if (selectionAttempt.error) controller.reportMainThreadError(selectionAttempt.error, "Canonical EQ selection");
   }, [controller, selectionAttempt.error]);
-  // Record candidate-selection-accepted only after the pool contains a valid
-  // selectable result. Guard with a Set so unrelated React renders do not
-  // overwrite or duplicate the stage for the same token.
-  const candidateAcceptedTokensRef = useRef(new Set());
-  useEffect(() => {
-    if (!optimisationResult?.selectedCandidate) return;
-    const token = lifecycle?.result?.diagnosticToken || null;
-    if (!token) return;
-    if (candidateAcceptedTokensRef.current.has(token)) return;
-    candidateAcceptedTokensRef.current.add(token);
-    recordDiagStage(token, "candidate-selection-accepted", { workerRequestId: lifecycle?.result?.workerRequestId || null, selectedCandidateId: optimisationResult.selectedCandidateId || null });
-  }, [optimisationResult, lifecycle?.result?.diagnosticToken, lifecycle?.result?.workerRequestId]);
   const optimisationResult = useMemo(() => {
     const selected = selectionAttempt.result;
     if (!selected) return null;
@@ -184,6 +172,18 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       finalOptimisedBassResponse: buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources }),
     };
   }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel]);
+  // Record candidate-selection-accepted only after the pool contains a valid
+  // selectable result. Guard with a Set so unrelated React renders do not
+  // overwrite or duplicate the stage for the same token.
+  const candidateAcceptedTokensRef = useRef(new Set());
+  useEffect(() => {
+    if (!optimisationResult?.selectedCandidate) return;
+    const token = lifecycle?.result?.diagnosticToken || null;
+    if (!token) return;
+    if (candidateAcceptedTokensRef.current.has(token)) return;
+    candidateAcceptedTokensRef.current.add(token);
+    recordDiagStage(token, "candidate-selection-accepted", { workerRequestId: lifecycle?.result?.workerRequestId || null, selectedCandidateId: optimisationResult.selectedCandidateId || null });
+  }, [optimisationResult, lifecycle?.result?.diagnosticToken, lifecycle?.result?.workerRequestId]);
   const contract = useBassAnalysisContract({
     ...fingerprintInputs, subsForSimulation: sources, designEqSystemLimits, optimisationResult,
     detailedStatus, detailedProgress: lifecycle.progress, detailedElapsedMs: lifecycle.elapsedMs,

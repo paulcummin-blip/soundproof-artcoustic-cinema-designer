@@ -374,30 +374,30 @@ export default function Test11GentlePeakCutValidation() {
             const onRetryStage = s("onRetry");
             const autoStage = s("automatic-update");
             const requestManualStage = s("requestManual");
-            const pendingStage = s("requestManual-pending-assigned") || s("updateInputs-pending-assigned");
-            const startPendingStage = s("startPending");
-            const postMessageStage = s("worker.postMessage");
-            const workerEventStage = s("worker-event-received");
+            const pendingStage = s("pending-assigned");
+            const startRequestStage = s("startRequest");
+            const postMessageStage = s("worker-posted");
+            const workerEventStage = s("worker-received");
             const completedStage = s("worker-completed");
             const checkboxValue = onRetryStage?.checkboxValueAtClick ?? autoStage?.checkboxValueAtClick ?? diagRun.checkboxClickValue;
             const onRetryArg = onRetryStage?.onRetryArg;
-            const requestManualCd = requestManualStage?.requestManualCollectDiagnostics;
-            const requestManualForce = requestManualStage?.requestManualForce;
-            const pendingCd = pendingStage?.pendingCollectDiagnostics;
+            const requestManualCd = requestManualStage?.collectDiagnostics;
+            const requestManualForce = requestManualStage?.force;
+            const pendingCd = pendingStage?.collectDiagnostics;
             const pendingToken = pendingStage?.pendingToken;
-            const startPendingCd = startPendingStage?.startPendingCollectDiagnostics;
-            const startPendingToken = startPendingStage?.startPendingToken;
-            const postMessageCd = postMessageStage?.postMessageCollectDiagnostics;
-            const postMessageRequestId = postMessageStage?.postMessageRequestId;
-            const postMessageToken = postMessageStage?.postMessageToken;
-            const workerEventCd = workerEventStage?.workerEventCollectDiagnostics;
-            const workerEventRequestId = workerEventStage?.workerEventRequestId;
-            const workerEventToken = workerEventStage?.workerEventToken;
-            const completedRequestId = completedStage?.resultRequestId ?? completedStage?.completedRequestId;
-            const completedToken = completedStage?.resultToken ?? completedStage?.completedToken;
-            const requiredStages = ["onRetry", "requestManual", "requestManual-pending-assigned", "startPending", "worker.postMessage", "worker-event-received", "worker-completed"];
+            const startRequestCd = startRequestStage?.collectDiagnostics;
+            const startRequestToken = startRequestStage?.token;
+            const postMessageCd = postMessageStage?.collectDiagnostics;
+            const postMessageRequestId = postMessageStage?.workerRequestId;
+            const postMessageToken = postMessageStage?.token;
+            const workerEventCd = workerEventStage?.collectDiagnostics;
+            const workerEventRequestId = workerEventStage?.workerRequestId;
+            const workerEventToken = workerEventStage?.returnedToken;
+            const completedRequestId = completedStage?.workerRequestId;
+            const completedToken = completedStage?.token;
+            const requiredStages = ["requestManual", "pending-assigned", "startRequest", "worker-posted", "worker-received", "worker-completed"];
             const missingStages = requiredStages.filter((name) => !s(name));
-            const allTokens = [diagRun.token, pendingToken, startPendingToken, postMessageToken, workerEventToken, completedToken].filter((t) => t != null);
+            const allTokens = [diagRun.token, pendingToken, startRequestToken, postMessageToken, workerEventToken, completedToken].filter((t) => t != null);
             const allRequestIds = [postMessageRequestId, workerEventRequestId, completedRequestId].filter((r) => r != null);
             const tokensMatch = allTokens.length === 6 && allTokens.every((t) => t === allTokens[0]);
             const requestIdsMatch = allRequestIds.length === 3 && allRequestIds.every((r) => r === allRequestIds[0]);
@@ -407,7 +407,7 @@ export default function Test11GentlePeakCutValidation() {
               { stage: "3. onRetry argument", value: onRetryArg },
               { stage: "4. requestManual collectDiagnostics", value: requestManualCd },
               { stage: "6. Pending collectDiagnostics", value: pendingCd },
-              { stage: "8. startPending collectDiagnostics", value: startPendingCd },
+              { stage: "8. startPending collectDiagnostics", value: startRequestCd },
               { stage: "10. worker.postMessage collectDiagnostics", value: postMessageCd },
               { stage: "13. Worker event received collectDiagnostics", value: workerEventCd },
             ];
@@ -428,8 +428,8 @@ export default function Test11GentlePeakCutValidation() {
                   <div>5. requestManual force argument: <b>{boolStr(requestManualForce)}</b></div>
                   <div>6. Pending collectDiagnostics after assignment: <b>{boolStr(pendingCd)}</b></div>
                   <div>7. Pending diagnostic request token: <b>{pendingToken || MISSING}</b></div>
-                  <div>8. startPending collectDiagnostics: <b>{boolStr(startPendingCd)}</b></div>
-                  <div>9. startPending diagnostic request token: <b>{startPendingToken || MISSING}</b></div>
+                  <div>8. startPending collectDiagnostics: <b>{boolStr(startRequestCd)}</b></div>
+                  <div>9. startPending diagnostic request token: <b>{startRequestToken || MISSING}</b></div>
                   <div>10. worker.postMessage collectDiagnostics: <b>{boolStr(postMessageCd)}</b></div>
                   <div>11. worker.postMessage requestId: <b>{postMessageRequestId || MISSING}</b></div>
                   <div>12. worker.postMessage diagnostic request token: <b>{postMessageToken || MISSING}</b></div>
@@ -454,8 +454,8 @@ export default function Test11GentlePeakCutValidation() {
                   <div style={{ marginTop: 8, fontWeight: 700 }}>Timestamps:</div>
                   <div>Checkbox click: <b>{diagRun.checkboxClickTs != null ? new Date(diagRun.checkboxClickTs).toISOString().split("T")[1].replace("Z", "") : MISSING}</b></div>
                   <div>requestManual: <b>{ts("requestManual")}</b></div>
-                  <div>worker.postMessage: <b>{ts("worker.postMessage")}</b></div>
-                  <div>Worker event received: <b>{ts("worker-event-received")}</b></div>
+                  <div>worker-posted: <b>{ts("worker-posted")}</b></div>
+                  <div>worker-received: <b>{ts("worker-received")}</b></div>
                   <div>Worker completed: <b>{ts("worker-completed")}</b></div>
                 </div>
                 {allDiagRuns.length > 1 && (
