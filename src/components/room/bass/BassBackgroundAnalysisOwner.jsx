@@ -8,7 +8,7 @@ import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore"
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
 import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
-import { startManualDiagnosticsCalculation, recordCandidateSelectionAccepted, recordContractPublished } from "./bassLifecycleOrchestrator";
+import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -182,7 +182,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     if (!token) return;
     if (candidateAcceptedTokensRef.current.has(token)) return;
     candidateAcceptedTokensRef.current.add(token);
-    recordCandidateSelectionAccepted(token, { workerRequestId: lifecycle?.result?.workerRequestId || null, selectedCandidateId: optimisationResult.selectedCandidateId || null });
+    recordDiagStage(token, "candidate-selection-accepted", { workerRequestId: lifecycle?.result?.workerRequestId || null, selectedCandidateId: optimisationResult.selectedCandidateId || null });
   }, [optimisationResult, lifecycle?.result?.diagnosticToken, lifecycle?.result?.workerRequestId]);
   const contract = useBassAnalysisContract({
     ...fingerprintInputs, subsForSimulation: sources, designEqSystemLimits, optimisationResult,
@@ -210,7 +210,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     const publishedToken = lifecycle?.result?.diagnosticToken || null;
     if (published && publishedToken && !publishedContractTokensRef.current.has(publishedToken)) {
       publishedContractTokensRef.current.add(publishedToken);
-      recordContractPublished(publishedToken, { contractAnalysisId: contract?.analysisId || null, contractFingerprint: currentFingerprint });
+      recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: currentFingerprint });
     }
   }, [scopeId, cacheKey, contract, fingerprints]);
 
@@ -228,11 +228,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   }, [controller, lifecycle.resultFingerprint, lifecycle.activeJobId, optimisationResult]);
   const onRetry = useCallback(
     ({ collectDiagnostics = false, force = true } = {}) => {
-      const { action } = startManualDiagnosticsCalculation(controller, {
-        fingerprint: cacheKey, payload, identity: requestIdentity,
-        collectDiagnostics, force,
-      });
-      return action;
+      const diagnosticToken = collectDiagnostics ? createDiagToken("manual-forced") : null;
+      if (diagnosticToken) recordDiagStage(diagnosticToken, "token-created", { origin: "manual-forced", collectDiagnostics: true });
+      return controller.requestManual({
+        fingerprint: cacheKey,
+        payload,
+        identity: requestIdentity,
+        collectDiagnostics: collectDiagnostics === true,
+        force: force === true,
+        diagnosticToken,
+        });
     },
     [controller, cacheKey, payload, requestIdentity]
   );

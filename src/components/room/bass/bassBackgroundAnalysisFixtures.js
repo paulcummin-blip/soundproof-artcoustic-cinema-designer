@@ -14,7 +14,7 @@ import {
   createProgressMessage,
 } from "./bassOptimiserWorkerProtocol";
 
-export class FakeClock {
+class FakeClock {
   constructor() { this.time = 0; this.jobs = []; }
   now = () => this.time;
   setTimer = (fn, delay) => { const job = { fn, at: this.time + delay, cancelled: false }; this.jobs.push(job); return job; };
@@ -22,33 +22,16 @@ export class FakeClock {
   tick(ms) { this.time += ms; const due = this.jobs.filter((job) => !job.cancelled && job.at <= this.time); due.forEach((job) => { job.cancelled = true; job.fn(); }); }
 }
 
-export class FakeWorker {
+class FakeWorker {
   constructor(registry) { this.registry = registry; this.terminated = false; registry.push(this); }
   postMessage(message) { this.message = message; }
   terminate() { this.terminated = true; }
-  // Include diagnosticToken and collectDiagnostics from the original request so
-  // the real controller's token-validation check sees a matching response.
-  // Override via data.diagnosticToken / data.collectDiagnostics to simulate
-  // a mismatch.
-  send(type, data = {}) {
-    this.onmessage?.({
-      data: {
-        type,
-        requestId: this.message.requestId,
-        fingerprint: this.message.fingerprint,
-        identity: this.message.identity || null,
-        diagnosticToken: this.message.diagnosticToken || null,
-        collectDiagnostics: this.message.collectDiagnostics === true,
-        ...BASS_OPTIMISER_VERSIONS,
-        ...data,
-      },
-    });
-  }
+  send(type, data = {}) { this.onmessage?.({ data: { type, requestId: this.message.requestId, fingerprint: this.message.fingerprint, identity: this.message.identity || null, ...BASS_OPTIMISER_VERSIONS, ...data } }); }
   fail(message = "Worker exception") { this.onerror?.({ message }); }
   messageFail() { this.onmessageerror?.({}); }
 }
 
-export function validInput(fingerprint = "cal:v1:0000000000000001") {
+function validInput(fingerprint = "cal:v1:0000000000000001") {
   return {
     valid: true, fingerprint,
     identity: {
@@ -60,7 +43,7 @@ export function validInput(fingerprint = "cal:v1:0000000000000001") {
   };
 }
 
-export function harness() {
+function harness() {
   const clock = new FakeClock();
   const workers = [];
   const cache = new BassAnalysisLruCache();
@@ -71,20 +54,18 @@ export function harness() {
   return { clock, workers, cache, controller };
 }
 
-export function completeCurrent(h, pool = {}, overrides = {}) {
+function completeCurrent(h, pool = {}) {
   const house = {
     designEqFitProfile: "house_curve", startStrategy: "multi-start",
     designEqFitProfileConfig: { maximumCutDb: 15, maximumAggregateBoostDb: 6 },
     generatedFilterBank: [], finalPostEqCurve: [{ frequency: 20, spl: 100 }],
-    assessmentStartHz: 20, assessmentEndHz: 200,
-    bankValidationResult: { allOk: true },
   };
   const compatiblePool = stampPoolAuthority({
     ...pool,
     candidates: Array.isArray(pool.candidates) && pool.candidates.length ? pool.candidates : [house],
     selectablePool: Array.isArray(pool.selectablePool) && pool.selectablePool.length ? pool.selectablePool : [house],
   });
-  h.workers[h.workers.length - 1].send("complete", { pool: compatiblePool, ...overrides });
+  h.workers[h.workers.length - 1].send("complete", { pool: compatiblePool });
 }
 
 export function runBassBackgroundAnalysisFixtures() {
