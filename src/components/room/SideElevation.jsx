@@ -905,6 +905,35 @@ export default function SideElevation({
               const svgBodyH   = svgGrille - svgBodyTop;
               const svgHalfW   = Math.max(4, (widthM / roomL) * drawW / 2);
               const cx = rx(spk.y);
+              // TEMP C3.3 instrumentation — remove after audit
+              try {
+                console.log("[C3.3 CEILING SPEAKER]", {
+                  role: spk.role,
+                  roleUpper: String(spk.role || "").toUpperCase(),
+                  model: spk.model,
+                  y: spk.y,
+                  z: spk.z,
+                  roomH,
+                  roomL,
+                  drawH,
+                  drawW,
+                  offsetX,
+                  offsetY,
+                  cx,
+                  svgGrille,
+                  svgBodyTop,
+                  svgBodyH,
+                  svgHalfW,
+                  rectWidth: svgHalfW * 2,
+                  rectHeight: svgBodyH,
+                  rectX: cx - svgHalfW,
+                  rectY: svgBodyTop,
+                  insideSvgX: (cx - svgHalfW) >= 0 && (cx + svgHalfW) <= SVG_W,
+                  insideSvgY: svgBodyTop >= 0 && (svgBodyTop + svgBodyH) <= SVG_H,
+                  ceilingLineAtOffsetY: svgGrille === offsetY,
+                  returnsJsx: true,
+                });
+              } catch (e) {}
               return (
                 <g key={`spk-${i}`} opacity={0.88}>
                   {/* Body above ceiling */}
