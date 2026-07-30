@@ -215,12 +215,12 @@ export default function SideElevation({
     return resolvedSpeakers
       .filter(s => {
         if (!Number.isFinite(s?.position?.y) || !Number.isFinite(s?.position?.z)) return false;
-        const role = String(s.role || '').toUpperCase();
+        const role = String(s.role || '').trim().toUpperCase();
         const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
         // LCR speakers are front-wall — always include them (shown faintly)
         if (lcrRoles.has(role)) return true;
         // Overhead speakers (T*) are ceiling-mounted — visible from both wall elevations
-        if (/^T/.test(role)) return true;
+        if (/^T[A-Z]/.test(role)) return true;
         // For side/surround speakers, filter by which wall side they're on
         const side = getRoleSide(role);
         if (side === null) return true; // centre roles: SC etc — always show
@@ -1101,37 +1101,43 @@ export default function SideElevation({
             if (REAR_ROLES.has(role)) return null; // drawn separately as side-profile
 
             if (isCeiling) {
-              // Side-profile ceiling insert: body sits ABOVE ceiling line, grille flush with ceiling.
+              // Side-profile ceiling insert: body extends upward into ceiling void.
+              // Uses actual selected speaker dimensions. Bottom edge 10mm below ceiling line.
               const meta = getSpeakerModelMeta(spk.model) || {};
-              const widthM = Number(meta.widthM) > 0 ? Number(meta.widthM) : 0.165;
-              const svgGrille = rz(roomH);                          // ceiling line
+              const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.165;
+              const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.10;
+              const GAP_BELOW_CEILING_M = 0.01; // 10mm below ceiling line
               const cx = rx(spk.y);
-              const svgHalfW = Math.max(7, (widthM / roomL) * drawW / 2);
-              const svgBodyH  = Math.max(10, (0.15 / roomH) * drawH); // ~15cm visual depth, min 10px
-              const svgBodyTop = svgGrille - svgBodyH;               // above ceiling
-              console.log("[T CEILING TRACE]", {
-                role, y: spk.y, z: spk.z, roomH, roomL,
-                cx, grille: svgGrille, svgHalfW, svgBodyH, svgBodyTop,
-                rectX: cx - svgHalfW, rectY: svgBodyTop,
-                rectW: svgHalfW * 2, rectH: svgBodyH
-              });
+              const svgHalfW = Math.max(4, (spkWidthM / roomL) * drawW / 2);
+              // Bottom of speaker body = 10mm below ceiling
+              const bodyBottomM = roomH - GAP_BELOW_CEILING_M;
+              const bodyTopM = bodyBottomM - spkHeightM;
+              const svgBodyBottom = rz(bodyBottomM);
+              const svgBodyTop = rz(bodyTopM);
+              const svgBodyH = Math.max(3, svgBodyBottom - svgBodyTop);
+              const svgGrille = rz(roomH); // ceiling line
               return (
                 <g key={`spk-${i}`} opacity={0.92}>
-                  {/* Body above ceiling */}
+                  {/* Speaker body — extends upward into ceiling void */}
                   <rect
                     x={cx - svgHalfW} y={svgBodyTop}
                     width={svgHalfW * 2} height={svgBodyH}
-                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.6} rx={1.5} />
-                  {/* Grille line flush with ceiling */}
+                    fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                  {/* Baffle edge — bottom face (facing into room) */}
                   <line
-                    x1={cx - svgHalfW} y1={svgGrille}
-                    x2={cx + svgHalfW} y2={svgGrille}
-                    stroke="#fff" strokeWidth={1.2} opacity={0.7} />
-                  {/* Label inside room, just below ceiling — clear of dimension lines */}
+                    x1={cx - svgHalfW} y1={svgBodyBottom}
+                    x2={cx + svgHalfW} y2={svgBodyBottom}
+                    stroke="#4A4540" strokeWidth={1.4} />
+                  {/* Ceiling line — drawn through the gap for clarity */}
+                  <line
+                    x1={cx - svgHalfW - 6} y1={svgGrille}
+                    x2={cx + svgHalfW + 6} y2={svgGrille}
+                    stroke="#B0AEA8" strokeWidth={0.6} strokeDasharray="2 2" opacity={0.6} />
+                  {/* Label below the symbol, inside the room */}
                   <text
-                    x={cx} y={svgGrille + 9}
-                    textAnchor="middle" fontSize={7}
-                    fill={SPK_COLOR} fontWeight={700}>
+                    x={cx} y={svgBodyBottom + 9}
+                    textAnchor="middle" fontSize={6}
+                    fill={SPK_COLOR} fontWeight={600}>
                     {spk.role}
                   </text>
                 </g>
