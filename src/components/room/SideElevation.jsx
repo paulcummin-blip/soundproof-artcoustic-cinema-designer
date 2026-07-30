@@ -219,7 +219,9 @@ export default function SideElevation({
         const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
         // LCR speakers are front-wall — always include them (shown faintly)
         if (lcrRoles.has(role)) return true;
-        // For side/surround/overhead speakers, filter by which wall side they're on
+        // Overhead speakers (T*) are ceiling-mounted — visible from both wall elevations
+        if (/^T/.test(role)) return true;
+        // For side/surround speakers, filter by which wall side they're on
         const side = getRoleSide(role);
         if (side === null) return true; // centre roles: SC etc — always show
         return side === wall;
