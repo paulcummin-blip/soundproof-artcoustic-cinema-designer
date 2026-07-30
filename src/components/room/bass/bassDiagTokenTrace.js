@@ -68,6 +68,11 @@ export function getDiagRuns() {
   return runOrder.map((t) => runs.get(t)).filter(Boolean);
 }
 
+export function getDiagRun(token) {
+  if (!token) return null;
+  return runs.get(token) || null;
+}
+
 export function getLatestDiagRun() {
   if (runOrder.length === 0) return null;
   return runs.get(runOrder[runOrder.length - 1]) || null;

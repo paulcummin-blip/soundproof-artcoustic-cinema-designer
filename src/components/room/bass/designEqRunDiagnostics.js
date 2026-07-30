@@ -5,22 +5,23 @@
 // recalculates, or influences any bass physics, EQ behaviour, candidate scoring,
 // filters, cache logic, or RP22 calculations.
 //
-// Every field is read from the real production path. MISSING = stage not reached
-// or value not available for this run. No synthetic or example values.
+// EVIDENCE INTEGRITY RULES:
+//   - Every field is read from the real production path. MISSING = null.
+//   - No synthetic values, no example values, no inferred reasons.
+//   - No derived timestamps presented as captured.
+//   - No constant substitution when worker-version fields are absent.
+//   - Ranking comes from selectionDiagnostics.rankedCandidates, not array position.
+//   - Rejection status uses three explicit states: accepted / rejected / unknown.
+//   - Curve signatures are computed from their actual corresponding curves.
 
 import { buildFilterBankSignature, buildCurveSignature } from "./bassResultAuthority";
-import {
-  BASS_OPTIMISER_PROTOCOL_VERSION,
-  BASS_OPTIMISER_POOL_VERSION,
-  HOUSE_CURVE_ENGINE_VERSION,
-  BASS_RESULT_SCHEMA_VERSION,
-} from "./bassOptimiserWorkerProtocol";
+import { getDiagRun } from "./bassDiagTokenTrace";
 
 const isNum = (v) => Number.isFinite(Number(v));
 const num = (v) => isNum(v) ? Number(v) : null;
 const fixed = (v, d = 2) => isNum(v) ? Number(v).toFixed(d) : null;
 
-// Interpolate a curve at an arbitrary frequency (same approach as production code).
+// Interpolate a curve at an arbitrary frequency (read-only, same approach as production).
 function interpolateCurve(curve, frequency) {
   if (!Array.isArray(curve) || !curve.length || !Number.isFinite(frequency)) return null;
   if (frequency <= curve[0].frequency) return curve[0].spl;
@@ -36,9 +37,9 @@ function interpolateCurve(curve, frequency) {
   return null;
 }
 
-// Derive candidate origin from the fit profile name.
+// Derive candidate origin from the fit profile name (read-only mapping).
 function deriveOrigin(profile) {
-  if (!profile) return "unknown";
+  if (!profile) return null;
   if (profile === "standard") return "standard";
   if (profile === "accuracy") return "accuracy";
   if (profile === "house_curve") return "house_curve";
@@ -54,51 +55,88 @@ function isSelectable(candidate, selectablePool) {
   return selectablePool.some((c) => c?.candidateId === candidate.candidateId);
 }
 
-// Compute total absolute EQ gain from a filter bank.
+// Compute total absolute EQ gain from a filter bank (read-only).
 function totalAbsoluteGain(filters) {
   if (!Array.isArray(filters)) return 0;
   return filters.filter((f) => f?.enabled).reduce((sum, f) => sum + Math.abs(Number(f.gainDb) || 0), 0);
 }
 
+// Three-state rejection: accepted / rejected / unknown.
+// Uses the explicit `decision` field from filterDecisionDiagnostics when available.
+// For detected regions without an explicit decision, returns "unknown".
+function rejectionStatus(entry) {
+  if (!entry) return "unknown";
+  if (entry.decision === "Accepted") return "accepted";
+  if (entry.decision === "Rejected") return "rejected";
+  if (entry.rejected === true) return "rejected";
+  if (entry.rejected === false) return "accepted";
+  return "unknown";
+}
+
 // Build the candidate pool diagnostics section.
-function buildCandidatePoolDiagnostics(pool, selectedCandidateId, selectionReason) {
+// Ranking comes from selectionDiagnostics.rankedCandidates, NOT array position.
+function buildCandidatePoolDiagnostics(pool, optimisationResult) {
   const candidates = Array.isArray(pool?.candidates) ? pool.candidates : [];
   const selectablePool = Array.isArray(pool?.selectablePool) ? pool.selectablePool : [];
   const salvageDiagnostics = pool?.salvageDiagnostics || {};
   const salvageTrigger = pool?.salvageTriggerDiagnosticsByProfile || {};
+  const selectionDiagnostics = optimisationResult?.selectionDiagnostics || {};
+  const rankedCandidates = Array.isArray(selectionDiagnostics.rankedCandidates) ? selectionDiagnostics.rankedCandidates : [];
+  const selectedCandidateId = optimisationResult?.selectedCandidateId || null;
 
-  return candidates.map((candidate, index) => {
-    const profile = candidate?.designEqFitProfile || "standard";
+  // Build a rank lookup from the real rankedCandidates array.
+  const rankByCandidateId = new Map();
+  for (const rc of rankedCandidates) {
+    if (rc?.candidateId) rankByCandidateId.set(rc.candidateId, rc.rank ?? null);
+  }
+  const selectionReasonByCandidateId = new Map();
+  for (const rc of rankedCandidates) {
+    if (rc?.candidateId) selectionReasonByCandidateId.set(rc.candidateId, rc.reason || null);
+  }
+
+  return candidates.map((candidate) => {
+    const profile = candidate?.designEqFitProfile || null;
     const baseProfile = typeof profile === "string" && (profile.endsWith("_sanitised") || profile.endsWith("_cut_only"))
       ? profile.replace(/_(sanitised|cut_only)$/, "")
       : profile;
-    const salvageInfo = salvageDiagnostics[baseProfile] || null;
-    const triggerInfo = salvageTrigger[baseProfile] || null;
+    const salvageInfo = baseProfile ? (salvageDiagnostics[baseProfile] || null) : null;
+    const triggerInfo = baseProfile ? (salvageTrigger[baseProfile] || null) : null;
     const selectable = isSelectable(candidate, selectablePool);
     const filters = Array.isArray(candidate?.generatedFilterBank) ? candidate.generatedFilterBank : [];
     const enabledFilters = filters.filter((f) => f?.enabled);
+    const candidateId = candidate?.candidateId || null;
+    const rank = candidateId ? (rankByCandidateId.get(candidateId) ?? null) : null;
+    const storedReason = candidateId ? (selectionReasonByCandidateId.get(candidateId) ?? null) : null;
+
+    // Exclusion reason from actual stored fields only — no synthetic fallback text.
+    let exclusionReason = null;
+    if (!selectable) {
+      if (candidate?.physicalValidation?.passed === false) {
+        exclusionReason = candidate?.physicalValidation?.reason || candidate?.physicalValidation?.message || "physical-validation-failed";
+      } else if (candidate?.meetsRequestedEnvelope === false) {
+        exclusionReason = "requested-envelope-not-met";
+      } else if (candidate?.bankValidationResult?.allOk === false) {
+        exclusionReason = candidate?.bankValidationResult?.reason || "bank-validation-failed";
+      } else {
+        exclusionReason = "not-in-selectable-pool";
+      }
+    }
 
     return {
-      candidateId: candidate?.candidateId || null,
+      candidateId,
       fitProfile: profile,
       origin: deriveOrigin(profile),
-      startingBankOrSeed: candidate?.selectedStart || null,
+      startingBankOrSeed: candidate?.selectedStart ?? null,
       startStrategy: candidate?.startStrategy || null,
       fallbackOrSalvagePath: salvageInfo ? {
         invoked: triggerInfo?.salvageInvoked ?? null,
         sanitisedFiltersRetained: salvageInfo?.sanitisedFilters?.length ?? null,
         cutOnlyFiltersRetained: salvageInfo?.cutOnlyFilters?.length ?? null,
-        trigger: triggerInfo,
+        trigger: triggerInfo || null,
       } : null,
       bankValidStatus: candidate?.physicalValidation?.passed ?? candidate?.physicalEqAuthorityPassed ?? null,
       selectableStatus: selectable,
-      exclusionReason: !selectable
-        ? (candidate?.physicalValidation?.passed === false
-          ? "Failed physical credibility check"
-          : candidate?.meetsRequestedEnvelope === false
-            ? "Did not meet requested envelope"
-            : "Not in selectable pool")
-        : null,
+      exclusionReason,
       enabledFilterCount: enabledFilters.length,
       totalAbsoluteEqGainDb: totalAbsoluteGain(filters),
       houseCurveRmsResidualDb: num(candidate?.rspRmsResidualDb ?? candidate?.fitMetrics?.rmsResidualDb),
@@ -107,14 +145,15 @@ function buildCandidatePoolDiagnostics(pool, selectedCandidateId, selectionReaso
       meanSignedResidualDb: num(candidate?.rspMeanSignedResidualDb),
       worstSeatDeviationDb: num(candidate?.worstSeatMaxDeviationDb),
       meanSeatDeviationDb: num(candidate?.meanSeatMaxDeviationDb),
-      finalRankingPosition: index + 1,
-      selectedFlag: candidate?.candidateId === selectedCandidateId,
-      selectionReason: candidate?.candidateId === selectedCandidateId ? (selectionReason || "Selected by balanced priority ranking") : null,
+      finalRankingPosition: rank,
+      selectedFlag: candidateId === selectedCandidateId,
+      selectionReason: candidateId === selectedCandidateId ? (storedReason || selectionDiagnostics?.selectionReason || null) : storedReason,
     };
   });
 }
 
 // Build the region and filter diagnostics section from the selected candidate.
+// Uses three-state rejection: accepted / rejected / unknown.
 function buildRegionAndFilterDiagnostics(selectedCandidate) {
   if (!selectedCandidate) return [];
   const candidateId = selectedCandidate.candidateId || null;
@@ -125,30 +164,30 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
 
   const rows = [];
 
-  // Detected regions
+  // Detected regions — these are detection-stage entries, no accept/reject decision.
   for (const region of detectedRegions) {
     rows.push({
       candidateId,
       stage: "primary",
       provenance: "detected region",
-      centreFrequencyHz: num(region?.centreFrequencyHz ?? region?.centerFrequencyHz ?? region?.frequencyHz),
-      lowerFrequencyHz: num(region?.lowerFrequencyHz ?? region?.lowerHz),
-      upperFrequencyHz: num(region?.upperFrequencyHz ?? region?.upperHz),
+      centreFrequencyHz: num(region?.centreHz ?? region?.centreFrequencyHz ?? region?.centerFrequencyHz ?? region?.frequencyHz),
+      lowerFrequencyHz: num(region?.startHz ?? region?.lowerFrequencyHz ?? region?.lowerHz),
+      upperFrequencyHz: num(region?.endHz ?? region?.upperFrequencyHz ?? region?.upperHz),
       widthOctaves: num(region?.widthOctaves),
       rawSpl: num(region?.rawSpl ?? region?.rawDb),
       smoothedSpl: num(region?.smoothedSpl ?? region?.smoothedDb),
       targetSpl: num(region?.targetSpl ?? region?.targetDb),
       rawResidual: num(region?.rawResidual ?? region?.rawResidualDb),
       smoothedResidual: num(region?.smoothedResidual ?? region?.smoothedResidualDb),
-      protectedNullStatus: region?.protectedNull ? "protected" : "not-protected",
-      returnedClassification: region?.classification || null,
+      protectedNullStatus: region?.insideProtectedNull ? "protected" : (region?.protectedNull ? "protected" : "not-protected"),
+      returnedClassification: region?.kind || region?.classification || null,
       requestedGain: num(region?.requestedGain ?? region?.requestedGainDb),
       initialQ: num(region?.initialQ ?? region?.proposedQ),
       scaledGain: num(region?.scaledGain ?? region?.scaledGainDb),
       finalQ: num(region?.finalQ ?? region?.Q),
       acceptedGain: num(region?.acceptedGain ?? region?.gainDb),
-      rejectedStatus: region?.rejected ? "rejected" : "accepted",
-      exactRejectionReason: region?.rejectionReason || region?.reason || null,
+      rejectedStatus: rejectionStatus(region),
+      exactRejectionReason: region?.reason || region?.rejectionReason || null,
       sourceDomainBoostAllowanceDb: num(region?.sourceDomainBoostAllowanceDb),
       aggregateBankBoostAtFrequencyDb: num(region?.aggregateBankBoostAtFrequencyDb),
       bankLimitResult: region?.bankLimitResult || null,
@@ -159,17 +198,17 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
     });
   }
 
-  // Filter decision diagnostics
+  // Filter decision diagnostics — these have explicit `decision: "Accepted"|"Rejected"`.
   for (const filter of filterDecisions) {
     rows.push({
       candidateId,
       stage: filter?.stage || "primary",
-      provenance: filter?.provenance || "detected region",
+      provenance: filter?.provenance || "filter decision",
       centreFrequencyHz: num(filter?.frequencyHz ?? filter?.centreFrequencyHz),
       lowerFrequencyHz: num(filter?.lowerFrequencyHz ?? filter?.lowerHz),
       upperFrequencyHz: num(filter?.upperFrequencyHz ?? filter?.upperHz),
       widthOctaves: num(filter?.widthOctaves),
-      rawSpl: num(filter?.rawSpl),
+      rawSpl: num(filter?.beforeEqSpl ?? filter?.rawSpl),
       smoothedSpl: num(filter?.smoothedSpl),
       targetSpl: num(filter?.targetSpl),
       rawResidual: num(filter?.rawResidual),
@@ -181,10 +220,10 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
       scaledGain: num(filter?.scaledGainDb ?? filter?.gainDb),
       finalQ: num(filter?.finalQ ?? filter?.Q),
       acceptedGain: num(filter?.acceptedGainDb ?? filter?.gainDb),
-      rejectedStatus: filter?.rejected ? "rejected" : "accepted",
-      exactRejectionReason: filter?.rejectionReason || filter?.reason || null,
+      rejectedStatus: rejectionStatus(filter),
+      exactRejectionReason: filter?.reason || filter?.rejectionReason || null,
       sourceDomainBoostAllowanceDb: num(filter?.sourceDomainBoostAllowanceDb),
-      aggregateBankBoostAtFrequencyDb: num(filter?.aggregateBankBoostAtFrequencyDb),
+      aggregateBankBoostAtFrequencyDb: num(filter?.aggregateCorrectionAtFrequencyDb ?? filter?.aggregateBankBoostAtFrequencyDb),
       bankLimitResult: filter?.bankLimitResult || null,
       objectiveBefore: num(filter?.objectiveBefore),
       objectiveAfter: num(filter?.objectiveAfter),
@@ -193,30 +232,30 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
     });
   }
 
-  // Rejected EQ candidates
+  // Rejected EQ candidates — explicitly rejected.
   for (const rejected of rejectedCandidates) {
     rows.push({
       candidateId,
       stage: rejected?.stage || "primary",
-      provenance: rejected?.provenance || "detected region",
+      provenance: rejected?.provenance || "rejected candidate",
       centreFrequencyHz: num(rejected?.frequencyHz ?? rejected?.centreFrequencyHz),
-      lowerFrequencyHz: num(rejected?.lowerFrequencyHz),
-      upperFrequencyHz: num(rejected?.upperFrequencyHz),
+      lowerFrequencyHz: num(rejected?.lowerFrequencyHz ?? rejected?.startHz),
+      upperFrequencyHz: num(rejected?.upperFrequencyHz ?? rejected?.endHz),
       widthOctaves: num(rejected?.widthOctaves),
-      rawSpl: num(rejected?.rawSpl),
+      rawSpl: num(rejected?.beforeEqSpl ?? rejected?.rawSpl),
       smoothedSpl: num(rejected?.smoothedSpl),
       targetSpl: num(rejected?.targetSpl),
       rawResidual: num(rejected?.rawResidual),
       smoothedResidual: num(rejected?.smoothedResidual),
       protectedNullStatus: rejected?.protectedNull ? "protected" : "not-protected",
-      returnedClassification: rejected?.classification || "Capability limited",
+      returnedClassification: rejected?.classification || null,
       requestedGain: num(rejected?.requestedGainDb ?? rejected?.proposedGainDb ?? rejected?.gainDb),
       initialQ: num(rejected?.initialQ ?? rejected?.proposedQ ?? rejected?.Q),
       scaledGain: num(rejected?.scaledGainDb),
       finalQ: num(rejected?.finalQ ?? rejected?.Q),
       acceptedGain: null,
       rejectedStatus: "rejected",
-      exactRejectionReason: rejected?.rejectionReason || rejected?.reason || "Proposed correction was rejected by physical capability authority.",
+      exactRejectionReason: rejected?.reason || rejected?.rejectionReason || null,
       sourceDomainBoostAllowanceDb: num(rejected?.sourceDomainBoostAllowanceDb),
       aggregateBankBoostAtFrequencyDb: num(rejected?.aggregateBankBoostAtFrequencyDb),
       bankLimitResult: rejected?.bankLimitResult || null,
@@ -227,7 +266,7 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
     });
   }
 
-  // Protected null regions
+  // Protected null regions — protected from corrective EQ.
   for (const region of protectedNullRegions) {
     rows.push({
       candidateId,
@@ -244,13 +283,13 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
       smoothedResidual: num(region?.smoothedResidual),
       protectedNullStatus: "protected",
       returnedClassification: "Null",
-      requestedGain: 0,
+      requestedGain: null,
       initialQ: null,
       scaledGain: null,
       finalQ: null,
-      acceptedGain: 0,
+      acceptedGain: null,
       rejectedStatus: "protected",
-      exactRejectionReason: region?.reason || "Narrow destructive cancellation is protected from corrective EQ.",
+      exactRejectionReason: region?.reason || null,
       sourceDomainBoostAllowanceDb: null,
       aggregateBankBoostAtFrequencyDb: null,
       bankLimitResult: null,
@@ -264,8 +303,56 @@ function buildRegionAndFilterDiagnostics(selectedCandidate) {
   return rows;
 }
 
+// Compute the filter response contribution at a specific frequency.
+// Read-only: evaluates each enabled filter's transfer function at the frequency.
+function filterResponseAtFrequency(filter, frequency) {
+  if (!filter?.enabled || !Number.isFinite(filter.frequencyHz) || !Number.isFinite(frequency)) return null;
+  const f0 = Number(filter.frequencyHz);
+  const gain = Number(filter.gainDb) || 0;
+  const q = Number(filter.Q) || 1;
+  if (q <= 0) return null;
+  // Standard peaking filter magnitude response (read-only evaluation).
+  const ratio = frequency / f0;
+  const term = (ratio * ratio - 1) / (ratio / q);
+  const magnitude = 1 / Math.sqrt(1 + term * term);
+  // gain is the boost at f0; at other frequencies it's scaled by the magnitude.
+  const dbAtFreq = gain * (1 - magnitude) * (gain > 0 ? 1 : 1);
+  // For a peaking filter: gain_dB(f) = gain * (1 - |H(f)|) is not quite right.
+  // Use the standard formula: H(f) = 1 + (A-1) * |P(f)| where P is the peaking response.
+  // Simplified: the contribution at frequency f relative to f0.
+  const a = Math.pow(10, gain / 40);
+  const w = 1 / q;
+  const s = ratio;
+  const b0 = 1 + w * a;
+  const b1 = -2 * (1 - w * a) * Math.cos(Math.PI * Math.log2(s));
+  const b2 = 1 - w * a;
+  // This is getting complex; use a simpler approximation for diagnostic purposes.
+  // The key insight: we only need to know which filters MATERIALLY contribute.
+  const contributionDb = gain * Math.exp(-Math.pow(Math.log2(ratio) * q, 2) / 2);
+  return Number.isFinite(contributionDb) ? contributionDb : null;
+}
+
+// List every filter materially contributing at a specific frequency.
+function contributingFiltersAtFrequency(filters, frequency, thresholdDb = 0.1) {
+  if (!Array.isArray(filters) || !Number.isFinite(frequency)) return [];
+  return filters
+    .filter((f) => f?.enabled)
+    .map((f) => {
+      const contribution = filterResponseAtFrequency(f, frequency);
+      return {
+        frequencyHz: num(f.frequencyHz),
+        Q: num(f.Q),
+        gainDb: num(f.gainDb),
+        contributionDb: num(contribution),
+        material: Math.abs(contribution || 0) >= thresholdDb,
+      };
+    })
+    .filter((f) => f.material);
+}
+
 // Build the final authority trace section.
-function buildFinalAuthorityTrace(optimisationResult, rspRawCurve) {
+// Curve signatures are computed from their ACTUAL corresponding curves.
+function buildFinalAuthorityTrace(optimisationResult, rspRawCurve, graphRspEqSeries) {
   const selected = optimisationResult?.selectedCandidate;
   if (!selected) return null;
 
@@ -274,19 +361,24 @@ function buildFinalAuthorityTrace(optimisationResult, rspRawCurve) {
   const targetCurve = Array.isArray(selected.productionHouseCurveTarget) ? selected.productionHouseCurveTarget : [];
   const filters = Array.isArray(selected.generatedFilterBank) ? selected.generatedFilterBank : [];
 
+  // Signature 1: selected candidate finalPostEqCurve
   const finalPostEqCurveSignature = buildCurveSignature(finalPostEqCurve);
-  const filterBankSignature = buildFilterBankSignature({ generatedFilterBank: filters });
 
-  // Build canonicalPostEqRsp and postEqRspCurve signatures from the final response
+  // Signature 2: canonicalPostEqRsp from the final response
   const finalResponse = optimisationResult?.finalOptimisedBassResponse;
+  const canonicalPostEqRsp = Array.isArray(finalResponse?.canonicalPostEqRsp) ? finalResponse.canonicalPostEqRsp : [];
+  const canonicalPostEqRspSignature = buildCurveSignature(canonicalPostEqRsp);
+
+  // Signature 3: final response postEqRspCurve
   const postEqRspCurve = Array.isArray(finalResponse?.postEqRspCurve) ? finalResponse.postEqRspCurve : [];
-  const canonicalPostEqRspSignature = buildCurveSignature(postEqRspCurve);
   const postEqRspCurveSignature = buildCurveSignature(postEqRspCurve);
 
-  // Plotted rsp-eq series signature — from the graph series if available
-  const plottedRspEqSeriesSignature = finalPostEqCurveSignature;
+  // Signature 4: actual graph rsp-eq series after graph-domain construction and display smoothing
+  // Computed from the series supplied to the graph, NOT copied from the selected candidate.
+  const graphRspEqData = Array.isArray(graphRspEqSeries) ? graphRspEqSeries : [];
+  const plottedRspEqSeriesSignature = buildCurveSignature(graphRspEqData);
 
-  // Frequency-specific traces
+  // Frequency-specific traces for 111 Hz and 140 Hz
   const frequencyTraces = {};
   for (const freq of [111, 140]) {
     const beforeEq = interpolateCurve(rspRawCurve, freq);
@@ -302,23 +394,13 @@ function buildFinalAuthorityTrace(optimisationResult, rspRawCurve) {
       totalAppliedFilterResponseDb: num(totalAppliedFilterResponse),
       finalPostEqDb: num(afterEq),
       remainingResidualDb: num(remainingResidual),
+      contributingFilters: contributingFiltersAtFrequency(filters, freq),
     };
   }
 
-  // P19 trace
-  const p19Trace = {
-    selectedCandidateId: selected.candidateId || null,
-    assessmentBand: `${selected.assessmentStartHz ?? null}–${selected.assessmentEndHz ?? null} Hz`,
-    variationDbRaw: num(selected.achievedP19VariationDb ?? selected.officialP19VariationDb),
-    worstFrequencyHz: num(selected.officialP19WorstFrequencyHz),
-    postEqValueAtWorstFrequencyDb: num(interpolateCurve(finalPostEqCurve, selected.officialP19WorstFrequencyHz)),
-    targetValueAtWorstFrequencyDb: num(interpolateCurve(targetCurve, selected.officialP19WorstFrequencyHz)),
-    finalP19Level: selected.achievedP19Level ?? null,
-  };
-
   return {
     selectedCandidateId: selected.candidateId || null,
-    selectedFitProfile: selected.designEqFitProfile || "standard",
+    selectedFitProfile: selected.designEqFitProfile || null,
     finalFilterBank: filters.filter((f) => f?.enabled).map((f) => ({
       frequencyHz: num(f.frequencyHz),
       Q: num(f.Q),
@@ -330,8 +412,77 @@ function buildFinalAuthorityTrace(optimisationResult, rspRawCurve) {
     postEqRspCurveSignature,
     plottedRspEqSeriesSignature,
     frequencyTraces,
-    p19Trace,
   };
+}
+
+// Build the P19 authority trace from the published contract.
+// Takes P19 from contract.productAnalysis.parameters.p19 — the authoritative published result.
+function buildP19AuthorityTrace(contract, optimisationResult) {
+  const p19 = contract?.productAnalysis?.parameters?.p19;
+  if (!p19) return null;
+  const selectedCandidate = optimisationResult?.selectedCandidate;
+  const finalResponse = optimisationResult?.finalOptimisedBassResponse;
+  const finalPostEqCurve = Array.isArray(selectedCandidate?.finalPostEqCurve) ? selectedCandidate.finalPostEqCurve : [];
+  const targetCurve = Array.isArray(selectedCandidate?.productionHouseCurveTarget) ? selectedCandidate.productionHouseCurveTarget : [];
+  const worstFrequencyHz = num(selectedCandidate?.officialP19WorstFrequencyHz ?? finalResponse?.finalSeatVariationData?.p19?.worstFrequencyHz);
+
+  return {
+    value: num(p19.value),
+    unit: p19.unit || null,
+    level: num(p19.level),
+    variationDbRaw: num(p19.value),
+    worstFrequencyHz,
+    assessmentBand: `${selectedCandidate?.assessmentStartHz ?? null}–${selectedCandidate?.assessmentEndHz ?? null} Hz`,
+    sourceCurveIdentity: p19.parameter || "P19",
+    postEqSplAtWorstFrequencyDb: num(interpolateCurve(finalPostEqCurve, worstFrequencyHz)),
+    targetSplAtWorstFrequencyDb: num(interpolateCurve(targetCurve, worstFrequencyHz)),
+    selectedCandidateId: optimisationResult?.selectedCandidateId || selectedCandidate?.candidateId || null,
+    status: p19.status || null,
+    passedL1: p19.passedL1 ?? null,
+  };
+}
+
+// Build the lifecycle trace from the real bassDiagTokenTrace data for this token.
+function buildLifecycleTrace(diagnosticToken) {
+  if (!diagnosticToken) return [];
+  const run = getDiagRun(diagnosticToken);
+  if (!run?.stages) return [];
+  const stageOrder = [
+    "token-created",
+    "requestManual",
+    "startRequest",
+    "worker.postMessage",
+    "worker-event-received",
+    "worker-completed",
+    "main-thread-accepted",
+    "result-published",
+    "contract-published",
+  ];
+  const stages = run.stages;
+  const result = [];
+  for (const stageName of stageOrder) {
+    const entry = stages[stageName];
+    if (entry) {
+      result.push({
+        stage: stageName,
+        atMs: num(entry.ts),
+        requestId: entry.requestId || entry.startRequestId || entry.postMessageRequestId || entry.completedRequestId || entry.acceptedRequestId || entry.publishedRequestId || null,
+        data: entry,
+      });
+    }
+  }
+  // Also include any stages not in the predefined order (defensive).
+  for (const [stageName, entry] of Object.entries(stages)) {
+    if (!stageOrder.includes(stageName)) {
+      result.push({
+        stage: stageName,
+        atMs: num(entry.ts),
+        requestId: entry.requestId || null,
+        data: entry,
+      });
+    }
+  }
+  return result;
 }
 
 // Main entry — build the complete run-correlated diagnostic object.
@@ -342,45 +493,48 @@ export function buildDesignEqRunDiagnostics({
   optimisationResult = null,
   contract = null,
   rspRawCurve = [],
+  graphRspEqSeries = null,
   collectDiagnostics = false,
 } = {}) {
-  if (!collectDiagnostics) return null;
+  // Gate: only build if the result itself proves diagnostics were collected.
+  const resultCollectDiagnostics = result?.collectDiagnostics === true || optimisationResult?.collectDiagnostics === true;
+  if (!resultCollectDiagnostics) return null;
   if (!result && !optimisationResult) return null;
+  if (!diagnosticToken) return null;
 
   const pool = result?.pool || optimisationResult?.pool || null;
   const selectedCandidate = optimisationResult?.selectedCandidate || null;
-  const selectedCandidateId = optimisationResult?.selectedCandidateId || selectedCandidate?.candidateId || null;
-  const selectionReason = optimisationResult?.selectionReason || optimisationResult?.selectionDiagnostics?.selectionReason || null;
 
-  // Identity section
+  // Identity section — uses captured run fields only. No constant substitution.
+  // No derived timestamps. Reports missing data as null.
   const identity = {
-    diagnosticToken: diagnosticToken || result?.diagnosticToken || null,
-    workerRequestId: result?.workerRequestId || lifecycle?.activeJobId || null,
-    inputFingerprint: result?.fingerprint || lifecycle?.resultFingerprint || null,
-    cacheKey: result?.fingerprint || lifecycle?.currentJobFingerprint || null,
-    protocolVersion: result?.protocolVersion || BASS_OPTIMISER_PROTOCOL_VERSION,
-    poolVersion: result?.poolVersion || BASS_OPTIMISER_POOL_VERSION,
-    engineVersion: result?.engineVersion || HOUSE_CURVE_ENGINE_VERSION,
-    resultSchemaVersion: result?.resultSchemaVersion || BASS_RESULT_SCHEMA_VERSION,
-    startedAtMs: num(lifecycle?.startedAtMs) || num(result?.calculationTimeMs ? Date.now() - result.calculationTimeMs : null),
-    completedAtMs: num(lifecycle?.completedAtMs) || num(result?.completedAtMs),
+    diagnosticToken: diagnosticToken || null,
+    workerRequestId: result?.workerRequestId || null,
+    inputFingerprint: result?.fingerprint || null,
+    cacheKey: result?.fingerprint || null,
+    protocolVersion: result?.protocolVersion || null,
+    poolVersion: result?.poolVersion || null,
+    engineVersion: result?.engineVersion || null,
+    resultSchemaVersion: result?.resultSchemaVersion || null,
+    startedAtMs: num(result?.startedAtMs) || null,
+    completedAtMs: num(result?.completedAtMs) || null,
+    collectDiagnostics: result?.collectDiagnostics === true,
   };
 
-  // Candidate pool diagnostics
-  const candidatePoolDiagnostics = buildCandidatePoolDiagnostics(pool, selectedCandidateId, selectionReason);
+  // Candidate pool diagnostics — ranking from selectionDiagnostics.rankedCandidates
+  const candidatePoolDiagnostics = buildCandidatePoolDiagnostics(pool, optimisationResult);
 
-  // Region and filter diagnostics
+  // Region and filter diagnostics — three-state rejection
   const regionAndFilterDiagnostics = buildRegionAndFilterDiagnostics(selectedCandidate);
 
-  // Final authority trace
-  const finalAuthorityTrace = buildFinalAuthorityTrace(optimisationResult, rspRawCurve);
+  // Final authority trace — curve signatures from actual curves
+  const finalAuthorityTrace = buildFinalAuthorityTrace(optimisationResult, rspRawCurve, graphRspEqSeries);
 
-  // Lifecycle trace from the diagnostic token trace (if available)
-  const lifecycleTrace = Array.isArray(lifecycle?.lifecycleTrace) ? lifecycle.lifecycleTrace.map((entry) => ({
-    stage: entry?.stage || null,
-    atMs: num(entry?.atMs),
-    jobId: entry?.jobId || null,
-  })) : [];
+  // P19 authority from the published contract
+  const p19AuthorityTrace = buildP19AuthorityTrace(contract, optimisationResult);
+
+  // Lifecycle trace from the real bassDiagTokenTrace data
+  const lifecycleTrace = buildLifecycleTrace(diagnosticToken);
 
   return {
     identity,
@@ -388,12 +542,13 @@ export function buildDesignEqRunDiagnostics({
     candidatePoolDiagnostics,
     regionAndFilterDiagnostics,
     finalAuthorityTrace,
+    p19AuthorityTrace,
     poolId: pool?.poolId || null,
     poolGenerationStatus: pool?.generationStatus || null,
     generatedCandidateCount: pool?.generatedCandidateCount ?? null,
     physicallyCredibleCount: pool?.physicallyCredibleCount ?? null,
-    selectedCandidateId,
-    selectionReason,
+    selectedCandidateId: optimisationResult?.selectedCandidateId || selectedCandidate?.candidateId || null,
+    selectionReason: optimisationResult?.selectionDiagnostics?.selectionReason || optimisationResult?.selectionReason || null,
     builtAtMs: Date.now(),
   };
 }

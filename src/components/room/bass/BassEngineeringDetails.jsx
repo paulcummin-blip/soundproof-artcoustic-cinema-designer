@@ -9,7 +9,7 @@ import LiveResultAuthorityDiagnostic, { shouldShowLiveResultAuthorityDiagnostic 
 import ExactHouseCurveCaseCaptureButton from "./ExactHouseCurveCaseCaptureButton";
 import BassCapabilityReceiptDiagnostic from "./BassCapabilityReceiptDiagnostic";
 import DesignEqLifecycleDiagnostic from "./DesignEqLifecycleDiagnostic";
-import DesignEqDiagnosticTrace from "./DesignEqDiagnosticTrace";
+import DesignEqDiagnosticTrace, { shouldShowDesignEqDiagnosticTrace } from "./DesignEqDiagnosticTrace";
 
 export default function BassEngineeringDetails({ enabled, designEqEnabled, result, rspPosition, seatingPositions, contract, detailedStatus, rspRawCurve, perSeatRawCurves, priorityMode, onPriorityChange, systemLimits, multiSeries, runtimeCapture, smoothingMode, lifecycle, graphCandidateId, graphFilterBankSignature, graphSeries, transitionFrequencyHz, normalizedTransferResult }) {
   if (!enabled) return null;
@@ -47,7 +47,8 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
         optimisationResult={result}
         contract={contract}
         rspRawCurve={rspRawCurve}
-        collectDiagnostics={enabled}
+        graphRspEqSeries={graphSeries?.find((s) => s?.id === "rsp-eq")?.data || null}
+        collectDiagnostics={true}
       />
       <SourceDomainCapabilityDiagnostic activeSubs={systemLimits.activeSubs} rawCurve={baseCurve} postEqCurve={result.finalPostEqCurve} usableLfHz={systemLimits.usableLfHz} optimisationResult={result} />
     </>}

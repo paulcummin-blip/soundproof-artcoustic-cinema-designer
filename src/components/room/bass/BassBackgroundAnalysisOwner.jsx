@@ -8,7 +8,7 @@ import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore"
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
 import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
-import { createDiagToken } from "./bassDiagTokenTrace";
+import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -175,6 +175,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     }
     if (!publishCompletedBassContract(scopeId, contract)) markBassAuthorityUpdating(scopeId, currentFingerprint);
     syncPersistentBassAuthority(scopeId, currentFingerprint, contract);
+    const publishedToken = lifecycle?.result?.diagnosticToken || null;
+    if (publishedToken) recordDiagStage(publishedToken, "contract-published", { contractAnalysisId: contract?.analysisId || null, contractFingerprint: currentFingerprint });
   }, [scopeId, cacheKey, contract, fingerprints]);
 
   const publishedStagesRef = useRef(new Set());
@@ -192,6 +194,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const onRetry = useCallback(
     ({ collectDiagnostics = false, force = true } = {}) => {
       const diagnosticToken = collectDiagnostics ? createDiagToken("manual-forced") : null;
+      if (diagnosticToken) recordDiagStage(diagnosticToken, "token-created", { origin: "manual-forced", collectDiagnostics: true });
       return controller.requestManual({
         fingerprint: cacheKey,
         payload,
