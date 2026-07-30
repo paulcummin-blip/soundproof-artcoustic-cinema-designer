@@ -1254,13 +1254,14 @@ function RP22ReportInner() {
                         )}
 
                         {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-positions" className="print-page-break-after" style={{ background: "transparent", padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan-positions" style={{ background: "transparent", padding: 0, margin: 0 }}>
                                 <div className="plan-fitbox"><img src={planSpeakerDimsImageDataUrl} alt="Room plan (speaker positions)" style={{ background: "transparent" }} /></div>
                             </section>
                         )}
 
                         <section
                           id="pdf-room-parameters"
+                          className="print-page-break-before"
                           data-bass-result-fingerprint={complianceBassExportData.resultFingerprint || ""}
                           data-bass-selected-candidate={complianceBassExportData.selectedCandidateId || ""}
                         >
@@ -1268,7 +1269,7 @@ function RP22ReportInner() {
                                  <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
                                 <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
                                 {bassErrorMessage && <div style={{ color: '#625143', fontSize: 11, marginBottom: 10 }}>Bass analysis unavailable</div>}
-                                <RP22ReportParameterGrid {...parameterGridProps} />
+                                <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                             </div>
                         </section>
 

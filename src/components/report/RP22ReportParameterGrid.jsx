@@ -117,7 +117,10 @@ export default function RP22ReportParameterGrid({
   p21EarlyReflectionPreset,
   bassContract = null,
   bassErrorMessage = null,
+  variant = "screen",
 }) {
+  const isPrintVariant = variant === "print";
+  const MASKED_PARAM_IDS = [14, 18, 19, 20];
   const appState = useAppState();
   const sharedBassResults = useOptionalSharedBassResults();
   const resolvedBassContract = bassContract || sharedBassResults?.contract || null;
@@ -208,6 +211,7 @@ export default function RP22ReportParameterGrid({
   /* ----- getHudValueForParam (exact logic from RP22CompliancePanel) ----- */
   const getHudValueForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
+    if (isPrintVariant && MASKED_PARAM_IDS.includes(pid)) return "–";
     if ([14, 18, 19].includes(pid)) return bassPresentation.parameters[`p${pid}`].valueText;
     if (pid === 20) return bassPresentation.parameters.p20.valueText;
     const isRoomScope = String(param?.scope || "").toLowerCase() === "room";
@@ -272,7 +276,7 @@ export default function RP22ReportParameterGrid({
     const n = getMetricNumericValue(metric);
     if (Number.isFinite(n)) return formatMetricFallback(n, paramDef?.unit || "");
     return "Not Calculated";
-  }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, bassPresentation]);
+  }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, bassPresentation, isPrintVariant]);
 
   /* ----- Per-seat pill grid for seat-scoped params ----- */
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];

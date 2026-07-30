@@ -143,11 +143,34 @@ export default function ReportPrintStyles() {
                 }
                 
                 .print-avoid-break {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
                 }
                 
                 .print-summary .print-avoid-break {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+
+                /* Strengthen parameter card integrity — never split a card across pages */
+                .rp22-report .rp22-params-grid,
+                .rp22-report [style*="grid-template-columns"] {
+                    break-inside: auto;
+                    page-break-inside: auto;
+                    overflow: visible;
+                }
+
+                .rp22-report .rp22-card-wrap,
+                .rp22-report .rp22-param-card,
+                .rp22-report .rp22-seat-card,
+                .rp22-report .print-avoid-break {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                    -webkit-column-break-inside: avoid !important;
+                    overflow: visible !important;
+                }
+
+                .rp22-report .rp22-card-wrap > * {
                     break-inside: avoid !important;
                     page-break-inside: avoid !important;
                 }
