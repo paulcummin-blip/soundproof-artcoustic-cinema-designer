@@ -886,170 +886,7 @@ export default function SideElevation({
             );
           })()}
 
-          {/* Speaker height markers (non-LCR surrounds/wides) */}
-          {speakerMarkers.map((spk, i) => {
-            const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
-            if (lcrRoles.has(String(spk.role || '').toUpperCase())) return null;
-
-            const role = String(spk.role || '').toUpperCase();
-            const isCeiling = /^T[A-Z]/.test(role);
-            if (REAR_ROLES.has(role)) return null; // drawn separately as side-profile
-
-            if (isCeiling) {
-              // Side-profile ceiling insert: body sits ABOVE ceiling line, grille flush with ceiling.
-              // Visual sizing prioritises legibility over true cabinet depth (which is too small to read).
-              const meta = getSpeakerModelMeta(spk.model) || {};
-              const widthM = Number(meta.widthM) > 0 ? Number(meta.widthM) : 0.165;
-              const svgGrille = rz(roomH);                          // ceiling line
-              const cx = rx(spk.y);
-              // Minimum visible symbol: enforce floor on body height + half-width
-              const svgHalfW = Math.max(7, (widthM / roomL) * drawW / 2);
-              const svgBodyH  = Math.max(10, (0.15 / roomH) * drawH); // ~15cm visual depth, min 10px
-              const svgBodyTop = svgGrille - svgBodyH;               // above ceiling
-              return (
-                <g key={`spk-${i}`} opacity={0.92}>
-                  {/* Body above ceiling */}
-                  <rect
-                    x={cx - svgHalfW} y={svgBodyTop}
-                    width={svgHalfW * 2} height={svgBodyH}
-                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.6} rx={1.5} />
-                  {/* Grille line flush with ceiling */}
-                  <line
-                    x1={cx - svgHalfW} y1={svgGrille}
-                    x2={cx + svgHalfW} y2={svgGrille}
-                    stroke="#fff" strokeWidth={1.2} opacity={0.7} />
-                  {/* Label inside room, just below ceiling — clear of dimension lines */}
-                  <text
-                    x={cx} y={svgGrille + 9}
-                    textAnchor="middle" fontSize={7}
-                    fill={SPK_COLOR} fontWeight={700}>
-                    {spk.role}
-                  </text>
-                </g>
-              );
-            }
-
-            const meta = getSpeakerModelMeta(spk.model) || {};
-            const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
-            const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
-
-            const roleUp = String(spk.role || '').toUpperCase();
-            const isDraggable = !!onSideSpeakerMoved && (['LW','RW','SL','SR'].includes(roleUp) || /^(SL|SR)\d+$/.test(roleUp));
-            const effectiveZ = (liveSpeakerDrag && liveSpeakerDrag.role === roleUp) ? liveSpeakerDrag.z : spk.z;
-            const spkX   = rx(spk.y);
-            const svgTop = rz(effectiveZ + spkHeightM / 2);
-            const svgBot = rz(effectiveZ - spkHeightM / 2);
-            const svgH   = Math.max(3, svgBot - svgTop);
-            const svgW   = Math.max(3, (spkWidthM / roomL) * drawW);
-            const ix     = spkX - svgW / 2;
-
-            const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
-
-            // Product dimensions are the source of truth for the visible cabinet box.
-            // The FaceIcon PNG assets contain internal transparent padding, so the outer SVG icon
-            // is enlarged beyond the cabinet box (then clipped) so the visible artwork fills it exactly.
-            const FACE_ICON_VISIBLE_RATIO = 0.72; // fraction of the PNG canvas occupied by visible artwork; scaled down to enlarge internal cabinet drawing closer to box edges (~2–4px clearance)
-            const clipId = `spk-clip-${i}`;
-
-            // True-size cabinet box (product heightM × widthM)
-            const cabinetX = ix;       // = spkX - svgW / 2
-            const cabinetY = svgTop;   // = rz(spk.z + spkHeightM / 2)
-
-            // Enlarged icon dimensions so visible artwork fills the cabinet box
-            const adjustedIconW = svgW / FACE_ICON_VISIBLE_RATIO;
-            const adjustedIconH = svgH / FACE_ICON_VISIBLE_RATIO;
-            const adjustedIconX = spkX - adjustedIconW / 2;
-            const adjustedIconY = rz(effectiveZ) - adjustedIconH / 2;
-
-            const sideSpkHCm = Number.isFinite(effectiveZ) ? Math.round(effectiveZ * 100) : null;
-            const sideSpkWCm = Number.isFinite(spkWidthM) ? Math.round(spkWidthM * 100) : null;
-            const sideSpkDimHCm = Number.isFinite(spkHeightM) ? Math.round(spkHeightM * 100) : null;
-            // Dim labels to the right of the cabinet box
-            const sideDimX = spkX + svgW / 2 + 4;
-            return (
-              <g key={`spk-${i}`} opacity={0.85}
-                onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, effectiveZ) : undefined}
-                style={{ cursor: isDraggable ? 'ns-resize' : 'default' }}
-              >
-                {FaceIcon ? (
-                  <>
-                    {/* Define clip region = true cabinet box */}
-                    <defs>
-                      <clipPath id={clipId}>
-                        <rect x={cabinetX} y={cabinetY} width={svgW} height={svgH} />
-                      </clipPath>
-                    </defs>
-                    {/* True-size white cabinet background */}
-                    <rect
-                      x={cabinetX} y={cabinetY}
-                      width={svgW} height={svgH}
-                      fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
-                    {/* FaceIcon enlarged so its visible artwork fills the cabinet box, clipped to it */}
-                    <g clipPath={`url(#${clipId})`}>
-                      <FaceIcon x={adjustedIconX} y={adjustedIconY} width={adjustedIconW} height={adjustedIconH} />
-                    </g>
-                  </>
-                ) : (
-                  <rect
-                    x={cabinetX} y={cabinetY}
-                    width={svgW} height={svgH}
-                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2} />
-                )}
-                <text
-                  x={spkX}
-                  y={svgTop - 3}
-                  textAnchor="middle"
-                  fontSize={6}
-                  fill={SPK_COLOR}
-                  fontWeight={600}>
-                  {spk.role}
-                </text>
-                {/* Vertical dimension line — floor to speaker centre */}
-                {sideSpkHCm !== null && (() => {
-                  const dimX = spkX + svgW / 2 + 7;
-                  const floorPx = rz(0);
-                  const centrePx = rz(effectiveZ);
-                  return (
-                    <g opacity={0.75}>
-                      {/* Vertical line */}
-                      <line x1={dimX} y1={floorPx} x2={dimX} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      {/* Tick at floor */}
-                      <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      {/* Tick at centre */}
-                      <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      {/* Label — rotated vertically beside the line */}
-                      {(() => {
-                        const midY = (floorPx + centrePx) / 2;
-                        return (
-                          <text
-                            x={dimX + 4} y={midY}
-                            textAnchor="middle" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em"
-                            transform={`rotate(-90, ${dimX + 4}, ${midY})`}>
-                            H{sideSpkHCm}cm
-                          </text>
-                        );
-                      })()}
-                    </g>
-                  );
-                })()}
-                {sideSpkWCm !== null && sideSpkDimHCm !== null && (
-                  <text x={spkX + svgW / 2 + 7} y={svgBot + 8} textAnchor="start" fontSize={6} fill={DIM_COLOR} opacity={0.75}>
-                    {sideSpkWCm}×{sideSpkDimHCm}cm
-                  </text>
-                )}
-                {isDraggable && (
-                  <rect
-                    x={cabinetX - 7} y={cabinetY - 7}
-                    width={svgW + 14} height={svgH + 14}
-                    fill="transparent"
-                    pointerEvents="all"
-                    style={{ cursor: 'ns-resize' }}
-                    onMouseDown={(e) => handleSpeakerMouseDown(e, roleUp, effectiveZ)}
-                  />
-                )}
-              </g>
-            );
-          })}
+          {/* Speaker height markers — moved to top annotation layer (after sightlines) */}
 
           {/* Rear-wall surround speakers — side profile, one per height group */}
           {rearWallGroups.map((grp, i) => {
@@ -1253,6 +1090,155 @@ export default function SideElevation({
               </g>
             );
           })()}
+
+          {/* Speaker height markers — top annotation layer (moved from above) */}
+          {speakerMarkers.map((spk, i) => {
+            const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+            if (lcrRoles.has(String(spk.role || '').toUpperCase())) return null;
+
+            const role = String(spk.role || '').toUpperCase();
+            const isCeiling = /^T[A-Z]/.test(role);
+            if (REAR_ROLES.has(role)) return null; // drawn separately as side-profile
+
+            if (isCeiling) {
+              // Side-profile ceiling insert: body sits ABOVE ceiling line, grille flush with ceiling.
+              const meta = getSpeakerModelMeta(spk.model) || {};
+              const widthM = Number(meta.widthM) > 0 ? Number(meta.widthM) : 0.165;
+              const svgGrille = rz(roomH);                          // ceiling line
+              const cx = rx(spk.y);
+              const svgHalfW = Math.max(7, (widthM / roomL) * drawW / 2);
+              const svgBodyH  = Math.max(10, (0.15 / roomH) * drawH); // ~15cm visual depth, min 10px
+              const svgBodyTop = svgGrille - svgBodyH;               // above ceiling
+              return (
+                <g key={`spk-${i}`} opacity={0.92}>
+                  {/* Body above ceiling */}
+                  <rect
+                    x={cx - svgHalfW} y={svgBodyTop}
+                    width={svgHalfW * 2} height={svgBodyH}
+                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={0.6} rx={1.5} />
+                  {/* Grille line flush with ceiling */}
+                  <line
+                    x1={cx - svgHalfW} y1={svgGrille}
+                    x2={cx + svgHalfW} y2={svgGrille}
+                    stroke="#fff" strokeWidth={1.2} opacity={0.7} />
+                  {/* Label inside room, just below ceiling — clear of dimension lines */}
+                  <text
+                    x={cx} y={svgGrille + 9}
+                    textAnchor="middle" fontSize={7}
+                    fill={SPK_COLOR} fontWeight={700}>
+                    {spk.role}
+                  </text>
+                </g>
+              );
+            }
+
+            const meta = getSpeakerModelMeta(spk.model) || {};
+            const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
+            const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
+
+            const roleUp = String(spk.role || '').toUpperCase();
+            const isDraggable = !!onSideSpeakerMoved && (['LW','RW','SL','SR'].includes(roleUp) || /^(SL|SR)\d+$/.test(roleUp));
+            const effectiveZ = (liveSpeakerDrag && liveSpeakerDrag.role === roleUp) ? liveSpeakerDrag.z : spk.z;
+            const spkX   = rx(spk.y);
+            const svgTop = rz(effectiveZ + spkHeightM / 2);
+            const svgBot = rz(effectiveZ - spkHeightM / 2);
+            const svgH   = Math.max(3, svgBot - svgTop);
+            const svgW   = Math.max(3, (spkWidthM / roomL) * drawW);
+            const ix     = spkX - svgW / 2;
+
+            const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
+
+            const FACE_ICON_VISIBLE_RATIO = 0.72;
+            const clipId = `spk-clip-${i}`;
+
+            const cabinetX = ix;
+            const cabinetY = svgTop;
+
+            const adjustedIconW = svgW / FACE_ICON_VISIBLE_RATIO;
+            const adjustedIconH = svgH / FACE_ICON_VISIBLE_RATIO;
+            const adjustedIconX = spkX - adjustedIconW / 2;
+            const adjustedIconY = rz(effectiveZ) - adjustedIconH / 2;
+
+            const sideSpkHCm = Number.isFinite(effectiveZ) ? Math.round(effectiveZ * 100) : null;
+            const sideSpkWCm = Number.isFinite(spkWidthM) ? Math.round(spkWidthM * 100) : null;
+            const sideSpkDimHCm = Number.isFinite(spkHeightM) ? Math.round(spkHeightM * 100) : null;
+            const sideDimX = spkX + svgW / 2 + 4;
+            return (
+              <g key={`spk-${i}`} opacity={0.85}
+                onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, effectiveZ) : undefined}
+                style={{ cursor: isDraggable ? 'ns-resize' : 'default' }}
+              >
+                {FaceIcon ? (
+                  <>
+                    <defs>
+                      <clipPath id={clipId}>
+                        <rect x={cabinetX} y={cabinetY} width={svgW} height={svgH} />
+                      </clipPath>
+                    </defs>
+                    <rect
+                      x={cabinetX} y={cabinetY}
+                      width={svgW} height={svgH}
+                      fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                    <g clipPath={`url(#${clipId})`}>
+                      <FaceIcon x={adjustedIconX} y={adjustedIconY} width={adjustedIconW} height={adjustedIconH} />
+                    </g>
+                  </>
+                ) : (
+                  <rect
+                    x={cabinetX} y={cabinetY}
+                    width={svgW} height={svgH}
+                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2} />
+                )}
+                <text
+                  x={spkX}
+                  y={svgTop - 3}
+                  textAnchor="middle"
+                  fontSize={6}
+                  fill={SPK_COLOR}
+                  fontWeight={600}>
+                  {spk.role}
+                </text>
+                {sideSpkHCm !== null && (() => {
+                  const dimX = spkX + svgW / 2 + 7;
+                  const floorPx = rz(0);
+                  const centrePx = rz(effectiveZ);
+                  return (
+                    <g opacity={0.75}>
+                      <line x1={dimX} y1={floorPx} x2={dimX} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
+                      {(() => {
+                        const midY = (floorPx + centrePx) / 2;
+                        return (
+                          <text
+                            x={dimX + 4} y={midY}
+                            textAnchor="middle" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em"
+                            transform={`rotate(-90, ${dimX + 4}, ${midY})`}>
+                            H{sideSpkHCm}cm
+                          </text>
+                        );
+                      })()}
+                    </g>
+                  );
+                })()}
+                {sideSpkWCm !== null && sideSpkDimHCm !== null && (
+                  <text x={spkX + svgW / 2 + 7} y={svgBot + 8} textAnchor="start" fontSize={6} fill={DIM_COLOR} opacity={0.75}>
+                    {sideSpkWCm}×{sideSpkDimHCm}cm
+                  </text>
+                )}
+                {isDraggable && (
+                  <rect
+                    x={cabinetX - 7} y={cabinetY - 7}
+                    width={svgW + 14} height={svgH + 14}
+                    fill="transparent"
+                    pointerEvents="all"
+                    style={{ cursor: 'ns-resize' }}
+                    onMouseDown={(e) => handleSpeakerMouseDown(e, roleUp, effectiveZ)}
+                  />
+                )}
+              </g>
+            );
+          })}
 
           {/* Front wall indicator (left edge = front) */}
           <text x={offsetX + 3} y={offsetY + drawH - 4}
