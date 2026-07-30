@@ -4,8 +4,6 @@ import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import { useProjectActions } from "@/components/state/project-session";
 import { base44 } from "@/api/base44Client";
 import NewProjectDialog, { dolbyConfigs, splOptions } from "@/components/projects/NewProjectDialog";
-// TEMP-MOUNT (Stage B4.2): remove after observation
-import BassLifecycleTestBench from "@/components/room/bass/BassLifecycleTestBench";
 
 // Build lookup maps from the shared label arrays
 const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(c => [c.value, c.label]));
@@ -779,8 +777,6 @@ export default function ProjectsPage() {
       }}
       data-testid="projects-safe-boot"
     >
-      {/* TEMP-MOUNT (Stage B4.2): BassLifecycleTestBench — remove after observation */}
-      <BassLifecycleTestBench />
       {/* Header */}
       <div
         style={{
