@@ -409,7 +409,8 @@ export default function RP22ReportParameterGrid({
 
   return (
     <div className="rp22-params-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-      {RP22_PARAMS.map(param => {
+      {RP22_PARAMS.map((param, idx) => {
+        const needsPrintPageBreak = idx > 0 && idx % 4 === 0;
         const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
         const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
           ? { ...param, thresholds: resolvedThresholds }
@@ -420,7 +421,7 @@ export default function RP22ReportParameterGrid({
           param.id === 14 ? bassPresentation.parameters.p14.detail :
           null;
         return (
-          <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
+          <div key={param.id} className={`rp22-card-wrap print-avoid-break${needsPrintPageBreak ? ' print-page-break-before' : ''}`} style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
             <RP22ComplianceParameterTile
               param={resolvedParam}
               achievedValue={getHudValueForParam(param)}

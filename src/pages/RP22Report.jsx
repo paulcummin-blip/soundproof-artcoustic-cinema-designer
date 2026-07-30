@@ -1276,7 +1276,7 @@ function RP22ReportInner() {
                         {/* ── Elevation Drawings page ── */}
                         <section id="pdf-elevation-drawings" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
                             <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>Elevation Drawings</div>
-                            <div style={{ marginBottom: 48 }}>
+                            <div className="print-avoid-break" style={{ marginBottom: 48 }}>
                                 <FrontElevation
                                     dimensions={stableDimensions}
                                     screen={screen}
@@ -1286,7 +1286,7 @@ function RP22ReportInner() {
                                     roomElements={(app?.roomElements || []).filter(el => el?.type !== 'projector')}
                                 />
                             </div>
-                            <div style={{ marginBottom: 16 }}>
+                            <div className="print-avoid-break print-page-break-before" style={{ marginBottom: 16 }}>
                                 <SideElevation
                                     wall="left"
                                     dimensions={stableDimensions}
@@ -1301,7 +1301,7 @@ function RP22ReportInner() {
                                     roomElements={app?.roomElements || []}
                                 />
                             </div>
-                            <div>
+                            <div className="print-avoid-break print-page-break-before">
                                 <SideElevation
                                     wall="right"
                                     dimensions={stableDimensions}
@@ -1321,7 +1321,8 @@ function RP22ReportInner() {
                         {/* ── Sightlines & Viewing Angles (final page) ── */}
                         {canRenderSightlinePage && sightlineScreenMetrics && sightlineRowData.length > 0 && (
                             <>
-                                <section id="pdf-sightlines" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                <section id="pdf-sightlines" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                    <div className="print-avoid-break">
                                     <SightlineGraphic
                                         projectName={app?.projectName || ''}
                                         clientName={app?.clientName || ''}
@@ -1345,6 +1346,7 @@ function RP22ReportInner() {
                                         rowData={sightlineRowData}
                                         dolbyConfig={exportSystemConfiguration || ''}
                                     />
+                                    </div>
                                 </section>
 
                                 <section
@@ -1352,6 +1354,7 @@ function RP22ReportInner() {
                                     className="print-page-break-before"
                                     style={{ padding: '8mm 10mm', background: '#FFFFFF' }}
                                 >
+                                    <div className="print-avoid-break">
                                     <ScreenWallConstructionGraphic
                                         projectName={projectDetails?.name || ''}
                                         clientName={projectDetails?.client_name || ''}
@@ -1367,6 +1370,7 @@ function RP22ReportInner() {
                                         frontSubs={frontSubs}
                                         frontSubsCfg={app?.frontSubsCfg}
                                     />
+                                    </div>
                                 </section>
                             </>
                         )}
