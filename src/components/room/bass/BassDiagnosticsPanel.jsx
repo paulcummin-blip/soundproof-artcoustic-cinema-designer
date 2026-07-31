@@ -27,7 +27,7 @@ import { getTemporaryP18P19Trace } from "@/components/hooks/useRP22AnalysisEngin
 
 // Development flag — set to false to hide all diagnostic UI panels in production.
 // Flip to true to re-enable. Do not delete diagnostic code. (Identical to BassResponse.jsx's const.)
-const IS_DEVELOPMENT_MODE = false;
+const IS_DEVELOPMENT_MODE = true;
 
 export default function BassDiagnosticsPanel({
   // room / seat / sub state (read-only)
