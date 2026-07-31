@@ -328,17 +328,22 @@ export default function RvPlanCanvas({
     try { return JSON.stringify(v); } catch (_) { return "(unserializable)"; }
   };
 
-  // Raw overhead roles from placedSpeakers role values whose canonical role begins T or U.
+  // Raw overhead roles: original raw role strings for speakers whose canonical role begins T or U.
   const c327RawOverheadRoles = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
-    .map((s) => String(s?.role ?? ""))
-    .filter((r) => r.length > 0);
+    .filter((s) => {
+      let canon;
+      try { canon = getCanonicalRole ? getCanonicalRole(s?.role) : s?.role; } catch (_) { canon = s?.role; }
+      const c0 = String(canon ?? "").toUpperCase();
+      return c0.startsWith("T") || c0.startsWith("U");
+    })
+    .map((s) => String(s?.role ?? ""));
 
   const c327CanonicalOverheadRoles = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
     .map((s) => {
       try { return getCanonicalRole ? getCanonicalRole(s?.role) : s?.role; } catch (_) { return s?.role; }
     })
     .filter((r) => {
-      const r0 = String(r ?? "");
+      const r0 = String(r ?? "").toUpperCase();
       return r0.startsWith("T") || r0.startsWith("U");
     });
 
@@ -1022,6 +1027,31 @@ export default function RvPlanCanvas({
           "frontZone: " + (c327FrontZone ? c327SafeJson(c327FrontZone) : "(absent)"),
           "midZone: " + (c327MidZone ? c327SafeJson(c327MidZone) : "(absent)"),
           "backZone: " + (c327BackZone ? c327SafeJson(c327BackZone) : "(absent)"),
+          "lateral corridor inputs: " + (() => {
+            const b = c327Bounds || {};
+            const flX = b.xLeft;
+            const frX = b.xRight;
+            const seatMinX = b.seatMinX;
+            const seatMaxX = b.seatMaxX;
+            const centerX = Number.isFinite(widthM) ? widthM / 2 : NaN;
+            const innerLeft = Math.min(centerX, seatMinX - 0.15);
+            const innerRight = Math.max(centerX, seatMaxX + 0.15);
+            const outerLeft = Math.max(0, flX + 0.05);
+            const outerRight = Math.min(widthM, frX - 0.05);
+            return c327SafeJson({
+              "FL x": flX,
+              "FR x": frX,
+              seatMinX,
+              seatMaxX,
+              centerX,
+              innerLeft,
+              innerRight,
+              outerLeft,
+              outerRight,
+              "left condition outerLeft < innerLeft": outerLeft < innerLeft,
+              "right condition innerRight < outerRight": innerRight < outerRight,
+            });
+          })(),
         ].join("\n")}</pre>
 
         <br /><strong>C3.27 — DECISION TRACE</strong>
