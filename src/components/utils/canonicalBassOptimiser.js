@@ -270,6 +270,7 @@ export function generateCanonicalCandidatePool({
 
   const fitOptions = (profile, initialFilters = []) => ({
     targetAnchorDb: verticalOffsetDb,
+    p14TargetDb: Number(selectedP14TargetDb),
     canonicalTargetCurve: targetCurve,
     protectedNullRegions,
     fitProfile: profile,
