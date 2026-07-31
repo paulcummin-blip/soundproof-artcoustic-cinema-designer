@@ -111,32 +111,83 @@ export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLf
     boostLimitOk,
     cutLimitOk,
     sourceDomainHeadroomOk,
-    allOk: boostLimitOk && cutLimitOk && sourceDomainHeadroomOk,
+    // Stage B: sourceDomainHeadroomOk remains as a diagnostic field but is
+    // no longer part of the allOk gate. Per-filter clamping in
+    // scaleCandidateForBankLimits is the frequency-dependent authority.
+    allOk: boostLimitOk && cutLimitOk,
   };
 }
 
 export function scaleCandidateForBankLimits(candidate, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
-  const initial = evaluateProvisionalBankLimits([...existingFilters, candidate], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
-  if (initial.allOk) return { filter: candidate, scaled: false, limits: initial };
+  // Stage B: Frequency-dependent boost authority.
+  // Each positive-gain filter is individually clamped to the source-domain
+  // boost allowance available at its own centre frequency. A single unsafe
+  // frequency no longer vetoes the entire filter bank — the global
+  // sourceDomainHeadroomOk flag remains as a diagnostic only.
   const isBoost = candidate.gainDb > 0;
+  let perFilterDiagnostics = null;
+  let clampedCandidate = candidate;
+
+  if (isBoost) {
+    const requestedGainDb = candidate.gainDb;
+    const allowance = getSourceDomainBoostAllowance({
+      frequency: candidate.frequencyHz,
+      requestedBoostDb: requestedGainDb,
+      activeSubs,
+      usableLfHz,
+      maxBoostDb: 6,
+      requestedSystemOutputDb,
+    });
+    const allowedGainDb = Math.max(0, Math.min(6, allowance.allowedBoostDb));
+    const appliedGainDb = Math.min(requestedGainDb, allowedGainDb);
+    const headroomLimited = appliedGainDb < requestedGainDb - 0.05;
+    perFilterDiagnostics = {
+      frequencyHz: candidate.frequencyHz,
+      requestedGainDb,
+      allowedGainDb,
+      appliedGainDb,
+      headroomLimited,
+      reason: headroomLimited
+        ? `Boost reduced from ${requestedGainDb.toFixed(2)} dB to ${appliedGainDb.toFixed(2)} dB — source-domain headroom limit at ${candidate.frequencyHz.toFixed(1)} Hz`
+        : `Boost within source-domain allowance at ${candidate.frequencyHz.toFixed(1)} Hz`,
+    };
+    // Remove the filter if the permitted gain at this frequency is effectively zero.
+    if (appliedGainDb <= 0.1) {
+      return {
+        filter: null,
+        scaled: true,
+        limits: evaluateProvisionalBankLimits([...existingFilters, { ...candidate, gainDb: 0 }], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile),
+        perFilterDiagnostics,
+      };
+    }
+    clampedCandidate = { ...candidate, gainDb: appliedGainDb };
+  }
+
+  const initial = evaluateProvisionalBankLimits([...existingFilters, clampedCandidate], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  if (initial.allOk) return { filter: clampedCandidate, scaled: clampedCandidate.gainDb !== candidate.gainDb, limits: initial, perFilterDiagnostics };
+
+  // Binary search on gain for boost/cut limit violations only.
+  // sourceDomainHeadroomOk is not part of allOk (Stage B) so the search
+  // constrains only on aggregate boost/cut envelope limits.
   let low = 0;
-  let high = Math.abs(candidate.gainDb);
+  let high = Math.abs(clampedCandidate.gainDb);
   for (let index = 0; index < 14; index += 1) {
     const magnitude = (low + high) / 2;
     const gainDb = isBoost ? magnitude : -magnitude;
     const limits = evaluateProvisionalBankLimits(
-      [...existingFilters, { ...candidate, gainDb }], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile,
+      [...existingFilters, { ...clampedCandidate, gainDb }], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile,
     );
     if (limits.allOk) low = magnitude;
     else high = magnitude;
   }
   const gainDb = isBoost ? low : -low;
-  if (Math.abs(gainDb) <= 0.1) return { filter: null, scaled: true, limits: initial };
-  const filter = { ...candidate, gainDb };
+  if (Math.abs(gainDb) <= 0.1) return { filter: null, scaled: true, limits: initial, perFilterDiagnostics };
+  const filter = { ...clampedCandidate, gainDb };
   return {
     filter,
     scaled: true,
     limits: evaluateProvisionalBankLimits([...existingFilters, filter], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile),
+    perFilterDiagnostics,
   };
 }
 
