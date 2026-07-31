@@ -197,6 +197,11 @@ export function computeOverheadZones({
     midZone: zones.midZone,
     backZone: zones.backZone,
     bounds, // Include bounds with seatMinX/seatMaxX for icon clamping
+    lateralMode: zones.lateralMode,
+    excludedLeftSeatIds: zones.excludedLeftSeatIds,
+    excludedRightSeatIds: zones.excludedRightSeatIds,
+    excludedSeatCount: zones.excludedSeatCount,
+    lateralReason: zones.reason,
   };
 }
 

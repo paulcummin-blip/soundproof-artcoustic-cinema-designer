@@ -464,15 +464,11 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const x2Overhead = Math.min(widthM, roomCenterX + clampedHalfSpan);
 
   // ────────────────────────────────────────────────────────────────────────────
-  // SIDE CORRIDORS: between widest seats and L/R speakers
+  // SIDE CORRIDORS: RP22 lateral authority (Section 5.8.1)
+  // Left/right overhead zones span between FL/FR and the listening-area
+  // head-centre edges. No 150 mm seat clearance, no 50 mm FL/FR inset,
+  // no combined 200 mm gate, no minimum-width suppression.
   // ────────────────────────────────────────────────────────────────────────────
-
-  // Use seat bounds already computed earlier (seatXs, seatMinX, seatMaxX, centreX, hasSeats)
-  // If no seats were found earlier, fall back to central block
-  if (!hasSeats) {
-    seatMinX = centreX - widthM * 0.15;
-    seatMaxX = centreX + widthM * 0.15;
-  }
 
   const centerX = roomCenterX;
 
@@ -487,40 +483,70 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const flX = Number.isFinite(fl?.position?.x) ? fl.position.x : 0;
   const frX = Number.isFinite(fr?.position?.x) ? fr.position.x : widthM;
 
-  const SEAT_MARGIN_M = 0.15; // keep overheads comfortably outside seats
-  const LCR_MARGIN_M  = 0.05; // keep just inside the L/R speakers
+  // Collect all seat-head positions with stable IDs
+  const seatHeads = (seatingPositions || [])
+    .map((seat, idx) => {
+      const x = Number(seat?.x ?? seat?.position?.x);
+      if (!Number.isFinite(x)) return null;
+      const id = seat?.id ?? `seat-${idx}`;
+      return { id, x };
+    })
+    .filter(Boolean);
 
-  // Inner edges are just outside the widest seats
-  let innerLeft  = Math.min(centerX, seatMinX - SEAT_MARGIN_M);
-  let innerRight = Math.max(centerX, seatMaxX + SEAT_MARGIN_M);
+  // Categorise seats relative to FL/FR span
+  const seatsInside = seatHeads.filter(s => s.x >= flX && s.x <= frX);
+  const seatsOutsideLeft = seatHeads.filter(s => s.x < flX);
+  const seatsOutsideRight = seatHeads.filter(s => s.x > frX);
 
-  // Outer edges are just inside the L/R speakers
-  const outerLeft  = Math.max(0, flX + LCR_MARGIN_M);
-  const outerRight = Math.min(widthM, frX - LCR_MARGIN_M);
+  let lateralMode = "unavailable";
+  let reason = null;
+  let excludedLeftSeatIds = [];
+  let excludedRightSeatIds = [];
+  let leftPiece = null;
+  let rightPiece = null;
 
-  // CLAMPING: prevent overhead zones from extending inside the outer seats
-  // If FL/FR are inboard of the seats, clamp the inner edges to the seat span
-  if (Number.isFinite(seatMinX) && Number.isFinite(seatMaxX)) {
-    // Left corridor: inner edge must not go past seatMinX
-    innerLeft = Math.min(innerLeft, seatMinX);
-    // Right corridor: inner edge must not go past seatMaxX
-    innerRight = Math.max(innerRight, seatMaxX);
+  if (seatsInside.length === 0) {
+    lateralMode = "unavailable";
+    reason = "NO_VALID_LATERAL_CORRIDORS";
+  } else {
+    const insideXs = seatsInside.map(s => s.x);
+    const minInsideX = Math.min(...insideXs);
+    const maxInsideX = Math.max(...insideXs);
+
+    // Left piece: FL.x → min inside seat-head x
+    // Right piece: max inside seat-head x → FR.x
+    const leftX1 = flX;
+    const leftX2 = minInsideX;
+    const rightX1 = maxInsideX;
+    const rightX2 = frX;
+
+    const leftValid = leftX2 > leftX1;
+    const rightValid = rightX2 > rightX1;
+
+    if (!leftValid || !rightValid) {
+      lateralMode = "unavailable";
+      reason = "NO_VALID_LATERAL_CORRIDORS";
+    } else {
+      leftPiece = { x1: leftX1, x2: leftX2 };
+      rightPiece = { x1: rightX1, x2: rightX2 };
+
+      if (seatsOutsideLeft.length === 0 && seatsOutsideRight.length === 0) {
+        lateralMode = "full-listening-area";
+      } else {
+        lateralMode = "outer-seats-excluded";
+        reason = "WIDE_LISTENING_AREA_OUTER_SEATS_EXCLUDED";
+        excludedLeftSeatIds = seatsOutsideLeft.map(s => s.id);
+        excludedRightSeatIds = seatsOutsideRight.map(s => s.id);
+      }
+    }
   }
 
-  // Final clamping and sanity checks: no inverted corridors
-  const leftCorridor  = outerLeft < innerLeft
-    ? { x1: outerLeft, x2: innerLeft }
-    : null;
-
-  const rightCorridor = innerRight < outerRight
-    ? { x1: innerRight, x2: outerRight }
-    : null;
+  const excludedSeatCount = excludedLeftSeatIds.length + excludedRightSeatIds.length;
 
   // Band thickness (±0.5m around center)
   const halfBandM = 0.5;
 
-  const basePieces =
-    [leftCorridor, rightCorridor].filter(Boolean);
+  const basePieces = [leftPiece, rightPiece].filter(Boolean);
 
   // Middle zone: centered on MLP
   const midZone = {
@@ -553,66 +579,7 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     pieces: basePieces,
   };
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // FINAL CLAMPING: prevent overhead zones from extending inside outer seats
-  // ────────────────────────────────────────────────────────────────────────────
-  
-  const MIN_OVERHEAD_WIDTH_M = 0.10;
-
-  // Apply clamping if we have valid seat boundaries
-  if (hasSeats && Number.isFinite(seatMinX) && Number.isFinite(seatMaxX)) {
-    // Process pieces for each zone
-    [frontZone, midZone, backZone].forEach(zone => {
-      if (!zone || !Array.isArray(zone.pieces)) return;
-      
-      zone.pieces = zone.pieces.map(piece => {
-        if (!piece) return piece;
-
-        const x1 = Number(piece.x1);
-        const x2 = Number(piece.x2);
-        if (!Number.isFinite(x1) || !Number.isFinite(x2)) return piece;
-
-        const width = Math.abs(x2 - x1);
-        const midX = (x1 + x2) / 2;
-        
-        // Determine if this is a left or right corridor
-        if (midX < centreX) {
-          // LEFT CORRIDOR
-          let outerX = Math.min(x1, x2);
-          let innerX = Math.max(x1, x2);
-          
-          // Clamp inner edge to never go past seatMinX
-          innerX = Math.min(innerX, seatMinX);
-          
-          // Enforce minimum width
-          if ((innerX - outerX) < MIN_OVERHEAD_WIDTH_M) {
-            outerX = innerX - MIN_OVERHEAD_WIDTH_M;
-          }
-          
-          return { x1: outerX, x2: innerX };
-        } else {
-          // RIGHT CORRIDOR
-          let outerX = Math.max(x1, x2);
-          let innerX = Math.min(x1, x2);
-          
-          // Clamp inner edge to never go past seatMaxX
-          innerX = Math.max(innerX, seatMaxX);
-          
-          // Enforce minimum width
-          if ((outerX - innerX) < MIN_OVERHEAD_WIDTH_M) {
-            outerX = innerX + MIN_OVERHEAD_WIDTH_M;
-          }
-          
-          return { x1: innerX, x2: outerX };
-        }
-      });
-      
-      // Filter out any null/invalid pieces after clamping
-      zone.pieces = zone.pieces.filter(p => p && Number.isFinite(p.x1) && Number.isFinite(p.x2));
-    });
-  }
-
-  // Re-evaluate active flags after clamping
+  // Re-evaluate active flags after lateral authority computation
   frontZone.active = frontZone.y2 > frontZone.y1 && Array.isArray(frontZone.pieces) && frontZone.pieces.length > 0;
   midZone.active   = midZone.y2   > midZone.y1   && Array.isArray(midZone.pieces)   && midZone.pieces.length   > 0;
   backZone.active  = backZone.y2  > backZone.y1  && Array.isArray(backZone.pieces)  && backZone.pieces.length  > 0;
@@ -662,5 +629,14 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   backZone.leftCorridor = backCorridors.leftCorridor;
   backZone.rightCorridor = backCorridors.rightCorridor;
 
-  return { frontZone, midZone, backZone };
+  return {
+    frontZone,
+    midZone,
+    backZone,
+    lateralMode,
+    excludedLeftSeatIds,
+    excludedRightSeatIds,
+    excludedSeatCount,
+    reason,
+  };
 }
