@@ -410,7 +410,7 @@ export default function RP22ReportParameterGrid({
   return (
     <div className="rp22-params-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
       {RP22_PARAMS.map((param, idx) => {
-        const needsPrintPageBreak = idx > 0 && idx % 4 === 0;
+        const needsPrintPageBreak = idx > 0 && idx % 3 === 0;
         const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
         const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
           ? { ...param, thresholds: resolvedThresholds }
