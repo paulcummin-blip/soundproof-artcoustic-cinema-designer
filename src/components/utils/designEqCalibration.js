@@ -277,12 +277,25 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
 
   const thirdOctave = applyBassSmoothing(raw, "third");
   const referenceBand = thirdOctave.filter((point) => point.frequency >= 150 && point.frequency <= 200);
-  const rawAnchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
-  const anchorDb = isNumber(options.targetAnchorDb) ? Number(options.targetAnchorDb) : rawAnchorDb;
-  if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [], designEqFitProfile: "standard" };
+  const measuredAnchorDb = median((referenceBand.length ? referenceBand : thirdOctave).map((point) => point.spl));
 
   const assessmentStartHz = Number.isFinite(Number(options.assessmentStartHz)) ? Number(options.assessmentStartHz) : 20;
   const assessmentEndHz = Number.isFinite(Number(options.assessmentEndHz)) ? Number(options.assessmentEndHz) : 200;
+
+  // Stage A: RP22 P14 target authority — shift the house curve vertically
+  // so the optimiser fits toward the selected P14 performance level.
+  // The measured 150–200 Hz anchor is preserved; the P14 offset is additive.
+  const p14TargetDb = Number.isFinite(Number(options.p14TargetDb)) ? Number(options.p14TargetDb) : null;
+  const bassBandPoints = thirdOctave.filter((point) => point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz);
+  const currentIntegratedBassDb = bassBandPoints.length
+    ? 10 * Math.log10(bassBandPoints.reduce((sum, p) => sum + Math.pow(10, p.spl / 10), 0) / bassBandPoints.length)
+    : measuredAnchorDb;
+  const requiredP14OffsetDb = p14TargetDb != null && isNumber(currentIntegratedBassDb)
+    ? p14TargetDb - currentIntegratedBassDb
+    : 0;
+  const finalDesignTargetAnchorDb = measuredAnchorDb + requiredP14OffsetDb;
+  const anchorDb = isNumber(options.targetAnchorDb) ? Number(options.targetAnchorDb) : finalDesignTargetAnchorDb;
+  if (!isNumber(anchorDb)) return { curve: raw, diagnostics: [], filters: emptyFilters([]), combinedEqCurve: [], designEqFitProfile: "standard" };
   const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : [];
   const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
   // Resolve conservative or accuracy fitting against the same fixed target.
@@ -944,6 +957,13 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     physicalAuthorityViolations,
     worstResidualDiagnostics,
     selectionReason,
+    p14TargetAuthority: {
+      measuredAnchorDb,
+      currentIntegratedBassDb,
+      p14TargetDb,
+      requiredP14OffsetDb,
+      finalDesignTargetAnchorDb,
+    },
     lfCapabilityProtection: null,
     bankDiagnostics: {
       evaluatedVariantsScaledByBankLimit: bankLimitScaledCount,
