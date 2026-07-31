@@ -318,6 +318,125 @@ export default function RvPlanCanvas({
     c326ReasonHidden = "active renderer produced no drawable SVG elements";
   }
 
+  // C3.27 temporary audit — read-only diagnostics extending C3.26.
+  // Source fact: useOverheadZonesComputed receives no dolbyLayout/config argument
+  // and performs no overhead-count parsing.
+  const c327HookLayoutConfig = "NOT SUPPLIED";
+  const c327HookParsedCount = "NOT PARSED";
+
+  const c327SafeJson = (v) => {
+    try { return JSON.stringify(v); } catch (_) { return "(unserializable)"; }
+  };
+
+  // Raw overhead roles from placedSpeakers role values whose canonical role begins T or U.
+  const c327RawOverheadRoles = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
+    .map((s) => String(s?.role ?? ""))
+    .filter((r) => r.length > 0);
+
+  const c327CanonicalOverheadRoles = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
+    .map((s) => {
+      try { return getCanonicalRole ? getCanonicalRole(s?.role) : s?.role; } catch (_) { return s?.role; }
+    })
+    .filter((r) => {
+      const r0 = String(r ?? "");
+      return r0.startsWith("T") || r0.startsWith("U");
+    });
+
+  // Roles required by parsed count: .2 -> TML/TMR; .4 -> TFL/TFR/TRL/TRR; .6 -> all six.
+  const c327RequiredByCount = c326OverheadCount === 2
+    ? ["TML", "TMR"]
+    : c326OverheadCount === 4
+      ? ["TFL", "TFR", "TRL", "TRR"]
+      : c326OverheadCount === 6
+        ? ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"]
+        : [];
+
+  const c327ActiveRoleCount = c327RequiredByCount.filter((r) =>
+    c327CanonicalOverheadRoles.includes(r)
+  ).length;
+
+  const c327FrontPair = c327CanonicalOverheadRoles.includes("TFL") && c327CanonicalOverheadRoles.includes("TFR");
+  const c327MiddlePair = c327CanonicalOverheadRoles.includes("TML") && c327CanonicalOverheadRoles.includes("TMR");
+  const c327RearPair = c327CanonicalOverheadRoles.includes("TRL") && c327CanonicalOverheadRoles.includes("TRR");
+
+  const c327Fmt = (v) => `raw=${String(v)} finite=${String(Number.isFinite(v))}`;
+
+  const c327ZoneFmt = (z) => {
+    if (!z) return null;
+    const x1 = z.x1, x2 = z.x2, y1 = z.y1, y2 = z.y2;
+    const w = (Number.isFinite(x1) && Number.isFinite(x2)) ? x2 - x1 : NaN;
+    const h = (Number.isFinite(y1) && Number.isFinite(y2)) ? y2 - y1 : NaN;
+    const pieces = Array.isArray(z.pieces) ? z.pieces : null;
+    return {
+      active: String(z.active),
+      x1: c327Fmt(x1),
+      x2: c327Fmt(x2),
+      y1: c327Fmt(y1),
+      y2: c327Fmt(y2),
+      width: c327Fmt(w),
+      height: c327Fmt(h),
+      x2GtX1: String(Number.isFinite(x1) && Number.isFinite(x2) && x2 > x1),
+      y2GtY1: String(Number.isFinite(y1) && Number.isFinite(y2) && y2 > y1),
+      piecesLen: pieces ? pieces.length : 0,
+      piecesJson: pieces ? c327SafeJson(pieces) : "(no pieces)",
+    };
+  };
+
+  const c327Bounds = overheadZones?.bounds;
+  const c327BoundsFields = c327Bounds ? {
+    active: String(c327Bounds.active),
+    listeningFrontY: c327Fmt(c327Bounds.listeningFrontY),
+    listeningBackY: c327Fmt(c327Bounds.listeningBackY),
+    midCenterY: c327Fmt(c327Bounds.midCenterY),
+    xLeft: c327Fmt(c327Bounds.xLeft),
+    xRight: c327Fmt(c327Bounds.xRight),
+    mlpEarHeight: c327Fmt(c327Bounds.mlpEarHeight),
+    seatMinX: c327Fmt(c327Bounds.seatMinX),
+    seatMaxX: c327Fmt(c327Bounds.seatMaxX),
+  } : null;
+
+  const c327FrontZone = c327ZoneFmt(overheadZones?.frontZone);
+  const c327MidZone = c327ZoneFmt(overheadZones?.midZone);
+  const c327BackZone = c327ZoneFmt(overheadZones?.backZone);
+
+  const c327RoomFinite = Number.isFinite(widthM) && widthM > 0 &&
+    Number.isFinite(lengthM) && lengthM > 0 &&
+    Number.isFinite(heightM) && heightM > 0;
+
+  const c327SeatingValid = (() => {
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return false;
+    const hasFiniteSeatY = seatingPositions.some((sp) => {
+      if (Number.isFinite(sp?.y)) return true;
+      return Number.isFinite(sp?.position?.y);
+    });
+    if (hasFiniteSeatY) return true;
+    return Boolean((mlp && Number.isFinite(mlp?.y)) || (mlpPoint && Number.isFinite(mlpPoint?.y)));
+  })();
+
+  const c327FamilyRequested = (family) => {
+    if (c326Config === ".2") return family === "middle";
+    if (c326Config === ".4") return family === "front" || family === "rear";
+    if (c326Config === ".6") return true;
+    return false;
+  };
+
+  const c327TraceFamily = (family, zone) => {
+    if (!c327FamilyRequested(family)) return "1 unsupported layout/config";
+    if (!c327Bounds || c327Bounds.active === false) return "2 bounds inactive or absent";
+    if (!c327RoomFinite) return "3 invalid room geometry";
+    if (!c327SeatingValid) return "4 invalid seating reference";
+    const x1 = zone?.x1, x2 = zone?.x2, y1 = zone?.y1, y2 = zone?.y2;
+    if (!Number.isFinite(x1) || !Number.isFinite(x2) || !(x2 > x1)) return "5 degenerate width";
+    if (!Number.isFinite(y1) || !Number.isFinite(y2) || !(y2 > y1)) return "6 degenerate height";
+    if (!Array.isArray(zone?.pieces) || zone.pieces.length === 0) return "7 empty pieces";
+    if (zone?.active === false) return "8 other: zone.active false at final helper guard";
+    return "PASS";
+  };
+
+  const c327FrontTrace = c327TraceFamily("front", overheadZones?.frontZone);
+  const c327MiddleTrace = c327TraceFamily("middle", overheadZones?.midZone);
+  const c327RearTrace = c327TraceFamily("rear", overheadZones?.backZone);
+
   return (
     <div
       ref={(el) => {
@@ -853,6 +972,65 @@ export default function RvPlanCanvas({
         returned null: {String(c326RenderResult.returnedNull)}<br />
         SVG elements produced: {c326RenderResult.svgElementsProduced}<br />
         reason hidden: {c326ReasonHidden}
+      </div>
+
+      {/* C3.27 temporary HTML audit panel — extends C3.26 with role/zone decision trace. */}
+      <div
+        data-testid="c327-overhead-renderer-audit"
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          margin: "12px",
+          padding: "12px",
+          border: "1px solid #1e3a8a",
+          background: "#eff6ff",
+          color: "#1e3a8a",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          fontSize: "12px",
+          lineHeight: 1.5,
+          whiteSpace: "normal",
+        }}
+      >
+        <strong>C3.27 — COMPUTATION INPUTS</strong>
+        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{[
+          "dolbyLayout: " + String(dolbyLayout),
+          "layout/config value seen inside useOverheadZonesComputed: " + c327HookLayoutConfig,
+          "parsed overhead count inside the hook: " + c327HookParsedCount,
+          "room length: " + String(lengthM) + " width: " + String(widthM) + " height: " + String(heightM),
+          "screen/front reference: " + c327SafeJson({ screen, actualScreenFrontY }) + " | helper front wall Y=0 inner limit 0.05",
+          "rear reference: helper rear wall=lengthM inner limit=" + String(Number.isFinite(lengthM) ? lengthM - 0.05 : "NaN"),
+          "MLP/seating reference: " + c327SafeJson({ mlp, mlpPoint, seatingCount: Array.isArray(seatingPositions) ? seatingPositions.length : 0 }) + " | authority: mlp (RoomVisualisation passes mlp as mlpPoint)",
+          "scale/bounds inputs: " + c327SafeJson({ scale, roomRect, bounds: overheadZones?.bounds }),
+        ].join("\n")}</pre>
+
+        <br /><strong>C3.27 — ROLE / LAYOUT INPUTS</strong>
+        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{[
+          "raw overhead roles: " + c327SafeJson(c327RawOverheadRoles),
+          "canonical overhead roles: " + c327SafeJson(c327CanonicalOverheadRoles),
+          "required by parsed count: " + c327SafeJson(c327RequiredByCount),
+          "active overhead role count: " + String(c327ActiveRoleCount),
+          "front pair present (TFL/TFR): " + String(c327FrontPair),
+          "middle pair present (TML/TMR): " + String(c327MiddlePair),
+          "rear pair present (TRL/TRR): " + String(c327RearPair),
+          "NOTE: overhead roles are NOT consumed by computeOverheadZones; only FL/FR are consumed for lateral geometry.",
+        ].join("\n")}</pre>
+
+        <br /><strong>C3.27 — OVERHEAD ZONES</strong>
+        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{[
+          "overheadZones.status: " + String(overheadZones?.status),
+          "overheadZones.reason: " + String(overheadZones?.reason ?? "(none)"),
+          "bounds: " + (c327BoundsFields ? c327SafeJson(c327BoundsFields) : "(absent)"),
+          "frontZone: " + (c327FrontZone ? c327SafeJson(c327FrontZone) : "(absent)"),
+          "midZone: " + (c327MidZone ? c327SafeJson(c327MidZone) : "(absent)"),
+          "backZone: " + (c327BackZone ? c327SafeJson(c327BackZone) : "(absent)"),
+        ].join("\n")}</pre>
+
+        <br /><strong>C3.27 — DECISION TRACE</strong>
+        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{[
+          "front: " + c327FrontTrace,
+          "middle: " + c327MiddleTrace,
+          "rear: " + c327RearTrace,
+          "NOTE: missing overhead roles are NOT classified as a geometry failure (production computation does not consume them).",
+        ].join("\n")}</pre>
       </div>
     </div>
   );
