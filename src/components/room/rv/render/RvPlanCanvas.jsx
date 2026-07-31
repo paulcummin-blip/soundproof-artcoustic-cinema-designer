@@ -1,4 +1,4 @@
-import React, { useMemo, useLayoutEffect, useState } from "react";
+import React, { useMemo } from "react";
 import { hasPos } from "@/components/room/rv/RenderPrimitives";
 import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import SvgDefs from "@/components/room/SvgDefs";
@@ -235,212 +235,14 @@ export default function RvPlanCanvas({
     });
   }, [dragging, draftSpeakersRef, visiblePlanSpeakers, speakerDragTick]);
 
-  // C3.26 temporary renderer audit. Read-only instrumentation; remove after diagnosis.
-  const c326ShowOverheads = !!(
-    overlaysForRendering?.OVERHEADS_2 ||
-    overlaysForRendering?.OVERHEADS_4 ||
-    overlaysForRendering?.OVERHEADS_6
-  );
-  const c326LayoutParts = String(dolbyLayout || "5.1").split(".");
-  const c326OverheadCount = c326LayoutParts.length >= 3
-    ? parseInt(c326LayoutParts[2], 10) || 0
-    : 0;
-  const c326Config =
-    c326OverheadCount === 2 ? ".2" :
-    c326OverheadCount === 4 ? ".4" :
-    c326OverheadCount === 6 ? ".6" : "off";
-
-  const c326ZoneShapeCount = (zone) => {
-    if (!zone || !zone.active || typeof toPx !== "function") return 0;
-    const [, y0px] = toPx(0, zone.y1);
-    const [, y1px] = toPx(0, zone.y2);
-    if (!(Math.abs(y1px - y0px) > 0)) return 0;
-    const pieces = Array.isArray(zone.pieces) && zone.pieces.length
-      ? zone.pieces
-      : [{ x1: zone.x1, x2: zone.x2 }];
-    return pieces.filter((piece) => {
-      const [x0px] = toPx(piece.x1, 0);
-      const [x1px] = toPx(piece.x2, 0);
-      return Math.abs(x1px - x0px) > 0;
-    }).length;
-  };
-
-  const c326FrontZoneCount = c326ZoneShapeCount(overheadZones?.frontZone);
-  const c326MiddleZoneCount = c326ZoneShapeCount(overheadZones?.midZone);
-  const c326RearZoneCount = c326ZoneShapeCount(overheadZones?.backZone);
-  const c326TotalDrawableShapes =
-    c326Config === ".2" ? c326MiddleZoneCount :
-    c326Config === ".4" ? c326FrontZoneCount + c326RearZoneCount :
-    c326Config === ".6" ? c326FrontZoneCount + c326MiddleZoneCount + c326RearZoneCount : 0;
-
-  const [c326RenderResult, setC326RenderResult] = useState({
-    returnedNull: true,
-    svgElementsProduced: 0,
-  });
-
-  useLayoutEffect(() => {
-    const overheadGroup = svgRef?.current?.querySelector?.('[data-layer="overhead-bands"]') || null;
-    const next = {
-      returnedNull: overheadGroup === null,
-      svgElementsProduced: overheadGroup
-        ? overheadGroup.querySelectorAll("rect,path,polygon,polyline,circle,ellipse,line").length
-        : 0,
-    };
-    setC326RenderResult((previous) =>
-      previous.returnedNull === next.returnedNull &&
-      previous.svgElementsProduced === next.svgElementsProduced
-        ? previous
-        : next
-    );
-  }, [svgRef, c326ShowOverheads, c326Config, overheadZones, c326TotalDrawableShapes]);
-
-  const c326OverheadZonesType = overheadZones === null
-    ? "null"
-    : Array.isArray(overheadZones)
-      ? "array"
-      : typeof overheadZones;
-  const c326OverheadZoneKeys = overheadZones && typeof overheadZones === "object"
-    ? Object.keys(overheadZones).join(", ")
-    : "";
-
-  let c326ReasonHidden = "not hidden by renderer";
-  if (!c326ShowOverheads) {
-    c326ReasonHidden = "no overhead overlay toggle enabled";
-  } else if (c326Config === "off") {
-    c326ReasonHidden = "unsupported/off parsed overhead config";
-  } else if (!overheadZones || overheadZones.status !== "ok") {
-    c326ReasonHidden = "overheadZones status: " + String(overheadZones?.status || "absent");
-  } else if (c326TotalDrawableShapes === 0) {
-    c326ReasonHidden = "no active drawable zone pieces";
-  } else if (c326RenderResult.returnedNull) {
-    c326ReasonHidden = "active renderer returned no overhead-bands group";
-  } else if (c326RenderResult.svgElementsProduced === 0) {
-    c326ReasonHidden = "active renderer produced no drawable SVG elements";
-  }
-
-  // C3.27 temporary audit — read-only diagnostics extending C3.26.
-  // Source fact: useOverheadZonesComputed receives no dolbyLayout/config argument
-  // and performs no overhead-count parsing.
-  const c327HookLayoutConfig = "NOT SUPPLIED";
-  const c327HookParsedCount = "NOT PARSED";
-
-  const c327SafeJson = (v) => {
-    try { return JSON.stringify(v); } catch (_) { return "(unserializable)"; }
-  };
-
-  // Raw overhead roles: original raw role strings for speakers whose canonical role begins T or U.
-  const c327RawOverheadRoles = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
-    .filter((s) => {
-      let canon;
-      try { canon = getCanonicalRole ? getCanonicalRole(s?.role) : s?.role; } catch (_) { canon = s?.role; }
-      const c0 = String(canon ?? "").toUpperCase();
-      return c0.startsWith("T") || c0.startsWith("U");
-    })
-    .map((s) => String(s?.role ?? ""));
-
-  const c327CanonicalOverheadRoles = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
-    .map((s) => {
-      try { return getCanonicalRole ? getCanonicalRole(s?.role) : s?.role; } catch (_) { return s?.role; }
-    })
-    .filter((r) => {
-      const r0 = String(r ?? "").toUpperCase();
-      return r0.startsWith("T") || r0.startsWith("U");
-    });
-
-  // Roles required by parsed count: .2 -> TML/TMR; .4 -> TFL/TFR/TRL/TRR; .6 -> all six.
-  const c327RequiredByCount = c326OverheadCount === 2
-    ? ["TML", "TMR"]
-    : c326OverheadCount === 4
-      ? ["TFL", "TFR", "TRL", "TRR"]
-      : c326OverheadCount === 6
-        ? ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"]
-        : [];
-
-  const c327ActiveRoleCount = c327RequiredByCount.filter((r) =>
-    c327CanonicalOverheadRoles.includes(r)
-  ).length;
-
-  const c327FrontPair = c327CanonicalOverheadRoles.includes("TFL") && c327CanonicalOverheadRoles.includes("TFR");
-  const c327MiddlePair = c327CanonicalOverheadRoles.includes("TML") && c327CanonicalOverheadRoles.includes("TMR");
-  const c327RearPair = c327CanonicalOverheadRoles.includes("TRL") && c327CanonicalOverheadRoles.includes("TRR");
-
-  const c327Fmt = (v) => `raw=${String(v)} finite=${String(Number.isFinite(v))}`;
-
-  const c327ZoneFmt = (z) => {
-    if (!z) return null;
-    const x1 = z.x1, x2 = z.x2, y1 = z.y1, y2 = z.y2;
-    const w = (Number.isFinite(x1) && Number.isFinite(x2)) ? x2 - x1 : NaN;
-    const h = (Number.isFinite(y1) && Number.isFinite(y2)) ? y2 - y1 : NaN;
-    const pieces = Array.isArray(z.pieces) ? z.pieces : null;
-    return {
-      active: String(z.active),
-      x1: c327Fmt(x1),
-      x2: c327Fmt(x2),
-      y1: c327Fmt(y1),
-      y2: c327Fmt(y2),
-      width: c327Fmt(w),
-      height: c327Fmt(h),
-      x2GtX1: String(Number.isFinite(x1) && Number.isFinite(x2) && x2 > x1),
-      y2GtY1: String(Number.isFinite(y1) && Number.isFinite(y2) && y2 > y1),
-      piecesLen: pieces ? pieces.length : 0,
-      piecesJson: pieces ? c327SafeJson(pieces) : "(no pieces)",
-    };
-  };
-
-  const c327Bounds = overheadZones?.bounds;
-  const c327BoundsFields = c327Bounds ? {
-    active: String(c327Bounds.active),
-    listeningFrontY: c327Fmt(c327Bounds.listeningFrontY),
-    listeningBackY: c327Fmt(c327Bounds.listeningBackY),
-    midCenterY: c327Fmt(c327Bounds.midCenterY),
-    xLeft: c327Fmt(c327Bounds.xLeft),
-    xRight: c327Fmt(c327Bounds.xRight),
-    mlpEarHeight: c327Fmt(c327Bounds.mlpEarHeight),
-    seatMinX: c327Fmt(c327Bounds.seatMinX),
-    seatMaxX: c327Fmt(c327Bounds.seatMaxX),
-  } : null;
-
-  const c327FrontZone = c327ZoneFmt(overheadZones?.frontZone);
-  const c327MidZone = c327ZoneFmt(overheadZones?.midZone);
-  const c327BackZone = c327ZoneFmt(overheadZones?.backZone);
-
-  const c327RoomFinite = Number.isFinite(widthM) && widthM > 0 &&
-    Number.isFinite(lengthM) && lengthM > 0 &&
-    Number.isFinite(heightM) && heightM > 0;
-
-  const c327SeatingValid = (() => {
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return false;
-    const hasFiniteSeatY = seatingPositions.some((sp) => {
-      if (Number.isFinite(sp?.y)) return true;
-      return Number.isFinite(sp?.position?.y);
-    });
-    if (hasFiniteSeatY) return true;
-    return Boolean((mlp && Number.isFinite(mlp?.y)) || (mlpPoint && Number.isFinite(mlpPoint?.y)));
-  })();
-
-  const c327FamilyRequested = (family) => {
-    if (c326Config === ".2") return family === "middle";
-    if (c326Config === ".4") return family === "front" || family === "rear";
-    if (c326Config === ".6") return true;
-    return false;
-  };
-
-  const c327TraceFamily = (family, zone) => {
-    if (!c327FamilyRequested(family)) return "1 unsupported layout/config";
-    if (!c327Bounds || c327Bounds.active === false) return "2 bounds inactive or absent";
-    if (!c327RoomFinite) return "3 invalid room geometry";
-    if (!c327SeatingValid) return "4 invalid seating reference";
-    const x1 = zone?.x1, x2 = zone?.x2, y1 = zone?.y1, y2 = zone?.y2;
-    if (!Number.isFinite(x1) || !Number.isFinite(x2) || !(x2 > x1)) return "5 degenerate width";
-    if (!Number.isFinite(y1) || !Number.isFinite(y2) || !(y2 > y1)) return "6 degenerate height";
-    if (!Array.isArray(zone?.pieces) || zone.pieces.length === 0) return "7 empty pieces";
-    if (zone?.active === false) return "8 other: zone.active false at final helper guard";
-    return "PASS";
-  };
-
-  const c327FrontTrace = c327TraceFamily("front", overheadZones?.frontZone);
-  const c327MiddleTrace = c327TraceFamily("middle", overheadZones?.midZone);
-  const c327RearTrace = c327TraceFamily("rear", overheadZones?.backZone);
+  // C3.28B — overhead lateral compromise warning (uses canonical lateralMode metadata)
+  const overheadLateralMode = overheadZones?.lateralMode || null;
+  const overheadWarningText =
+    overheadLateralMode === "outer-seats-excluded"
+      ? "Wide listening area. Outer seats are excluded from the overhead lateral placement guidance."
+      : overheadLateralMode === "unavailable"
+        ? "No valid RP22 lateral overhead placement zone is available within the current FL/FR span."
+        : null;
 
   return (
     <div
@@ -935,133 +737,25 @@ export default function RvPlanCanvas({
 
       </div>
 
-      {/* C3.26 temporary HTML audit panel — outside the SVG/canvas drawing area. */}
-      <div
-        data-testid="c326-overhead-renderer-audit"
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          margin: "12px",
-          padding: "12px",
-          border: "1px solid #92400e",
-          background: "#fffbeb",
-          color: "#451a03",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-          fontSize: "12px",
-          lineHeight: 1.5,
-          whiteSpace: "normal",
-        }}
-      >
-        <strong>ACTIVE RENDER PATHS</strong><br />
-        RvZonesAndOverlays mounted: true<br />
-        ZoneComponents.OVERHEADS mounted: false<br /><br />
-
-        <strong>RUNTIME INPUTS</strong><br />
-        dolbyLayout: {String(dolbyLayout)}<br />
-        parsed overhead count: {c326OverheadCount}<br />
-        OVERHEADS_2: {String(!!overlaysForRendering?.OVERHEADS_2)}<br />
-        OVERHEADS_4: {String(!!overlaysForRendering?.OVERHEADS_4)}<br />
-        OVERHEADS_6: {String(!!overlaysForRendering?.OVERHEADS_6)}<br />
-        showOverheads in RvZonesAndOverlays: {String(c326ShowOverheads)}<br />
-        showOverheads in useZoneComponents: {String(c326ShowOverheads)}<br /><br />
-
-        <strong>OVERHEAD ZONE COMPUTATION</strong><br />
-        overheadZones type: {c326OverheadZonesType}<br />
-        overheadZones keys: {c326OverheadZoneKeys || "(none)"}<br />
-        front zone count: {c326FrontZoneCount}<br />
-        middle zone count: {c326MiddleZoneCount}<br />
-        rear zone count: {c326RearZoneCount}<br />
-        total drawable shapes: {c326TotalDrawableShapes}<br /><br />
-
-        <strong>ACTIVE RENDER RESULT</strong><br />
-        renderer selected: RvZonesAndOverlays<br />
-        returned null: {String(c326RenderResult.returnedNull)}<br />
-        SVG elements produced: {c326RenderResult.svgElementsProduced}<br />
-        reason hidden: {c326ReasonHidden}
-      </div>
-
-      {/* C3.27 temporary HTML audit panel — extends C3.26 with role/zone decision trace. */}
-      <div
-        data-testid="c327-overhead-renderer-audit"
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          margin: "12px",
-          padding: "12px",
-          border: "1px solid #1e3a8a",
-          background: "#eff6ff",
-          color: "#1e3a8a",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-          fontSize: "12px",
-          lineHeight: 1.5,
-          whiteSpace: "normal",
-        }}
-      >
-        <strong>C3.27 — COMPUTATION INPUTS</strong>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{[
-          "dolbyLayout: " + String(dolbyLayout),
-          "layout/config value seen inside useOverheadZonesComputed: " + c327HookLayoutConfig,
-          "parsed overhead count inside the hook: " + c327HookParsedCount,
-          "room length: " + String(lengthM) + " width: " + String(widthM) + " height: " + String(heightM),
-          "screen/front reference: " + c327SafeJson({ screen, actualScreenFrontY }) + " | helper front wall Y=0 inner limit 0.05",
-          "rear reference: helper rear wall=lengthM inner limit=" + String(Number.isFinite(lengthM) ? lengthM - 0.05 : "NaN"),
-          "MLP/seating reference: " + c327SafeJson({ mlp, mlpPoint, seatingCount: Array.isArray(seatingPositions) ? seatingPositions.length : 0 }) + " | authority: mlp (RoomVisualisation passes mlp as mlpPoint)",
-          "scale/bounds inputs: " + c327SafeJson({ scale, roomRect, bounds: overheadZones?.bounds }),
-        ].join("\n")}</pre>
-
-        <br /><strong>C3.27 — ROLE / LAYOUT INPUTS</strong>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{[
-          "raw overhead roles: " + c327SafeJson(c327RawOverheadRoles),
-          "canonical overhead roles: " + c327SafeJson(c327CanonicalOverheadRoles),
-          "required by parsed count: " + c327SafeJson(c327RequiredByCount),
-          "active overhead role count: " + String(c327ActiveRoleCount),
-          "front pair present (TFL/TFR): " + String(c327FrontPair),
-          "middle pair present (TML/TMR): " + String(c327MiddlePair),
-          "rear pair present (TRL/TRR): " + String(c327RearPair),
-          "NOTE: overhead roles are NOT consumed by computeOverheadZones; only FL/FR are consumed for lateral geometry.",
-        ].join("\n")}</pre>
-
-        <br /><strong>C3.27 — OVERHEAD ZONES</strong>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{[
-          "overheadZones.status: " + String(overheadZones?.status),
-          "overheadZones.reason: " + String(overheadZones?.reason ?? "(none)"),
-          "bounds: " + (c327BoundsFields ? c327SafeJson(c327BoundsFields) : "(absent)"),
-          "frontZone: " + (c327FrontZone ? c327SafeJson(c327FrontZone) : "(absent)"),
-          "midZone: " + (c327MidZone ? c327SafeJson(c327MidZone) : "(absent)"),
-          "backZone: " + (c327BackZone ? c327SafeJson(c327BackZone) : "(absent)"),
-          "lateral corridor inputs: " + (() => {
-            const b = c327Bounds || {};
-            const flX = b.xLeft;
-            const frX = b.xRight;
-            const seatMinX = b.seatMinX;
-            const seatMaxX = b.seatMaxX;
-            const centerX = Number.isFinite(widthM) ? widthM / 2 : NaN;
-            const innerLeft = Math.min(centerX, seatMinX - 0.15);
-            const innerRight = Math.max(centerX, seatMaxX + 0.15);
-            const outerLeft = Math.max(0, flX + 0.05);
-            const outerRight = Math.min(widthM, frX - 0.05);
-            return c327SafeJson({
-              "FL x": flX,
-              "FR x": frX,
-              seatMinX,
-              seatMaxX,
-              centerX,
-              innerLeft,
-              innerRight,
-              outerLeft,
-              outerRight,
-              "left condition outerLeft < innerLeft": outerLeft < innerLeft,
-              "right condition innerRight < outerRight": innerRight < outerRight,
-            });
-          })(),
-        ].join("\n")}</pre>
-
-        <br /><strong>C3.27 — DECISION TRACE</strong>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{[
-          "front: " + c327FrontTrace,
-          "middle: " + c327MiddleTrace,
-          "rear: " + c327RearTrace,
-          "NOTE: missing overhead roles are NOT classified as a geometry failure (production computation does not consume them).",
-        ].join("\n")}</pre>
-      </div>
+      {/* C3.28B — overhead lateral compromise warning */}
+      {overheadWarningText && (
+        <div
+          data-testid="overhead-lateral-warning"
+          onClick={(event) => event.stopPropagation()}
+          style={{
+            margin: "12px",
+            padding: "10px 14px",
+            border: "1px solid #92400e",
+            background: "#fffbeb",
+            color: "#451a03",
+            borderRadius: "6px",
+            fontSize: "13px",
+            lineHeight: 1.5,
+          }}
+        >
+          {overheadWarningText}
+        </div>
+      )}
     </div>
   );
 }
