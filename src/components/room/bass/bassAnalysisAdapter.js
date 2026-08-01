@@ -169,6 +169,8 @@ function buildCandidateRef(candidate, collectDiagnostics = false) {
     })),
     meetsRequestedEnvelope: candidate.meetsRequestedEnvelope ?? null,
     filterCount: Array.isArray(candidate.generatedFilterBank) ? candidate.generatedFilterBank.filter((f) => f?.enabled).length : 0,
+    selectedOperatingOutputDb: Number.isFinite(candidate.selectedOperatingOutputDb) ? candidate.selectedOperatingOutputDb : null,
+    operatingOutputDiagnostics: candidate.operatingOutputDiagnostics || null,
     // Preserve the candidate acceptance diagnostics array ONLY when engineering
     // diagnostics were requested. The array is passed through unchanged — never
     // recalculated, transformed, or recreated. When diagnostics were not

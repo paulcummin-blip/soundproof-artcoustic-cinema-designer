@@ -306,6 +306,14 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     : profileFittingToleranceDb;
   const fittingToleranceDb = Math.max(1, Math.min(5, requestedFittingToleranceDb));
   const requestedSystemOutputDb = Number(options.requestedSystemOutputDb);
+  // Defensive invariant (Stage C3): the fitter's source-domain operating output
+  // must match the authoritative requested P14 operating target used by the
+  // capability path. If the values differ beyond 0.05 dB, flag a diagnostic
+  // mismatch — the fitter still runs, but the invariant is recorded.
+  const p14TargetDbForInvariant = Number.isFinite(Number(options.p14TargetDb)) ? Number(options.p14TargetDb) : null;
+  const operatingOutputInvariantOk = p14TargetDbForInvariant != null
+    && Number.isFinite(requestedSystemOutputDb)
+    && Math.abs(requestedSystemOutputDb - p14TargetDbForInvariant) <= 0.05;
   const collectDiagnostics = options.collectDiagnostics !== false;
   // Accept initialFilters for seeded fits (Accuracy profile seeded from Standard).
   // Keep only valid, enabled filters. Limit to 10 filters.
@@ -957,6 +965,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     physicalAuthorityViolations,
     worstResidualDiagnostics,
     selectionReason,
+    operatingOutputInvariantOk,
     p14TargetAuthority: {
       measuredAnchorDb,
       currentIntegratedBassDb,

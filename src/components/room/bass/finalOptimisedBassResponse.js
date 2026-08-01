@@ -32,6 +32,8 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     requestedOperatingLevelOffsetDb: Number.isFinite(candidate.requestedOperatingLevelOffsetDb) ? candidate.requestedOperatingLevelOffsetDb : 0,
     baseRequestedSystemOutputDb: Number.isFinite(candidate.baseRequestedSystemOutputDb) ? candidate.baseRequestedSystemOutputDb : null,
     operatingSystemOutputDb: Number.isFinite(candidate.operatingSystemOutputDb) ? candidate.operatingSystemOutputDb : null,
+    selectedOperatingOutputDb: Number.isFinite(candidate.selectedOperatingOutputDb) ? candidate.selectedOperatingOutputDb : null,
+    operatingOutputDiagnostics: candidate.operatingOutputDiagnostics || null,
     rspBeforePeqAtOperatingLevel: cloneCurve(candidate.rspBeforePeqAtOperatingLevel),
     positiveEqDemandCurve: cloneCurve(candidate.positiveEqDemandCurve),
     fitMetrics: candidate.fitMetrics || null,

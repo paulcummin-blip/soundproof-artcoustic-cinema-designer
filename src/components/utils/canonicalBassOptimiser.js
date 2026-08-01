@@ -14,7 +14,7 @@ import {
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
 import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { getCurrentSystemSourceOutput, getSystemSourceCapability } from "@/components/utils/subwooferCapability";
+import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
@@ -87,7 +87,48 @@ function bankLimits(eq) {
   };
 }
 
-function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb, perSeatRawCurves, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb }) {
+function buildOperatingOutputDiagnostics(activeSubs, usableLfHz, selectedOperatingOutputDb, correctionStartHz, correctionEndHz) {
+  const authority = "selected-p14-target";
+  if (!Array.isArray(activeSubs) || !activeSubs.length || !Number.isFinite(selectedOperatingOutputDb)) {
+    return {
+      selectedOperatingOutputDb: Number.isFinite(selectedOperatingOutputDb) ? selectedOperatingOutputDb : null,
+      productCapabilityAuthoritySource: authority,
+      maximumAllowedBoostByFrequency: [],
+      firstBindingConstraint: null,
+    };
+  }
+  const bandFrequencies = [20, 25, 31.5, 40, 50, 63, 80, 100, 120, 141.68, 150, 200]
+    .filter((f) => f >= (correctionStartHz || 20) && f <= (correctionEndHz || 200));
+  const maximumAllowedBoostByFrequency = bandFrequencies.map((frequency) => {
+    const allowance = getSourceDomainBoostAllowance({
+      frequency,
+      requestedBoostDb: 6,
+      activeSubs,
+      usableLfHz,
+      maxBoostDb: 6,
+      requestedSystemOutputDb: selectedOperatingOutputDb,
+    });
+    return {
+      frequency,
+      allowedBoostDb: Number.isFinite(allowance.allowedBoostDb) ? allowance.allowedBoostDb : 6,
+      systemCapabilityDb: allowance.systemCapabilityDb ?? null,
+      availableHeadroomDb: allowance.availableHeadroomDb ?? null,
+    };
+  });
+  const firstBinding = maximumAllowedBoostByFrequency.find((point) =>
+    Number.isFinite(point.allowedBoostDb) && point.allowedBoostDb < 6 - 0.05
+  );
+  return {
+    selectedOperatingOutputDb,
+    productCapabilityAuthoritySource: authority,
+    maximumAllowedBoostByFrequency,
+    firstBindingConstraint: firstBinding
+      ? { frequency: firstBinding.frequency, allowedBoostDb: firstBinding.allowedBoostDb, constraintType: "product-headroom" }
+      : null,
+  };
+}
+
+function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb, perSeatRawCurves, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics }) {
   const perSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, eq.combinedEqCurve);
   const seatsForMetrics = perSeatPostEqCurves.length
     ? perSeatPostEqCurves
@@ -118,6 +159,8 @@ function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingL
     requestedOperatingLevelOffsetDb: Number.isFinite(requestedOperatingLevelOffsetDb) ? requestedOperatingLevelOffsetDb : 0,
     baseRequestedSystemOutputDb: Number.isFinite(baseRequestedSystemOutputDb) ? baseRequestedSystemOutputDb : null,
     operatingSystemOutputDb: Number.isFinite(operatingSystemOutputDb) ? operatingSystemOutputDb : null,
+    selectedOperatingOutputDb: Number.isFinite(selectedOperatingOutputDb) ? selectedOperatingOutputDb : null,
+    operatingOutputDiagnostics: operatingOutputDiagnostics || null,
     rawResponseSignature: buildCurveSignature(rawCurve),
     generatedFilterBank: eq.filters || [],
     finalPostEqCurve: eq.curve || [],
@@ -248,6 +291,22 @@ export function generateCanonicalCandidatePool({
   const operatingSystemOutputDb = Number.isFinite(baseRequestedSystemOutputDb)
     ? Number(baseRequestedSystemOutputDb) + appliedOperatingLevelOffsetDb
     : appliedOperatingLevelOffsetDb;
+  // ── Source-domain operating authority (Stage C3) ──
+  // The canonical source-domain operating output is the selected P14 target
+  // itself — the same authority used by the P14 capability diagnostic. The
+  // fitter's headroom calculation (systemCapability - operatingOutput) must
+  // use this value, NOT the response-domain operatingSystemOutputDb (which
+  // mixes baseRequestedSystemOutputDb with the RSP operating-level offset).
+  // Domain separation:
+  //   selectedOperatingOutputDb      — source-domain product operating output (= P14 target)
+  //   operatingSystemOutputDb        — response-domain graph trim baseline (base + offset)
+  //   appliedOperatingLevelOffsetDb  — response-domain RSP vertical shift
+  const selectedOperatingOutputDb = Number.isFinite(selectedP14TargetDb)
+    ? Number(selectedP14TargetDb)
+    : (Number.isFinite(baseRequestedSystemOutputDb) ? baseRequestedSystemOutputDb : null);
+  const operatingOutputDiagnostics = buildOperatingOutputDiagnostics(
+    activeSubs, usableLfHz, selectedOperatingOutputDb, domains.correctionStartHz, domains.correctionEndHz,
+  );
   const levelNormalisedRawCurve = rawCurve.map((point) => ({
     ...point,
     spl: Number.isFinite(point.spl) ? point.spl + appliedOperatingLevelOffsetDb : point.spl,
@@ -278,7 +337,7 @@ export function generateCanonicalCandidatePool({
     assessmentEndHz: domains.correctionEndHz,
     collectDiagnostics,
     initialFilters,
-    requestedSystemOutputDb: operatingSystemOutputDb,
+    requestedSystemOutputDb: selectedOperatingOutputDb,
   });
   const eqResults = [];
   const standardEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("standard"));
@@ -316,7 +375,7 @@ export function generateCanonicalCandidatePool({
 
   const eqCandidates = eqResults.map((eq) => buildCanonicalCandidate({
     rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
-    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
   }));
 
   // ── Partial-bank salvage ──
@@ -359,7 +418,7 @@ export function generateCanonicalCandidatePool({
       rawCurve: levelNormalisedRawCurve,
       activeSubs,
       usableLfHz,
-      requestedSystemOutputDb: operatingSystemOutputDb,
+      requestedSystemOutputDb: selectedOperatingOutputDb,
       profile: salvageProfile,
       protectedNullRegions,
       canonicalTargetCurve: targetCurve,
@@ -381,7 +440,7 @@ export function generateCanonicalCandidatePool({
         rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
         perSeatRawCurves: levelNormalisedSeats, eq: sanitisedEq, domains, targetCurve, targetShape,
         verticalOffsetDb, protectedNullRegions,
-        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
       }));
     }
     if (salvage.cutOnlyFilters.length > 0 && salvage.cutOnlyBankLimits.allOk) {
@@ -399,7 +458,7 @@ export function generateCanonicalCandidatePool({
         rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
         perSeatRawCurves: levelNormalisedSeats, eq: cutOnlyEq, domains, targetCurve, targetShape,
         verticalOffsetDb, protectedNullRegions,
-        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
       }));
     }
   }
@@ -443,7 +502,7 @@ export function generateCanonicalCandidatePool({
   };
   const identityCandidate = buildCanonicalCandidate({
     rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
-    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
   });
   const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, ...salvagedCandidates, identityCandidate]);
   const __canonicalTrace__ = {
@@ -525,6 +584,8 @@ export function generateCanonicalCandidatePool({
     requestedOperatingLevelOffsetDb,
     baseRequestedSystemOutputDb,
     operatingSystemOutputDb,
+    selectedOperatingOutputDb,
+    operatingOutputDiagnostics,
     canonicalHouseCurveShape: targetShape,
     canonicalTargetCurve: targetCurve,
     protectedNullRegions,
