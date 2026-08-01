@@ -91,7 +91,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     ...BASS_OPTIMISER_VERSIONS,
     canonicalPriorityMode: "canonical-physics-eq",
     poolId: null,
-  }), [cacheKey, fingerprints, OPTIMISER_VERSION_SIGNATURE]);
+    selectedP14TargetDb: requested.selectedP14TargetDb,
+    p14TargetBasis: requested.p14TargetBasis,
+    p14TargetLevel: requested.requestedLevel,
+    selectedP14RequiredExtensionHz: requested.selectedP14RequiredExtensionHz,
+  }), [cacheKey, fingerprints, OPTIMISER_VERSION_SIGNATURE, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel, requested.selectedP14RequiredExtensionHz]);
   useEffect(() => {
     if (isDragging || !fingerprints) return; // Defer during drag; skip when analysis is blocked
     controller.ensureProtocolCompatibility(BASS_OPTIMISER_VERSIONS);

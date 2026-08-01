@@ -276,6 +276,7 @@ export function adaptCurrentBassOptimisationResult({
   p14TargetBasis = "minimum",
   selectedP14Level = 4,
   selectedP14TargetDb = null,
+  selectedP14RequiredExtensionHz = null,
   collectDiagnostics = false,
 } = {}) {
   const contract = createBassAnalysisResult();
@@ -499,6 +500,7 @@ export function adaptCurrentBassOptimisationResult({
   contract.selectedP14TargetBasis = contract.selectedTargetBasis;
   contract.selectedP14Level = p14SelectedLevel;
   contract.selectedP14TargetDb = p14Value;
+  contract.selectedP14RequiredExtensionHz = Number.isFinite(selectedP14RequiredExtensionHz) ? selectedP14RequiredExtensionHz : null;
   const selectedTarget = contract.bassTargets[contract.selectedTargetBasis];
   contract.productAnalysis.parameters = {
     p14: selectedTarget.p14,

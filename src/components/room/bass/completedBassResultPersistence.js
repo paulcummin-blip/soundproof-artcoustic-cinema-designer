@@ -1,6 +1,6 @@
 import { INSTANCE_AUTHORITY_VERSION } from "@/components/utils/subwooferInstanceMigration";
 
-export const COMPLETED_BASS_CACHE_VERSION = 1;
+export const COMPLETED_BASS_CACHE_VERSION = 2;
 
 export function isCompletedBassContract(contract) {
   const status = contract?.job?.status;
@@ -29,8 +29,33 @@ export function compactCompletedBassContract(contract) {
       perSeatP20Results: contract.selectedCandidate?.perSeatP20Results || [],
       p14TargetBasis: contract.selectedCandidate?.p14TargetBasis || contract.productAnalysis?.parameters?.p14?.targetBasis || "minimum",
       },
+    requestedP14TargetDb: Number.isFinite(contract.selectedP14TargetDb) ? contract.selectedP14TargetDb : null,
+    requestedP14Basis: contract.selectedP14TargetBasis || null,
+    requestedP14Level: Number.isFinite(contract.selectedP14Level) ? contract.selectedP14Level : null,
+    requestedP18ExtensionHz: Number.isFinite(contract.selectedP14RequiredExtensionHz) ? contract.selectedP14RequiredExtensionHz : null,
     provenance: contract.provenance || {},
   };
+}
+
+/**
+ * Validate that a completed bass contract's stored P14 identity matches the
+ * currently requested P14 identity. Defense-in-depth: the calibration fingerprint
+ * already includes P14 identity (v4+), so a fingerprint mismatch rejects wrong
+ * results at the cache layer. This function provides an explicit second check
+ * at the contract level so a ready result is never presented under mismatched
+ * P14 identity.
+ */
+export function bassContractMatchesRequestedP14(contract, requested) {
+  if (!contract) return false;
+  const cDb = Number.isFinite(contract.selectedP14TargetDb) ? contract.selectedP14TargetDb : null;
+  const cBasis = contract.selectedP14TargetBasis || null;
+  const cLevel = Number.isFinite(contract.selectedP14Level) ? contract.selectedP14Level : null;
+  const cExtHz = Number.isFinite(contract.selectedP14RequiredExtensionHz) ? contract.selectedP14RequiredExtensionHz : null;
+  const rDb = Number.isFinite(requested?.selectedP14TargetDb) ? requested.selectedP14TargetDb : null;
+  const rBasis = requested?.p14TargetBasis || requested?.selectedP14TargetBasis || null;
+  const rLevel = Number.isFinite(requested?.requestedLevel) ? requested.requestedLevel : (Number.isFinite(requested?.selectedP14Level) ? requested.selectedP14Level : null);
+  const rExtHz = Number.isFinite(requested?.selectedP14RequiredExtensionHz) ? requested.selectedP14RequiredExtensionHz : null;
+  return cDb === rDb && cBasis === rBasis && cLevel === rLevel && cExtHz === rExtHz;
 }
 
 export function buildPersistedBassAuthority(existing, currentFingerprint, contract = null, forceUpdating = false) {

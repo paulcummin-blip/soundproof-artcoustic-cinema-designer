@@ -2,13 +2,14 @@ import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
 import {
   COMPLETED_BASS_CACHE_VERSION,
+  bassContractMatchesRequestedP14,
   buildPersistedBassAuthority,
   compactCompletedBassContract,
   isCompletedBassContract,
   resolvePersistedBassAuthority,
 } from "./completedBassResultPersistence";
 
-export { buildPersistedBassAuthority, compactCompletedBassContract, isCompletedBassContract, resolvePersistedBassAuthority };
+export { buildPersistedBassAuthority, compactCompletedBassContract, isCompletedBassContract, resolvePersistedBassAuthority, bassContractMatchesRequestedP14 };
 
 const memoryByProject = new Map();
 const listeners = new Set();

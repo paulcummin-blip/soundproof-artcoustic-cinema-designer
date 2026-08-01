@@ -18,7 +18,7 @@
 // new fingerprint version that, combined with the instanceAuthorityVersion
 // in completedBassResultPersistence.js, forms an explicit instance-authority
 // cache namespace. Old CFG results always miss.
-export const FINGERPRINT_VERSION = 3;
+export const FINGERPRINT_VERSION = 4;
 
 // ---------------------------------------------------------------------------
 // 1. Stable serialization primitives
@@ -372,6 +372,16 @@ export function computeCalibrationFingerprint(inputs) {
     optimisationTransitionHz: num(i.optimisationTransitionHz, 3),
     activeFitProfile: i.activeFitProfile || null,
     usableLfHz: num(i.usableLfHz, 3),
+    // P14 identity — canonical target basis/level/db and P18 extension requirement.
+    // Without this, L1 and L4 produce the same fingerprint and the cache returns
+    // the wrong result when switching P14 target. Uses stable canonical values
+    // (basis string, numeric level, numeric dB, numeric Hz) — never labels.
+    p14Identity: {
+      selectedP14TargetDb: num(i.selectedP14TargetDb, 2),
+      p14TargetBasis: i.p14TargetBasis || null,
+      p14TargetLevel: i.p14TargetLevel ?? null,
+      selectedP14RequiredExtensionHz: num(i.selectedP14RequiredExtensionHz, 2),
+    },
     // Phase 2A: The sorted set of fit profiles the optimiser actually
     // evaluates, with their real named constraints (id, max aggregate boost,
     // max cut) derived from DESIGN_EQ_FIT_PROFILES. A change to any profile
