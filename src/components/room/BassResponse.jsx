@@ -379,6 +379,39 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     });
   }, [multiSeriesForGraph, designEqEnabled, showRawResponse, showOptimisedResponse]);
 
+  // Material signature for BassGraph Auto Y-axis: tracks P14-independent inputs only.
+  // When only the P14 target changes, this signature stays the same so BassGraph
+  // preserves the cached Y-axis domain — making the house curve's vertical movement
+  // visually obvious. Recalculates when room dims, sub config, raw response, or
+  // enabled series actually change.
+  const bassGraphMaterialSignature = useMemo(() => {
+    const subSig = (subsForSimulation || [])
+      .map((s) => `${s.modelKey || s.model || ''}:${s.position?.x ?? ''}:${s.position?.y ?? ''}:${s.enabled ?? ''}`)
+      .sort().join(',');
+    const rawSig = rspRawCurve.length
+      ? `len:${rspRawCurve.length}:` + [0, Math.floor(rspRawCurve.length / 4), Math.floor(rspRawCurve.length / 2), Math.floor(rspRawCurve.length * 3 / 4), rspRawCurve.length - 1]
+          .map((i) => Number.isFinite(rspRawCurve[i]?.spl) ? rspRawCurve[i].spl.toFixed(2) : 'null').join(',')
+      : 'empty';
+    const seatSig = (seatingPositions || [])
+      .map((s) => `${s.id || `${s.x}-${s.y}`}:${s.x}:${s.y}`)
+      .sort().join(',');
+    return [
+      `dims:${roomDims?.widthM}:${roomDims?.lengthM}:${roomDims?.heightM}`,
+      `subs:${subSig}`,
+      `raw:${rawSig}`,
+      `seats:${seatSig}`,
+      `smooth:${bassSmoothingMode}`,
+      `showRaw:${showRawResponse}`,
+      `showEq:${showOptimisedResponse}`,
+      `showOverlays:${showRealSeatOverlays}`,
+      `showHouse:${showHouseCurve}`,
+      `designEq:${designEqEnabled}`,
+      `selSeats:${[...selectedSeatIds].sort().join(',')}`,
+    ].join('|');
+  }, [roomDims, subsForSimulation, rspRawCurve, seatingPositions, bassSmoothingMode,
+    showRawResponse, showOptimisedResponse, showRealSeatOverlays, showHouseCurve,
+    designEqEnabled, selectedSeatIds]);
+
   const graphStatusText = detailedEqStatusText({
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
     detailedStatus, optimisationResult, error: detailedError,
@@ -733,6 +766,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               renderToken={qStrategy}
               p14TotalDb={p14PresentationData.targetDb}
               operatingLevelOffsetDb={operatingLevelOffsetDb}
+              materialSignature={bassGraphMaterialSignature}
             />
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
