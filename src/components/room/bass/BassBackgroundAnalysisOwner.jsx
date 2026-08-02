@@ -7,7 +7,7 @@ import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
 import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
-import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
+import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority, getCompletedBassAuthority } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
@@ -172,28 +172,43 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       resultSchemaVersion: matchingResult.resultSchemaVersion || null,
     } : null;
     const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources });
-    // C6.1A: Pass all four fingerprints for identity parity. The completed
-    // result P14 identity uses the ACTUAL field names from
-    // evaluateCanonicalBassAuthority (selectedP14TargetDb, p14TargetBasis,
-    // selectedP14Level, requiredExtensionHz). No circular graph hashes —
-    // the graph boundary hash check is done in BassResponse using the
-    // source identity metadata embedded in the rendered series.
-    // C6.1B: Explicit fingerprint fields — no conflation.
-    //   activeRequestFingerprint   = cacheKey (the full request fingerprint)
-    //   returnedWorkerFingerprint  = matchingResult.fingerprint (from the worker)
-    //   completedResultFingerprint = result.cacheKey (fingerprint on the completed result)
-    //   calibrationFingerprint     = calibrationFingerprint (embedded calibration identity)
-    //   candidateId               = selected candidate identity (different type)
+    // C6.1B2 Gap 1: completedContractFingerprint MUST come from the completed
+    // contract/store, NOT from the current request cacheKey.
+    //   activeRequestFingerprint    = cacheKey (the current request fingerprint)
+    //   returnedWorkerFingerprint   = matchingResult.fingerprint (returned by the worker)
+    //   completedContractFingerprint = lifecycle.resultFingerprint (the fingerprint on the
+    //                                  COMPLETED RESULT in the lifecycle store — this is the
+    //                                  same value that contract.job.resultFingerprint will get)
+    //   persistedCompletedFingerprint = from the persisted completed authority store
+    //   calibrationFingerprint      = calibrationFingerprint (embedded calibration identity)
+    //
+    // We do NOT use result.cacheKey — that is the current request cacheKey, not
+    // the completed contract fingerprint. Using it would derive completed
+    // identity from the current request, which is exactly what C6.1B2 prohibits.
     const returnedWorkerFingerprint = matchingResult?.fingerprint || null;
-    const completedResultFingerprint = result?.cacheKey || matchingResult?.fingerprint || null;
+    const completedContractFingerprint = lifecycle?.resultFingerprint || null;
+    const persistedCompletedFingerprint = getCompletedBassAuthority(scopeId)?.contract?.job?.resultFingerprint || null;
     const resolvedCandidateId = result?.selectedCandidate?.candidateId || null;
+    // C6.1B2 Gap 2: Candidate-result identity receipt. The candidate must be
+    // explicitly linked to the completed result — presence alone is insufficient.
+    const candidateResultIdentity = {
+      candidateId: resolvedCandidateId,
+      completedResultFingerprint: completedContractFingerprint,
+    };
     const canonicalMetricAuthorityResult = buildCanonicalCompletedBassMetricAuthority({
       finalOptimisedBassResponse,
       activeRequestFingerprint: cacheKey,
       returnedWorkerFingerprint,
-      completedResultFingerprint,
+      completedContractFingerprint,
+      persistedCompletedFingerprint,
       calibrationFingerprint,
       candidateId: resolvedCandidateId,
+      candidateResultIdentity,
+      // C6.1B2 Gap 3: graphMetricParityValid is not yet known at authority build
+      // time — it is computed in BassResponse after the graph series are rendered.
+      // Pass null so canonicalMetricPublicationValid starts false and is only set
+      // true after the graph parity check completes via computeCanonicalMetricPublication.
+      graphMetricParityValid: null,
       completedResultP14Identity: {
         selectedP14TargetDb: Number.isFinite(result?.selectedP14TargetDb) ? result.selectedP14TargetDb : null,
         p14TargetBasis: result?.p14TargetBasis ?? null,
@@ -211,10 +226,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       ...result,
       diagnosticIdentity,
       finalOptimisedBassResponse,
+      // Expose completedContractFingerprint so graph series can carry it as
+      // sourceFingerprint (C6.1B2: graph must carry completed-contract identity,
+      // not current-request identity).
+      completedContractFingerprint,
       canonicalMetricAuthority: canonicalMetricAuthorityResult.authority,
       canonicalMetricDiagnostics: canonicalMetricAuthorityResult.diagnostics,
     };
-  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz]);
+  }, [selectionAttempt.result, cacheKey, lifecycle.resultFingerprint, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz, scopeId]);
   // Record candidate-selection-accepted only after the pool contains a valid
   // selectable result. Guard with a Set so unrelated React renders do not
   // overwrite or duplicate the stage for the same token.

@@ -62,13 +62,15 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
     strokeWidth: 2.25,
     strokeDasharray: "10 5",
     data: exactTarget,
-    // C6.1B: Source identity metadata for graph boundary hash check.
-    // sourceFingerprint = the completed-result fingerprint (cacheKey) consumed
-    //   by the graph — NOT merely the calibration fingerprint.
+    // C6.1B2: Source identity metadata for graph boundary hash check.
+    // sourceFingerprint = the COMPLETED-CONTRACT fingerprint (from lifecycle.resultFingerprint),
+    //   NOT the current request cacheKey. This ensures the graph carries the
+    //   same identity as the completed contract, so graph parity can verify
+    //   that the rendered series matches the metric authority.
     // sourceCalibrationFingerprint = the embedded calibration identity (separate).
     sourceTargetCurveHash: buildCurveSignature(exactTarget),
     sourceCandidateId: candidate.candidateId || null,
-    sourceFingerprint: optimisationResult?.cacheKey || null,
+    sourceFingerprint: optimisationResult?.completedContractFingerprint || optimisationResult?.cacheKey || null,
     sourceCalibrationFingerprint: optimisationResult?.calibrationFingerprint || null,
   };
 }
@@ -126,7 +128,8 @@ export function buildBassGraphSeries({
             sourcePostEqCurveHash: finalResponse.postEqCurveSignature || null,
             sourceCandidateId: finalResponse.selectedCandidateId || null,
             sourceFilterBankSignature: finalResponse.filterBankSignature || null,
-            sourceFingerprint: optimisationResult?.cacheKey || null,
+            // C6.1B2: carry completed-contract fingerprint, not current request
+            sourceFingerprint: optimisationResult?.completedContractFingerprint || optimisationResult?.cacheKey || null,
             sourceCalibrationFingerprint: optimisationResult?.calibrationFingerprint || null,
             color: seat.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
             strokeWidth: 2.25, data: applyBassSmoothing(postEq.responseData, smoothingMode) };
@@ -145,7 +148,8 @@ export function buildBassGraphSeries({
           sourcePostEqCurveHash: finalResponse.postEqCurveSignature || null,
           sourceCandidateId: finalResponse.selectedCandidateId || null,
           sourceFilterBankSignature: finalResponse.filterBankSignature || null,
-          sourceFingerprint: optimisationResult?.cacheKey || null,
+          // C6.1B2: carry completed-contract fingerprint, not current request
+          sourceFingerprint: optimisationResult?.completedContractFingerprint || optimisationResult?.cacheKey || null,
           sourceCalibrationFingerprint: optimisationResult?.calibrationFingerprint || null,
           color: "#16A34A", strokeWidth: 2.5, data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode) });
         if (showRealSeatOverlays) series.push(...finalResponse.postEqPerSeatCurves

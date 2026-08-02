@@ -81,27 +81,42 @@ function frequencyGridParity(postEq, target) {
  * Build the canonical completed-bass metric authority from the completed
  * product-constrained candidate.
  *
- * C6.1B fingerprint fields (all explicit, no conflation):
- *   - activeRequestFingerprint:   the full cache/request fingerprint (cacheKey)
- *   - returnedWorkerFingerprint:  the fingerprint returned by the worker
- *   - completedResultFingerprint: the fingerprint stored on the completed
- *                                 contract/result (full result fingerprint)
- *   - calibrationFingerprint:     the embedded calibration identity
- *   - candidateId:                the selected candidate identity
+ * C6.1B2 fingerprint fields (all explicit, no conflation):
+ *   - activeRequestFingerprint:    the full cache/request fingerprint (cacheKey)
+ *   - returnedWorkerFingerprint:   the fingerprint returned by the worker
+ *   - completedContractFingerprint: the fingerprint on the COMPLETED CONTRACT
+ *                                   (contract.job.resultFingerprint / lifecycle.resultFingerprint).
+ *                                   MUST come from the completed contract/store,
+ *                                   NOT from the current request cacheKey.
+ *   - persistedCompletedFingerprint: optional fingerprint from the persisted
+ *                                   completed authority store. If present, must match.
+ *   - calibrationFingerprint:      the embedded calibration identity
+ *   - candidateId:                 the selected candidate identity
+ *   - candidateResultIdentity:     { candidateId, completedResultFingerprint } receipt
+ *                                   linking the candidate to the completed result
+ *   - graphMetricParityValid:      graph parity check result (null = not yet checked)
  *
- * Parity rules:
- *   - activeRequestFingerprint === returnedWorkerFingerprint
- *   - activeRequestFingerprint === completedResultFingerprint
+ * Parity rules (C6.1B2):
+ *   - activeRequestFingerprint === returnedWorkerFingerprint === completedContractFingerprint
+ *   - If persistedCompletedFingerprint exists, it must also match
  *   - activeRequestFingerprint contains calibrationFingerprint (cache-key contract)
- *   - candidateId is present (different identity type — never compared as a
- *     fingerprint equal to the request)
+ *   - candidateResultIdentity.candidateId === finalOptimisedBassResponse.selectedCandidateId
+ *   - candidateResultIdentity.completedResultFingerprint === completedContractFingerprint
+ *
+ * Publication gating (C6.1B2 Gap 3):
+ *   - canonicalMetricAuthorityValid = identity + candidate + curve + P14 checks pass
+ *   - graphMetricParityValid = graph series identity matches metric identity
+ *   - canonicalMetricPublicationValid = canonicalMetricAuthorityValid && graphMetricParityValid
  *
  * @param {object} finalOptimisedBassResponse - from buildFinalOptimisedBassResponse
  * @param {string|null} activeRequestFingerprint - active request cache key
  * @param {string|null} returnedWorkerFingerprint - fingerprint returned by the worker
- * @param {string|null} completedResultFingerprint - fingerprint on the completed result
+ * @param {string|null} completedContractFingerprint - fingerprint on the completed contract (NOT current request)
+ * @param {string|null} persistedCompletedFingerprint - fingerprint from persisted completed authority (optional)
  * @param {string|null} calibrationFingerprint - embedded calibration identity
  * @param {string|null} candidateId - selected candidate identity
+ * @param {object|null} candidateResultIdentity - { candidateId, completedResultFingerprint } receipt
+ * @param {boolean|null} graphMetricParityValid - graph parity result (null = not yet checked)
  * @param {object|null} completedResultP14Identity - P14 identity that produced the completed result (MANDATORY)
  * @param {object} requestedP14Identity - current requested P14 identity
  *
@@ -111,24 +126,49 @@ export function buildCanonicalCompletedBassMetricAuthority({
   finalOptimisedBassResponse,
   activeRequestFingerprint = null,
   returnedWorkerFingerprint = null,
+  completedContractFingerprint = null,
+  // Backward compat: old param name
   completedResultFingerprint = null,
+  persistedCompletedFingerprint = null,
   calibrationFingerprint = null,
   candidateId = null,
+  candidateResultIdentity = null,
+  graphMetricParityValid = null,
   completedResultP14Identity = null,
   requestedP14Identity,
 }) {
+  // C6.1B2 Gap 1: completedContractFingerprint MUST come from the completed
+  // contract/store, NOT from the current request cacheKey. The caller must
+  // source it from lifecycle.resultFingerprint or contract.job.resultFingerprint.
+  // We do NOT fall back to activeRequestFingerprint here — that would defeat
+  // the audit. If the caller passes the old param name, use it (backward compat).
+  const resolvedCompletedContractFingerprint = completedContractFingerprint || completedResultFingerprint || null;
+
+  // C6.1B2 Gap 2: Candidate-result identity receipt.
+  const candidateReceiptCandidateId = candidateResultIdentity?.candidateId || null;
+  const candidateReceiptCompletedFingerprint = candidateResultIdentity?.completedResultFingerprint || null;
+
   const diagnostics = {
     canonicalMetricAuthorityValid: false,
-    // Explicit fingerprint fields (C6.1B)
+    // Explicit fingerprint fields (C6.1B2)
     metricRequestFingerprint: activeRequestFingerprint ?? null,
     metricReturnedWorkerFingerprint: returnedWorkerFingerprint ?? null,
-    metricCompletedResultFingerprint: completedResultFingerprint ?? null,
+    metricCompletedContractFingerprint: resolvedCompletedContractFingerprint ?? null,
+    // Backward-compat alias for consumers that read the old field name
+    metricCompletedResultFingerprint: resolvedCompletedContractFingerprint ?? null,
+    metricPersistedCompletedFingerprint: persistedCompletedFingerprint ?? null,
     metricCalibrationFingerprint: calibrationFingerprint ?? null,
     metricCandidateId: candidateId ?? null,
+    // Candidate-result identity receipt (C6.1B2 Gap 2)
+    metricCompletedCandidateId: candidateReceiptCandidateId ?? null,
+    metricCompletedCandidateFingerprint: candidateReceiptCompletedFingerprint ?? null,
     // Parity sub-checks
     requestWorkerParityValid: false,
     requestCompletedParityValid: false,
+    persistedFingerprintParityValid: false,
     calibrationIdentityParityValid: false,
+    candidateIdParityValid: false,
+    candidateFingerprintParityValid: false,
     candidateResultIdentityValid: false,
     fingerprintParityValid: false,
     // Curve / P14 diagnostics
@@ -141,6 +181,10 @@ export function buildCanonicalCompletedBassMetricAuthority({
     legacyMetricCurveDetected: false,
     p14IdentityParityValid: false,
     achievedCapabilitySource: null,
+    // Publication gating (C6.1B2 Gap 3)
+    graphMetricParityValid: graphMetricParityValid,
+    canonicalMetricPublicationValid: false,
+    publicationRejectionReason: null,
     rejectionReason: null,
   };
 
@@ -174,24 +218,47 @@ export function buildCanonicalCompletedBassMetricAuthority({
   diagnostics.targetCurvePointCount = targetCurve.length;
   diagnostics.legacyMetricCurveDetected = postEqRsp.length === LEGACY_CURVE_LENGTH;
 
-  // --- Strict identity checks (C6.1B) ---
+  // --- Strict identity checks (C6.1B2) ---
 
-  // 1. Fingerprint parity — explicit sub-checks, no field conflation.
-  //    candidateId is a different identity type and is NOT compared as a
-  //    fingerprint equal to the request.
+  // 1. Fingerprint parity — three-way: request === worker === completedContract.
+  //    C6.1B2 Gap 1: completedContractFingerprint MUST come from the completed
+  //    contract/store, NOT from the current request cacheKey. The caller is
+  //    responsible for sourcing it correctly; we do NOT fall back to the
+  //    request fingerprint here.
   const requestWorkerParityValid = !!(activeRequestFingerprint && returnedWorkerFingerprint
     && activeRequestFingerprint === returnedWorkerFingerprint);
-  const requestCompletedParityValid = !!(activeRequestFingerprint && completedResultFingerprint
-    && activeRequestFingerprint === completedResultFingerprint);
+  const requestCompletedParityValid = !!(activeRequestFingerprint && resolvedCompletedContractFingerprint
+    && activeRequestFingerprint === resolvedCompletedContractFingerprint);
+  const workerCompletedParityValid = !!(returnedWorkerFingerprint && resolvedCompletedContractFingerprint
+    && returnedWorkerFingerprint === resolvedCompletedContractFingerprint);
+  // If persistedCompletedFingerprint exists, it must also match.
+  const persistedFingerprintParityValid = !persistedCompletedFingerprint
+    || (persistedCompletedFingerprint === resolvedCompletedContractFingerprint);
   const calibrationIdentityParityValid = !!(activeRequestFingerprint && calibrationFingerprint
     && activeRequestFingerprint.includes(calibrationFingerprint));
-  const candidateResultIdentityValid = !!(resolvedCandidateId && completedResultFingerprint);
+
+  // 2. Candidate-result identity linkage (C6.1B2 Gap 2).
+  //    Presence is insufficient — the candidate must be explicitly linked to
+  //    the completed result via the candidateResultIdentity receipt.
+  //    - candidateReceipt.candidateId must equal the selectedCandidateId
+  //    - candidateReceipt.completedResultFingerprint must equal completedContractFingerprint
+  const candidateIdParityValid = !!(candidateReceiptCandidateId && resolvedCandidateId
+    && candidateReceiptCandidateId === resolvedCandidateId);
+  const candidateFingerprintParityValid = !!(candidateReceiptCompletedFingerprint
+    && resolvedCompletedContractFingerprint
+    && candidateReceiptCompletedFingerprint === resolvedCompletedContractFingerprint);
+  const candidateResultIdentityValid = !!(candidateIdParityValid && candidateFingerprintParityValid);
 
   diagnostics.requestWorkerParityValid = requestWorkerParityValid;
   diagnostics.requestCompletedParityValid = requestCompletedParityValid;
+  diagnostics.workerCompletedParityValid = workerCompletedParityValid;
+  diagnostics.persistedFingerprintParityValid = persistedFingerprintParityValid;
   diagnostics.calibrationIdentityParityValid = calibrationIdentityParityValid;
+  diagnostics.candidateIdParityValid = candidateIdParityValid;
+  diagnostics.candidateFingerprintParityValid = candidateFingerprintParityValid;
   diagnostics.candidateResultIdentityValid = candidateResultIdentityValid;
   diagnostics.fingerprintParityValid = !!(requestWorkerParityValid && requestCompletedParityValid
+    && workerCompletedParityValid && persistedFingerprintParityValid
     && calibrationIdentityParityValid && candidateResultIdentityValid);
 
   // Fail closed: each missing identity is a hard rejection.
@@ -203,8 +270,8 @@ export function buildCanonicalCompletedBassMetricAuthority({
     diagnostics.rejectionReason = "missing-returned-worker-fingerprint";
     return { authority: null, diagnostics };
   }
-  if (!completedResultFingerprint) {
-    diagnostics.rejectionReason = "missing-completed-result-fingerprint";
+  if (!resolvedCompletedContractFingerprint) {
+    diagnostics.rejectionReason = "missing-completed-contract-fingerprint";
     return { authority: null, diagnostics };
   }
   if (!calibrationFingerprint) {
@@ -219,12 +286,29 @@ export function buildCanonicalCompletedBassMetricAuthority({
     diagnostics.rejectionReason = "request-completed-fingerprint-mismatch";
     return { authority: null, diagnostics };
   }
+  if (!workerCompletedParityValid) {
+    diagnostics.rejectionReason = "worker-completed-fingerprint-mismatch";
+    return { authority: null, diagnostics };
+  }
+  if (!persistedFingerprintParityValid) {
+    diagnostics.rejectionReason = "persisted-completed-fingerprint-mismatch";
+    return { authority: null, diagnostics };
+  }
   if (!calibrationIdentityParityValid) {
     diagnostics.rejectionReason = "calibration-identity-not-embedded-in-request";
     return { authority: null, diagnostics };
   }
-  if (!candidateResultIdentityValid) {
-    diagnostics.rejectionReason = "missing-candidate-or-result-identity";
+  // C6.1B2 Gap 2: candidate must be explicitly linked to the completed result.
+  if (!candidateReceiptCandidateId) {
+    diagnostics.rejectionReason = "missing-candidate-result-identity-receipt";
+    return { authority: null, diagnostics };
+  }
+  if (!candidateIdParityValid) {
+    diagnostics.rejectionReason = "candidate-id-parity-mismatch";
+    return { authority: null, diagnostics };
+  }
+  if (!candidateFingerprintParityValid) {
+    diagnostics.rejectionReason = "candidate-fingerprint-parity-mismatch";
     return { authority: null, diagnostics };
   }
 
@@ -297,9 +381,16 @@ export function buildCanonicalCompletedBassMetricAuthority({
     identity: {
       activeRequestFingerprint,
       returnedWorkerFingerprint,
-      completedResultFingerprint,
+      completedContractFingerprint: resolvedCompletedContractFingerprint,
+      // Backward-compat alias
+      completedResultFingerprint: resolvedCompletedContractFingerprint,
+      persistedCompletedFingerprint: persistedCompletedFingerprint ?? null,
       calibrationFingerprint,
       candidateId: resolvedCandidateId,
+      candidateResultIdentity: {
+        candidateId: candidateReceiptCandidateId,
+        completedResultFingerprint: candidateReceiptCompletedFingerprint,
+      },
       filterBankSignature,
       postEqCurveHash,
       targetCurveHash,
@@ -323,12 +414,22 @@ export function buildCanonicalCompletedBassMetricAuthority({
     fingerprintParity: {
       activeRequestFingerprint,
       returnedWorkerFingerprint,
-      completedResultFingerprint,
+      completedContractFingerprint: resolvedCompletedContractFingerprint,
+      completedResultFingerprint: resolvedCompletedContractFingerprint,
+      persistedCompletedFingerprint: persistedCompletedFingerprint ?? null,
       calibrationFingerprint,
       candidateId: resolvedCandidateId,
+      candidateResultIdentity: {
+        candidateId: candidateReceiptCandidateId,
+        completedResultFingerprint: candidateReceiptCompletedFingerprint,
+      },
       requestWorkerParityValid,
       requestCompletedParityValid,
+      workerCompletedParityValid,
+      persistedFingerprintParityValid,
       calibrationIdentityParityValid,
+      candidateIdParityValid,
+      candidateFingerprintParityValid,
       candidateResultIdentityValid,
       parityValid: diagnostics.fingerprintParityValid,
     },
@@ -350,5 +451,67 @@ export function buildCanonicalCompletedBassMetricAuthority({
   };
 
   diagnostics.canonicalMetricAuthorityValid = true;
+
+  // C6.1B2 Gap 3: Graph parity gates publication. When graphMetricParityValid
+  // is null (not yet checked), publication is NOT valid — the graph parity
+  // check must be completed before any metric is published as authoritative.
+  // When graphMetricParityValid is false, retain diagnostic data but do NOT
+  // publish metric results as authoritative.
+  if (graphMetricParityValid === null) {
+    diagnostics.canonicalMetricPublicationValid = false;
+    diagnostics.publicationRejectionReason = "graph-parity-not-yet-checked";
+  } else if (!graphMetricParityValid) {
+    diagnostics.canonicalMetricPublicationValid = false;
+    diagnostics.publicationRejectionReason = "graph-metric-parity-invalid";
+  } else {
+    diagnostics.canonicalMetricPublicationValid = true;
+    diagnostics.publicationRejectionReason = null;
+  }
+
   return { authority, diagnostics };
+}
+
+/**
+ * C6.1B2 Gap 3: Compute the final canonical metric publication receipt.
+ *
+ * This is the ONE final authority receipt that gates P14/P18/P19 metric
+ * publication, report authority, export authority, and any "VALID" authority
+ * label. It combines:
+ *   - canonicalMetricAuthorityValid (identity + candidate + curve + P14 checks)
+ *   - graphMetricParityValid (graph series identity matches metric identity)
+ *
+ * When graphMetricParityValid is false:
+ *   - Retain diagnostic data (do not clear it)
+ *   - Do NOT publish metric results as authoritative
+ *   - Report/export authority must be INVALID
+ *
+ * @param {object} params
+ * @param {boolean} params.canonicalMetricAuthorityValid - from buildCanonicalCompletedBassMetricAuthority
+ * @param {boolean} params.graphMetricParityValid - from graph parity check
+ * @param {string|null} params.authorityRejectionReason - rejection reason from authority builder
+ * @param {string|null} params.graphParityReason - rejection reason from graph parity check
+ * @returns {{ canonicalMetricPublicationValid: boolean, publicationRejectionReason: string|null }}
+ */
+export function computeCanonicalMetricPublication({
+  canonicalMetricAuthorityValid,
+  graphMetricParityValid,
+  authorityRejectionReason = null,
+  graphParityReason = null,
+}) {
+  if (!canonicalMetricAuthorityValid) {
+    return {
+      canonicalMetricPublicationValid: false,
+      publicationRejectionReason: authorityRejectionReason || "metric-authority-invalid",
+    };
+  }
+  if (!graphMetricParityValid) {
+    return {
+      canonicalMetricPublicationValid: false,
+      publicationRejectionReason: `graph-parity-failed:${graphParityReason || "unknown"}`,
+    };
+  }
+  return {
+    canonicalMetricPublicationValid: true,
+    publicationRejectionReason: null,
+  };
 }

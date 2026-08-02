@@ -378,10 +378,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     });
   }, [multiSeriesForGraph, designEqEnabled, showRawResponse, showOptimisedResponse]);
 
-  // C6.1A: Graph boundary hash check — compare the ACTUAL rendered-series
+  // C6.1A/C6.1B2: Graph boundary hash check — compare the ACTUAL rendered-series
   // source identity metadata (embedded by bassGraphDomainBuilder) with the
   // canonical metric authority hashes. This breaks the circular dependency
   // where graph hashes were computed from the same completed-result object.
+  //
+  // C6.1B2 Gap 2: Also verify that the graph candidate ID equals the completed
+  // candidate ID (metricCompletedCandidateId from the candidateResultIdentity receipt).
+  //
+  // C6.1B2 Gap 3: The result of this check (graphMetricParityValid) feeds into
+  // computeCanonicalMetricPublication to produce the final publication receipt
+  // that gates P14/P18/P19 metric publication, report authority, and export authority.
   const graphMetricParity = useMemo(() => {
     const metricDiag = optimisationResult?.canonicalMetricDiagnostics;
     if (!metricDiag || !metricDiag.canonicalMetricAuthorityValid) {
@@ -392,14 +399,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const graphPostEqCurveHash = postEqSeries?.sourcePostEqCurveHash || null;
     const graphTargetCurveHash = houseSeries?.sourceTargetCurveHash || null;
     const graphCandidateId = postEqSeries?.sourceCandidateId || houseSeries?.sourceCandidateId || null;
-    // C6.1B: sourceFingerprint = completed-result fingerprint (cacheKey).
+    // C6.1B2: sourceFingerprint = completed-contract fingerprint (from lifecycle.resultFingerprint).
     // sourceCalibrationFingerprint = embedded calibration identity (separate).
     const graphFingerprint = postEqSeries?.sourceFingerprint || houseSeries?.sourceFingerprint || null;
     const graphCalibrationFingerprint = postEqSeries?.sourceCalibrationFingerprint || houseSeries?.sourceCalibrationFingerprint || null;
     const postEqMatch = graphPostEqCurveHash && graphPostEqCurveHash === metricDiag.metricPostEqCurveHash;
     const targetMatch = graphTargetCurveHash && graphTargetCurveHash === metricDiag.metricTargetCurveHash;
-    const candidateMatch = graphCandidateId && graphCandidateId === metricDiag.metricCandidateId;
-    const fingerprintMatch = graphFingerprint && graphFingerprint === metricDiag.metricCompletedResultFingerprint;
+    // C6.1B2 Gap 2: graph candidate must equal the completed candidate ID
+    // (metricCompletedCandidateId from the candidateResultIdentity receipt),
+    // not just the metric candidate ID.
+    const candidateMatch = graphCandidateId && graphCandidateId === metricDiag.metricCompletedCandidateId;
+    const fingerprintMatch = graphFingerprint && graphFingerprint === metricDiag.metricCompletedContractFingerprint;
     const calibrationMatch = graphCalibrationFingerprint && graphCalibrationFingerprint === metricDiag.metricCalibrationFingerprint;
     const graphMetricParityValid = !!(postEqMatch && targetMatch && candidateMatch && fingerprintMatch && calibrationMatch);
     const reason = !postEqMatch ? "post-eq-hash-mismatch"
