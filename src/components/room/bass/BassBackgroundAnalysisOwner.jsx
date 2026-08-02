@@ -5,7 +5,7 @@ import { useAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
 import { createBassBackgroundAnalysisStore } from "./bassBackgroundAnalysisStore";
 import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
-import { buildBassResultCacheKey, buildCurveSignature } from "./bassResultAuthority";
+import { buildBassResultCacheKey } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
 import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
@@ -172,23 +172,32 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       resultSchemaVersion: matchingResult.resultSchemaVersion || null,
     } : null;
     const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources });
+    // C6.1A: Pass all four fingerprints for identity parity. The completed
+    // result P14 identity uses the ACTUAL field names from
+    // evaluateCanonicalBassAuthority (selectedP14TargetDb, p14TargetBasis,
+    // selectedP14Level, requiredExtensionHz). No circular graph hashes —
+    // the graph boundary hash check is done in BassResponse using the
+    // source identity metadata embedded in the rendered series.
+    const workerResultFingerprint = matchingResult?.fingerprint || null;
+    const candidateFingerprint = result?.selectedCandidate?.candidateId || null;
     const canonicalMetricAuthorityResult = buildCanonicalCompletedBassMetricAuthority({
       finalOptimisedBassResponse,
+      requestFingerprint: cacheKey,
       completedResultFingerprint: calibrationFingerprint,
+      workerResultFingerprint,
+      candidateFingerprint,
       completedResultP14Identity: {
         selectedP14TargetDb: Number.isFinite(result?.selectedP14TargetDb) ? result.selectedP14TargetDb : null,
-        p14TargetBasis: result?.p14TargetBasis ?? requested.p14TargetBasis ?? null,
-        requestedLevel: Number.isFinite(result?.selectedP14Level) ? result.selectedP14Level : requested.requestedLevel,
-        selectedP14RequiredExtensionHz: Number.isFinite(requested.selectedP14RequiredExtensionHz) ? requested.selectedP14RequiredExtensionHz : null,
+        p14TargetBasis: result?.p14TargetBasis ?? null,
+        selectedP14Level: Number.isFinite(result?.selectedP14Level) ? result.selectedP14Level : null,
+        requiredExtensionHz: Number.isFinite(result?.requiredExtensionHz) ? result.requiredExtensionHz : null,
       },
       requestedP14Identity: {
         selectedP14TargetDb: requested.selectedP14TargetDb,
         p14TargetBasis: requested.p14TargetBasis,
-        requestedLevel: requested.requestedLevel,
+        p14TargetLevel: requested.requestedLevel,
         selectedP14RequiredExtensionHz: requested.selectedP14RequiredExtensionHz,
       },
-      graphPostEqCurveHash: finalOptimisedBassResponse?.postEqCurveSignature || null,
-      graphTargetCurveHash: finalOptimisedBassResponse?.canonicalTargetCurve ? buildCurveSignature(finalOptimisedBassResponse.canonicalTargetCurve) : null,
     });
     return {
       ...result,

@@ -378,6 +378,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     });
   }, [multiSeriesForGraph, designEqEnabled, showRawResponse, showOptimisedResponse]);
 
+  // C6.1A: Graph boundary hash check — compare the ACTUAL rendered-series
+  // source identity metadata (embedded by bassGraphDomainBuilder) with the
+  // canonical metric authority hashes. This breaks the circular dependency
+  // where graph hashes were computed from the same completed-result object.
+  const graphMetricParity = useMemo(() => {
+    const metricDiag = optimisationResult?.canonicalMetricDiagnostics;
+    if (!metricDiag || !metricDiag.canonicalMetricAuthorityValid) {
+      return { graphMetricParityValid: false, reason: "metric-authority-invalid", graphPostEqCurveHash: null, graphTargetCurveHash: null, graphCandidateId: null, graphFingerprint: null };
+    }
+    const postEqSeries = multiSeriesForGraph.find((s) => s.kind === "post-eq" && s.id === "rsp-eq");
+    const houseSeries = multiSeriesForGraph.find((s) => s.kind === "house-curve");
+    const graphPostEqCurveHash = postEqSeries?.sourcePostEqCurveHash || null;
+    const graphTargetCurveHash = houseSeries?.sourceTargetCurveHash || null;
+    const graphCandidateId = postEqSeries?.sourceCandidateId || houseSeries?.sourceCandidateId || null;
+    const graphFingerprint = postEqSeries?.sourceFingerprint || houseSeries?.sourceFingerprint || null;
+    const postEqMatch = graphPostEqCurveHash && graphPostEqCurveHash === metricDiag.metricPostEqCurveHash;
+    const targetMatch = graphTargetCurveHash && graphTargetCurveHash === metricDiag.metricTargetCurveHash;
+    const candidateMatch = graphCandidateId && graphCandidateId === metricDiag.metricCandidateId;
+    const fingerprintMatch = graphFingerprint && graphFingerprint === metricDiag.metricCompletedFingerprint;
+    const graphMetricParityValid = !!(postEqMatch && targetMatch && candidateMatch && fingerprintMatch);
+    const reason = !postEqMatch ? "post-eq-hash-mismatch"
+      : !targetMatch ? "target-hash-mismatch"
+      : !candidateMatch ? "candidate-id-mismatch"
+      : !fingerprintMatch ? "fingerprint-mismatch"
+      : null;
+    return { graphMetricParityValid, reason, graphPostEqCurveHash, graphTargetCurveHash, graphCandidateId, graphFingerprint };
+  }, [multiSeriesForGraph, optimisationResult?.canonicalMetricDiagnostics]);
+
   const graphStatusText = detailedEqStatusText({
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
     detailedStatus, optimisationResult, error: detailedError,
@@ -760,26 +788,53 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         {includeDiagnostics && optimisationResult?.canonicalMetricDiagnostics && (() => {
           const d = optimisationResult.canonicalMetricDiagnostics;
           const valid = d.canonicalMetricAuthorityValid;
+          const g = graphMetricParity;
+          const gValid = g.graphMetricParityValid;
           return (
-            <div style={{ fontSize: 10, color: valid ? '#213428' : '#b45309', fontFamily: 'monospace', marginTop: 2, padding: '4px 10px', background: '#F8F8F7', border: `1px solid ${valid ? '#DCDBD6' : '#f59e0b'}`, borderRadius: 6 }}>
+            <div style={{ fontSize: 10, color: valid ? '#213428' : '#b45309', fontFamily: 'monospace', marginTop: 2, padding: '4px 10px', background: '#F8F8F7', border: `1px solid ${valid && gValid ? '#DCDBD6' : '#f59e0b'}`, borderRadius: 6 }}>
               <div style={{ fontWeight: 700 }}>
                 Canonical metric authority: {valid ? 'VALID' : 'INVALID'} {valid ? '✓' : '✗'}
                 {!valid && d.rejectionReason ? <span style={{ fontWeight: 400, marginLeft: 8, color: '#b45309' }}>({d.rejectionReason})</span> : null}
               </div>
               <div style={{ marginTop: 2, fontWeight: 400 }}>
-                fingerprint: {d.metricFingerprint ? String(d.metricFingerprint).slice(0, 16) : 'null'} ·
-                candidate: {d.metricCandidateId ? String(d.metricCandidateId).slice(0, 20) : 'null'} ·
-                points: {d.metricCurvePointCount}
+                fingerprintParity: {d.fingerprintParityValid ? '✓' : '✗'} ·
+                p14IdentityParity: {d.p14IdentityParityValid ? '✓' : '✗'} ·
+                freqGridParity: {d.frequencyGridParityValid ? '✓' : '✗'} ({d.metricCurvePointCount}/{d.targetCurvePointCount} pts)
                 {d.legacyMetricCurveDetected ? <span style={{ color: '#dc2626', fontWeight: 700 }}> · LEGACY 186</span> : null}
               </div>
               <div style={{ marginTop: 1, fontWeight: 400 }}>
-                post-EQ hash: {d.metricPostEqCurveHash || 'null'}
-                {d.graphPostEqCurveHash ? <span style={{ color: d.graphPostEqCurveHash === d.metricPostEqCurveHash ? '#213428' : '#dc2626' }}>
-                  {' '}· graph: {d.graphPostEqCurveHash === d.metricPostEqCurveHash ? 'match ✓' : 'MISMATCH ✗'}
+                fingerprints: req={d.metricRequestFingerprint ? String(d.metricRequestFingerprint).slice(0, 12) : 'null'} ·
+                comp={d.metricCompletedFingerprint ? String(d.metricCompletedFingerprint).slice(0, 12) : 'null'} ·
+                worker={d.metricWorkerFingerprint ? String(d.metricWorkerFingerprint).slice(0, 12) : 'null'} ·
+                cand={d.metricCandidateFingerprint ? String(d.metricCandidateFingerprint).slice(0, 12) : 'null'}
+              </div>
+              <div style={{ marginTop: 1, fontWeight: 400 }}>
+                P14: requestedTarget={optimisationResult?.selectedP14TargetDb ?? 'null'} dBC ·
+                achievedCapability={optimisationResult?.finalOptimisedBassResponse?.achievedP14Db != null ? optimisationResult.finalOptimisedBassResponse.achievedP14Db.toFixed(2) : 'null'} dBC ·
+                source={d.achievedCapabilitySource ? 'assessP14Capability' : 'null'}
+              </div>
+              <div style={{ marginTop: 1, fontWeight: 400 }}>
+                metric post-EQ hash: {d.metricPostEqCurveHash || 'null'} ·
+                metric target hash: {d.metricTargetCurveHash || 'null'}
+              </div>
+              <div style={{ marginTop: 1, fontWeight: 400, color: gValid ? '#213428' : '#dc2626' }}>
+                graph parity: {gValid ? 'VALID ✓' : 'INVALID ✗'} {!gValid && g.reason ? `(${g.reason})` : ''}
+              </div>
+              <div style={{ marginTop: 1, fontWeight: 400 }}>
+                graph post-EQ hash: {g.graphPostEqCurveHash || 'null'}
+                {g.graphPostEqCurveHash && d.metricPostEqCurveHash ? <span style={{ color: g.graphPostEqCurveHash === d.metricPostEqCurveHash ? '#213428' : '#dc2626' }}>
+                  {' '}· {g.graphPostEqCurveHash === d.metricPostEqCurveHash ? 'match ✓' : 'MISMATCH ✗'}
                 </span> : null}
               </div>
               <div style={{ marginTop: 1, fontWeight: 400 }}>
-                target hash: {d.metricTargetCurveHash || 'null'}
+                graph target hash: {g.graphTargetCurveHash || 'null'}
+                {g.graphTargetCurveHash && d.metricTargetCurveHash ? <span style={{ color: g.graphTargetCurveHash === d.metricTargetCurveHash ? '#213428' : '#dc2626' }}>
+                  {' '}· {g.graphTargetCurveHash === d.metricTargetCurveHash ? 'match ✓' : 'MISMATCH ✗'}
+                </span> : null}
+              </div>
+              <div style={{ marginTop: 1, fontWeight: 400 }}>
+                graph candidate: {g.graphCandidateId ? String(g.graphCandidateId).slice(0, 20) : 'null'} ·
+                graph fingerprint: {g.graphFingerprint ? String(g.graphFingerprint).slice(0, 12) : 'null'}
               </div>
             </div>
           );
