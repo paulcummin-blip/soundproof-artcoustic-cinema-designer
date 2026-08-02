@@ -30,10 +30,6 @@ import { buildVisibleRoomModeMarkers } from "@/components/room/bass/roomModePres
 import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedNullPresentation";
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
-import { computeCanonicalMetricPublication } from "@/components/room/bass/canonicalCompletedBassMetricAuthority";
-// C6.2A: computeCanonicalMetricPublication is still imported for backward-compat
-// reference, but the authoritative receipt now lives in the completed contract
-// (bassAnalysisContract.metricPublication), computed before publication.
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 import P14PresentationHeader from "@/components/room/bass/P14PresentationHeader";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
