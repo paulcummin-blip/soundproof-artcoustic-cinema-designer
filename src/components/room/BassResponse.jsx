@@ -30,6 +30,7 @@ import { buildVisibleRoomModeMarkers } from "@/components/room/bass/roomModePres
 import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedNullPresentation";
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
+import { computeCanonicalMetricPublication } from "@/components/room/bass/canonicalCompletedBassMetricAuthority";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 import P14PresentationHeader from "@/components/room/bass/P14PresentationHeader";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
@@ -421,6 +422,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return { graphMetricParityValid, reason, graphPostEqCurveHash, graphTargetCurveHash, graphCandidateId, graphFingerprint, graphCalibrationFingerprint };
   }, [multiSeriesForGraph, optimisationResult?.canonicalMetricDiagnostics]);
 
+  // C6.1B2 Gap 3: Final publication receipt — gates all authority labels,
+  // P14/P18/P19 metric publication, report authority, and export authority.
+  // Combines canonicalMetricAuthorityValid (identity + candidate + curve + P14)
+  // with graphMetricParityValid (graph series identity matches metric identity).
+  // When either is false, publication is INVALID and publicationRejectionReason
+  // explains why. No silent fallback to canonicalMetricAuthorityValid alone.
+  const canonicalMetricPublication = useMemo(() => {
+    const diagnostics = optimisationResult?.canonicalMetricDiagnostics;
+
+    return computeCanonicalMetricPublication({
+      canonicalMetricAuthorityValid:
+        diagnostics?.canonicalMetricAuthorityValid === true,
+      graphMetricParityValid:
+        graphMetricParity.graphMetricParityValid === true,
+      authorityRejectionReason:
+        diagnostics?.rejectionReason || null,
+      graphParityReason:
+        graphMetricParity.reason || null,
+    });
+  }, [
+    optimisationResult?.canonicalMetricDiagnostics,
+    graphMetricParity,
+  ]);
+
   const graphStatusText = detailedEqStatusText({
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
     detailedStatus, optimisationResult, error: detailedError,
@@ -802,68 +827,79 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         })()}
         {includeDiagnostics && optimisationResult?.canonicalMetricDiagnostics && (() => {
           const d = optimisationResult.canonicalMetricDiagnostics;
-          const valid = d.canonicalMetricAuthorityValid;
           const g = graphMetricParity;
-          const gValid = g.graphMetricParityValid;
+          const pub = canonicalMetricPublication;
+          const pubValid = pub.canonicalMetricPublicationValid === true;
+          const authorityValid = d.canonicalMetricAuthorityValid === true;
+          const gValid = g.graphMetricParityValid === true;
+          const fp = (v) => v ? String(v).slice(0, 12) : 'null';
+          const id = (v) => v ? String(v).slice(0, 20) : 'null';
+          const bool = (v) => v ? '✓' : '✗';
+          const SectionLabel = ({ children }) => (
+            <div style={{ fontWeight: 700, marginTop: 4, marginBottom: 1, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: 9 }}>{children}</div>
+          );
+          const Row = ({ label, value, ok }) => (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
+              <span style={{ color: '#3E4349' }}>{label}</span>
+              <span style={{ color: ok === undefined ? '#1B1A1A' : (ok ? '#213428' : '#dc2626'), fontWeight: ok === undefined ? 400 : 600 }}>
+                {value} {ok === undefined ? '' : (ok ? '✓' : '✗')}
+              </span>
+            </div>
+          );
           return (
-            <div style={{ fontSize: 10, color: valid ? '#213428' : '#b45309', fontFamily: 'monospace', marginTop: 2, padding: '4px 10px', background: '#F8F8F7', border: `1px solid ${valid && gValid ? '#DCDBD6' : '#f59e0b'}`, borderRadius: 6 }}>
-              <div style={{ fontWeight: 700 }}>
-                Canonical metric authority: {valid ? 'VALID' : 'INVALID'} {valid ? '✓' : '✗'}
-                {!valid && d.rejectionReason ? <span style={{ fontWeight: 400, marginLeft: 8, color: '#b45309' }}>({d.rejectionReason})</span> : null}
+            <div style={{ fontSize: 10, color: pubValid ? '#213428' : '#b45309', fontFamily: 'monospace', marginTop: 2, padding: '6px 10px', background: '#F8F8F7', border: `1px solid ${pubValid ? '#DCDBD6' : '#f59e0b'}`, borderRadius: 6 }}>
+              <div style={{ fontWeight: 700, fontSize: 11 }}>
+                Canonical metric publication: {pubValid ? 'VALID' : 'INVALID'} {pubValid ? '✓' : '✗'}
+                {!pubValid && pub.publicationRejectionReason ? <span style={{ fontWeight: 400, marginLeft: 8, color: '#b45309' }}>({pub.publicationRejectionReason})</span> : null}
               </div>
-              <div style={{ marginTop: 2, fontWeight: 400 }}>
-                fingerprintParity: {d.fingerprintParityValid ? '✓' : '✗'} ·
-                req↔worker: {d.requestWorkerParityValid ? '✓' : '✗'} ·
-                req↔completed: {d.requestCompletedParityValid ? '✓' : '✗'} ·
-                cal-in-req: {d.calibrationIdentityParityValid ? '✓' : '✗'} ·
-                cand/result: {d.candidateResultIdentityValid ? '✓' : '✗'} ·
-                p14Identity: {d.p14IdentityParityValid ? '✓' : '✗'} ·
-                freqGrid: {d.frequencyGridParityValid ? '✓' : '✗'} ({d.metricCurvePointCount}/{d.targetCurvePointCount} pts)
+
+              <SectionLabel>Completed Identity</SectionLabel>
+              <Row label="metricRequestFingerprint" value={fp(d.metricRequestFingerprint)} />
+              <Row label="metricReturnedWorkerFingerprint" value={fp(d.metricReturnedWorkerFingerprint)} />
+              <Row label="metricCompletedContractFingerprint" value={fp(d.metricCompletedContractFingerprint)} />
+              <Row label="metricPersistedCompletedFingerprint" value={fp(d.metricPersistedCompletedFingerprint)} />
+              <Row label="metricCalibrationFingerprint" value={fp(d.metricCalibrationFingerprint)} />
+
+              <SectionLabel>Candidate Linkage</SectionLabel>
+              <Row label="metricCandidateId" value={id(d.metricCandidateId)} />
+              <Row label="metricCompletedCandidateId" value={id(d.metricCompletedCandidateId)} />
+              <Row label="metricCompletedCandidateFingerprint" value={fp(d.metricCompletedCandidateFingerprint)} />
+              <Row label="candidateIdParityValid" value={bool(d.candidateIdParityValid)} ok={d.candidateIdParityValid} />
+              <Row label="candidateFingerprintParityValid" value={bool(d.candidateFingerprintParityValid)} ok={d.candidateFingerprintParityValid} />
+              <Row label="candidateResultIdentityValid" value={bool(d.candidateResultIdentityValid)} ok={d.candidateResultIdentityValid} />
+
+              <SectionLabel>Fingerprint Parity</SectionLabel>
+              <Row label="requestWorkerParityValid" value={bool(d.requestWorkerParityValid)} ok={d.requestWorkerParityValid} />
+              <Row label="requestCompletedParityValid" value={bool(d.requestCompletedParityValid)} ok={d.requestCompletedParityValid} />
+              <Row label="workerCompletedParityValid" value={bool(d.workerCompletedParityValid)} ok={d.workerCompletedParityValid} />
+              <Row label="persistedFingerprintParityValid" value={bool(d.persistedFingerprintParityValid)} ok={d.persistedFingerprintParityValid} />
+              <Row label="calibrationIdentityParityValid" value={bool(d.calibrationIdentityParityValid)} ok={d.calibrationIdentityParityValid} />
+              <Row label="fingerprintParityValid" value={bool(d.fingerprintParityValid)} ok={d.fingerprintParityValid} />
+
+              <SectionLabel>Graph Parity</SectionLabel>
+              <Row label="graphPostEqCurveHash" value={g.graphPostEqCurveHash || 'null'} />
+              <Row label="graphTargetCurveHash" value={g.graphTargetCurveHash || 'null'} />
+              <Row label="graphCandidateId" value={id(g.graphCandidateId)} />
+              <Row label="graphFingerprint" value={fp(g.graphFingerprint)} />
+              <Row label="graphCalibrationFingerprint" value={fp(g.graphCalibrationFingerprint)} />
+              <Row label="graphMetricParityValid" value={bool(gValid)} ok={gValid} />
+              <Row label="graph parity reason" value={g.reason || '—'} />
+
+              <SectionLabel>Publication</SectionLabel>
+              <Row label="canonicalMetricAuthorityValid" value={bool(authorityValid)} ok={authorityValid} />
+              <Row label="graphMetricParityValid" value={bool(gValid)} ok={gValid} />
+              <Row label="canonicalMetricPublicationValid" value={bool(pubValid)} ok={pubValid} />
+              <Row label="publicationRejectionReason" value={pub.publicationRejectionReason || '—'} />
+
+              <div style={{ marginTop: 4, paddingTop: 3, borderTop: '1px solid #DCDBD6', fontWeight: 400, color: '#625143' }}>
+                p14Identity: {bool(d.p14IdentityParityValid)} ·
+                freqGrid: {bool(d.frequencyGridParityValid)} ({d.metricCurvePointCount}/{d.targetCurvePointCount} pts)
                 {d.legacyMetricCurveDetected ? <span style={{ color: '#dc2626', fontWeight: 700 }}> · LEGACY 186</span> : null}
               </div>
-              <div style={{ marginTop: 1, fontWeight: 400 }}>
-                activeReq={d.metricRequestFingerprint ? String(d.metricRequestFingerprint).slice(0, 12) : 'null'} ·
-                worker={d.metricReturnedWorkerFingerprint ? String(d.metricReturnedWorkerFingerprint).slice(0, 12) : 'null'} ·
-                completed={d.metricCompletedResultFingerprint ? String(d.metricCompletedResultFingerprint).slice(0, 12) : 'null'} ·
-                cal={d.metricCalibrationFingerprint ? String(d.metricCalibrationFingerprint).slice(0, 12) : 'null'} ·
-                candId={d.metricCandidateId ? String(d.metricCandidateId).slice(0, 20) : 'null'}
-              </div>
-              <div style={{ marginTop: 1, fontWeight: 400 }}>
+              <div style={{ marginTop: 1, fontWeight: 400, color: '#625143' }}>
                 P14: requestedTarget={optimisationResult?.selectedP14TargetDb ?? 'null'} dBC ·
                 achievedCapability={optimisationResult?.finalOptimisedBassResponse?.achievedP14Db != null ? optimisationResult.finalOptimisedBassResponse.achievedP14Db.toFixed(2) : 'null'} dBC ·
-                source={d.achievedCapabilitySource ? 'assessP14Capability' : 'null'}
-              </div>
-              <div style={{ marginTop: 1, fontWeight: 400 }}>
-                metric post-EQ hash: {d.metricPostEqCurveHash || 'null'} ·
-                metric target hash: {d.metricTargetCurveHash || 'null'}
-              </div>
-              <div style={{ marginTop: 1, fontWeight: 400, color: gValid ? '#213428' : '#dc2626' }}>
-                graph parity: {gValid ? 'VALID ✓' : 'INVALID ✗'} {!gValid && g.reason ? `(${g.reason})` : ''}
-              </div>
-              <div style={{ marginTop: 1, fontWeight: 400 }}>
-                graph post-EQ hash: {g.graphPostEqCurveHash || 'null'}
-                {g.graphPostEqCurveHash && d.metricPostEqCurveHash ? <span style={{ color: g.graphPostEqCurveHash === d.metricPostEqCurveHash ? '#213428' : '#dc2626' }}>
-                  {' '}· {g.graphPostEqCurveHash === d.metricPostEqCurveHash ? 'match ✓' : 'MISMATCH ✗'}
-                </span> : null}
-              </div>
-              <div style={{ marginTop: 1, fontWeight: 400 }}>
-                graph target hash: {g.graphTargetCurveHash || 'null'}
-                {g.graphTargetCurveHash && d.metricTargetCurveHash ? <span style={{ color: g.graphTargetCurveHash === d.metricTargetCurveHash ? '#213428' : '#dc2626' }}>
-                  {' '}· {g.graphTargetCurveHash === d.metricTargetCurveHash ? 'match ✓' : 'MISMATCH ✗'}
-                </span> : null}
-              </div>
-              <div style={{ marginTop: 1, fontWeight: 400 }}>
-                graph candidate: {g.graphCandidateId ? String(g.graphCandidateId).slice(0, 20) : 'null'} ·
-                graph resultFP: {g.graphFingerprint ? String(g.graphFingerprint).slice(0, 12) : 'null'}
-                {g.graphFingerprint && d.metricCompletedResultFingerprint ? <span style={{ color: g.graphFingerprint === d.metricCompletedResultFingerprint ? '#213428' : '#dc2626' }}>
-                  {' '}· {g.graphFingerprint === d.metricCompletedResultFingerprint ? 'match ✓' : 'MISMATCH ✗'}
-                </span> : null}
-              </div>
-              <div style={{ marginTop: 1, fontWeight: 400 }}>
-                graph calFP: {g.graphCalibrationFingerprint ? String(g.graphCalibrationFingerprint).slice(0, 12) : 'null'}
-                {g.graphCalibrationFingerprint && d.metricCalibrationFingerprint ? <span style={{ color: g.graphCalibrationFingerprint === d.metricCalibrationFingerprint ? '#213428' : '#dc2626' }}>
-                  {' '}· {g.graphCalibrationFingerprint === d.metricCalibrationFingerprint ? 'match ✓' : 'MISMATCH ✗'}
-                </span> : null}
+                source={d.achievedCapabilitySource || 'null'}
               </div>
             </div>
           );
