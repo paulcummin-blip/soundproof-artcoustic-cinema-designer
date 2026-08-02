@@ -6,10 +6,22 @@ import {
   buildPersistedBassAuthority,
   compactCompletedBassContract,
   isCompletedBassContract,
+  isStructurallyCompleteBassContract,
+  isAuthoritativeBassContract,
+  isExportableBassContract,
   resolvePersistedBassAuthority,
 } from "./completedBassResultPersistence";
 
-export { buildPersistedBassAuthority, compactCompletedBassContract, isCompletedBassContract, resolvePersistedBassAuthority, bassContractMatchesRequestedP14 };
+export {
+  buildPersistedBassAuthority,
+  compactCompletedBassContract,
+  isCompletedBassContract,
+  isStructurallyCompleteBassContract,
+  isAuthoritativeBassContract,
+  isExportableBassContract,
+  resolvePersistedBassAuthority,
+  bassContractMatchesRequestedP14,
+};
 
 const memoryByProject = new Map();
 const listeners = new Set();
@@ -24,7 +36,10 @@ const emptyAuthority = (projectId) => ({
   contract: null,
   staleContract: null,
   errorMessage: null,
+  structurallyComplete: false,
+  authoritative: false,
   exportable: false,
+  publicationRejectionReason: null,
 });
 
 function notify() {
@@ -38,8 +53,13 @@ function setMemory(projectId, authority) {
 }
 
 export function publishCompletedBassContract(projectId, contract) {
-  if (!isCompletedBassContract(contract)) return false;
+  if (!isStructurallyCompleteBassContract(contract)) return false;
   const compact = compactCompletedBassContract(contract);
+  const authoritative = isAuthoritativeBassContract(compact);
+  const exportable = authoritative;
+  const publicationRejectionReason = !authoritative
+    ? (compact?.metricPublication?.publicationRejectionReason || "metric-publication-invalid")
+    : null;
   setMemory(projectId, {
     projectId: projectKey(projectId),
     status: "complete",
@@ -47,7 +67,10 @@ export function publishCompletedBassContract(projectId, contract) {
     contract: compact,
     staleContract: memoryByProject.get(projectKey(projectId))?.contract || null,
     errorMessage: null,
-    exportable: true,
+    structurallyComplete: true,
+    authoritative,
+    exportable,
+    publicationRejectionReason,
   });
   return true;
 }
@@ -61,7 +84,10 @@ export function markBassAuthorityUpdating(projectId, currentFingerprint) {
     contract: null,
     staleContract: previous.contract || previous.staleContract || null,
     errorMessage: null,
+    structurallyComplete: false,
+    authoritative: false,
     exportable: false,
+    publicationRejectionReason: null,
   });
 }
 
@@ -74,7 +100,10 @@ export function markBassAuthorityFailed(projectId, currentFingerprint, errorMess
     contract: null,
     staleContract: previous.contract || previous.staleContract || null,
     errorMessage: typeof errorMessage === "string" && errorMessage.trim() ? errorMessage : "Bass analysis failed",
-    exportable: true,
+    structurallyComplete: false,
+    authoritative: false,
+    exportable: false,
+    publicationRejectionReason: null,
   });
 }
 
@@ -87,7 +116,10 @@ export function markBassAuthorityBlocked(projectId) {
     contract: null,
     staleContract: null,
     errorMessage: null,
+    structurallyComplete: false,
+    authoritative: false,
     exportable: false,
+    publicationRejectionReason: null,
   });
 }
 

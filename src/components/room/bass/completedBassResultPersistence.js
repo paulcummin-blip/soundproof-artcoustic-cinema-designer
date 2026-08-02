@@ -2,14 +2,41 @@ import { INSTANCE_AUTHORITY_VERSION } from "@/components/utils/subwooferInstance
 
 export const COMPLETED_BASS_CACHE_VERSION = 2;
 
-export function isCompletedBassContract(contract) {
+export function isStructurallyCompleteBassContract(contract) {
   const status = contract?.job?.status;
   return ["ready", "complete"].includes(status)
     && !!contract?.selectedCandidate
     && !!contract?.selectedCandidateId
     && !!contract?.job?.resultFingerprint
+    && !!contract?.job?.currentJobFingerprint
     && contract.job.resultFingerprint === contract.job.currentJobFingerprint;
 }
+
+/**
+ * Authoritative: structurally complete AND metric publication is valid.
+ *
+ * A contract that is structurally complete but has an invalid or missing
+ * metricPublication receipt is NOT authoritative — its metrics must not be
+ * published downstream.
+ */
+export function isAuthoritativeBassContract(contract) {
+  if (!isStructurallyCompleteBassContract(contract)) return false;
+  const pub = contract?.metricPublication;
+  return !!pub && pub.canonicalMetricPublicationValid === true;
+}
+
+/**
+ * Exportable: authoritative (currently equivalent, but kept as a distinct
+ * predicate so export gating can diverge from authority in future without
+ * touching call sites).
+ */
+export function isExportableBassContract(contract) {
+  return isAuthoritativeBassContract(contract);
+}
+
+// Backward-compat alias — explicit meaning: structural completeness only.
+// Existing callers that only need the structural check are unaffected.
+export const isCompletedBassContract = isStructurallyCompleteBassContract;
 
 export function compactCompletedBassContract(contract) {
   if (!isCompletedBassContract(contract)) return null;
@@ -112,14 +139,23 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
 
   const current = state.status === "complete" && currentFingerprint ? validSnapshots[currentFingerprint] || null : null;
   const staleContract = Object.values(validSnapshots)
-    .filter((snapshot) => snapshot !== current && isCompletedBassContract(snapshot))
+    .filter((snapshot) => snapshot !== current && isStructurallyCompleteBassContract(snapshot))
     .sort((left, right) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))[0] || null;
+  const structurallyComplete = isStructurallyCompleteBassContract(current);
+  const authoritative = isAuthoritativeBassContract(current);
+  const exportable = isExportableBassContract(current);
+  const publicationRejectionReason = structurallyComplete && !authoritative
+    ? (current?.metricPublication?.publicationRejectionReason || "metric-publication-invalid")
+    : null;
   return {
     projectId: String(projectId || "free"),
     status: current ? "complete" : state.status === "uncalculated" ? "uncalculated" : "updating",
     currentFingerprint,
-    contract: isCompletedBassContract(current) ? current : null,
+    contract: structurallyComplete ? current : null,
     staleContract,
-    exportable: isCompletedBassContract(current),
+    structurallyComplete,
+    authoritative,
+    exportable,
+    publicationRejectionReason,
   };
 }
