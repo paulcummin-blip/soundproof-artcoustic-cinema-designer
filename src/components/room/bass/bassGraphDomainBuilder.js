@@ -1,6 +1,5 @@
 import { applyBassSmoothing } from "./bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
-import { buildCurveSignature } from "./bassResultAuthority";
 import { buildGraphSourceIdentity } from "./graphSourceIdentity";
 
 export const NORMALIZED_ROOM_REFERENCE_DB = 94;
@@ -54,6 +53,8 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
   const label = p14TotalDb != null
     ? `House-curve target · ${p14TotalDb} dBC total`
     : `Absolute house-curve target — correction band ${Math.round(startHz)}–${Math.round(endHz)} Hz`;
+  // C6.2A2: consume all source identity from the shared helper (once).
+  const graphIdentity = buildGraphSourceIdentity(optimisationResult);
   return {
     id: "house-curve",
     kind: "house-curve",
@@ -63,17 +64,10 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
     strokeWidth: 2.25,
     strokeDasharray: "10 5",
     data: exactTarget,
-    // C6.1B2: Source identity metadata for graph boundary hash check.
-    // sourceFingerprint = the COMPLETED-CONTRACT fingerprint (from lifecycle.resultFingerprint),
-    //   NOT the current request cacheKey. This ensures the graph carries the
-    //   same identity as the completed contract, so graph parity can verify
-    //   that the rendered series matches the metric authority.
-    // sourceCalibrationFingerprint = the embedded calibration identity (separate).
-    sourceTargetCurveHash: buildCurveSignature(exactTarget),
-    sourceCandidateId: candidate.candidateId || null,
-    // C6.2A1: completed-contract fingerprint ONLY — no cacheKey fallback.
-    sourceFingerprint: buildGraphSourceIdentity(optimisationResult)?.fingerprint || null,
-    sourceCalibrationFingerprint: buildGraphSourceIdentity(optimisationResult)?.calibrationFingerprint || null,
+    sourceTargetCurveHash: graphIdentity?.targetCurveHash || null,
+    sourceCandidateId: graphIdentity?.candidateId || null,
+    sourceFingerprint: graphIdentity?.fingerprint || null,
+    sourceCalibrationFingerprint: graphIdentity?.calibrationFingerprint || null,
   };
 }
 
@@ -98,6 +92,8 @@ export function buildBassGraphSeries({
   overlayProductionSeries, showRewOverlay, rewOverlaySeries, operatingLevelOffsetDb = 0,
 }) {
   const finalResponse = optimisationResult?.finalOptimisedBassResponse;
+  // C6.2A2: consume all source identity from the shared helper (once per scope).
+  const graphIdentity = buildGraphSourceIdentity(optimisationResult);
   let series;
   if (!designEqEnabled) {
     series = normalizedSeries
@@ -127,12 +123,11 @@ export function buildBassGraphSeries({
           if (!postEq) return null;
           return { id: `${seat.id}-eq`, kind: "post-eq", label: `${seat.id} after EQ`, tooltipLabel: `${seat.id} after EQ`,
             candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
-            sourcePostEqCurveHash: finalResponse.postEqCurveSignature || null,
-            sourceCandidateId: finalResponse.selectedCandidateId || null,
-            sourceFilterBankSignature: finalResponse.filterBankSignature || null,
-            // C6.2A1: completed-contract fingerprint ONLY — no cacheKey fallback.
-            sourceFingerprint: buildGraphSourceIdentity(optimisationResult)?.fingerprint || null,
-            sourceCalibrationFingerprint: buildGraphSourceIdentity(optimisationResult)?.calibrationFingerprint || null,
+            sourcePostEqCurveHash: graphIdentity?.postEqCurveHash || null,
+            sourceCandidateId: graphIdentity?.candidateId || null,
+            sourceFilterBankSignature: graphIdentity?.filterBankSignature || null,
+            sourceFingerprint: graphIdentity?.fingerprint || null,
+            sourceCalibrationFingerprint: graphIdentity?.calibrationFingerprint || null,
             color: seat.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
             strokeWidth: 2.25, data: applyBassSmoothing(postEq.responseData, smoothingMode) };
         }).filter(Boolean));
@@ -147,12 +142,11 @@ export function buildBassGraphSeries({
             : isSalvagedCandidate ? "RSP after EQ — partial EQ bank applied"
             : "RSP after EQ",
           candidateId: finalResponse.selectedCandidateId, filterBankSignature: finalResponse.filterBankSignature,
-          sourcePostEqCurveHash: finalResponse.postEqCurveSignature || null,
-          sourceCandidateId: finalResponse.selectedCandidateId || null,
-          sourceFilterBankSignature: finalResponse.filterBankSignature || null,
-          // C6.2A1: completed-contract fingerprint ONLY — no cacheKey fallback.
-          sourceFingerprint: buildGraphSourceIdentity(optimisationResult)?.fingerprint || null,
-          sourceCalibrationFingerprint: buildGraphSourceIdentity(optimisationResult)?.calibrationFingerprint || null,
+          sourcePostEqCurveHash: graphIdentity?.postEqCurveHash || null,
+          sourceCandidateId: graphIdentity?.candidateId || null,
+          sourceFilterBankSignature: graphIdentity?.filterBankSignature || null,
+          sourceFingerprint: graphIdentity?.fingerprint || null,
+          sourceCalibrationFingerprint: graphIdentity?.calibrationFingerprint || null,
           color: "#16A34A", strokeWidth: 2.5, data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode) });
         if (showRealSeatOverlays) series.push(...finalResponse.postEqPerSeatCurves
           .filter((seat) => multiSeries.some((item) => item.id === seat.seatId))
