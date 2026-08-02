@@ -16,6 +16,7 @@ import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
 import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
 import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
 import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompletedBassMetricAuthority";
+import { buildMetricPublicationReceipt } from "./metricPublicationReceipt";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -246,12 +247,18 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     candidateAcceptedTokensRef.current.add(token);
     recordDiagStage(token, "candidate-selection-accepted", { workerRequestId: lifecycle?.result?.workerRequestId || null, selectedCandidateId: optimisationResult.selectedCandidateId || null });
   }, [optimisationResult, lifecycle?.result?.diagnosticToken, lifecycle?.result?.workerRequestId]);
+  // C6.2A: Compute the metric publication receipt from the optimisation result
+  // before publishCompletedBassContract(). This receipt is attached to the
+  // completed contract and is the sole authoritative publication receipt.
+  // BassResponse reads it from the contract rather than owning the only copy.
+  const metricPublication = useMemo(() => buildMetricPublicationReceipt(optimisationResult), [optimisationResult]);
   const contract = useBassAnalysisContract({
     ...fingerprintInputs, subsForSimulation: sources, designEqSystemLimits, optimisationResult,
     detailedStatus, detailedProgress: lifecycle.progress, detailedElapsedMs: lifecycle.elapsedMs,
     rspRawCurve, perSeatRawCurves, optimiserPriorityMode: selectedPriorityMode, ...requested,
     fingerprintsOverride: fingerprints, backgroundLifecycle: lifecycle,
     collectDiagnostics: includeDiagnostics,
+    metricPublication,
   });
   const publishedContractTokensRef = useRef(new Set());
   useEffect(() => {

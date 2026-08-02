@@ -31,6 +31,9 @@ import { buildProtectedNullAnnotations } from "@/components/room/bass/protectedN
 import ProtectedNullNotice from "@/components/room/bass/ProtectedNullNotice";
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import { computeCanonicalMetricPublication } from "@/components/room/bass/canonicalCompletedBassMetricAuthority";
+// C6.2A: computeCanonicalMetricPublication is still imported for backward-compat
+// reference, but the authoritative receipt now lives in the completed contract
+// (bassAnalysisContract.metricPublication), computed before publication.
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 import P14PresentationHeader from "@/components/room/bass/P14PresentationHeader";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
@@ -422,29 +425,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return { graphMetricParityValid, reason, graphPostEqCurveHash, graphTargetCurveHash, graphCandidateId, graphFingerprint, graphCalibrationFingerprint };
   }, [multiSeriesForGraph, optimisationResult?.canonicalMetricDiagnostics]);
 
-  // C6.1B2 Gap 3: Final publication receipt — gates all authority labels,
-  // P14/P18/P19 metric publication, report authority, and export authority.
-  // Combines canonicalMetricAuthorityValid (identity + candidate + curve + P14)
-  // with graphMetricParityValid (graph series identity matches metric identity).
-  // When either is false, publication is INVALID and publicationRejectionReason
-  // explains why. No silent fallback to canonicalMetricAuthorityValid alone.
-  const canonicalMetricPublication = useMemo(() => {
-    const diagnostics = optimisationResult?.canonicalMetricDiagnostics;
-
-    return computeCanonicalMetricPublication({
-      canonicalMetricAuthorityValid:
-        diagnostics?.canonicalMetricAuthorityValid === true,
-      graphMetricParityValid:
-        graphMetricParity.graphMetricParityValid === true,
-      authorityRejectionReason:
-        diagnostics?.rejectionReason || null,
-      graphParityReason:
-        graphMetricParity.reason || null,
-    });
-  }, [
-    optimisationResult?.canonicalMetricDiagnostics,
-    graphMetricParity,
-  ]);
+  // C6.2A: The authoritative metric publication receipt now lives in the
+  // completed contract (bassAnalysisContract.metricPublication), computed
+  // before publishCompletedBassContract() in BassBackgroundAnalysisOwner.
+  // BassResponse reads it from the contract rather than owning the only copy.
+  // The runtime graph parity check below (graphMetricParity) still verifies
+  // that the RENDERED series carry the same hashes as the contract receipt.
+  const canonicalMetricPublication = bassAnalysisContract?.metricPublication || null;
 
   const graphStatusText = detailedEqStatusText({
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
@@ -829,7 +816,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           const d = optimisationResult.canonicalMetricDiagnostics;
           const g = graphMetricParity;
           const pub = canonicalMetricPublication;
-          const pubValid = pub.canonicalMetricPublicationValid === true;
+          const pubValid = pub?.canonicalMetricPublicationValid === true;
           const authorityValid = d.canonicalMetricAuthorityValid === true;
           const gValid = g.graphMetricParityValid === true;
           const fp = (v) => v ? String(v).slice(0, 12) : 'null';
@@ -850,7 +837,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             <div style={{ fontSize: 10, color: pubValid ? '#213428' : '#b45309', fontFamily: 'monospace', marginTop: 2, padding: '6px 10px', background: '#F8F8F7', border: `1px solid ${pubValid ? '#DCDBD6' : '#f59e0b'}`, borderRadius: 6 }}>
               <div style={{ fontWeight: 700, fontSize: 11 }}>
                 Canonical metric publication: {pubValid ? 'VALID' : 'INVALID'} {pubValid ? '✓' : '✗'}
-                {!pubValid && pub.publicationRejectionReason ? <span style={{ fontWeight: 400, marginLeft: 8, color: '#b45309' }}>({pub.publicationRejectionReason})</span> : null}
+                {!pubValid && pub?.publicationRejectionReason ? <span style={{ fontWeight: 400, marginLeft: 8, color: '#b45309' }}>({pub.publicationRejectionReason})</span> : null}
               </div>
 
               <SectionLabel>Completed Identity</SectionLabel>
@@ -876,7 +863,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               <Row label="calibrationIdentityParityValid" value={bool(d.calibrationIdentityParityValid)} ok={d.calibrationIdentityParityValid} />
               <Row label="fingerprintParityValid" value={bool(d.fingerprintParityValid)} ok={d.fingerprintParityValid} />
 
-              <SectionLabel>Graph Parity</SectionLabel>
+              <SectionLabel>Graph Parity (runtime — rendered series)</SectionLabel>
               <Row label="graphPostEqCurveHash" value={g.graphPostEqCurveHash || 'null'} />
               <Row label="graphTargetCurveHash" value={g.graphTargetCurveHash || 'null'} />
               <Row label="graphCandidateId" value={id(g.graphCandidateId)} />
@@ -885,11 +872,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               <Row label="graphMetricParityValid" value={bool(gValid)} ok={gValid} />
               <Row label="graph parity reason" value={g.reason || '—'} />
 
+              <SectionLabel>Graph Parity (contract receipt)</SectionLabel>
+              <Row label="contract.graphPostEqCurveHash" value={pub?.graphPostEqCurveHash || 'null'} />
+              <Row label="contract.graphTargetCurveHash" value={pub?.graphTargetCurveHash || 'null'} />
+              <Row label="contract.graphMetricParityValid" value={bool(pub?.graphMetricParityValid)} ok={pub?.graphMetricParityValid} />
+
               <SectionLabel>Publication</SectionLabel>
               <Row label="canonicalMetricAuthorityValid" value={bool(authorityValid)} ok={authorityValid} />
               <Row label="graphMetricParityValid" value={bool(gValid)} ok={gValid} />
               <Row label="canonicalMetricPublicationValid" value={bool(pubValid)} ok={pubValid} />
-              <Row label="publicationRejectionReason" value={pub.publicationRejectionReason || '—'} />
+              <Row label="publicationRejectionReason" value={pub?.publicationRejectionReason || '—'} />
 
               <div style={{ marginTop: 4, paddingTop: 3, borderTop: '1px solid #DCDBD6', fontWeight: 400, color: '#625143' }}>
                 p14Identity: {bool(d.p14IdentityParityValid)} ·

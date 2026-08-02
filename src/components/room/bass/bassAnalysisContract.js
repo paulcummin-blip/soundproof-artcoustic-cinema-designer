@@ -278,6 +278,7 @@ export function createBassAnalysisResult() {
     achievedP20VariationDb: null,
     achievedP20Level: null,
     designRecommendation: null,
+    metricPublication: null,
 
     provenance: {
       poolId: null,

@@ -33,6 +33,7 @@ export function compactCompletedBassContract(contract) {
     requestedP14Basis: contract.selectedP14TargetBasis || null,
     requestedP14Level: Number.isFinite(contract.selectedP14Level) ? contract.selectedP14Level : null,
     requestedP18ExtensionHz: Number.isFinite(contract.selectedP14RequiredExtensionHz) ? contract.selectedP14RequiredExtensionHz : null,
+    metricPublication: contract.metricPublication || null,
     provenance: contract.provenance || {},
   };
 }

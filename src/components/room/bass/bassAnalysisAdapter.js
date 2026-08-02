@@ -280,6 +280,7 @@ export function adaptCurrentBassOptimisationResult({
   selectedP14TargetDb = null,
   selectedP14RequiredExtensionHz = null,
   collectDiagnostics = false,
+  metricPublication = null,
 } = {}) {
   const contract = createBassAnalysisResult();
 
@@ -544,6 +545,11 @@ export function adaptCurrentBassOptimisationResult({
 
   // Map usable LF where available.
   contract.roomResponse.usableLfHz = Number.isFinite(usableLfHz) ? usableLfHz : null;
+
+  // C6.2A: Metric publication receipt — computed before publishCompletedBassContract()
+  // from the canonical metric authority and graph-source identity. This is the
+  // sole authoritative publication receipt; BassResponse reads it from the contract.
+  contract.metricPublication = metricPublication || null;
 
   return contract;
 }
