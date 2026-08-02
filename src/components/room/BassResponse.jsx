@@ -175,7 +175,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   // Presentation-only state. Production response inputs and physics are owned by the room-scoped authority.
   const [isDraggingSub, setIsDraggingSub] = useState(false);
-  const [graphScaleMode, setGraphScaleMode] = useState('auto');
   const [houseCurveOverride, setHouseCurveOverride] = useState(null);
   const showHouseCurve = houseCurveOverride ?? !!designEqEnabled;
   const [overlayProduction, setOverlayProduction] = useState(false);
@@ -378,39 +377,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       return true;
     });
   }, [multiSeriesForGraph, designEqEnabled, showRawResponse, showOptimisedResponse]);
-
-  // Material signature for BassGraph Auto Y-axis: tracks P14-independent inputs only.
-  // When only the P14 target changes, this signature stays the same so BassGraph
-  // preserves the cached Y-axis domain — making the house curve's vertical movement
-  // visually obvious. Recalculates when room dims, sub config, raw response, or
-  // enabled series actually change.
-  const bassGraphMaterialSignature = useMemo(() => {
-    const subSig = (subsForSimulation || [])
-      .map((s) => `${s.modelKey || s.model || ''}:${s.position?.x ?? ''}:${s.position?.y ?? ''}:${s.enabled ?? ''}`)
-      .sort().join(',');
-    const rawSig = rspRawCurve.length
-      ? `len:${rspRawCurve.length}:` + [0, Math.floor(rspRawCurve.length / 4), Math.floor(rspRawCurve.length / 2), Math.floor(rspRawCurve.length * 3 / 4), rspRawCurve.length - 1]
-          .map((i) => Number.isFinite(rspRawCurve[i]?.spl) ? rspRawCurve[i].spl.toFixed(2) : 'null').join(',')
-      : 'empty';
-    const seatSig = (seatingPositions || [])
-      .map((s) => `${s.id || `${s.x}-${s.y}`}:${s.x}:${s.y}`)
-      .sort().join(',');
-    return [
-      `dims:${roomDims?.widthM}:${roomDims?.lengthM}:${roomDims?.heightM}`,
-      `subs:${subSig}`,
-      `raw:${rawSig}`,
-      `seats:${seatSig}`,
-      `smooth:${bassSmoothingMode}`,
-      `showRaw:${showRawResponse}`,
-      `showEq:${showOptimisedResponse}`,
-      `showOverlays:${showRealSeatOverlays}`,
-      `showHouse:${showHouseCurve}`,
-      `designEq:${designEqEnabled}`,
-      `selSeats:${[...selectedSeatIds].sort().join(',')}`,
-    ].join('|');
-  }, [roomDims, subsForSimulation, rspRawCurve, seatingPositions, bassSmoothingMode,
-    showRawResponse, showOptimisedResponse, showRealSeatOverlays, showHouseCurve,
-    designEqEnabled, selectedSeatIds]);
 
   const graphStatusText = detailedEqStatusText({
     designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
@@ -629,17 +595,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 </select>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, color: '#625143', fontFamily: 'monospace' }}>Graph scale:</span>
-              <select
-                value={graphScaleMode}
-                onChange={e => setGraphScaleMode(e.target.value)}
-                style={{ height: 26, borderRadius: 6, border: '1px solid #DCDBD6', background: '#F8F8F7', fontSize: 11, padding: '0 6px', color: '#1B1A1A', fontFamily: 'monospace', cursor: 'pointer' }}
-              >
-                <option value="rew_fixed">REW-style fixed</option>
-                <option value="auto">Auto</option>
-              </select>
-            </div>
             <BassTargetLevelControl disabled={detailedStatus === "CALCULATING" || detailedStatus === "QUEUED"} />
             <DesignEqLimitStatus enabled={designEqEnabled} onChange={setDesignEqEnabled} priorityMode={optimiserPriorityMode} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -756,17 +711,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               protectedNullAnnotations={protectedNullAnnotations}
               linearHzAxis={false}
               rewStyleMode={true}
-              yDomain={graphScaleMode === 'rew_fixed' ? [70, 140] : undefined}
-              xDomain={graphScaleMode === 'rew_fixed'
-                ? (visibleMultiSeries[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200])
-                : [15, 200]}
+              yDomain={[70, 140]}
+              xDomain={visibleMultiSeries[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200]}
               showAxialOnly={false}
               refDb={85}
               disableHighlight={false}
               renderToken={qStrategy}
               p14TotalDb={p14PresentationData.targetDb}
               operatingLevelOffsetDb={operatingLevelOffsetDb}
-              materialSignature={bassGraphMaterialSignature}
             />
           ) : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>

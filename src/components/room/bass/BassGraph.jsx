@@ -91,13 +91,8 @@ export default function BassGraph({
   disableHighlight = false,
   renderToken = '',
   p14TotalDb = null,
-  operatingLevelOffsetDb = 0,
-  materialSignature = ''
+  operatingLevelOffsetDb = 0
 }) {
-    const lastValidYDomainRef = React.useRef(null);
-    const autoDomainCacheRef = React.useRef(null);
-    const [resetScaleToken, setResetScaleToken] = React.useState(0);
-
     // Multi-series: merge all series data into one keyed chartData array
     const isMulti = rewStyleMode && Array.isArray(multiSeries) && multiSeries.length > 0;
 
@@ -231,136 +226,15 @@ export default function BassGraph({
     const xMin = xDomain?.[0] ?? 20;
     const xMax = xDomain?.[1] ?? 200;
     
-    // Determine Y-axis domain
-    let finalYMin, finalYMax, finalYTicks;
-
-    const hasExternalYDomain =
-      Array.isArray(yDomain) &&
-      yDomain.length === 2 &&
-      Number.isFinite(yDomain[0]) &&
-      Number.isFinite(yDomain[1]);
-
-    if (hasExternalYDomain) {
-      // Manual / fixed mode — use the provided domain
-      lastValidYDomainRef.current = [yDomain[0], yDomain[1]];
-      finalYMin = yDomain[0];
-      finalYMax = yDomain[1];
-
-      // Always use 10 dB steps for fixed external domains (e.g. REW-style 60–120)
-      const domainSpan = finalYMax - finalYMin;
-      const step = domainSpan <= 30 ? 5 : 10;
-
-      const ticks = [];
-      for (let i = finalYMin; i <= finalYMax; i += step) {
-        ticks.push(i);
-      }
-      finalYTicks = ticks;
-
-    } else {
-      // Auto mode — recalculate only when material inputs change (not on P14 target changes).
-      // materialSignature is computed by the parent from P14-independent inputs (room dims,
-      // subs, raw response, enabled series). When only P14 changes, the signature is unchanged
-      // and the cached domain is preserved, making the house curve's vertical movement visible.
-      const shouldRecalc = !autoDomainCacheRef.current ||
-        autoDomainCacheRef.current.signature !== materialSignature ||
-        autoDomainCacheRef.current.resetToken !== resetScaleToken;
-
-      if (shouldRecalc) {
-      // Auto-calculation logic if no yDomain is provided
-      let calculatedYMin, calculatedYMax;
-
-      // REW mode: derive layout only from response/target data. The maximum-SPL
-      // capability ceiling remains rendered, but never participates in axis layout.
-      if (rewStyleMode) {
-        const domainKinds = new Set([
-          "raw", "post-eq", "house-curve", "normalized", "normalized-target", "real-seat-overlay",
-        ]);
-        const domainSeries = isMulti
-          ? multiSeries.filter((series) => domainKinds.has(series.kind))
-          : [];
-        const responseValues = isMulti
-          ? domainSeries.flatMap((series) => (series.data || [])
-              .filter((point) => point.frequency >= xMin && point.frequency <= xMax)
-              .map((point) => point.spl))
-          : chartData
-              .filter((point) => point.frequency >= xMin && point.frequency <= xMax)
-              .map((point) => point.spl);
-        const rp22Values = (rp22Levels || []).map((level) => level.spl);
-        const splValues = [...responseValues, ...rp22Values].filter((value) => Number.isFinite(value));
-
-        if (splValues.length > 0) {
-          const dataMin = Math.min(...splValues);
-          const dataMax = Math.max(...splValues);
-          const padding = 5; // 5 dB padding top and bottom
-          calculatedYMin = dataMin - padding;
-          calculatedYMax = dataMax + padding;
-        } else {
-          // Fallback if no data
-          calculatedYMin = 60;
-          calculatedYMax = 110;
-        }
-      } else {
-        // Default Y range
-        calculatedYMin = 90;
-        calculatedYMax = 130;
-      }
-
-      // Nice ticks policy: snap Y domain to clean numbers for designer readability
-      let snappedYMin = calculatedYMin;
-      let snappedYMax = calculatedYMax;
-      let yTicks = undefined;
-
-      if (Number.isFinite(calculatedYMin) && Number.isFinite(calculatedYMax) && calculatedYMax > calculatedYMin) {
-        const rawMin = calculatedYMin;
-        const rawMax = calculatedYMax;
-        const span = rawMax - rawMin;
-
-        // Determine tick step based on span
-        let step;
-        if (span <= 30) {
-          step = 5;
-        } else if (span <= 60) {
-          step = 10;
-        } else {
-          step = 20;
-        }
-
-        // Snap min/max to tick boundaries
-        snappedYMin = Math.floor(rawMin / step) * step;
-        snappedYMax = Math.ceil(rawMax / step) * step;
-
-        // Generate ticks array
-        const ticks = [];
-        for (let i = snappedYMin; i <= snappedYMax; i += step) {
-          ticks.push(i);
-        }
-
-        // Guard: if too many ticks, fall back to step=20
-        if (ticks.length > 50) {
-          step = 20;
-          snappedYMin = Math.floor(rawMin / step) * step;
-          snappedYMax = Math.ceil(rawMax / step) * step;
-          const safeTicks = [];
-          for (let i = snappedYMin; i <= snappedYMax; i += step) {
-            safeTicks.push(i);
-          }
-          yTicks = safeTicks;
-        } else {
-          yTicks = ticks;
-        }
-      }
-        autoDomainCacheRef.current = {
-          signature: materialSignature,
-          resetToken: resetScaleToken,
-          yMin: snappedYMin,
-          yMax: snappedYMax,
-          ticks: yTicks,
-        };
-      }
-
-      finalYMin = autoDomainCacheRef.current.yMin;
-      finalYMax = autoDomainCacheRef.current.yMax;
-      finalYTicks = autoDomainCacheRef.current.ticks;
+    // Fixed REW-style Y-axis domain — always 70–140 dB with 10 dB ticks.
+    // No Auto scaling, no material-signature cache, no reset control.
+    const finalYMin = Array.isArray(yDomain) && Number.isFinite(yDomain[0]) ? yDomain[0] : 70;
+    const finalYMax = Array.isArray(yDomain) && Number.isFinite(yDomain[1]) ? yDomain[1] : 140;
+    const domainSpan = finalYMax - finalYMin;
+    const step = domainSpan <= 30 ? 5 : 10;
+    const finalYTicks = [];
+    for (let i = finalYMin; i <= finalYMax; i += step) {
+      finalYTicks.push(i);
     }
 
     // chartRenderKey — forces LineChart remount when plotted data changes.
@@ -416,15 +290,6 @@ export default function BassGraph({
                 <>
                     <div className="text-[10px] text-gray-500 mb-1 flex items-center justify-between">
                         <span>X-axis scale: {linearHzAxis ? 'LINEAR' : 'LOG'}</span>
-                        {!hasExternalYDomain && (
-                            <button
-                                onClick={() => setResetScaleToken((t) => t + 1)}
-                                className="text-[10px] text-[#625143] hover:text-[#213428] underline cursor-pointer"
-                                style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'monospace' }}
-                            >
-                                Reset scale
-                            </button>
-                        )}
                     </div>
                     <RewPlotRangeDebug chartData={chartData} yDomain={yDomain} />
                 </>
