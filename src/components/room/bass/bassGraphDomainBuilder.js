@@ -62,12 +62,14 @@ export function buildAbsoluteHouseCurveSeries(optimisationResult) {
     strokeWidth: 2.25,
     strokeDasharray: "10 5",
     data: exactTarget,
-    // C6.1A: Source identity metadata for graph boundary hash check.
-    // These are computed from the SAME candidate object the graph renders,
-    // allowing BassResponse to compare against the canonical metric authority.
+    // C6.1B: Source identity metadata for graph boundary hash check.
+    // sourceFingerprint = the completed-result fingerprint (cacheKey) consumed
+    //   by the graph — NOT merely the calibration fingerprint.
+    // sourceCalibrationFingerprint = the embedded calibration identity (separate).
     sourceTargetCurveHash: buildCurveSignature(exactTarget),
     sourceCandidateId: candidate.candidateId || null,
-    sourceFingerprint: optimisationResult?.calibrationFingerprint || null,
+    sourceFingerprint: optimisationResult?.cacheKey || null,
+    sourceCalibrationFingerprint: optimisationResult?.calibrationFingerprint || null,
   };
 }
 
@@ -124,7 +126,8 @@ export function buildBassGraphSeries({
             sourcePostEqCurveHash: finalResponse.postEqCurveSignature || null,
             sourceCandidateId: finalResponse.selectedCandidateId || null,
             sourceFilterBankSignature: finalResponse.filterBankSignature || null,
-            sourceFingerprint: optimisationResult?.calibrationFingerprint || null,
+            sourceFingerprint: optimisationResult?.cacheKey || null,
+            sourceCalibrationFingerprint: optimisationResult?.calibrationFingerprint || null,
             color: seat.color || ["#213428", "#625143", "#8B7F76", "#A67C52", "#6B8A8F", "#7E8B6F"][index % 6],
             strokeWidth: 2.25, data: applyBassSmoothing(postEq.responseData, smoothingMode) };
         }).filter(Boolean));
@@ -142,7 +145,8 @@ export function buildBassGraphSeries({
           sourcePostEqCurveHash: finalResponse.postEqCurveSignature || null,
           sourceCandidateId: finalResponse.selectedCandidateId || null,
           sourceFilterBankSignature: finalResponse.filterBankSignature || null,
-          sourceFingerprint: optimisationResult?.calibrationFingerprint || null,
+          sourceFingerprint: optimisationResult?.cacheKey || null,
+          sourceCalibrationFingerprint: optimisationResult?.calibrationFingerprint || null,
           color: "#16A34A", strokeWidth: 2.5, data: applyBassSmoothing(finalResponse.postEqRspCurve, smoothingMode) });
         if (showRealSeatOverlays) series.push(...finalResponse.postEqPerSeatCurves
           .filter((seat) => multiSeries.some((item) => item.id === seat.seatId))

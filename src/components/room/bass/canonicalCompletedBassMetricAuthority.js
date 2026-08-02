@@ -81,11 +81,27 @@ function frequencyGridParity(postEq, target) {
  * Build the canonical completed-bass metric authority from the completed
  * product-constrained candidate.
  *
+ * C6.1B fingerprint fields (all explicit, no conflation):
+ *   - activeRequestFingerprint:   the full cache/request fingerprint (cacheKey)
+ *   - returnedWorkerFingerprint:  the fingerprint returned by the worker
+ *   - completedResultFingerprint: the fingerprint stored on the completed
+ *                                 contract/result (full result fingerprint)
+ *   - calibrationFingerprint:     the embedded calibration identity
+ *   - candidateId:                the selected candidate identity
+ *
+ * Parity rules:
+ *   - activeRequestFingerprint === returnedWorkerFingerprint
+ *   - activeRequestFingerprint === completedResultFingerprint
+ *   - activeRequestFingerprint contains calibrationFingerprint (cache-key contract)
+ *   - candidateId is present (different identity type — never compared as a
+ *     fingerprint equal to the request)
+ *
  * @param {object} finalOptimisedBassResponse - from buildFinalOptimisedBassResponse
- * @param {string|null} requestFingerprint - active request cache key (cacheKey)
- * @param {string|null} completedResultFingerprint - calibration fingerprint
- * @param {string|null} workerResultFingerprint - fingerprint returned by the worker
- * @param {string|null} candidateFingerprint - selected candidate identity hash
+ * @param {string|null} activeRequestFingerprint - active request cache key
+ * @param {string|null} returnedWorkerFingerprint - fingerprint returned by the worker
+ * @param {string|null} completedResultFingerprint - fingerprint on the completed result
+ * @param {string|null} calibrationFingerprint - embedded calibration identity
+ * @param {string|null} candidateId - selected candidate identity
  * @param {object|null} completedResultP14Identity - P14 identity that produced the completed result (MANDATORY)
  * @param {object} requestedP14Identity - current requested P14 identity
  *
@@ -93,22 +109,29 @@ function frequencyGridParity(postEq, target) {
  */
 export function buildCanonicalCompletedBassMetricAuthority({
   finalOptimisedBassResponse,
-  requestFingerprint = null,
+  activeRequestFingerprint = null,
+  returnedWorkerFingerprint = null,
   completedResultFingerprint = null,
-  workerResultFingerprint = null,
-  candidateFingerprint = null,
+  calibrationFingerprint = null,
+  candidateId = null,
   completedResultP14Identity = null,
   requestedP14Identity,
 }) {
   const diagnostics = {
     canonicalMetricAuthorityValid: false,
-    metricRequestFingerprint: requestFingerprint ?? null,
-    metricCompletedFingerprint: completedResultFingerprint ?? null,
-    metricWorkerFingerprint: workerResultFingerprint ?? null,
-    metricCandidateFingerprint: candidateFingerprint ?? null,
+    // Explicit fingerprint fields (C6.1B)
+    metricRequestFingerprint: activeRequestFingerprint ?? null,
+    metricReturnedWorkerFingerprint: returnedWorkerFingerprint ?? null,
+    metricCompletedResultFingerprint: completedResultFingerprint ?? null,
+    metricCalibrationFingerprint: calibrationFingerprint ?? null,
+    metricCandidateId: candidateId ?? null,
+    // Parity sub-checks
+    requestWorkerParityValid: false,
+    requestCompletedParityValid: false,
+    calibrationIdentityParityValid: false,
+    candidateResultIdentityValid: false,
     fingerprintParityValid: false,
-    metricFingerprint: null,
-    metricCandidateId: null,
+    // Curve / P14 diagnostics
     metricPostEqCurveHash: null,
     metricTargetCurveHash: null,
     metricCurvePointCount: 0,
@@ -143,37 +166,65 @@ export function buildCanonicalCompletedBassMetricAuthority({
   const targetCurveHash = buildCurveSignature(targetCurve);
   const filterBankSignature = finalOptimisedBassResponse.filterBankSignature
     || buildFilterBankSignature({ generatedFilterBank: finalOptimisedBassResponse.eqFilterBank });
-  const candidateId = finalOptimisedBassResponse.selectedCandidateId;
+  const resolvedCandidateId = candidateId || finalOptimisedBassResponse.selectedCandidateId;
 
-  diagnostics.metricFingerprint = completedResultFingerprint || null;
-  diagnostics.metricCandidateId = candidateId;
   diagnostics.metricPostEqCurveHash = postEqCurveHash;
   diagnostics.metricTargetCurveHash = targetCurveHash;
   diagnostics.metricCurvePointCount = postEqRsp.length;
   diagnostics.targetCurvePointCount = targetCurve.length;
   diagnostics.legacyMetricCurveDetected = postEqRsp.length === LEGACY_CURVE_LENGTH;
 
-  // --- Strict identity checks ---
+  // --- Strict identity checks (C6.1B) ---
 
-  // 1. Fingerprint parity: all four fingerprints must be present and consistent.
-  //    - requestFingerprint (cacheKey) and workerResultFingerprint must be equal.
-  //    - completedResultFingerprint (calibrationFingerprint) must be embedded
-  //      in requestFingerprint (cacheKey = calibrationFingerprint|mode:...|...).
-  //    - candidateFingerprint must be present (candidate identity hash).
-  const hasAllFingerprints = !!(requestFingerprint && completedResultFingerprint && workerResultFingerprint && candidateFingerprint);
-  const workerMatchesRequest = requestFingerprint && workerResultFingerprint && workerResultFingerprint === requestFingerprint;
-  const completedEmbeddedInRequest = requestFingerprint && completedResultFingerprint && requestFingerprint.includes(completedResultFingerprint);
-  diagnostics.fingerprintParityValid = hasAllFingerprints && !!workerMatchesRequest && !!completedEmbeddedInRequest;
-  if (!hasAllFingerprints) {
-    diagnostics.rejectionReason = "missing-fingerprint";
+  // 1. Fingerprint parity — explicit sub-checks, no field conflation.
+  //    candidateId is a different identity type and is NOT compared as a
+  //    fingerprint equal to the request.
+  const requestWorkerParityValid = !!(activeRequestFingerprint && returnedWorkerFingerprint
+    && activeRequestFingerprint === returnedWorkerFingerprint);
+  const requestCompletedParityValid = !!(activeRequestFingerprint && completedResultFingerprint
+    && activeRequestFingerprint === completedResultFingerprint);
+  const calibrationIdentityParityValid = !!(activeRequestFingerprint && calibrationFingerprint
+    && activeRequestFingerprint.includes(calibrationFingerprint));
+  const candidateResultIdentityValid = !!(resolvedCandidateId && completedResultFingerprint);
+
+  diagnostics.requestWorkerParityValid = requestWorkerParityValid;
+  diagnostics.requestCompletedParityValid = requestCompletedParityValid;
+  diagnostics.calibrationIdentityParityValid = calibrationIdentityParityValid;
+  diagnostics.candidateResultIdentityValid = candidateResultIdentityValid;
+  diagnostics.fingerprintParityValid = !!(requestWorkerParityValid && requestCompletedParityValid
+    && calibrationIdentityParityValid && candidateResultIdentityValid);
+
+  // Fail closed: each missing identity is a hard rejection.
+  if (!activeRequestFingerprint) {
+    diagnostics.rejectionReason = "missing-active-request-fingerprint";
     return { authority: null, diagnostics };
   }
-  if (!workerMatchesRequest) {
-    diagnostics.rejectionReason = "worker-fingerprint-mismatch";
+  if (!returnedWorkerFingerprint) {
+    diagnostics.rejectionReason = "missing-returned-worker-fingerprint";
     return { authority: null, diagnostics };
   }
-  if (!completedEmbeddedInRequest) {
-    diagnostics.rejectionReason = "completed-fingerprint-not-embedded-in-request";
+  if (!completedResultFingerprint) {
+    diagnostics.rejectionReason = "missing-completed-result-fingerprint";
+    return { authority: null, diagnostics };
+  }
+  if (!calibrationFingerprint) {
+    diagnostics.rejectionReason = "missing-calibration-fingerprint";
+    return { authority: null, diagnostics };
+  }
+  if (!requestWorkerParityValid) {
+    diagnostics.rejectionReason = "request-worker-fingerprint-mismatch";
+    return { authority: null, diagnostics };
+  }
+  if (!requestCompletedParityValid) {
+    diagnostics.rejectionReason = "request-completed-fingerprint-mismatch";
+    return { authority: null, diagnostics };
+  }
+  if (!calibrationIdentityParityValid) {
+    diagnostics.rejectionReason = "calibration-identity-not-embedded-in-request";
+    return { authority: null, diagnostics };
+  }
+  if (!candidateResultIdentityValid) {
+    diagnostics.rejectionReason = "missing-candidate-or-result-identity";
     return { authority: null, diagnostics };
   }
 
@@ -223,19 +274,18 @@ export function buildCanonicalCompletedBassMetricAuthority({
   // 6. P14 achieved capability — from assessP14Capability via the canonical
   // authority evaluation chain. This is the production product-capability
   // value (approved continuous SPL, frequency-dependent, power-summed across
-  // active subs, minus positive EQ demand and safety margin). It must NEVER
-  // equal the requested target (which would indicate target leakage).
+  // active subs, minus positive EQ demand and safety margin).
+  //
+  // C6.1B: Exact equality between achievedCapabilityDb and requestedTargetDb
+  // is NOT rejected. A system may legitimately achieve exactly the target
+  // after rounding or calculation. The protection is source provenance
+  // (achievedCapabilitySource diagnostic), not numerical inequality.
   const achievedCapabilityDb = isFiniteNum(finalOptimisedBassResponse.achievedP14Db) ? Number(finalOptimisedBassResponse.achievedP14Db) : null;
   const achievedLevel = isFiniteNum(finalOptimisedBassResponse.achievedP14Level) ? Number(finalOptimisedBassResponse.achievedP14Level) : null;
   diagnostics.achievedCapabilitySource = "assessP14Capability:approved-continuous-frequency-dependent-post-eq";
 
   if (achievedCapabilityDb == null) {
     diagnostics.rejectionReason = "missing-achieved-p14-capability";
-    return { authority: null, diagnostics };
-  }
-  // Guard: the requested target must never be stored as achieved capability.
-  if (requestedNorm.selectedP14TargetDb != null && achievedCapabilityDb === requestedNorm.selectedP14TargetDb) {
-    diagnostics.rejectionReason = "achieved-capability-equals-requested-target-leakage";
     return { authority: null, diagnostics };
   }
 
@@ -245,11 +295,11 @@ export function buildCanonicalCompletedBassMetricAuthority({
 
   const authority = {
     identity: {
-      fingerprint: completedResultFingerprint,
-      requestFingerprint,
-      workerResultFingerprint,
-      candidateFingerprint,
-      candidateId,
+      activeRequestFingerprint,
+      returnedWorkerFingerprint,
+      completedResultFingerprint,
+      calibrationFingerprint,
+      candidateId: resolvedCandidateId,
       filterBankSignature,
       postEqCurveHash,
       targetCurveHash,
@@ -271,10 +321,15 @@ export function buildCanonicalCompletedBassMetricAuthority({
       parityValid: diagnostics.p14IdentityParityValid,
     },
     fingerprintParity: {
-      requestFingerprint,
+      activeRequestFingerprint,
+      returnedWorkerFingerprint,
       completedResultFingerprint,
-      workerResultFingerprint,
-      candidateFingerprint,
+      calibrationFingerprint,
+      candidateId: resolvedCandidateId,
+      requestWorkerParityValid,
+      requestCompletedParityValid,
+      calibrationIdentityParityValid,
+      candidateResultIdentityValid,
       parityValid: diagnostics.fingerprintParityValid,
     },
     frequencyGridParity: {

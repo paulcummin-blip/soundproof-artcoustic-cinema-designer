@@ -385,25 +385,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const graphMetricParity = useMemo(() => {
     const metricDiag = optimisationResult?.canonicalMetricDiagnostics;
     if (!metricDiag || !metricDiag.canonicalMetricAuthorityValid) {
-      return { graphMetricParityValid: false, reason: "metric-authority-invalid", graphPostEqCurveHash: null, graphTargetCurveHash: null, graphCandidateId: null, graphFingerprint: null };
+      return { graphMetricParityValid: false, reason: "metric-authority-invalid", graphPostEqCurveHash: null, graphTargetCurveHash: null, graphCandidateId: null, graphFingerprint: null, graphCalibrationFingerprint: null };
     }
     const postEqSeries = multiSeriesForGraph.find((s) => s.kind === "post-eq" && s.id === "rsp-eq");
     const houseSeries = multiSeriesForGraph.find((s) => s.kind === "house-curve");
     const graphPostEqCurveHash = postEqSeries?.sourcePostEqCurveHash || null;
     const graphTargetCurveHash = houseSeries?.sourceTargetCurveHash || null;
     const graphCandidateId = postEqSeries?.sourceCandidateId || houseSeries?.sourceCandidateId || null;
+    // C6.1B: sourceFingerprint = completed-result fingerprint (cacheKey).
+    // sourceCalibrationFingerprint = embedded calibration identity (separate).
     const graphFingerprint = postEqSeries?.sourceFingerprint || houseSeries?.sourceFingerprint || null;
+    const graphCalibrationFingerprint = postEqSeries?.sourceCalibrationFingerprint || houseSeries?.sourceCalibrationFingerprint || null;
     const postEqMatch = graphPostEqCurveHash && graphPostEqCurveHash === metricDiag.metricPostEqCurveHash;
     const targetMatch = graphTargetCurveHash && graphTargetCurveHash === metricDiag.metricTargetCurveHash;
     const candidateMatch = graphCandidateId && graphCandidateId === metricDiag.metricCandidateId;
-    const fingerprintMatch = graphFingerprint && graphFingerprint === metricDiag.metricCompletedFingerprint;
-    const graphMetricParityValid = !!(postEqMatch && targetMatch && candidateMatch && fingerprintMatch);
+    const fingerprintMatch = graphFingerprint && graphFingerprint === metricDiag.metricCompletedResultFingerprint;
+    const calibrationMatch = graphCalibrationFingerprint && graphCalibrationFingerprint === metricDiag.metricCalibrationFingerprint;
+    const graphMetricParityValid = !!(postEqMatch && targetMatch && candidateMatch && fingerprintMatch && calibrationMatch);
     const reason = !postEqMatch ? "post-eq-hash-mismatch"
       : !targetMatch ? "target-hash-mismatch"
       : !candidateMatch ? "candidate-id-mismatch"
-      : !fingerprintMatch ? "fingerprint-mismatch"
+      : !fingerprintMatch ? "result-fingerprint-mismatch"
+      : !calibrationMatch ? "calibration-fingerprint-mismatch"
       : null;
-    return { graphMetricParityValid, reason, graphPostEqCurveHash, graphTargetCurveHash, graphCandidateId, graphFingerprint };
+    return { graphMetricParityValid, reason, graphPostEqCurveHash, graphTargetCurveHash, graphCandidateId, graphFingerprint, graphCalibrationFingerprint };
   }, [multiSeriesForGraph, optimisationResult?.canonicalMetricDiagnostics]);
 
   const graphStatusText = detailedEqStatusText({
@@ -798,15 +803,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               </div>
               <div style={{ marginTop: 2, fontWeight: 400 }}>
                 fingerprintParity: {d.fingerprintParityValid ? '✓' : '✗'} ·
-                p14IdentityParity: {d.p14IdentityParityValid ? '✓' : '✗'} ·
-                freqGridParity: {d.frequencyGridParityValid ? '✓' : '✗'} ({d.metricCurvePointCount}/{d.targetCurvePointCount} pts)
+                req↔worker: {d.requestWorkerParityValid ? '✓' : '✗'} ·
+                req↔completed: {d.requestCompletedParityValid ? '✓' : '✗'} ·
+                cal-in-req: {d.calibrationIdentityParityValid ? '✓' : '✗'} ·
+                cand/result: {d.candidateResultIdentityValid ? '✓' : '✗'} ·
+                p14Identity: {d.p14IdentityParityValid ? '✓' : '✗'} ·
+                freqGrid: {d.frequencyGridParityValid ? '✓' : '✗'} ({d.metricCurvePointCount}/{d.targetCurvePointCount} pts)
                 {d.legacyMetricCurveDetected ? <span style={{ color: '#dc2626', fontWeight: 700 }}> · LEGACY 186</span> : null}
               </div>
               <div style={{ marginTop: 1, fontWeight: 400 }}>
-                fingerprints: req={d.metricRequestFingerprint ? String(d.metricRequestFingerprint).slice(0, 12) : 'null'} ·
-                comp={d.metricCompletedFingerprint ? String(d.metricCompletedFingerprint).slice(0, 12) : 'null'} ·
-                worker={d.metricWorkerFingerprint ? String(d.metricWorkerFingerprint).slice(0, 12) : 'null'} ·
-                cand={d.metricCandidateFingerprint ? String(d.metricCandidateFingerprint).slice(0, 12) : 'null'}
+                activeReq={d.metricRequestFingerprint ? String(d.metricRequestFingerprint).slice(0, 12) : 'null'} ·
+                worker={d.metricReturnedWorkerFingerprint ? String(d.metricReturnedWorkerFingerprint).slice(0, 12) : 'null'} ·
+                completed={d.metricCompletedResultFingerprint ? String(d.metricCompletedResultFingerprint).slice(0, 12) : 'null'} ·
+                cal={d.metricCalibrationFingerprint ? String(d.metricCalibrationFingerprint).slice(0, 12) : 'null'} ·
+                candId={d.metricCandidateId ? String(d.metricCandidateId).slice(0, 20) : 'null'}
               </div>
               <div style={{ marginTop: 1, fontWeight: 400 }}>
                 P14: requestedTarget={optimisationResult?.selectedP14TargetDb ?? 'null'} dBC ·
@@ -834,7 +844,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               </div>
               <div style={{ marginTop: 1, fontWeight: 400 }}>
                 graph candidate: {g.graphCandidateId ? String(g.graphCandidateId).slice(0, 20) : 'null'} ·
-                graph fingerprint: {g.graphFingerprint ? String(g.graphFingerprint).slice(0, 12) : 'null'}
+                graph resultFP: {g.graphFingerprint ? String(g.graphFingerprint).slice(0, 12) : 'null'}
+                {g.graphFingerprint && d.metricCompletedResultFingerprint ? <span style={{ color: g.graphFingerprint === d.metricCompletedResultFingerprint ? '#213428' : '#dc2626' }}>
+                  {' '}· {g.graphFingerprint === d.metricCompletedResultFingerprint ? 'match ✓' : 'MISMATCH ✗'}
+                </span> : null}
+              </div>
+              <div style={{ marginTop: 1, fontWeight: 400 }}>
+                graph calFP: {g.graphCalibrationFingerprint ? String(g.graphCalibrationFingerprint).slice(0, 12) : 'null'}
+                {g.graphCalibrationFingerprint && d.metricCalibrationFingerprint ? <span style={{ color: g.graphCalibrationFingerprint === d.metricCalibrationFingerprint ? '#213428' : '#dc2626' }}>
+                  {' '}· {g.graphCalibrationFingerprint === d.metricCalibrationFingerprint ? 'match ✓' : 'MISMATCH ✗'}
+                </span> : null}
               </div>
             </div>
           );

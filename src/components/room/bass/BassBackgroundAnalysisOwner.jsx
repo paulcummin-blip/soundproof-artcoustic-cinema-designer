@@ -178,14 +178,22 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // selectedP14Level, requiredExtensionHz). No circular graph hashes —
     // the graph boundary hash check is done in BassResponse using the
     // source identity metadata embedded in the rendered series.
-    const workerResultFingerprint = matchingResult?.fingerprint || null;
-    const candidateFingerprint = result?.selectedCandidate?.candidateId || null;
+    // C6.1B: Explicit fingerprint fields — no conflation.
+    //   activeRequestFingerprint   = cacheKey (the full request fingerprint)
+    //   returnedWorkerFingerprint  = matchingResult.fingerprint (from the worker)
+    //   completedResultFingerprint = result.cacheKey (fingerprint on the completed result)
+    //   calibrationFingerprint     = calibrationFingerprint (embedded calibration identity)
+    //   candidateId               = selected candidate identity (different type)
+    const returnedWorkerFingerprint = matchingResult?.fingerprint || null;
+    const completedResultFingerprint = result?.cacheKey || matchingResult?.fingerprint || null;
+    const resolvedCandidateId = result?.selectedCandidate?.candidateId || null;
     const canonicalMetricAuthorityResult = buildCanonicalCompletedBassMetricAuthority({
       finalOptimisedBassResponse,
-      requestFingerprint: cacheKey,
-      completedResultFingerprint: calibrationFingerprint,
-      workerResultFingerprint,
-      candidateFingerprint,
+      activeRequestFingerprint: cacheKey,
+      returnedWorkerFingerprint,
+      completedResultFingerprint,
+      calibrationFingerprint,
+      candidateId: resolvedCandidateId,
       completedResultP14Identity: {
         selectedP14TargetDb: Number.isFinite(result?.selectedP14TargetDb) ? result.selectedP14TargetDb : null,
         p14TargetBasis: result?.p14TargetBasis ?? null,
