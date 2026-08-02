@@ -757,6 +757,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             </div>
           );
         })()}
+        {includeDiagnostics && optimisationResult?.canonicalMetricDiagnostics && (() => {
+          const d = optimisationResult.canonicalMetricDiagnostics;
+          const valid = d.canonicalMetricAuthorityValid;
+          return (
+            <div style={{ fontSize: 10, color: valid ? '#213428' : '#b45309', fontFamily: 'monospace', marginTop: 2, padding: '4px 10px', background: '#F8F8F7', border: `1px solid ${valid ? '#DCDBD6' : '#f59e0b'}`, borderRadius: 6 }}>
+              <div style={{ fontWeight: 700 }}>
+                Canonical metric authority: {valid ? 'VALID' : 'INVALID'} {valid ? '✓' : '✗'}
+                {!valid && d.rejectionReason ? <span style={{ fontWeight: 400, marginLeft: 8, color: '#b45309' }}>({d.rejectionReason})</span> : null}
+              </div>
+              <div style={{ marginTop: 2, fontWeight: 400 }}>
+                fingerprint: {d.metricFingerprint ? String(d.metricFingerprint).slice(0, 16) : 'null'} ·
+                candidate: {d.metricCandidateId ? String(d.metricCandidateId).slice(0, 20) : 'null'} ·
+                points: {d.metricCurvePointCount}
+                {d.legacyMetricCurveDetected ? <span style={{ color: '#dc2626', fontWeight: 700 }}> · LEGACY 186</span> : null}
+              </div>
+              <div style={{ marginTop: 1, fontWeight: 400 }}>
+                post-EQ hash: {d.metricPostEqCurveHash || 'null'}
+                {d.graphPostEqCurveHash ? <span style={{ color: d.graphPostEqCurveHash === d.metricPostEqCurveHash ? '#213428' : '#dc2626' }}>
+                  {' '}· graph: {d.graphPostEqCurveHash === d.metricPostEqCurveHash ? 'match ✓' : 'MISMATCH ✗'}
+                </span> : null}
+              </div>
+              <div style={{ marginTop: 1, fontWeight: 400 }}>
+                target hash: {d.metricTargetCurveHash || 'null'}
+              </div>
+            </div>
+          );
+        })()}
         <BassEngineeringDetails
           enabled={includeDiagnostics}
           designEqEnabled={designEqEnabled}

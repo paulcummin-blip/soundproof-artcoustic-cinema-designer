@@ -5,7 +5,7 @@ import { useAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
 import { createBassBackgroundAnalysisStore } from "./bassBackgroundAnalysisStore";
 import { useBassAnalysisContract } from "./useBassAnalysisContract";
 import { BassResultsProvider, createBassResultsScope } from "./bassResultsStore";
-import { buildBassResultCacheKey } from "./bassResultAuthority";
+import { buildBassResultCacheKey, buildCurveSignature } from "./bassResultAuthority";
 import { BASS_OPTIMISER_VERSIONS, bassOptimiserVersionSignature } from "./bassOptimiserWorkerProtocol";
 import { markBassAuthorityBlocked, markBassAuthorityFailed, markBassAuthorityUpdating, publishCompletedBassContract, syncPersistentBassAuthority } from "./completedBassResultStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
@@ -15,6 +15,7 @@ import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
 import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
 import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
 import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
+import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompletedBassMetricAuthority";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -170,12 +171,33 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       engineVersion: matchingResult.engineVersion || null,
       resultSchemaVersion: matchingResult.resultSchemaVersion || null,
     } : null;
+    const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources });
+    const canonicalMetricAuthorityResult = buildCanonicalCompletedBassMetricAuthority({
+      finalOptimisedBassResponse,
+      completedResultFingerprint: calibrationFingerprint,
+      completedResultP14Identity: {
+        selectedP14TargetDb: Number.isFinite(result?.selectedP14TargetDb) ? result.selectedP14TargetDb : null,
+        p14TargetBasis: result?.p14TargetBasis ?? requested.p14TargetBasis ?? null,
+        requestedLevel: Number.isFinite(result?.selectedP14Level) ? result.selectedP14Level : requested.requestedLevel,
+        selectedP14RequiredExtensionHz: Number.isFinite(requested.selectedP14RequiredExtensionHz) ? requested.selectedP14RequiredExtensionHz : null,
+      },
+      requestedP14Identity: {
+        selectedP14TargetDb: requested.selectedP14TargetDb,
+        p14TargetBasis: requested.p14TargetBasis,
+        requestedLevel: requested.requestedLevel,
+        selectedP14RequiredExtensionHz: requested.selectedP14RequiredExtensionHz,
+      },
+      graphPostEqCurveHash: finalOptimisedBassResponse?.postEqCurveSignature || null,
+      graphTargetCurveHash: finalOptimisedBassResponse?.canonicalTargetCurve ? buildCurveSignature(finalOptimisedBassResponse.canonicalTargetCurve) : null,
+    });
     return {
       ...result,
       diagnosticIdentity,
-      finalOptimisedBassResponse: buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources }),
+      finalOptimisedBassResponse,
+      canonicalMetricAuthority: canonicalMetricAuthorityResult.authority,
+      canonicalMetricDiagnostics: canonicalMetricAuthorityResult.diagnostics,
     };
-  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel]);
+  }, [selectionAttempt.result, cacheKey, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz]);
   // Record candidate-selection-accepted only after the pool contains a valid
   // selectable result. Guard with a Set so unrelated React renders do not
   // overwrite or duplicate the stage for the same token.
