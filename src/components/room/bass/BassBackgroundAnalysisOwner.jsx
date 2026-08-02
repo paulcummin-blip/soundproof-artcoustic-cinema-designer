@@ -188,7 +188,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // identity from the current request, which is exactly what C6.1B2 prohibits.
     const returnedWorkerFingerprint = matchingResult?.fingerprint || null;
     const completedContractFingerprint = lifecycle?.resultFingerprint || null;
-    const persistedCompletedFingerprint = getCompletedBassAuthority(scopeId)?.contract?.job?.resultFingerprint || null;
+    // C6.2A1: Only compare persistedCompletedFingerprint when the persisted
+    // record claims to represent the same result identity (same completed
+    // fingerprint). For fresh runtime publication, pass null so an older
+    // stored result does not invalidate a legitimate fresh replacement.
+    // Restored persisted results still validate their own persisted
+    // fingerprint because it matches their completedContractFingerprint.
+    const rawPersistedFingerprint = getCompletedBassAuthority(scopeId)?.contract?.job?.resultFingerprint || null;
+    const persistedCompletedFingerprint = rawPersistedFingerprint === completedContractFingerprint
+      ? rawPersistedFingerprint
+      : null;
     const resolvedCandidateId = result?.selectedCandidate?.candidateId || null;
     // C6.1B2 Gap 2: Candidate-result identity receipt. The candidate must be
     // explicitly linked to the completed result — presence alone is insufficient.

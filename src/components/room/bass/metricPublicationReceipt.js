@@ -14,33 +14,12 @@
 //   - Create a second store.
 //   - Introduce any render or publication loop.
 
-import { buildCurveSignature } from "./bassResultAuthority";
 import { computeCanonicalMetricPublication } from "./canonicalCompletedBassMetricAuthority";
+import { buildGraphSourceIdentity } from "./graphSourceIdentity";
 
-/**
- * Build graph-source identity from the optimisation result.
- *
- * These are the same hashes that bassGraphDomainBuilder.js embeds into the
- * graph series (sourcePostEqCurveHash, sourceTargetCurveHash, sourceCandidateId,
- * sourceFingerprint, sourceCalibrationFingerprint). Computing them here from
- * the optimisationResult ensures the contract carries the same identity the
- * graph will render with.
- */
-export function buildGraphSourceIdentity(optimisationResult) {
-  if (!optimisationResult) return null;
-  const finalResponse = optimisationResult.finalOptimisedBassResponse;
-  const candidate = optimisationResult.selectedCandidate;
-  const targetCurve = candidate?.productionHouseCurveTarget;
-  return {
-    graphPostEqCurveHash: finalResponse?.postEqCurveSignature || null,
-    graphTargetCurveHash: Array.isArray(targetCurve) && targetCurve.length
-      ? buildCurveSignature(targetCurve)
-      : null,
-    graphCandidateId: finalResponse?.selectedCandidateId || candidate?.candidateId || null,
-    graphFingerprint: optimisationResult.completedContractFingerprint || null,
-    graphCalibrationFingerprint: optimisationResult.calibrationFingerprint || null,
-  };
-}
+// Re-export for backward compatibility — any existing imports of
+// buildGraphSourceIdentity from this module still resolve.
+export { buildGraphSourceIdentity };
 
 /**
  * Build the full metric publication receipt for the completed contract.
@@ -65,16 +44,16 @@ export function buildMetricPublicationReceipt(optimisationResult) {
   const graphSource = buildGraphSourceIdentity(optimisationResult);
 
   // Graph parity: verify graph-source hashes match metric authority hashes.
-  const postEqMatch = !!(graphSource?.graphPostEqCurveHash
-    && graphSource.graphPostEqCurveHash === d.metricPostEqCurveHash);
-  const targetMatch = !!(graphSource?.graphTargetCurveHash
-    && graphSource.graphTargetCurveHash === d.metricTargetCurveHash);
-  const candidateMatch = !!(graphSource?.graphCandidateId
-    && graphSource.graphCandidateId === d.metricCompletedCandidateId);
-  const fingerprintMatch = !!(graphSource?.graphFingerprint
-    && graphSource.graphFingerprint === d.metricCompletedContractFingerprint);
-  const calibrationMatch = !!(graphSource?.graphCalibrationFingerprint
-    && graphSource.graphCalibrationFingerprint === d.metricCalibrationFingerprint);
+  const postEqMatch = !!(graphSource?.postEqCurveHash
+    && graphSource.postEqCurveHash === d.metricPostEqCurveHash);
+  const targetMatch = !!(graphSource?.targetCurveHash
+    && graphSource.targetCurveHash === d.metricTargetCurveHash);
+  const candidateMatch = !!(graphSource?.candidateId
+    && graphSource.candidateId === d.metricCompletedCandidateId);
+  const fingerprintMatch = !!(graphSource?.fingerprint
+    && graphSource.fingerprint === d.metricCompletedContractFingerprint);
+  const calibrationMatch = !!(graphSource?.calibrationFingerprint
+    && graphSource.calibrationFingerprint === d.metricCalibrationFingerprint);
   const graphMetricParityValid = !!(postEqMatch && targetMatch
     && candidateMatch && fingerprintMatch && calibrationMatch);
   const graphParityReason = !postEqMatch ? "post-eq-hash-mismatch"
@@ -105,8 +84,9 @@ export function buildMetricPublicationReceipt(optimisationResult) {
     candidateCompletedFingerprint: d.metricCompletedCandidateFingerprint || null,
     postEqCurveHash: d.metricPostEqCurveHash || null,
     targetCurveHash: d.metricTargetCurveHash || null,
-    graphPostEqCurveHash: graphSource?.graphPostEqCurveHash || null,
-    graphTargetCurveHash: graphSource?.graphTargetCurveHash || null,
+    graphPostEqCurveHash: graphSource?.postEqCurveHash || null,
+    graphTargetCurveHash: graphSource?.targetCurveHash || null,
+    graphFilterBankSignature: graphSource?.filterBankSignature || null,
     metricCurvePointCount: d.metricCurvePointCount || 0,
     targetCurvePointCount: d.targetCurvePointCount || 0,
     frequencyGridParityValid: d.frequencyGridParityValid === true,
