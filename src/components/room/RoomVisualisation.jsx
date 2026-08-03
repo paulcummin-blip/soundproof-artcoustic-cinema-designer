@@ -1152,7 +1152,6 @@ const byId = useEntitiesById({
     lengthM,
     widthM,
     mlpDotX_m,
-    setManualRspY_m: onSetManualRspY_m,
     setMlpDragInfo,
     dragOffsetRoomRef,
   });
@@ -1442,6 +1441,8 @@ const byId = useEntitiesById({
     isDraggingSpeakerDraftRef,
     draftSpeakersRef,
     commitDraftSpeakerPositions,
+    mlpDragInfo,
+    onSetManualRspY_m,
   });
 
   // Wrap mouseup so mlpDragActiveRef is always cleared, regardless of drag type
@@ -1883,11 +1884,17 @@ useEffect(() => {
     handleMouseDown(e, 'mlp-marker-dot', 'mlpMarker');
   }, [handleMouseDown]);
 
+  // During RSP drag, render the marker from the draft Y (mlpDragInfo) so it
+  // follows the pointer live without triggering the canonical RSP authority
+  // chain (useEffectiveRsp → mlpY_m → seat responses → RP22).
+  const _mlpMarkerDragging = dragType === 'mlpMarker' && mlpDragInfo?.visible && Number.isFinite(mlpDragInfo?.y);
+  const _mlpMarkerY = _mlpMarkerDragging ? mlpDragInfo.y : mlpDotY_m;
+
   const MLPMarker = (
     <RvMlpMarker
       toPx={toPx}
       mlpDotX_m={mlpDotX_m}
-      mlpDotY_m={mlpDotY_m}
+      mlpDotY_m={_mlpMarkerY}
       _overlays={_overlays}
       exportMode={exportMode}
       rspMode={rspMode}

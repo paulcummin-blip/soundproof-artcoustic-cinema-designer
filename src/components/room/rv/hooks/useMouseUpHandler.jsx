@@ -42,14 +42,21 @@ export function useMouseUpHandler({
   isDraggingSpeakerDraftRef,
   draftSpeakersRef,
   commitDraftSpeakerPositions,
+  // RSP marker draft commit
+  mlpDragInfo,
+  onSetManualRspY_m,
 }) {
   const handleMouseUp = useCallback((e) => {
-    // TEMPORARY P18/P19 trace: RSP uses setManualRspY_m on pointer move; this handler has no separate RSP commit setter.
+    // RSP marker drag: commit the final draft Y once on release.
     if (dragType === "mlpMarker") {
+      const finalY = mlpDragInfo?.y;
+      if (Number.isFinite(finalY) && typeof onSetManualRspY_m === "function") {
+        onSetManualRspY_m(finalY);
+      }
       recordTemporaryP18P19DragEnd({
         dragEndCount: ++temporaryRSPDragEndCount,
-        committedRspCoordinate: null,
-        exactStateSetter: "none — RSP coordinate is written by setManualRspY_m during pointer move",
+        committedRspCoordinate: Number.isFinite(finalY) ? { x: null, y: finalY, z: 1.2 } : null,
+        exactStateSetter: "onSetManualRspY_m (commit on release)",
       });
     }
 
@@ -182,7 +189,7 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions, mlpDragInfo, onSetManualRspY_m]);
 
   return { handleMouseUp };
 }
