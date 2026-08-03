@@ -219,6 +219,19 @@ export function buildSeatHudSnapshot({
     });
   }
 
+  // RP23 — prefer settled engine authority (analysisResult.perSeatRp23) to avoid
+  // transient publication during RSP geometry settling. Falls back to the inline
+  // calculation above when the engine result is unavailable.
+  const engineRp23 = analysisResult?.perSeatRp23?.[engineSeatId];
+  if (engineRp23 && (engineRp23.angleDeg != null || engineRp23.formatted != null)) {
+    data.rp23 = {
+      angleDeg: engineRp23.angleDeg,
+      displayDeg: engineRp23.displayDeg,
+      level: engineRp23.level,
+      formatted: engineRp23.formatted,
+    };
+  }
+
   // Detect if overheads exist (for P9/P10 applicability)
   const hasOverheads = placedSpeakers.some(s => {
     const r = getCanonicalRole(s.role);
