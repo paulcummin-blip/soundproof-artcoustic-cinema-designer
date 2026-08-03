@@ -954,6 +954,7 @@ const byId = useEntitiesById({
     isRenderableSpeaker, isDraggable,
     roomElements,
     rspMode,
+    mlpDotX_m,
     mlpDotY_m,
     meterToCanvasY,
     seatDragStartRef,

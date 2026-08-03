@@ -33,6 +33,7 @@ export function useMouseDownHandler({
   roomElements,
   // RSP marker drag (manual_position mode only)
   rspMode,
+  mlpDotX_m,
   mlpDotY_m,
   meterToCanvasY,
   // Seat drag baseline ref — populated here, consumed by useSeatDragHandler
@@ -103,9 +104,14 @@ export function useMouseDownHandler({
       // RSP marker drag — only active in manual_position mode
       if (type === 'mlpMarker') {
         if (rspMode !== 'manual_position') return;
+        // Capture pointer-to-marker offset in room coordinates so the first
+        // drag frame preserves the user's grab point instead of snapping the
+        // marker centre onto the cursor.
+        const markerX = Number(mlpDotX_m);
+        const markerY = Number(mlpDotY_m);
         dragOffsetRoomRef.current = {
-          x: 0,
-          y: 0,
+          x: Number.isFinite(markerX) ? markerX - cursorRoom.x : 0,
+          y: Number.isFinite(markerY) ? markerY - cursorRoom.y : 0,
           coordinateSpace: 'canvas',
         };
         isAnyDraggingRef.current = true;
@@ -399,7 +405,7 @@ export function useMouseDownHandler({
         }
       }
     },
-    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomElements, seatDragStartRef, seatingPositions, placedSpeakers]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomElements, seatDragStartRef, seatingPositions, placedSpeakers, mlpDotX_m, mlpDotY_m]
   );
 
   return { handleMouseDown };
