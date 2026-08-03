@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
 import {
   COMPLETED_BASS_CACHE_VERSION,
+  BASS_AUTHORITY_STATUS,
   bassContractMatchesRequestedP14,
   buildPersistedBassAuthority,
   compactCompletedBassContract,
@@ -13,6 +14,7 @@ import {
 } from "./completedBassResultPersistence";
 
 export {
+  BASS_AUTHORITY_STATUS,
   buildPersistedBassAuthority,
   compactCompletedBassContract,
   isCompletedBassContract,
@@ -32,6 +34,7 @@ const projectKey = (projectId) => String(projectId || "free");
 const emptyAuthority = (projectId) => ({
   projectId: projectKey(projectId),
   status: "loading",
+  authorityStatus: BASS_AUTHORITY_STATUS.LOADING,
   currentFingerprint: null,
   contract: null,
   staleContract: null,
@@ -63,6 +66,7 @@ export function publishCompletedBassContract(projectId, contract) {
   setMemory(projectId, {
     projectId: projectKey(projectId),
     status: "complete",
+    authorityStatus: authoritative ? BASS_AUTHORITY_STATUS.AUTHORITATIVE : BASS_AUTHORITY_STATUS.NOT_VERIFIED,
     currentFingerprint: compact.job.resultFingerprint,
     contract: compact,
     staleContract: memoryByProject.get(projectKey(projectId))?.contract || null,
@@ -80,6 +84,7 @@ export function markBassAuthorityUpdating(projectId, currentFingerprint) {
   setMemory(projectId, {
     ...previous,
     status: currentFingerprint ? "updating" : "uncalculated",
+    authorityStatus: currentFingerprint ? BASS_AUTHORITY_STATUS.UPDATING : BASS_AUTHORITY_STATUS.UNCALCULATED,
     currentFingerprint: currentFingerprint || null,
     contract: null,
     staleContract: previous.contract || previous.staleContract || null,
@@ -96,6 +101,7 @@ export function markBassAuthorityFailed(projectId, currentFingerprint, errorMess
   setMemory(projectId, {
     ...previous,
     status: "error",
+    authorityStatus: BASS_AUTHORITY_STATUS.ERROR,
     currentFingerprint: currentFingerprint || null,
     contract: null,
     staleContract: previous.contract || previous.staleContract || null,
@@ -112,6 +118,7 @@ export function markBassAuthorityBlocked(projectId) {
   setMemory(projectId, {
     ...previous,
     status: "blocked",
+    authorityStatus: BASS_AUTHORITY_STATUS.BLOCKED,
     currentFingerprint: null,
     contract: null,
     staleContract: null,
@@ -156,7 +163,7 @@ export function syncPersistentBassAuthority(projectId, currentFingerprint, contr
 
 export async function hydrateCompletedBassAuthority(projectId) {
   const key = projectKey(projectId);
-  if (key === "free") return setMemory(key, { ...emptyAuthority(key), status: "uncalculated" });
+  if (key === "free") return setMemory(key, { ...emptyAuthority(key), status: "uncalculated", authorityStatus: BASS_AUTHORITY_STATUS.UNCALCULATED });
   const current = memoryByProject.get(key);
   if (current?.status === "error" && current.errorMessage) return current;
   const records = await base44.entities.ProjectAnalysisCache.filter({ project_id: key }, '-updated_date', 1);

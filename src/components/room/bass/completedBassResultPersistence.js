@@ -2,6 +2,23 @@ import { INSTANCE_AUTHORITY_VERSION } from "@/components/utils/subwooferInstance
 
 export const COMPLETED_BASS_CACHE_VERSION = 2;
 
+/**
+ * Explicit authority status — distinct from job status.
+ *
+ * `complete` (job status) means the analysis finished; it does NOT mean the
+ * metrics are authoritative. Use `authorityStatus` to gate publication,
+ * exports, and UI authority indicators.
+ */
+export const BASS_AUTHORITY_STATUS = Object.freeze({
+  LOADING: "LOADING",
+  UPDATING: "UPDATING",
+  BLOCKED: "BLOCKED",
+  ERROR: "ERROR",
+  UNCALCULATED: "UNCALCULATED",
+  NOT_VERIFIED: "NOT_VERIFIED",
+  AUTHORITATIVE: "AUTHORITATIVE",
+});
+
 export function isStructurallyCompleteBassContract(contract) {
   const status = contract?.job?.status;
   return ["ready", "complete"].includes(status)
@@ -120,10 +137,14 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
     return {
       projectId: String(projectId || "free"),
       status: "uncalculated",
+      authorityStatus: BASS_AUTHORITY_STATUS.UNCALCULATED,
       currentFingerprint: null,
       contract: null,
       staleContract: null,
+      structurallyComplete: false,
+      authoritative: false,
       exportable: false,
+      publicationRejectionReason: null,
     };
   }
 
@@ -147,9 +168,13 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
   const publicationRejectionReason = structurallyComplete && !authoritative
     ? (current?.metricPublication?.publicationRejectionReason || "metric-publication-invalid")
     : null;
+  const authorityStatus = structurallyComplete
+    ? (authoritative ? BASS_AUTHORITY_STATUS.AUTHORITATIVE : BASS_AUTHORITY_STATUS.NOT_VERIFIED)
+    : (state.status === "uncalculated" ? BASS_AUTHORITY_STATUS.UNCALCULATED : BASS_AUTHORITY_STATUS.UPDATING);
   return {
     projectId: String(projectId || "free"),
     status: current ? "complete" : state.status === "uncalculated" ? "uncalculated" : "updating",
+    authorityStatus,
     currentFingerprint,
     contract: structurallyComplete ? current : null,
     staleContract,
