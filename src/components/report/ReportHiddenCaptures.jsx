@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import RoomVisualisation from '../room/RoomVisualisation';
+import RvStaticCanvas from './RvStaticCanvas';
 
 const HIDDEN_STYLE = {
     position: 'fixed',
@@ -125,12 +126,35 @@ export default function ReportHiddenCaptures({
     return (
         <>
             {/* Clean plan (no dimensions, with RP22 zone labels) */}
+            {/* Stage A: RvStaticCanvas replaces RoomVisualisation to bypass the
+                acoustic engine (useRP22AnalysisEngine, useSeatResponses,
+                useLiveImpactBaseline, useSeatMetricsCacheEffect) for this
+                geometry-only capture. */}
             <div data-plan-capture style={HIDDEN_STYLE}>
-                <RoomVisualisation
-                    {...commonProps}
-                    overlays={overlaysClean}
+                <RvStaticCanvas
+                    placedSpeakers={placedSpeakers}
+                    seatingPositions={seats}
+                    mlpPoint={primarySeatingPosition}
+                    screen={screenWithDepth}
+                    dolbyLayout={dolbyLayout}
+                    frontSubs={frontSubsForExport}
+                    rearSubs={rearSubsForExport}
+                    frontSubsCfg={frontSubsCfg}
+                    rearSubsCfg={rearSubsCfg}
+                    roomElements={stableRoomElements}
+                    exportMode="dimensions"
+                    exportWidthPx={1200}
+                    exportHeightPx={800}
+                    showBaffle={true}
+                    showScreen={true}
+                    screenFrontPlaneM={screenFrontPlaneM}
+                    screenPlaneMode="fixed"
                     speakerPositionsView="off"
                     showMlpRuler={false}
+                    overlays={overlaysClean}
+                    lcrAimMode={lcrAimMode || "flat"}
+                    aimAtMLP={aimAtMLP ?? false}
+                    appState={app}
                 />
             </div>
 
