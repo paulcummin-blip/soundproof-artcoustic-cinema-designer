@@ -19,7 +19,7 @@ export default function ComplianceReportPrint() {
   const completedBassAuthority = useCompletedBassAuthority(reportScopeId);
   const completedBassContract = completedBassAuthority.contract;
   const bassErrorMessage = completedBassAuthority.errorMessage || null;
-  const bassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract, bassErrorMessage), [completedBassContract, bassErrorMessage]);
+  const bassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
   const bassReportPending = completedBassAuthority.status === 'loading';
 
   // Extract data

@@ -115,7 +115,7 @@ export default function RP22ReportParameterGrid({
   rearSubsCount,
   p15ConstructionLevel,
   p21EarlyReflectionPreset,
-  bassContract = null,
+  bassAuthority = null,
   bassErrorMessage = null,
   variant = "screen",
 }) {
@@ -123,9 +123,14 @@ export default function RP22ReportParameterGrid({
   const MASKED_PARAM_IDS = [14, 18, 19, 20];
   const appState = useAppState();
   const sharedBassResults = useOptionalSharedBassResults();
-  const resolvedBassContract = bassContract || sharedBassResults?.contract || null;
+  const resolvedBassAuthority = React.useMemo(() => bassAuthority || (sharedBassResults ? {
+    contract: sharedBassResults?.contract || null,
+    authoritative: false,
+    publicationRejectionReason: null,
+    errorMessage: sharedBassResults?.detailedError || null,
+  } : null), [bassAuthority, sharedBassResults]);
   const resolvedBassError = bassErrorMessage || sharedBassResults?.detailedError || null;
-  const bassPresentation = React.useMemo(() => buildComplianceBassPresentation(resolvedBassContract, resolvedBassError), [resolvedBassContract, resolvedBassError]);
+  const bassPresentation = React.useMemo(() => buildComplianceBassPresentation({ completedBassAuthority: resolvedBassAuthority }, resolvedBassError), [resolvedBassAuthority, resolvedBassError]);
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";

@@ -66,7 +66,8 @@ export function runP14TargetBasisFixtures() {
 
   const minimumContract = completedContract(FP_MIN, "minimum", 112.4, 2);
   const pill = formatBassResults(minimumContract).pills.p14.text;
-  const compliance = buildComplianceBassPresentation(minimumContract).parameters.p14;
+  if (!minimumContract.metricPublication) minimumContract.metricPublication = { canonicalMetricPublicationValid: true, publicationRejectionReason: null };
+  const compliance = buildComplianceBassPresentation({ completedBassAuthority: { contract: minimumContract, authoritative: true, publicationRejectionReason: null } }).parameters.p14;
   const expectedText = "Estimated LFE Capability L2 · 112 dBC — Minimum target";
   const reportText = `Estimated LFE Capability ${compliance.level} · ${compliance.valueText} — ${compliance.targetBasisLabel} target`;
   check("Subwoofers/Bass/Compliance/PDF P14 authority parity", expectedText, `${pill} | ${reportText}`, pill === expectedText && reportText === expectedText);

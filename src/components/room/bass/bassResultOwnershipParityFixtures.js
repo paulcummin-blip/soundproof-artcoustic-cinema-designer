@@ -41,8 +41,10 @@ export function runBassResultOwnershipParityFixtures() {
   const check = (name, passed) => checks.push({ name, passed: !!passed });
   const contract = contractFixture();
   const simulation = formatBassResults(contract);
-  const compliance = buildComplianceBassPresentation(contract);
-  const pdf = buildComplianceBassExportData(contract);
+  if (!contract.metricPublication) contract.metricPublication = { canonicalMetricPublicationValid: true, publicationRejectionReason: null };
+  const verifiedAuthority = { contract, authoritative: true, publicationRejectionReason: null };
+  const compliance = buildComplianceBassPresentation({ completedBassAuthority: verifiedAuthority });
+  const pdf = buildComplianceBassExportData({ completedBassAuthority: verifiedAuthority });
   const expectedSeatOrder = "1,4,5,6,9,10,16,17,19,20";
   const rows = buildSeatHudParameterRows(baseSnapshot);
 

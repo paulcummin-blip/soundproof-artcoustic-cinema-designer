@@ -73,8 +73,8 @@ function RP22ReportInner() {
     const completedBassAuthority = useCompletedBassAuthority(effectiveProjectId || "free");
     const completedBassContract = completedBassAuthority.contract;
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
-    const completedBassPresentation = useMemo(() => buildComplianceBassPresentation(completedBassContract, bassErrorMessage), [completedBassContract, bassErrorMessage]);
-    const complianceBassExportData = useMemo(() => buildComplianceBassExportData(completedBassContract, bassErrorMessage), [completedBassContract, bassErrorMessage]);
+    const completedBassPresentation = useMemo(() => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
+    const complianceBassExportData = useMemo(() => buildComplianceBassExportData({ completedBassAuthority }, bassErrorMessage), [completedBassAuthority, bassErrorMessage]);
     const bassReportPending = completedBassAuthority.status === "loading";
     const completedP19Result = completedBassContract?.productAnalysis?.parameters?.p19 || null;
     const completedP19Results = completedBassContract?.selectedCandidate?.perSeatP19Results || [];
@@ -771,7 +771,7 @@ function RP22ReportInner() {
         rearSubsCount: app?.rearSubsCfg?.count,
         p15ConstructionLevel: app?.p15ConstructionLevel,
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
-        bassContract: completedBassContract,
+        bassAuthority: completedBassAuthority,
         bassErrorMessage,
     };
 
