@@ -417,27 +417,55 @@ export function adaptCurrentBassOptimisationResult({
     return detailedStatus === "CALCULATING" ? PARAM_STATUS_CALCULATING : PARAM_STATUS_UNCALCULATED;
   }
 
-  // P14 presents the selected operating target; fixed hardware capability remains separate.
+  // P14: the generic `value` is the ACHIEVED product capability (from
+  // assessP14Capability via postEqCapabilityAssessment.maximumAvailableSplAfterEqDb),
+  // NOT the requested target. The requested target is retained separately as
+  // `requestedTargetDb`. Fail closed: if achieved capability is missing, value
+  // is null and the parameter is unavailable — the target is never substituted
+  // as capability.
   const p14SelectedLevel = Math.max(1, Math.min(4, Math.round(Number(selectedP14Level) || 4)));
-  const p14Value = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : selectedCandidate?.selectedP14TargetDb ?? null;
+  const requestedTargetDb = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : selectedCandidate?.selectedP14TargetDb ?? null;
   const selectedP14TargetBasis = normalizeP14TargetBasis(p14TargetBasis);
-  const availableP14CapabilityDb = selectedCandidate?.availableP14CapabilityDb ?? selectedCandidate?.achievedP14Db ?? null;
-  const requestedP14Pass = Number.isFinite(availableP14CapabilityDb) && Number.isFinite(p14Value)
-    ? availableP14CapabilityDb >= p14Value
+  const achievedCapabilityDb = Number.isFinite(selectedCandidate?.postEqCapabilityAssessment?.maximumAvailableSplAfterEqDb)
+    ? selectedCandidate.postEqCapabilityAssessment.maximumAvailableSplAfterEqDb
+    : (Number.isFinite(selectedCandidate?.availableP14CapabilityDb)
+      ? selectedCandidate.availableP14CapabilityDb
+      : (Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : null));
+  const achievedLevel = Number.isFinite(selectedCandidate?.postEqCapabilityAssessment?.achievedP14Level)
+    ? selectedCandidate.postEqCapabilityAssessment.achievedP14Level
+    : (typeof selectedCandidate?.achievedP14Level === "number" ? selectedCandidate.achievedP14Level : null);
+  const headroomOrShortfallDb = Number.isFinite(achievedCapabilityDb) && Number.isFinite(requestedTargetDb)
+    ? achievedCapabilityDb - requestedTargetDb
     : null;
+  const p14Pass = Number.isFinite(achievedCapabilityDb) && Number.isFinite(requestedTargetDb)
+    ? achievedCapabilityDb >= requestedTargetDb
+    : null;
+  const p14Status = achievedCapabilityDb == null
+    ? PARAM_STATUS_NOT_APPLICABLE
+    : paramStatus(true);
   contract.productAnalysis.parameters.p14 = {
     ...createBassParameterResult({
-      parameter: PARAM_P14, status: paramStatus(p14Value != null), level: requestedP14Pass === false ? 0 : p14SelectedLevel, value: p14Value,
-      unit: "dBC", passedL1: requestedP14Pass, isStale,
+      parameter: PARAM_P14,
+      status: p14Status,
+      level: achievedCapabilityDb == null ? null : (p14Pass === false ? 0 : (achievedLevel ?? p14SelectedLevel)),
+      value: achievedCapabilityDb,
+      unit: "dBC",
+      passedL1: p14Pass,
+      isStale,
       recommendedLevel: selectedCandidate?.achievedP14RecommendedLevel ?? 0,
       recommendedDetail: formatP14RecommendedDetail(selectedCandidate?.achievedP14RecommendedLevel ?? 0),
       targetBasis: selectedP14TargetBasis,
       targetBasisDetail: formatP14TargetBasisDetail(selectedP14TargetBasis),
+      ...(achievedCapabilityDb == null ? { reason: "Achieved product capability unavailable" } : {}),
     }),
     selectedLevel: p14SelectedLevel,
-    selectedTargetDb: p14Value,
-    availableCapabilityDb: availableP14CapabilityDb,
-    pass: requestedP14Pass,
+    selectedTargetDb: requestedTargetDb,
+    availableCapabilityDb: achievedCapabilityDb,
+    requestedTargetDb,
+    achievedCapabilityDb,
+    headroomOrShortfallDb,
+    achievedLevel,
+    pass: p14Pass,
   };
 
   // P18 — final selected-candidate authority is achieved post-EQ room extension.
@@ -502,7 +530,7 @@ export function adaptCurrentBassOptimisationResult({
   contract.selectedTargetBasis = normalizeP14TargetBasis(p14TargetBasis);
   contract.selectedP14TargetBasis = contract.selectedTargetBasis;
   contract.selectedP14Level = p14SelectedLevel;
-  contract.selectedP14TargetDb = p14Value;
+  contract.selectedP14TargetDb = requestedTargetDb;
   contract.selectedP14RequiredExtensionHz = Number.isFinite(selectedP14RequiredExtensionHz) ? selectedP14RequiredExtensionHz : null;
   const selectedTarget = contract.bassTargets[contract.selectedTargetBasis];
   contract.productAnalysis.parameters = {
