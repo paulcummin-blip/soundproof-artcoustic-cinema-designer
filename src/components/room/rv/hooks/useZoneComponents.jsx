@@ -41,11 +41,6 @@ export function useZoneComponents({
       const yTopPx = (roomRect?.y ?? 0);
       const yBottomPx = (roomRect?.y ?? 0) + (ZONE_DEPTH_M * scale);
 
-      const rectX = Math.min(xStartPx, x2Px);
-      const rectWidth = Math.abs(x2Px - xStartPx);
-      const rectY = yTopPx;
-      const rectHeight = yBottomPx - yTopPx;
-
       const fill = side === 'left' ? '#4A230F' : '#213428';
 
       // Apply visual overhang for the display, similar to previous LCRZoneComponent
@@ -54,17 +49,43 @@ export function useZoneComponents({
       const [extendedRoomLeftPx] = toPx(0 - overhangM, 0);
       const [extendedRoomRightPx] = toPx(widthM + overhangM, 0);
 
-      // Clamp the visual rectangle to the extended bounds for display
-      const finalX = Math.max(extendedRoomLeftPx, rectX);
-      const finalWidth = Math.min(extendedRoomRightPx, rectX + rectWidth) - finalX;
+      // Source geometry
+      const zoneLeft = xStartPx;
+      const zoneRight = x2Px;
+      const clipLeft = extendedRoomLeftPx;
+      const clipRight = extendedRoomRightPx;
+      const y = yTopPx;
+      const height = yBottomPx - yTopPx;
+
+      // P0: Validate all source geometry before clipping — all must be finite.
+      if (!Number.isFinite(zoneLeft) || !Number.isFinite(zoneRight) ||
+          !Number.isFinite(clipLeft) || !Number.isFinite(clipRight) ||
+          !Number.isFinite(y) || !Number.isFinite(height)) {
+        return null;
+      }
+
+      // Normalise each interval independently
+      const normalisedZoneLeft = Math.min(zoneLeft, zoneRight);
+      const normalisedZoneRight = Math.max(zoneLeft, zoneRight);
+
+      const normalisedClipLeft = Math.min(clipLeft, clipRight);
+      const normalisedClipRight = Math.max(clipLeft, clipRight);
+
+      // Compute intersection
+      const finalX = Math.max(normalisedClipLeft, normalisedZoneLeft);
+      const finalRight = Math.min(normalisedClipRight, normalisedZoneRight);
+      const finalWidth = finalRight - finalX;
+
+      // If no overlap, render nothing — prevents negative/invalid width.
+      if (finalWidth <= 0 || height <= 0) return null;
 
       return (
         <rect
           id={`LCR_ZONE_${side.toUpperCase()}`}
           x={finalX}
-          y={rectY}
+          y={y}
           width={finalWidth}
-          height={rectHeight}
+          height={height}
           fill={fill}
           fillOpacity="0.35"
         />
