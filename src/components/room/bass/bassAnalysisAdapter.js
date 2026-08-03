@@ -426,14 +426,36 @@ export function adaptCurrentBassOptimisationResult({
   const p14SelectedLevel = Math.max(1, Math.min(4, Math.round(Number(selectedP14Level) || 4)));
   const requestedTargetDb = Number.isFinite(selectedP14TargetDb) ? selectedP14TargetDb : selectedCandidate?.selectedP14TargetDb ?? null;
   const selectedP14TargetBasis = normalizeP14TargetBasis(p14TargetBasis);
-  const achievedCapabilityDb = Number.isFinite(selectedCandidate?.postEqCapabilityAssessment?.maximumAvailableSplAfterEqDb)
-    ? selectedCandidate.postEqCapabilityAssessment.maximumAvailableSplAfterEqDb
-    : (Number.isFinite(selectedCandidate?.availableP14CapabilityDb)
-      ? selectedCandidate.availableP14CapabilityDb
-      : (Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : null));
-  const achievedLevel = Number.isFinite(selectedCandidate?.postEqCapabilityAssessment?.achievedP14Level)
-    ? selectedCandidate.postEqCapabilityAssessment.achievedP14Level
-    : (typeof selectedCandidate?.achievedP14Level === "number" ? selectedCandidate.achievedP14Level : null);
+  // C6.2C1: Capability source preference order (never falls back to requestedTargetDb):
+  //   1. optimisationResult.canonicalMetricAuthority.p14 — completed canonical
+  //      metric authority, proven to originate from assessP14Capability.
+  //   2. selectedCandidate.postEqCapabilityAssessment.maximumAvailableSplAfterEqDb
+  //      (buildPostEqBassCapabilityOutcome — same assessP14Capability lineage).
+  //   3. selectedCandidate.availableP14CapabilityDb (legacy compatibility).
+  //   4. selectedCandidate.achievedP14Db (legacy compatibility).
+  const canonicalP14 = optimisationResult?.canonicalMetricAuthority?.p14 || null;
+  const achievedCapabilityDb = Number.isFinite(canonicalP14?.achievedCapabilityDb)
+    ? canonicalP14.achievedCapabilityDb
+    : (Number.isFinite(selectedCandidate?.postEqCapabilityAssessment?.maximumAvailableSplAfterEqDb)
+      ? selectedCandidate.postEqCapabilityAssessment.maximumAvailableSplAfterEqDb
+      : (Number.isFinite(selectedCandidate?.availableP14CapabilityDb)
+        ? selectedCandidate.availableP14CapabilityDb
+        : (Number.isFinite(selectedCandidate?.achievedP14Db) ? selectedCandidate.achievedP14Db : null)));
+  // C6.2C1: achievedLevel is the RP22 level supported by achievedCapabilityDb.
+  // It is NOT zeroed when the requested target is missed — pass/fail is tracked
+  // separately in `pass`. Missing capability gives level null.
+  const achievedLevel = Number.isFinite(canonicalP14?.achievedLevel)
+    ? canonicalP14.achievedLevel
+    : (Number.isFinite(selectedCandidate?.postEqCapabilityAssessment?.achievedP14Level)
+      ? selectedCandidate.postEqCapabilityAssessment.achievedP14Level
+      : (typeof selectedCandidate?.achievedP14Level === "number" ? selectedCandidate.achievedP14Level : null));
+  const p14CapabilitySource = Number.isFinite(canonicalP14?.achievedCapabilityDb)
+    ? "canonicalMetricAuthority"
+    : (Number.isFinite(selectedCandidate?.postEqCapabilityAssessment?.maximumAvailableSplAfterEqDb)
+      ? "postEqCapabilityAssessment"
+      : (Number.isFinite(selectedCandidate?.availableP14CapabilityDb)
+        ? "availableP14CapabilityDb"
+        : (Number.isFinite(selectedCandidate?.achievedP14Db) ? "achievedP14Db" : null)));
   const headroomOrShortfallDb = Number.isFinite(achievedCapabilityDb) && Number.isFinite(requestedTargetDb)
     ? achievedCapabilityDb - requestedTargetDb
     : null;
@@ -447,7 +469,7 @@ export function adaptCurrentBassOptimisationResult({
     ...createBassParameterResult({
       parameter: PARAM_P14,
       status: p14Status,
-      level: achievedCapabilityDb == null ? null : (p14Pass === false ? 0 : (achievedLevel ?? p14SelectedLevel)),
+      level: achievedCapabilityDb == null ? null : (achievedLevel ?? null),
       value: achievedCapabilityDb,
       unit: "dBC",
       passedL1: p14Pass,
@@ -466,6 +488,7 @@ export function adaptCurrentBassOptimisationResult({
     headroomOrShortfallDb,
     achievedLevel,
     pass: p14Pass,
+    p14CapabilitySource,
   };
 
   // P18 — final selected-candidate authority is achieved post-EQ room extension.
