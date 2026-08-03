@@ -8,14 +8,26 @@ const levelLabel = (level) => level == null ? "—" : Number(level) === 0 ? "FAI
 // authoritative === true AND canonicalMetricPublicationValid === true means verified.
 function resolvePublicationState(completedBassAuthority) {
   const contract = completedBassAuthority?.contract || null;
-  const publicationVerified =
-    completedBassAuthority?.authoritative === true &&
-    contract?.metricPublication?.canonicalMetricPublicationValid === true;
-  const publicationRejectionReason =
-    completedBassAuthority?.publicationRejectionReason
-    || contract?.metricPublication?.publicationRejectionReason
-    || null;
-  return { contract, publicationVerified, publicationRejectionReason };
+
+  // No deterministic reason needed for structurally incomplete contracts
+  if (!isCompletedBassContract(contract)) {
+    return { contract, publicationVerified: false, publicationRejectionReason: null };
+  }
+
+  // C6.2D1A: Deterministic rejection reason with clear precedence.
+  // Do not return null for an unverified structurally complete contract.
+  let publicationRejectionReason = null;
+  if (!completedBassAuthority || typeof completedBassAuthority !== "object") {
+    publicationRejectionReason = "completed-authority-missing";
+  } else if (completedBassAuthority.authoritative !== true) {
+    publicationRejectionReason = "completed-authority-not-authoritative";
+  } else if (!contract.metricPublication) {
+    publicationRejectionReason = "metric-publication-receipt-missing";
+  } else if (contract.metricPublication.canonicalMetricPublicationValid !== true) {
+    publicationRejectionReason = contract.metricPublication.publicationRejectionReason || "metric-publication-not-verified";
+  }
+
+  return { contract, publicationVerified: publicationRejectionReason === null, publicationRejectionReason };
 }
 
 // C6.2D1: P14-specific fields from the corrected contract (Stage C6.2C1).
@@ -48,11 +60,12 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
 
   const parameter = contract?.productAnalysis?.parameters?.[key];
 
-  if (parameter?.status === "not_applicable") {
+  // C6.2D1A: P20 may return N/A when genuinely not applicable, before the publication gate.
+  if (key === "p20" && parameter?.status === "not_applicable") {
     return { key, valueText: "N/A", level: "N/A", status: parameter.status, isAuthoritative: false, publicationRejectionReason: null };
   }
 
-  // C6.2D1: Fail closed for NOT_VERIFIED authority. Retain raw diagnostic data separately.
+  // C6.2D1A: P14/P18/P19 — publication gate takes precedence over not_applicable.
   if (!publicationVerified) {
     const rawValue = Number.isFinite(Number(parameter?.value)) ? Number(parameter.value) : null;
     const result = {
@@ -71,6 +84,11 @@ export function formatAuthoritativeBassParameter(completedBassAuthority, key, er
     };
     if (key === "p14") Object.assign(result, buildP14Fields(parameter));
     return result;
+  }
+
+  // C6.2D1A: P14/P18/P19 — not_applicable only reachable when verified.
+  if (parameter?.status === "not_applicable") {
+    return { key, valueText: "N/A", level: "N/A", status: parameter.status, isAuthoritative: false, publicationRejectionReason: null };
   }
 
   // Verified: normal value and level presentation
@@ -117,12 +135,12 @@ export function buildComplianceBassPresentation({ completedBassAuthority }, erro
 
 export function buildComplianceBassExportData({ completedBassAuthority }, errorMessage = null) {
   const presentation = buildComplianceBassPresentation({ completedBassAuthority }, errorMessage);
-  const { publicationVerified, publicationRejectionReason } = presentation;
+  // C6.2D1A: Removed unused destructured publication fields.
   return {
     ...presentation,
     // C6.2D1: When invalid, do not use the source label "completed-authoritative-bass-result".
-    source: publicationVerified ? "completed-authoritative-bass-result" : "completed-bass-result-not-verified",
-    authority: publicationVerified ? "VALID" : "NOT_VERIFIED",
+    source: presentation.publicationVerified ? "completed-authoritative-bass-result" : "completed-bass-result-not-verified",
+    authority: presentation.publicationVerified ? "VALID" : "NOT_VERIFIED",
     independentBassCalculation: false,
   };
 }
