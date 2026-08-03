@@ -1,40 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import RoomVisualisation from '../room/RoomVisualisation';
-
-function buildSubsForExport(cfg, group, roomDims) {
-    const count = Math.max(0, Number(cfg?.count ?? cfg?.qty ?? 0) || 0);
-    const model = cfg?.model || '';
-    if (count === 0 || !model) return [];
-
-    const width = Number(roomDims?.widthM) || 4.5;
-    const length = Number(roomDims?.lengthM) || 6.0;
-    const y = group === 'front' ? 0.16 : length - 0.16;
-
-    const positions = Array.isArray(cfg?.positions) ? cfg.positions : [];
-
-    return Array.from({ length: count }, (_, i) => {
-        const savedX = positions[i]?.x;
-        let x;
-        if (Number.isFinite(savedX)) {
-            x = savedX;
-        } else if (count === 1) {
-            x = width * 0.5;
-        } else {
-            const margin = width * 0.15;
-            const span = width - 2 * margin;
-            x = margin + (span / (count - 1)) * i;
-        }
-        const num = i + 1;
-        return {
-            id: `sub-${group}-${num}`,
-            group,
-            role: group === 'front' ? `SUBF${num}` : `SUBR${num}`,
-            model,
-            isSub: true,
-            position: { x, y, z: 0 },
-        };
-    });
-}
 
 const HIDDEN_STYLE = {
     position: 'fixed',
@@ -47,6 +12,7 @@ const HIDDEN_STYLE = {
     zIndex: -1,
 };
 
+// Stable no-op callbacks — created once at module scope so they never trigger re-renders.
 const NOOPS = {
     onSetSpeakers: () => {},
     onSetSeatingPositions: () => {},
@@ -60,6 +26,9 @@ const NOOPS = {
     onSetMlpPoint: () => {},
 };
 
+// Stable empty overlays object for the seat-metrics-builder capture.
+const EMPTY_OVERLAYS = Object.freeze({});
+
 export default function ReportHiddenCaptures({
     app,
     placedSpeakers,
@@ -68,26 +37,51 @@ export default function ReportHiddenCaptures({
     screen,
     dolbyLayout,
 }) {
+    // --- Extract only the fields we need from `app` so useMemo deps are stable ---
     const screenFrontPlaneM = Number.isFinite(Number(app?.screenFrontPlaneM))
         ? Number(app.screenFrontPlaneM)
         : undefined;
 
-    const screenWithDepth = {
+    const allLiveSubs = app?.subwoofers;
+    const appOverlays = app?.overlays;
+    const enableFrontWides = app?.enableFrontWides;
+    const frontSubsCfg = app?.frontSubsCfg;
+    const rearSubsCfg = app?.rearSubsCfg;
+    const roomElements = app?.roomElements;
+    const lcrAimMode = app?.lcrAimMode;
+    const aimAtMLP = app?.aimAtMLP;
+
+    // --- Memoize all derived data so RoomVisualisation receives stable prop refs ---
+    const screenWithDepth = useMemo(() => ({
         ...(screen || {}),
         floatDepthM: screenFrontPlaneM ?? (Number(screen?.floatDepthM) || 0),
-    };
+    }), [screen, screenFrontPlaneM]);
 
-    const allLiveSubs = Array.isArray(app?.subwoofers) ? app.subwoofers : [];
-    const frontSubsForExport = allLiveSubs.filter((sub) => sub?.group === 'front');
-    const rearSubsForExport = allLiveSubs.filter((sub) => sub?.group === 'rear');
+    const frontSubsForExport = useMemo(
+        () => (Array.isArray(allLiveSubs) ? allLiveSubs.filter((sub) => sub?.group === 'front') : []),
+        [allLiveSubs]
+    );
 
-    const liveOverlays = {
-        ...(app?.overlays || {}),
-        FRONT_WIDE: app?.overlays?.FRONT_WIDE,
-        enableFrontWides: app?.enableFrontWides,
-    };
+    const rearSubsForExport = useMemo(
+        () => (Array.isArray(allLiveSubs) ? allLiveSubs.filter((sub) => sub?.group === 'rear') : []),
+        [allLiveSubs]
+    );
 
-    const commonProps = {
+    const liveOverlays = useMemo(() => ({
+        ...(appOverlays || {}),
+        FRONT_WIDE: appOverlays?.FRONT_WIDE,
+        enableFrontWides,
+    }), [appOverlays, enableFrontWides]);
+
+    const stableRoomElements = useMemo(
+        () => (Array.isArray(roomElements) ? roomElements : []),
+        [roomElements]
+    );
+
+    // The common props shared by all three plan-capture RoomVisualisation instances.
+    // Memoized so that RoomVisualisation never receives a new `commonProps` object
+    // unless one of its actual dependencies changed.
+    const commonProps = useMemo(() => ({
         placedSpeakers,
         seatingPositions: seats,
         mlpPoint: primarySeatingPosition,
@@ -96,9 +90,9 @@ export default function ReportHiddenCaptures({
         dolbyLayout,
         frontSubs: frontSubsForExport,
         rearSubs: rearSubsForExport,
-        frontSubsCfg: app?.frontSubsCfg,
-        rearSubsCfg: app?.rearSubsCfg,
-        roomElements: app?.roomElements || [],
+        frontSubsCfg,
+        rearSubsCfg,
+        roomElements: stableRoomElements,
         exportMode: "dimensions",
         exportWidthPx: 1200,
         exportHeightPx: 800,
@@ -106,10 +100,27 @@ export default function ReportHiddenCaptures({
         showScreen: true,
         zoomMode: "off",
         screenPlaneMode: "fixed",
-        lcrAimMode: app?.lcrAimMode || "flat",
-        aimAtMLP: app?.aimAtMLP ?? false,
+        lcrAimMode: lcrAimMode || "flat",
+        aimAtMLP: aimAtMLP ?? false,
         ...NOOPS,
-    };
+    }), [
+        placedSpeakers, seats, primarySeatingPosition, screenWithDepth,
+        screenFrontPlaneM, dolbyLayout, frontSubsForExport, rearSubsForExport,
+        frontSubsCfg, rearSubsCfg, stableRoomElements, lcrAimMode, aimAtMLP,
+    ]);
+
+    // Memoize each overlay variant so they are stable across re-renders.
+    const overlaysClean = useMemo(() => ({
+        ...liveOverlays,
+        ROOM_DIMS: true,
+        EXPORT_ROW_FRONT_DIST: true,
+        EXPORT_RSP_LABEL: true,
+        EXPORT_CEILING_LABEL: true,
+    }), [liveOverlays]);
+
+    const overlaysDims = useMemo(() => ({
+        ...liveOverlays,
+    }), [liveOverlays]);
 
     return (
         <>
@@ -117,13 +128,7 @@ export default function ReportHiddenCaptures({
             <div data-plan-capture style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     {...commonProps}
-                    overlays={{
-                        ...liveOverlays,
-                        ROOM_DIMS: true,
-                        EXPORT_ROW_FRONT_DIST: true,
-                        EXPORT_RSP_LABEL: true,
-                        EXPORT_CEILING_LABEL: true,
-                    }}
+                    overlays={overlaysClean}
                     speakerPositionsView="off"
                     showMlpRuler={false}
                 />
@@ -133,9 +138,7 @@ export default function ReportHiddenCaptures({
             <div data-plan-capture-dims style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     {...commonProps}
-                    overlays={{
-                        ...liveOverlays,
-                    }}
+                    overlays={overlaysDims}
                     speakerPositionsView="off"
                     showMlpRuler={true}
                     showThrowDistance={true}
@@ -146,9 +149,7 @@ export default function ReportHiddenCaptures({
             <div data-plan-capture-speaker-dims style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     {...commonProps}
-                    overlays={{
-                        ...liveOverlays,
-                    }}
+                    overlays={overlaysDims}
                     speakerPositionsView="plan"
                     showMlpRuler={false}
                 />
@@ -166,13 +167,13 @@ export default function ReportHiddenCaptures({
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsForExport}
                     rearSubs={rearSubsForExport}
-                    overlays={{}}
+                    overlays={EMPTY_OVERLAYS}
                     showBaffle={true}
                     showScreen={true}
                     speakerPositionsView="off"
                     showMlpRuler={false}
                     zoomMode="off"
-                    aimAtMLP={app?.aimAtMLP ?? false}
+                    aimAtMLP={aimAtMLP ?? false}
                     {...NOOPS}
                 />
             </div>

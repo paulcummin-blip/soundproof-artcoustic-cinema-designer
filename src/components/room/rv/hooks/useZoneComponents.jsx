@@ -76,8 +76,12 @@ export function useZoneComponents({
       const finalRight = Math.min(normalisedClipRight, normalisedZoneRight);
       const finalWidth = finalRight - finalX;
 
-      // If no overlap, render nothing — prevents negative/invalid width.
-      if (finalWidth <= 0 || height <= 0) return null;
+      // If no overlap or non-finite result, render nothing — prevents
+      // negative/NaN width from reaching the SVG rect.
+      if (!Number.isFinite(finalWidth) || !Number.isFinite(height) ||
+          finalWidth <= 0 || height <= 0) {
+        return null;
+      }
 
       return (
         <rect
@@ -169,9 +173,20 @@ export function useZoneComponents({
         backRectWidth = Math.max(0, roomRight - rightSeat_px + fadeLen_px);
       }
 
+      // Finite guards on all rect-bound values — prevents NaN/negative SVG geometry.
+      const vBandRender = (vBandTotalHeight_px > 0 &&
+        Number.isFinite(sideX_px) && Number.isFinite(vBandStartY_px) &&
+        Number.isFinite(bandW_px) && Number.isFinite(vBottom_px) &&
+        Number.isFinite(mlpOffsetRatio));
+
+      const backRender = (backRectWidth > 0 &&
+        Number.isFinite(backRectX) && Number.isFinite(backY_px) &&
+        Number.isFinite(backRectWidth) && Number.isFinite(backH_px) &&
+        Number.isFinite(solidOffsetRatio) && Number.isFinite(fadeOffsetRatio));
+
       return (
         <g pointerEvents="none">
-          {vBandTotalHeight_px > 0 && (
+          {vBandRender && (
             <>
               <defs>
                 <linearGradient id={gidV} gradientUnits="userSpaceOnUse"
@@ -192,7 +207,7 @@ export function useZoneComponents({
             </>
           )}
 
-          {backRectWidth > 0 && (
+          {backRender && (
             <>
               <defs>
                 <linearGradient id={gidB} gradientUnits="userSpaceOnUse"
@@ -265,7 +280,10 @@ export function useZoneComponents({
         const fillColor = isLeft ? '#4A230F' : '#213428';
         const sideX_px = isLeft ? roomLeft : roomRight - bandW_px;
 
-        const verticalRect = vHeight_px > 0 ? (
+        // Finite guard for vertical rect
+        const verticalRect = (vHeight_px > 0 &&
+          Number.isFinite(sideX_px) && Number.isFinite(lastSeatY_px) &&
+          Number.isFinite(bandW_px) && Number.isFinite(vHeight_px)) ? (
           <rect
             key={`vert-${side}`}
             x={sideX_px}
@@ -288,10 +306,16 @@ export function useZoneComponents({
         const offsetSolid = totalW > 0 ? solidW / totalW : 0;
         const offsetFade = totalW > 0 ? backFadeW_px / totalW : 0;
 
+        // Finite guard for horizontal rect
+        const horizontalRender = (totalW > 0 &&
+          Number.isFinite(bandX) && Number.isFinite(backY_px) &&
+          Number.isFinite(totalW) && Number.isFinite(bandW_px) &&
+          Number.isFinite(offsetSolid) && Number.isFinite(offsetFade));
+
         return (
           <g key={side} pointerEvents="none">
             {verticalRect}
-            {totalW > 0 && (
+            {horizontalRender && (
               <>
                 <defs>
                   <linearGradient
