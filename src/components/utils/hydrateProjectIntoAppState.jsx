@@ -204,7 +204,13 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     enableDolbyZones: false, ROOM_DIMS: false,
   };
   const overlaysData = parseMaybe(p?.overlays, defaultOverlays);
-  if (typeof setOverlays === "function") setOverlays({ ...defaultOverlays, ...overlaysData });
+  const normalisedOverlays = { ...defaultOverlays, ...overlaysData };
+  // Stage 1: Normalise overhead toggle fields to strict booleans — legacy object
+  // values must not pass through as overlay toggles to RP22ZonesOverlay.
+  for (const key of ['OVERHEADS_2', 'OVERHEADS_4', 'OVERHEADS_6']) {
+    normalisedOverlays[key] = typeof normalisedOverlays[key] === 'boolean' ? normalisedOverlays[key] : defaultOverlays[key];
+  }
+  if (typeof setOverlays === "function") setOverlays(normalisedOverlays);
 
   // 6) SEATING
   const sp = parseMaybe(p?.seating_positions, []);

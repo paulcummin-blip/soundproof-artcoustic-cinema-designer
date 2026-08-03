@@ -22,6 +22,35 @@ function elevationAngleFromMLP(yPos_m, mlpY_m, deltaH_m) {
   return Math.atan2(deltaH_m, horizontalDist) * (180 / Math.PI);
 }
 
+// --- Shared overhead band guard (Stage 1: Live SVG NaN Fix) ---
+// Validates band data before AND after toPx conversion. Returns null if any
+// check fails — caller must render nothing. Do not substitute zero, do not
+// invent geometry.
+let _overheadBandWarned = false;
+function warnOverheadBandRejected() {
+  if (_overheadBandWarned) return;
+  const isDev = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV;
+  if (!isDev) return;
+  _overheadBandWarned = true;
+  console.warn('[RP22ZonesOverlay] Malformed overhead band data rejected — no SVG emitted for invalid band.');
+}
+
+function validateOverheadBand(band, toPx, xM) {
+  if (!band) return null;
+  if (!Number.isFinite(band.yMin) || !Number.isFinite(band.yMax) || !Number.isFinite(band.medianY)) return null;
+  if (!(band.yMax > band.yMin)) return null;
+
+  const [x, yMin] = toPx(xM, band.yMin);
+  const [, yMax] = toPx(xM, band.yMax);
+  const [, yMed] = toPx(xM, band.medianY);
+  const h = yMax - yMin;
+
+  if (!Number.isFinite(x) || !Number.isFinite(yMin) || !Number.isFinite(yMax) || !Number.isFinite(yMed)) return null;
+  if (!Number.isFinite(h) || h <= 0) return null;
+
+  return { x, yMin, yMax, yMed, h };
+}
+
 export default function RP22ZonesOverlay(props) {
   const {
     overlays,
@@ -216,18 +245,19 @@ export default function RP22ZonesOverlay(props) {
 
     function renderBand(bandType, side) {
       const band = bands[bandType];
-      if (!band) return;
-
       const isLeft = (side === 'L');
 
       // choose the precomputed *left edge* anchor (in meters)
       const xM = isLeft ? leftBandLeft_m : rightBandLeft_m;
 
-      // convert to px
-      const [xPxRaw, yMin] = toPx(xM, band.yMin);
-      const [, yMax] = toPx(xM, band.yMax);
-      const [, yMed] = toPx(xM, band.medianY);
-      const h = Math.max(1, yMax - yMin);
+      // Stage 1: Validate band data before and after toPx — reject NaN, no substitution.
+      const validated = validateOverheadBand(band, toPx, xM);
+      if (!validated) {
+        warnOverheadBandRejected();
+        return;
+      }
+
+      const { x: xPxRaw, yMin, yMax, yMed, h } = validated;
 
       // clamp so the rect never escapes the room
       const xPx = Math.max(roomLeftPx, Math.min(roomRightPx - BAND_PX, xPxRaw));
@@ -356,18 +386,19 @@ export default function RP22ZonesOverlay(props) {
 
     function renderBand(bandType, side) {
       const band = bands[bandType];
-      if (!band) return;
-
       const isLeft = (side === 'L');
 
       // choose the precomputed *left edge* anchor (in meters)
       const xM = isLeft ? leftBandLeft_m : rightBandLeft_m;
 
-      // convert to px
-      const [xPxRaw, yMin] = toPx(xM, band.yMin);
-      const [, yMax] = toPx(xM, band.yMax);
-      const [, yMed] = toPx(xM, band.medianY);
-      const h = Math.max(1, yMax - yMin);
+      // Stage 1: Validate band data before and after toPx — reject NaN, no substitution.
+      const validated = validateOverheadBand(band, toPx, xM);
+      if (!validated) {
+        warnOverheadBandRejected();
+        return;
+      }
+
+      const { x: xPxRaw, yMin, yMax, yMed, h } = validated;
 
       // clamp so the rect never escapes the room
       const xPx = Math.max(roomLeftPx, Math.min(roomRightPx - BAND_PX, xPxRaw));
@@ -498,18 +529,19 @@ export default function RP22ZonesOverlay(props) {
 
     function renderBand(bandType, side) {
       const band = bands[bandType];
-      if (!band) return;
-
       const isLeft = (side === 'L');
 
       // choose the precomputed *left edge* anchor (in meters)
       const xM = isLeft ? leftBandLeft_m : rightBandLeft_m;
 
-      // convert to px
-      const [xPxRaw, yMin] = toPx(xM, band.yMin);
-      const [, yMax] = toPx(xM, band.yMax);
-      const [, yMed] = toPx(xM, band.medianY);
-      const h = Math.max(1, yMax - yMin);
+      // Stage 1: Validate band data before and after toPx — reject NaN, no substitution.
+      const validated = validateOverheadBand(band, toPx, xM);
+      if (!validated) {
+        warnOverheadBandRejected();
+        return;
+      }
+
+      const { x: xPxRaw, yMin, yMax, yMed, h } = validated;
 
       // clamp so the rect never escapes the room
       const xPx = Math.max(roomLeftPx, Math.min(roomRightPx - BAND_PX, xPxRaw));
