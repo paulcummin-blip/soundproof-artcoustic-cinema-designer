@@ -778,10 +778,64 @@ function RoomDesignerWithState() {
     SHOW_DEBUG_LOGS,
   });
 
-  // ✅ analysisResult uses internal overlay calculation (no props needed)
-  const analysisResult = useRP22AnalysisEngine({
+  // ── Stage 2: Settled-input gate for RP22 after manual RSP release ───────────
+  // After RSP release, mlpAnchorEffective changes immediately but placedSpeakers
+  // (LCR y/z, rotation) and screen clearance take several render cycles to
+  // settle via the geometry effects below. This gate retains the previous settled
+  // RP22 inputs until all geometry has caught up, then runs one authoritative
+  // RP22 calculation. Prevents transient RP22 publications (flat LCR: 2→1, angled: 4→1).
+  const _settledInputsRef = useRef({
     placedSpeakers: engineSpeakers,
     visiblePlanSpeakers: analysisSpeakers,
+    mlpPointOverride: mlpAnchorEffective,
+    screen: _screen,
+    seatSplMetrics: allSeatSplMetrics,
+  });
+  const [settledMlpY, setSettledMlpY] = useState(mlpAnchorEffective?.y ?? null);
+  const _settleRafRef = useRef(null);
+
+  useEffect(() => {
+    // Schedule a settle check on next animation frame. If any key input changes
+    // before the frame fires, the previous rAF is cancelled and rescheduled — so
+    // settledMlpY only updates once all geometry has stopped changing.
+    if (_settleRafRef.current != null) cancelAnimationFrame(_settleRafRef.current);
+    _settleRafRef.current = requestAnimationFrame(() => {
+      _settleRafRef.current = null;
+      setSettledMlpY(mlpAnchorEffective?.y ?? null);
+    });
+    return () => {
+      if (_settleRafRef.current != null) {
+        cancelAnimationFrame(_settleRafRef.current);
+        _settleRafRef.current = null;
+      }
+    };
+  }, [mlpAnchorEffective?.y, engineSpeakers, analysisSpeakers, _screen, allSeatSplMetrics]);
+
+  const _isRspSettled = settledMlpY === mlpAnchorEffective?.y;
+
+  // Update settled inputs ref only when settled (never read + write same render).
+  if (_isRspSettled) {
+    _settledInputsRef.current = {
+      placedSpeakers: engineSpeakers,
+      visiblePlanSpeakers: analysisSpeakers,
+      mlpPointOverride: mlpAnchorEffective,
+      screen: _screen,
+      seatSplMetrics: allSeatSplMetrics,
+    };
+  }
+
+  const _settled = _settledInputsRef.current;
+  const _effectivePlacedSpeakers = _isRspSettled ? engineSpeakers : _settled.placedSpeakers;
+  const _effectiveVisiblePlanSpeakers = _isRspSettled ? analysisSpeakers : _settled.visiblePlanSpeakers;
+  const _effectiveMlpPointOverride = _isRspSettled ? mlpAnchorEffective : _settled.mlpPointOverride;
+  const _effectiveScreen = _isRspSettled ? _screen : _settled.screen;
+  const _effectiveSeatSplMetrics = _isRspSettled ? allSeatSplMetrics : _settled.seatSplMetrics;
+  // ── END Stage 2 ────────────────────────────────────────────────────────────
+
+  // ✅ analysisResult uses internal overlay calculation (no props needed)
+  const analysisResult = useRP22AnalysisEngine({
+    placedSpeakers: _effectivePlacedSpeakers,
+    visiblePlanSpeakers: _effectiveVisiblePlanSpeakers,
     seatingPositions: seats,
     primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
@@ -789,9 +843,9 @@ function RoomDesignerWithState() {
     sevenBedLayoutType: appState?.sevenBedLayoutType,
     extraSurroundCount: appState?.extraSurroundCount,
     p15ConstructionLevel: appState?.p15ConstructionLevel,
-    screen: _screen,
-    mlpPointOverride: mlpAnchorEffective, // Use same MLP as FW overlay (green dot)
-    seatSplMetrics: allSeatSplMetrics,
+    screen: _effectiveScreen,
+    mlpPointOverride: _effectiveMlpPointOverride, // Use same MLP as FW overlay (green dot)
+    seatSplMetrics: _effectiveSeatSplMetrics,
     overheadState: {
       globalModel: _overheadGlobalModel,
       frontOverride: _overheadFrontOverride,
