@@ -16,6 +16,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useClientReportAuthority } from "@/components/report/client/useClientReportAuthority";
 import ClientSoundAroundListener from "@/components/report/client/ClientSoundAroundListener";
+import ClientSoundAboveListener from "@/components/report/client/ClientSoundAboveListener";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText } from "lucide-react";
 
@@ -34,7 +35,7 @@ export default function RP22ClientReport() {
   );
 
   const authority = useClientReportAuthority(projectId);
-  const { hydrating, projectDetails, p5Snapshot, roomDims, screen, screenFrontPlaneM } = authority;
+  const { hydrating, projectDetails, p5Snapshot, p9Snapshot, roomDims, screen, screenFrontPlaneM } = authority;
 
   const handleBackToProject = () => {
     if (!projectId) return;
@@ -148,12 +149,20 @@ export default function RP22ClientReport() {
             No project selected. Open a project from the Room Designer to view its Client Visual Report.
           </div>
         ) : (
-          <ClientSoundAroundListener
-            p5Snapshot={p5Snapshot}
-            roomDims={roomDims}
-            screen={screen}
-            screenFrontPlaneM={screenFrontPlaneM}
-          />
+          <>
+            <ClientSoundAroundListener
+              p5Snapshot={p5Snapshot}
+              roomDims={roomDims}
+              screen={screen}
+              screenFrontPlaneM={screenFrontPlaneM}
+            />
+            <div style={{ marginTop: 24 }}>
+              <ClientSoundAboveListener
+                p9Snapshot={p9Snapshot}
+                roomDims={roomDims}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>

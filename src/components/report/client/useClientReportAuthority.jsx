@@ -21,6 +21,8 @@ import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { computeSurroundRingGaps, rp22LevelForP5 } from "@/components/utils/p5SurroundGaps";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
+import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat } from "@/components/utils/rp22UpperSeatMetrics";
+import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
@@ -270,6 +272,121 @@ export function useClientReportAuthority(projectId) {
     };
   }, [rsp, analysisSpeakers, rspSourceLabel]);
 
+  // ── 7) Ear height ───────────────────────────────────────────────────────
+  const earHeightM = useMemo(() => {
+    const rowHeights = Array.isArray(app?.rowEarHeights) ? app.rowEarHeights : [];
+    const validRowHeights = rowHeights.map(Number).filter((h) => Number.isFinite(h) && h > 0);
+    if (validRowHeights.length > 0) {
+      return validRowHeights.reduce((a, b) => a + b, 0) / validRowHeights.length;
+    }
+    if (seatingPositions.length > 0) {
+      const heights = seatingPositions
+        .map((s) => Number(s?.earHeightM ?? s?.ear_h ?? s?.z ?? s?.position?.z))
+        .filter((h) => Number.isFinite(h) && h > 0);
+      if (heights.length > 0) {
+        return heights.reduce((a, b) => a + b, 0) / heights.length;
+      }
+    }
+    return 1.2;
+  }, [app?.rowEarHeights, seatingPositions]);
+
+  // ── 8) Overhead zone bands (preferred placement) ────────────────────────
+  const zoneBands = useOverheadZonesComputed({
+    seatingPositions,
+    heightM: roomDims.heightM,
+    widthM: roomDims.widthM,
+    lengthM: roomDims.lengthM,
+    mlpY_m: rsp?.y,
+    mlp: rsp,
+    placedSpeakers,
+    getCanonicalRole,
+  });
+
+  // ── 9) P9 snapshot — overhead spatial resolution ─────────────────────────
+  // Uses the SAME production helpers as useRP22AnalysisEngine:
+  //   getUpperSpeakersForSeat + computeUpperVerticalAnglesForSeat
+  // Level mapping matches the engine exactly (≤50→L4, ≤60→L3, ≤80→L2, else L1).
+  const p9Snapshot = useMemo(() => {
+    if (!rsp || !analysisSpeakers.length) return null;
+
+    const roomCenterX = roomDims.widthM / 2;
+    const rspSeat = { id: "rsp", x: rsp.x, y: rsp.y, z: earHeightM };
+    const upperSpeakers = getUpperSpeakersForSeat(rspSeat, analysisSpeakers, getCanonicalRole);
+
+    if (upperSpeakers.length < 2) return null;
+
+    const result = computeUpperVerticalAnglesForSeat(rspSeat, upperSpeakers, roomCenterX);
+    const { maxVerticalGapDeg, gaps, rowElevations } = result;
+
+    if (!Number.isFinite(maxVerticalGapDeg)) return null;
+
+    let level9 = 1;
+    if (maxVerticalGapDeg <= 50) level9 = 4;
+    else if (maxVerticalGapDeg <= 60) level9 = 3;
+    else if (maxVerticalGapDeg <= 80) level9 = 2;
+
+    // Merge row elevations by row (combine left+right for side view)
+    const rowMap = new Map();
+    for (const elev of rowElevations) {
+      if (!rowMap.has(elev.rowName)) {
+        rowMap.set(elev.rowName, {
+          rowName: elev.rowName,
+          rowIndex: elev.rowIndex,
+          sumY: 0,
+          sumZ: 0,
+          count: 0,
+        });
+      }
+      const group = rowMap.get(elev.rowName);
+      group.sumY += elev.avgY;
+      group.sumZ += elev.avgZ;
+      group.count += 1;
+    }
+
+    const rowGroups = [];
+    for (const group of rowMap.values()) {
+      const avgY = group.sumY / group.count;
+      const avgZ = group.sumZ / group.count;
+      const dz = avgZ - earHeightM;
+      const dy = avgY - rsp.y;
+      const elevDeg = Math.atan2(dz, dy) * 180 / Math.PI;
+      rowGroups.push({
+        rowName: group.rowName,
+        rowIndex: group.rowIndex,
+        avgY,
+        avgZ,
+        elevDeg,
+      });
+    }
+    rowGroups.sort((a, b) => a.rowIndex - b.rowIndex);
+
+    // Merged gaps for side-view display (front→mid, mid→rear)
+    const mergedGaps = [];
+    for (let i = 1; i < rowGroups.length; i++) {
+      const prev = rowGroups[i - 1];
+      const next = rowGroups[i];
+      mergedGaps.push({
+        fromRow: prev.rowName,
+        toRow: next.rowName,
+        deg: Math.abs(next.elevDeg - prev.elevDeg),
+        fromElevDeg: prev.elevDeg,
+        toElevDeg: next.elevDeg,
+      });
+    }
+
+    return {
+      rsp,
+      earHeightM,
+      rowGroups,
+      gaps,
+      mergedGaps,
+      level: `L${level9}`,
+      worstGapDeg: maxVerticalGapDeg,
+      zoneBands,
+      upperSpeakers,
+    };
+  }, [rsp, analysisSpeakers, roomDims.widthM, earHeightM, zoneBands]);
+
   return {
     projectId,
     projectDetails,
@@ -282,6 +399,7 @@ export function useClientReportAuthority(projectId) {
     rsp,
     rspSourceLabel,
     p5Snapshot,
+    p9Snapshot,
     analysisSpeakers,
   };
 }
