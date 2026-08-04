@@ -17,17 +17,28 @@ import React, { useMemo } from "react";
 
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
-  L4: { label: "Excellent overhead continuity", color: "#213428", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
-  L3: { label: "Very good overhead continuity", color: "#3E4349", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
-  L2: { label: "Good overhead continuity", color: "#625143", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
-  L1: { label: "Noticeable overhead gaps", color: "#4A230F", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
-  Fail: { label: "Improvement recommended", color: "#4A230F", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
-  "N/A": { label: "P9 not applicable", color: "#625143", explanation: "This layout uses a single overhead row, so there is no adjacent-row spacing to assess." },
-  "—": { label: "Improvement recommended", color: "#C1B6AD", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
+  L4: { label: "Excellent overhead continuity", color: "#213428", explanation: "The overhead layout creates smooth, precise movement above the listening area." },
+  L3: { label: "Very good overhead continuity", color: "#3E4349", explanation: "The overhead layout creates smooth movement above the listener, with only a small increase in spacing between rows." },
+  L2: { label: "Good overhead continuity", color: "#625143", explanation: "The overhead layout provides clear front-to-back movement, with wider spacing between the overhead rows." },
+  L1: { label: "Further refinement recommended", color: "#4A230F", explanation: "Moving the overhead rows closer together would create smoother movement above the listener." },
+  Fail: { label: "Further refinement recommended", color: "#4A230F", explanation: "Moving the overhead rows closer together would create smoother movement above the listener." },
+  "N/A": { label: "Single overhead row — spacing assessment not applicable", color: "#625143", explanation: "This layout uses a single overhead row, so there is no adjacent-row spacing to assess." },
+  "—": { label: "Further refinement recommended", color: "#C1B6AD", explanation: "Moving the overhead rows closer together would create smoother movement above the listener." },
 };
 
-function getStatusInfo(level) {
-  return STATUS_COPY[level] || STATUS_COPY["—"];
+// L3 near-boundary: when the largest gap is no more than 1° outside the 50° L4 target,
+// use a gentler explanation that avoids alarming the client over a fractional miss.
+const L4_BOUNDARY_DEG = 50;
+const NEAR_BOUNDARY_TOLERANCE_DEG = 1;
+const L3_NEAR_BOUNDARY_EXPLANATION =
+  "The overhead layout creates smooth movement above the listener. The largest spacing is only fractionally outside the highest RP22 target.";
+
+function getStatusInfo(level, value) {
+  const base = STATUS_COPY[level] || STATUS_COPY["—"];
+  if (level === "L3" && Number.isFinite(value) && value <= L4_BOUNDARY_DEG + NEAR_BOUNDARY_TOLERANCE_DEG) {
+    return { ...base, explanation: L3_NEAR_BOUNDARY_EXPLANATION };
+  }
+  return base;
 }
 
 // ── Row metadata ───────────────────────────────────────────────────────────
@@ -80,7 +91,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
   const level = p9Snapshot?.level || "—";
   const value = p9Snapshot?.value;
   const worstGapDeg = p9Snapshot?.worstGapDeg;
-  const statusInfo = getStatusInfo(level);
+  const statusInfo = getStatusInfo(level, value);
 
   // Ear position in SVG coords (authoritative seat origin)
   const earPx = authoritativeSeat ? toPx(authoritativeSeat.y, authoritativeSeat.z) : null;
@@ -506,69 +517,34 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
 
       {/* ── Status card ── */}
       <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
         padding: "16px 20px",
         background: "#F1F0EE",
         borderRadius: 12,
         border: `1px solid ${statusInfo.color}40`,
       }}>
         <div style={{
-          width: 48,
-          height: 48,
-          borderRadius: 8,
-          background: `${statusInfo.color}25`,
-          border: `2px solid ${statusInfo.color}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 18,
-          fontWeight: 700,
-          color: statusInfo.color,
-          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-          flexShrink: 0,
+          fontSize: 16,
+          fontWeight: 600,
+          color: "#213428",
+          marginBottom: 4,
         }}>
-          {level}
+          {statusInfo.label}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: "#213428",
-            marginBottom: 4,
-          }}>
-            {statusInfo.label}
-          </div>
-          <div style={{
-            fontSize: 13,
-            color: "#3E4349",
-            lineHeight: 1.5,
-          }}>
-            {statusInfo.explanation}
-          </div>
+        <div style={{
+          fontSize: 13,
+          color: "#3E4349",
+          lineHeight: 1.5,
+          marginBottom: Number.isFinite(value) ? 8 : 0,
+        }}>
+          {statusInfo.explanation}
         </div>
         {Number.isFinite(value) && (
           <div style={{
-            textAlign: "right",
-            flexShrink: 0,
+            fontSize: 11,
+            color: "#625143",
+            letterSpacing: "0.04em",
           }}>
-            <div style={{
-              fontSize: 11,
-              color: "#625143",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              marginBottom: 2,
-            }}>
-              Largest gap
-            </div>
-            <div style={{
-              fontSize: 20,
-              fontWeight: 600,
-              color: statusInfo.color,
-            }}>
-              {value.toFixed(1)}°
-            </div>
+            {value.toFixed(1)}° largest gap — RP22 Parameter 9
           </div>
         )}
       </div>
