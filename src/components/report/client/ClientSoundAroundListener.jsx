@@ -396,17 +396,33 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
                 >
                   {item.role}
                 </text>
-                {/* Azimuth label */}
-                <text
-                  x={sp.px}
-                  y={sp.py + 18}
-                  fill="#625143"
-                  fontSize={9}
-                  textAnchor="middle"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
-                >
-                  {Math.round(item.azimuth)}°
-                </text>
+                {/* Azimuth label — LCR uses vector-based offset toward RSP */}
+                {(() => {
+                  const offsetPx = isFrontLCR ? 24 : 18;
+                  let labelX = sp.px;
+                  let labelY = sp.py + offsetPx;
+                  if (isFrontLCR && rspPx) {
+                    const dx = rspPx.px - sp.px;
+                    const dy = rspPx.py - sp.py;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 0.01) {
+                      labelX = sp.px + (dx / dist) * offsetPx;
+                      labelY = sp.py + (dy / dist) * offsetPx;
+                    }
+                  }
+                  return (
+                    <text
+                      x={labelX}
+                      y={labelY}
+                      fill="#625143"
+                      fontSize={9}
+                      textAnchor="middle"
+                      fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                    >
+                      {Math.round(item.azimuth)}°
+                    </text>
+                  );
+                })()}
               </g>
             );
           })}
