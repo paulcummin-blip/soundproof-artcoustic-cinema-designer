@@ -7,15 +7,17 @@
  * with a very light translucent fill on the compliant side.
  * For .2 layouts, renders a discreet "Single overhead row" label.
  *
+ * Supports multiple compliant ranges (state = "bounded_l4").
  * Follows the existing front-wide L4 target-line visual language.
  */
 
 import React from "react";
 
 export default function RvP9Corridors({
-  l4Range,
+  ranges,
   boundaries,
   applicable,
+  state,
   note,
   toPx,
   widthM,
@@ -51,14 +53,15 @@ export default function RvP9Corridors({
 
   return (
     <g data-layer="p9-target" pointerEvents="none">
-      {/* L4-compliant range — very light translucent fill */}
-      {l4Range && (() => {
-        const [, yStartPx] = toPx(0, l4Range.yStart);
-        const [, yEndPx] = toPx(0, l4Range.yEnd);
+      {/* L4-compliant ranges — very light translucent fill */}
+      {(ranges || []).map((range, i) => {
+        const [, yStartPx] = toPx(0, range.yStart);
+        const [, yEndPx] = toPx(0, range.yEnd);
         const y = Math.min(yStartPx, yEndPx);
         const hpx = Math.max(0, Math.abs(yEndPx - yStartPx));
         return (
           <rect
+            key={`p9-range-${i}`}
             x={x0px}
             y={y}
             width={wpx}
@@ -68,10 +71,10 @@ export default function RvP9Corridors({
             stroke="none"
           />
         );
-      })()}
+      })}
 
       {/* L4 target boundary lines */}
-      {boundaries.map((yBoundary, i) => {
+      {(boundaries || []).map((yBoundary, i) => {
         const [, yPx] = toPx(0, yBoundary);
         return (
           <g key={`p9-target-${i}`}>

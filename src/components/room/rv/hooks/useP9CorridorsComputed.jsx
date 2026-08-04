@@ -6,8 +6,20 @@
  * Samples candidate Y positions along the room length, moves only the selected
  * overhead row to each candidate Y, and runs the existing production helpers
  * (getUpperSpeakersForSeat + computeUpperVerticalAnglesForSeat) to find the
- * max vertical gap at each position. The L4-compliant range (gap ≤ 50°) and
- * its boundary crossings are returned for rendering as a target line.
+ * relevant vertical gap at each position.
+ *
+ * Pair-specific authority:
+ *   .4 layout (front + rear):
+ *     selected front → front ↔ rear gap
+ *     selected rear  → front ↔ rear gap
+ *   .6 layout (front + mid + rear):
+ *     selected front → front ↔ mid gap only
+ *     selected rear  → mid ↔ rear gap only
+ *     selected mid   → max(front ↔ mid, mid ↔ rear)
+ *
+ * Returns a stable result contract:
+ *   { applicable, state, ranges, boundaries, selectedRow, note }
+ *   state: "single_row" | "no_l4" | "all_l4" | "bounded_l4" | null
  *
  * No state writes, no autosave, no full RP22 engine rerun.
  * Memoised from stable inputs for drag responsiveness.
@@ -32,6 +44,60 @@ function getOverheadRowFromRole(role) {
   return null;
 }
 
+// Extract the row pair from a gap's pair string.
+// Format: "SIDE | rowName1 [roles] ... ↔ rowName2 [roles] ..."
+function getRowPairFromGap(gap) {
+  if (!gap || !gap.pair) return null;
+  const parts = gap.pair.split("↔");
+  if (parts.length !== 2) return null;
+  const row1Match = parts[0].match(/(\w+)\s+\[/);
+  const row2Match = parts[1].match(/(\w+)\s+\[/);
+  if (!row1Match || !row2Match) return null;
+  return [row1Match[1], row2Match[1]];
+}
+
+// Determine the relevant gap degree from the helper result, based on the
+// selected row and overhead count. Uses the existing result.gaps — no
+// duplicate angle maths.
+function getRelevantGapDeg(result, selectedRow, ohCount) {
+  if (!result || !Array.isArray(result.gaps)) return null;
+
+  let relevantPairs;
+  if (ohCount === 4) {
+    // .4: front ↔ rear only
+    relevantPairs = [["front", "rear"]];
+  } else if (ohCount === 6) {
+    if (selectedRow === "front") {
+      relevantPairs = [["front", "mid"]];
+    } else if (selectedRow === "rear") {
+      relevantPairs = [["mid", "rear"]];
+    } else if (selectedRow === "mid") {
+      relevantPairs = [["front", "mid"], ["mid", "rear"]];
+    } else {
+      return null;
+    }
+  } else {
+    return null;
+  }
+
+  const norm = (p) => [...p].sort().join("|");
+  const targetSet = new Set(relevantPairs.map(norm));
+
+  const relevantGaps = [];
+  for (const gap of result.gaps) {
+    const pair = getRowPairFromGap(gap);
+    if (!pair) continue;
+    if (targetSet.has(norm(pair))) {
+      if (Number.isFinite(gap.deg)) {
+        relevantGaps.push(gap.deg);
+      }
+    }
+  }
+
+  if (relevantGaps.length === 0) return null;
+  return Math.max(...relevantGaps);
+}
+
 export function useP9CorridorsComputed({
   selectedOverheadRow,
   rsp,
@@ -41,15 +107,17 @@ export function useP9CorridorsComputed({
   dolbyLayout,
 }) {
   return useMemo(() => {
+    const empty = { applicable: false, state: null, ranges: [], boundaries: [], selectedRow: null, note: null };
+
     if (!selectedOverheadRow || !rsp || !Array.isArray(placedSpeakers)) {
-      return { corridors: [], applicable: false, note: null };
+      return empty;
     }
 
     const rspX = Number(rsp.x);
     const rspY = Number(rsp.y);
     const rspZ = Number(rsp.z);
     if (!Number.isFinite(rspX) || !Number.isFinite(rspY) || !Number.isFinite(rspZ)) {
-      return { corridors: [], applicable: false, note: null };
+      return empty;
     }
 
     const widthM = Number(roomDims?.widthM) || 4.5;
@@ -62,12 +130,12 @@ export function useP9CorridorsComputed({
 
     // .2 layout: single overhead row, P9 not applicable
     if (ohCount === 2) {
-      return { corridors: [], applicable: false, note: "Single overhead row — P9 spacing not applicable" };
+      return { applicable: false, state: "single_row", ranges: [], boundaries: [], selectedRow: selectedOverheadRow, note: "Single overhead row — P9 spacing not applicable" };
     }
 
     // Only .4 and .6 layouts have P9 corridors
     if (ohCount !== 4 && ohCount !== 6) {
-      return { corridors: [], applicable: false, note: null };
+      return empty;
     }
 
     // Get overhead speakers with valid positions
@@ -80,7 +148,7 @@ export function useP9CorridorsComputed({
         Number.isFinite(s.position.z)
     );
     if (overheadSpeakers.length === 0) {
-      return { corridors: [], applicable: false, note: null };
+      return empty;
     }
 
     // Check that the selected row has speakers
@@ -88,7 +156,7 @@ export function useP9CorridorsComputed({
       (s) => getOverheadRowFromRole(s.role) === selectedOverheadRow
     );
     if (selectedRowSpeakers.length === 0) {
-      return { corridors: [], applicable: false, note: null };
+      return empty;
     }
 
     // Check that at least one other row exists (for adjacency)
@@ -96,7 +164,7 @@ export function useP9CorridorsComputed({
       (s) => getOverheadRowFromRole(s.role) !== selectedOverheadRow
     );
     if (otherRowSpeakers.length === 0) {
-      return { corridors: [], applicable: false, note: null };
+      return empty;
     }
 
     const rspPoint = { x: rspX, y: rspY, z: rspZ };
@@ -120,35 +188,74 @@ export function useP9CorridorsComputed({
       const upperSpeakers = getUpperSpeakersForSeat(rspPoint, candidateSpeakers, canonicalRoleFn);
       const result = computeUpperVerticalAnglesForSeat(rspPoint, upperSpeakers, roomCenterX);
 
-      samples.push({ y, maxGap: result.maxVerticalGapDeg });
+      // Use pair-specific gap, not global maxVerticalGapDeg
+      const relevantGapDeg = getRelevantGapDeg(result, selectedOverheadRow, ohCount);
+
+      samples.push({ y, gap: relevantGapDeg });
     }
 
-    // Find L4-compliant range and boundary crossings (where maxGap crosses 50°)
-    const l4Samples = samples.filter((s) => s.maxGap <= P9_L4_MAX);
+    // Only consider samples with finite gap values
+    const validSamples = samples.filter((s) => Number.isFinite(s.gap));
+    if (validSamples.length === 0) {
+      return { applicable: true, state: "no_l4", ranges: [], boundaries: [], selectedRow: selectedOverheadRow, note: null };
+    }
 
+    const l4Samples = validSamples.filter((s) => s.gap <= P9_L4_MAX);
+
+    // All samples L4
+    if (l4Samples.length === validSamples.length) {
+      const ranges = [{ yStart: validSamples[0].y, yEnd: validSamples[validSamples.length - 1].y }];
+      return { applicable: true, state: "all_l4", ranges, boundaries: [], selectedRow: selectedOverheadRow, note: null };
+    }
+
+    // No L4 samples
     if (l4Samples.length === 0) {
-      return { l4Range: null, boundaries: [], applicable: true, note: null };
+      return { applicable: true, state: "no_l4", ranges: [], boundaries: [], selectedRow: selectedOverheadRow, note: null };
     }
 
-    const l4Range = {
-      yStart: l4Samples[0].y,
-      yEnd: l4Samples[l4Samples.length - 1].y,
-    };
+    // Bounded L4 — find compliant ranges (consecutive L4 samples)
+    // Does not assume first-to-last compliant samples form one range.
+    const ranges = [];
+    let rangeStart = null;
+    for (let i = 0; i < validSamples.length; i++) {
+      const s = validSamples[i];
+      const isL4 = s.gap <= P9_L4_MAX;
+      if (isL4 && rangeStart === null) {
+        rangeStart = s.y;
+      } else if (!isL4 && rangeStart !== null) {
+        ranges.push({ yStart: rangeStart, yEnd: validSamples[i - 1].y });
+        rangeStart = null;
+      }
+    }
+    if (rangeStart !== null) {
+      ranges.push({ yStart: rangeStart, yEnd: validSamples[validSamples.length - 1].y });
+    }
 
-    // Interpolate boundary crossings where maxGap transitions across 50°
+    // Interpolate boundary crossings with numerical safety
     const boundaries = [];
-    for (let i = 1; i < samples.length; i++) {
-      const prev = samples[i - 1];
-      const curr = samples[i];
-      const prevL4 = prev.maxGap <= P9_L4_MAX;
-      const currL4 = curr.maxGap <= P9_L4_MAX;
+    for (let i = 1; i < validSamples.length; i++) {
+      const prev = validSamples[i - 1];
+      const curr = validSamples[i];
+      const prevL4 = prev.gap <= P9_L4_MAX;
+      const currL4 = curr.gap <= P9_L4_MAX;
       if (prevL4 !== currL4) {
-        const t = (P9_L4_MAX - prev.maxGap) / (curr.maxGap - prev.maxGap);
-        boundaries.push(prev.y + t * (curr.y - prev.y));
+        const denom = curr.gap - prev.gap;
+        let yBoundary;
+        if (Number.isFinite(denom) && Math.abs(denom) > 1e-9) {
+          const t = (P9_L4_MAX - prev.gap) / denom;
+          yBoundary = prev.y + t * (curr.y - prev.y);
+        } else {
+          // Denominator is zero or non-finite — use midpoint as fallback
+          yBoundary = (prev.y + curr.y) / 2;
+        }
+        // Guard: interpolated Y must be finite and within candidate domain
+        if (Number.isFinite(yBoundary) && yBoundary >= yMin && yBoundary <= yMax) {
+          boundaries.push(yBoundary);
+        }
       }
     }
 
-    return { l4Range, boundaries, applicable: true, note: null };
+    return { applicable: true, state: "bounded_l4", ranges, boundaries, selectedRow: selectedOverheadRow, note: null };
   }, [
     selectedOverheadRow,
     rsp?.x,
