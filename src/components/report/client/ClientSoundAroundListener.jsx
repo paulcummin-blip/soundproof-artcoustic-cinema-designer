@@ -19,12 +19,36 @@ import { isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
 
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
-  L4: { label: "Excellent spatial continuity", color: "#213428" },
-  L3: { label: "Very good spatial continuity", color: "#3E4349" },
-  L2: { label: "Good spatial continuity", color: "#625143" },
-  L1: { label: "Further refinement recommended", color: "#4A230F" },
-  Fail: { label: "Further refinement recommended", color: "#4A230F" },
-  "—": { label: "Further refinement recommended", color: "#C1B6AD" },
+  L4: {
+    label: "Excellent spatial continuity",
+    color: "#213428",
+    explanation: "The speaker layout creates smooth, precise movement around the listening position.",
+  },
+  L3: {
+    label: "Very good spatial continuity",
+    color: "#3E4349",
+    explanation: "The speaker layout creates smooth movement around the listening position, with well-controlled spacing between channels.",
+  },
+  L2: {
+    label: "Good spatial continuity",
+    color: "#625143",
+    explanation: "The speaker layout provides clear movement around the listening position, with slightly wider spacing between some channels.",
+  },
+  L1: {
+    label: "Further refinement recommended",
+    color: "#4A230F",
+    explanation: "Refining the surround-speaker positions would create smoother movement around the listening position.",
+  },
+  Fail: {
+    label: "Further refinement recommended",
+    color: "#4A230F",
+    explanation: "Refining the surround-speaker positions would create smoother movement around the listening position.",
+  },
+  "—": {
+    label: "Further refinement recommended",
+    color: "#C1B6AD",
+    explanation: "Refining the surround-speaker positions would create smoother movement around the listening position.",
+  },
 };
 
 function getStatusInfo(level) {
@@ -440,25 +464,16 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
           lineHeight: 1.5,
           marginBottom: 8,
         }}>
-          The proposed speaker layout creates smooth, continuous movement around the reference listening position.
+          {statusInfo.explanation}
         </div>
         {Number.isFinite(worstGapDeg) && (
           <div style={{
             fontSize: 12,
             color: "#625143",
-            marginBottom: 6,
           }}>
-            {Math.round(worstGapDeg)}° largest spacing at the RSP — RP22 Parameter 5
+            {Math.round(worstGapDeg)}° largest spacing — RP22 Parameter 5
           </div>
         )}
-        <div style={{
-          fontSize: 11,
-          color: "#625143",
-          opacity: 0.7,
-          fontStyle: "italic",
-        }}>
-          Seat-by-seat compliance results are provided in the Technical RP22 Report.
-        </div>
       </div>
 
       {/* ── Footnote ── */}
