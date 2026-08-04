@@ -20,6 +20,8 @@ import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectInt
 import { useAnalysisSpeakers } from '@/components/hooks/useAnalysisSpeakers';
 import { useSubwooferSync } from '@/components/hooks/useSubwooferSync';
 import { base44 } from '@/api/base44Client';
+import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
+import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 
 // Extracted child components
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
@@ -300,14 +302,73 @@ function RP22ReportInner() {
         return [inchesTxt, ratioTxt].filter(Boolean).join(" ") || "Not specified";
     };
 
+    // ── Effective RSP from restored authority ──────────────────────────────
+    // Resolves RSP Y directly from rspMode / manualRspY_m / screen geometry via
+    // the production useEffectiveRsp helper.  Does NOT rely on app.mlpY_m being
+    // precomputed by Room Designer effects (those effects don't run here).
+    const rspMode = app?.rspMode || "auto_from_screen";
+    const manualRspY_m = app?.manualRspY_m ?? null;
+
+    const screenVisibleWidthInches = React.useMemo(() => {
+        const TV_PRESET_WIDTH_MM = { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 };
+        const tvKey = screen?.tvPresetKey;
+        const tvMm = Number(screen?.tvWidthMm);
+        if (tvKey && TV_PRESET_WIDTH_MM[tvKey]) return TV_PRESET_WIDTH_MM[tvKey] / 25.4;
+        if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
+        const vwi = Number(screen?.visibleWidthInches);
+        if (Number.isFinite(vwi) && vwi > 0) return vwi;
+        const mw = Number(screen?.manualWidthM);
+        if (Number.isFinite(mw) && mw > 0) return mw / 0.0254;
+        return 120;
+    }, [screen?.tvPresetKey, screen?.tvWidthMm, screen?.visibleWidthInches, screen?.manualWidthM]);
+
+    const reportScreenFrontPlaneM = React.useMemo(() => {
+        const raw = Number(app?.screenFrontPlaneM);
+        if (Number.isFinite(raw) && raw > 0) return raw;
+        const floatDepth = Number(screen?.floatDepthM);
+        if (Number.isFinite(floatDepth) && floatDepth > 0) return floatDepth;
+        return 0.20;
+    }, [app?.screenFrontPlaneM, screen?.floatDepthM]);
+
+    const reportScreenWidthM = React.useMemo(
+        () => Number(screenVisibleWidthInches) * 0.0254,
+        [screenVisibleWidthInches]
+    );
+
+    const rowDerivedRspYByMode = React.useMemo(() => {
+        if (!seats.length) return {};
+        try {
+            const result = computeMLPAndPrimary(
+                seats,
+                stableDimensions.width,
+                stableDimensions.length,
+                "front"
+            );
+            return result?.rowDerivedRspYByMode ?? {};
+        } catch {
+            return {};
+        }
+    }, [seats, stableDimensions.width, stableDimensions.length]);
+
+    const { effectiveRspY_m } = useEffectiveRsp({
+        rspMode,
+        manualRspY_m,
+        screenFrontPlaneM: reportScreenFrontPlaneM,
+        screenWidthM: reportScreenWidthM,
+        rowCentersM: app?.rowCentersM || [],
+        seatingPositions: seats,
+        currentMlpY_m: app?.mlpY_m ?? null,
+        rowDerivedRspYByMode,
+    });
+
     const reportMlpAnchorEffective = React.useMemo(() => {
         const cx = stableDimensions.width / 2;
-        const mlpY = app?.mlpY_m;
-        if (Number.isFinite(mlpY)) {
-            return { x: cx, y: mlpY, z: 1.2 };
+        const y = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : app?.mlpY_m;
+        if (Number.isFinite(y)) {
+            return { x: cx, y, z: 1.2 };
         }
         return app?.mlp || null;
-    }, [app?.mlpY_m, stableDimensions.width, app?.mlp]);
+    }, [effectiveRspY_m, app?.mlpY_m, stableDimensions.width, app?.mlp]);
 
     const primarySeatingPosition = reportMlpAnchorEffective || app?.mlp || null;
 
