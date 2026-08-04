@@ -49,13 +49,13 @@ export default function RP22ClientReport() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#1B1A1A",
+      background: "#F1F0EE",
       fontFamily: "Didact Gothic, Century Gothic, sans-serif",
     }}>
       {/* ── Header ── */}
       <div style={{
         padding: "20px 32px",
-        borderBottom: "1px solid rgba(62, 67, 73, 0.4)",
+        borderBottom: "1px solid #DCDBD6",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -65,7 +65,7 @@ export default function RP22ClientReport() {
             margin: 0,
             fontSize: 22,
             fontWeight: 600,
-            color: "#F8F8F7",
+            color: "#213428",
             fontFamily: "Futura PT Light, Century Gothic, sans-serif",
           }}>
             Client Visual Report
@@ -74,7 +74,7 @@ export default function RP22ClientReport() {
             <p style={{
               margin: "4px 0 0 0",
               fontSize: 13,
-              color: "#C1B6AD",
+              color: "#625143",
             }}>
               {projectDetails.name}
               {projectDetails.client_name ? ` — ${projectDetails.client_name}` : ""}
@@ -123,23 +123,27 @@ export default function RP22ClientReport() {
       }}>
         {hydrating ? (
           <div style={{
-            background: "rgba(62, 67, 73, 0.35)",
+            background: "#FFFFFF",
             borderRadius: 16,
             padding: 64,
             textAlign: "center",
-            color: "#C1B6AD",
+            color: "#625143",
             fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+            border: "1px solid #DCDBD6",
           }}>
             Loading project…
           </div>
         ) : !projectId ? (
           <div style={{
-            background: "rgba(62, 67, 73, 0.35)",
+            background: "#FFFFFF",
             borderRadius: 16,
             padding: 64,
             textAlign: "center",
-            color: "#C1B6AD",
+            color: "#625143",
             fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+            border: "1px solid #DCDBD6",
           }}>
             No project selected. Open a project from the Room Designer to view its Client Visual Report.
           </div>

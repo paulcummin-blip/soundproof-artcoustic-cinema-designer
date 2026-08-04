@@ -33,14 +33,14 @@ function getStatusInfo(level) {
 
 // ── Role label colours ─────────────────────────────────────────────────────
 const ROLE_COLORS = {
-  FL: "#DCDBD6", FC: "#DCDBD6", FR: "#DCDBD6",
+  FL: "#3E4349", FC: "#3E4349", FR: "#3E4349",
   SL: "#625143", SR: "#625143",
   SBL: "#4A230F", SBR: "#4A230F",
   LW: "#213428", RW: "#213428",
 };
 
 function getRoleColor(canon) {
-  return ROLE_COLORS[canon] || "#C1B6AD";
+  return ROLE_COLORS[canon] || "#625143";
 }
 
 // ── Azimuth from RSP ───────────────────────────────────────────────────────
@@ -179,12 +179,14 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
   if (!p5Snapshot || !rspPx) {
     return (
       <div style={{
-        background: "rgba(62, 67, 73, 0.35)",
+        background: "#FFFFFF",
         borderRadius: 16,
         padding: 48,
         textAlign: "center",
-        color: "#C1B6AD",
+        color: "#625143",
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+        boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+        border: "1px solid #DCDBD6",
       }}>
         Preparing spatial resolution view…
       </div>
@@ -193,10 +195,12 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
 
   return (
     <div style={{
-      background: "rgba(62, 67, 73, 0.35)",
+      background: "#FFFFFF",
       borderRadius: 16,
       padding: 32,
       fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+      boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+      border: "1px solid #DCDBD6",
     }}>
       {/* ── Title + subtitle ── */}
       <div style={{ marginBottom: 24 }}>
@@ -204,7 +208,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
           margin: 0,
           fontSize: 28,
           fontWeight: 600,
-          color: "#F8F8F7",
+          color: "#213428",
           letterSpacing: "0.01em",
           fontFamily: "Futura PT Light, Century Gothic, sans-serif",
         }}>
@@ -213,7 +217,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
         <p style={{
           margin: "4px 0 0 0",
           fontSize: 14,
-          color: "#C1B6AD",
+          color: "#625143",
           letterSpacing: "0.04em",
           textTransform: "uppercase",
         }}>
@@ -234,7 +238,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
           style={{ maxWidth: SVG_W, width: "100%", height: "auto" }}
         >
           {/* Background */}
-          <rect width={SVG_W} height={SVG_H} fill="#1B1A1A" rx="12" />
+          <rect width={SVG_W} height={SVG_H} fill="#F8F8F7" rx="12" />
 
           {/* ── Room outline ── */}
           {(() => {
@@ -247,8 +251,8 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
                 width={(br.px - tl.px)}
                 height={(br.py - tl.py)}
                 fill="none"
-                stroke="#DCDBD6"
-                strokeOpacity={0.25}
+                stroke="#C1B6AD"
+                strokeOpacity={0.5}
                 strokeWidth={2}
                 rx={4}
               />
@@ -274,7 +278,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
                 <text
                   x={(left.px + right.px) / 2}
                   y={left.py - 10}
-                  fill="#C1B6AD"
+                  fill="#625143"
                   fontSize={11}
                   textAnchor="middle"
                   fontFamily="Didact Gothic, Century Gothic, sans-serif"
@@ -291,7 +295,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
             <path
               d={continuityPath}
               fill="#213428"
-              fillOpacity={0.10}
+              fillOpacity={0.06}
               stroke="none"
             />
           )}
@@ -325,7 +329,6 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
           {speakersWithAzimuth.map((item, i) => {
             const sp = toPx(item.position.x, item.position.y);
             const isFrontLCR = ["FL", "FC", "FR"].includes(item.canon);
-            const rayColor = isFrontLCR ? "#C1B6AD" : getRoleColor(item.canon);
             return (
               <line
                 key={`ray-${i}`}
@@ -333,9 +336,9 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
                 y1={rspPx.py}
                 x2={sp.px}
                 y2={sp.py}
-                stroke={rayColor}
+                stroke="#625143"
                 strokeWidth={isFrontLCR ? 1 : 1.5}
-                strokeOpacity={isFrontLCR ? 0.35 : 0.6}
+                strokeOpacity={isFrontLCR ? 0.2 : 0.3}
               />
             );
           })}
@@ -353,15 +356,15 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
                   cx={sp.px}
                   cy={sp.py}
                   r={radius}
-                  fill={isFrontLCR ? "#DCDBD6" : color}
-                  stroke="#1B1A1A"
+                  fill={isFrontLCR ? "#3E4349" : color}
+                  stroke="#F8F8F7"
                   strokeWidth={1.5}
                   />
                   {/* Role label */}
                   <text
                   x={sp.px}
                   y={sp.py - 12}
-                  fill={isFrontLCR ? "#DCDBD6" : color}
+                  fill={isFrontLCR ? "#3E4349" : color}
                   fontSize={11}
                   textAnchor="middle"
                   fontFamily="Didact Gothic, Century Gothic, sans-serif"
@@ -373,7 +376,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
                 <text
                   x={sp.px}
                   y={sp.py + 18}
-                  fill="#C1B6AD"
+                  fill="#625143"
                   fontSize={9}
                   textAnchor="middle"
                   fontFamily="Didact Gothic, Century Gothic, sans-serif"
@@ -391,19 +394,19 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
               cy={rspPx.py}
               r={10}
               fill="none"
-              stroke="#F8F8F7"
+              stroke="#213428"
               strokeWidth={2}
             />
             <circle
               cx={rspPx.px}
               cy={rspPx.py}
               r={4}
-              fill="#625143"
+              fill="#FFFFFF"
             />
             <text
               x={rspPx.px}
               y={rspPx.py + 24}
-              fill="#F8F8F7"
+              fill="#213428"
               fontSize={11}
               textAnchor="middle"
               fontFamily="Didact Gothic, Century Gothic, sans-serif"
@@ -422,9 +425,9 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
         alignItems: "center",
         gap: 16,
         padding: "16px 20px",
-        background: "rgba(62, 67, 73, 0.35)",
+        background: "#F1F0EE",
         borderRadius: 12,
-        border: `1px solid ${statusInfo.color}60`,
+        border: `1px solid ${statusInfo.color}40`,
       }}>
         <div style={{
           width: 48,
@@ -447,14 +450,14 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
           <div style={{
             fontSize: 16,
             fontWeight: 600,
-            color: "#F8F8F7",
+            color: "#213428",
             marginBottom: 4,
           }}>
             {statusInfo.label}
           </div>
           <div style={{
             fontSize: 13,
-            color: "#C1B6AD",
+            color: "#3E4349",
             lineHeight: 1.5,
           }}>
             The proposed speaker layout creates smooth, continuous movement around the listening position.
@@ -467,7 +470,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
           }}>
             <div style={{
               fontSize: 11,
-              color: "#C1B6AD",
+              color: "#625143",
               textTransform: "uppercase",
               letterSpacing: "0.06em",
               marginBottom: 2,
@@ -489,8 +492,8 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
       <p style={{
         margin: "16px 0 0 0",
         fontSize: 11,
-        color: "#C1B6AD",
-        opacity: 0.7,
+        color: "#625143",
+        opacity: 0.6,
         fontStyle: "italic",
         textAlign: "center",
       }}>
