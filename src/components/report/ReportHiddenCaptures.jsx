@@ -86,8 +86,8 @@ export default function ReportHiddenCaptures({
         [roomElements]
     );
 
-    // The common props shared by all three plan-capture RoomVisualisation instances.
-    // Memoized so that RoomVisualisation never receives a new `commonProps` object
+    // The common props shared by the two static plan captures.
+    // Memoized so that RvStaticCanvas never receives a new `commonProps` object
     // unless one of its actual dependencies changed.
     const commonProps = useMemo(() => ({
         placedSpeakers,
@@ -167,9 +167,9 @@ export default function ReportHiddenCaptures({
 
             {/* Dimensioned plan (room dimensions + MLP ruler) */}
             <div data-plan-capture-dims style={HIDDEN_STYLE}>
-                <RoomVisualisation
+                <RvStaticCanvas
                     {...commonProps}
-                    rp22DiagnosticOwner="report-dimensioned-plan"
+                    appState={app}
                     overlays={overlaysDims}
                     speakerPositionsView="off"
                     showMlpRuler={true}
@@ -179,9 +179,9 @@ export default function ReportHiddenCaptures({
 
             {/* Speaker positions plan */}
             <div data-plan-capture-speaker-dims style={HIDDEN_STYLE}>
-                <RoomVisualisation
+                <RvStaticCanvas
                     {...commonProps}
-                    rp22DiagnosticOwner="report-speaker-plan"
+                    appState={app}
                     overlays={overlaysDims}
                     speakerPositionsView="plan"
                     showMlpRuler={false}
