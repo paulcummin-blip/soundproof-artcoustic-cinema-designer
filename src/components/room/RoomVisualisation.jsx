@@ -44,6 +44,7 @@ import { useScreenPlane } from "@/components/room/rv/hooks/useScreenPlane";
 import { useRoomCoordinateConverters } from "@/components/room/rv/hooks/useRoomCoordinateConverters";
 import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWideZonesComputed";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
+import { useP9CorridorsComputed } from "@/components/room/rv/hooks/useP9CorridorsComputed";
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
@@ -383,6 +384,10 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const hudDragRef = useRef(null);
   const hudElRef = useRef(null);
   const isHudPinned = Boolean(hudPinnedSeatId);
+
+  // P9 corridor selection — tracks which overhead row is selected for dynamic guidance
+  const [selectedOverheadRow, setSelectedOverheadRow] = useState(null);
+  const justSelectedOverheadRef = useRef(false);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -973,6 +978,26 @@ const byId = useEntitiesById({
     [handleMouseDown]
   );
 
+  // Wrapped handler that also tracks selected overhead row for P9 corridors
+  const bedLayerSpeakerMouseDownHandlerWithSelection = useCallback(
+    (e, id) => {
+      const speaker = placedSpeakers.find((s) => s.id === id);
+      let isOverhead = false;
+      if (speaker) {
+        const role = String(speaker.role || "").toUpperCase();
+        if (role.startsWith("TF")) { setSelectedOverheadRow("front"); isOverhead = true; }
+        else if (role.startsWith("TM")) { setSelectedOverheadRow("mid"); isOverhead = true; }
+        else if (role.startsWith("TR") || role.startsWith("TB")) { setSelectedOverheadRow("rear"); isOverhead = true; }
+        else { setSelectedOverheadRow(null); }
+      } else {
+        setSelectedOverheadRow(null);
+      }
+      justSelectedOverheadRef.current = isOverhead;
+      bedLayerSpeakerMouseDownHandler(e, id);
+    },
+    [bedLayerSpeakerMouseDownHandler, placedSpeakers]
+  );
+
   const handleBedLayerSpeakerAimToggle = useCallback((speaker) => {
     const role = String(getCanonicalRole(speaker?.role) || '').toUpperCase();
 
@@ -1008,6 +1033,23 @@ const byId = useEntitiesById({
     setPanY,
     setZoom,
   });
+
+  // Clear overhead selection when clicking on canvas background
+  const handlePlanClickWithSelection = useCallback((e) => {
+    if (!justSelectedOverheadRef.current) {
+      setSelectedOverheadRow(null);
+    }
+    justSelectedOverheadRef.current = false;
+    handlePlanClick(e);
+  }, [handlePlanClick]);
+
+  // Reset just-selected ref after drag ends (handles case where onClick doesn't fire)
+  useEffect(() => {
+    if (!dragging) {
+      const timer = setTimeout(() => { justSelectedOverheadRef.current = false; }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [dragging]);
 
   // Pan handlers - extracted to hook
   const { onPanPointerDown: hookOnPanDown, onPanPointerMove: hookOnPanMove, onPanPointerUp: hookOnPanUp } = usePanZoomHandlers({
@@ -1777,8 +1819,18 @@ useEffect(() => {
     });
   }, [placedSpeakers, speakerDragTick]);
 
+  // Dynamic P9 target corridors for selected overhead row
+  const p9Corridors = useP9CorridorsComputed({
+    selectedOverheadRow,
+    rsp: mlp,
+    placedSpeakers: renderSpeakers,
+    roomDims: { widthM, lengthM, heightM },
+    getCanonicalRole,
+    dolbyLayout,
+  });
+
   // Overhead speaker icons — extracted to hook
-  const overheadIconElements = useOverheadIconElements({ placedSpeakers: renderSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
+  const overheadIconElements = useOverheadIconElements({ placedSpeakers: renderSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride,   overheadRearOverride, bedLayerSpeakerMouseDownHandler: bedLayerSpeakerMouseDownHandlerWithSelection, handleIconEnter, handleIconMove, handleIconLeave });
 
   // Front-wide zone rendering helper — extracted to hook
   const renderFrontWideZones = useRenderFrontWideZones({
@@ -1943,7 +1995,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         rvWrapRef={rvWrapRef}
         aspect={aspect}
         zoomMode={zoomMode}
-        handlePlanClick={handlePlanClick}
+        handlePlanClick={handlePlanClickWithSelection}
         lastPointerRef={lastPointerRef}
         canvasStyle={canvasStyle}
         svgWSafe={svgWSafe}
@@ -1996,6 +2048,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         getModelDimsM={getModelDimsM}
         WALL_BUFFER_M={WALL_BUFFER_M}
         overheadZones={overheadZones}
+        p9Corridors={p9Corridors}
         dragging={dragging}
         draggedItemId={draggedItemId}
         frontWideZones={frontWideZones}

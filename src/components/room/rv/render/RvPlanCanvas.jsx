@@ -82,6 +82,7 @@ export default function RvPlanCanvas({
   WALL_BUFFER_M,
 
   overheadZones,
+  p9Corridors,
   dragging,
   draggedItemId,
   frontWideZones,
@@ -394,6 +395,7 @@ export default function RvPlanCanvas({
               WALL_BUFFER_M={WALL_BUFFER_M}
               dolbyLayout={dolbyLayout}
               overheadZones={overheadZones}
+              p9Corridors={p9Corridors}
               getCanonicalRole={getCanonicalRole}
               scale={scale}
               frontWideZones={frontWideZones}
