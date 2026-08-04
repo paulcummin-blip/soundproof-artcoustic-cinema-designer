@@ -17,8 +17,12 @@ import { useActiveProjectId } from "@/components/state/project-session";
 import { useClientReportAuthority } from "@/components/report/client/useClientReportAuthority";
 import ClientSoundAroundListener from "@/components/report/client/ClientSoundAroundListener";
 import ClientSoundAboveListener from "@/components/report/client/ClientSoundAboveListener";
+import ClientReportPage from "@/components/report/client/ClientReportPage";
+import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
+import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
+import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, FileText, Download } from "lucide-react";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -37,6 +41,43 @@ export default function RP22ClientReport() {
   const authority = useClientReportAuthority(projectId);
   const { hydrating, projectDetails, p5Snapshot, p9Snapshot, roomDims, screen, screenFrontPlaneM } = authority;
 
+  // ── Active pages collection — drives both screen and PDF rendering order ──
+  const activePages = useMemo(() => {
+    const pages = [];
+    if (p5Snapshot) {
+      pages.push({
+        id: "p5-spatial-resolution",
+        visual: (
+          <ClientSoundAroundListener
+            p5Snapshot={p5Snapshot}
+            roomDims={roomDims}
+            screen={screen}
+            screenFrontPlaneM={screenFrontPlaneM}
+          />
+        ),
+      });
+    }
+    // P9 only when an actual overhead visual exists (not the no-overhead empty-state)
+    if (p9Snapshot && p9Snapshot.reason !== "no_overhead_speakers") {
+      pages.push({
+        id: "p9-spatial-resolution",
+        visual: (
+          <ClientSoundAboveListener
+            p9Snapshot={p9Snapshot}
+            roomDims={roomDims}
+          />
+        ),
+      });
+    }
+    return pages;
+  }, [p5Snapshot, p9Snapshot, roomDims, screen, screenFrontPlaneM]);
+
+  const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
+    activePageCount: activePages.length,
+    projectName: projectDetails?.name,
+    logoUrl: LOGO_URL,
+  });
+
   const handleBackToProject = () => {
     if (!projectId) return;
     navigate(`/RoomDesigner?projectId=${projectId}`);
@@ -48,13 +89,13 @@ export default function RP22ClientReport() {
   };
 
   return (
-    <div style={{
+    <div className="client-report-root" style={{
       minHeight: "100vh",
       background: "#F1F0EE",
       fontFamily: "Didact Gothic, Century Gothic, sans-serif",
     }}>
       {/* ── Header ── */}
-      <div style={{
+      <div className="client-report-screen-only" style={{
         padding: "20px 32px",
         borderBottom: "1px solid #DCDBD6",
         display: "flex",
@@ -113,17 +154,33 @@ export default function RP22ClientReport() {
             <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
             Technical RP22 Report
           </Button>
+          <Button
+            type="button"
+            onClick={handleExport}
+            disabled={hydrating || activePages.length === 0 || exporting}
+            className="client-report-screen-only"
+            style={{
+              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+              backgroundColor: "#213428",
+              border: "1px solid #213428",
+              color: "#FFFFFF",
+              opacity: 1,
+            }}
+          >
+            <Download className="w-4 h-4 mr-2" style={{ color: "#FFFFFF" }} />
+            {exporting ? "Preparing PDF…" : "Download PDF"}
+          </Button>
         </div>
       </div>
 
-      {/* ── Body ── */}
-      <div style={{
+      {/* ── Body — active pages drive both screen and print ── */}
+      <div className="client-report-body" style={{
         padding: "32px",
         maxWidth: 900,
         margin: "0 auto",
       }}>
         {hydrating ? (
-          <div style={{
+          <div className="client-report-screen-only" style={{
             background: "#FFFFFF",
             borderRadius: 16,
             padding: 64,
@@ -136,7 +193,7 @@ export default function RP22ClientReport() {
             Loading project…
           </div>
         ) : !projectId ? (
-          <div style={{
+          <div className="client-report-screen-only" style={{
             background: "#FFFFFF",
             borderRadius: 16,
             padding: 64,
@@ -148,23 +205,50 @@ export default function RP22ClientReport() {
           }}>
             No project selected. Open a project from the Room Designer to view its Client Visual Report.
           </div>
+        ) : activePages.length === 0 ? (
+          <div className="client-report-screen-only" style={{
+            background: "#FFFFFF",
+            borderRadius: 16,
+            padding: 64,
+            textAlign: "center",
+            color: "#625143",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+            border: "1px solid #DCDBD6",
+          }}>
+            No active report pages.
+          </div>
         ) : (
-          <>
-            <ClientSoundAroundListener
-              p5Snapshot={p5Snapshot}
-              roomDims={roomDims}
-              screen={screen}
-              screenFrontPlaneM={screenFrontPlaneM}
-            />
-            <div style={{ marginTop: 24 }}>
-              <ClientSoundAboveListener
-                p9Snapshot={p9Snapshot}
-                roomDims={roomDims}
-              />
-            </div>
-          </>
+          activePages.map((page, i) => (
+            <ClientReportPage
+              key={page.id}
+              pageId={page.id}
+              isFirst={i === 0}
+              isLast={i === activePages.length - 1}
+              projectDetails={projectDetails}
+              logoUrl={LOGO_URL}
+            >
+              {page.visual}
+            </ClientReportPage>
+          ))
+        )}
+        {exportError && (
+          <div className="client-report-screen-only" style={{
+            marginTop: 16,
+            padding: "12px 16px",
+            background: "#F1F0EE",
+            borderRadius: 8,
+            color: "#4A230F",
+            fontSize: 13,
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+            border: "1px solid #4A230F40",
+          }}>
+            {exportError}
+          </div>
         )}
       </div>
+
+      <ClientReportPrintStyles />
     </div>
   );
 }

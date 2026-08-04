@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg';
+export const LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg';
 
 // Single source of truth for the report cover branding — logo, positioning lines,
 // divider, and title. Used by both the in-app screen header and the exported PDF

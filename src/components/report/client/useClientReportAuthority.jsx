@@ -104,6 +104,7 @@ export function useClientReportAuthority(projectId) {
         id: p.id,
         name: p.name,
         client_name: p.client_name,
+        created_date: p.created_date,
       });
       hydrateProjectIntoAppState(p, app, {
         setScreen: app.setScreen,
