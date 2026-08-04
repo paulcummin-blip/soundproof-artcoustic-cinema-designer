@@ -49,13 +49,13 @@ export default function RP22ClientReport() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#0E0E0E",
-      fontFamily: "Didact Gothic, sans-serif",
+      background: "#1B1A1A",
+      fontFamily: "Didact Gothic, Century Gothic, sans-serif",
     }}>
       {/* ── Header ── */}
       <div style={{
         padding: "20px 32px",
-        borderBottom: "1px solid #2A2A2A",
+        borderBottom: "1px solid rgba(62, 67, 73, 0.4)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -65,7 +65,8 @@ export default function RP22ClientReport() {
             margin: 0,
             fontSize: 22,
             fontWeight: 600,
-            color: "#F5F5F5",
+            color: "#F8F8F7",
+            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
           }}>
             Client Visual Report
           </h1>
@@ -73,7 +74,7 @@ export default function RP22ClientReport() {
             <p style={{
               margin: "4px 0 0 0",
               fontSize: 13,
-              color: "#8A8A8A",
+              color: "#C1B6AD",
             }}>
               {projectDetails.name}
               {projectDetails.client_name ? ` — ${projectDetails.client_name}` : ""}
@@ -86,14 +87,14 @@ export default function RP22ClientReport() {
             onClick={handleBackToProject}
             disabled={!projectId}
             style={{
-              fontFamily: "Didact Gothic, sans-serif",
-              backgroundColor: "#1E1E1E",
-              border: "1px solid #3A3A3A",
-              color: "#F5F5F5",
+              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+              backgroundColor: "#F8F8F7",
+              border: "1px solid #213428",
+              color: "#213428",
               opacity: 1,
             }}
           >
-            <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#F5F5F5" }} />
+            <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#213428" }} />
             Back to Project
           </Button>
           <Button
@@ -101,14 +102,14 @@ export default function RP22ClientReport() {
             onClick={handleTechnicalReport}
             disabled={!projectId}
             style={{
-              fontFamily: "Didact Gothic, sans-serif",
-              backgroundColor: "#1E1E1E",
-              border: "1px solid #3A3A3A",
-              color: "#F5F5F5",
+              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+              backgroundColor: "#F1F0EE",
+              border: "1px solid #625143",
+              color: "#625143",
               opacity: 1,
             }}
           >
-            <FileText className="w-4 h-4 mr-2" style={{ color: "#F5F5F5" }} />
+            <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
             Technical RP22 Report
           </Button>
         </div>
@@ -122,23 +123,23 @@ export default function RP22ClientReport() {
       }}>
         {hydrating ? (
           <div style={{
-            background: "#161616",
+            background: "rgba(62, 67, 73, 0.35)",
             borderRadius: 16,
             padding: 64,
             textAlign: "center",
-            color: "#8A8A8A",
-            fontFamily: "Didact Gothic, sans-serif",
+            color: "#C1B6AD",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
           }}>
             Loading project…
           </div>
         ) : !projectId ? (
           <div style={{
-            background: "#161616",
+            background: "rgba(62, 67, 73, 0.35)",
             borderRadius: 16,
             padding: 64,
             textAlign: "center",
-            color: "#8A8A8A",
-            fontFamily: "Didact Gothic, sans-serif",
+            color: "#C1B6AD",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
           }}>
             No project selected. Open a project from the Room Designer to view its Client Visual Report.
           </div>
