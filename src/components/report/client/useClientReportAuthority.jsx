@@ -550,32 +550,84 @@ export function useClientReportAuthority(projectId) {
     };
   }, [authoritativeSeat, placedSpeakers, roomDims.widthM, earHeightM, zoneBands, rsp]);
 
+  // ── 10a) Canonical display override — P5/P9 display fields from perSeatRp22 ──
+  // Helper geometry (gaps, rows, arcs, speaker positions) is preserved for drawing.
+  // Display fields (level, worstGapDeg/value) are overridden from canonical perSeatRp22
+  // when available. Helper originals are retained as geometryWorstGapDeg / geometryLevel
+  // so the parity safeguard can still compare helper vs canonical.
+  const canonicalP5 = useMemo(() => {
+    if (!analysisResult || !authoritativeSeat) return null;
+    const c = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[5];
+    return (c && Number.isFinite(c.value)) ? c : null;
+  }, [analysisResult, authoritativeSeat]);
+
+  const canonicalP9 = useMemo(() => {
+    if (!analysisResult || !authoritativeSeat) return null;
+    const c = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[9];
+    return (c && Number.isFinite(c.value)) ? c : null;
+  }, [analysisResult, authoritativeSeat]);
+
+  const p5SnapshotFinal = useMemo(() => {
+    if (!p5Snapshot) return null;
+    const geometryWorstGapDeg = p5Snapshot.worstGapDeg;
+    const geometryLevel = p5Snapshot.level;
+    if (!canonicalP5) {
+      return { ...p5Snapshot, canonical: false, geometryWorstGapDeg, geometryLevel };
+    }
+    return {
+      ...p5Snapshot,
+      level: canonicalP5.level ?? geometryLevel,
+      worstGapDeg: canonicalP5.value ?? geometryWorstGapDeg,
+      formatted: canonicalP5.formatted ?? null,
+      status: canonicalP5.status ?? null,
+      canonical: true,
+      geometryWorstGapDeg,
+      geometryLevel,
+    };
+  }, [p5Snapshot, canonicalP5]);
+
+  const p9SnapshotFinal = useMemo(() => {
+    if (!p9Snapshot) return null;
+    const geometryWorstGapDeg = p9Snapshot.worstGapDeg;
+    const geometryLevel = p9Snapshot.level;
+    if (!canonicalP9) {
+      return { ...p9Snapshot, canonical: false, geometryWorstGapDeg, geometryLevel };
+    }
+    return {
+      ...p9Snapshot,
+      level: canonicalP9.level ?? geometryLevel,
+      value: canonicalP9.value ?? p9Snapshot.value,
+      formatted: canonicalP9.formatted ?? null,
+      status: canonicalP9.status ?? null,
+      canonical: true,
+      geometryWorstGapDeg,
+      geometryLevel,
+    };
+  }, [p9Snapshot, canonicalP9]);
+
   // ── 10b) P5/P9 parity safeguard — development-only divergence warnings ────
-  // Canonical displayed value/level/status comes from analysisResult.perSeatRp22.
-  // Helper geometry (p5Snapshot/p9Snapshot) is for drawing only.
-  // This effect warns if helper-computed values diverge from canonical engine results.
+  // Compares helper geometry (geometryWorstGapDeg) against canonical perSeatRp22 values.
+  // Display fields are already canonical in the final snapshots; this warns if the
+  // helper geometry diverges from the canonical engine result by more than 0.5°.
   useEffect(() => {
     if (!analysisResult || !authoritativeSeat) return;
     const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV;
     if (!isDev) return;
 
-    const canonicalP5 = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[5];
-    const canonicalP9 = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[9];
-
-    if (p5Snapshot && canonicalP5 && Number.isFinite(canonicalP5.value) && Number.isFinite(p5Snapshot.worstGapDeg)) {
-      const delta = Math.abs(p5Snapshot.worstGapDeg - canonicalP5.value);
+    if (p5SnapshotFinal && canonicalP5 && Number.isFinite(canonicalP5.value) && Number.isFinite(p5SnapshotFinal.geometryWorstGapDeg)) {
+      const delta = Math.abs(p5SnapshotFinal.geometryWorstGapDeg - canonicalP5.value);
       if (delta > 0.5) {
-        console.warn(`[ClientReportAuthority] P5 divergence: helper=${p5Snapshot.worstGapDeg.toFixed(1)}° canonical=${canonicalP5.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
+        console.warn(`[ClientReportAuthority] P5 divergence: helper=${p5SnapshotFinal.geometryWorstGapDeg.toFixed(1)}° canonical=${canonicalP5.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
       }
     }
 
-    if (p9Snapshot && p9Snapshot.applicable && canonicalP9 && Number.isFinite(canonicalP9.value) && Number.isFinite(p9Snapshot.worstGapDeg)) {
-      const delta = Math.abs(p9Snapshot.worstGapDeg - canonicalP9.value);
+    if (p9SnapshotFinal && p9SnapshotFinal.applicable && canonicalP9 && Number.isFinite(canonicalP9.value) && Number.isFinite(p9SnapshotFinal.geometryWorstGapDeg)) {
+      const delta = Math.abs(p9SnapshotFinal.geometryWorstGapDeg - canonicalP9.value);
       if (delta > 0.5) {
-        console.warn(`[ClientReportAuthority] P9 divergence: helper=${p9Snapshot.worstGapDeg.toFixed(1)}° canonical=${canonicalP9.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
+        console.warn(`[ClientReportAuthority] P9 divergence: helper=${p9SnapshotFinal.geometryWorstGapDeg.toFixed(1)}° canonical=${canonicalP9.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
       }
     }
-  }, [analysisResult, authoritativeSeat, p5Snapshot, p9Snapshot]);
+  }, [analysisResult, authoritativeSeat, p5SnapshotFinal, p9SnapshotFinal, canonicalP5, canonicalP9]);
 
   return {
     projectId,
@@ -588,8 +640,8 @@ export function useClientReportAuthority(projectId) {
     screenWidthM,
     rsp,
     rspSourceLabel,
-    p5Snapshot,
-    p9Snapshot,
+    p5Snapshot: p5SnapshotFinal,
+    p9Snapshot: p9SnapshotFinal,
     analysisSpeakers,
     // Canonical authorities (Stage B)
     analysisResult,

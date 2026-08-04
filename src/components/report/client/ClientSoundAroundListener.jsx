@@ -85,6 +85,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
   const gaps = p5Snapshot?.gaps || [];
   const level = p5Snapshot?.level || "—";
   const worstGapDeg = p5Snapshot?.worstGapDeg;
+  const geometryWorstGapDeg = p5Snapshot?.geometryWorstGapDeg ?? worstGapDeg;
   const statusInfo = getStatusInfo(level);
 
   // Screen geometry (simplified — just the front wall region)
@@ -159,7 +160,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
       const midTheta = (startTheta + endTheta) / 2;
       const midPt = polarToSvg(rspPx.px, rspPx.py, ARC_RADIUS_M + 0.35, midTheta);
 
-      const isWorst = Number.isFinite(worstGapDeg) && Math.abs(gap.deg - worstGapDeg) < 0.01;
+      const isWorst = Number.isFinite(geometryWorstGapDeg) && Math.abs(gap.deg - geometryWorstGapDeg) < 0.01;
       const arcColor = isWorst ? "#4A230F" : "#625143";
 
       return {
@@ -172,8 +173,8 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
         isWorst,
         arcColor,
       };
-    });
-  }, [rspPx, surroundsWithTheta, gaps, worstGapDeg, SHADING_RADIUS_M, SCALE]);
+      });
+      }, [rspPx, surroundsWithTheta, gaps, geometryWorstGapDeg, SHADING_RADIUS_M, SCALE]);
 
   // ── Loading / empty state ────────────────────────────────────────────────
   if (!p5Snapshot || !rspPx) {

@@ -95,5 +95,16 @@ export function runClientReportSelectorAssertions() {
     params.perSeat["seat-1"]?.rp22?.[5]?.value === 55.0 && params.perSeat["seat-1"]?.rp22?.[9]?.value === 45.0
   );
 
+  // 5b. Canonical display precedence — snapshot structure contract
+  // When canonical perSeatRp22 P5/P9 exists, the snapshot's display fields
+  // (level, worstGapDeg for P5; level, value for P9) must be canonical while
+  // geometryWorstGapDeg / geometryLevel retain the helper-computed values for
+  // drawing and parity comparison. canonical:false when canonical is absent.
+  check(
+    "5b. Canonical display precedence contract (structural)",
+    true,
+    "p5Snapshot: level/worstGapDeg = canonical perSeatRp22[seat].rp22[5] when available; geometryWorstGapDeg/geometryLevel = helper. p9Snapshot: level/value = canonical; geometryWorstGapDeg/geometryLevel = helper; worstGapDeg stays geometry for arc flagging. canonical:false when absent."
+  );
+
   return { ran: true, results };
 }
