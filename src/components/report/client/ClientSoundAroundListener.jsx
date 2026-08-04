@@ -32,22 +32,22 @@ const STATUS_COPY = {
   L2: {
     label: "Good spatial continuity",
     color: "#625143",
-    explanation: "The speaker layout provides clear movement around the listening position, with slightly wider spacing between some channels.",
+    explanation: "The layout provides clear movement around the listening position, with slightly wider spacing between some channels.",
   },
   L1: {
     label: "Further refinement recommended",
     color: "#4A230F",
-    explanation: "Refining the surround-speaker positions would create smoother movement around the listening position.",
+    explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener.",
   },
   Fail: {
     label: "Further refinement recommended",
     color: "#4A230F",
-    explanation: "Refining the surround-speaker positions would create smoother movement around the listening position.",
+    explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener.",
   },
   "—": {
     label: "Further refinement recommended",
     color: "#C1B6AD",
-    explanation: "Refining the surround-speaker positions would create smoother movement around the listening position.",
+    explanation: "Reducing the widest gap between the surround channels would create smoother movement around the listener.",
   },
 };
 
@@ -445,48 +445,59 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
 
       {/* ── Status card ── */}
       <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
         padding: "16px 20px",
         background: "#F1F0EE",
         borderRadius: 12,
         border: `1px solid ${statusInfo.color}40`,
       }}>
         <div style={{
-          fontSize: 16,
-          fontWeight: 600,
-          color: "#213428",
-          marginBottom: 4,
+          width: 48,
+          height: 48,
+          borderRadius: 8,
+          background: `${statusInfo.color}25`,
+          border: `2px solid ${statusInfo.color}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 18,
+          fontWeight: 700,
+          color: statusInfo.color,
+          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+          flexShrink: 0,
         }}>
-          {statusInfo.label}
+          {level}
         </div>
-        <div style={{
-          fontSize: 13,
-          color: "#3E4349",
-          lineHeight: 1.5,
-          marginBottom: 8,
-        }}>
-          {statusInfo.explanation}
-        </div>
-        {Number.isFinite(worstGapDeg) && (
+        <div style={{ flex: 1 }}>
           <div style={{
-            fontSize: 12,
-            color: "#625143",
+            fontSize: 16,
+            fontWeight: 600,
+            color: "#213428",
+            marginBottom: 4,
           }}>
-            {Math.round(worstGapDeg)}° largest spacing — RP22 Parameter 5
+            {statusInfo.label}
           </div>
-        )}
+          <div style={{
+            fontSize: 13,
+            color: "#3E4349",
+            lineHeight: 1.5,
+            marginBottom: 8,
+          }}>
+            {statusInfo.explanation}
+          </div>
+          {Number.isFinite(worstGapDeg) && (
+            <div style={{
+              fontSize: 12,
+              color: "#625143",
+            }}>
+              {Math.round(worstGapDeg)}° largest spacing — RP22 Parameter 5
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── Footnote ── */}
-      <p style={{
-        margin: "16px 0 0 0",
-        fontSize: 11,
-        color: "#625143",
-        opacity: 0.6,
-        fontStyle: "italic",
-        textAlign: "center",
-      }}>
-        Shading represents angular continuity only and does not imply SPL, dispersion, or measured acoustic coverage.
-      </p>
     </div>
   );
 }

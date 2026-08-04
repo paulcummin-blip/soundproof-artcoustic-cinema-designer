@@ -17,21 +17,21 @@ import React, { useMemo } from "react";
 
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
-  L4: { label: "Excellent overhead continuity", color: "#213428", explanation: "The overhead layout creates smooth, precise movement above the listening area." },
-  L3: { label: "Very good overhead continuity", color: "#3E4349", explanation: "The overhead layout creates smooth movement above the listener, with only a small increase in spacing between rows." },
-  L2: { label: "Good overhead continuity", color: "#625143", explanation: "The overhead layout provides clear front-to-back movement, with wider spacing between the overhead rows." },
-  L1: { label: "Further refinement recommended", color: "#4A230F", explanation: "Moving the overhead rows closer together would create smoother movement above the listener." },
-  Fail: { label: "Further refinement recommended", color: "#4A230F", explanation: "Moving the overhead rows closer together would create smoother movement above the listener." },
-  "N/A": { label: "Single overhead row — spacing assessment not applicable", color: "#625143", explanation: "This layout uses a single overhead row, so there is no adjacent-row spacing to assess." },
-  "—": { label: "Further refinement recommended", color: "#C1B6AD", explanation: "Moving the overhead rows closer together would create smoother movement above the listener." },
+  L4: { label: "Excellent overhead continuity", color: "#213428", explanation: "The overhead rows are correctly spaced for smooth, precise movement above the listening position." },
+  L3: { label: "Very good overhead continuity", color: "#3E4349", explanation: "The overhead rows are well positioned and create smooth movement above the listener." },
+  L2: { label: "Good overhead continuity", color: "#625143", explanation: "The overhead layout provides clear movement above the listener. Bringing the rows slightly closer together would improve continuity." },
+  L1: { label: "Further refinement recommended", color: "#4A230F", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
+  Fail: { label: "Further refinement recommended", color: "#4A230F", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
+  "N/A": { label: "Single overhead row", color: "#625143", explanation: "This layout uses one overhead row, so spacing between rows is not assessed." },
+  "—": { label: "Further refinement recommended", color: "#C1B6AD", explanation: "Bringing the overhead rows closer together would create smoother movement above the listener." },
 };
 
 // L3 near-boundary: when the largest gap is no more than 1° outside the 50° L4 target,
 // use a gentler explanation that avoids alarming the client over a fractional miss.
 const L4_BOUNDARY_DEG = 50;
-const NEAR_BOUNDARY_TOLERANCE_DEG = 1;
+const NEAR_BOUNDARY_TOLERANCE_DEG = 2;
 const L3_NEAR_BOUNDARY_EXPLANATION =
-  "The overhead layout creates smooth movement above the listener. The largest spacing is only fractionally outside the highest RP22 target.";
+  "The overhead rows are well positioned and create smooth movement above the listener. Only a small adjustment would reach the highest target.";
 
 function getStatusInfo(level, value) {
   const base = STATUS_COPY[level] || STATUS_COPY["—"];
@@ -39,6 +39,29 @@ function getStatusInfo(level, value) {
     return { ...base, explanation: L3_NEAR_BOUNDARY_EXPLANATION };
   }
   return base;
+}
+
+// L1 pair-specific placement advice based on the worst adjacent-row pair
+function getL1Advice(representativeGaps, worstGapDeg) {
+  if (!Array.isArray(representativeGaps) || !Number.isFinite(worstGapDeg)) {
+    return "Bringing the overhead rows closer together would create smoother movement above the listener.";
+  }
+  const worst = representativeGaps.find((g) => Math.abs(g.deg - worstGapDeg) < 0.5);
+  if (!worst) {
+    return "Bringing the overhead rows closer together would create smoother movement above the listener.";
+  }
+  const pair = [worst.fromRow, worst.toRow].sort();
+  const [a, b] = pair;
+  if (a === "front" && b === "rear") {
+    return "Bringing the front and rear overhead rows closer together would create smoother movement above the listener.";
+  }
+  if (a === "front" && b === "mid") {
+    return "Bringing the front and middle overhead rows closer together would create smoother movement above the listener.";
+  }
+  if (a === "mid" && b === "rear") {
+    return "Bringing the middle and rear overhead rows closer together would create smoother movement above the listener.";
+  }
+  return "Bringing the overhead rows closer together would create smoother movement above the listener.";
 }
 
 // ── Row metadata ───────────────────────────────────────────────────────────
@@ -92,6 +115,8 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
   const value = p9Snapshot?.value;
   const worstGapDeg = p9Snapshot?.worstGapDeg;
   const statusInfo = getStatusInfo(level, value);
+  const l1Advice = getL1Advice(representativeGaps, worstGapDeg);
+  const displayExplanation = (level === "L1" || level === "Fail") ? l1Advice : statusInfo.explanation;
 
   // Ear position in SVG coords (authoritative seat origin)
   const earPx = authoritativeSeat ? toPx(authoritativeSeat.y, authoritativeSeat.z) : null;
@@ -524,12 +549,22 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
         border: `1px solid ${statusInfo.color}40`,
       }}>
         <div style={{
-          width: 4,
+          width: 48,
           height: 48,
-          borderRadius: 2,
-          background: statusInfo.color,
+          borderRadius: 8,
+          background: `${statusInfo.color}25`,
+          border: `2px solid ${statusInfo.color}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 18,
+          fontWeight: 700,
+          color: statusInfo.color,
+          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
           flexShrink: 0,
-        }} />
+        }}>
+          {level}
+        </div>
         <div style={{ flex: 1 }}>
           <div style={{
             fontSize: 16,
@@ -543,33 +578,21 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
             fontSize: 13,
             color: "#3E4349",
             lineHeight: 1.5,
-            marginBottom: Number.isFinite(value) ? 8 : 0,
+            marginBottom: 8,
           }}>
-            {statusInfo.explanation}
+            {displayExplanation}
           </div>
           {Number.isFinite(value) && (
             <div style={{
-              fontSize: 11,
+              fontSize: 12,
               color: "#625143",
-              letterSpacing: "0.04em",
             }}>
-              {value.toFixed(1)}° largest gap — RP22 Parameter 9
+              {Math.round(value)}° largest gap — RP22 Parameter 9
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Footnote ── */}
-      <p style={{
-        margin: "16px 0 0 0",
-        fontSize: 11,
-        color: "#625143",
-        opacity: 0.6,
-        fontStyle: "italic",
-        textAlign: "center",
-      }}>
-        Side elevation shows vertical angular continuity only and does not imply SPL, dispersion, or measured acoustic coverage.
-      </p>
     </div>
   );
 }
