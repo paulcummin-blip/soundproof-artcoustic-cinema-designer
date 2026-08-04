@@ -202,13 +202,23 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
       boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
       border: "1px solid #DCDBD6",
     }}>
-      {/* ── Title + subtitle ── */}
+      {/* ── Heading hierarchy: Category → Visual title → Parameter reference ── */}
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{
+        <h1 style={{
           margin: 0,
-          fontSize: 28,
-          fontWeight: 600,
+          fontSize: 34,
+          fontWeight: 300,
           color: "#213428",
+          letterSpacing: "0.01em",
+          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+        }}>
+          Spatial Resolution
+        </h1>
+        <h2 style={{
+          margin: "6px 0 0 0",
+          fontSize: 22,
+          fontWeight: 500,
+          color: "#3E4349",
           letterSpacing: "0.01em",
           fontFamily: "Futura PT Light, Century Gothic, sans-serif",
         }}>
@@ -216,12 +226,12 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
         </h2>
         <p style={{
           margin: "4px 0 0 0",
-          fontSize: 14,
+          fontSize: 12,
           color: "#625143",
-          letterSpacing: "0.04em",
+          letterSpacing: "0.08em",
           textTransform: "uppercase",
         }}>
-          RP22 Parameter 5 — Spatial resolution
+          RP22 Parameter 5 — Horizontal speaker spacing
         </p>
       </div>
 
