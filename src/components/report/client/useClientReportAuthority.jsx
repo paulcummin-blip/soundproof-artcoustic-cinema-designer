@@ -313,17 +313,13 @@ export function useClientReportAuthority(projectId) {
     const rspSeat = { id: "rsp", x: rsp.x, y: rsp.y, z: earHeightM };
     const upperSpeakers = getUpperSpeakersForSeat(rspSeat, analysisSpeakers, getCanonicalRole);
 
-    if (upperSpeakers.length < 2) return null;
+    // True no-overhead state: zero upper speakers for this seat
+    if (upperSpeakers.length === 0) {
+      return { noOverhead: true, upperSpeakers: [], rsp, earHeightM, zoneBands };
+    }
 
     const result = computeUpperVerticalAnglesForSeat(rspSeat, upperSpeakers, roomCenterX);
     const { maxVerticalGapDeg, gaps, rowElevations } = result;
-
-    if (!Number.isFinite(maxVerticalGapDeg)) return null;
-
-    let level9 = 1;
-    if (maxVerticalGapDeg <= 50) level9 = 4;
-    else if (maxVerticalGapDeg <= 60) level9 = 3;
-    else if (maxVerticalGapDeg <= 80) level9 = 2;
 
     // Merge row elevations by row (combine left+right for side view)
     const rowMap = new Map();
@@ -374,6 +370,28 @@ export function useClientReportAuthority(projectId) {
       });
     }
 
+    // Single overhead row: P9 not applicable (no adjacent-row gap to assess)
+    if (!Number.isFinite(maxVerticalGapDeg) || rowGroups.length < 2) {
+      return {
+        rsp,
+        earHeightM,
+        rowGroups,
+        gaps: [],
+        mergedGaps: [],
+        level: "N/A",
+        worstGapDeg: null,
+        applicable: false,
+        reason: "single_overhead_row",
+        zoneBands,
+        upperSpeakers,
+      };
+    }
+
+    let level9 = 1;
+    if (maxVerticalGapDeg <= 50) level9 = 4;
+    else if (maxVerticalGapDeg <= 60) level9 = 3;
+    else if (maxVerticalGapDeg <= 80) level9 = 2;
+
     return {
       rsp,
       earHeightM,
@@ -382,6 +400,8 @@ export function useClientReportAuthority(projectId) {
       mergedGaps,
       level: `L${level9}`,
       worstGapDeg: maxVerticalGapDeg,
+      applicable: true,
+      reason: null,
       zoneBands,
       upperSpeakers,
     };

@@ -17,12 +17,13 @@ import React, { useMemo } from "react";
 
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
-  L4: { label: "Excellent overhead continuity", color: "#213428" },
-  L3: { label: "Very good overhead continuity", color: "#3E4349" },
-  L2: { label: "Good overhead continuity", color: "#625143" },
-  L1: { label: "Noticeable overhead gaps", color: "#4A230F" },
-  Fail: { label: "Improvement recommended", color: "#4A230F" },
-  "—": { label: "Improvement recommended", color: "#C1B6AD" },
+  L4: { label: "Excellent overhead continuity", color: "#213428", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
+  L3: { label: "Very good overhead continuity", color: "#3E4349", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
+  L2: { label: "Good overhead continuity", color: "#625143", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
+  L1: { label: "Noticeable overhead gaps", color: "#4A230F", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
+  Fail: { label: "Improvement recommended", color: "#4A230F", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
+  "N/A": { label: "P9 not applicable", color: "#625143", explanation: "This layout uses a single overhead row, so there is no adjacent-row spacing to assess." },
+  "—": { label: "Improvement recommended", color: "#C1B6AD", explanation: "The overhead layout creates a clear and continuous sound path above the listener." },
 };
 
 function getStatusInfo(level) {
@@ -166,24 +167,28 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
     });
   }, [earPx, mergedGaps, worstGapDeg, SHADING_RADIUS_M, SCALE]);
 
-  // ── Loading / empty state ────────────────────────────────────────────────
-  if (!p9Snapshot || !earPx) {
-    return (
-      <div style={{
-        background: "#FFFFFF",
-        borderRadius: 16,
-        padding: 48,
-        textAlign: "center",
-        color: "#625143",
-        fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-        boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
-        border: "1px solid #DCDBD6",
-      }}>
-        {p9Snapshot === null && upperSpeakers.length === 0
-          ? "No overhead speakers configured for this layout."
-          : "Preparing overhead resolution view…"}
-      </div>
-    );
+  // ── Loading / empty states ───────────────────────────────────────────────
+  const emptyStyle = {
+    background: "#FFFFFF",
+    borderRadius: 16,
+    padding: 48,
+    textAlign: "center",
+    color: "#625143",
+    fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+    border: "1px solid #DCDBD6",
+  };
+
+  if (!p9Snapshot) {
+    return <div style={emptyStyle}>Preparing overhead resolution view…</div>;
+  }
+
+  if (p9Snapshot.noOverhead) {
+    return <div style={emptyStyle}>No overhead speakers are configured for this layout.</div>;
+  }
+
+  if (!earPx) {
+    return <div style={emptyStyle}>Preparing overhead resolution view…</div>;
   }
 
   return (
@@ -195,7 +200,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
       boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
       border: "1px solid #DCDBD6",
     }}>
-      {/* ── Heading hierarchy: Category → Visual title → Parameter reference ── */}
+      {/* ── Heading hierarchy: Category → Parameter reference ── */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{
           margin: 0,
@@ -207,18 +212,8 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
         }}>
           Spatial Resolution
         </h1>
-        <h2 style={{
-          margin: "6px 0 0 0",
-          fontSize: 22,
-          fontWeight: 500,
-          color: "#3E4349",
-          letterSpacing: "0.01em",
-          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-        }}>
-          Sound Above the Listener
-        </h2>
         <p style={{
-          margin: "4px 0 0 0",
+          margin: "6px 0 0 0",
           fontSize: 12,
           color: "#625143",
           letterSpacing: "0.08em",
@@ -544,7 +539,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
             color: "#3E4349",
             lineHeight: 1.5,
           }}>
-            The overhead layout creates a clear and continuous sound path above the listener.
+            {statusInfo.explanation}
           </div>
         </div>
         {Number.isFinite(worstGapDeg) && (

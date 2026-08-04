@@ -202,7 +202,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
       boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
       border: "1px solid #DCDBD6",
     }}>
-      {/* ── Heading hierarchy: Category → Visual title → Parameter reference ── */}
+      {/* ── Heading hierarchy: Category → Parameter reference ── */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{
           margin: 0,
@@ -214,18 +214,8 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
         }}>
           Spatial Resolution
         </h1>
-        <h2 style={{
-          margin: "6px 0 0 0",
-          fontSize: 22,
-          fontWeight: 500,
-          color: "#3E4349",
-          letterSpacing: "0.01em",
-          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-        }}>
-          Sound Around the Listener
-        </h2>
         <p style={{
-          margin: "4px 0 0 0",
+          margin: "6px 0 0 0",
           fontSize: 12,
           color: "#625143",
           letterSpacing: "0.08em",
