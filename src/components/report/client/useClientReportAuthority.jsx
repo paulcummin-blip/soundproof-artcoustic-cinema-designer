@@ -22,6 +22,7 @@ import { computeSurroundRingGaps, rp22LevelForP5 } from "@/components/utils/p5Su
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat } from "@/components/utils/rp22UpperSeatMetrics";
+import { levelP9_upperSpacing } from "@/components/utils/rp22/levels";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
@@ -42,6 +43,21 @@ function resolveScreenVisibleWidthInches(screen) {
     return (mh * ar) / 0.0254;
   }
   return 120;
+}
+
+function normalizeSeat(seat) {
+  if (!seat) return null;
+  const x = Number(seat.x ?? seat.position?.x);
+  const y = Number(seat.y ?? seat.position?.y);
+  const z = Number(seat.z ?? seat.position?.z ?? seat.earHeightM ?? seat.ear_h ?? 1.2);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  return {
+    id: seat.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`,
+    x,
+    y,
+    z,
+    isPrimary: seat.isPrimary === true,
+  };
 }
 
 export function useClientReportAuthority(projectId) {
@@ -290,38 +306,88 @@ export function useClientReportAuthority(projectId) {
     return 1.2;
   }, [app?.rowEarHeights, seatingPositions]);
 
-  // ── 8) Overhead zone bands (preferred placement) ────────────────────────
+  // ── 8) Authoritative P9 seat (Technical-equivalent locked-seat rule) ──────
+  // Seat selection order (Client pure-helper path):
+  //   1. closest real seat to effective RSP, only when within 0.05 m
+  //   2. first real seatingPosition marked isPrimary
+  //   3. first available real seat
+  // Do not use the synthetic RSP as the authoritative P9 seat.
+  const authoritativeSeat = useMemo(() => {
+    if (!rsp || !seatingPositions.length) return null;
+
+    const normalized = seatingPositions.map(normalizeSeat).filter(Boolean);
+    if (normalized.length === 0) return null;
+
+    // 1. Closest real seat within 0.05 m of effective RSP
+    let closest = null;
+    let closestDist = Infinity;
+    for (const seat of normalized) {
+      const dist = Math.hypot(seat.x - rsp.x, seat.y - rsp.y);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = seat;
+      }
+    }
+    if (closest && closestDist <= 0.05) return closest;
+
+    // 2. First real primary seat
+    const primary = normalized.find((s) => s.isPrimary);
+    if (primary) return primary;
+
+    // 3. First available real seat (closest fallback)
+    return closest || normalized[0];
+  }, [rsp, seatingPositions]);
+
+  // ── 9) Overhead zone bands (preferred placement) ────────────────────────
+  // zoneBands must use the authoritative seat, not the synthetic RSP.
   const zoneBands = useOverheadZonesComputed({
     seatingPositions,
     heightM: roomDims.heightM,
     widthM: roomDims.widthM,
     lengthM: roomDims.lengthM,
-    mlpY_m: rsp?.y,
-    mlp: rsp,
+    mlpY_m: authoritativeSeat?.y,
+    mlp: authoritativeSeat,
     placedSpeakers,
     getCanonicalRole,
   });
 
-  // ── 9) P9 snapshot — overhead spatial resolution ─────────────────────────
+  // ── 10) P9 snapshot — overhead spatial resolution ─────────────────────────
   // Uses the SAME production helpers as useRP22AnalysisEngine:
-  //   getUpperSpeakersForSeat + computeUpperVerticalAnglesForSeat
-  // Level mapping matches the engine exactly (≤50→L4, ≤60→L3, ≤80→L2, else L1).
+  //   getUpperSpeakersForSeat + computeUpperVerticalAnglesForSeat + levelP9_upperSpacing
+  // Uses raw placedSpeakers (not filtered analysisSpeakers) for authoritative P9.
+  // Uses the authoritative locked seat (not synthetic RSP) for P9 grading.
+  // Representative (averaged) row positions are visual-only.
   const p9Snapshot = useMemo(() => {
-    if (!rsp || !analysisSpeakers.length) return null;
+    if (!authoritativeSeat || !placedSpeakers.length) return null;
 
     const roomCenterX = roomDims.widthM / 2;
-    const rspSeat = { id: "rsp", x: rsp.x, y: rsp.y, z: earHeightM };
-    const upperSpeakers = getUpperSpeakersForSeat(rspSeat, analysisSpeakers, getCanonicalRole);
+    const upperSpeakers = getUpperSpeakersForSeat(authoritativeSeat, placedSpeakers, getCanonicalRole);
 
-    // True no-overhead state: zero upper speakers for this seat
+    // A. No overheads
     if (upperSpeakers.length === 0) {
-      return { noOverhead: true, upperSpeakers: [], rsp, earHeightM, zoneBands };
+      return {
+        authoritativeSeatId: authoritativeSeat.id,
+        authoritativeSeat,
+        value: null,
+        level: "N/A",
+        worstGapDeg: null,
+        rowElevations: [],
+        gaps: [],
+        representativeRows: [],
+        representativeGaps: [],
+        applicable: false,
+        reason: "no_overhead_speakers",
+        upperSpeakers: [],
+        zoneBands,
+        rsp,
+        earHeightM,
+      };
     }
 
-    const result = computeUpperVerticalAnglesForSeat(rspSeat, upperSpeakers, roomCenterX);
-    const { maxVerticalGapDeg, gaps, rowElevations } = result;
+    const result = computeUpperVerticalAnglesForSeat(authoritativeSeat, upperSpeakers, roomCenterX);
+    const { maxVerticalGapDeg, gaps, worstGap, rowElevations } = result;
 
-    // Merge row elevations by row (combine left+right for side view)
+    // Build representative rows for visual drawing (merge left+right by row)
     const rowMap = new Map();
     for (const elev of rowElevations) {
       if (!rowMap.has(elev.rowName)) {
@@ -339,14 +405,14 @@ export function useClientReportAuthority(projectId) {
       group.count += 1;
     }
 
-    const rowGroups = [];
+    const representativeRows = [];
     for (const group of rowMap.values()) {
       const avgY = group.sumY / group.count;
       const avgZ = group.sumZ / group.count;
-      const dz = avgZ - earHeightM;
-      const dy = avgY - rsp.y;
+      const dz = avgZ - authoritativeSeat.z;
+      const dy = avgY - authoritativeSeat.y;
       const elevDeg = Math.atan2(dz, dy) * 180 / Math.PI;
-      rowGroups.push({
+      representativeRows.push({
         rowName: group.rowName,
         rowIndex: group.rowIndex,
         avgY,
@@ -354,14 +420,14 @@ export function useClientReportAuthority(projectId) {
         elevDeg,
       });
     }
-    rowGroups.sort((a, b) => a.rowIndex - b.rowIndex);
+    representativeRows.sort((a, b) => a.rowIndex - b.rowIndex);
 
-    // Merged gaps for side-view display (front→mid, mid→rear)
-    const mergedGaps = [];
-    for (let i = 1; i < rowGroups.length; i++) {
-      const prev = rowGroups[i - 1];
-      const next = rowGroups[i];
-      mergedGaps.push({
+    // Representative gaps for side-view display (front→mid, mid→rear)
+    const representativeGaps = [];
+    for (let i = 1; i < representativeRows.length; i++) {
+      const prev = representativeRows[i - 1];
+      const next = representativeRows[i];
+      representativeGaps.push({
         fromRow: prev.rowName,
         toRow: next.rowName,
         deg: Math.abs(next.elevDeg - prev.elevDeg),
@@ -370,42 +436,48 @@ export function useClientReportAuthority(projectId) {
       });
     }
 
-    // Single overhead row: P9 not applicable (no adjacent-row gap to assess)
-    if (!Number.isFinite(maxVerticalGapDeg) || rowGroups.length < 2) {
+    // B. Single overhead row: P9 not applicable
+    if (!Number.isFinite(maxVerticalGapDeg) || representativeRows.length < 2) {
       return {
-        rsp,
-        earHeightM,
-        rowGroups,
-        gaps: [],
-        mergedGaps: [],
+        authoritativeSeatId: authoritativeSeat.id,
+        authoritativeSeat,
+        value: null,
         level: "N/A",
         worstGapDeg: null,
+        rowElevations,
+        gaps: [],
+        representativeRows,
+        representativeGaps,
         applicable: false,
         reason: "single_overhead_row",
-        zoneBands,
         upperSpeakers,
+        zoneBands,
+        rsp,
+        earHeightM,
       };
     }
 
-    let level9 = 1;
-    if (maxVerticalGapDeg <= 50) level9 = 4;
-    else if (maxVerticalGapDeg <= 60) level9 = 3;
-    else if (maxVerticalGapDeg <= 80) level9 = 2;
+    // C. Two or three overhead rows: authoritative P9
+    const levelResult = levelP9_upperSpacing(maxVerticalGapDeg);
 
     return {
-      rsp,
-      earHeightM,
-      rowGroups,
+      authoritativeSeatId: authoritativeSeat.id,
+      authoritativeSeat,
+      value: maxVerticalGapDeg,
+      level: levelResult.level,
+      worstGapDeg: worstGap?.deg ?? maxVerticalGapDeg,
+      rowElevations,
       gaps,
-      mergedGaps,
-      level: `L${level9}`,
-      worstGapDeg: maxVerticalGapDeg,
+      representativeRows,
+      representativeGaps,
       applicable: true,
       reason: null,
-      zoneBands,
       upperSpeakers,
+      zoneBands,
+      rsp,
+      earHeightM,
     };
-  }, [rsp, analysisSpeakers, roomDims.widthM, earHeightM, zoneBands]);
+  }, [authoritativeSeat, placedSpeakers, roomDims.widthM, earHeightM, zoneBands, rsp]);
 
   return {
     projectId,

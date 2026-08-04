@@ -70,18 +70,20 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
     py: SVG_H - (z + PADDING_M) * SCALE,
   });
 
+  const authoritativeSeat = p9Snapshot?.authoritativeSeat;
   const rsp = p9Snapshot?.rsp;
-  const earHeightM = p9Snapshot?.earHeightM || 1.2;
-  const rowGroups = p9Snapshot?.rowGroups || [];
-  const mergedGaps = p9Snapshot?.mergedGaps || [];
+  const earHeightM = authoritativeSeat?.z || p9Snapshot?.earHeightM || 1.2;
+  const representativeRows = p9Snapshot?.representativeRows || [];
+  const representativeGaps = p9Snapshot?.representativeGaps || [];
   const upperSpeakers = p9Snapshot?.upperSpeakers || [];
   const zoneBands = p9Snapshot?.zoneBands;
   const level = p9Snapshot?.level || "—";
+  const value = p9Snapshot?.value;
   const worstGapDeg = p9Snapshot?.worstGapDeg;
   const statusInfo = getStatusInfo(level);
 
-  // Ear position in SVG coords
-  const earPx = rsp ? toPx(rsp.y, earHeightM) : null;
+  // Ear position in SVG coords (authoritative seat origin)
+  const earPx = authoritativeSeat ? toPx(authoritativeSeat.y, authoritativeSeat.z) : null;
 
   // Polar to SVG (elevation angle from horizontal, 0°=behind, 90°=above, 180°=front)
   const polarToSvg = (cx, cy, radiusPx, elevDeg) => {
@@ -106,8 +108,8 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
       const right = toPx(y2, 0);
       bands.push({
         rowName,
-        x: left.px,
-        w: right.px - left.px,
+        leftPx: left.px,
+        rightPx: right.px,
         color: ROW_COLORS[rowName] || "#213428",
       });
     }
@@ -121,9 +123,9 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
   }, [H, L, earHeightM]);
 
   const continuityPath = useMemo(() => {
-    if (!earPx || rowGroups.length < 2) return null;
-    const first = rowGroups[0];
-    const last = rowGroups[rowGroups.length - 1];
+    if (!earPx || representativeRows.length < 2) return null;
+    const first = representativeRows[0];
+    const last = representativeRows[representativeRows.length - 1];
     const r = SHADING_RADIUS_M * SCALE;
 
     const startPt = polarToSvg(earPx.px, earPx.py, r, first.elevDeg);
@@ -133,15 +135,15 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
     const largeArc = sweepDeg > 180 ? 1 : 0;
 
     return `M ${earPx.px} ${earPx.py} L ${startPt.x} ${startPt.y} A ${r} ${r} 0 ${largeArc} 1 ${endPt.x} ${endPt.y} Z`;
-  }, [earPx, rowGroups, SHADING_RADIUS_M, SCALE]);
+  }, [earPx, representativeRows, SHADING_RADIUS_M, SCALE]);
 
   // ── Gap arcs (between adjacent merged rows) ───────────────────────────────
   const gapArcs = useMemo(() => {
-    if (!earPx || mergedGaps.length === 0) return [];
+    if (!earPx || representativeGaps.length === 0) return [];
     const ARC_RADIUS_M = SHADING_RADIUS_M * 0.78;
     const r = ARC_RADIUS_M * SCALE;
 
-    return mergedGaps.map((gap, i) => {
+    return representativeGaps.map((gap, i) => {
       const startPt = polarToSvg(earPx.px, earPx.py, r, gap.fromElevDeg);
       const endPt = polarToSvg(earPx.px, earPx.py, r, gap.toElevDeg);
 
@@ -165,7 +167,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
         arcColor,
       };
     });
-  }, [earPx, mergedGaps, worstGapDeg, SHADING_RADIUS_M, SCALE]);
+  }, [earPx, representativeGaps, worstGapDeg, SHADING_RADIUS_M, SCALE]);
 
   // ── Loading / empty states ───────────────────────────────────────────────
   const emptyStyle = {
@@ -183,7 +185,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
     return <div style={emptyStyle}>Preparing overhead resolution view…</div>;
   }
 
-  if (p9Snapshot.noOverhead) {
+  if (p9Snapshot.reason === "no_overhead_speakers") {
     return <div style={emptyStyle}>No overhead speakers are configured for this layout.</div>;
   }
 
@@ -231,7 +233,6 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
       }}>
         <svg
           width="100%"
-          maxWidth={SVG_W}
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{ maxWidth: SVG_W, width: "100%", height: "auto" }}
         >
@@ -242,15 +243,20 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
           {placementBands.map((band, i) => {
             const ceilingPy = toPx(0, H).py;
             const bandBottomPy = toPx(0, H * 0.65).py;
-            const bandH = ceilingPy - bandBottomPy;
-            if (bandH <= 0) return null;
+            const topPx = Math.min(ceilingPy, bandBottomPy);
+            const bottomPx = Math.max(ceilingPy, bandBottomPy);
+            const heightPx = bottomPx - topPx;
+            const xPx = Math.min(Number(band.leftPx), Number(band.rightPx));
+            const widthPx = Math.abs(Number(band.rightPx) - Number(band.leftPx));
+            if (!Number.isFinite(xPx) || !Number.isFinite(topPx) || !Number.isFinite(widthPx) || !Number.isFinite(heightPx)) return null;
+            if (widthPx <= 0 || heightPx <= 0) return null;
             return (
               <rect
                 key={`band-${i}`}
-                x={band.x}
-                y={ceilingPy}
-                width={band.w}
-                height={Math.abs(bandH)}
+                x={xPx}
+                y={topPx}
+                width={widthPx}
+                height={heightPx}
                 fill={band.color}
                 fillOpacity={0.08}
                 rx={2}
@@ -432,7 +438,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
           })}
 
           {/* ── Row angle labels (client-friendly) ── */}
-          {rowGroups.map((row, i) => {
+          {representativeRows.map((row, i) => {
             const rowColor = ROW_COLORS[row.rowName] || "#625143";
             const label = ROW_LABELS[row.rowName] || "";
             // Place label near the row's average position
@@ -542,7 +548,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
             {statusInfo.explanation}
           </div>
         </div>
-        {Number.isFinite(worstGapDeg) && (
+        {Number.isFinite(value) && (
           <div style={{
             textAlign: "right",
             flexShrink: 0,
@@ -561,7 +567,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
               fontWeight: 600,
               color: statusInfo.color,
             }}>
-              {Math.round(worstGapDeg)}°
+              {value.toFixed(1)}°
             </div>
           </div>
         )}

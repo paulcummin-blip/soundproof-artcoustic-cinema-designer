@@ -233,7 +233,6 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
       }}>
         <svg
           width="100%"
-          maxWidth={SVG_W}
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{ maxWidth: SVG_W, width: "100%", height: "auto" }}
         >
