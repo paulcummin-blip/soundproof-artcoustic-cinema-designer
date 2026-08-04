@@ -64,6 +64,17 @@ function getL1Advice(representativeGaps, worstGapDeg) {
   return "Bringing the overhead rows closer together would create smoother movement above the listener.";
 }
 
+// Presentation-only level normaliser: converts numeric levels (1–4) to string
+// levels (L1–L4) for STATUS_COPY lookup, badge text, and conditional logic.
+// Does not modify the underlying authority value.
+function normaliseClientLevel(level) {
+  const raw = String(level ?? "").trim().toUpperCase();
+  if (/^[1-4]$/.test(raw)) return `L${raw}`;
+  if (/^L[1-4]$/.test(raw)) return raw;
+  if (raw === "N/A" || raw === "NA") return "N/A";
+  return "—";
+}
+
 // ── Row metadata ───────────────────────────────────────────────────────────
 const ROW_COLORS = {
   front: "#625143",
@@ -111,12 +122,12 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
   const representativeGaps = p9Snapshot?.representativeGaps || [];
   const upperSpeakers = p9Snapshot?.upperSpeakers || [];
   const zoneBands = p9Snapshot?.zoneBands;
-  const level = p9Snapshot?.level || "—";
+  const displayLevel = normaliseClientLevel(p9Snapshot?.level);
   const value = p9Snapshot?.value;
   const worstGapDeg = p9Snapshot?.worstGapDeg;
-  const statusInfo = getStatusInfo(level, value);
+  const statusInfo = getStatusInfo(displayLevel, value);
   const l1Advice = getL1Advice(representativeGaps, worstGapDeg);
-  const displayExplanation = (level === "L1" || level === "Fail") ? l1Advice : statusInfo.explanation;
+  const displayExplanation = (displayLevel === "L1" || displayLevel === "Fail") ? l1Advice : statusInfo.explanation;
 
   // Ear position in SVG coords (authoritative seat origin)
   const earPx = authoritativeSeat ? toPx(authoritativeSeat.y, authoritativeSeat.z) : null;
@@ -563,7 +574,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
           fontFamily: "Futura PT Light, Century Gothic, sans-serif",
           flexShrink: 0,
         }}>
-          {level}
+          {displayLevel}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{
