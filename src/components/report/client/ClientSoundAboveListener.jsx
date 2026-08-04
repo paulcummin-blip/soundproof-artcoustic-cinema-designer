@@ -412,8 +412,8 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
                 x2={sp.px}
                 y2={sp.py}
                 stroke="#625143"
-                strokeWidth={1}
-                strokeOpacity={0.25}
+                strokeWidth={1.5}
+                strokeOpacity={0.3}
               />
             );
           })}
@@ -428,7 +428,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
                 <circle
                   cx={sp.px}
                   cy={sp.py}
-                  r={6}
+                  r={7}
                   fill={color}
                   stroke="#F8F8F7"
                   strokeWidth={1.5}
@@ -437,7 +437,7 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
                   x={sp.px}
                   y={sp.py - 12}
                   fill={color}
-                  fontSize={10}
+                  fontSize={11}
                   textAnchor="middle"
                   fontFamily="Didact Gothic, Century Gothic, sans-serif"
                   fontWeight={600}
@@ -481,27 +481,25 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
             );
           })}
 
-          {/* ── Listener marker (seated ear position) ── */}
+          {/* ── RSP marker ── */}
           <g>
-            {/* Head */}
             <circle
               cx={earPx.px}
               cy={earPx.py}
-              r={5}
-              fill="#213428"
-            />
-            {/* Shoulders */}
-            <path
-              d={`M ${earPx.px - 9} ${earPx.py + 14} Q ${earPx.px} ${earPx.py + 5} ${earPx.px + 9} ${earPx.py + 14}`}
+              r={10}
+              fill="none"
               stroke="#213428"
               strokeWidth={2}
-              fill="none"
-              strokeLinecap="round"
             />
-            {/* Label */}
+            <circle
+              cx={earPx.px}
+              cy={earPx.py}
+              r={4}
+              fill="#FFFFFF"
+            />
             <text
               x={earPx.px}
-              y={earPx.py + 28}
+              y={earPx.py + 24}
               fill="#213428"
               fontSize={11}
               textAnchor="middle"
@@ -517,36 +515,48 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
 
       {/* ── Status card ── */}
       <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
         padding: "16px 20px",
         background: "#F1F0EE",
         borderRadius: 12,
         border: `1px solid ${statusInfo.color}40`,
       }}>
         <div style={{
-          fontSize: 16,
-          fontWeight: 600,
-          color: "#213428",
-          marginBottom: 4,
-        }}>
-          {statusInfo.label}
-        </div>
-        <div style={{
-          fontSize: 13,
-          color: "#3E4349",
-          lineHeight: 1.5,
-          marginBottom: Number.isFinite(value) ? 8 : 0,
-        }}>
-          {statusInfo.explanation}
-        </div>
-        {Number.isFinite(value) && (
+          width: 4,
+          height: 48,
+          borderRadius: 2,
+          background: statusInfo.color,
+          flexShrink: 0,
+        }} />
+        <div style={{ flex: 1 }}>
           <div style={{
-            fontSize: 11,
-            color: "#625143",
-            letterSpacing: "0.04em",
+            fontSize: 16,
+            fontWeight: 600,
+            color: "#213428",
+            marginBottom: 4,
           }}>
-            {value.toFixed(1)}° largest gap — RP22 Parameter 9
+            {statusInfo.label}
           </div>
-        )}
+          <div style={{
+            fontSize: 13,
+            color: "#3E4349",
+            lineHeight: 1.5,
+            marginBottom: Number.isFinite(value) ? 8 : 0,
+          }}>
+            {statusInfo.explanation}
+          </div>
+          {Number.isFinite(value) && (
+            <div style={{
+              fontSize: 11,
+              color: "#625143",
+              letterSpacing: "0.04em",
+            }}>
+              {value.toFixed(1)}° largest gap — RP22 Parameter 9
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Footnote ── */}
