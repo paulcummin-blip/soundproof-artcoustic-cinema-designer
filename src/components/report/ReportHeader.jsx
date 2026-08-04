@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useActiveProjectId } from '@/components/state/project-session';
-import { ArrowLeft, FileText, Download } from 'lucide-react';
+import { ArrowLeft, FileText, Download, Eye } from 'lucide-react';
 import { generateSVG, generateDXF, downloadTextFile } from '../utils/cadExport';
 import ReportCover from './ReportCover';
 
@@ -51,6 +51,11 @@ export default function ReportHeader({
     const handleBackToProject = () => {
         if (!activeProjectId) return;
         navigate(`/RoomDesigner?projectId=${activeProjectId}`);
+    };
+
+    const handleClientReport = () => {
+        if (!activeProjectId) return;
+        navigate(`/RP22ClientReport?projectId=${activeProjectId}`);
     };
 
     const handleExportPDF = () => {
@@ -149,6 +154,23 @@ export default function ReportHeader({
                 >
                     <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#213428" }} />
                     Back to Project
+                </Button>
+
+                <Button
+                    type="button"
+                    onClick={handleClientReport}
+                    disabled={!activeProjectId}
+                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] screen-only"
+                    style={{
+                        fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                        backgroundColor: "#F9F8F6",
+                        borderColor: "#625143",
+                        color: "#625143",
+                        opacity: 1,
+                    }}
+                >
+                    <Eye className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
+                    Client Visual Report
                 </Button>
 
                 <Button

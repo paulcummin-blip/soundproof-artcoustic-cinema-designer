@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Save, RotateCcw, ChevronDown, FolderOpen, FileText } from "lucide-react";
+import { Save, RotateCcw, ChevronDown, FolderOpen, FileText, Eye } from "lucide-react";
 import ViewModeToggle from "@/components/roomdesigner/ViewModeToggle";
 import {
   DropdownMenu,
@@ -49,6 +49,12 @@ export default function RoomDesignerHeader({
   const handleRP22ReportClick = () => {
     if (effectiveProjectId) {
       navigate(`/RP22Report?projectId=${effectiveProjectId}`);
+    }
+  };
+
+  const handleClientReportClick = () => {
+    if (effectiveProjectId) {
+      navigate(`/RP22ClientReport?projectId=${effectiveProjectId}`);
     }
   };
 
@@ -100,11 +106,22 @@ export default function RoomDesignerHeader({
             size="sm"
             variant="secondary"
             className="font-semibold border-[#213428] text-[#213428]"
+            onClick={handleClientReportClick}
+            disabled={!effectiveProjectId}
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            Client Visual Report
+          </Button>
+
+          <Button
+            size="sm"
+            variant="secondary"
+            className="font-semibold border-[#625143] text-[#625143]"
             onClick={handleRP22ReportClick}
             disabled={!effectiveProjectId}
           >
             <FileText className="w-4 h-4 mr-2" />
-            RP22 Report
+            Technical RP22 Report
           </Button>
 
           <DropdownMenu>

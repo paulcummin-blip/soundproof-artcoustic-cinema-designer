@@ -17,6 +17,7 @@ import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
 import AdminDatasetManager from './pages/AdminDatasetManager';
 import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
+import RP22ClientReport from './pages/RP22ClientReport';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -57,6 +58,7 @@ const AuthenticatedApp = () => {
         {Object.entries(Pages).map(([path, Page]) => (
           <Route key={path} path={`/${path}`} element={<Page />} />
         ))}
+        <Route path="/RP22ClientReport" element={<RP22ClientReport />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/accounts" element={<AdminAccounts />} />
         <Route path="/admin/accounts/:accountId" element={<AccountDashboard />} />
