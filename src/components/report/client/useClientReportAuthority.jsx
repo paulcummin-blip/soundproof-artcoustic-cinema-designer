@@ -7,8 +7,10 @@
  *   projectId → fetch project → hydrateProjectIntoAppState → wait for hydration
  *   → resolve canonical RSP → useAnalysisSpeakers → compute one memoised P5 snapshot
  *
- * Does NOT mount useRP22AnalysisEngine, useSeatResponses, or RoomVisualisation.
- * The P5 snapshot depends only on settled project geometry.
+ * Mounts exactly ONE useRP22AnalysisEngine instance (includeBassAnalysis:false) with
+ * the same production inputs as RP22Report. Mounts useCompletedBassAuthority for
+ * P14/P18/P19/P20. Does NOT mount useSeatResponses, RoomVisualisation, SideElevation,
+ * or hidden report captures.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +26,12 @@ import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat } from "@/components/utils/rp22UpperSeatMetrics";
 import { levelP9_upperSpacing } from "@/components/utils/rp22/levels";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
+import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
+import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
+import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
+import { useSubwooferSync } from "@/components/hooks/useSubwooferSync";
+import { computeAllSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
@@ -152,6 +160,15 @@ export function useClientReportAuthority(projectId) {
     heightM: Number(app?.roomDims?.heightM) || 2.4,
   }), [app?.roomDims?.widthM, app?.roomDims?.lengthM, app?.roomDims?.heightM]);
 
+  // ── 2a) Stable dimensions + subwoofer sync (mirrors RP22Report) ──────────
+  const stableDimensions = useMemo(() => ({
+    width: Number(app?.roomDims?.widthM) || 4.5,
+    length: Number(app?.roomDims?.lengthM) || 6.0,
+    height: Number(app?.roomDims?.heightM) || 2.4,
+  }), [app?.roomDims?.widthM, app?.roomDims?.lengthM, app?.roomDims?.heightM]);
+
+  useSubwooferSync({ appState: app });
+
   const screen = app?.screen || {};
 
   const screenVisibleWidthInches = useMemo(
@@ -232,6 +249,60 @@ export function useClientReportAuthority(projectId) {
     getSpeakerVisibility: app?.getSpeakerVisibility,
     dolbyPreset: reportDolbyLayout,
   });
+
+  // ── 5b) All-seat SPL metrics (mirrors RP22Report exactly) ───────────────
+  const mlpBasis = app?.mlpBasis || "front";
+  const hasSeats = seatingPositions.length > 0;
+  const hasSpeakers = placedSpeakers.length > 0;
+
+  const allSeatSplMetrics = useMemo(() => {
+    if (!hasSeats || !hasSpeakers) return [];
+    const getCanonicalRoleSpl = (role) => {
+      const map = { SL: 'SL', LS: 'SL', SR: 'SR', RS: 'SR', SBL: 'SBL', SBR: 'SBR', LW: 'LW', RW: 'RW', FL: 'FL', L: 'FL', FC: 'FC', C: 'FC', FR: 'FR', R: 'FR', TFL: 'TFL', TFR: 'TFR', TML: 'TML', TMR: 'TMR', TRL: 'TRL', TRR: 'TRR' };
+      return map[String(role || '').toUpperCase()] || String(role || '').toUpperCase();
+    };
+    return computeAllSeatSplMetrics({
+      seats: seatingPositions, placedSpeakers, getCanonicalRole: getCanonicalRoleSpl,
+      getEffectiveSplInputs: app?.getEffectiveSplInputs || (() => ({ powerW: 100, eqHeadroomDb: 0 })),
+      getModelDimsM: (model) => {
+        const meta = getSpeakerModelMeta(model);
+        if (meta && !meta.notFound) return { ...meta, sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || 87, power_handling_w: meta.max_power || Infinity, max_spl_cont_db_1m: meta.max_spl || null };
+        return { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 };
+      },
+      screenLoss_dB: Number(app?.splConfig?.screenLossDb) || 0,
+      eqHeadroom_dB: Number(app?.splConfig?.globalEqHeadroomDb) || 0,
+      mlpPoint: rsp,
+    });
+  }, [seatingPositions, placedSpeakers, rsp, app?.splConfig, app?.getEffectiveSplInputs, hasSeats, hasSpeakers]);
+
+  // ── 5c) Canonical RP22 analysis engine (exactly one mount, same inputs as RP22Report) ──
+  const analysisResult = useRP22AnalysisEngine({
+    diagnosticOwner: "client-report-authority",
+    placedSpeakers,
+    visiblePlanSpeakers: analysisSpeakers,
+    seatingPositions,
+    primarySeatingPosition: rsp,
+    dimensions: stableDimensions,
+    mlpBasis,
+    sevenBedLayoutType: app?.sevenBedLayoutType,
+    extraSurroundCount: app?.extraSurroundCount,
+    seatSplMetrics: allSeatSplMetrics,
+    mlpPointOverride: rsp,
+    overheadState: { globalModel: app?.overheadGlobalModel, frontOverride: app?.overheadFrontOverride, midOverride: app?.overheadMidOverride, rearOverride: app?.overheadRearOverride, useFrontGlobal: app?.useFrontGlobal ?? true, useMidGlobal: app?.useMidGlobal ?? true, useRearGlobal: app?.useRearGlobal ?? true, aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
+    aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
+    p15ConstructionLevel: app?.p15ConstructionLevel,
+    screen,
+    includeBassAnalysis: false,
+  });
+
+  // ── 5d) Completed bass authority (lightweight useSyncExternalStore, no engine) ──
+  const completedBassAuthority = useCompletedBassAuthority(projectId || "free");
+  const completedBassContract = completedBassAuthority.contract;
+  const bassErrorMessage = completedBassAuthority.errorMessage || null;
+  const bassPresentation = useMemo(
+    () => buildComplianceBassPresentation({ completedBassAuthority }, bassErrorMessage),
+    [completedBassAuthority, bassErrorMessage]
+  );
 
   // ── 6) P5 snapshot — depends only on settled RSP + analysis speakers ─────
   const p5Snapshot = useMemo(() => {
@@ -479,6 +550,33 @@ export function useClientReportAuthority(projectId) {
     };
   }, [authoritativeSeat, placedSpeakers, roomDims.widthM, earHeightM, zoneBands, rsp]);
 
+  // ── 10b) P5/P9 parity safeguard — development-only divergence warnings ────
+  // Canonical displayed value/level/status comes from analysisResult.perSeatRp22.
+  // Helper geometry (p5Snapshot/p9Snapshot) is for drawing only.
+  // This effect warns if helper-computed values diverge from canonical engine results.
+  useEffect(() => {
+    if (!analysisResult || !authoritativeSeat) return;
+    const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV;
+    if (!isDev) return;
+
+    const canonicalP5 = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[5];
+    const canonicalP9 = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[9];
+
+    if (p5Snapshot && canonicalP5 && Number.isFinite(canonicalP5.value) && Number.isFinite(p5Snapshot.worstGapDeg)) {
+      const delta = Math.abs(p5Snapshot.worstGapDeg - canonicalP5.value);
+      if (delta > 0.5) {
+        console.warn(`[ClientReportAuthority] P5 divergence: helper=${p5Snapshot.worstGapDeg.toFixed(1)}° canonical=${canonicalP5.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
+      }
+    }
+
+    if (p9Snapshot && p9Snapshot.applicable && canonicalP9 && Number.isFinite(canonicalP9.value) && Number.isFinite(p9Snapshot.worstGapDeg)) {
+      const delta = Math.abs(p9Snapshot.worstGapDeg - canonicalP9.value);
+      if (delta > 0.5) {
+        console.warn(`[ClientReportAuthority] P9 divergence: helper=${p9Snapshot.worstGapDeg.toFixed(1)}° canonical=${canonicalP9.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
+      }
+    }
+  }, [analysisResult, authoritativeSeat, p5Snapshot, p9Snapshot]);
+
   return {
     projectId,
     projectDetails,
@@ -493,5 +591,12 @@ export function useClientReportAuthority(projectId) {
     p5Snapshot,
     p9Snapshot,
     analysisSpeakers,
+    // Canonical authorities (Stage B)
+    analysisResult,
+    completedBassAuthority,
+    completedBassContract,
+    bassPresentation,
+    allSeatSplMetrics,
+    authoritativeSeat,
   };
 }
