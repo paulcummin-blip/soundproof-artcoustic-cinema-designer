@@ -111,7 +111,8 @@ export default function RvZonesAndOverlays({
       {/* Dynamic P9 Target Corridors — interactive guidance only */}
       {exportMode === "default" && (
         <RvP9Corridors
-          corridors={p9Corridors?.corridors}
+          l4Range={p9Corridors?.l4Range}
+          boundaries={p9Corridors?.boundaries}
           applicable={p9Corridors?.applicable}
           note={p9Corridors?.note}
           toPx={toPx}

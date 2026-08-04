@@ -1,34 +1,20 @@
 /**
  * RvP9Corridors
  * -------------
- * SVG renderer for dynamic P9 target corridors in the Room Designer plan view.
+ * SVG renderer for the dynamic P9 L4 target line in the Room Designer plan view.
  *
- * Renders translucent branded bands showing where the selected overhead row
- * can be moved to achieve different P9 outcomes (L4/L3/L2/L1).
- * For .2 layouts, renders a discreet "not applicable" note.
+ * Renders a restrained dashed guide at the L4 boundary (50° adjacent-row gap),
+ * with a very light translucent fill on the compliant side.
+ * For .2 layouts, renders a discreet "Single overhead row" label.
  *
- * Uses restrained branded styling — low opacity so room geometry and speakers
- * remain clear. No bright colours, gradients, or dashboard styling.
+ * Follows the existing front-wide L4 target-line visual language.
  */
 
 import React from "react";
 
-const CORRIDOR_OPACITY = {
-  L4: 0.10,
-  L3: 0.08,
-  L2: 0.06,
-  L1: 0.04,
-};
-
-const CORRIDOR_LABELS = {
-  L4: "L4 target",
-  L3: "L3",
-  L2: "L2",
-  L1: "L1",
-};
-
 export default function RvP9Corridors({
-  corridors,
+  l4Range,
+  boundaries,
   applicable,
   note,
   toPx,
@@ -41,7 +27,7 @@ export default function RvP9Corridors({
     const [cx] = toPx(widthM / 2, 0);
     const [, cy] = toPx(0, lengthM / 2);
     return (
-      <g data-layer="p9-corridors" pointerEvents="none">
+      <g data-layer="p9-target" pointerEvents="none">
         <text
           x={cx}
           y={cy}
@@ -57,45 +43,57 @@ export default function RvP9Corridors({
     );
   }
 
-  if (!applicable || !corridors || corridors.length === 0) return null;
+  if (!applicable) return null;
 
   const [x0px] = toPx(0, 0);
   const [x1px] = toPx(widthM, 0);
   const wpx = Math.abs(x1px - x0px);
 
   return (
-    <g data-layer="p9-corridors" pointerEvents="none">
-      {corridors.map((band, i) => {
-        const [, y0px] = toPx(0, band.yStart);
-        const [, y1px] = toPx(0, band.yEnd);
-        const y = Math.min(y0px, y1px);
-        const hpx = Math.max(1, Math.abs(y1px - y0px));
-        const opacity = CORRIDOR_OPACITY[band.level] || 0.06;
-        const isL1 = band.level === "L1";
-
+    <g data-layer="p9-target" pointerEvents="none">
+      {/* L4-compliant range — very light translucent fill */}
+      {l4Range && (() => {
+        const [, yStartPx] = toPx(0, l4Range.yStart);
+        const [, yEndPx] = toPx(0, l4Range.yEnd);
+        const y = Math.min(yStartPx, yEndPx);
+        const hpx = Math.max(0, Math.abs(yEndPx - yStartPx));
         return (
-          <g key={`p9-band-${i}`}>
-            <rect
-              x={x0px}
-              y={y}
-              width={wpx}
-              height={hpx}
-              fill={isL1 ? "none" : band.color}
-              fillOpacity={isL1 ? 0 : opacity}
-              stroke={band.color}
-              strokeWidth={isL1 ? 1 : 0.5}
-              strokeOpacity={isL1 ? 0.2 : 0.12}
-              strokeDasharray={isL1 ? "4 4" : undefined}
+          <rect
+            x={x0px}
+            y={y}
+            width={wpx}
+            height={hpx}
+            fill="#213428"
+            fillOpacity={0.06}
+            stroke="none"
+          />
+        );
+      })()}
+
+      {/* L4 target boundary lines */}
+      {boundaries.map((yBoundary, i) => {
+        const [, yPx] = toPx(0, yBoundary);
+        return (
+          <g key={`p9-target-${i}`}>
+            <line
+              x1={x0px}
+              y1={yPx}
+              x2={x0px + wpx}
+              y2={yPx}
+              stroke="#213428"
+              strokeWidth={2}
+              strokeOpacity={0.6}
+              strokeDasharray="6 4"
             />
             <text
               x={x0px + 6}
-              y={y + Math.max(10, 11)}
-              fill={band.color}
+              y={yPx - 4}
+              fill="#213428"
               fontSize={9}
               fontFamily="Didact Gothic, sans-serif"
-              opacity={0.45}
+              opacity={0.55}
             >
-              {CORRIDOR_LABELS[band.level] || band.level}
+              P9 L4 target
             </text>
           </g>
         );

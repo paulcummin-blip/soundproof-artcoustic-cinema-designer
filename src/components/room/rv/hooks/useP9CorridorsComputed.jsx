@@ -1,13 +1,13 @@
 /**
  * useP9CorridorsComputed
  * ----------------------
- * Pure hook that computes dynamic P9 target corridors for a selected overhead row.
+ * Pure hook that computes the dynamic P9 L4 target line for a selected overhead row.
  *
  * Samples candidate Y positions along the room length, moves only the selected
  * overhead row to each candidate Y, and runs the existing production helpers
- * (getUpperSpeakersForSeat + computeUpperVerticalAnglesForSeat) to classify
- * the resulting P9 level at each position. Contiguous positions with the same
- * level are merged into drawable bands.
+ * (getUpperSpeakersForSeat + computeUpperVerticalAnglesForSeat) to find the
+ * max vertical gap at each position. The L4-compliant range (gap ≤ 50°) and
+ * its boundary crossings are returned for rendering as a target line.
  *
  * No state writes, no autosave, no full RP22 engine rerun.
  * Memoised from stable inputs for drag responsiveness.
@@ -19,27 +19,10 @@ import {
   computeUpperVerticalAnglesForSeat,
 } from "@/components/utils/rp22UpperSeatMetrics";
 
-// P9 thresholds (matching the production helper classification)
+// P9 L4 target threshold (matching the production helper classification)
 const P9_L4_MAX = 50;
-const P9_L3_MAX = 60;
-const P9_L2_MAX = 80;
-
-const CORRIDOR_COLORS = {
-  L4: "#213428",
-  L3: "#3E4349",
-  L2: "#625143",
-  L1: "#4A230F",
-};
 
 const SAMPLE_INTERVAL_M = 0.05;
-
-function classifyP9(maxGapDeg) {
-  if (!Number.isFinite(maxGapDeg)) return null;
-  if (maxGapDeg <= P9_L4_MAX) return "L4";
-  if (maxGapDeg <= P9_L3_MAX) return "L3";
-  if (maxGapDeg <= P9_L2_MAX) return "L2";
-  return "L1";
-}
 
 function getOverheadRowFromRole(role) {
   const r = String(role || "").toUpperCase();
@@ -136,38 +119,36 @@ export function useP9CorridorsComputed({
       // Run production helpers (no new acoustic maths)
       const upperSpeakers = getUpperSpeakersForSeat(rspPoint, candidateSpeakers, canonicalRoleFn);
       const result = computeUpperVerticalAnglesForSeat(rspPoint, upperSpeakers, roomCenterX);
-      const level = classifyP9(result.maxVerticalGapDeg);
 
-      samples.push({ y, level });
+      samples.push({ y, maxGap: result.maxVerticalGapDeg });
     }
 
-    // Merge contiguous same-level ranges into bands
-    const corridors = [];
-    let currentBand = null;
+    // Find L4-compliant range and boundary crossings (where maxGap crosses 50°)
+    const l4Samples = samples.filter((s) => s.maxGap <= P9_L4_MAX);
 
-    for (const sample of samples) {
-      if (sample.level === null) {
-        if (currentBand) {
-          corridors.push(currentBand);
-          currentBand = null;
-        }
-        continue;
-      }
-      if (!currentBand || currentBand.level !== sample.level) {
-        if (currentBand) corridors.push(currentBand);
-        currentBand = {
-          yStart: sample.y,
-          yEnd: sample.y,
-          level: sample.level,
-          color: CORRIDOR_COLORS[sample.level],
-        };
-      } else {
-        currentBand.yEnd = sample.y;
+    if (l4Samples.length === 0) {
+      return { l4Range: null, boundaries: [], applicable: true, note: null };
+    }
+
+    const l4Range = {
+      yStart: l4Samples[0].y,
+      yEnd: l4Samples[l4Samples.length - 1].y,
+    };
+
+    // Interpolate boundary crossings where maxGap transitions across 50°
+    const boundaries = [];
+    for (let i = 1; i < samples.length; i++) {
+      const prev = samples[i - 1];
+      const curr = samples[i];
+      const prevL4 = prev.maxGap <= P9_L4_MAX;
+      const currL4 = curr.maxGap <= P9_L4_MAX;
+      if (prevL4 !== currL4) {
+        const t = (P9_L4_MAX - prev.maxGap) / (curr.maxGap - prev.maxGap);
+        boundaries.push(prev.y + t * (curr.y - prev.y));
       }
     }
-    if (currentBand) corridors.push(currentBand);
 
-    return { corridors, applicable: true, note: null };
+    return { l4Range, boundaries, applicable: true, note: null };
   }, [
     selectedOverheadRow,
     rsp?.x,
