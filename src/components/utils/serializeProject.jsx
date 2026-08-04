@@ -100,6 +100,10 @@ export function serializeProject(input = {}) {
     // P12 result (from app state, written by LCRPanel)
     p12Mode = null,
     p12Level = null,
+
+    // RSP mode + manual RSP Y (from appState)
+    rspMode = "auto_from_screen",
+    manualRspY_m = null,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -267,5 +271,9 @@ export function serializeProject(input = {}) {
       ...(p12Mode != null ? { p12_mode: p12Mode } : {}),
       ...(p12Level != null ? { p12_level: p12Level } : {}),
     },
+
+    // RSP mode + manual RSP Y
+    rsp_mode: typeof rspMode === "string" && rspMode ? rspMode : "auto_from_screen",
+    manual_rsp_y_m: Number.isFinite(Number(manualRspY_m)) ? Number(manualRspY_m) : null,
   };
 }

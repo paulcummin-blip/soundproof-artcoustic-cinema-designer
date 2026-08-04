@@ -128,6 +128,8 @@ appState, // Pass appState directly for setters
       splConfig: appState.splConfig,
       p12Mode: appState.p12Mode,
       p12Level: appState.p12Level,
+      rspMode: appState?.rspMode,
+      manualRspY_m: appState?.manualRspY_m,
     });
     return projectData;
   }, [
@@ -186,6 +188,8 @@ appState, // Pass appState directly for setters
       setSelectedSpeakersByRole, setSpeakerNodes, setSpeakerSystem,
       setGlobalSurroundModel,
       setExtraSurroundCount,
+      setRspMode: appState?.setRspMode,
+      setManualRspY_m: appState?.setManualRspY_m,
     });
   }, [
   appState?.setRoomDims,
@@ -302,6 +306,8 @@ appState, // Pass appState directly for setters
           splConfig: _parseMaybe(p?.spl_config, null),
           p12Mode: p?.spl_config?.p12_mode ?? null,
           p12Level: p?.spl_config?.p12_level ?? null,
+          rspMode: p?.rsp_mode || "auto_from_screen",
+          manualRspY_m: (() => { const v = Number(p?.manual_rsp_y_m); return Number.isFinite(v) ? v : null; })(),
         });
         delete loadedProjectData.name;
         delete loadedProjectData.client_name;
@@ -598,7 +604,9 @@ appState, // Pass appState directly for setters
   appState?.globalSurroundModel,
   appState?.extraSurroundCount,
   appState?.subwooferInstancesStatus,
-  appState?.subwooferInstanceMigrationState]
+  appState?.subwooferInstanceMigrationState,
+  appState?.rspMode,
+  appState?.manualRspY_m]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults

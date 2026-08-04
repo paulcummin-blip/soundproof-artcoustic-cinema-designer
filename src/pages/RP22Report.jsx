@@ -153,6 +153,8 @@ function RP22ReportInner() {
                 setGlobalSurroundModel: app.setGlobalSurroundModel,
                 setExtraSurroundCount: app.setExtraSurroundCount,
                 setFreeMoveLcr: app.setFreeMoveLcr,
+                setRspMode: app.setRspMode,
+                setManualRspY_m: app.setManualRspY_m,
             });
             setReportReadyProjectId(p.id);
             setReportHydrating(false);
