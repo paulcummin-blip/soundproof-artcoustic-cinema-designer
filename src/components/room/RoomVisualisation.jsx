@@ -256,6 +256,14 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     return map[r] || r;
   }, []);
 
+  // Stable transient selection key for speakers — used throughout the Room
+  // Visualisation drag/selection path so legacy speakers without .id remain
+  // selectable and draggable. Never written to the project or saved entities.
+  const getSpeakerSelectionKey = useCallback((speaker) => {
+    if (!speaker) return null;
+    return speaker.id || getCanonicalRole(speaker.role) || speaker.role || null;
+  }, [getCanonicalRole]);
+
   // --- MLP: use RoomDesigner anchor if available; DO NOT stick to seats ---
 
   // We assume widthM and lengthM are already defined earlier in this file.
@@ -981,7 +989,7 @@ const byId = useEntitiesById({
   // Wrapped handler that also tracks selected overhead row for P9 corridors
   const bedLayerSpeakerMouseDownHandlerWithSelection = useCallback(
     (e, id) => {
-      const speaker = placedSpeakers.find((s) => s.id === id);
+      const speaker = placedSpeakers.find((s) => getSpeakerSelectionKey(s) === id);
       let isOverhead = false;
       if (speaker) {
         const role = String(speaker.role || "").toUpperCase();
@@ -1426,10 +1434,10 @@ const byId = useEntitiesById({
   const commitDraftSpeakerPositions = useCallback(() => {
     if (!draftSpeakersRef.current || !onSetSpeakers) return;
     const draftSpeakers = draftSpeakersRef.current;
-    const draftMap = new Map(draftSpeakers.map(s => [s.id, s]));
+    const draftMap = new Map(draftSpeakers.map(s => [getSpeakerSelectionKey(s), s]));
     onSetSpeakers(prev =>
       prev.map(s => {
-        const draft = draftMap.get(s.id);
+        const draft = draftMap.get(getSpeakerSelectionKey(s));
         if (!draft) return s;
         return {
           ...s,
@@ -1811,10 +1819,10 @@ useEffect(() => {
       return placedSpeakers;
     }
     const draftById = new Map(
-      draftSpeakersRef.current.map((speaker) => [speaker.id, speaker])
+      draftSpeakersRef.current.map((speaker) => [getSpeakerSelectionKey(speaker), speaker])
     );
     return placedSpeakers.map((speaker) => {
-      const draft = draftById.get(speaker.id);
+      const draft = draftById.get(getSpeakerSelectionKey(speaker));
       return draft || speaker;
     });
   }, [placedSpeakers, speakerDragTick]);

@@ -110,7 +110,7 @@ export function useOverheadIconElements({
               widthM={0.27}
               depthM={0.27}
               scale={scale}
-              speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
+              speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id || spk.role)}
               onIconEnter={handleIconEnter}
               onIconMove={handleIconMove}
               onIconLeave={handleIconLeave}

@@ -200,7 +200,8 @@ export function useSpeakerDragUpdate({
         const updatedMap = new Map(finalPositions.map(p => [p.id, p]));
 
         draftSpeakersRef.current = draftSpeakersRef.current.map(s => {
-          const upd = updatedMap.get(s.id);
+          const sKey = s.id || getCanonicalRole(s.role) || s.role;
+          const upd = updatedMap.get(sKey);
           if (!upd) return s;
           // Guard: never write a non-finite position
           const pos = upd.position;
