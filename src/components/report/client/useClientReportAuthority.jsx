@@ -29,7 +29,6 @@ import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverhead
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
 import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
-import { useSubwooferSync } from "@/components/hooks/useSubwooferSync";
 import { computeAllSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
@@ -160,14 +159,12 @@ export function useClientReportAuthority(projectId) {
     heightM: Number(app?.roomDims?.heightM) || 2.4,
   }), [app?.roomDims?.widthM, app?.roomDims?.lengthM, app?.roomDims?.heightM]);
 
-  // ── 2a) Stable dimensions + subwoofer sync (mirrors RP22Report) ──────────
+  // ── 2a) Stable dimensions (mirrors RP22Report) ──────────
   const stableDimensions = useMemo(() => ({
     width: Number(app?.roomDims?.widthM) || 4.5,
     length: Number(app?.roomDims?.lengthM) || 6.0,
     height: Number(app?.roomDims?.heightM) || 2.4,
   }), [app?.roomDims?.widthM, app?.roomDims?.lengthM, app?.roomDims?.heightM]);
-
-  useSubwooferSync({ appState: app });
 
   const screen = app?.screen || {};
 
