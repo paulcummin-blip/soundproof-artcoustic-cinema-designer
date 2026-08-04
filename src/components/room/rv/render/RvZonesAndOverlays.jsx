@@ -116,6 +116,8 @@ export default function RvZonesAndOverlays({
           applicable={p9Corridors?.applicable}
           state={p9Corridors?.state}
           note={p9Corridors?.note}
+          selectedRow={p9Corridors?.selectedRow}
+          overheadZones={overheadZones}
           toPx={toPx}
           widthM={widthM}
           lengthM={lengthM}
