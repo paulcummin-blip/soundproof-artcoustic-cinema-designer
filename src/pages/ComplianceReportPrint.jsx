@@ -35,6 +35,7 @@ export default function ComplianceReportPrint() {
 
   // Run non-bass RP22 analysis; P14/P18/P19/P20 display comes only from the completed bass contract.
   const analysis = useRP22AnalysisEngine({
+    diagnosticOwner: "compliance-report-print",
     roomDims: { widthM, lengthM, heightM },
     speakers,
     seats,

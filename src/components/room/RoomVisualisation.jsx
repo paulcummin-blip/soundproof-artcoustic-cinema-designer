@@ -196,6 +196,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     showRoomModesOverlay = false,
     showThrowDistance = false,
     liveImpactMode = "summary",
+    rp22DiagnosticOwner = "room-visualisation-live-impact",
   } = props;
 
   const appState = useAppState();
@@ -1244,6 +1245,7 @@ const byId = useEntitiesById({
     aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, getSpeakerVisibility,
   ]);
   const liveRp22 = useRP22AnalysisEngine({
+    diagnosticOwner: rp22DiagnosticOwner,
     placedSpeakers,
     seatingPositions,
     dimensions: engineDimensions,

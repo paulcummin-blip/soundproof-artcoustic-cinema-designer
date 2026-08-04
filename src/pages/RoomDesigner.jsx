@@ -834,6 +834,7 @@ function RoomDesignerWithState() {
 
   // ✅ analysisResult uses internal overlay calculation (no props needed)
   const analysisResult = useRP22AnalysisEngine({
+    diagnosticOwner: "room-designer-authority",
     placedSpeakers: _effectivePlacedSpeakers,
     visiblePlanSpeakers: _effectiveVisiblePlanSpeakers,
     seatingPositions: seats,

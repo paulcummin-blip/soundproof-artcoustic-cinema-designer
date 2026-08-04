@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import RoomVisualisation from '../room/RoomVisualisation';
 import RvStaticCanvas from './RvStaticCanvas';
 
@@ -38,6 +38,13 @@ export default function ReportHiddenCaptures({
     screen,
     dolbyLayout,
 }) {
+    useEffect(() => {
+        console.log("[REPORT CAPTURE MOUNT]", "rv-static-canvas");
+        console.log("[REPORT CAPTURE MOUNT]", "report-dimensioned-plan");
+        console.log("[REPORT CAPTURE MOUNT]", "report-speaker-plan");
+        console.log("[REPORT CAPTURE MOUNT]", "report-seat-metrics");
+    }, []);
+
     // --- Extract only the fields we need from `app` so useMemo deps are stable ---
     const screenFrontPlaneM = Number.isFinite(Number(app?.screenFrontPlaneM))
         ? Number(app.screenFrontPlaneM)
@@ -162,6 +169,7 @@ export default function ReportHiddenCaptures({
             <div data-plan-capture-dims style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     {...commonProps}
+                    rp22DiagnosticOwner="report-dimensioned-plan"
                     overlays={overlaysDims}
                     speakerPositionsView="off"
                     showMlpRuler={true}
@@ -173,6 +181,7 @@ export default function ReportHiddenCaptures({
             <div data-plan-capture-speaker-dims style={HIDDEN_STYLE}>
                 <RoomVisualisation
                     {...commonProps}
+                    rp22DiagnosticOwner="report-speaker-plan"
                     overlays={overlaysDims}
                     speakerPositionsView="plan"
                     showMlpRuler={false}
@@ -182,6 +191,7 @@ export default function ReportHiddenCaptures({
             {/* Seat metrics builder (keeps seatMetricsById live) */}
             <div data-seat-metrics-builder style={HIDDEN_STYLE}>
                 <RoomVisualisation
+                    rp22DiagnosticOwner="report-seat-metrics"
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}

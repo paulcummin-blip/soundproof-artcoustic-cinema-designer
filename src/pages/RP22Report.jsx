@@ -382,6 +382,7 @@ function RP22ReportInner() {
     }, [seats, placedSpeakers, primarySeatingPosition, app?.splConfig, app?.getEffectiveSplInputs, hasSeats, hasSpeakers]);
 
     const analysisResult = useRP22AnalysisEngine({
+        diagnosticOwner: "rp22-report-page-authority",
         placedSpeakers, visiblePlanSpeakers: analysisSpeakers, seatingPositions: seats, primarySeatingPosition,
         dimensions: stableDimensions, mlpBasis,
         sevenBedLayoutType: app?.sevenBedLayoutType,

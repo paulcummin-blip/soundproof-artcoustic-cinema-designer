@@ -387,7 +387,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers, includeBassAnalysis = true }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
   // Report consumers disable this calculation path and present only the completed bass authority.
   const liveSeatResponses = useSeatResponses();
   const seatResponses = includeBassAnalysis ? liveSeatResponses : [];
@@ -473,6 +473,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
   const memoizedResult = useMemo(() => {
     const temporaryRunId = ++temporaryAnalysisRunId;
     const temporaryTimestamp = new Date().toISOString();
+    const safeSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    const safeSeats = Array.isArray(seatingPositions) ? seatingPositions : [];
+    console.log("[RP22 ENGINE TRACE]", JSON.stringify({
+      owner: diagnosticOwner,
+      runId: temporaryRunId,
+      timestamp: temporaryTimestamp,
+      mlpY: Number.isFinite(Number(mlpPointOverride?.y)) ? Number(mlpPointOverride.y) : null,
+      speakerCount: safeSpeakers.length,
+      seatCount: safeSeats.length,
+    }));
     const temporaryTrace = {
       analysisRunId: temporaryRunId,
       timestamp: temporaryTimestamp,
@@ -483,9 +493,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       caughtErrorStack: null,
     };
     const gradedParameters = { primary: {}, secondary: null };
-
-    const safeSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-    const safeSeats = Array.isArray(seatingPositions) ? seatingPositions : [];
 
     // Extract room height early for use throughout
     // Prefer explicit heightM, fallback to generic height, then default 2.5 m
