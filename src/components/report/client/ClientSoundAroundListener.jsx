@@ -22,9 +22,9 @@ const STATUS_COPY = {
   L4: { label: "Excellent spatial continuity", color: "#213428" },
   L3: { label: "Very good spatial continuity", color: "#3E4349" },
   L2: { label: "Good spatial continuity", color: "#625143" },
-  L1: { label: "Noticeable gaps", color: "#4A230F" },
-  Fail: { label: "Improvement recommended", color: "#4A230F" },
-  "—": { label: "Improvement recommended", color: "#C1B6AD" },
+  L1: { label: "Further refinement recommended", color: "#4A230F" },
+  Fail: { label: "Further refinement recommended", color: "#4A230F" },
+  "—": { label: "Further refinement recommended", color: "#C1B6AD" },
 };
 
 function getStatusInfo(level) {
@@ -421,71 +421,44 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
 
       {/* ── Status card ── */}
       <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
         padding: "16px 20px",
         background: "#F1F0EE",
         borderRadius: 12,
         border: `1px solid ${statusInfo.color}40`,
       }}>
         <div style={{
-          width: 48,
-          height: 48,
-          borderRadius: 8,
-          background: `${statusInfo.color}25`,
-          border: `2px solid ${statusInfo.color}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 18,
-          fontWeight: 700,
-          color: statusInfo.color,
-          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-          flexShrink: 0,
+          fontSize: 16,
+          fontWeight: 600,
+          color: "#213428",
+          marginBottom: 4,
         }}>
-          {level}
+          {statusInfo.label}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: "#213428",
-            marginBottom: 4,
-          }}>
-            {statusInfo.label}
-          </div>
-          <div style={{
-            fontSize: 13,
-            color: "#3E4349",
-            lineHeight: 1.5,
-          }}>
-            The proposed speaker layout creates smooth, continuous movement around the listening position.
-          </div>
+        <div style={{
+          fontSize: 13,
+          color: "#3E4349",
+          lineHeight: 1.5,
+          marginBottom: 8,
+        }}>
+          The proposed speaker layout creates smooth, continuous movement around the reference listening position.
         </div>
         {Number.isFinite(worstGapDeg) && (
           <div style={{
-            textAlign: "right",
-            flexShrink: 0,
+            fontSize: 12,
+            color: "#625143",
+            marginBottom: 6,
           }}>
-            <div style={{
-              fontSize: 11,
-              color: "#625143",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              marginBottom: 2,
-            }}>
-              Worst gap
-            </div>
-            <div style={{
-              fontSize: 20,
-              fontWeight: 600,
-              color: statusInfo.color,
-            }}>
-              {Math.round(worstGapDeg)}°
-            </div>
+            {Math.round(worstGapDeg)}° largest spacing at the RSP — RP22 Parameter 5
           </div>
         )}
+        <div style={{
+          fontSize: 11,
+          color: "#625143",
+          opacity: 0.7,
+          fontStyle: "italic",
+        }}>
+          Seat-by-seat compliance results are provided in the Technical RP22 Report.
+        </div>
       </div>
 
       {/* ── Footnote ── */}

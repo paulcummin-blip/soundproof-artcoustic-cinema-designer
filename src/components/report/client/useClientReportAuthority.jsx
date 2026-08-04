@@ -552,36 +552,25 @@ export function useClientReportAuthority(projectId) {
   // Display fields (level, worstGapDeg/value) are overridden from canonical perSeatRp22
   // when available. Helper originals are retained as geometryWorstGapDeg / geometryLevel
   // so the parity safeguard can still compare helper vs canonical.
-  const canonicalP5 = useMemo(() => {
-    if (!analysisResult || !authoritativeSeat) return null;
-    const c = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[5];
-    return (c && Number.isFinite(c.value)) ? c : null;
-  }, [analysisResult, authoritativeSeat]);
-
+  // Client P5 is intentionally RSP-based (not canonical per-seat).
+  // canonicalP5 override removed — p5Snapshot already computes from the effective RSP.
   const canonicalP9 = useMemo(() => {
     if (!analysisResult || !authoritativeSeat) return null;
     const c = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[9];
     return (c && Number.isFinite(c.value)) ? c : null;
   }, [analysisResult, authoritativeSeat]);
 
+  // Client P5 is RSP-based. p5Snapshot already computes from the effective RSP
+  // via computeSurroundRingGaps + rp22LevelForP5. The real-seat engine result
+  // remains in analysisResult for the Technical Report and future seat maps.
   const p5SnapshotFinal = useMemo(() => {
     if (!p5Snapshot) return null;
-    const geometryWorstGapDeg = p5Snapshot.worstGapDeg;
-    const geometryLevel = p5Snapshot.level;
-    if (!canonicalP5) {
-      return { ...p5Snapshot, canonical: false, geometryWorstGapDeg, geometryLevel };
-    }
     return {
       ...p5Snapshot,
-      level: canonicalP5.level ?? geometryLevel,
-      worstGapDeg: canonicalP5.value ?? geometryWorstGapDeg,
-      formatted: canonicalP5.formatted ?? null,
-      status: canonicalP5.status ?? null,
-      canonical: true,
-      geometryWorstGapDeg,
-      geometryLevel,
+      geometryWorstGapDeg: p5Snapshot.worstGapDeg,
+      geometryLevel: p5Snapshot.level,
     };
-  }, [p5Snapshot, canonicalP5]);
+  }, [p5Snapshot]);
 
   const p9SnapshotFinal = useMemo(() => {
     if (!p9Snapshot) return null;
@@ -611,20 +600,15 @@ export function useClientReportAuthority(projectId) {
     const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV;
     if (!isDev) return;
 
-    if (p5SnapshotFinal && canonicalP5 && Number.isFinite(canonicalP5.value) && Number.isFinite(p5SnapshotFinal.geometryWorstGapDeg)) {
-      const delta = Math.abs(p5SnapshotFinal.geometryWorstGapDeg - canonicalP5.value);
-      if (delta > 0.5) {
-        console.warn(`[ClientReportAuthority] P5 divergence: helper=${p5SnapshotFinal.geometryWorstGapDeg.toFixed(1)}° canonical=${canonicalP5.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
-      }
-    }
-
+    // P5 is intentionally RSP-based for the Client Report; no canonical parity check.
+    // P9 remains canonical per-seat; warn on helper vs engine divergence.
     if (p9SnapshotFinal && p9SnapshotFinal.applicable && canonicalP9 && Number.isFinite(canonicalP9.value) && Number.isFinite(p9SnapshotFinal.geometryWorstGapDeg)) {
       const delta = Math.abs(p9SnapshotFinal.geometryWorstGapDeg - canonicalP9.value);
       if (delta > 0.5) {
         console.warn(`[ClientReportAuthority] P9 divergence: helper=${p9SnapshotFinal.geometryWorstGapDeg.toFixed(1)}° canonical=${canonicalP9.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
       }
     }
-  }, [analysisResult, authoritativeSeat, p5SnapshotFinal, p9SnapshotFinal, canonicalP5, canonicalP9]);
+  }, [analysisResult, authoritativeSeat, p9SnapshotFinal, canonicalP9]);
 
   return {
     projectId,
