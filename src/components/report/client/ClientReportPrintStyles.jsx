@@ -64,10 +64,11 @@ export default function ClientReportPrintStyles() {
       /* ── Print layout rules (active during measurement AND print) ── */
       body.client-report-printing .client-report-page {
         width: 186mm !important;
-        height: 270mm !important;
+        height: 272mm !important;
+        min-height: 272mm !important;
         box-sizing: border-box !important;
-        display: flex !important;
-        flex-direction: column !important;
+        display: grid !important;
+        grid-template-rows: auto minmax(0, 1fr) auto;
         break-inside: avoid !important;
         page-break-inside: avoid !important;
         page-break-after: always;
@@ -83,7 +84,8 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__header {
-        flex-shrink: 0;
+        grid-row: 1;
+        align-self: start;
         max-height: 34mm;
         overflow: hidden;
         padding-bottom: 3mm;
@@ -120,11 +122,13 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__visual {
-        flex: 1 1 auto;
+        grid-row: 2;
+        min-height: 0;
+        width: 100%;
+        height: 100%;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        min-height: 0;
         overflow: hidden !important;
       }
 
@@ -147,12 +151,17 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__footer {
-        flex-shrink: 0;
+        grid-row: 3;
+        align-self: end;
+        width: 100%;
         height: 18mm;
         min-height: 18mm;
+        max-height: none;
+        margin: 0;
+        padding: 3mm 0 0 0;
+        box-sizing: border-box;
         border-top: 1px solid #DCDBD6;
-        margin-top: auto;
-        display: flex;
+        display: flex !important;
         align-items: center;
         justify-content: center;
         gap: 4mm;
@@ -274,10 +283,11 @@ export default function ClientReportPrintStyles() {
         /* ── A4 page frame ── */
         .client-report-page {
           width: 186mm !important;
-          height: 270mm !important; /* slightly below 273mm to prevent blank trailing page */
+          height: 272mm !important;
+          min-height: 272mm !important;
           box-sizing: border-box !important;
-          display: flex !important;
-          flex-direction: column !important;
+          display: grid !important;
+          grid-template-rows: auto minmax(0, 1fr) auto;
           break-inside: avoid !important;
           page-break-inside: avoid !important;
           page-break-after: always;
@@ -294,7 +304,8 @@ export default function ClientReportPrintStyles() {
 
         /* ── Header (first page only) — max ~34mm ── */
         .client-report-page__header {
-          flex-shrink: 0;
+          grid-row: 1;
+          align-self: start;
           max-height: 34mm;
           overflow: hidden;
           padding-bottom: 3mm;
@@ -330,13 +341,15 @@ export default function ClientReportPrintStyles() {
           white-space: nowrap;
         }
 
-        /* ── Visual area — flex container, centred ── */
+        /* ── Visual area — grid row 2, centred ── */
         .client-report-page__visual {
-          flex: 1 1 auto;
+          grid-row: 2;
+          min-height: 0;
+          width: 100%;
+          height: 100%;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          min-height: 0;
           overflow: hidden !important;
         }
 
@@ -363,12 +376,17 @@ export default function ClientReportPrintStyles() {
 
         /* ── Footer (last page only) — bottom-anchored ~18mm row ── */
         .client-report-page__footer {
-          flex-shrink: 0;
+          grid-row: 3;
+          align-self: end;
+          width: 100%;
           height: 18mm;
           min-height: 18mm;
+          max-height: none;
+          margin: 0;
+          padding: 3mm 0 0 0;
+          box-sizing: border-box;
           border-top: 1px solid #DCDBD6;
-          margin-top: auto;
-          display: flex;
+          display: flex !important;
           align-items: center;
           justify-content: center;
           gap: 4mm;
