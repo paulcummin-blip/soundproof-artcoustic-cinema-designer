@@ -20,6 +20,9 @@ import ClientSoundAboveListener from "@/components/report/client/ClientSoundAbov
 import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
+import { selectClientDesignHighlights } from "@/components/report/client/selectClientDesignHighlights";
+import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
+import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -39,7 +42,44 @@ export default function RP22ClientReport() {
   );
 
   const authority = useClientReportAuthority(projectId);
-  const { hydrating, projectDetails, p5Snapshot, p9Snapshot, roomDims, screen, screenFrontPlaneM } = authority;
+  const {
+    hydrating,
+    projectDetails,
+    p5Snapshot,
+    p9Snapshot,
+    roomDims,
+    screen,
+    screenFrontPlaneM,
+    screenWidthM,
+    rsp,
+    rspSourceLabel,
+    seatingPositions,
+    placedSpeakers,
+    analysisResult,
+    bassPresentation,
+    authoritativeSeat,
+  } = authority;
+
+  // ── Design highlights (pure selector, no new analysis) ──
+  const highlights = useMemo(() => {
+    if (hydrating || !analysisResult) return [];
+    return selectClientDesignHighlights({
+      analysisResult,
+      bassPresentation,
+      p5Snapshot,
+      p9Snapshot,
+      placedSpeakers,
+      authoritativeSeat,
+    });
+  }, [hydrating, analysisResult, bassPresentation, p5Snapshot, p9Snapshot, placedSpeakers, authoritativeSeat]);
+
+  // ── Recommended seating position availability ──
+  const hasSeatingPosition = useMemo(() => {
+    if (!roomDims || !Array.isArray(seatingPositions) || seatingPositions.length === 0 || !rsp) return false;
+    const x = Number(rsp.x);
+    const y = Number(rsp.y);
+    return Number.isFinite(x) && Number.isFinite(y);
+  }, [roomDims, seatingPositions, rsp]);
 
   // ── Active pages collection — drives both screen and PDF rendering order ──
   const activePages = useMemo(() => {
@@ -81,8 +121,48 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Design Highlights (only when supported highlights exist)
+    if (highlights.length > 0) {
+      pages.push({
+        id: "design-highlights",
+        visual: (
+          <ClientDesignHighlights highlights={highlights} />
+        ),
+        printData: {
+          type: "highlights",
+          highlights,
+        },
+      });
+    }
+    // Recommended Seating Position (only when valid geometry + seats + RSP)
+    if (hasSeatingPosition) {
+      pages.push({
+        id: "recommended-seating-position",
+        visual: (
+          <ClientRecommendedSeatingPosition
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
+            rsp={rsp}
+            rspSourceLabel={rspSourceLabel}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            screen={screen}
+          />
+        ),
+        printData: {
+          type: "seating-position",
+          roomDims,
+          seatingPositions,
+          rsp,
+          rspSourceLabel,
+          screenFrontPlaneM,
+          screenWidthM,
+          screen,
+        },
+      });
+    }
     return pages;
-  }, [p5Snapshot, p9Snapshot, roomDims, screen, screenFrontPlaneM]);
+  }, [p5Snapshot, p9Snapshot, highlights, hasSeatingPosition, roomDims, seatingPositions, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,
@@ -122,7 +202,7 @@ export default function RP22ClientReport() {
             color: "#213428",
             fontFamily: "Futura PT Light, Century Gothic, sans-serif",
           }}>
-            Client Visual Report
+            Visual Report
           </h1>
           {projectDetails && (
             <p style={{
@@ -180,7 +260,7 @@ export default function RP22ClientReport() {
             }}
           >
             <Download className="w-4 h-4 mr-2" style={{ color: "#FFFFFF" }} />
-            {exporting ? "Preparing PDF…" : "Download PDF"}
+            {exporting ? "Preparing Visual Report…" : "Download Visual Report (PDF)"}
           </Button>
         </div>
       </div>
@@ -202,7 +282,7 @@ export default function RP22ClientReport() {
             boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
             border: "1px solid #DCDBD6",
           }}>
-            Loading project…
+            Preparing Visual Report…
           </div>
         ) : !projectId ? (
           <div className="client-report-screen-only" style={{
@@ -215,7 +295,7 @@ export default function RP22ClientReport() {
             boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
             border: "1px solid #DCDBD6",
           }}>
-            No project selected. Open a project from the Room Designer to view its Client Visual Report.
+            Open a project from the Room Designer to view its Visual Report.
           </div>
         ) : activePages.length === 0 ? (
           <div className="client-report-screen-only" style={{

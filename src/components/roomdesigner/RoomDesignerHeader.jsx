@@ -110,7 +110,7 @@ export default function RoomDesignerHeader({
             disabled={!effectiveProjectId}
           >
             <Eye className="w-4 h-4 mr-2" />
-            Client Visual Report
+            Visual Report
           </Button>
 
           <Button

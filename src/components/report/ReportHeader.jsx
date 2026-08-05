@@ -170,7 +170,7 @@ export default function ReportHeader({
                     }}
                 >
                     <Eye className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
-                    Client Visual Report
+                    Visual Report
                 </Button>
 
                 <Button

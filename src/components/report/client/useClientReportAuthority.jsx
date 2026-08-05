@@ -1,7 +1,7 @@
 /**
  * useClientReportAuthority
  * ------------------------
- * Page-local, hydration-gated authority hook for the Client Visual Report.
+ * Page-local, hydration-gated authority hook for the Visual Report.
  *
  * Pipeline:
  *   projectId → fetch project → hydrateProjectIntoAppState → wait for hydration
@@ -632,5 +632,7 @@ export function useClientReportAuthority(projectId) {
     bassPresentation,
     allSeatSplMetrics,
     authoritativeSeat,
+    seatingPositions,
+    placedSpeakers,
   };
 }

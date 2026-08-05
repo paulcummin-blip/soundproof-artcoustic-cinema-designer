@@ -15,6 +15,7 @@ import { selectClientSeatCoverage } from "./selectClientSeatCoverage";
 import { selectClientDynamics } from "./selectClientDynamics";
 import { selectClientBass } from "./selectClientBass";
 import { selectClientParameterResults } from "./selectClientParameterResults";
+import { selectClientDesignHighlights } from "./selectClientDesignHighlights";
 import { assertPillarGroupingComplete } from "./rp22PillarGrouping";
 
 const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV;
@@ -105,6 +106,51 @@ export function runClientReportSelectorAssertions() {
     true,
     "p5Snapshot: level/worstGapDeg = RSP-based computeSurroundRingGaps result (no per-seat override). p9Snapshot: level/value = canonical perSeatRp22[seat].rp22[9] when available; geometryWorstGapDeg/geometryLevel = helper. Client and Technical may differ by design."
   );
+
+  // 6. Design highlights selector
+  const emptyHighlights = selectClientDesignHighlights({});
+  check("6a. Missing authority returns empty highlights", Array.isArray(emptyHighlights) && emptyHighlights.length === 0);
+
+  const mockHighlightsAnalysis = {
+    gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" } } },
+  };
+  const mockHighlightsBass = {
+    publicationVerified: true,
+    parameters: { p20: { level: "L3" } },
+  };
+  const mockP5 = { level: "L2" };
+  const mockP9 = { applicable: true, level: "L3" };
+  const mockSpeakers = [{ role: "TFL" }, { role: "TFR" }];
+  const highlightsResult = selectClientDesignHighlights({
+    analysisResult: mockHighlightsAnalysis,
+    bassPresentation: mockHighlightsBass,
+    p5Snapshot: mockP5,
+    p9Snapshot: mockP9,
+    placedSpeakers: mockSpeakers,
+  });
+  check("6b. All four highlights present when passing", highlightsResult.length === 4);
+  check("6c. Clear dialogue highlight present", highlightsResult.some((h) => h.id === "clear-dialogue"));
+  check("6d. Consistent bass highlight present", highlightsResult.some((h) => h.id === "consistent-bass"));
+
+  // 6e. Omit when L1
+  const failHighlights = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L1" }, 4: { level: "L2" }, 12: { level: "L4" } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L3" },
+    placedSpeakers: [{ role: "TFL" }],
+  });
+  check("6e. Clear dialogue omitted when P3 is L1", !failHighlights.some((h) => h.id === "clear-dialogue"));
+
+  // 6f. Omit bass when not verified
+  const unverifiedBass = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" } } } },
+    bassPresentation: { publicationVerified: false, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L3" },
+    placedSpeakers: [{ role: "TFL" }],
+  });
+  check("6f. Consistent bass omitted when not verified", !unverifiedBass.some((h) => h.id === "consistent-bass"));
 
   return { ran: true, results };
 }

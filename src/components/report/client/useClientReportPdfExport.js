@@ -1,7 +1,7 @@
 /**
  * useClientReportPdfExport
  * ------------------------
- * Export lifecycle hook for the Client Visual Report PDF.
+ * Export lifecycle hook for the Visual Report PDF.
  *
  * With the dedicated print composition (three document regions per page),
  * the SVG scales via CSS to fill the drawing region — no JS transform
@@ -106,7 +106,7 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
 
       // 4. Set temporary document title
       originalTitleRef.current = document.title;
-      document.title = `Sound Proof - ${sanitiseProjectName(projectName)} - Client Visual Report`;
+      document.title = `Sound Proof - ${sanitiseProjectName(projectName)} - Visual Report`;
 
       // 5. Wait two animation frames for print layout to settle
       await new Promise((resolve) =>
