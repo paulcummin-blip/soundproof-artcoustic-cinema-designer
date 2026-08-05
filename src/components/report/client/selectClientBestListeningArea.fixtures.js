@@ -35,6 +35,16 @@ function run() {
     return { level, value, formatted: String(value), status };
   }
 
+  // Helper: make a FAIL param (no finite value required)
+  function paramFail(status = "ok") {
+    return { level: "FAIL", status };
+  }
+
+  // Helper: make a param with applicable flag
+  function paramApplicable(level, value, status, applicable) {
+    return { level, value, formatted: String(value), status, applicable };
+  }
+
   // ── 1. P4-only fixture ──
   {
     const analysis = makeAnalysis({
@@ -98,6 +108,90 @@ function run() {
   }
 
   // ── 6. No valid results ──
+  // (Tests 6–15 below; FAIL-specific tests 16–22 inserted before test 6) ──
+
+  // ── 16. Explicit FAIL with status "ok" (no finite value) ──
+  {
+    const analysis = makeAnalysis({
+      "s1": { 4: param("L4"), 6: paramFail("ok") },
+    });
+    const seats = [makeSeat("s1", 2, 3)];
+    const r = selectClientBestListeningArea({ analysisResult: analysis, seatingPositions: seats, rsp: null });
+    check("16a. FAIL+ok → worst FAIL", "FAIL", r.seats[0].worstLevel);
+    check("16b. FAIL+ok → improvement", "improvement", r.seats[0].categoryKey);
+    check("16c. FAIL+ok → category label", "Improvement recommended", r.seats[0].category);
+  }
+
+  // ── 17. Explicit FAIL with status "fail" ──
+  {
+    const analysis = makeAnalysis({
+      "s1": { 4: param("L4"), 6: paramFail("fail") },
+    });
+    const seats = [makeSeat("s1", 2, 3)];
+    const r = selectClientBestListeningArea({ analysisResult: analysis, seatingPositions: seats, rsp: null });
+    check("17a. FAIL+fail → worst FAIL", "FAIL", r.seats[0].worstLevel);
+    check("17b. FAIL+fail → improvement", "improvement", r.seats[0].categoryKey);
+    check("17c. FAIL+fail → category label", "Improvement recommended", r.seats[0].category);
+  }
+
+  // ── 18. Status "fail" without explicit FAIL level → rejected ──
+  {
+    const analysis = makeAnalysis({
+      "s1": { 4: param("L3", 1.0, "fail"), 6: param("L4"), 10: param("L4") },
+    });
+    const seats = [makeSeat("s1", 2, 3)];
+    const r = selectClientBestListeningArea({ analysisResult: analysis, seatingPositions: seats, rsp: null });
+    check("18a. L3+fail rejected → worst L4", "L4", r.seats[0].worstLevel);
+    check("18b. L3+fail rejected → primary", "primary", r.seats[0].categoryKey);
+  }
+
+  // ── 19. Status "no_data" → rejected ──
+  {
+    const analysis = makeAnalysis({
+      "s1": { 4: param("L3", 1.0, "no_data"), 6: param("L4"), 10: param("L4") },
+    });
+    const seats = [makeSeat("s1", 2, 3)];
+    const r = selectClientBestListeningArea({ analysisResult: analysis, seatingPositions: seats, rsp: null });
+    check("19a. no_data rejected → worst L4", "L4", r.seats[0].worstLevel);
+    check("19b. no_data rejected → primary", "primary", r.seats[0].categoryKey);
+  }
+
+  // ── 20. Status "error" → rejected ──
+  {
+    const analysis = makeAnalysis({
+      "s1": { 4: param("L3", 1.0, "error"), 6: param("L4"), 10: param("L4") },
+    });
+    const seats = [makeSeat("s1", 2, 3)];
+    const r = selectClientBestListeningArea({ analysisResult: analysis, seatingPositions: seats, rsp: null });
+    check("20a. error rejected → worst L4", "L4", r.seats[0].worstLevel);
+    check("20b. error rejected → primary", "primary", r.seats[0].categoryKey);
+  }
+
+  // ── 21. applicable === false → rejected ──
+  {
+    const analysis = makeAnalysis({
+      "s1": { 4: paramApplicable("L4", 1.0, "ok", false), 6: param("L3"), 10: param("L3") },
+    });
+    const seats = [makeSeat("s1", 2, 3)];
+    const r = selectClientBestListeningArea({ analysisResult: analysis, seatingPositions: seats, rsp: null });
+    check("21a. applicable=false rejected → worst L3", "L3", r.seats[0].worstLevel);
+    check("21b. applicable=false rejected → primary", "primary", r.seats[0].categoryKey);
+  }
+
+  // ── 22. Mixed L4 / L3 / FAIL → Improvement recommended ──
+  {
+    const analysis = makeAnalysis({
+      "s1": { 4: param("L4"), 6: param("L3"), 10: paramFail("fail") },
+    });
+    const seats = [makeSeat("s1", 2, 3)];
+    const r = selectClientBestListeningArea({ analysisResult: analysis, seatingPositions: seats, rsp: null });
+    check("22a. Mixed L4/L3/FAIL → worst FAIL", "FAIL", r.seats[0].worstLevel);
+    check("22b. Mixed L4/L3/FAIL → improvement", "improvement", r.seats[0].categoryKey);
+    check("22c. Mixed L4/L3/FAIL → category label", "Improvement recommended", r.seats[0].category);
+    check("22d. Mixed L4/L3/FAIL → improvement count", 1, r.counts.improvement);
+  }
+
+  // ── 6. No valid results (original) ──
   {
     const analysis = makeAnalysis({
       "s1": { 4: param(null, null, "no_data"), 6: param(null, null, "error"), 10: param("N/A") },

@@ -24,17 +24,9 @@ import { resolveCoordinate } from "./selectClientSpeakerBalance";
 const LEVEL_RANK = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
 
 /**
- * Check whether a normalised seat param is an applicable canonical result.
- * Accepts L1–L4 and explicit FAIL with status "ok" and a finite value.
- * Rejects missing, no_data, error, N/A, dash, and non-applicable states.
+ * Normalise a raw level value to "L1"–"L4", "FAIL", or null.
+ * Handles numeric (1–4), string ("L3", "FAIL", "N/A", "—"), and null.
  */
-function isApplicableParam(param) {
-  if (!param || typeof param !== "object") return false;
-  if (!Number.isFinite(param.value)) return false;
-  if (param.status !== "ok") return false;
-  return normalizeLevel(param.level) !== null;
-}
-
 function normalizeLevel(level) {
   if (level === null || level === undefined) return null;
   const str = String(level).trim().toUpperCase();
@@ -43,6 +35,55 @@ function normalizeLevel(level) {
   const n = typeof level === "number" ? level : parseInt(str.replace(/[^0-9]/g, ""), 10);
   if (Number.isFinite(n) && n >= 1 && n <= 4) return `L${n}`;
   return null;
+}
+
+/**
+ * Check whether a status string is equivalent to "ok".
+ */
+function isOkStatus(status) {
+  return String(status ?? "").trim().toLowerCase() === "ok";
+}
+
+/**
+ * Check whether a status string is equivalent to "fail".
+ */
+function isFailStatus(status) {
+  return String(status ?? "").trim().toLowerCase() === "fail";
+}
+
+/**
+ * Check whether a normalised seat param is an applicable canonical result.
+ *
+ * L1–L4 RESULT: Accept when level normalises to L1–L4, status is equivalent
+ * to "ok", value is finite, and applicable is not explicitly false.
+ *
+ * EXPLICIT FAIL RESULT: Accept when level explicitly normalises to "FAIL",
+ * status is equivalent to "ok" or "fail", and applicable is not explicitly
+ * false. A finite numeric value is NOT required for FAIL.
+ *
+ * Rejects: missing object, no_data, error, unavailable, N/A, dash,
+ * applicable === false, and status "fail" without an explicit FAIL level.
+ */
+function isApplicableParam(param) {
+  if (!param || typeof param !== "object") return false;
+  if (param.applicable === false) return false;
+
+  const level = normalizeLevel(param.level);
+
+  // Explicit FAIL: accept with status "ok" or "fail", no finite value required
+  if (level === "FAIL") {
+    return isOkStatus(param.status) || isFailStatus(param.status);
+  }
+
+  // L1–L4: require status "ok" and a finite value
+  if (level !== null) {
+    if (!isOkStatus(param.status)) return false;
+    if (!Number.isFinite(param.value)) return false;
+    return true;
+  }
+
+  // Reject everything else (no_data, error, N/A, dash, unavailable, etc.)
+  return false;
 }
 
 /**

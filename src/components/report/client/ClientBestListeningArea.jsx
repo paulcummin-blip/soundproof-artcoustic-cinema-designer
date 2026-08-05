@@ -370,8 +370,8 @@ export default function ClientBestListeningArea({
         </div>
       )}
 
-      {/* ── Main client explanation ── */}
-      {explanation && (
+      {/* ── Main client explanation (screen only — print renders it in the result region) ── */}
+      {!print && explanation && (
         <p style={{
           fontSize: 14,
           color: "#625143",

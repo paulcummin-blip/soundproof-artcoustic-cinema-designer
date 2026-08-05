@@ -375,18 +375,6 @@ function RP22ReportInner() {
 
     const primarySeatingPosition = reportMlpAnchorEffective || app?.mlp || null;
 
-    // ── Speaker Balance Across the Seats (canonical P4/P6/P10 per real seat) ──
-    const speakerBalance = React.useMemo(() => {
-        if (!analysisResult || !Array.isArray(seats) || seats.length === 0) {
-            return { seats: [], rsp: null, hasAnyValid: false, hasValidP4: false, hasValidP6: false, hasValidP10: false };
-        }
-        return selectClientSpeakerBalance({
-            analysisResult,
-            seatingPositions: seats,
-            rsp: primarySeatingPosition ? { x: primarySeatingPosition.x, y: primarySeatingPosition.y } : null,
-        });
-    }, [analysisResult, seats, primarySeatingPosition]);
-
     const rspSeatId = React.useMemo(() => {
         const greenDot = primarySeatingPosition;
         if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
@@ -474,6 +462,19 @@ function RP22ReportInner() {
         dolbyLayout: canonicalP2Layout,
         includeBassAnalysis: false,
     });
+
+    // ── Speaker Balance Across the Seats (canonical P4/P6/P10 per real seat) ──
+    // Declared AFTER analysisResult to avoid temporal-dead-zone crash.
+    const speakerBalance = React.useMemo(() => {
+        if (!analysisResult || !Array.isArray(seats) || seats.length === 0) {
+            return { seats: [], rsp: null, hasAnyValid: false, hasValidP4: false, hasValidP6: false, hasValidP10: false };
+        }
+        return selectClientSpeakerBalance({
+            analysisResult,
+            seatingPositions: seats,
+            rsp: primarySeatingPosition ? { x: primarySeatingPosition.x, y: primarySeatingPosition.y } : null,
+        });
+    }, [analysisResult, seats, primarySeatingPosition]);
 
     const reportSeatHudById = React.useMemo(() => {
         const out = {};
@@ -1463,6 +1464,19 @@ function RP22ReportInner() {
                         {speakerBalance.hasAnyValid && (
                             <section id="pdf-speaker-balance" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
                                 <div className="print-avoid-break">
+                                    {/* Category heading */}
+                                    <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 11, fontWeight: 600, color: '#625143', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                                        Spatial Resolution
+                                    </div>
+                                    {/* Parameter subtitle */}
+                                    <div style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif', fontSize: 10, color: '#625143', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
+                                        RP22 Parameters 4, 6 &amp; 10 — Speaker Balance Across the Seats
+                                    </div>
+                                    {/* Page title */}
+                                    <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
+                                        Speaker Balance Across the Seats
+                                    </div>
+                                    {/* Drawing — existing detailed component in print mode */}
                                     <ClientSpeakerBalance
                                         roomDims={{ widthM: stableDimensions.width, lengthM: stableDimensions.length }}
                                         seats={speakerBalance.seats}
@@ -1474,6 +1488,10 @@ function RP22ReportInner() {
                                         hasValidP10={speakerBalance.hasValidP10}
                                         print
                                     />
+                                    {/* Technical explanation — owned by the page wrapper, not the drawing */}
+                                    <div style={{ marginTop: 14, fontFamily: 'Didact Gothic, Century Gothic, sans-serif', fontSize: 11, color: '#3E4349', lineHeight: 1.6, maxWidth: '180mm' }}>
+                                        This drawing shows the relative screen, surround and overhead speaker-level balance at each real seating position. The three results remain separate so variations between speaker layers can be assessed directly.
+                                    </div>
                                 </div>
                             </section>
                         )}
