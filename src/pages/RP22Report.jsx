@@ -276,6 +276,7 @@ function RP22ReportInner() {
     const hasSpeakers = placedSpeakers.length > 0;
 
     const reportDolbyLayout = app?.dolbyLayout ?? app?.dolbyConfig ?? app?.speakerSystem?.dolbyLayout ?? app?.speakerSystem?.dolbyPreset ?? "5.1";
+    const canonicalP2Layout = app?.dolbyLayout ?? app?.dolbyConfig ?? app?.speakerSystem?.dolbyLayout ?? app?.speakerSystem?.dolbyPreset ?? null;
     const reportSevenBedMode = String(app?.sevenBedLayoutType || app?.speakerSystem?.sevenBedLayoutType || (app?.speakerSystem?.useWidesInsteadOfRears ? "wides" : "") || "rears").toLowerCase();
 
     const cleanAspectLabel = (v) => {
@@ -456,7 +457,7 @@ function RP22ReportInner() {
         aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
         p15ConstructionLevel: app?.p15ConstructionLevel,
         screen,
-        dolbyLayout: reportDolbyLayout,
+        dolbyLayout: canonicalP2Layout,
         includeBassAnalysis: false,
     });
 

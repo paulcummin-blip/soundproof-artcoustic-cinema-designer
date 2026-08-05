@@ -239,6 +239,7 @@ export function useClientReportAuthority(projectId) {
   );
 
   const reportDolbyLayout = app?.dolbyLayout ?? app?.dolbyConfig ?? app?.speakerSystem?.dolbyLayout ?? "5.1";
+  const canonicalP2Layout = app?.dolbyLayout ?? app?.dolbyConfig ?? app?.speakerSystem?.dolbyLayout ?? app?.speakerSystem?.dolbyPreset ?? null;
 
   const analysisSpeakers = useAnalysisSpeakers({
     placedSpeakers,
@@ -290,7 +291,7 @@ export function useClientReportAuthority(projectId) {
     aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
     p15ConstructionLevel: app?.p15ConstructionLevel,
     screen,
-    dolbyLayout: reportDolbyLayout,
+    dolbyLayout: canonicalP2Layout,
     includeBassAnalysis: false,
   });
 
