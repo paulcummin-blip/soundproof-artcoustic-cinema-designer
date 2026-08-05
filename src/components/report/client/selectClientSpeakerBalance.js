@@ -46,6 +46,22 @@ function strictCoord(value) {
   return null;
 }
 
+/**
+ * Coordinate resolver — tries the top-level value first, then the nested fallback.
+ *
+ * Unlike `??` (nullish coalescing), this falls back whenever the top-level
+ * value is *invalid* (empty string, whitespace, non-numeric text, NaN,
+ * Infinity), not just when it is nullish. A genuine numeric zero in the
+ * top-level value is valid and wins over a different nested value.
+ *
+ * @returns {number|null} finite number or null if neither source is valid
+ */
+export function resolveCoordinate(primaryValue, fallbackValue) {
+  const primary = strictCoord(primaryValue);
+  if (primary !== null) return primary;
+  return strictCoord(fallbackValue);
+}
+
 function isValidLevel(level) {
   if (level === null || level === undefined) return false;
   const str = String(level).trim().toUpperCase();
@@ -67,11 +83,12 @@ export function selectClientSpeakerBalance({ analysisResult, seatingPositions, r
 
   if (!analysisResult || !Array.isArray(seatingPositions)) return empty;
 
-  // Filter seats with valid original coordinates using strict parser
+  // Filter seats with valid original coordinates using the resolver
+  // (top-level value first, nested fallback if top-level is invalid)
   const validSeats = seatingPositions.filter((s) => {
     if (!s || s.id == null) return false;
-    const x = strictCoord(s.x ?? s.position?.x);
-    const y = strictCoord(s.y ?? s.position?.y);
+    const x = resolveCoordinate(s.x, s.position?.x);
+    const y = resolveCoordinate(s.y, s.position?.y);
     return x !== null && y !== null;
   });
 
@@ -81,8 +98,8 @@ export function selectClientSpeakerBalance({ analysisResult, seatingPositions, r
   // Map to drawing entries using original full-precision coordinates
   const seats = coverage.map((entry) => {
     const originalSeat = validSeats.find((s) => s.id === entry.seatId);
-    const x = strictCoord(originalSeat.x ?? originalSeat.position?.x);
-    const y = strictCoord(originalSeat.y ?? originalSeat.position?.y);
+    const x = resolveCoordinate(originalSeat.x, originalSeat.position?.x);
+    const y = resolveCoordinate(originalSeat.y, originalSeat.position?.y);
 
     return {
       id: entry.seatId,

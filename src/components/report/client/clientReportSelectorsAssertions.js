@@ -16,7 +16,8 @@ import { selectClientDynamics } from "./selectClientDynamics";
 import { selectClientBass } from "./selectClientBass";
 import { selectClientParameterResults } from "./selectClientParameterResults";
 import { selectClientDesignHighlights } from "./selectClientDesignHighlights";
-import { selectClientSpeakerBalance } from "./selectClientSpeakerBalance";
+import { selectClientSpeakerBalance, resolveCoordinate } from "./selectClientSpeakerBalance";
+import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { assertPillarGroupingComplete } from "./rp22PillarGrouping";
 
 const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV;
@@ -624,6 +625,147 @@ export function runClientReportSelectorAssertions() {
     rsp: null,
   });
   check("7z1. Page not omitted when one layer valid", oneValidResult.hasAnyValid);
+
+  // ── Stage C2 final defects: coordinate fallback, legend omission, RSP collision ──
+
+  // 7aa. Coordinate resolver — valid nested fallback after invalid top-level (x)
+  check("7aa. Missing top-level + valid nested x", resolveCoordinate(undefined, 2) === 2);
+  check("7aa1. Null top-level + valid nested x", resolveCoordinate(null, 2) === 2);
+  check("7aa2. Empty top-level + valid nested x", resolveCoordinate("", 2) === 2);
+  check("7aa3. Whitespace top-level + valid nested x", resolveCoordinate("  ", 2) === 2);
+  check("7aa4. Text top-level + valid nested x", resolveCoordinate("abc", 2) === 2);
+  check("7aa5. NaN top-level + valid nested x", resolveCoordinate(NaN, 2) === 2);
+  check("7aa6. Infinity top-level + valid nested x", resolveCoordinate(Infinity, 2) === 2);
+  check("7aa7. Valid zero top-level wins over different nested", resolveCoordinate(0, 5) === 0);
+  check("7aa8. Both invalid → null", resolveCoordinate("", null) === null);
+  check("7aa9. Both invalid (NaN + undefined) → null", resolveCoordinate(NaN, undefined) === null);
+
+  // 7ab. Coordinate resolver — valid nested fallback (y)
+  check("7ab. Missing top-level + valid nested y", resolveCoordinate(undefined, 3) === 3);
+  check("7ab1. Null top-level + valid nested y", resolveCoordinate(null, 3) === 3);
+  check("7ab2. Empty top-level + valid nested y", resolveCoordinate("", 3) === 3);
+  check("7ab3. Whitespace top-level + valid nested y", resolveCoordinate("  ", 3) === 3);
+  check("7ab4. Text top-level + valid nested y", resolveCoordinate("abc", 3) === 3);
+  check("7ab5. NaN top-level + valid nested y", resolveCoordinate(NaN, 3) === 3);
+  check("7ab6. Infinity top-level + valid nested y", resolveCoordinate(Infinity, 3) === 3);
+  check("7ab7. Valid zero top-level wins over different nested y", resolveCoordinate(0, 5) === 0);
+
+  // 7ac. Selector end-to-end: invalid top-level + valid nested → seat recovered
+  const fallbackResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: "", y: "  ", position: { x: 2, y: 3 } }],
+    rsp: null,
+  });
+  check("7ac. Invalid top-level + valid nested → seat recovered", fallbackResult.seats.length === 1 && fallbackResult.seats[0].x === 2 && fallbackResult.seats[0].y === 3);
+
+  // 7ad. Selector: valid zero top-level wins over different nested
+  const zeroWinsResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 0, y: 0, position: { x: 5, y: 5 } }],
+    rsp: null,
+  });
+  check("7ad. Valid zero top-level wins over nested", zeroWinsResult.seats.length === 1 && zeroWinsResult.seats[0].x === 0 && zeroWinsResult.seats[0].y === 0);
+
+  // 7ae. Selector: both invalid → seat rejected
+  const bothInvalidResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: "", y: "  ", position: { x: null, y: undefined } }],
+    rsp: null,
+  });
+  check("7ae. Both invalid → seat rejected", bothInvalidResult.seats.length === 0);
+
+  // 7bb. Legend omission — selector flags for partial-layer configurations
+  // P4-only
+  const p4OnlyFlags = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7bb. P4-only: hasValidP4 true, P6/P10 false", p4OnlyFlags.hasValidP4 && !p4OnlyFlags.hasValidP6 && !p4OnlyFlags.hasValidP10);
+
+  // P4 + P6
+  const p4p6Flags = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 }, 6: { valueDb: 2, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7bb1. P4+P6: hasValidP4/P6 true, P10 false", p4p6Flags.hasValidP4 && p4p6Flags.hasValidP6 && !p4p6Flags.hasValidP10);
+
+  // P10-only
+  const p10OnlyFlags = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 10: { value: 45, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7bb2. P10-only: hasValidP10 true, P4/P6 false", p10OnlyFlags.hasValidP10 && !p10OnlyFlags.hasValidP4 && !p10OnlyFlags.hasValidP6);
+
+  // P4 + P10
+  const p4p10Flags = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 }, 10: { value: 45, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7bb3. P4+P10: hasValidP4/P10 true, P6 false", p4p10Flags.hasValidP4 && p4p10Flags.hasValidP10 && !p4p10Flags.hasValidP6);
+
+  // All three
+  const allThreeFlags = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 }, 6: { valueDb: 2, level: 3 }, 10: { value: 45, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7bb4. All three: all flags true", allThreeFlags.hasValidP4 && allThreeFlags.hasValidP6 && allThreeFlags.hasValidP10);
+
+  // 7cc. RSP label placement — no collision with badges (centred RSP between two middle seats)
+  // Simulate current project geometry: 4 seats, RSP at x=2.5 (between seats 2 and 3)
+  const ccScale = 133.3;
+  const ccPad = 0.6;
+  const ccToPx = (x, y) => ({ px: (x + ccPad) * ccScale, py: (y + ccPad) * ccScale });
+  const ccSeatPx = [1, 2, 3, 4].map((x) => ccToPx(x, 2));
+  const ccBadgeY = ccSeatPx[0].py + 22;
+  const ccBadgeRects = [];
+  ccSeatPx.forEach((sp) => {
+    ccBadgeRects.push({ x1: sp.px - 32 - 14, y1: ccBadgeY - 9, x2: sp.px - 32 + 14, y2: ccBadgeY + 9 });
+    ccBadgeRects.push({ x1: sp.px - 14, y1: ccBadgeY - 9, x2: sp.px + 14, y2: ccBadgeY + 9 });
+    ccBadgeRects.push({ x1: sp.px + 32 - 14, y1: ccBadgeY - 9, x2: sp.px + 32 + 14, y2: ccBadgeY + 9 });
+  });
+  const ccRspPx = ccToPx(2.5, 2);
+  const ccSeatCircles = ccSeatPx.map((sp) => ({ cx: sp.px, cy: sp.py, r: 7 }));
+  const ccScreenRect = { x1: 0, y1: 80, x2: 760, y2: 110 };
+  const ccSvgBounds = { w: 760, h: 960 };
+  const ccPlacement = resolveRspLabelPlacement(ccRspPx, ccSeatCircles, ccBadgeRects, ccScreenRect, ccSvgBounds);
+  // Label rect
+  const ccLabelRect = {
+    x1: ccPlacement.x - 15, y1: ccPlacement.y - 7, x2: ccPlacement.x + 15, y2: ccPlacement.y + 7,
+  };
+  const ccLabelIntersectsBadges = ccBadgeRects.some((br) =>
+    !(ccLabelRect.x2 < br.x1 || br.x2 < ccLabelRect.x1 || ccLabelRect.y2 < br.y1 || br.y2 < ccLabelRect.y1)
+  );
+  check("7cc. Centred RSP label does not intersect badges", !ccLabelIntersectsBadges);
+
+  // 7cc1. RSP marker (8px ring) does not intersect badge bounds
+  const ccMarkerR = 8;
+  const ccMarkerIntersectsBadges = ccBadgeRects.some((br) => {
+    const closestX = Math.max(br.x1, Math.min(ccRspPx.px, br.x2));
+    const closestY = Math.max(br.y1, Math.min(ccRspPx.py, br.y2));
+    const dx = ccRspPx.px - closestX;
+    const dy = ccRspPx.py - closestY;
+    return dx * dx + dy * dy < ccMarkerR * ccMarkerR;
+  });
+  check("7cc1. RSP marker does not intersect badges", !ccMarkerIntersectsBadges);
+
+  // 7cc2. Off-centre RSP remains inside SVG
+  const offCentreRsp = ccToPx(0.5, 5);
+  const offCentrePlacement = resolveRspLabelPlacement(offCentreRsp, ccSeatCircles, ccBadgeRects, ccScreenRect, ccSvgBounds);
+  const offCentreInBounds = offCentrePlacement.x >= 0 && offCentrePlacement.x <= 760 && offCentrePlacement.y >= 0 && offCentrePlacement.y <= 960;
+  check("7cc2. Off-centre RSP label inside SVG", offCentreInBounds);
+
+  // 7cc3. RSP has no P4/P6/P10 badges (selector-level)
+  const ccSelectorResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s1: { rp22: { 4: { valueDb: 1, level: 4 } } }, s2: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s1", x: 2, y: 2 }, { id: "s2", x: 3, y: 2 }],
+    rsp: { x: 2.5, y: 2 },
+  });
+  check("7cc3. RSP is reference-only (no badges in selector)", ccSelectorResult.rsp !== null && !("p4" in ccSelectorResult.rsp) && !("p6" in ccSelectorResult.rsp) && !("p10" in ccSelectorResult.rsp));
 
   return { ran: true, results };
 }

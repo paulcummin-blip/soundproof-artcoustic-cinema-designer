@@ -41,6 +41,84 @@ const BADGE_RX = 4;
 const BADGE_DX = 32; // horizontal spacing between badge centres
 const BADGE_DY = 22; // vertical offset from seat centre to badge centre
 
+// RSP marker geometry — smaller to avoid badge collision
+const RSP_RING_R = 8;
+const RSP_DOT_R = 3;
+
+// RSP label approximate bounding box
+const RSP_LABEL_W = 30;
+const RSP_LABEL_H = 14;
+
+// ── Pure intersection helpers ──────────────────────────────────────────────
+function rectsIntersect(a, b) {
+  return !(a.x2 < b.x1 || b.x2 < a.x1 || a.y2 < b.y1 || b.y2 < a.y1);
+}
+
+function circleRectIntersect(cx, cy, r, rect) {
+  const closestX = Math.max(rect.x1, Math.min(cx, rect.x2));
+  const closestY = Math.max(rect.y1, Math.min(cy, rect.y2));
+  const dx = cx - closestX;
+  const dy = cy - closestY;
+  return dx * dx + dy * dy < r * r;
+}
+
+/**
+ * resolveRspLabelPlacement — pure placement helper for the RSP label.
+ *
+ * Tests candidate label positions in order: above, left, right, below (last resort).
+ * Chooses the first candidate that:
+ *   - remains inside the SVG bounds
+ *   - does not intersect any seat circle
+ *   - does not intersect any badge rectangle
+ *   - does not intersect the screen line or SCREEN label
+ *
+ * @param {Object} rspPx        - { px, py } RSP pixel position
+ * @param {Array}  seatCircles - [{ cx, cy, r }] seat circle obstacles
+ * @param {Array}  badgeRects  - [{ x1, y1, x2, y2 }] badge rectangle obstacles
+ * @param {Object} screenRect  - { x1, y1, x2, y2 } screen line + label bounds
+ * @param {Object} svgBounds   - { w, h } SVG dimensions
+ * @returns {Object} { x, y, anchor } label anchor position + text-anchor
+ */
+export function resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, svgBounds) {
+  const cx = rspPx.px;
+  const cy = rspPx.py;
+  const hw = RSP_LABEL_W / 2;
+  const hh = RSP_LABEL_H / 2;
+
+  const candidates = [
+    { name: "above", x: cx, y: cy - RSP_RING_R - hh - 4, anchor: "middle",
+      rect: { x1: cx - hw, y1: cy - RSP_RING_R - RSP_LABEL_H - 4, x2: cx + hw, y2: cy - RSP_RING_R - 4 } },
+    { name: "left", x: cx - RSP_RING_R - hw - 4, y: cy, anchor: "end",
+      rect: { x1: cx - RSP_RING_R - RSP_LABEL_W - 4, y1: cy - hh, x2: cx - RSP_RING_R - 4, y2: cy + hh } },
+    { name: "right", x: cx + RSP_RING_R + hw + 4, y: cy, anchor: "start",
+      rect: { x1: cx + RSP_RING_R + 4, y1: cy - hh, x2: cx + RSP_RING_R + RSP_LABEL_W + 4, y2: cy + hh } },
+    { name: "below", x: cx, y: cy + RSP_RING_R + hh + 4, anchor: "middle",
+      rect: { x1: cx - hw, y1: cy + RSP_RING_R + 4, x2: cx + hw, y2: cy + RSP_RING_R + RSP_LABEL_H + 4 } },
+  ];
+
+  for (const c of candidates) {
+    // Check SVG bounds
+    if (c.rect.x1 < 0 || c.rect.y1 < 0 || c.rect.x2 > svgBounds.w || c.rect.y2 > svgBounds.h) continue;
+    // Check seat circles
+    let ok = true;
+    for (const sc of seatCircles) {
+      if (circleRectIntersect(sc.cx, sc.cy, sc.r, c.rect)) { ok = false; break; }
+    }
+    if (!ok) continue;
+    // Check badge rects
+    for (const br of badgeRects) {
+      if (rectsIntersect(br, c.rect)) { ok = false; break; }
+    }
+    if (!ok) continue;
+    // Check screen rect
+    if (screenRect && rectsIntersect(screenRect, c.rect)) continue;
+    return { x: c.x, y: c.y, anchor: c.anchor, name: c.name };
+  }
+
+  // Fallback: above (even if it collides — best effort)
+  return { x: cx, y: cy - RSP_RING_R - hh - 4, anchor: "middle", name: "above-fallback" };
+}
+
 export default function ClientSpeakerBalance({
   roomDims,
   seats,
@@ -242,25 +320,50 @@ export default function ClientSpeakerBalance({
           );
         })}
 
-        {/* RSP marker — reference only, no result badges */}
-        {rspPx && (
-          <g>
-            <circle cx={rspPx.px} cy={rspPx.py} r={12} fill="none" stroke="#213428" strokeWidth={3} />
-            <circle cx={rspPx.px} cy={rspPx.py} r={5} fill="#213428" />
-            <text
-              x={rspPx.px}
-              y={rspPx.py + 28}
-              fill="#213428"
-              fontSize={12}
-              textAnchor="middle"
-              fontWeight={600}
-              fontFamily="Didact Gothic, Century Gothic, sans-serif"
-              letterSpacing="0.08em"
-            >
-              RSP
-            </text>
-          </g>
-        )}
+        {/* RSP marker — reference only, no result badges.
+             Smaller marker (8px ring, 3px dot) + label placed via collision-free helper. */}
+        {rspPx && (() => {
+          // Build obstacle lists for the placement helper
+          const seatCircles = seats.map((seat) => {
+            const sp = toPx(seat.x, seat.y);
+            return { cx: sp.px, cy: sp.py, r: 7 };
+          });
+          const badgeRects = [];
+          seats.forEach((seat) => {
+            const sp = toPx(seat.x, seat.y);
+            const by = sp.py + BADGE_DY;
+            if (seat.p4) badgeRects.push({ x1: sp.px - BADGE_DX - BADGE_W / 2, y1: by - BADGE_H / 2, x2: sp.px - BADGE_DX + BADGE_W / 2, y2: by + BADGE_H / 2 });
+            if (seat.p6) badgeRects.push({ x1: sp.px - BADGE_W / 2, y1: by - BADGE_H / 2, x2: sp.px + BADGE_W / 2, y2: by + BADGE_H / 2 });
+            if (seat.p10) badgeRects.push({ x1: sp.px + BADGE_DX - BADGE_W / 2, y1: by - BADGE_H / 2, x2: sp.px + BADGE_DX + BADGE_W / 2, y2: by + BADGE_H / 2 });
+          });
+          const screenCx = (screenLeftPx.px + screenRightPx.px) / 2;
+          const screenRect = {
+            x1: Math.min(screenLeftPx.px, screenCx - 25),
+            y1: screenLeftPx.py - 22,
+            x2: Math.max(screenRightPx.px, screenCx + 25),
+            y2: screenLeftPx.py + 3,
+          };
+          const placement = resolveRspLabelPlacement(rspPx, seatCircles, badgeRects, screenRect, { w: SVG_W, h: SVG_H });
+          return (
+            <g>
+              <circle cx={rspPx.px} cy={rspPx.py} r={RSP_RING_R} fill="none" stroke="#213428" strokeWidth={2.5} />
+              <circle cx={rspPx.px} cy={rspPx.py} r={RSP_DOT_R} fill="#213428" />
+              <text
+                x={placement.x}
+                y={placement.y}
+                fill="#213428"
+                fontSize={12}
+                textAnchor={placement.anchor}
+                dominantBaseline="middle"
+                fontWeight={600}
+                fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                letterSpacing="0.08em"
+              >
+                RSP
+              </text>
+            </g>
+          );
+        })()}
       </svg>
 
       {/* ── Legend: explicit three-position example + level key ── */}
@@ -276,47 +379,43 @@ export default function ClientSpeakerBalance({
         maxWidth: print ? "100%" : 600,
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
-        {/* Three-position example — reproduces the seat badge layout */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 64 }}>
-            {hasValidP4 ? (
+        {/* Three-position example — fixed three-column grid.
+             Unavailable layers render only an invisible structural spacer
+             (aria-hidden) so canonical left/centre/right positions are preserved. */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          {hasValidP4 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
                 <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="#C1B6AD" stroke="#625143" strokeWidth={1.5} />
                 <text x={(BADGE_W + 4) / 2} y={(BADGE_H + 4) / 2 + 1} fill="#625143" fontSize={11} fontWeight={700} textAnchor="middle" dominantBaseline="middle" fontFamily="Futura PT Light, Century Gothic, sans-serif">L·</text>
               </svg>
-            ) : (
-              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
-                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="none" stroke="#DCDBD6" strokeWidth={1.5} strokeDasharray="3 3" />
-              </svg>
-            )}
-            <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Screen</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 64 }}>
-            {hasValidP6 ? (
+              <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Screen</span>
+            </div>
+          ) : (
+            <div aria-hidden="true" style={{ minWidth: 64, minHeight: BADGE_H + 20 }} />
+          )}
+          {hasValidP6 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
                 <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="#C1B6AD" stroke="#625143" strokeWidth={1.5} />
                 <text x={(BADGE_W + 4) / 2} y={(BADGE_H + 4) / 2 + 1} fill="#625143" fontSize={11} fontWeight={700} textAnchor="middle" dominantBaseline="middle" fontFamily="Futura PT Light, Century Gothic, sans-serif">L·</text>
               </svg>
-            ) : (
-              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
-                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="none" stroke="#DCDBD6" strokeWidth={1.5} strokeDasharray="3 3" />
-              </svg>
-            )}
-            <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Surround</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 64 }}>
-            {hasValidP10 ? (
+              <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Surround</span>
+            </div>
+          ) : (
+            <div aria-hidden="true" style={{ minWidth: 64, minHeight: BADGE_H + 20 }} />
+          )}
+          {hasValidP10 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
                 <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="#C1B6AD" stroke="#625143" strokeWidth={1.5} />
                 <text x={(BADGE_W + 4) / 2} y={(BADGE_H + 4) / 2 + 1} fill="#625143" fontSize={11} fontWeight={700} textAnchor="middle" dominantBaseline="middle" fontFamily="Futura PT Light, Century Gothic, sans-serif">L·</text>
               </svg>
-            ) : (
-              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
-                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="none" stroke="#DCDBD6" strokeWidth={1.5} strokeDasharray="3 3" />
-              </svg>
-            )}
-            <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Overhead</span>
-          </div>
+              <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Overhead</span>
+            </div>
+          ) : (
+            <div aria-hidden="true" style={{ minWidth: 64, minHeight: BADGE_H + 20 }} />
+          )}
         </div>
 
         {/* Divider */}
