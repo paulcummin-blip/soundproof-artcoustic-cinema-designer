@@ -57,15 +57,6 @@ export default function ClientReportPage({ children, isFirst, isLast, projectDet
         </div>
       </div>
 
-      {/* Print-only footer (last page) */}
-      {isLast && (
-        <div className="client-report-page__footer client-report-print-only">
-          <img src={logoUrl} alt="Sound Proof" />
-          <span className="client-report-page__footer-text">
-            Powered by Artcoustic Design Intelligence (ADI)
-          </span>
-        </div>
-      )}
     </div>
   );
 }

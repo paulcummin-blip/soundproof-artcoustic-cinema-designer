@@ -143,7 +143,12 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
         const naturalW = visualInner.scrollWidth;
         const naturalH = visualInner.scrollHeight;
         if (availW <= 0 || availH <= 0 || naturalW <= 0 || naturalH <= 0) return;
-        const scale = Math.min(availW / naturalW, availH / naturalH, 1);
+        // Safety inset preserves card corners, borders, shadows, and edge labels
+        const SAFETY_INSET_PX = 32;
+        const safeWidth = availW - SAFETY_INSET_PX;
+        const safeHeight = availH - SAFETY_INSET_PX;
+        if (safeWidth <= 0 || safeHeight <= 0) return;
+        const scale = Math.min(safeWidth / naturalW, safeHeight / naturalH, 1);
         const scaledW = naturalW * scale;
         const scaledH = naturalH * scale;
         page.style.setProperty("--client-report-scale", String(scale));

@@ -48,10 +48,6 @@ export default function ClientReportPrintStyles() {
         display: block !important;
       }
 
-      body.client-report-printing .client-report-page__footer.client-report-print-only {
-        display: flex !important;
-      }
-
       body.client-report-printing .client-report-print-root {
         display: block !important;
       }
@@ -64,11 +60,11 @@ export default function ClientReportPrintStyles() {
       /* ── Print layout rules (active during measurement AND print) ── */
       body.client-report-printing .client-report-page {
         width: 186mm !important;
-        height: 272mm !important;
-        min-height: 272mm !important;
+        height: 271mm !important;
+        min-height: 271mm !important;
         box-sizing: border-box !important;
         display: grid !important;
-        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-rows: auto minmax(0, 1fr);
         break-inside: avoid !important;
         page-break-inside: avoid !important;
         page-break-after: always;
@@ -130,6 +126,8 @@ export default function ClientReportPrintStyles() {
         align-items: center !important;
         justify-content: center !important;
         overflow: hidden !important;
+        padding: 4mm;
+        box-sizing: border-box;
       }
 
       body.client-report-printing .client-report-page__visual-stage {
@@ -148,36 +146,6 @@ export default function ClientReportPrintStyles() {
       body.client-report-printing .client-report-page__visual-inner > * {
         break-inside: avoid !important;
         page-break-inside: avoid !important;
-      }
-
-      body.client-report-printing .client-report-page__footer {
-        grid-row: 3;
-        align-self: end;
-        width: 100%;
-        height: 18mm;
-        min-height: 18mm;
-        max-height: none;
-        margin: 0;
-        padding: 3mm 0 0 0;
-        box-sizing: border-box;
-        border-top: 1px solid #DCDBD6;
-        display: flex !important;
-        align-items: center;
-        justify-content: center;
-        gap: 4mm;
-      }
-
-      body.client-report-printing .client-report-page__footer img {
-        height: var(--client-report-logo-height, 12mm);
-        width: auto;
-        object-fit: contain;
-      }
-
-      body.client-report-printing .client-report-page__footer-text {
-        font-size: 8pt;
-        color: #625143;
-        font-family: "Didact Gothic", "Century Gothic", sans-serif;
-        letter-spacing: 0.04em;
       }
 
       body.client-report-printing .client-report-page,
@@ -209,13 +177,9 @@ export default function ClientReportPrintStyles() {
           display: block !important;
         }
 
-        /* Header: block; Footer: flex (overrides generic print-only block) */
+        /* Header: block (overrides generic print-only block) */
         .client-report-page__header.client-report-print-only {
           display: block !important;
-        }
-
-        .client-report-page__footer.client-report-print-only {
-          display: flex !important;
         }
 
         /* Hide app sidebar, nav */
@@ -283,11 +247,11 @@ export default function ClientReportPrintStyles() {
         /* ── A4 page frame ── */
         .client-report-page {
           width: 186mm !important;
-          height: 272mm !important;
-          min-height: 272mm !important;
+          height: 271mm !important;
+          min-height: 271mm !important;
           box-sizing: border-box !important;
           display: grid !important;
-          grid-template-rows: auto minmax(0, 1fr) auto;
+          grid-template-rows: auto minmax(0, 1fr);
           break-inside: avoid !important;
           page-break-inside: avoid !important;
           page-break-after: always;
@@ -351,6 +315,8 @@ export default function ClientReportPrintStyles() {
           align-items: center !important;
           justify-content: center !important;
           overflow: hidden !important;
+          padding: 4mm;
+          box-sizing: border-box;
         }
 
         /* ── Visual stage — sized wrapper, normal flex layout ── */
@@ -372,37 +338,6 @@ export default function ClientReportPrintStyles() {
         .client-report-page__visual-inner > * {
           break-inside: avoid !important;
           page-break-inside: avoid !important;
-        }
-
-        /* ── Footer (last page only) — bottom-anchored ~18mm row ── */
-        .client-report-page__footer {
-          grid-row: 3;
-          align-self: end;
-          width: 100%;
-          height: 18mm;
-          min-height: 18mm;
-          max-height: none;
-          margin: 0;
-          padding: 3mm 0 0 0;
-          box-sizing: border-box;
-          border-top: 1px solid #DCDBD6;
-          display: flex !important;
-          align-items: center;
-          justify-content: center;
-          gap: 4mm;
-        }
-
-        .client-report-page__footer img {
-          height: var(--client-report-logo-height, 12mm);
-          width: auto;
-          object-fit: contain;
-        }
-
-        .client-report-page__footer-text {
-          font-size: 8pt;
-          color: #625143;
-          font-family: "Didact Gothic", "Century Gothic", sans-serif;
-          letter-spacing: 0.04em;
         }
 
         /* ── Preserve approved fonts and colours ── */
