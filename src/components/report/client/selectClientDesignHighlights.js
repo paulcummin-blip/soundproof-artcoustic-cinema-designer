@@ -29,7 +29,6 @@ export function selectClientDesignHighlights({
   p5Snapshot,
   p9Snapshot,
   placedSpeakers,
-  authoritativeSeat,
 }) {
   const highlights = [];
 
@@ -44,17 +43,50 @@ export function selectClientDesignHighlights({
     return Number.isFinite(n) && n >= 2 && n <= 4;
   };
 
+  // ── Helper: result exists, level L2–L4, no explicit negative status ──────
+  // Returns false when result is missing, level is missing/N/A/Fail/L1, or
+  // an existing status/verification field explicitly identifies the result
+  // as unverified, stale, incomplete, missing, error or failed.
+  // An absent status field alone is NOT failure.
+  const isVerifiedPassingResult = (result) => {
+    if (!result || typeof result !== "object") return false;
+    if (!isPassLevel(result.level)) return false;
+
+    // Boolean verification flags — explicit false on a positive flag = fail
+    if (result.verified === false) return false;
+    if (result.isVerified === false) return false;
+
+    // Boolean negative flags — explicit true = fail
+    if (result.stale === true) return false;
+    if (result.isStale === true) return false;
+    if (result.incomplete === true) return false;
+    if (result.missing === true) return false;
+    if (result.error === true) return false;
+    if (result.failed === true) return false;
+
+    // String status/verification fields — check for negative indicator words
+    const negativeWords = ["unverified", "stale", "incomplete", "missing", "error", "failed", "no_data"];
+    const stringFields = ["status", "verification", "verificationStatus"];
+    for (const field of stringFields) {
+      const val = result[field];
+      if (val === undefined || val === null) continue;
+      const str = String(val).trim().toLowerCase();
+      if (negativeWords.some((w) => str.includes(w))) return false;
+    }
+
+    return true;
+  };
+
   const primary = analysisResult?.gradedParameters?.primary || {};
-  const perSeat = analysisResult?.perSeatRp22 || {};
 
   // ── SPATIAL RESOLUTION (P1–P11) ──
 
-  // 1. Clear, focused dialogue — P3 & canonical RSP P4 & P12 (all must be L2–L4)
-  // P4 is seat-scoped: use perSeatRp22[authoritativeSeat.id].rp22[4], NOT primary[4].
-  const rspSeatId = authoritativeSeat?.id;
-  const rspP4 = rspSeatId ? perSeat[rspSeatId]?.rp22?.[4] : null;
+  // 1. Clear, focused dialogue — P3 & canonical mlp P4 & P12
+  // P4 is seat-scoped: use perSeatRp22.mlp.rp22[4] (canonical MLP authority),
+  // NOT primary[4] or a locked/nearest seat.
+  const mlpP4 = analysisResult?.perSeatRp22?.mlp?.rp22?.[4] ?? null;
 
-  if (isPassLevel(primary[3]?.level) && isPassLevel(rspP4?.level) && isPassLevel(primary[12]?.level)) {
+  if (isVerifiedPassingResult(primary[3]) && isVerifiedPassingResult(mlpP4) && isVerifiedPassingResult(primary[12])) {
     highlights.push({
       id: "clear-dialogue",
       category: "Spatial Resolution",
