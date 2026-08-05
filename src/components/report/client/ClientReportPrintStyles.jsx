@@ -33,6 +33,7 @@ export default function ClientReportPrintStyles() {
       /* ── Pre-print measurement phase: body class added before window.print() ── */
       body.client-report-printing {
         background: #FFFFFF !important;
+        --client-report-logo-height: 12mm;
       }
 
       body.client-report-printing .client-report-screen-only {
@@ -91,7 +92,7 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__header img {
-        height: 12mm;
+        height: var(--client-report-logo-height, 12mm);
         width: auto;
         object-fit: contain;
         margin-bottom: 3mm;
@@ -119,7 +120,7 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__visual {
-        flex: 1;
+        flex: 1 1 auto;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -147,10 +148,10 @@ export default function ClientReportPrintStyles() {
 
       body.client-report-printing .client-report-page__footer {
         flex-shrink: 0;
-        max-height: 13mm;
-        padding-top: 3mm;
+        height: 18mm;
+        min-height: 18mm;
         border-top: 1px solid #DCDBD6;
-        margin-top: 3mm;
+        margin-top: auto;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -158,7 +159,7 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__footer img {
-        height: 5mm;
+        height: var(--client-report-logo-height, 12mm);
         width: auto;
         object-fit: contain;
       }
@@ -302,7 +303,7 @@ export default function ClientReportPrintStyles() {
         }
 
         .client-report-page__header img {
-          height: 12mm;
+          height: var(--client-report-logo-height, 12mm);
           width: auto;
           object-fit: contain;
           margin-bottom: 3mm;
@@ -331,7 +332,7 @@ export default function ClientReportPrintStyles() {
 
         /* ── Visual area — flex container, centred ── */
         .client-report-page__visual {
-          flex: 1;
+          flex: 1 1 auto;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
@@ -360,13 +361,13 @@ export default function ClientReportPrintStyles() {
           page-break-inside: avoid !important;
         }
 
-        /* ── Footer (last page only) — max ~13mm ── */
+        /* ── Footer (last page only) — bottom-anchored ~18mm row ── */
         .client-report-page__footer {
           flex-shrink: 0;
-          max-height: 13mm;
-          padding-top: 3mm;
+          height: 18mm;
+          min-height: 18mm;
           border-top: 1px solid #DCDBD6;
-          margin-top: 3mm;
+          margin-top: auto;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -374,7 +375,7 @@ export default function ClientReportPrintStyles() {
         }
 
         .client-report-page__footer img {
-          height: 5mm;
+          height: var(--client-report-logo-height, 12mm);
           width: auto;
           object-fit: contain;
         }

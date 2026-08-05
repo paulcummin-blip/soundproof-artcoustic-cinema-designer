@@ -120,6 +120,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
 
   const screenCenterX = W / 2;
   const screenY = Math.max(0, Number(screenFrontPlaneM) || 0);
+  const screenLineY = toPx(0, screenY).py;
 
   // RSP centre in SVG coords
   const rspPx = rsp ? toPx(rsp.x, rsp.y) : null;
@@ -396,19 +397,13 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
                 >
                   {item.role}
                 </text>
-                {/* Azimuth label — LCR uses vector-based offset toward RSP */}
+                {/* Azimuth label — LCR positioned below screen line, others offset from speaker */}
                 {(() => {
-                  const offsetPx = isFrontLCR ? 24 : 18;
                   let labelX = sp.px;
-                  let labelY = sp.py + offsetPx;
-                  if (isFrontLCR && rspPx) {
-                    const dx = rspPx.px - sp.px;
-                    const dy = rspPx.py - sp.py;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist > 0.01) {
-                      labelX = sp.px + (dx / dist) * offsetPx;
-                      labelY = sp.py + (dy / dist) * offsetPx;
-                    }
+                  let labelY = sp.py + 18;
+                  if (isFrontLCR) {
+                    labelX = sp.px;
+                    labelY = screenLineY + 25;
                   }
                   return (
                     <text
