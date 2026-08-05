@@ -4,7 +4,7 @@
  * Scoped print styles for the Client Visual Report PDF export.
  *
  * Does NOT import or reuse ReportPrintStyles unchanged — the Client PDF
- * needs its own header and footer, so broad selectors like
+ * needs its own header, so broad selectors like
  * `header { display: none; }` and `footer { display: none; }` are avoided.
  *
  * Uses scoped classes:
@@ -12,7 +12,7 @@
  *   client-report-print-only   — hidden on screen, visible in print
  *   client-report-print-root   — print container
  *   client-report-page         — one A4 page wrapper
- *   client-report-page__header / __visual / __footer
+ *   client-report-page__header / __visual
  */
 
 import React from "react";
@@ -126,8 +126,17 @@ export default function ClientReportPrintStyles() {
         align-items: center !important;
         justify-content: center !important;
         overflow: hidden !important;
-        padding: 4mm;
         box-sizing: border-box;
+      }
+
+      /* Page 1 (with header) — small gap below header, card centred in remaining space */
+      body.client-report-printing .client-report-page--first .client-report-page__visual {
+        padding: 3mm 0 0 0;
+      }
+
+      /* Page 2+ (no header) — optical centring, slight upward shift */
+      body.client-report-printing .client-report-page:not(.client-report-page--first) .client-report-page__visual {
+        padding: 0 0 8mm 0;
       }
 
       body.client-report-printing .client-report-page__visual-stage {
@@ -315,8 +324,17 @@ export default function ClientReportPrintStyles() {
           align-items: center !important;
           justify-content: center !important;
           overflow: hidden !important;
-          padding: 4mm;
           box-sizing: border-box;
+        }
+
+        /* Page 1 (with header) — small gap below header */
+        .client-report-page--first .client-report-page__visual {
+          padding: 3mm 0 0 0;
+        }
+
+        /* Page 2+ (no header) — optical centring, slight upward shift */
+        .client-report-page:not(.client-report-page--first) .client-report-page__visual {
+          padding: 0 0 8mm 0;
         }
 
         /* ── Visual stage — sized wrapper, normal flex layout ── */

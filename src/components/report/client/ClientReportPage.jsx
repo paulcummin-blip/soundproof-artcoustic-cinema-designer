@@ -6,13 +6,13 @@
  * On screen: transparent container — preserves the existing card appearance
  * with no visible page headers or footers.
  *
- * In print: one A4 portrait page with optional header (first page) and
- * footer (last page). The visual is scaled as a single unit and centred.
+ * In print: one A4 portrait page with optional header (first page).
+ * The visual is scaled as a single unit and centred.
  */
 
 import React from "react";
 
-export default function ClientReportPage({ children, isFirst, isLast, projectDetails, logoUrl, pageId }) {
+export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId }) {
   const projectName = projectDetails?.name || "Untitled";
   const clientName = projectDetails?.client_name || "";
   const projectId = projectDetails?.id || "";
@@ -35,7 +35,7 @@ export default function ClientReportPage({ children, isFirst, isLast, projectDet
   }
 
   return (
-    <div className="client-report-page print-avoid-break" data-page-id={pageId}>
+    <div className={`client-report-page print-avoid-break${isFirst ? " client-report-page--first" : ""}`} data-page-id={pageId}>
       {/* Print-only header (first page) */}
       {isFirst && (
         <div className="client-report-page__header client-report-print-only">

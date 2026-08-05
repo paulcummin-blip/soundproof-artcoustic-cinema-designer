@@ -111,7 +111,7 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
         return;
       }
 
-      // 3. Add print-mode body class so the real print header, footer and page dimensions exist
+      // 3. Add print-mode body class so the real print header and page dimensions exist
       document.body.classList.add("client-report-printing");
 
       // 4. Set temporary document title
@@ -138,17 +138,20 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
         const visualInner = page.querySelector(".client-report-page__visual-inner");
         if (!visual || !visualInner) return;
         const availRect = visual.getBoundingClientRect();
-        const availW = availRect.width;
-        const availH = availRect.height;
         const naturalW = visualInner.scrollWidth;
         const naturalH = visualInner.scrollHeight;
-        if (availW <= 0 || availH <= 0 || naturalW <= 0 || naturalH <= 0) return;
-        // Safety inset preserves card corners, borders, shadows, and edge labels
-        const SAFETY_INSET_PX = 32;
-        const safeWidth = availW - SAFETY_INSET_PX;
-        const safeHeight = availH - SAFETY_INSET_PX;
-        if (safeWidth <= 0 || safeHeight <= 0) return;
-        const scale = Math.min(safeWidth / naturalW, safeHeight / naturalH, 1);
+        if (availRect.width <= 0 || availRect.height <= 0 || naturalW <= 0 || naturalH <= 0) return;
+        // Measure the actual content area (after CSS padding) for accurate scaling
+        const cs = window.getComputedStyle(visual);
+        const padL = parseFloat(cs.paddingLeft) || 0;
+        const padR = parseFloat(cs.paddingRight) || 0;
+        const padT = parseFloat(cs.paddingTop) || 0;
+        const padB = parseFloat(cs.paddingBottom) || 0;
+        const contentW = availRect.width - padL - padR;
+        const contentH = availRect.height - padT - padB;
+        if (contentW <= 0 || contentH <= 0) return;
+        // Scale to fill the available area — width-first, height constrains, no cap
+        const scale = Math.min(contentW / naturalW, contentH / naturalH);
         const scaledW = naturalW * scale;
         const scaledH = naturalH * scale;
         page.style.setProperty("--client-report-scale", String(scale));
