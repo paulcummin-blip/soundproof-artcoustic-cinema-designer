@@ -25,6 +25,7 @@ import {
   computeParam20SeatConsistency,
   applyDesignEqCurve,
 } from "@/components/utils/rp22BassMetrics";
+import { evaluateCanonicalP2 } from "@/components/utils/rp22/canonicalP2Authority";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -391,7 +392,7 @@ const getCanonicalRole = (role) => String(role || "").toUpperCase();
 // so that the seatResponses reference never changes between unrelated renders.
 const EMPTY_SEAT_RESPONSES = Object.freeze([]);
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
   // Report consumers disable this calculation path and present only the completed bass authority.
   const liveSeatResponses = useSeatResponses();
   const seatResponses = includeBassAnalysis ? liveSeatResponses : EMPTY_SEAT_RESPONSES;
@@ -497,6 +498,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       caughtErrorStack: null,
     };
     const gradedParameters = { primary: {}, secondary: null };
+
+    // RP22 Parameter 2 — discrete speaker configuration from canonical layout
+    gradedParameters.primary[2] = evaluateCanonicalP2(dolbyLayout);
 
     // Extract room height early for use throughout
     // Prefer explicit heightM, fallback to generic height, then default 2.5 m
@@ -1655,6 +1659,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     aimState?.lcrAimMode,
     overheadState?.lcrAimMode,
     p15ConstructionLevel,
+    dolbyLayout,
     screen?.mountMode,
     screen?.floatDepthM,
     seatResponses,

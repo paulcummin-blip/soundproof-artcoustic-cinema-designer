@@ -290,6 +290,7 @@ export function useClientReportAuthority(projectId) {
     aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
     p15ConstructionLevel: app?.p15ConstructionLevel,
     screen,
+    dolbyLayout: reportDolbyLayout,
     includeBassAnalysis: false,
   });
 

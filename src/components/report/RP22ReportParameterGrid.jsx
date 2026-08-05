@@ -110,9 +110,6 @@ export default function RP22ReportParameterGrid({
   seatHudSnapshots,
   seatingPositions,
   mlpSeatId,
-  dolbyLayout,
-  frontSubsCount,
-  rearSubsCount,
   p15ConstructionLevel,
   p21EarlyReflectionPreset,
   bassAuthority = null,
@@ -134,24 +131,6 @@ export default function RP22ReportParameterGrid({
   const p12Mode = appState?.p12Mode || "minimum";
   const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   const p14Mode = bassPresentation.parameters.p14.targetBasis || appState?.splConfig?.p14Mode || "minimum";
-  /* ----- p2SystemConfig ----- */
-  const p2SystemConfig = React.useMemo(() => {
-    const preset = dolbyLayout || "5.1";
-    const base = String(preset).split(" ")[0];
-    const parts = base.split(".");
-    const bed = parts[0] || "5";
-    const heights = parts[2] || "";
-    const totalSubs = Number(frontSubsCount ?? 0) + Number(rearSubsCount ?? 0);
-    const systemStr = heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-    const p = systemStr.split(".");
-    const bedCount = parseInt(p[0], 10) || 5;
-    const overheadCount = parseInt(p[2], 10) || 0;
-    const discreteCount = bedCount + overheadCount;
-    let p2Level = "L1";
-    if (discreteCount >= 15) p2Level = "L4";
-    else if (discreteCount >= 11) p2Level = "L2";
-    return { discreteSpeakerCount: discreteCount, p2Level };
-  }, [dolbyLayout, frontSubsCount, rearSubsCount]);
 
   /* ----- Seat snapshot lookup ----- */
   const seatSnapshotsById = React.useMemo(() => {
@@ -198,7 +177,6 @@ export default function RP22ReportParameterGrid({
       if (pid === 21 && res?.status === "error") return "—";
       if (pid === 21 && res && res.status !== "no_data" && res.status !== "fail" && Number.isFinite(res.value)) return levelP21_earlyReflections(res.value).level;
       if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) return res.level;
-      if (pid === 2 && p2SystemConfig) return p2SystemConfig.p2Level;
       if (pid === 3) { const p3 = analysisResult?.gradedParameters?.primary?.[3]; return (p3 && p3.status === "ok") ? p3.level : "—"; }
       if (pid === 8) return "L4";
       if (pid === 11) return "L4";
@@ -211,7 +189,7 @@ export default function RP22ReportParameterGrid({
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
     return getMetricDisplayState(metric, pid).level || "—";
-  }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, bassPresentation]);
+  }, [analysisResult, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, bassPresentation]);
 
   /* ----- getHudValueForParam (exact logic from RP22CompliancePanel) ----- */
   const getHudValueForParam = React.useCallback((param) => {
@@ -250,7 +228,6 @@ export default function RP22ReportParameterGrid({
           return String(v);
         }
       }
-      if (pid === 2 && p2SystemConfig) return `${p2SystemConfig.discreteSpeakerCount} speakers`;
       if (pid === 8) return "No";
       if (pid === 11) return "0";
       if (pid === 15) { const LABEL = { standard: "NCB 26 (standard)", "purpose-built": "NCB 22 (purpose-built)", reference: "NCB 18 (reference)", studio: "NCB 15 (studio)" }; return LABEL[p15ConstructionLevel || "standard"] || "—"; }
@@ -281,7 +258,7 @@ export default function RP22ReportParameterGrid({
     const n = getMetricNumericValue(metric);
     if (Number.isFinite(n)) return formatMetricFallback(n, paramDef?.unit || "");
     return "Not Calculated";
-  }, [analysisResult, p2SystemConfig, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, bassPresentation, isPrintVariant]);
+  }, [analysisResult, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, bassPresentation, isPrintVariant]);
 
   /* ----- Per-seat pill grid for seat-scoped params ----- */
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];

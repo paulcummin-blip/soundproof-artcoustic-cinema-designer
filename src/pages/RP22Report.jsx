@@ -456,6 +456,7 @@ function RP22ReportInner() {
         aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
         p15ConstructionLevel: app?.p15ConstructionLevel,
         screen,
+        dolbyLayout: reportDolbyLayout,
         includeBassAnalysis: false,
     });
 
@@ -513,19 +514,6 @@ function RP22ReportInner() {
         return [...rp22Parameters].filter(p => !seatScopedParamNumbers.has(p.number)).sort((a, b) => a.id - b.id);
     }, [seatScopedParamNumbers]);
 
-    const p2SystemConfig = React.useMemo(() => {
-        const dolbyPreset = app?.dolbyLayout || "5.1";
-        const base = String(dolbyPreset).split(" ")[0];
-        const parts = base.split(".");
-        const bedCount = parseInt(parts[0]) || 5;
-        const overheadCount = parseInt(parts[2]) || 0;
-        const discreteCount = bedCount + overheadCount;
-        let p2Level = 'L1';
-        if (discreteCount >= 15) p2Level = 'L4';
-        else if (discreteCount >= 11) p2Level = 'L2';
-        return { discreteSpeakerCount: discreteCount, p2Level };
-    }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
-
     const getRoomResult = React.useCallback((paramId) => analysisResult?.gradedParameters?.primary?.[paramId] ?? null, [analysisResult]);
 
     const getDisplayedRoomLevel = React.useCallback((paramId) => {
@@ -543,7 +531,11 @@ function RP22ReportInner() {
             const lvl = normaliseLvl(res.level);
             if (lvl) return lvl;
         }
-        if (paramId === 2 && p2SystemConfig) return normaliseLvl(p2SystemConfig.p2Level);
+        if (paramId === 2) {
+          const p2 = getRoomResult(2);
+          if (p2 && p2.status === "ok" && String(p2.level).toUpperCase() === 'FAIL') return 'FAIL';
+          return null;
+        }
         if (paramId === 3) {
           const p3 = analysisResult?.gradedParameters?.primary?.[3];
           if (p3 && p3.status === "ok" && p3.level) return String(p3.level).toUpperCase() === 'FAIL' ? 'FAIL' : normaliseLvl(p3.level);
@@ -554,7 +546,7 @@ function RP22ReportInner() {
         if (paramId === 15) return ({ standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" })[app?.p15ConstructionLevel || 'standard'] || null;
         if (paramId === 21) return getP21PresetResult(app?.p21EarlyReflectionPreset || 'l2').level;
         return null;
-    }, [analysisResult, getRoomResult, p2SystemConfig, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset, completedBassPresentation]);
+    }, [analysisResult, getRoomResult, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset, completedBassPresentation]);
 
     const getSeatResults = React.useCallback((paramId) => {
         if (!analysisResult?.perSeatRp22) return [];
@@ -830,9 +822,6 @@ function RP22ReportInner() {
         seatHudSnapshots: reportSeatHudById,
         seatingPositions: seats,
         mlpSeatId: rspSeatId,
-        dolbyLayout: app?.dolbyLayout,
-        frontSubsCount: app?.frontSubsCfg?.count,
-        rearSubsCount: app?.rearSubsCfg?.count,
         p15ConstructionLevel: app?.p15ConstructionLevel,
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
         bassAuthority: completedBassAuthority,
