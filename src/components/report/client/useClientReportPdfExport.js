@@ -108,8 +108,13 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
         await document.fonts.ready;
       }
 
-      // 2. Wait for logo to decode
-      await decodeLogo(logoUrl);
+      // 2. Wait for logo to decode — abort if the required logo fails to load
+      const logoReady = await decodeLogo(logoUrl);
+      if (!logoReady) {
+        setError("PDF preparation failed because the Sound Proof logo could not be loaded. Please try again.");
+        cleanup();
+        return;
+      }
 
       // 3. Measure each page's visual natural size and calculate scale
       const pages = document.querySelectorAll(".client-report-page");
@@ -150,13 +155,7 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
       window.print();
     } catch (err) {
       setError("PDF preparation failed. Please try again.");
-      printingRef.current = false;
-      setExporting(false);
-      document.body.classList.remove("client-report-printing");
-      if (originalTitleRef.current !== null) {
-        document.title = originalTitleRef.current;
-        originalTitleRef.current = null;
-      }
+      cleanup();
     }
   }, [exporting, activePageCount, projectName, logoUrl, cleanup]);
 

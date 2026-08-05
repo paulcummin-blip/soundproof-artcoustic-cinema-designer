@@ -43,6 +43,14 @@ export default function ClientReportPrintStyles() {
         display: block !important;
       }
 
+      body.client-report-printing .client-report-page__header.client-report-print-only {
+        display: block !important;
+      }
+
+      body.client-report-printing .client-report-page__footer.client-report-print-only {
+        display: flex !important;
+      }
+
       body.client-report-printing .client-report-print-root {
         display: block !important;
       }
@@ -73,6 +81,15 @@ export default function ClientReportPrintStyles() {
         /* Show print-only elements */
         .client-report-print-only {
           display: block !important;
+        }
+
+        /* Header: block; Footer: flex (overrides generic print-only block) */
+        .client-report-page__header.client-report-print-only {
+          display: block !important;
+        }
+
+        .client-report-page__footer.client-report-print-only {
+          display: flex !important;
         }
 
         /* Hide app sidebar, nav */
