@@ -52,7 +52,9 @@ export default function ClientReportPage({ children, isFirst, isLast, projectDet
 
       {/* Visual area — screen + print */}
       <div className="client-report-page__visual">
-        <div className="client-report-page__visual-inner">{children}</div>
+        <div className="client-report-page__visual-stage">
+          <div className="client-report-page__visual-inner">{children}</div>
+        </div>
       </div>
 
       {/* Print-only footer (last page) */}

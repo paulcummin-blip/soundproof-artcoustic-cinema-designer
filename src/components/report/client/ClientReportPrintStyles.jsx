@@ -60,6 +60,122 @@ export default function ClientReportPrintStyles() {
         display: none !important;
       }
 
+      /* ── Print layout rules (active during measurement AND print) ── */
+      body.client-report-printing .client-report-page {
+        width: 186mm !important;
+        height: 270mm !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        page-break-after: always;
+        break-after: page;
+        overflow: hidden !important;
+        position: relative;
+        background: #FFFFFF !important;
+      }
+
+      body.client-report-printing .client-report-page:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+
+      body.client-report-printing .client-report-page__header {
+        flex-shrink: 0;
+        max-height: 34mm;
+        overflow: hidden;
+        padding-bottom: 3mm;
+        border-bottom: 1px solid #DCDBD6;
+        margin-bottom: 4mm;
+      }
+
+      body.client-report-printing .client-report-page__header img {
+        height: 12mm;
+        width: auto;
+        object-fit: contain;
+        margin-bottom: 3mm;
+      }
+
+      body.client-report-printing .client-report-page__header-title {
+        font-size: 15pt;
+        font-weight: 600;
+        color: #213428;
+        font-family: "Futura PT Light", "Century Gothic", sans-serif;
+        margin: 0 0 1.5mm 0;
+        letter-spacing: 0.01em;
+      }
+
+      body.client-report-printing .client-report-page__header-meta {
+        font-size: 9pt;
+        color: #625143;
+        font-family: "Didact Gothic", "Century Gothic", sans-serif;
+        line-height: 1.5;
+      }
+
+      body.client-report-printing .client-report-page__header-meta span {
+        margin-right: 6mm;
+        white-space: nowrap;
+      }
+
+      body.client-report-printing .client-report-page__visual {
+        flex: 1;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 0;
+        overflow: hidden !important;
+      }
+
+      body.client-report-printing .client-report-page__visual-stage {
+        width: var(--client-report-scaled-width, auto);
+        height: var(--client-report-scaled-height, auto);
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+
+      body.client-report-printing .client-report-page__visual-inner {
+        width: var(--client-report-natural-width, auto);
+        transform: scale(var(--client-report-scale, 1));
+        transform-origin: top left;
+      }
+
+      body.client-report-printing .client-report-page__visual-inner > * {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      body.client-report-printing .client-report-page__footer {
+        flex-shrink: 0;
+        max-height: 13mm;
+        padding-top: 3mm;
+        border-top: 1px solid #DCDBD6;
+        margin-top: 3mm;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4mm;
+      }
+
+      body.client-report-printing .client-report-page__footer img {
+        height: 5mm;
+        width: auto;
+        object-fit: contain;
+      }
+
+      body.client-report-printing .client-report-page__footer-text {
+        font-size: 8pt;
+        color: #625143;
+        font-family: "Didact Gothic", "Century Gothic", sans-serif;
+        letter-spacing: 0.04em;
+      }
+
+      body.client-report-printing .client-report-page,
+      body.client-report-printing .client-report-page * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
       /* ── Print media query ── */
       @media print {
         @page {
@@ -213,21 +329,29 @@ export default function ClientReportPrintStyles() {
           white-space: nowrap;
         }
 
-        /* ── Visual area — centred, scaled as one unit ── */
+        /* ── Visual area — flex container, centred ── */
         .client-report-page__visual {
           flex: 1;
-          position: relative;
-          overflow: hidden !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
           min-height: 0;
+          overflow: hidden !important;
         }
 
+        /* ── Visual stage — sized wrapper, normal flex layout ── */
+        .client-report-page__visual-stage {
+          width: var(--client-report-scaled-width, auto);
+          height: var(--client-report-scaled-height, auto);
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+
+        /* ── Visual inner — scaled content, transform-origin top left ── */
         .client-report-page__visual-inner {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: var(--client-report-natural-w, auto) !important;
-          transform: translate(-50%, -50%) scale(var(--client-report-scale, 1));
-          transform-origin: center center;
+          width: var(--client-report-natural-width, auto);
+          transform: scale(var(--client-report-scale, 1));
+          transform-origin: top left;
         }
 
         /* Prevent splitting of SVG, heading, status card */

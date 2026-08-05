@@ -22,12 +22,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
 const PRINT_TIMEOUT_MS = 60000;
-const MM_TO_PX = 3.7795; // 96 DPI
-const PRINT_SLOT_W_PX = 186 * MM_TO_PX; // ~703px
-const PAGE_H_MM = 270; // slightly below 273mm to prevent blank trailing page
-const HEADER_H_MM = 34;
-const FOOTER_H_MM = 13;
-const VISUAL_SLOT_H_PX = (PAGE_H_MM - HEADER_H_MM - FOOTER_H_MM) * MM_TO_PX; // ~843px
 
 function sanitiseProjectName(name) {
   if (!name) return "Untitled";
@@ -76,8 +70,9 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
     }
     document.querySelectorAll(".client-report-page").forEach((page) => {
       page.style.removeProperty("--client-report-scale");
-      page.style.removeProperty("--client-report-natural-w");
-      page.style.removeProperty("--client-report-natural-h");
+      page.style.removeProperty("--client-report-natural-width");
+      page.style.removeProperty("--client-report-scaled-width");
+      page.style.removeProperty("--client-report-scaled-height");
     });
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
@@ -116,42 +111,76 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
         return;
       }
 
-      // 3. Measure each page's visual natural size and calculate scale
-      const pages = document.querySelectorAll(".client-report-page");
-      pages.forEach((page) => {
-        const visualInner = page.querySelector(".client-report-page__visual-inner");
-        if (!visualInner) return;
-        const naturalW = visualInner.offsetWidth;
-        const naturalH = visualInner.offsetHeight;
-        if (naturalW <= 0 || naturalH <= 0) return;
-        page.style.setProperty("--client-report-natural-w", `${naturalW}px`);
-        page.style.setProperty("--client-report-natural-h", `${naturalH}px`);
-        const scale = Math.min(
-          PRINT_SLOT_W_PX / naturalW,
-          VISUAL_SLOT_H_PX / naturalH,
-          1
-        );
-        page.style.setProperty("--client-report-scale", String(scale));
-      });
-
-      // 4. Add print-mode body class
+      // 3. Add print-mode body class so the real print header, footer and page dimensions exist
       document.body.classList.add("client-report-printing");
 
-      // 5. Set temporary document title
+      // 4. Set temporary document title
       originalTitleRef.current = document.title;
       document.title = `Sound Proof - ${sanitiseProjectName(projectName)} - Client Visual Report`;
 
-      // 6. Wait two animation frames for layout to settle
+      // 5. Temporarily reset every visual to scale 1
+      document.querySelectorAll(".client-report-page").forEach((page) => {
+        page.style.removeProperty("--client-report-scale");
+        page.style.removeProperty("--client-report-natural-width");
+        page.style.removeProperty("--client-report-scaled-width");
+        page.style.removeProperty("--client-report-scaled-height");
+      });
+
+      // 6. Wait two animation frames for print layout to settle
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(resolve))
       );
 
-      // 7. Set timeout fallback (in case afterprint doesn't fire)
+      // 7. Measure each page — actual visual slot + natural content size
+      const pages = document.querySelectorAll(".client-report-page");
+      pages.forEach((page) => {
+        const visual = page.querySelector(".client-report-page__visual");
+        const visualInner = page.querySelector(".client-report-page__visual-inner");
+        if (!visual || !visualInner) return;
+        const availRect = visual.getBoundingClientRect();
+        const availW = availRect.width;
+        const availH = availRect.height;
+        const naturalW = visualInner.scrollWidth;
+        const naturalH = visualInner.scrollHeight;
+        if (availW <= 0 || availH <= 0 || naturalW <= 0 || naturalH <= 0) return;
+        const scale = Math.min(availW / naturalW, availH / naturalH, 1);
+        const scaledW = naturalW * scale;
+        const scaledH = naturalH * scale;
+        page.style.setProperty("--client-report-scale", String(scale));
+        page.style.setProperty("--client-report-natural-width", `${naturalW}px`);
+        page.style.setProperty("--client-report-scaled-width", `${scaledW}px`);
+        page.style.setProperty("--client-report-scaled-height", `${scaledH}px`);
+      });
+
+      // 8. Wait two further animation frames for scaled layout to settle
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
+
+      // 9. Re-measure and confirm the scaled stage fits inside the visual slot
+      let allFit = true;
+      pages.forEach((page) => {
+        const visual = page.querySelector(".client-report-page__visual");
+        const stage = page.querySelector(".client-report-page__visual-stage");
+        if (!visual || !stage) return;
+        const vRect = visual.getBoundingClientRect();
+        const sRect = stage.getBoundingClientRect();
+        if (sRect.width > vRect.width + 1 || sRect.height > vRect.height + 1) {
+          allFit = false;
+        }
+      });
+      if (!allFit) {
+        setError("PDF preparation failed — visual content could not be fitted to the page. Please try again.");
+        cleanup();
+        return;
+      }
+
+      // 10. Set timeout fallback (in case afterprint doesn't fire)
       cleanupTimeoutRef.current = setTimeout(() => {
         cleanup();
       }, PRINT_TIMEOUT_MS);
 
-      // 8. Trigger print
+      // 11. Trigger print
       window.print();
     } catch (err) {
       setError("PDF preparation failed. Please try again.");
