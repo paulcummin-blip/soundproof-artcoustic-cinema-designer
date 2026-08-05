@@ -29,6 +29,7 @@ export function selectClientDesignHighlights({
   p5Snapshot,
   p9Snapshot,
   placedSpeakers,
+  authoritativeSeat,
 }) {
   const highlights = [];
 
@@ -44,11 +45,16 @@ export function selectClientDesignHighlights({
   };
 
   const primary = analysisResult?.gradedParameters?.primary || {};
+  const perSeat = analysisResult?.perSeatRp22 || {};
 
   // ── SPATIAL RESOLUTION (P1–P11) ──
 
-  // 1. Clear, focused dialogue — P3 & P4 only (no P12)
-  if (isPassLevel(primary[3]?.level) && isPassLevel(primary[4]?.level)) {
+  // 1. Clear, focused dialogue — P3 & canonical RSP P4 & P12 (all must be L2–L4)
+  // P4 is seat-scoped: use perSeatRp22[authoritativeSeat.id].rp22[4], NOT primary[4].
+  const rspSeatId = authoritativeSeat?.id;
+  const rspP4 = rspSeatId ? perSeat[rspSeatId]?.rp22?.[4] : null;
+
+  if (isPassLevel(primary[3]?.level) && isPassLevel(rspP4?.level) && isPassLevel(primary[12]?.level)) {
     highlights.push({
       id: "clear-dialogue",
       category: "Spatial Resolution",
@@ -77,9 +83,8 @@ export function selectClientDesignHighlights({
     return role.startsWith("T") || role.startsWith("U");
   });
   const p9Applicable = p9Snapshot?.applicable === true;
-  const p9Passing = p9Applicable && isPassLevel(p9Snapshot.level);
 
-  if (hasOverheads && (!p9Applicable || p9Passing)) {
+  if (hasOverheads && p9Applicable && isPassLevel(p9Snapshot?.level)) {
     highlights.push({
       id: "immersive-overhead",
       category: "Spatial Resolution",

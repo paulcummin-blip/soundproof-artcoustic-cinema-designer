@@ -69,8 +69,9 @@ export default function RP22ClientReport() {
       p5Snapshot,
       p9Snapshot,
       placedSpeakers,
+      authoritativeSeat,
     });
-  }, [hydrating, analysisResult, bassPresentation, p5Snapshot, p9Snapshot, placedSpeakers]);
+  }, [hydrating, analysisResult, bassPresentation, p5Snapshot, p9Snapshot, placedSpeakers, authoritativeSeat]);
 
   // ── Recommended seating position availability ──
   const hasSeatingPosition = useMemo(() => {

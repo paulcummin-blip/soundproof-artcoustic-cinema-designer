@@ -90,7 +90,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           <>
             <div className="client-report-print-heading">
               <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
-              <p className="client-report-print-heading__subtitle">RP22 Parameter 1 — Seating position and wall clearance</p>
+              <p className="client-report-print-heading__subtitle">RP22 Parameter 1 — RECOMMENDED SEATING POSITION</p>
             </div>
             <div className="client-report-print-drawing">
               <ClientRecommendedSeatingPosition

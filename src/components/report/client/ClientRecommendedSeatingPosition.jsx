@@ -97,7 +97,8 @@ export default function ClientRecommendedSeatingPosition({
 
   return (
     <div style={containerStyle}>
-      {/* ── Heading hierarchy: Category → Parameter reference ── */}
+      {/* ── Heading hierarchy: Category → Parameter reference (screen only) ── */}
+      {!print && (
       <div style={{ width: "100%", marginBottom: 16 }}>
         <h1 style={{
           margin: 0,
@@ -122,8 +123,10 @@ export default function ClientRecommendedSeatingPosition({
           RP22 Parameter 1 — Seating position and wall clearance
         </p>
       </div>
+      )}
 
-      {/* ── Descriptive title ── */}
+      {/* ── Descriptive title (screen only) ── */}
+      {!print && (
       <div style={{
         fontSize: 18,
         fontWeight: 600,
@@ -133,6 +136,7 @@ export default function ClientRecommendedSeatingPosition({
       }}>
         Recommended Seating Position
       </div>
+      )}
 
       <svg
         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -218,6 +222,7 @@ export default function ClientRecommendedSeatingPosition({
         )}
       </svg>
 
+      {!print && (
       <p style={{
         fontSize: 14,
         color: "#625143",
@@ -229,6 +234,7 @@ export default function ClientRecommendedSeatingPosition({
       }}>
         The highlighted reference position is the point used to align the cinema's speaker and listening geometry.
       </p>
+      )}
     </div>
   );
 }

@@ -112,7 +112,8 @@ export function runClientReportSelectorAssertions() {
   check("6a. Missing authority returns empty highlights", Array.isArray(emptyHighlights) && emptyHighlights.length === 0);
 
   const mockHighlightsAnalysis = {
-    gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" }, 13: { level: "L3" } } },
+    gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } },
+    perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } },
   };
   const mockHighlightsBass = {
     publicationVerified: true,
@@ -121,15 +122,17 @@ export function runClientReportSelectorAssertions() {
   const mockP5 = { level: "L2" };
   const mockP9 = { applicable: true, level: "L3" };
   const mockSpeakers = [{ role: "TFL" }, { role: "TFR" }];
+  const mockAuthSeat = { id: "rsp-seat" };
   const highlightsResult = selectClientDesignHighlights({
     analysisResult: mockHighlightsAnalysis,
     bassPresentation: mockHighlightsBass,
     p5Snapshot: mockP5,
     p9Snapshot: mockP9,
     placedSpeakers: mockSpeakers,
+    authoritativeSeat: mockAuthSeat,
   });
   check("6b. All five highlights present when passing", highlightsResult.length === 5);
-  check("6c. Clear dialogue highlight present (P3 & P4 only)", highlightsResult.some((h) => h.id === "clear-dialogue"));
+  check("6c. Clear dialogue highlight present (P3 & RSP P4 & P12)", highlightsResult.some((h) => h.id === "clear-dialogue"));
   check("6d. Consistent bass highlight present", highlightsResult.some((h) => h.id === "consistent-bass"));
   check("6e. Clean cinema peaks highlight present (P12 & P13)", highlightsResult.some((h) => h.id === "clean-cinema-peaks"));
 
@@ -144,33 +147,79 @@ export function runClientReportSelectorAssertions() {
   const allCatsCorrect = highlightsResult.every((h) => h.category === catMap[h.id]);
   check("6f. Category ownership correct per highlight", allCatsCorrect);
 
-  // 6g. P12 no longer used to qualify clear-dialogue — P3 L1 but P12 L4 should still omit
-  const p12OnlyFail = selectClientDesignHighlights({
-    analysisResult: { gradedParameters: { primary: { 3: { level: "L1" }, 4: { level: "L2" }, 12: { level: "L4" }, 13: { level: "L3" } } } },
+  // 6g. Clear dialogue omitted when P3 is L1
+  const p3Fail = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L1" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L3" },
+    placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
+  });
+  check("6g. Clear dialogue omitted when P3 is L1", !p3Fail.some((h) => h.id === "clear-dialogue"));
+
+  // 6g2. Clear dialogue omitted when canonical RSP P4 is L1
+  const rspP4Fail = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L1" } } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L3" },
+    placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
+  });
+  check("6g2. Clear dialogue omitted when RSP P4 is L1", !rspP4Fail.some((h) => h.id === "clear-dialogue"));
+
+  // 6g3. Clear dialogue omitted when P12 is L1
+  const p12Fail = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L1" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L3" },
+    placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
+  });
+  check("6g3. Clear dialogue omitted when P12 is L1", !p12Fail.some((h) => h.id === "clear-dialogue"));
+
+  // 6g4. Clear dialogue omitted when RSP P4 is N/A
+  const rspP4Na = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "N/A" } } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L3" },
+    placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
+  });
+  check("6g4. Clear dialogue omitted when RSP P4 is N/A", !rspP4Na.some((h) => h.id === "clear-dialogue"));
+
+  // 6g5. Clear dialogue omitted when authoritativeSeat is missing
+  const noAuthSeat = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
     bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
     p5Snapshot: { level: "L2" },
     p9Snapshot: { applicable: true, level: "L3" },
     placedSpeakers: [{ role: "TFL" }],
   });
-  check("6g. Clear dialogue omitted when P3 is L1 (P12 does not qualify it)", !p12OnlyFail.some((h) => h.id === "clear-dialogue"));
+  check("6g5. Clear dialogue omitted when authoritativeSeat missing", !noAuthSeat.some((h) => h.id === "clear-dialogue"));
 
   // 6h. Clean cinema peaks omitted when P13 is L1 (both P12 & P13 required)
   const p13Fail = selectClientDesignHighlights({
-    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" }, 13: { level: "L1" } } } },
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L1" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
     bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
     p5Snapshot: { level: "L2" },
     p9Snapshot: { applicable: true, level: "L3" },
     placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
   });
   check("6h. Clean cinema peaks omitted when P13 is L1", !p13Fail.some((h) => h.id === "clean-cinema-peaks"));
 
   // 6i. Consistent bass omitted when not verified
   const unverifiedBass = selectClientDesignHighlights({
-    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" }, 13: { level: "L3" } } } },
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
     bassPresentation: { publicationVerified: false, parameters: { p20: { level: "L3" } } },
     p5Snapshot: { level: "L2" },
     p9Snapshot: { applicable: true, level: "L3" },
     placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
   });
   check("6i. Consistent bass omitted when not verified", !unverifiedBass.some((h) => h.id === "consistent-bass"));
 
@@ -184,6 +233,50 @@ export function runClientReportSelectorAssertions() {
     return false;
   });
   check("6j. No cross-category parameter combinations", noCrossCategory);
+
+  // 6k. Immersive overhead suppressed when P9 is not applicable
+  const p9NotApplicable = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: false, level: "N/A" },
+    placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
+  });
+  check("6k. Immersive overhead suppressed when P9 not applicable", !p9NotApplicable.some((h) => h.id === "immersive-overhead"));
+
+  // 6l. Immersive overhead suppressed when P9 is L1
+  const p9L1 = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L1" },
+    placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
+  });
+  check("6l. Immersive overhead suppressed when P9 is L1", !p9L1.some((h) => h.id === "immersive-overhead"));
+
+  // 6m. Immersive overhead suppressed when P9 is Fail
+  const p9Fail = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "Fail" },
+    placedSpeakers: [{ role: "TFL" }],
+    authoritativeSeat: { id: "rsp-seat" },
+  });
+  check("6m. Immersive overhead suppressed when P9 is Fail", !p9Fail.some((h) => h.id === "immersive-overhead"));
+
+  // 6n. Immersive overhead suppressed when no overhead speakers exist
+  const noOverheads = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 12: { level: "L4" }, 13: { level: "L3" } } }, perSeatRp22: { "rsp-seat": { rp22: { 4: { level: "L4" } } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L3" },
+    placedSpeakers: [{ role: "L" }],
+    authoritativeSeat: { id: "rsp-seat" },
+  });
+  check("6n. Immersive overhead suppressed when no overhead speakers", !noOverheads.some((h) => h.id === "immersive-overhead"));
 
   return { ran: true, results };
 }
