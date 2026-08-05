@@ -13,6 +13,7 @@
  */
 
 import React, { useMemo } from "react";
+import P9RowLabelStack, { P9_ROW_COLORS as ROW_COLORS } from "@/components/report/client/p9RowLabelStack";
 
 // ── Status copy (frozen — matches ClientSoundAboveListener) ───────────────
 const STATUS_COPY = {
@@ -67,24 +68,6 @@ function normaliseClientLevel(level) {
   if (raw === "N/A" || raw === "NA") return "N/A";
   return "—";
 }
-
-const ROW_COLORS = {
-  front: "#625143",
-  mid: "#213428",
-  rear: "#4A230F",
-};
-
-const ROW_LABELS = {
-  front: "45° forward",
-  mid: "90° overhead",
-  rear: "45° rear",
-};
-
-const ROW_ROLE_LABELS = {
-  front: "TFL / TFR",
-  mid: "TML / TMR",
-  rear: "TRL / TRR",
-};
 
 function getRowName(role) {
   const r = String(role || "").toUpperCase();
@@ -294,24 +277,16 @@ export default function PrintP9Content({ p9Snapshot, roomDims }) {
             );
           })}
 
-          {/* Row labels — one combined role label per row */}
+          {/* Row label stacks — one per overhead row (shared with screen) */}
           {representativeRows.map((row, i) => {
             const rowColor = ROW_COLORS[row.rowName] || "#625143";
-            const label = ROW_LABELS[row.rowName] || "";
-            const roleLabel = ROW_ROLE_LABELS[row.rowName] || "";
-            const labelPos = toPx(row.avgY, row.avgZ);
             return (
-              <g key={`row-label-${i}`}>
-                <text x={labelPos.px} y={labelPos.py - 36} fill={rowColor}
-                  fontSize={10} textAnchor="middle"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif">{roleLabel}</text>
-                <text x={labelPos.px} y={labelPos.py - 20} fill={rowColor}
-                  fontSize={11} textAnchor="middle"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif" fontWeight={600}>{label}</text>
-                <text x={labelPos.px} y={labelPos.py + 20} fill="#625143"
-                  fontSize={9} textAnchor="middle"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif">{Math.round(row.elevDeg)}°</text>
-              </g>
+              <P9RowLabelStack
+                key={`row-label-${i}`}
+                row={row}
+                toPx={toPx}
+                rowColor={rowColor}
+              />
             );
           })}
 

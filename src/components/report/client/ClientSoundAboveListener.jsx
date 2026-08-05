@@ -14,6 +14,7 @@
  */
 
 import React, { useMemo } from "react";
+import P9RowLabelStack, { P9_ROW_COLORS as ROW_COLORS } from "@/components/report/client/p9RowLabelStack";
 
 // ── Status copy ────────────────────────────────────────────────────────────
 const STATUS_COPY = {
@@ -76,12 +77,6 @@ function normaliseClientLevel(level) {
 }
 
 // ── Row metadata ───────────────────────────────────────────────────────────
-const ROW_COLORS = {
-  front: "#625143",
-  mid: "#213428",
-  rear: "#4A230F",
-};
-
 const ROW_LABELS = {
   front: "45° forward",
   mid: "90° overhead",
@@ -454,66 +449,34 @@ export default function ClientSoundAboveListener({ p9Snapshot, roomDims }) {
             );
           })}
 
-          {/* ── Overhead speakers ── */}
+          {/* ── Overhead speakers (markers only — no per-speaker role text) ── */}
           {upperSpeakers.map((spk, i) => {
             const sp = toPx(spk.position.y, spk.position.z);
             const rowName = getRowName(spk.role);
             const color = ROW_COLORS[rowName] || "#625143";
             return (
-              <g key={`spk-${i}`}>
-                <circle
-                  cx={sp.px}
-                  cy={sp.py}
-                  r={7}
-                  fill={color}
-                  stroke="#F8F8F7"
-                  strokeWidth={1.5}
-                />
-                <text
-                  x={sp.px}
-                  y={sp.py - 12}
-                  fill={color}
-                  fontSize={11}
-                  textAnchor="middle"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
-                  fontWeight={600}
-                >
-                  {spk.role}
-                </text>
-              </g>
+              <circle
+                key={`spk-${i}`}
+                cx={sp.px}
+                cy={sp.py}
+                r={7}
+                fill={color}
+                stroke="#F8F8F7"
+                strokeWidth={1.5}
+              />
             );
           })}
 
-          {/* ── Row angle labels (client-friendly) ── */}
+          {/* ── Row label stacks (one per overhead row — shared with print) ── */}
           {representativeRows.map((row, i) => {
             const rowColor = ROW_COLORS[row.rowName] || "#625143";
-            const label = ROW_LABELS[row.rowName] || "";
-            // Place label near the row's average position
-            const labelPos = toPx(row.avgY, row.avgZ);
             return (
-              <g key={`row-label-${i}`}>
-                <text
-                  x={labelPos.px}
-                  y={labelPos.py - 22}
-                  fill={rowColor}
-                  fontSize={11}
-                  textAnchor="middle"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
-                  fontWeight={600}
-                >
-                  {label}
-                </text>
-                <text
-                  x={labelPos.px}
-                  y={labelPos.py - 10}
-                  fill="#625143"
-                  fontSize={9}
-                  textAnchor="middle"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
-                >
-                  {Math.round(row.elevDeg)}°
-                </text>
-              </g>
+              <P9RowLabelStack
+                key={`row-label-${i}`}
+                row={row}
+                toPx={toPx}
+                rowColor={rowColor}
+              />
             );
           })}
 
