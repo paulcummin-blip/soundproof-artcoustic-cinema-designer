@@ -479,5 +479,151 @@ export function runClientReportSelectorAssertions() {
   });
   check("7k. Status no_data does not create P4 marker", noDataResult.seats[0]?.p4 === null);
 
+  // ── Stage C2 readability correction: strict coordinate + partial-layer ──
+
+  // 7l. P4-only project (no P6, no P10)
+  const p4OnlyResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7l. P4-only: P4 present, P6/P10 absent", p4OnlyResult.seats[0]?.p4 !== null && p4OnlyResult.seats[0]?.p6 === null && p4OnlyResult.seats[0]?.p10 === null);
+  check("7l1. P4-only: hasValidP4 true, P6/P10 false", p4OnlyResult.hasValidP4 && !p4OnlyResult.hasValidP6 && !p4OnlyResult.hasValidP10);
+  check("7l2. P4-only: hasAnyValid true", p4OnlyResult.hasAnyValid);
+
+  // 7m. P4 + P6 project (no P10)
+  const p4p6Result = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 }, 6: { valueDb: 2, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7m. P4+P6: P4/P6 present, P10 absent", p4p6Result.seats[0]?.p4 !== null && p4p6Result.seats[0]?.p6 !== null && p4p6Result.seats[0]?.p10 === null);
+  check("7m1. P4+P6: hasValidP10 false", !p4p6Result.hasValidP10);
+  check("7m2. P4+P6: hasAnyValid true", p4p6Result.hasAnyValid);
+
+  // 7n. P10-only project (no P4, no P6) — valid without P9
+  const p10OnlyResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 10: { value: 45, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7n. P10-only: P10 present, P4/P6 absent", p10OnlyResult.seats[0]?.p10 !== null && p10OnlyResult.seats[0]?.p4 === null && p10OnlyResult.seats[0]?.p6 === null);
+  check("7n1. P10-only: hasValidP10 true without P9", p10OnlyResult.hasValidP10);
+  check("7n2. P10-only: hasAnyValid true", p10OnlyResult.hasAnyValid);
+
+  // 7o. Mixed omissions across multiple seats
+  const mixedResult = selectClientSpeakerBalance({
+    analysisResult: {
+      perSeatRp22: {
+        s1: { rp22: { 4: { valueDb: 1, level: 4 }, 6: { valueDb: 2, level: 3 }, 10: { value: 45, level: 3 } } },
+        s2: { rp22: { 4: { valueDb: 1, level: 4 }, 10: { value: 45, level: 3 } } },
+        s3: { rp22: { 6: { valueDb: 2, level: 3 } } },
+      },
+      gradedParameters: { primary: {} },
+    },
+    seatingPositions: [{ id: "s1", x: 1, y: 2 }, { id: "s2", x: 2, y: 2 }, { id: "s3", x: 3, y: 2 }],
+    rsp: null,
+  });
+  check("7o. Mixed: seat1 all three", mixedResult.seats[0]?.p4 !== null && mixedResult.seats[0]?.p6 !== null && mixedResult.seats[0]?.p10 !== null);
+  check("7o1. Mixed: seat2 P4+P10, no P6", mixedResult.seats[1]?.p4 !== null && mixedResult.seats[1]?.p6 === null && mixedResult.seats[1]?.p10 !== null);
+  check("7o2. Mixed: seat3 P6 only", mixedResult.seats[2]?.p4 === null && mixedResult.seats[2]?.p6 !== null && mixedResult.seats[2]?.p10 === null);
+  check("7o3. Mixed: all three layers have at least one valid", mixedResult.hasValidP4 && mixedResult.hasValidP6 && mixedResult.hasValidP10);
+
+  // 7p. Empty-string x rejected
+  const emptyXResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { good: { rp22: { 4: { valueDb: 1, level: 4 } } }, bad: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "good", x: 2, y: 3 }, { id: "bad", x: "", y: 3 }],
+    rsp: null,
+  });
+  check("7p. Empty-string x rejected", emptyXResult.seats.length === 1 && emptyXResult.seats[0].id === "good");
+
+  // 7q. Whitespace-only x rejected
+  const wsXResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { good: { rp22: { 4: { valueDb: 1, level: 4 } } }, bad: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "good", x: 2, y: 3 }, { id: "bad", x: "   ", y: 3 }],
+    rsp: null,
+  });
+  check("7q. Whitespace-only x rejected", wsXResult.seats.length === 1 && wsXResult.seats[0].id === "good");
+
+  // 7r. Whitespace-only y rejected
+  const wsYResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { good: { rp22: { 4: { valueDb: 1, level: 4 } } }, bad: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "good", x: 2, y: 3 }, { id: "bad", x: 2, y: " " }],
+    rsp: null,
+  });
+  check("7r. Whitespace-only y rejected", wsYResult.seats.length === 1 && wsYResult.seats[0].id === "good");
+
+  // 7s. Empty nested position value rejected
+  const nestedEmptyResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { good: { rp22: { 4: { valueDb: 1, level: 4 } } }, bad: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "good", x: 2, y: 3 }, { id: "bad", position: { x: "", y: "" } }],
+    rsp: null,
+  });
+  check("7s. Empty nested position rejected", nestedEmptyResult.seats.length === 1 && nestedEmptyResult.seats[0].id === "good");
+
+  // 7t. Genuine numeric zero remains valid
+  const zeroResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 0, y: 0 }],
+    rsp: null,
+  });
+  check("7t. Genuine zero x/y accepted", zeroResult.seats.length === 1 && zeroResult.seats[0].x === 0 && zeroResult.seats[0].y === 0);
+
+  // 7u. Non-numeric string rejected
+  const nonNumResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { good: { rp22: { 4: { valueDb: 1, level: 4 } } }, bad: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "good", x: 2, y: 3 }, { id: "bad", x: "abc", y: 3 }],
+    rsp: null,
+  });
+  check("7u. Non-numeric string x rejected", nonNumResult.seats.length === 1 && nonNumResult.seats[0].id === "good");
+
+  // 7v. Infinity rejected
+  const infResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { good: { rp22: { 4: { valueDb: 1, level: 4 } } }, bad: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "good", x: 2, y: 3 }, { id: "bad", x: Infinity, y: 3 }, { id: "bad2", x: -Infinity, y: 3 }],
+    rsp: null,
+  });
+  check("7v. Infinity/-Infinity rejected", infResult.seats.length === 1 && infResult.seats[0].id === "good");
+
+  // 7w. RSP with empty-string coordinates rejected (no rsp point)
+  const rspEmptyResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: { x: "", y: 3 },
+  });
+  check("7w. RSP empty-string x → rsp null", rspEmptyResult.rsp === null);
+
+  // 7x. RSP with whitespace coordinates rejected
+  const rspWsResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: { x: "  ", y: 3 },
+  });
+  check("7x. RSP whitespace x → rsp null", rspWsResult.rsp === null);
+
+  // 7y. RSP with genuine zero accepted
+  const rspZeroResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: { x: 0, y: 0 },
+  });
+  check("7y. RSP genuine zero accepted", rspZeroResult.rsp !== null && rspZeroResult.rsp.x === 0 && rspZeroResult.rsp.y === 0);
+
+  // 7z. Page omitted only when no real seat has valid P4, P6 or P10
+  const allBadResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { value: null, level: "—" }, 6: { value: null, level: "N/A" }, 10: { value: null, level: "—" } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7z. Page omitted when all layers unavailable", !allBadResult.hasAnyValid);
+
+  // 7z1. Page NOT omitted when at least one layer valid
+  const oneValidResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { s: { rp22: { 4: { value: null, level: "—" }, 6: { value: null, level: "N/A" }, 10: { value: 45, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "s", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7z1. Page not omitted when one layer valid", oneValidResult.hasAnyValid);
+
   return { ran: true, results };
 }

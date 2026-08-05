@@ -7,10 +7,10 @@
  * Renders a plan-view SVG showing:
  *   - room outline
  *   - screen position and orientation (same authority as P5 / seating pages)
- *   - all valid real-seat positions with a compact fixed-order result group
- *     (Screen → Surround → Overhead) at each seat
+ *   - all valid real-seat positions with a compact fixed-order L-level badge
+ *     row (Screen → Surround → Overhead) at each seat
  *   - effective RSP highlighted as a reference marker only (no result badges)
- *   - one restrained legend
+ *   - one restrained legend with explicit three-position example + level key
  *
  * Works for both screen (card) and print (plain) contexts via the `print` prop.
  * Screen and PDF use the same filtered authority — this is the single shared
@@ -19,24 +19,27 @@
 
 import React from "react";
 
-// ── L-level colour palette (matches existing Visual Report pages) ───────────
-const LEVEL_COLORS = {
-  4: "#213428", "L4": "#213428",
-  3: "#3E4349", "L3": "#3E4349",
-  2: "#625143", "L2": "#625143",
-  1: "#4A230F", "L1": "#4A230F",
+// ── L-level badge styles (text + fill + border, readable without colour) ──
+const LEVEL_STYLES = {
+  4: { fill: "#213428", textColor: "#FFFFFF", borderColor: "#213428", label: "L4" },
+  3: { fill: "#3E4349", textColor: "#FFFFFF", borderColor: "#3E4349", label: "L3" },
+  2: { fill: "#F8F8F7", textColor: "#625143", borderColor: "#625143", label: "L2" },
+  1: { fill: "#F8F8F7", textColor: "#4A230F", borderColor: "#4A230F", label: "L1" },
 };
 
-function levelColor(level) {
-  if (level === null || level === undefined) return "#C1B6AD";
-  const key = typeof level === "number" ? level : String(level).trim().toUpperCase();
-  return LEVEL_COLORS[key] || "#C1B6AD";
+function levelStyle(level) {
+  if (level === null || level === undefined) return null;
+  const key = typeof level === "number" ? level : parseInt(String(level).replace(/[^0-9]/g, ""), 10);
+  if (!Number.isFinite(key) || key < 1 || key > 4) return null;
+  return LEVEL_STYLES[key];
 }
 
-// Marker geometry — fixed offsets from seat centre
-const MARKER_R = 5;
-const MARKER_DX = 12;
-const MARKER_DY = 18;
+// Badge geometry — fixed offsets from seat centre
+const BADGE_W = 28;
+const BADGE_H = 18;
+const BADGE_RX = 4;
+const BADGE_DX = 32; // horizontal spacing between badge centres
+const BADGE_DY = 22; // vertical offset from seat centre to badge centre
 
 export default function ClientSpeakerBalance({
   roomDims,
@@ -85,7 +88,7 @@ export default function ClientSpeakerBalance({
   if (!seats || seats.length === 0 || (!hasValidP4 && !hasValidP6 && !hasValidP10)) return null;
 
   const containerStyle = print
-    ? { display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "16px 40px" }
+    ? { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "8px 16px", width: "100%", height: "100%" }
     : {
         display: "flex",
         flexDirection: "column",
@@ -98,6 +101,39 @@ export default function ClientSpeakerBalance({
         boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       };
+
+  // Badge renderer — renders a rounded rect with L-level text
+  const renderBadge = (cx, cy, level) => {
+    const ls = levelStyle(level);
+    if (!ls) return null;
+    return (
+      <g>
+        <rect
+          x={cx - BADGE_W / 2}
+          y={cy - BADGE_H / 2}
+          width={BADGE_W}
+          height={BADGE_H}
+          rx={BADGE_RX}
+          ry={BADGE_RX}
+          fill={ls.fill}
+          stroke={ls.borderColor}
+          strokeWidth={1.5}
+        />
+        <text
+          x={cx}
+          y={cy + 1}
+          fill={ls.textColor}
+          fontSize={11}
+          fontWeight={700}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontFamily="Futura PT Light, Century Gothic, sans-serif"
+        >
+          {ls.label}
+        </text>
+      </g>
+    );
+  };
 
   return (
     <div style={containerStyle}>
@@ -146,8 +182,8 @@ export default function ClientSpeakerBalance({
         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
         className="client-report-print-svg"
         style={print
-          ? { width: "100%", height: "100%", maxHeight: "none" }
-          : { width: "100%", maxWidth: 600, height: "auto" }
+          ? { width: "100%", height: "100%", maxHeight: "none", display: "block" }
+          : { width: "100%", maxWidth: 760, height: "auto" }
         }
       >
         {/* Room outline */}
@@ -182,12 +218,13 @@ export default function ClientSpeakerBalance({
           SCREEN
         </text>
 
-        {/* Seats with compact fixed-order result markers */}
+        {/* Seats with compact fixed-order L-level badges */}
         {seats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
+          const badgeY = sp.py + BADGE_DY;
           return (
             <g key={seat.id}>
-              {/* Seat circle */}
+              {/* Seat circle — visually separate above badge row */}
               <circle
                 cx={sp.px}
                 cy={sp.py}
@@ -196,37 +233,11 @@ export default function ClientSpeakerBalance({
                 stroke="#F8F8F7"
                 strokeWidth={1.5}
               />
-              {/* Result markers — fixed order: Screen (P4), Surround (P6), Overhead (P10) */}
-              {seat.p4 && (
-                <circle
-                  cx={sp.px - MARKER_DX}
-                  cy={sp.py + MARKER_DY}
-                  r={MARKER_R}
-                  fill={levelColor(seat.p4.level)}
-                  stroke="#F8F8F7"
-                  strokeWidth={1}
-                />
-              )}
-              {seat.p6 && (
-                <circle
-                  cx={sp.px}
-                  cy={sp.py + MARKER_DY}
-                  r={MARKER_R}
-                  fill={levelColor(seat.p6.level)}
-                  stroke="#F8F8F7"
-                  strokeWidth={1}
-                />
-              )}
-              {seat.p10 && (
-                <circle
-                  cx={sp.px + MARKER_DX}
-                  cy={sp.py + MARKER_DY}
-                  r={MARKER_R}
-                  fill={levelColor(seat.p10.level)}
-                  stroke="#F8F8F7"
-                  strokeWidth={1}
-                />
-              )}
+              {/* L-level badges — fixed three-column order:
+                   Screen (P4) left, Surround (P6) centre, Overhead (P10) right */}
+              {seat.p4 && renderBadge(sp.px - BADGE_DX, badgeY, seat.p4.level)}
+              {seat.p6 && renderBadge(sp.px, badgeY, seat.p6.level)}
+              {seat.p10 && renderBadge(sp.px + BADGE_DX, badgeY, seat.p10.level)}
             </g>
           );
         })}
@@ -252,51 +263,78 @@ export default function ClientSpeakerBalance({
         )}
       </svg>
 
-      {/* ── Legend ── */}
+      {/* ── Legend: explicit three-position example + level key ── */}
       <div style={{
         display: "flex",
-        flexWrap: "wrap",
-        gap: 16,
-        justifyContent: "center",
-        alignItems: "center",
+        flexDirection: "column",
+        gap: 12,
         padding: "12px 16px",
         background: "#F1F0EE",
         borderRadius: 8,
         border: "1px solid #DCDBD6",
-        maxWidth: 600,
+        width: "100%",
+        maxWidth: print ? "100%" : 600,
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
-        {/* Layer order */}
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {hasValidP4 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#625143" }} />
-              <span style={{ fontSize: 12, color: "#625143" }}>Screen</span>
-            </div>
-          )}
-          {hasValidP6 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#625143" }} />
-              <span style={{ fontSize: 12, color: "#625143" }}>Surround</span>
-            </div>
-          )}
-          {hasValidP10 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#625143" }} />
-              <span style={{ fontSize: 12, color: "#625143" }}>Overhead</span>
-            </div>
-          )}
+        {/* Three-position example — reproduces the seat badge layout */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 64 }}>
+            {hasValidP4 ? (
+              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
+                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="#C1B6AD" stroke="#625143" strokeWidth={1.5} />
+                <text x={(BADGE_W + 4) / 2} y={(BADGE_H + 4) / 2 + 1} fill="#625143" fontSize={11} fontWeight={700} textAnchor="middle" dominantBaseline="middle" fontFamily="Futura PT Light, Century Gothic, sans-serif">L·</text>
+              </svg>
+            ) : (
+              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
+                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="none" stroke="#DCDBD6" strokeWidth={1.5} strokeDasharray="3 3" />
+              </svg>
+            )}
+            <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Screen</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 64 }}>
+            {hasValidP6 ? (
+              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
+                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="#C1B6AD" stroke="#625143" strokeWidth={1.5} />
+                <text x={(BADGE_W + 4) / 2} y={(BADGE_H + 4) / 2 + 1} fill="#625143" fontSize={11} fontWeight={700} textAnchor="middle" dominantBaseline="middle" fontFamily="Futura PT Light, Century Gothic, sans-serif">L·</text>
+              </svg>
+            ) : (
+              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
+                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="none" stroke="#DCDBD6" strokeWidth={1.5} strokeDasharray="3 3" />
+              </svg>
+            )}
+            <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Surround</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 64 }}>
+            {hasValidP10 ? (
+              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
+                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="#C1B6AD" stroke="#625143" strokeWidth={1.5} />
+                <text x={(BADGE_W + 4) / 2} y={(BADGE_H + 4) / 2 + 1} fill="#625143" fontSize={11} fontWeight={700} textAnchor="middle" dominantBaseline="middle" fontFamily="Futura PT Light, Century Gothic, sans-serif">L·</text>
+              </svg>
+            ) : (
+              <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
+                <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill="none" stroke="#DCDBD6" strokeWidth={1.5} strokeDasharray="3 3" />
+              </svg>
+            )}
+            <span style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em" }}>Overhead</span>
+          </div>
         </div>
+
         {/* Divider */}
-        <div style={{ width: 1, height: 20, background: "#DCDBD6" }} />
-        {/* Level scale */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[4, 3, 2, 1].map((n) => (
-            <div key={n} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: levelColor(n) }} />
-              <span style={{ fontSize: 11, color: "#625143" }}>L{n}</span>
-            </div>
-          ))}
+        <div style={{ height: 1, background: "#DCDBD6", width: "100%" }} />
+
+        {/* Level key — exact badge treatments used in the plan */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+          {[4, 3, 2, 1].map((n) => {
+            const ls = LEVEL_STYLES[n];
+            return (
+              <div key={n} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                <svg width={BADGE_W + 4} height={BADGE_H + 4} viewBox={`0 0 ${BADGE_W + 4} ${BADGE_H + 4}`}>
+                  <rect x={2} y={2} width={BADGE_W} height={BADGE_H} rx={BADGE_RX} fill={ls.fill} stroke={ls.borderColor} strokeWidth={1.5} />
+                  <text x={(BADGE_W + 4) / 2} y={(BADGE_H + 4) / 2 + 1} fill={ls.textColor} fontSize={11} fontWeight={700} textAnchor="middle" dominantBaseline="middle" fontFamily="Futura PT Light, Century Gothic, sans-serif">{ls.label}</text>
+                </svg>
+              </div>
+            );
+          })}
         </div>
       </div>
 

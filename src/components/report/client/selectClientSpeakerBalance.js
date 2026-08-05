@@ -7,8 +7,10 @@
  * perSeatRp22 structure via selectClientSeatCoverage.
  *
  * Uses original full-precision seatingPositions for drawing geometry.
- * Rejects seats with missing/non-finite original x or y coordinates —
- * malformed seats are NOT coerced to room origin.
+ * Uses a strict coordinate parser that rejects null, undefined, empty
+ * strings, whitespace-only strings, non-numeric strings, NaN, Infinity,
+ * -Infinity, and empty nested position values. Genuine numeric zero is
+ * accepted. Malformed seats are omitted, never drawn at x=0 or y=0.
  *
  * P10 is evaluated independently — not gated by P9 applicability.
  *
@@ -18,6 +20,31 @@
  * @returns {Object} { seats, rsp, hasAnyValid, hasValidP4, hasValidP6, hasValidP10 }
  */
 import { selectClientSeatCoverage } from "./selectClientSeatCoverage";
+
+/**
+ * Strict coordinate parser.
+ *
+ * Rejects: null, undefined, empty string, whitespace-only string,
+ *   non-numeric string, NaN, Infinity, -Infinity, empty nested values.
+ * Accepts: genuine numeric zero (0, "0", 0.0).
+ *
+ * @returns {number|null} finite number or null if invalid
+ */
+function strictCoord(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) return null;
+    return n;
+  }
+  return null;
+}
 
 function isValidLevel(level) {
   if (level === null || level === undefined) return false;
@@ -40,12 +67,12 @@ export function selectClientSpeakerBalance({ analysisResult, seatingPositions, r
 
   if (!analysisResult || !Array.isArray(seatingPositions)) return empty;
 
-  // Filter seats with valid original coordinates — reject non-finite, do not coerce to zero
+  // Filter seats with valid original coordinates using strict parser
   const validSeats = seatingPositions.filter((s) => {
     if (!s || s.id == null) return false;
-    const x = Number(s.x ?? s.position?.x);
-    const y = Number(s.y ?? s.position?.y);
-    return Number.isFinite(x) && Number.isFinite(y);
+    const x = strictCoord(s.x ?? s.position?.x);
+    const y = strictCoord(s.y ?? s.position?.y);
+    return x !== null && y !== null;
   });
 
   // Get normalised P4/P6/P10 from the canonical selector
@@ -54,8 +81,8 @@ export function selectClientSpeakerBalance({ analysisResult, seatingPositions, r
   // Map to drawing entries using original full-precision coordinates
   const seats = coverage.map((entry) => {
     const originalSeat = validSeats.find((s) => s.id === entry.seatId);
-    const x = Number(originalSeat.x ?? originalSeat.position?.x);
-    const y = Number(originalSeat.y ?? originalSeat.position?.y);
+    const x = strictCoord(originalSeat.x ?? originalSeat.position?.x);
+    const y = strictCoord(originalSeat.y ?? originalSeat.position?.y);
 
     return {
       id: entry.seatId,
@@ -75,9 +102,9 @@ export function selectClientSpeakerBalance({ analysisResult, seatingPositions, r
   // RSP as reference marker only — no result badges
   let rspPoint = null;
   if (rsp) {
-    const rx = Number(rsp.x);
-    const ry = Number(rsp.y);
-    if (Number.isFinite(rx) && Number.isFinite(ry)) {
+    const rx = strictCoord(rsp.x);
+    const ry = strictCoord(rsp.y);
+    if (rx !== null && ry !== null) {
       rspPoint = { x: rx, y: ry };
     }
   }
