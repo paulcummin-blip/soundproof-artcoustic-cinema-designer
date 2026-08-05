@@ -23,6 +23,8 @@ import { useClientReportPdfExport } from "@/components/report/client/useClientRe
 import { selectClientDesignHighlights } from "@/components/report/client/selectClientDesignHighlights";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
+import ClientSpeakerBalance from "@/components/report/client/ClientSpeakerBalance";
+import { selectClientSpeakerBalance } from "@/components/report/client/selectClientSpeakerBalance";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -70,6 +72,18 @@ export default function RP22ClientReport() {
       placedSpeakers,
     });
   }, [hydrating, analysisResult, bassPresentation, p5Snapshot, p9Snapshot, placedSpeakers]);
+
+  // ── Speaker balance across the seats (pure selector, no new analysis) ──
+  const speakerBalance = useMemo(() => {
+    if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
+      return { seats: [], rsp: null, hasAnyValid: false, hasValidP4: false, hasValidP6: false, hasValidP10: false };
+    }
+    return selectClientSpeakerBalance({
+      analysisResult,
+      seatingPositions,
+      rsp,
+    });
+  }, [hydrating, analysisResult, seatingPositions, rsp]);
 
   // ── Recommended seating position availability ──
   const hasSeatingPosition = useMemo(() => {
@@ -119,6 +133,36 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Speaker Balance Across the Seats (after P9 when P9 exists, otherwise after P5;
+    // before Design Highlights and Recommended Seating Position)
+    if (speakerBalance.hasAnyValid) {
+      pages.push({
+        id: "speaker-balance",
+        visual: (
+          <ClientSpeakerBalance
+            roomDims={roomDims}
+            seats={speakerBalance.seats}
+            rsp={speakerBalance.rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            hasValidP4={speakerBalance.hasValidP4}
+            hasValidP6={speakerBalance.hasValidP6}
+            hasValidP10={speakerBalance.hasValidP10}
+          />
+        ),
+        printData: {
+          type: "speaker-balance",
+          roomDims,
+          seats: speakerBalance.seats,
+          rsp: speakerBalance.rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+          hasValidP4: speakerBalance.hasValidP4,
+          hasValidP6: speakerBalance.hasValidP6,
+          hasValidP10: speakerBalance.hasValidP10,
+        },
+      });
+    }
     // Design Highlights (only when supported highlights exist)
     if (highlights.length > 0) {
       pages.push({
@@ -160,7 +204,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, highlights, hasSeatingPosition, roomDims, seatingPositions, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
+  }, [p5Snapshot, p9Snapshot, speakerBalance, highlights, hasSeatingPosition, roomDims, seatingPositions, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,

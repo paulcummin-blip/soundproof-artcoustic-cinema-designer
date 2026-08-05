@@ -16,6 +16,7 @@ import { selectClientDynamics } from "./selectClientDynamics";
 import { selectClientBass } from "./selectClientBass";
 import { selectClientParameterResults } from "./selectClientParameterResults";
 import { selectClientDesignHighlights } from "./selectClientDesignHighlights";
+import { selectClientSpeakerBalance } from "./selectClientSpeakerBalance";
 import { assertPillarGroupingComplete } from "./rp22PillarGrouping";
 
 const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV;
@@ -347,6 +348,136 @@ export function runClientReportSelectorAssertions() {
     placedSpeakers: [{ role: "L" }],
   });
   check("6q. Immersive overhead suppressed when no overhead speakers", !noOverheads.some((h) => h.id === "immersive-overhead"));
+
+  // 7. Speaker Balance selector (Stage C2)
+  const emptyBalance = selectClientSpeakerBalance({});
+  check("7a. Missing authority returns empty seats", emptyBalance.seats.length === 0 && !emptyBalance.hasAnyValid);
+
+  // 7b. Real-seat P4/P6/P10 from perSeatRp22 via selectClientSeatCoverage
+  const balanceSeats = [
+    { id: "seat-a", x: 1.5, y: 3.0, z: 1.2 },
+    { id: "seat-b", x: 3.0, y: 3.0, z: 1.2 },
+  ];
+  const balanceAnalysis = {
+    perSeatRp22: {
+      "seat-a": { rp22: { 4: { valueDb: 2.0, level: 3, formatted: "2 dB" }, 6: { valueDb: 4.0, level: 1, formatted: "4 dB" }, 10: { value: 55, level: 1, formatted: "55°" } } },
+      "seat-b": { rp22: { 4: { valueDb: 1.5, level: 4, formatted: "1.5 dB" }, 6: { valueDb: 3.0, level: 3, formatted: "3 dB" }, 10: { value: 45, level: 3, formatted: "45°" } } },
+    },
+    gradedParameters: { primary: {} },
+  };
+  const balanceResult = selectClientSpeakerBalance({
+    analysisResult: balanceAnalysis,
+    seatingPositions: balanceSeats,
+    rsp: { x: 2.25, y: 3.0 },
+  });
+  check("7b. Two seats mapped with valid P4/P6/P10", balanceResult.seats.length === 2);
+  check("7b1. Seat-a P4 level 3", balanceResult.seats[0].p4?.level === 3);
+  check("7b2. Seat-a P6 level 1", balanceResult.seats[0].p6?.level === 1);
+  check("7b3. Seat-a P10 level 1", balanceResult.seats[0].p10?.level === 1);
+  check("7b4. Seat-b P4 level 4", balanceResult.seats[1].p4?.level === 4);
+  check("7b5. Seat-b P6 level 3", balanceResult.seats[1].p6?.level === 3);
+  check("7b6. Seat-b P10 level 3", balanceResult.seats[1].p10?.level === 3);
+  check("7b7. hasValidP4/P6/P10 all true", balanceResult.hasValidP4 && balanceResult.hasValidP6 && balanceResult.hasValidP10);
+  check("7b8. hasAnyValid true", balanceResult.hasAnyValid);
+
+  // 7c. Synthetic mlp not shown as result-bearing seat
+  const mlpOnlyResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { mlp: { rp22: { 4: { valueDb: 1, level: 4 }, 6: { valueDb: 2, level: 4 }, 10: { value: 40, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [],
+    rsp: { x: 2, y: 3 },
+  });
+  check("7c. Synthetic mlp not in seats", mlpOnlyResult.seats.length === 0 && !mlpOnlyResult.hasAnyValid);
+
+  // 7d. RSP shown as reference marker only
+  check("7d. RSP returned as reference point", balanceResult.rsp !== null && balanceResult.rsp.x === 2.25 && balanceResult.rsp.y === 3.0);
+
+  // 7e. Invalid original seat coordinates rejected, not coerced to zero
+  const badCoordResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { good: { rp22: { 4: { valueDb: 1, level: 4 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [
+      { id: "good", x: 2, y: 3 },
+      { id: "bad-x", x: NaN, y: 3 },
+      { id: "bad-y", x: 2, y: undefined },
+      { id: "missing-x", y: 3 },
+    ],
+    rsp: null,
+  });
+  check("7e. Invalid coordinates rejected", badCoordResult.seats.length === 1 && badCoordResult.seats[0].id === "good");
+
+  // 7f. P10 N/A objects do not create markers
+  const p10NaResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { "seat-x": { rp22: { 4: { valueDb: 1, level: 4 }, 6: { valueDb: 2, level: 3 }, 10: { value: null, level: "—", formatted: "N/A (insufficient data)" } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "seat-x", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7f. P10 N/A does not create marker", p10NaResult.seats[0]?.p10 === null);
+  check("7f1. P10 N/A does not affect P4/P6", p10NaResult.seats[0]?.p4 !== null && p10NaResult.seats[0]?.p6 !== null);
+  check("7f2. hasValidP10 false", !p10NaResult.hasValidP10);
+  check("7f3. hasValidP4/P6 still true", p10NaResult.hasValidP4 && p10NaResult.hasValidP6);
+
+  // 7g. P10 does not depend on P9 applicability
+  const noP9Result = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { "seat-z": { rp22: { 4: { valueDb: 1, level: 4 }, 10: { value: 50, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "seat-z", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7g. P10 valid without P9 data", noP9Result.seats[0]?.p10 !== null && noP9Result.hasValidP10);
+
+  // 7h. Partial-layer projects show only available layers
+  const partialResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { "seat-p": { rp22: { 4: { valueDb: 1, level: 4 }, 10: { value: 50, level: 3 } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "seat-p", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7h. Partial: P4 present, P6 absent", partialResult.seats[0]?.p4 !== null && partialResult.seats[0]?.p6 === null);
+  check("7h1. Partial: P10 present", partialResult.seats[0]?.p10 !== null);
+  check("7h2. Partial: hasValidP6 false", !partialResult.hasValidP6);
+  check("7h3. Partial: hasAnyValid true", partialResult.hasAnyValid);
+
+  // 7i. Page omitted when all three layers unavailable
+  const allUnavailableResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { "seat-u": { rp22: { 4: { value: null, level: "—" }, 6: { value: null, level: "N/A" }, 10: { value: null, level: "—" } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "seat-u", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7i. All unavailable: hasAnyValid false", !allUnavailableResult.hasAnyValid);
+  check("7i1. All unavailable: all markers null", allUnavailableResult.seats[0]?.p4 === null && allUnavailableResult.seats[0]?.p6 === null && allUnavailableResult.seats[0]?.p10 === null);
+
+  // 7j. Current project parity — P4 L3/L4/L4/L3, P6 L1/L3/L3/L1, P10 L1/L3/L3/L1
+  const projectSeats = [
+    { id: "s1", x: 1, y: 2 },
+    { id: "s2", x: 2, y: 2 },
+    { id: "s3", x: 3, y: 2 },
+    { id: "s4", x: 4, y: 2 },
+  ];
+  const projectAnalysis = {
+    perSeatRp22: {
+      s1: { rp22: { 4: { valueDb: 3, level: 3 }, 6: { valueDb: 6, level: 1 }, 10: { value: 60, level: 1 } } },
+      s2: { rp22: { 4: { valueDb: 2, level: 4 }, 6: { valueDb: 4, level: 3 }, 10: { value: 50, level: 3 } } },
+      s3: { rp22: { 4: { valueDb: 2, level: 4 }, 6: { valueDb: 4, level: 3 }, 10: { value: 50, level: 3 } } },
+      s4: { rp22: { 4: { valueDb: 3, level: 3 }, 6: { valueDb: 6, level: 1 }, 10: { value: 60, level: 1 } } },
+    },
+    gradedParameters: { primary: {} },
+  };
+  const projectResult = selectClientSpeakerBalance({
+    analysisResult: projectAnalysis,
+    seatingPositions: projectSeats,
+    rsp: { x: 2.5, y: 2 },
+  });
+  const p4Levels = projectResult.seats.map((s) => s.p4?.level);
+  const p6Levels = projectResult.seats.map((s) => s.p6?.level);
+  const p10Levels = projectResult.seats.map((s) => s.p10?.level);
+  check("7j. P4 levels L3/L4/L4/L3", p4Levels.join("/") === "3/4/4/3");
+  check("7j1. P6 levels L1/L3/L3/L1", p6Levels.join("/") === "1/3/3/1");
+  check("7j2. P10 levels L1/L3/L3/L1", p10Levels.join("/") === "1/3/3/1");
+
+  // 7k. Status no_data does not create marker
+  const noDataResult = selectClientSpeakerBalance({
+    analysisResult: { perSeatRp22: { "seat-nd": { rp22: { 4: { valueDb: null, level: null, formatted: null } } } }, gradedParameters: { primary: {} } },
+    seatingPositions: [{ id: "seat-nd", x: 2, y: 3 }],
+    rsp: null,
+  });
+  check("7k. Status no_data does not create P4 marker", noDataResult.seats[0]?.p4 === null);
 
   return { ran: true, results };
 }

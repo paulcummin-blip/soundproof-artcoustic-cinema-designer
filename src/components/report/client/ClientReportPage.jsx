@@ -16,6 +16,7 @@ import PrintP5Content from "@/components/report/client/print/PrintP5Content";
 import PrintP9Content from "@/components/report/client/print/PrintP9Content";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
+import ClientSpeakerBalance from "@/components/report/client/ClientSpeakerBalance";
 
 export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {
   const projectName = projectDetails?.name || "Untitled";
@@ -83,6 +84,35 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             </div>
             <div className="client-report-print-drawing" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
               <ClientDesignHighlights highlights={printData.highlights} print />
+            </div>
+          </>
+        )}
+        {printData?.type === "speaker-balance" && (
+          <>
+            <div className="client-report-print-heading">
+              <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
+              <p className="client-report-print-heading__subtitle">RP22 Parameters 4, 6 & 10 — Speaker Balance Across the Seats</p>
+            </div>
+            <div className="client-report-print-drawing">
+              <ClientSpeakerBalance
+                roomDims={printData.roomDims}
+                seats={printData.seats}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                hasValidP4={printData.hasValidP4}
+                hasValidP6={printData.hasValidP6}
+                hasValidP10={printData.hasValidP10}
+                print
+              />
+            </div>
+            <div className="client-report-print-result">
+              <div className="client-report-print-result__content">
+                <div className="client-report-print-result__label">Speaker Balance Across the Seats</div>
+                <div className="client-report-print-result__explanation">
+                  The loudspeaker system is designed to keep dialogue, surround effects and overhead sound appropriately balanced across the seating area.
+                </div>
+              </div>
             </div>
           </>
         )}
