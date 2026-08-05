@@ -97,6 +97,43 @@ export default function ClientRecommendedSeatingPosition({
 
   return (
     <div style={containerStyle}>
+      {/* ── Heading hierarchy: Category → Parameter reference ── */}
+      <div style={{ width: "100%", marginBottom: 16 }}>
+        <h1 style={{
+          margin: 0,
+          fontSize: 34,
+          fontWeight: 300,
+          color: "#213428",
+          letterSpacing: "0.01em",
+          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+          textAlign: "center",
+        }}>
+          Spatial Resolution
+        </h1>
+        <p style={{
+          margin: "6px 0 0 0",
+          fontSize: 12,
+          color: "#625143",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          textAlign: "center",
+          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+        }}>
+          RP22 Parameter 1 — Seating position and wall clearance
+        </p>
+      </div>
+
+      {/* ── Descriptive title ── */}
+      <div style={{
+        fontSize: 18,
+        fontWeight: 600,
+        color: "#213428",
+        marginBottom: 8,
+        fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+      }}>
+        Recommended Seating Position
+      </div>
+
       <svg
         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
         className="client-report-print-svg"

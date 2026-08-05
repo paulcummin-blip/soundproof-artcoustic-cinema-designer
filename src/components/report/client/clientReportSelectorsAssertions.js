@@ -112,7 +112,7 @@ export function runClientReportSelectorAssertions() {
   check("6a. Missing authority returns empty highlights", Array.isArray(emptyHighlights) && emptyHighlights.length === 0);
 
   const mockHighlightsAnalysis = {
-    gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" } } },
+    gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" }, 13: { level: "L3" } } },
   };
   const mockHighlightsBass = {
     publicationVerified: true,
@@ -128,29 +128,62 @@ export function runClientReportSelectorAssertions() {
     p9Snapshot: mockP9,
     placedSpeakers: mockSpeakers,
   });
-  check("6b. All four highlights present when passing", highlightsResult.length === 4);
-  check("6c. Clear dialogue highlight present", highlightsResult.some((h) => h.id === "clear-dialogue"));
+  check("6b. All five highlights present when passing", highlightsResult.length === 5);
+  check("6c. Clear dialogue highlight present (P3 & P4 only)", highlightsResult.some((h) => h.id === "clear-dialogue"));
   check("6d. Consistent bass highlight present", highlightsResult.some((h) => h.id === "consistent-bass"));
+  check("6e. Clean cinema peaks highlight present (P12 & P13)", highlightsResult.some((h) => h.id === "clean-cinema-peaks"));
 
-  // 6e. Omit when L1
-  const failHighlights = selectClientDesignHighlights({
-    analysisResult: { gradedParameters: { primary: { 3: { level: "L1" }, 4: { level: "L2" }, 12: { level: "L4" } } } },
+  // 6f. Category ownership — each highlight has a valid category matching its parameters
+  const catMap = {
+    "clear-dialogue": "Spatial Resolution",
+    "smooth-surround": "Spatial Resolution",
+    "immersive-overhead": "Spatial Resolution",
+    "clean-cinema-peaks": "Dynamic Range",
+    "consistent-bass": "Timbre Matching",
+  };
+  const allCatsCorrect = highlightsResult.every((h) => h.category === catMap[h.id]);
+  check("6f. Category ownership correct per highlight", allCatsCorrect);
+
+  // 6g. P12 no longer used to qualify clear-dialogue — P3 L1 but P12 L4 should still omit
+  const p12OnlyFail = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L1" }, 4: { level: "L2" }, 12: { level: "L4" }, 13: { level: "L3" } } } },
     bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
     p5Snapshot: { level: "L2" },
     p9Snapshot: { applicable: true, level: "L3" },
     placedSpeakers: [{ role: "TFL" }],
   });
-  check("6e. Clear dialogue omitted when P3 is L1", !failHighlights.some((h) => h.id === "clear-dialogue"));
+  check("6g. Clear dialogue omitted when P3 is L1 (P12 does not qualify it)", !p12OnlyFail.some((h) => h.id === "clear-dialogue"));
 
-  // 6f. Omit bass when not verified
+  // 6h. Clean cinema peaks omitted when P13 is L1 (both P12 & P13 required)
+  const p13Fail = selectClientDesignHighlights({
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" }, 13: { level: "L1" } } } },
+    bassPresentation: { publicationVerified: true, parameters: { p20: { level: "L3" } } },
+    p5Snapshot: { level: "L2" },
+    p9Snapshot: { applicable: true, level: "L3" },
+    placedSpeakers: [{ role: "TFL" }],
+  });
+  check("6h. Clean cinema peaks omitted when P13 is L1", !p13Fail.some((h) => h.id === "clean-cinema-peaks"));
+
+  // 6i. Consistent bass omitted when not verified
   const unverifiedBass = selectClientDesignHighlights({
-    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" } } } },
+    analysisResult: { gradedParameters: { primary: { 3: { level: "L3" }, 4: { level: "L2" }, 12: { level: "L4" }, 13: { level: "L3" } } } },
     bassPresentation: { publicationVerified: false, parameters: { p20: { level: "L3" } } },
     p5Snapshot: { level: "L2" },
     p9Snapshot: { applicable: true, level: "L3" },
     placedSpeakers: [{ role: "TFL" }],
   });
-  check("6f. Consistent bass omitted when not verified", !unverifiedBass.some((h) => h.id === "consistent-bass"));
+  check("6i. Consistent bass omitted when not verified", !unverifiedBass.some((h) => h.id === "consistent-bass"));
+
+  // 6j. No cross-category parameter combinations — paramRef stays within one category
+  const noCrossCategory = highlightsResult.every((h) => {
+    const ref = String(h.paramRef || "");
+    const cat = h.category;
+    if (cat === "Spatial Resolution") return !ref.includes("12") && !ref.includes("13") && !ref.includes("20");
+    if (cat === "Dynamic Range") return ref.includes("12") || ref.includes("13");
+    if (cat === "Timbre Matching") return ref.includes("20");
+    return false;
+  });
+  check("6j. No cross-category parameter combinations", noCrossCategory);
 
   return { ran: true, results };
 }

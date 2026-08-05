@@ -78,7 +78,9 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         )}
         {printData?.type === "highlights" && (
           <>
-            <div className="client-report-print-heading">Design Highlights</div>
+            <div className="client-report-print-heading">
+              <h1 className="client-report-print-heading__title">Design Highlights</h1>
+            </div>
             <div className="client-report-print-drawing" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
               <ClientDesignHighlights highlights={printData.highlights} print />
             </div>
@@ -86,7 +88,10 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         )}
         {printData?.type === "seating-position" && (
           <>
-            <div className="client-report-print-heading">Recommended Seating Position</div>
+            <div className="client-report-print-heading">
+              <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
+              <p className="client-report-print-heading__subtitle">RP22 Parameter 1 — Seating position and wall clearance</p>
+            </div>
             <div className="client-report-print-drawing">
               <ClientRecommendedSeatingPosition
                 roomDims={printData.roomDims}
@@ -101,6 +106,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             </div>
             <div className="client-report-print-result">
               <div className="client-report-print-result__content">
+                <div className="client-report-print-result__label">Recommended Seating Position</div>
                 <div className="client-report-print-result__explanation">
                   The highlighted reference position is the point used to align the cinema's speaker and listening geometry.
                 </div>
