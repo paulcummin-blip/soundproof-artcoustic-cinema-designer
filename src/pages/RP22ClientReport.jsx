@@ -55,6 +55,13 @@ export default function RP22ClientReport() {
             screenFrontPlaneM={screenFrontPlaneM}
           />
         ),
+        printData: {
+          type: "p5",
+          p5Snapshot,
+          roomDims,
+          screen,
+          screenFrontPlaneM,
+        },
       });
     }
     // P9 only when an actual overhead visual exists (not the no-overhead empty-state)
@@ -67,6 +74,11 @@ export default function RP22ClientReport() {
             roomDims={roomDims}
           />
         ),
+        printData: {
+          type: "p9",
+          p9Snapshot,
+          roomDims,
+        },
       });
     }
     return pages;
@@ -227,6 +239,7 @@ export default function RP22ClientReport() {
               isLast={i === activePages.length - 1}
               projectDetails={projectDetails}
               logoUrl={LOGO_URL}
+              printData={page.printData}
             >
               {page.visual}
             </ClientReportPage>

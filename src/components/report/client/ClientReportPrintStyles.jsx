@@ -3,16 +3,20 @@
  * -----------------------
  * Scoped print styles for the Client Visual Report PDF export.
  *
- * Does NOT import or reuse ReportPrintStyles unchanged — the Client PDF
- * needs its own header, so broad selectors like
- * `header { display: none; }` and `footer { display: none; }` are avoided.
+ * The print layout uses three explicit document regions per page:
+ *   1. Header  (page 1 only — logo, title, project meta)
+ *   2. Drawing (heading + SVG — SVG scales via CSS to fill the region)
+ *   3. Result  (level badge, label, explanation, supporting text)
+ *
+ * The SVG is the primary scaling authority. It scales via CSS
+ * (width:100%; height:100%; preserveAspectRatio) to fill the drawing
+ * region — no JS transform on the whole card.
  *
  * Uses scoped classes:
  *   client-report-screen-only  — visible on screen, hidden in print
  *   client-report-print-only   — hidden on screen, visible in print
- *   client-report-print-root   — print container
  *   client-report-page         — one A4 page wrapper
- *   client-report-page__header / __visual
+ *   client-report-page__header / __screen-visual / __print-content
  */
 
 import React from "react";
@@ -64,7 +68,7 @@ export default function ClientReportPrintStyles() {
         min-height: 271mm !important;
         box-sizing: border-box !important;
         display: grid !important;
-        grid-template-rows: auto minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
         break-inside: avoid !important;
         page-break-inside: avoid !important;
         page-break-after: always;
@@ -79,6 +83,7 @@ export default function ClientReportPrintStyles() {
         break-after: auto !important;
       }
 
+      /* ── Header (first page only) ── */
       body.client-report-printing .client-report-page__header {
         grid-row: 1;
         align-self: start;
@@ -117,44 +122,114 @@ export default function ClientReportPrintStyles() {
         white-space: nowrap;
       }
 
-      body.client-report-printing .client-report-page__visual {
+      /* ── Screen visual — hidden in print ── */
+      body.client-report-printing .client-report-page__screen-visual {
+        display: none !important;
+      }
+
+      /* ── Print content — flex column: heading, drawing, result ── */
+      body.client-report-printing .client-report-page__print-content {
         grid-row: 2;
+        display: flex !important;
+        flex-direction: column;
         min-height: 0;
         width: 100%;
         height: 100%;
+      }
+
+      /* ── Heading region ── */
+      body.client-report-printing .client-report-print-heading {
+        flex-shrink: 0;
+        padding-bottom: 3mm;
+      }
+
+      body.client-report-printing .client-report-print-heading__title {
+        margin: 0;
+        font-size: 24pt;
+        font-weight: 300;
+        color: #213428;
+        letter-spacing: 0.01em;
+        font-family: "Futura PT Light", "Century Gothic", sans-serif;
+      }
+
+      body.client-report-printing .client-report-print-heading__subtitle {
+        margin: 2mm 0 0 0;
+        font-size: 9pt;
+        color: #625143;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-family: "Didact Gothic", "Century Gothic", sans-serif;
+      }
+
+      /* ── Drawing region — fills remaining space, SVG centred ── */
+      body.client-report-printing .client-report-print-drawing {
+        flex: 1;
+        min-height: 0;
         display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        overflow: hidden !important;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+      }
+
+      body.client-report-printing .client-report-print-svg {
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+      }
+
+      /* ── Result region — sits directly beneath the drawing ── */
+      body.client-report-printing .client-report-print-result {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 16px;
+        background: #F1F0EE;
+        border-radius: 8px;
+        border-width: 1px;
+        border-style: solid;
+        margin-top: 3mm;
+        width: 100%;
         box-sizing: border-box;
       }
 
-      /* Page 1 (with header) — small gap below header, card centred in remaining space */
-      body.client-report-printing .client-report-page--first .client-report-page__visual {
-        padding: 3mm 0 0 0;
-      }
-
-      /* Page 2+ (no header) — optical centring, slight upward shift */
-      body.client-report-printing .client-report-page:not(.client-report-page--first) .client-report-page__visual {
-        padding: 0 0 8mm 0;
-      }
-
-      body.client-report-printing .client-report-page__visual-stage {
-        width: var(--client-report-scaled-width, auto);
-        height: var(--client-report-scaled-height, auto);
+      body.client-report-printing .client-report-print-result__badge {
+        width: 40px;
+        height: 40px;
+        border-radius: 6px;
+        border-width: 2px;
+        border-style: solid;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14pt;
+        font-weight: 700;
+        font-family: "Futura PT Light", "Century Gothic", sans-serif;
         flex-shrink: 0;
-        overflow: hidden;
       }
 
-      body.client-report-printing .client-report-page__visual-inner {
-        width: var(--client-report-natural-width, auto);
-        transform: scale(var(--client-report-scale, 1));
-        transform-origin: top left;
+      body.client-report-printing .client-report-print-result__content {
+        flex: 1;
       }
 
-      body.client-report-printing .client-report-page__visual-inner > * {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
+      body.client-report-printing .client-report-print-result__label {
+        font-size: 12pt;
+        font-weight: 600;
+        color: #213428;
+        margin-bottom: 2mm;
+      }
+
+      body.client-report-printing .client-report-print-result__explanation {
+        font-size: 10pt;
+        color: #3E4349;
+        line-height: 1.4;
+        margin-bottom: 2mm;
+      }
+
+      body.client-report-printing .client-report-print-result__supporting {
+        font-size: 9pt;
+        color: #625143;
       }
 
       body.client-report-printing .client-report-page,
@@ -260,7 +335,7 @@ export default function ClientReportPrintStyles() {
           min-height: 271mm !important;
           box-sizing: border-box !important;
           display: grid !important;
-          grid-template-rows: auto minmax(0, 1fr);
+          grid-template-rows: auto 1fr;
           break-inside: avoid !important;
           page-break-inside: avoid !important;
           page-break-after: always;
@@ -275,7 +350,7 @@ export default function ClientReportPrintStyles() {
           break-after: auto !important;
         }
 
-        /* ── Header (first page only) — max ~34mm ── */
+        /* ── Header (first page only) ── */
         .client-report-page__header {
           grid-row: 1;
           align-self: start;
@@ -314,48 +389,114 @@ export default function ClientReportPrintStyles() {
           white-space: nowrap;
         }
 
-        /* ── Visual area — grid row 2, centred ── */
-        .client-report-page__visual {
+        /* ── Screen visual — hidden in print ── */
+        .client-report-page__screen-visual {
+          display: none !important;
+        }
+
+        /* ── Print content — flex column: heading, drawing, result ── */
+        .client-report-page__print-content {
           grid-row: 2;
+          display: flex !important;
+          flex-direction: column;
           min-height: 0;
           width: 100%;
           height: 100%;
+        }
+
+        /* ── Heading region ── */
+        .client-report-print-heading {
+          flex-shrink: 0;
+          padding-bottom: 3mm;
+        }
+
+        .client-report-print-heading__title {
+          margin: 0;
+          font-size: 24pt;
+          font-weight: 300;
+          color: #213428;
+          letter-spacing: 0.01em;
+          font-family: "Futura PT Light", "Century Gothic", sans-serif;
+        }
+
+        .client-report-print-heading__subtitle {
+          margin: 2mm 0 0 0;
+          font-size: 9pt;
+          color: #625143;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          font-family: "Didact Gothic", "Century Gothic", sans-serif;
+        }
+
+        /* ── Drawing region — fills remaining space, SVG centred ── */
+        .client-report-print-drawing {
+          flex: 1;
+          min-height: 0;
           display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          overflow: hidden !important;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+        }
+
+        .client-report-print-svg {
+          width: 100%;
+          height: 100%;
+          max-width: 100%;
+          max-height: 100%;
+        }
+
+        /* ── Result region — sits directly beneath the drawing ── */
+        .client-report-print-result {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 12px 16px;
+          background: #F1F0EE;
+          border-radius: 8px;
+          border-width: 1px;
+          border-style: solid;
+          margin-top: 3mm;
+          width: 100%;
           box-sizing: border-box;
         }
 
-        /* Page 1 (with header) — small gap below header */
-        .client-report-page--first .client-report-page__visual {
-          padding: 3mm 0 0 0;
-        }
-
-        /* Page 2+ (no header) — optical centring, slight upward shift */
-        .client-report-page:not(.client-report-page--first) .client-report-page__visual {
-          padding: 0 0 8mm 0;
-        }
-
-        /* ── Visual stage — sized wrapper, normal flex layout ── */
-        .client-report-page__visual-stage {
-          width: var(--client-report-scaled-width, auto);
-          height: var(--client-report-scaled-height, auto);
+        .client-report-print-result__badge {
+          width: 40px;
+          height: 40px;
+          border-radius: 6px;
+          border-width: 2px;
+          border-style: solid;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14pt;
+          font-weight: 700;
+          font-family: "Futura PT Light", "Century Gothic", sans-serif;
           flex-shrink: 0;
-          overflow: hidden;
         }
 
-        /* ── Visual inner — scaled content, transform-origin top left ── */
-        .client-report-page__visual-inner {
-          width: var(--client-report-natural-width, auto);
-          transform: scale(var(--client-report-scale, 1));
-          transform-origin: top left;
+        .client-report-print-result__content {
+          flex: 1;
         }
 
-        /* Prevent splitting of SVG, heading, status card */
-        .client-report-page__visual-inner > * {
-          break-inside: avoid !important;
-          page-break-inside: avoid !important;
+        .client-report-print-result__label {
+          font-size: 12pt;
+          font-weight: 600;
+          color: #213428;
+          margin-bottom: 2mm;
+        }
+
+        .client-report-print-result__explanation {
+          font-size: 10pt;
+          color: #3E4349;
+          line-height: 1.4;
+          margin-bottom: 2mm;
+        }
+
+        .client-report-print-result__supporting {
+          font-size: 9pt;
+          color: #625143;
         }
 
         /* ── Preserve approved fonts and colours ── */
@@ -364,6 +505,8 @@ export default function ClientReportPrintStyles() {
         }
 
         .client-report-page__header-title,
+        .client-report-print-heading__title,
+        .client-report-print-result__badge,
         h1,
         h2,
         h3 {

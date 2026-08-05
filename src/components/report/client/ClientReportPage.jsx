@@ -6,13 +6,16 @@
  * On screen: transparent container — preserves the existing card appearance
  * with no visible page headers or footers.
  *
- * In print: one A4 portrait page with optional header (first page).
- * The visual is scaled as a single unit and centred.
+ * In print: one A4 portrait page with three explicit document regions —
+ * header (first page), drawing (SVG), and result summary. The SVG is
+ * the primary scaling authority, scaled via CSS to fill the drawing region.
  */
 
 import React from "react";
+import PrintP5Content from "@/components/report/client/print/PrintP5Content";
+import PrintP9Content from "@/components/report/client/print/PrintP9Content";
 
-export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId }) {
+export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {
   const projectName = projectDetails?.name || "Untitled";
   const clientName = projectDetails?.client_name || "";
   const projectId = projectDetails?.id || "";
@@ -50,11 +53,27 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         </div>
       )}
 
-      {/* Visual area — screen + print */}
-      <div className="client-report-page__visual">
-        <div className="client-report-page__visual-stage">
-          <div className="client-report-page__visual-inner">{children}</div>
-        </div>
+      {/* Screen visual — hidden in print */}
+      <div className="client-report-page__screen-visual client-report-screen-only">
+        {children}
+      </div>
+
+      {/* Print content — three document regions: heading, drawing, result */}
+      <div className="client-report-page__print-content client-report-print-only">
+        {printData?.type === "p5" && (
+          <PrintP5Content
+            p5Snapshot={printData.p5Snapshot}
+            roomDims={printData.roomDims}
+            screen={printData.screen}
+            screenFrontPlaneM={printData.screenFrontPlaneM}
+          />
+        )}
+        {printData?.type === "p9" && (
+          <PrintP9Content
+            p9Snapshot={printData.p9Snapshot}
+            roomDims={printData.roomDims}
+          />
+        )}
       </div>
 
     </div>

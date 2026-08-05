@@ -3,20 +3,16 @@
  * ------------------------
  * Export lifecycle hook for the Client Visual Report PDF.
  *
- * Reuses the Technical Report's guarded window.print() pattern:
- *   - exporting state
- *   - readiness checks (document.fonts.ready, logo decode, page measurement)
- *   - two animation frames after applying print state
- *   - temporary print-mode body class
- *   - temporary document.title using the project name
- *   - window.print()
- *   - afterprint cleanup
- *   - timeout fallback cleanup
- *   - restore document.title
- *   - clear print-mode state after completion or cancellation
+ * With the dedicated print composition (three document regions per page),
+ * the SVG scales via CSS to fill the drawing region — no JS transform
+ * or measurement is needed. The hook simply:
+ *   - waits for fonts and logo
+ *   - adds the print-mode body class
+ *   - waits two animation frames for layout to settle
+ *   - calls window.print()
+ *   - cleans up after print
  *
- * Does NOT use html2canvas, jsPDF, raster screenshots, or the SPL Calculator
- * export helper.
+ * Does NOT use html2canvas, jsPDF, raster screenshots, or JS scaling.
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -68,12 +64,6 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
       document.title = originalTitleRef.current;
       originalTitleRef.current = null;
     }
-    document.querySelectorAll(".client-report-page").forEach((page) => {
-      page.style.removeProperty("--client-report-scale");
-      page.style.removeProperty("--client-report-natural-width");
-      page.style.removeProperty("--client-report-scaled-width");
-      page.style.removeProperty("--client-report-scaled-height");
-    });
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
       cleanupTimeoutRef.current = null;
@@ -111,84 +101,24 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
         return;
       }
 
-      // 3. Add print-mode body class so the real print header and page dimensions exist
+      // 3. Add print-mode body class so the print layout and page dimensions exist
       document.body.classList.add("client-report-printing");
 
       // 4. Set temporary document title
       originalTitleRef.current = document.title;
       document.title = `Sound Proof - ${sanitiseProjectName(projectName)} - Client Visual Report`;
 
-      // 5. Temporarily reset every visual to scale 1
-      document.querySelectorAll(".client-report-page").forEach((page) => {
-        page.style.removeProperty("--client-report-scale");
-        page.style.removeProperty("--client-report-natural-width");
-        page.style.removeProperty("--client-report-scaled-width");
-        page.style.removeProperty("--client-report-scaled-height");
-      });
-
-      // 6. Wait two animation frames for print layout to settle
+      // 5. Wait two animation frames for print layout to settle
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(resolve))
       );
 
-      // 7. Measure each page — actual visual slot + natural content size
-      const pages = document.querySelectorAll(".client-report-page");
-      pages.forEach((page) => {
-        const visual = page.querySelector(".client-report-page__visual");
-        const visualInner = page.querySelector(".client-report-page__visual-inner");
-        if (!visual || !visualInner) return;
-        const availRect = visual.getBoundingClientRect();
-        const naturalW = visualInner.scrollWidth;
-        const naturalH = visualInner.scrollHeight;
-        if (availRect.width <= 0 || availRect.height <= 0 || naturalW <= 0 || naturalH <= 0) return;
-        // Measure the actual content area (after CSS padding) for accurate scaling
-        const cs = window.getComputedStyle(visual);
-        const padL = parseFloat(cs.paddingLeft) || 0;
-        const padR = parseFloat(cs.paddingRight) || 0;
-        const padT = parseFloat(cs.paddingTop) || 0;
-        const padB = parseFloat(cs.paddingBottom) || 0;
-        const contentW = availRect.width - padL - padR;
-        const contentH = availRect.height - padT - padB;
-        if (contentW <= 0 || contentH <= 0) return;
-        // Scale to fill the available area — width-first, height constrains, no cap
-        const scale = Math.min(contentW / naturalW, contentH / naturalH);
-        const scaledW = naturalW * scale;
-        const scaledH = naturalH * scale;
-        page.style.setProperty("--client-report-scale", String(scale));
-        page.style.setProperty("--client-report-natural-width", `${naturalW}px`);
-        page.style.setProperty("--client-report-scaled-width", `${scaledW}px`);
-        page.style.setProperty("--client-report-scaled-height", `${scaledH}px`);
-      });
-
-      // 8. Wait two further animation frames for scaled layout to settle
-      await new Promise((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(resolve))
-      );
-
-      // 9. Re-measure and confirm the scaled stage fits inside the visual slot
-      let allFit = true;
-      pages.forEach((page) => {
-        const visual = page.querySelector(".client-report-page__visual");
-        const stage = page.querySelector(".client-report-page__visual-stage");
-        if (!visual || !stage) return;
-        const vRect = visual.getBoundingClientRect();
-        const sRect = stage.getBoundingClientRect();
-        if (sRect.width > vRect.width + 1 || sRect.height > vRect.height + 1) {
-          allFit = false;
-        }
-      });
-      if (!allFit) {
-        setError("PDF preparation failed — visual content could not be fitted to the page. Please try again.");
-        cleanup();
-        return;
-      }
-
-      // 10. Set timeout fallback (in case afterprint doesn't fire)
+      // 6. Set timeout fallback (in case afterprint doesn't fire)
       cleanupTimeoutRef.current = setTimeout(() => {
         cleanup();
       }, PRINT_TIMEOUT_MS);
 
-      // 11. Trigger print
+      // 7. Trigger print
       window.print();
     } catch (err) {
       setError("PDF preparation failed. Please try again.");
