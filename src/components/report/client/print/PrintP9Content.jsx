@@ -286,7 +286,7 @@ export default function PrintP9Content({ p9Snapshot, roomDims }) {
             return (
               <g key={`spk-${i}`}>
                 <circle cx={sp.px} cy={sp.py} r={7} fill={color} stroke="#F8F8F7" strokeWidth={1.5} />
-                <text x={sp.px} y={sp.py - 12} fill={color}
+                <text x={sp.px} y={sp.py - 34} fill={color}
                   fontSize={11} textAnchor="middle"
                   fontFamily="Didact Gothic, Century Gothic, sans-serif" fontWeight={600}>{spk.role}</text>
               </g>
@@ -300,10 +300,10 @@ export default function PrintP9Content({ p9Snapshot, roomDims }) {
             const labelPos = toPx(row.avgY, row.avgZ);
             return (
               <g key={`row-label-${i}`}>
-                <text x={labelPos.px} y={labelPos.py - 22} fill={rowColor}
+                <text x={labelPos.px} y={labelPos.py - 17} fill={rowColor}
                   fontSize={11} textAnchor="middle"
                   fontFamily="Didact Gothic, Century Gothic, sans-serif" fontWeight={600}>{label}</text>
-                <text x={labelPos.px} y={labelPos.py - 10} fill="#625143"
+                <text x={labelPos.px} y={labelPos.py + 20} fill="#625143"
                   fontSize={9} textAnchor="middle"
                   fontFamily="Didact Gothic, Century Gothic, sans-serif">{Math.round(row.elevDeg)}°</text>
               </g>
