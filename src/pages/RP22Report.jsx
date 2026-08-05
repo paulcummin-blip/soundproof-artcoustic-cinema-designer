@@ -44,6 +44,8 @@ import { getP21PresetResult, levelP21_earlyReflections } from '@/components/util
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
+import ClientSpeakerBalance from '@/components/report/client/ClientSpeakerBalance';
+import { selectClientSpeakerBalance } from '@/components/report/client/selectClientSpeakerBalance';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -372,6 +374,18 @@ function RP22ReportInner() {
     }, [effectiveRspY_m, app?.mlpY_m, stableDimensions.width, app?.mlp]);
 
     const primarySeatingPosition = reportMlpAnchorEffective || app?.mlp || null;
+
+    // ── Speaker Balance Across the Seats (canonical P4/P6/P10 per real seat) ──
+    const speakerBalance = React.useMemo(() => {
+        if (!analysisResult || !Array.isArray(seats) || seats.length === 0) {
+            return { seats: [], rsp: null, hasAnyValid: false, hasValidP4: false, hasValidP6: false, hasValidP10: false };
+        }
+        return selectClientSpeakerBalance({
+            analysisResult,
+            seatingPositions: seats,
+            rsp: primarySeatingPosition ? { x: primarySeatingPosition.x, y: primarySeatingPosition.y } : null,
+        });
+    }, [analysisResult, seats, primarySeatingPosition]);
 
     const rspSeatId = React.useMemo(() => {
         const greenDot = primarySeatingPosition;
@@ -1097,6 +1111,22 @@ function RP22ReportInner() {
                         </CardContent>
                     </Card>
 
+                    {/* ── Speaker Balance Across the Seats (final technical content page) ── */}
+                    {speakerBalance.hasAnyValid && (
+                        <div className="max-w-7xl mx-auto" style={{ marginTop: 24 }}>
+                            <ClientSpeakerBalance
+                                roomDims={{ widthM: stableDimensions.width, lengthM: stableDimensions.length }}
+                                seats={speakerBalance.seats}
+                                rsp={speakerBalance.rsp}
+                                screenFrontPlaneM={reportScreenFrontPlaneM}
+                                screenWidthM={reportScreenWidthM}
+                                hasValidP4={speakerBalance.hasValidP4}
+                                hasValidP6={speakerBalance.hasValidP6}
+                                hasValidP10={speakerBalance.hasValidP10}
+                            />
+                        </div>
+                    )}
+
                 </div>
             </div>
 
@@ -1429,6 +1459,24 @@ function RP22ReportInner() {
                             </>
                         )}
 
+                        {/* ── Speaker Balance Across the Seats (final technical content page) ── */}
+                        {speakerBalance.hasAnyValid && (
+                            <section id="pdf-speaker-balance" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                <div className="print-avoid-break">
+                                    <ClientSpeakerBalance
+                                        roomDims={{ widthM: stableDimensions.width, lengthM: stableDimensions.length }}
+                                        seats={speakerBalance.seats}
+                                        rsp={speakerBalance.rsp}
+                                        screenFrontPlaneM={reportScreenFrontPlaneM}
+                                        screenWidthM={reportScreenWidthM}
+                                        hasValidP4={speakerBalance.hasValidP4}
+                                        hasValidP6={speakerBalance.hasValidP6}
+                                        hasValidP10={speakerBalance.hasValidP10}
+                                        print
+                                    />
+                                </div>
+                            </section>
+                        )}
 
                     </div>
                 </div>

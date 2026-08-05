@@ -23,8 +23,8 @@ import { useClientReportPdfExport } from "@/components/report/client/useClientRe
 import { selectClientDesignHighlights } from "@/components/report/client/selectClientDesignHighlights";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
-import ClientSpeakerBalance from "@/components/report/client/ClientSpeakerBalance";
-import { selectClientSpeakerBalance } from "@/components/report/client/selectClientSpeakerBalance";
+import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
+import { selectClientBestListeningArea } from "@/components/report/client/selectClientBestListeningArea";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -73,12 +73,12 @@ export default function RP22ClientReport() {
     });
   }, [hydrating, analysisResult, bassPresentation, p5Snapshot, p9Snapshot, placedSpeakers]);
 
-  // ── Speaker balance across the seats (pure selector, no new analysis) ──
-  const speakerBalance = useMemo(() => {
+  // ── Best Listening Area (pure selector, no new analysis) ──
+  const bestListeningArea = useMemo(() => {
     if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
-      return { seats: [], rsp: null, hasAnyValid: false, hasValidP4: false, hasValidP6: false, hasValidP10: false };
+      return { seats: [], rsp: null, counts: {}, hasAny: false, hasPrimary: false, explanation: "" };
     }
-    return selectClientSpeakerBalance({
+    return selectClientBestListeningArea({
       analysisResult,
       seatingPositions,
       rsp,
@@ -133,33 +133,31 @@ export default function RP22ClientReport() {
         },
       });
     }
-    // Speaker Balance Across the Seats (after P9 when P9 exists, otherwise after P5;
+    // Best Listening Area (after P9 when P9 exists, otherwise after P5;
     // before Design Highlights and Recommended Seating Position)
-    if (speakerBalance.hasAnyValid) {
+    if (bestListeningArea.hasAny) {
       pages.push({
-        id: "speaker-balance",
+        id: "best-listening-area",
         visual: (
-          <ClientSpeakerBalance
+          <ClientBestListeningArea
             roomDims={roomDims}
-            seats={speakerBalance.seats}
-            rsp={speakerBalance.rsp}
+            seats={bestListeningArea.seats}
+            rsp={bestListeningArea.rsp}
             screenFrontPlaneM={screenFrontPlaneM}
             screenWidthM={screenWidthM}
-            hasValidP4={speakerBalance.hasValidP4}
-            hasValidP6={speakerBalance.hasValidP6}
-            hasValidP10={speakerBalance.hasValidP10}
+            counts={bestListeningArea.counts}
+            explanation={bestListeningArea.explanation}
           />
         ),
         printData: {
-          type: "speaker-balance",
+          type: "best-listening-area",
           roomDims,
-          seats: speakerBalance.seats,
-          rsp: speakerBalance.rsp,
+          seats: bestListeningArea.seats,
+          rsp: bestListeningArea.rsp,
           screenFrontPlaneM,
           screenWidthM,
-          hasValidP4: speakerBalance.hasValidP4,
-          hasValidP6: speakerBalance.hasValidP6,
-          hasValidP10: speakerBalance.hasValidP10,
+          counts: bestListeningArea.counts,
+          explanation: bestListeningArea.explanation,
         },
       });
     }
@@ -204,7 +202,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, speakerBalance, highlights, hasSeatingPosition, roomDims, seatingPositions, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
+  }, [p5Snapshot, p9Snapshot, bestListeningArea, highlights, hasSeatingPosition, roomDims, seatingPositions, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,
