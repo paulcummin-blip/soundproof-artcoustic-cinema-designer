@@ -80,6 +80,12 @@ const ROW_LABELS = {
   rear: "45° rear",
 };
 
+const ROW_ROLE_LABELS = {
+  front: "TFL / TFR",
+  mid: "TML / TMR",
+  rear: "TRL / TRR",
+};
+
 function getRowName(role) {
   const r = String(role || "").toUpperCase();
   if (r.startsWith("TF")) return "front";
@@ -284,23 +290,22 @@ export default function PrintP9Content({ p9Snapshot, roomDims }) {
             const rowName = getRowName(spk.role);
             const color = ROW_COLORS[rowName] || "#625143";
             return (
-              <g key={`spk-${i}`}>
-                <circle cx={sp.px} cy={sp.py} r={7} fill={color} stroke="#F8F8F7" strokeWidth={1.5} />
-                <text x={sp.px} y={sp.py - 34} fill={color}
-                  fontSize={11} textAnchor="middle"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif" fontWeight={600}>{spk.role}</text>
-              </g>
+              <circle key={`spk-${i}`} cx={sp.px} cy={sp.py} r={7} fill={color} stroke="#F8F8F7" strokeWidth={1.5} />
             );
           })}
 
-          {/* Row angle labels */}
+          {/* Row labels — one combined role label per row */}
           {representativeRows.map((row, i) => {
             const rowColor = ROW_COLORS[row.rowName] || "#625143";
             const label = ROW_LABELS[row.rowName] || "";
+            const roleLabel = ROW_ROLE_LABELS[row.rowName] || "";
             const labelPos = toPx(row.avgY, row.avgZ);
             return (
               <g key={`row-label-${i}`}>
-                <text x={labelPos.px} y={labelPos.py - 17} fill={rowColor}
+                <text x={labelPos.px} y={labelPos.py - 36} fill={rowColor}
+                  fontSize={10} textAnchor="middle"
+                  fontFamily="Didact Gothic, Century Gothic, sans-serif">{roleLabel}</text>
+                <text x={labelPos.px} y={labelPos.py - 20} fill={rowColor}
                   fontSize={11} textAnchor="middle"
                   fontFamily="Didact Gothic, Century Gothic, sans-serif" fontWeight={600}>{label}</text>
                 <text x={labelPos.px} y={labelPos.py + 20} fill="#625143"
