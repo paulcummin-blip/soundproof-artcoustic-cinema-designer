@@ -94,6 +94,83 @@ const RSP_DOT_R = 3;
 const RSP_LABEL_W = 30;
 const RSP_LABEL_H = 14;
 
+// ── Seat matrix helpers ──
+const MATRIX_PARAMS = [
+  { key: "p4", label: "P4 Screen" },
+  { key: "p6", label: "P6 Surround" },
+  { key: "p10", label: "P10 Overhead" },
+];
+
+// Best-category rank: primary is strongest, not_assessed is weakest
+const CATEGORY_BEST_RANK = { primary: 4, good: 3, acceptable: 2, improvement: 1, not_assessed: 0 };
+
+// Y-tolerance for grouping seats into the same physical row (meters)
+const ROW_TOLERANCE_M = 0.05;
+
+/**
+ * Group seats into physical rows (front-to-back by y), each sorted left-to-right
+ * by x with 1-based seat numbers. Returns [{ rowIndex, seats: [{ ...seat, seatNumber }] }].
+ */
+function buildSeatRows(seats) {
+  if (!seats || seats.length === 0) return [];
+  const sortedByY = [...seats].sort((a, b) => a.y - b.y);
+  const clusters = [];
+  for (const seat of sortedByY) {
+    const last = clusters[clusters.length - 1];
+    if (last && Math.abs(seat.y - last.y) <= ROW_TOLERANCE_M) {
+      last.seats.push(seat);
+    } else {
+      clusters.push({ y: seat.y, seats: [seat] });
+    }
+  }
+  return clusters.map((cluster, idx) => {
+    const sortedByX = cluster.seats.sort((a, b) => a.x - b.x);
+    return {
+      rowIndex: idx + 1,
+      seats: sortedByX.map((s, i) => ({ ...s, seatNumber: i + 1 })),
+    };
+  });
+}
+
+/**
+ * Determine the strongest client category present among the seats.
+ */
+function getBestCategoryKey(seats) {
+  if (!seats || seats.length === 0) return null;
+  let best = null;
+  for (const seat of seats) {
+    const r = CATEGORY_BEST_RANK[seat.categoryKey] ?? 0;
+    if (best === null || r > (CATEGORY_BEST_RANK[best] ?? 0)) {
+      best = seat.categoryKey;
+    }
+  }
+  return best;
+}
+
+function MatrixLevelBadge({ level, strong }) {
+  if (!level) {
+    return <span style={{ color: "#C1B6AD", fontSize: 11 }}>—</span>;
+  }
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 4,
+        fontSize: 11,
+        fontWeight: strong ? 700 : 500,
+        background: strong ? "#E5E1D9" : "#F1F0EE",
+        color: "#213428",
+        border: strong ? "1px solid #213428" : "1px solid #DCDBD6",
+        letterSpacing: "0.02em",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {level}
+    </span>
+  );
+}
+
 export default function ClientBestListeningArea({
   roomDims,
   seats,
@@ -153,6 +230,10 @@ export default function ClientBestListeningArea({
 
   // Categories present in the project (for key)
   const activeCategories = CATEGORY_ORDER.filter((key) => (counts?.[key] || 0) > 0);
+
+  // Physical row grouping + best-category for matrix emphasis
+  const matrixRows = buildSeatRows(seats);
+  const bestCategoryKey = getBestCategoryKey(seats);
 
   const containerStyle = print
     ? { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "8px 16px", width: "100%", height: "100%" }
@@ -367,6 +448,106 @@ export default function ClientBestListeningArea({
           fontFamily: "Futura PT Light, Century Gothic, sans-serif",
         }}>
           {countSummary}
+        </div>
+      )}
+
+      {/* ── Compact seat-by-seat matrix ── */}
+      {matrixRows.length > 0 && (
+        <div
+          style={{
+            width: "100%",
+            maxWidth: print ? "100%" : 600,
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+          }}
+        >
+          {matrixRows.map((row) => (
+            <div
+              key={row.rowIndex}
+              style={{ marginBottom: matrixRows.length > 1 ? 14 : 0 }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#213428",
+                  marginBottom: 6,
+                  letterSpacing: "0.02em",
+                }}
+              >
+                Row {row.rowIndex}
+              </div>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: 11,
+                  tableLayout: "fixed",
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th style={{ padding: "4px 6px", textAlign: "left", width: 100 }}></th>
+                    {row.seats.map((seat) => {
+                      const isBest =
+                        bestCategoryKey && seat.categoryKey === bestCategoryKey;
+                      return (
+                        <th
+                          key={seat.id}
+                          style={{
+                            padding: "4px 6px",
+                            textAlign: "center",
+                            color: "#213428",
+                            fontWeight: isBest ? 700 : 400,
+                            borderBottom: isBest
+                              ? "2px solid #213428"
+                              : "1px solid #DCDBD6",
+                            fontSize: 11,
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          Seat {seat.seatNumber}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {MATRIX_PARAMS.map((mr) => (
+                    <tr key={mr.key}>
+                      <td
+                        style={{
+                          padding: "4px 6px",
+                          color: "#625143",
+                          fontWeight: 400,
+                          fontSize: 11,
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        {mr.label}
+                      </td>
+                      {row.seats.map((seat) => {
+                        const isBest =
+                          bestCategoryKey && seat.categoryKey === bestCategoryKey;
+                        const level = seat[`${mr.key}Level`];
+                        return (
+                          <td
+                            key={seat.id}
+                            style={{
+                              padding: "4px 6px",
+                              textAlign: "center",
+                              borderBottom: "1px solid #DCDBD6",
+                            }}
+                          >
+                            <MatrixLevelBadge level={level} strong={isBest} />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </div>
       )}
 

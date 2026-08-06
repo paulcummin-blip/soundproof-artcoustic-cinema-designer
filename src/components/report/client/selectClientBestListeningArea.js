@@ -177,6 +177,9 @@ export function selectClientBestListeningArea({ analysisResult, seatingPositions
       category: cat.category,
       wording: cat.wording,
       worstLevel: worst,
+      p4Level: isApplicableParam(entry.p4) ? normalizeLevel(entry.p4.level) : null,
+      p6Level: isApplicableParam(entry.p6) ? normalizeLevel(entry.p6.level) : null,
+      p10Level: isApplicableParam(entry.p10) ? normalizeLevel(entry.p10.level) : null,
     };
   });
 
@@ -199,10 +202,11 @@ export function selectClientBestListeningArea({ analysisResult, seatingPositions
   const hasPrimary = (counts.primary || 0) > 0;
   const hasAny = seats.length > 0;
 
+  const primaryCount = counts.primary || 0;
   const explanation = !hasAny
     ? ""
     : hasPrimary
-      ? "The strongest listening area is centred on the primary seats, with the surrounding seats still providing a balanced and enjoyable cinema experience."
+      ? `The ${primaryCount === 1 ? "centre seat" : `${primaryCount} centre seats`} achieve the strongest balance across the screen, surround and overhead speaker layers. The outer seats remain enjoyable listening positions, with the surround layer creating the main difference in performance.`
       : "The seating area provides a range of listening positions, with the strongest available seats highlighted.";
 
   return { seats, rsp: rspPoint, counts, hasAny, hasPrimary, explanation };
