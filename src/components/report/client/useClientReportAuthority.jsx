@@ -161,11 +161,15 @@ export function useClientReportAuthority(projectId) {
   }), [app?.roomDims?.widthM, app?.roomDims?.lengthM, app?.roomDims?.heightM]);
 
   // ── 2a) Stable dimensions (mirrors RP22Report) ──────────
-  const stableDimensions = useMemo(() => ({
-    width: Number(app?.roomDims?.widthM) || 4.5,
-    length: Number(app?.roomDims?.lengthM) || 6.0,
-    height: Number(app?.roomDims?.heightM) || 2.4,
-  }), [app?.roomDims?.widthM, app?.roomDims?.lengthM, app?.roomDims?.heightM]);
+  // P1 reads dimensions.widthM / lengthM / heightM, while the legacy contract
+  // uses width / length / height. Provide both aliases from the same canonical
+  // numeric values so P1 computes non-negative right/rear distances.
+  const stableDimensions = useMemo(() => {
+    const width = Number(app?.roomDims?.widthM) || 4.5;
+    const length = Number(app?.roomDims?.lengthM) || 6.0;
+    const height = Number(app?.roomDims?.heightM) || 2.4;
+    return { width, length, height, widthM: width, lengthM: length, heightM: height };
+  }, [app?.roomDims?.widthM, app?.roomDims?.lengthM, app?.roomDims?.heightM]);
 
   const screen = app?.screen || {};
 
