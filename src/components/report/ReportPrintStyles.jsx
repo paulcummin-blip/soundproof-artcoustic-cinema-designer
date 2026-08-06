@@ -218,6 +218,53 @@ export default function ReportPrintStyles() {
                     overflow: visible !important;
                     max-height: none !important;
                 }
+
+                /* ── Print parameter pagination: 3 cards per page ── */
+                .rp22-report .rp22-params-print-groups {
+                    display: block !important;
+                    gap: 0 !important;
+                }
+                .rp22-report .rp22-param-page {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2mm;
+                }
+                .rp22-report .rp22-param-page + .rp22-param-page {
+                    break-before: page;
+                    page-break-before: always;
+                }
+
+                /* Override inline min-heights to fit 3 cards per page */
+                .rp22-report .rp22-param-page .rp22-card-wrap > div,
+                .rp22-report .rp22-param-page .rp22-card-wrap > div > div {
+                    min-height: 0 !important;
+                }
+
+                /* Compact padding for print */
+                .rp22-report .rp22-param-page .rp22-card-wrap > div > div {
+                    padding-left: 5mm !important;
+                    padding-right: 5mm !important;
+                }
+                .rp22-report .rp22-param-page .rp22-card-wrap > div > div:first-child {
+                    padding-top: 2.5mm !important;
+                    padding-bottom: 0 !important;
+                }
+                .rp22-report .rp22-param-page .rp22-card-wrap > div > div:nth-child(2) {
+                    padding-top: 1mm !important;
+                    padding-bottom: 0 !important;
+                }
+                .rp22-report .rp22-param-page .rp22-card-wrap > div > div:last-child {
+                    padding-top: 0 !important;
+                    padding-bottom: 2.5mm !important;
+                }
+
+                /* Reduce description font size and line height */
+                .rp22-report .rp22-param-page .rp22-card-wrap > div > div:first-child > div:nth-child(2) {
+                    font-size: 8.5pt !important;
+                    line-height: 1.35 !important;
+                }
             }
 
             @media screen {
