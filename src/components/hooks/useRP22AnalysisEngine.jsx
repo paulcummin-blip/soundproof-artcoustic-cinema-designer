@@ -26,6 +26,7 @@ import {
   applyDesignEqCurve,
 } from "@/components/utils/rp22BassMetrics";
 import { evaluateCanonicalP2 } from "@/components/utils/rp22/canonicalP2Authority";
+import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNormalisation";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -1388,47 +1389,39 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P10 – Maximum SPL difference between upper speakers (upper SPL spread)
-      // Uses the same SPL data source as the HUD (getSeatSplMetrics → .uppers)
+      // P10 – Maximum SPL difference between upper speakers, normalised to RSP
+      // Canonical RP22: each upper channel is normalised against that same channel
+      // at the effective RSP before computing the spread.
+      // Upper channels: TFL, TFR, TML, TMR, TRL, TRR
       {
-        let upperValues = [];
+        let p10Result = null;
 
         if (seatSplMetrics) {
-          // Use the same helper + key as RoomVisualisation / HUD:
-          // getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id)
           const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
+          // RSP resolution — same authority as P6 (synthetic "mlp" seat, then primary seat fallback)
+          const rspSpl = getSeatSplMetrics(seatSplMetrics, "mlp") || (
+            primarySeats.length > 0
+              ? getSeatSplMetrics(
+                  seatSplMetrics,
+                  primarySeats[0].id || `seat-${primarySeats[0].x}-${primarySeats[0].y}`
+                )
+              : null
+          );
 
-          if (seatSpl && seatSpl.uppers) {
-            // seatSpl.uppers is an object like { TFL: { value, formatted }, ... }
-            upperValues = Object.values(seatSpl.uppers)
-              .map((o) => (o && typeof o.value === 'number' ? o.value : null))
-              .filter((v) => isNum(v));
-          }
+          p10Result = computeP10RspNormalisedSpread(
+            seatSpl?.uppers,
+            rspSpl?.uppers
+          );
         }
 
-        if (upperValues.length >= 2) {
-          const maxSpl = Math.max(...upperValues);
-          const minSpl = Math.min(...upperValues);
-          const delta = Math.abs(maxSpl - minSpl);
-
-          // Round to 0.1 dB for display, keep numeric for value
-          const deltaRounded = Math.round(delta * 10) / 10;
-
-          // RP22 P10 levels:
-          // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: > 8 dB
-          let level10 = 1;
-          if (deltaRounded <= 2) level10 = 4;
-          else if (deltaRounded <= 5) level10 = 3;
-          else if (deltaRounded <= 8) level10 = 2;
-          else level10 = 1;
-
+        if (p10Result) {
           metrics.p10 = {
-            value: deltaRounded,
-            formatted: `±${deltaRounded.toFixed(1)} dB`,
-            level: level10,
+            value: p10Result.deltaRounded,
+            formatted: p10Result.formatted,
+            level: p10Result.level,
           };
         } else {
-          // Less than 2 valid upper SPL values – keep HUD honest but neutral
+          // Less than 2 valid normalised upper SPL values – preserve insufficient-data behaviour
           metrics.p10 = {
             value: null,
             formatted: 'N/A (insufficient data)',
