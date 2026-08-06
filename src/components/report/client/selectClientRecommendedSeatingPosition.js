@@ -18,10 +18,18 @@
  *   }
  */
 
-// Engine stores P1 level as a numeric (4/3/2/1) or "FAIL" string.
-// Map to the client-facing display label used by the shaded-zone legend.
-const LEVEL_LABELS = { 4: "L4", 3: "L3", 2: "L2", 1: "L1", FAIL: "Below L1" };
-const LEVEL_RANK = { 4: 4, 3: 3, 2: 2, 1: 1, FAIL: 0 };
+// Engine stores P1 level as a canonical string ("L4"/"L3"/"L2"/"L1"/"FAIL") or,
+// on legacy paths, a numeric (4/3/2/1). Map both forms to the client-facing
+// display label used by the shaded-zone legend. Do NOT alter the canonical
+// level object — this only normalises for display/ranking.
+const LEVEL_LABELS = {
+  L4: "L4", L3: "L3", L2: "L2", L1: "L1", FAIL: "Below L1",
+  4: "L4", 3: "L3", 2: "L2", 1: "L1",
+};
+const LEVEL_RANK = {
+  L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0,
+  4: 4, 3: 3, 2: 2, 1: 1,
+};
 
 function normalizeSeat(seat) {
   if (!seat) return null;
