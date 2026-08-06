@@ -1,17 +1,19 @@
-
 // components/utils/seatMetrics.js
 // Pure helpers for per-seat metrics. No React imports, no hooks.
 
+import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
+
 /**
  * Level mapping for RP22 P1 (nearest boundary).
+ * Canonical grading authority: gradeP1Distance.
+ * No local threshold comparisons — the helper is the sole authority.
  */
 export function rp22LevelForP1(m) {
   if (m == null || !Number.isFinite(m)) return '—';
-  if (m >= 1.50) return 'L4';
-  if (m >= 1.20) return 'L3';
-  if (m >= 0.80) return 'L2';
-  if (m >= 0.50) return 'L1';
-  return 'Below L1';
+  const graded = gradeP1Distance(m);
+  // Helper returns 'L4'/'L3'/'L2'/'L1'/'FAIL' (or null for no_data).
+  // 'Below L1' is superseded by the canonical 'FAIL'.
+  return graded.level ?? '—';
 }
 
 /**
