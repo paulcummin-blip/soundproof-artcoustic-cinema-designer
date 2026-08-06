@@ -389,75 +389,31 @@ export default function RP22ReportParameterGrid({
     );
   };
 
-  const renderParamCard = (param) => {
-    const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
-    const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
-      ? { ...param, thresholds: resolvedThresholds }
-      : param;
-    const targetBasisNote =
-      param.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
-      param.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
-      param.id === 14 ? bassPresentation.parameters.p14.detail :
-      null;
-    return (
-      <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
-        <RP22ComplianceParameterTile
-          param={resolvedParam}
-          achievedValue={getHudValueForParam(param)}
-          lvl={getHudLevelForParam(param)}
-          seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
-          targetBasisNote={targetBasisNote}
-        />
-      </div>
-    );
-  };
-
-  // Print variant: fixed groups of 3 parameters per page with explicit page breaks
-  if (isPrintVariant) {
-    const groups = [];
-    for (let i = 0; i < RP22_PARAMS.length; i += 3) {
-      groups.push(RP22_PARAMS.slice(i, i + 3));
-    }
-    return (
-      <>
-        <style>{`
-          @media print {
-            .rp22-print-param-group {
-              display: grid;
-              grid-template-columns: 1fr;
-              gap: 4mm;
-            }
-            .rp22-print-param-group .rp22-param-card-inner {
-              padding: 4mm 6mm !important;
-            }
-            .rp22-print-param-group .rp22-param-content {
-              font-size: 9pt !important;
-              line-height: 1.4 !important;
-            }
-            .rp22-print-param-group .rp22-param-subtitle {
-              margin-bottom: 2mm !important;
-            }
-            .rp22-print-param-group .rp22-param-divider {
-              margin: 2mm 0 !important;
-            }
-          }
-        `}</style>
-        {groups.map((group, groupIdx) => (
-          <div
-            key={`param-group-${groupIdx}`}
-            className={`rp22-print-param-group print-avoid-break${groupIdx > 0 ? ' print-page-break-before' : ''}`}
-          >
-            {group.map(renderParamCard)}
-          </div>
-        ))}
-      </>
-    );
-  }
-
-  // Screen variant: single 3-column grid (unchanged)
   return (
     <div className="rp22-params-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-      {RP22_PARAMS.map(renderParamCard)}
+      {RP22_PARAMS.map((param, idx) => {
+        const needsPrintPageBreak = idx > 0 && idx % 3 === 0;
+        const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
+        const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
+          ? { ...param, thresholds: resolvedThresholds }
+          : param;
+        const targetBasisNote =
+          param.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
+          param.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
+          param.id === 14 ? bassPresentation.parameters.p14.detail :
+          null;
+        return (
+          <div key={param.id} className={`rp22-card-wrap print-avoid-break${needsPrintPageBreak ? ' print-page-break-before' : ''}`} style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
+            <RP22ComplianceParameterTile
+              param={resolvedParam}
+              achievedValue={getHudValueForParam(param)}
+              lvl={getHudLevelForParam(param)}
+              seatPillGrid={String(param.scope || "").toLowerCase() === "seat" ? renderSeatPillGrid(param.id) : null}
+              targetBasisNote={targetBasisNote}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
