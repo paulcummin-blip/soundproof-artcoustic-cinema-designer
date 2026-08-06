@@ -3,14 +3,17 @@
  * ---------------------------------
  * Client-facing Visual Report page — Front Soundstage Dynamic Capability.
  *
- * Shows where the front soundstage (LCR) maintains the greatest dynamic
- * capability across the seating area, using the canonical per-seat LCR SPL
- * values from allSeatSplMetrics (computeAllSeatSplMetrics).
+ * RP22 Parameter 12 — Screen Speakers SPL Capability at RSP.
+ * P12 is a ROOM parameter, measured at the Reference Seating Position.
+ * This page does NOT present per-seat SPL; it shows a compact RSP summary.
  *
- * The shaded zones are purely visual — nested bands measured inward from the
- * screen wall, lightest at the front (highest capability) and stronger toward
- * the back. Seat markers carry the real per-seat graded data; zones never
- * recalculate SPL.
+ * The shaded horizontal bands are a purely visual explanation of how dynamic
+ * capability changes with listening distance — they are NOT calculated SPL
+ * contours and no acoustic transition is implied at any boundary.
+ *
+ * Data authority:
+ *   - gradedParameters.primary[12]  → RP22 level + minimum capability
+ *   - allSeatSplMetrics.get("mlp").spl.screen → FL/FC/FR SPL at RSP
  *
  * Works for both screen (card) and print (plain) contexts via the `print` prop.
  */
@@ -19,24 +22,25 @@ import React, { useMemo } from "react";
 
 // ── Front-soundstage capability bands (distance from screen wall, % of length) ──
 // Purely visual — lightest at the front (preferred), stronger toward the back.
+// No text is rendered inside the drawing for these bands.
 const ZONES = [
-  { key: "below-102", from: 0.80, to: 1.00, fill: "rgba(74, 35, 15, 0.20)",  label: "Below 102 dB" },
-  { key: "l1",        from: 0.60, to: 0.80, fill: "rgba(98, 81, 67, 0.14)",   label: "102–105 dB" },
-  { key: "l2",        from: 0.40, to: 0.60, fill: "rgba(98, 81, 67, 0.08)",   label: "105–108 dB" },
-  { key: "l3",        from: 0.20, to: 0.40, fill: "rgba(33, 52, 40, 0.05)",   label: "108–111 dB" },
-  { key: "l4",        from: 0.00, to: 0.20, fill: "rgba(33, 52, 40, 0.02)",   label: "111 dB+" },
+  { key: "below-102", from: 0.80, to: 1.00, fill: "rgba(74, 35, 15, 0.20)" },
+  { key: "l1",        from: 0.60, to: 0.80, fill: "rgba(98, 81, 67, 0.14)" },
+  { key: "l2",        from: 0.40, to: 0.60, fill: "rgba(98, 81, 67, 0.08)" },
+  { key: "l3",        from: 0.20, to: 0.40, fill: "rgba(33, 52, 40, 0.05)" },
+  { key: "l4",        from: 0.00, to: 0.20, fill: "rgba(33, 52, 40, 0.02)" },
 ];
 
 const LEGEND_ITEMS = [
-  { label: "Below 102 dB", fill: "rgba(74, 35, 15, 0.20)" },
-  { label: "102–105 dB",   fill: "rgba(98, 81, 67, 0.14)" },
-  { label: "105–108 dB",   fill: "rgba(98, 81, 67, 0.08)" },
-  { label: "108–111 dB",   fill: "rgba(33, 52, 40, 0.05)" },
-  { label: "111 dB+",      fill: "rgba(33, 52, 40, 0.02)" },
+  { range: "111 dB+",      description: "Exceptional headroom",   fill: "rgba(33, 52, 40, 0.02)" },
+  { range: "108–111 dB",   description: "Very high capability",   fill: "rgba(33, 52, 40, 0.05)" },
+  { range: "105–108 dB",   description: "Strong capability",      fill: "rgba(98, 81, 67, 0.08)" },
+  { range: "102–105 dB",   description: "Reference cinema level", fill: "rgba(98, 81, 67, 0.14)" },
+  { range: "Below 102 dB", description: "Reduced headroom",       fill: "rgba(74, 35, 15, 0.20)" },
 ];
 
 const CLIENT_EXPLANATION =
-  "The front soundstage has been designed to maintain consistent dynamic impact throughout the seating area. The left, centre and right speakers operate together as a single acoustic system, ensuring dialogue remains clear and effects retain their intended scale across all listening positions.";
+  "The front soundstage provides strong cinema-level dynamic capability at the reference seating position. The left, centre and right speakers operate together as a single acoustic system, maintaining clear dialogue and preserving the impact of demanding movie soundtracks.";
 
 export default function ClientFrontSoundstageDynamicRange({
   roomDims,
@@ -46,6 +50,11 @@ export default function ClientFrontSoundstageDynamicRange({
   screenWidthM,
   screen,
   placedSpeakers,
+  fl,
+  fc,
+  fr,
+  minimum,
+  level,
   print,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
@@ -72,15 +81,7 @@ export default function ClientFrontSoundstageDynamicRange({
           const x = Number(s.x);
           const y = Number(s.y);
           if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-          return {
-            id: s.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`,
-            x,
-            y,
-            spl: s.spl,
-            formatted: s.formatted,
-            level: s.level,
-            isStrongest: s.isStrongest === true,
-          };
+          return { id: s.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`, x, y };
         })
         .filter(Boolean),
     [seats]
@@ -102,7 +103,8 @@ export default function ClientFrontSoundstageDynamicRange({
   const screenLeftPx = toPx(screenLeftX, screenY);
   const screenRightPx = toPx(screenRightX, screenY);
 
-  // LCR speaker positions (optional, from placedSpeakers)
+  // LCR speaker positions (optional, from placedSpeakers) + SPL labels
+  const splByRole = { FL: fl?.formatted, FC: fc?.formatted, FR: fr?.formatted };
   const lcrSpeakers = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return [];
     return placedSpeakers
@@ -163,21 +165,8 @@ export default function ClientFrontSoundstageDynamicRange({
             textAlign: "center",
             fontFamily: "Didact Gothic, Century Gothic, sans-serif",
           }}>
-            RP22 Parameter 12 — Front Soundstage Dynamic Capability
+            RP22 Parameter 12 — Screen Speakers SPL Capability at RSP
           </p>
-        </div>
-      )}
-
-      {/* ── Descriptive page title (screen only) ── */}
-      {!print && (
-        <div style={{
-          fontSize: 18,
-          fontWeight: 600,
-          color: "#213428",
-          marginBottom: 4,
-          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-        }}>
-          Front Soundstage Performance
         </div>
       )}
 
@@ -189,7 +178,7 @@ export default function ClientFrontSoundstageDynamicRange({
           : { width: "100%", maxWidth: 600, height: "auto" }
         }
       >
-        {/* ── Nested capability bands (front = lightest, back = strongest) ── */}
+        {/* ── Nested capability bands (visual only — no text inside the drawing) ── */}
         {ZONES.map((zone) => {
           const y0 = screenY + L * zone.from;
           const y1 = screenY + L * zone.to;
@@ -240,9 +229,10 @@ export default function ClientFrontSoundstageDynamicRange({
           SCREEN
         </text>
 
-        {/* ── LCR speaker markers (small squares at the screen wall) ── */}
+        {/* ── LCR speaker markers + small SPL labels (only text inside the drawing) ── */}
         {lcrSpeakers.map((spk) => {
           const sp = toPx(spk.x, spk.y);
+          const splText = splByRole[spk.role];
           return (
             <g key={`lcr-${spk.role}`}>
               <rect
@@ -265,29 +255,27 @@ export default function ClientFrontSoundstageDynamicRange({
               >
                 {spk.role}
               </text>
+              {splText && (
+                <text
+                  x={sp.px}
+                  y={sp.py + 34}
+                  fill="#625143"
+                  fontSize={8.5}
+                  textAnchor="middle"
+                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                  letterSpacing="0.02em"
+                >
+                  {splText}
+                </text>
+              )}
             </g>
           );
         })}
 
-        {/* ── Seats ── */}
+        {/* ── Seats (geometry only — no per-seat SPL) ── */}
         {plotSeats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
           const isRspSeat = rspMatchesSeat && Math.abs(seat.x - rspX) < 0.01 && Math.abs(seat.y - rspY) < 0.01;
-          if (seat.isStrongest) {
-            return (
-              <g key={seat.id}>
-                <circle cx={sp.px} cy={sp.py} r={13} fill="none" stroke="#213428" strokeWidth={2.5} opacity={0.9} />
-                <circle
-                  cx={sp.px}
-                  cy={sp.py}
-                  r={isRspSeat ? 10 : 9}
-                  fill="#213428"
-                  stroke="#F8F8F7"
-                  strokeWidth={1.5}
-                />
-              </g>
-            );
-          }
           return (
             <circle
               key={seat.id}
@@ -326,7 +314,7 @@ export default function ClientFrontSoundstageDynamicRange({
         )}
       </svg>
 
-      {/* ── Compact horizontal legend ── */}
+      {/* ── Compact horizontal legend (client-friendly) ── */}
       <div style={{
         display: "flex",
         flexWrap: "wrap",
@@ -336,7 +324,7 @@ export default function ClientFrontSoundstageDynamicRange({
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
         {LEGEND_ITEMS.map((item) => (
-          <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div key={item.range} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{
               display: "inline-block",
               width: 14,
@@ -346,78 +334,79 @@ export default function ClientFrontSoundstageDynamicRange({
               border: "1px solid #DCDBD6",
             }} />
             <span style={{ fontSize: print ? 9 : 11, color: "#625143", letterSpacing: "0.04em" }}>
-              {item.label}
+              <span style={{ fontWeight: 600, color: "#3E4349" }}>{item.range}</span>
+              {" — "}
+              {item.description}
             </span>
           </div>
         ))}
       </div>
 
-      {/* ── Compact result matrix ── */}
+      {/* ── Compact RSP summary (replaces per-seat matrix) ── */}
       <div style={{
-        display: "flex",
-        justifyContent: "center",
         width: "100%",
+        maxWidth: print ? 460 : 520,
+        margin: "0 auto",
+        textAlign: "center",
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
-        <table style={{
-          borderCollapse: "collapse",
-          fontSize: print ? 10 : 12,
-          color: "#3E4349",
+        <div style={{
+          fontSize: print ? 12 : 14,
+          fontWeight: 600,
+          color: "#213428",
+          letterSpacing: "0.04em",
+          marginBottom: 10,
         }}>
-          <thead>
-            <tr>
-              <th style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143", borderBottom: "1px solid #DCDBD6" }} />
-              {plotSeats.map((seat, i) => (
-                <th
-                  key={seat.id}
-                  style={{
-                    padding: "4px 12px",
-                    textAlign: "center",
-                    fontWeight: seat.isStrongest ? 700 : 500,
-                    color: seat.isStrongest ? "#213428" : "#625143",
-                    borderBottom: "1px solid #DCDBD6",
-                  }}
-                >
-                  Seat {i + 1}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143" }}>Front Soundstage</td>
-              {plotSeats.map((seat) => (
-                <td
-                  key={seat.id}
-                  style={{
-                    padding: "4px 12px",
-                    textAlign: "center",
-                    fontWeight: seat.isStrongest ? 700 : 500,
-                    color: seat.isStrongest ? "#213428" : "#3E4349",
-                  }}
-                >
-                  {seat.level ?? "—"}
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <td style={{ padding: "2px 10px 4px", textAlign: "left", fontWeight: 600, color: "#625143", fontSize: print ? 9 : 11 }}>Capability</td>
-              {plotSeats.map((seat) => (
-                <td
-                  key={seat.id}
-                  style={{
-                    padding: "2px 12px 4px",
-                    textAlign: "center",
-                    fontSize: print ? 8.5 : 10,
-                    color: "#625143",
-                  }}
-                >
-                  {seat.formatted ?? "—"}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+          Front Soundstage Capability
+        </div>
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: print ? 20 : 32,
+          marginBottom: 12,
+        }}>
+          {[
+            { label: "FL", data: fl },
+            { label: "FC", data: fc },
+            { label: "FR", data: fr },
+          ].map((ch) => (
+            <div key={ch.label} style={{ textAlign: "center" }}>
+              <div style={{
+                fontSize: print ? 10 : 11,
+                color: "#625143",
+                letterSpacing: "0.08em",
+                marginBottom: 2,
+              }}>
+                {ch.label}
+              </div>
+              <div style={{
+                fontSize: print ? 16 : 20,
+                fontWeight: 300,
+                color: "#213428",
+                fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+              }}>
+                {ch.data?.formatted ?? "—"}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: print ? 18 : 28,
+          flexWrap: "wrap",
+          paddingTop: 8,
+          borderTop: "1px solid #DCDBD6",
+        }}>
+          <div style={{ fontSize: print ? 10 : 12, color: "#625143" }}>
+            <span style={{ letterSpacing: "0.04em" }}>Minimum Capability: </span>
+            <span style={{ fontWeight: 600, color: "#213428" }}>{minimum?.formatted ?? "—"}</span>
+          </div>
+          <div style={{ fontSize: print ? 10 : 12, color: "#625143" }}>
+            <span style={{ letterSpacing: "0.04em" }}>RP22 Parameter 12: </span>
+            <span style={{ fontWeight: 600, color: "#213428" }}>{level ?? "—"}</span>
+          </div>
+        </div>
       </div>
 
       {/* ── Client explanation (screen only — print uses the result region) ── */}

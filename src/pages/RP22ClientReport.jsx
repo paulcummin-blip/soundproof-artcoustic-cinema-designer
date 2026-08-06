@@ -116,16 +116,19 @@ export default function RP22ClientReport() {
   }, [hydrating, analysisResult, seatingPositions, rsp]);
 
   // ── Front Soundstage Dynamic Range (pure selector, no new analysis) ──
+  // P12 is a room-scope parameter measured at the RSP — reads canonical
+  // gradedParameters.primary[12] + allSeatSplMetrics.get("mlp").spl.screen.
   const frontSoundstage = useMemo(() => {
     if (hydrating || !allSeatSplMetrics || !Array.isArray(seatingPositions)) {
-      return { seats: [], rsp: null, hasAny: false };
+      return { seats: [], rsp: null, fl: null, fc: null, fr: null, minimum: null, level: null, hasAny: false };
     }
     return selectClientFrontSoundstageDynamicRange({
+      analysisResult,
       allSeatSplMetrics,
       seatingPositions,
       rsp,
     });
-  }, [hydrating, allSeatSplMetrics, seatingPositions, rsp]);
+  }, [hydrating, analysisResult, allSeatSplMetrics, seatingPositions, rsp]);
 
   const hasSeatingPosition = recommendedSeatingPosition.hasAny && !!rsp;
 
@@ -235,6 +238,11 @@ export default function RP22ClientReport() {
             screenWidthM={screenWidthM}
             screen={screen}
             placedSpeakers={placedSpeakers}
+            fl={frontSoundstage.fl}
+            fc={frontSoundstage.fc}
+            fr={frontSoundstage.fr}
+            minimum={frontSoundstage.minimum}
+            level={frontSoundstage.level}
           />
         ),
         printData: {
@@ -246,6 +254,11 @@ export default function RP22ClientReport() {
           screenWidthM,
           screen,
           placedSpeakers,
+          fl: frontSoundstage.fl,
+          fc: frontSoundstage.fc,
+          fr: frontSoundstage.fr,
+          minimum: frontSoundstage.minimum,
+          level: frontSoundstage.level,
         },
       });
     }

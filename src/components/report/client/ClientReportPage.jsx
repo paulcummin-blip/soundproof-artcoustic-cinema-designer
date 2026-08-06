@@ -148,7 +148,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           <>
             <div className="client-report-print-heading">
               <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
-              <p className="client-report-print-heading__subtitle">RP22 Parameter 12 — Front Soundstage Dynamic Capability</p>
+              <p className="client-report-print-heading__subtitle">RP22 Parameter 12 — Screen Speakers SPL Capability at RSP</p>
             </div>
             <div className="client-report-print-drawing">
               <ClientFrontSoundstageDynamicRange
@@ -159,14 +159,19 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 screenWidthM={printData.screenWidthM}
                 screen={printData.screen}
                 placedSpeakers={printData.placedSpeakers}
+                fl={printData.fl}
+                fc={printData.fc}
+                fr={printData.fr}
+                minimum={printData.minimum}
+                level={printData.level}
                 print
               />
             </div>
             <div className="client-report-print-result">
               <div className="client-report-print-result__content">
-                <div className="client-report-print-result__label">Front Soundstage Performance</div>
+                <div className="client-report-print-result__label">Front Soundstage Capability</div>
                 <div className="client-report-print-result__explanation">
-                  The front soundstage has been designed to maintain consistent dynamic impact throughout the seating area. The left, centre and right speakers operate together as a single acoustic system, ensuring dialogue remains clear and effects retain their intended scale across all listening positions.
+                  The front soundstage provides strong cinema-level dynamic capability at the reference seating position. The left, centre and right speakers operate together as a single acoustic system, maintaining clear dialogue and preserving the impact of demanding movie soundtracks.
                 </div>
               </div>
             </div>

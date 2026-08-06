@@ -1,102 +1,89 @@
 /**
  * selectClientFrontSoundstageDynamicRange
  * ---------------------------------------
- * Pure selector for the Front Soundstage Dynamic Range client Visual Report.
+ * Pure selector for the Front Soundstage Dynamic Capability client Visual Report.
  *
- * Reads the CANONICAL per-seat LCR SPL values only:
- *   allSeatSplMetrics.get(seatId).spl.screen.{FL,FC,FR}.value
+ * RP22 Parameter 12 is a ROOM parameter, measured at the Reference Seating
+ * Position (RSP). This selector does NOT compute per-seat SPL. It reads only
+ * the canonical P12 authority and the RSP screen-channel SPL values.
  *
- * Does NOT recalculate SPL. The front soundstage value is the limiting LCR
- * channel (Math.min of the already-calculated FL/FC/FR values), graded against
- * the RP22 P12 presentation thresholds for client-facing display only.
+ * Authority:
+ *   - analysisResult.gradedParameters.primary[12]  → RP22 level + minimum capability
+ *   - allSeatSplMetrics.get("mlp").spl.screen.{FL,FC,FR} → individual channel SPL
+ *
+ * Seat geometry (id, x, y) is returned for drawing only — it carries no SPL
+ * or level data, because P12 does not vary by seat.
  *
  * Returns:
  *   {
- *     seats: [{ id, x, y, spl, formatted, level, rank, isStrongest }],
+ *     seats: [{ id, x, y }],                 // geometry only, for drawing
  *     rsp,
+ *     fl: { value, formatted } | null,
+ *     fc: { value, formatted } | null,
+ *     fr: { value, formatted } | null,
+ *     minimum: { value, formatted } | null,  // from gradedParameters.primary[12]
+ *     level: string | null,                  // e.g. "L3"
  *     hasAny: boolean
  *   }
  */
 
-// P12 presentation thresholds (client-facing display only — does not modify
-// the RP22 engine's room-scope P12 grading).
-// L4: >=111, L3: >=108, L2: >=105, L1: >=102, Below L1: <102
-const LEVEL_LABELS = {
-  L4: "L4", L3: "L3", L2: "L2", L1: "L1", FAIL: "Below L1",
-};
-const LEVEL_RANK = {
-  L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0,
-};
-
-function gradeFrontSpl(db) {
-  if (!Number.isFinite(db)) return { level: null, rank: -1 };
-  if (db >= 111) return { level: "L4", rank: 4 };
-  if (db >= 108) return { level: "L3", rank: 3 };
-  if (db >= 105) return { level: "L2", rank: 2 };
-  if (db >= 102) return { level: "L1", rank: 1 };
-  return { level: "FAIL", rank: 0 };
+function ceilDb(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  const c = Math.ceil(n); // whole dB, matches engine P12 rounding
+  return { value: c, formatted: `${c} dB` };
 }
 
-function normalizeSeat(seat) {
+function normalizeSeatGeometry(seat) {
   if (!seat) return null;
   const x = Number(seat.x ?? seat.position?.x);
   const y = Number(seat.y ?? seat.position?.y);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return {
-    id: seat.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`,
-    x,
-    y,
-  };
+  return { id: seat.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`, x, y };
 }
 
-function readScreenSpl(allSeatSplMetrics, seatId) {
-  if (!allSeatSplMetrics || typeof allSeatSplMetrics.get !== "function") return null;
-  const entry = allSeatSplMetrics.get(seatId);
-  const screen = entry?.spl?.screen;
-  if (!screen) return null;
-  const fl = Number.isFinite(screen.FL?.value) ? Number(screen.FL.value) : null;
-  const fc = Number.isFinite(screen.FC?.value) ? Number(screen.FC.value) : null;
-  const fr = Number.isFinite(screen.FR?.value) ? Number(screen.FR.value) : null;
-  // Also tolerate legacy L/C/R keys
-  const l = fl ?? (Number.isFinite(screen.L?.value) ? Number(screen.L.value) : null);
-  const c = fc ?? (Number.isFinite(screen.C?.value) ? Number(screen.C.value) : null);
-  const r = fr ?? (Number.isFinite(screen.R?.value) ? Number(screen.R.value) : null);
-  const values = [l, c, r].filter((v) => Number.isFinite(v));
-  if (values.length === 0) return null;
-  return Math.min(...values);
-}
-
-export function selectClientFrontSoundstageDynamicRange({ allSeatSplMetrics, seatingPositions, rsp }) {
+export function selectClientFrontSoundstageDynamicRange({
+  analysisResult,
+  allSeatSplMetrics,
+  seatingPositions,
+  rsp,
+}) {
+  // Seat geometry for drawing only (no SPL/level)
   const seats = (Array.isArray(seatingPositions) ? seatingPositions : [])
-    .map((raw) => {
-      const base = normalizeSeat(raw);
-      if (!base) return null;
-
-      const rawSpl = readScreenSpl(allSeatSplMetrics, base.id);
-      if (rawSpl === null || !Number.isFinite(rawSpl)) return null;
-
-      const spl = Math.ceil(rawSpl); // whole dB, matches engine P12 rounding
-      const { level, rank } = gradeFrontSpl(rawSpl);
-      const formatted = `${spl} dB`;
-
-      return {
-        ...base,
-        spl,
-        formatted,
-        level: LEVEL_LABELS[level] ?? level,
-        rank,
-        isStrongest: false,
-      };
-    })
+    .map(normalizeSeatGeometry)
     .filter(Boolean);
 
-  const valid = seats.filter((s) => s.rank >= 0);
-  const bestRank = valid.length ? Math.max(...valid.map((s) => s.rank)) : -1;
-  valid.forEach((s) => {
-    s.isStrongest = bestRank > 0 && s.rank === bestRank;
-  });
+  // RSP screen-channel SPL values (canonical authority)
+  let fl = null;
+  let fc = null;
+  let fr = null;
+  if (allSeatSplMetrics && typeof allSeatSplMetrics.get === "function") {
+    const entry = allSeatSplMetrics.get("mlp");
+    const screen = entry?.spl?.screen;
+    if (screen) {
+      const flRaw = Number.isFinite(screen.FL?.value) ? Number(screen.FL.value)
+        : (Number.isFinite(screen.L?.value) ? Number(screen.L.value) : null);
+      const fcRaw = Number.isFinite(screen.FC?.value) ? Number(screen.FC.value)
+        : (Number.isFinite(screen.C?.value) ? Number(screen.C.value) : null);
+      const frRaw = Number.isFinite(screen.FR?.value) ? Number(screen.FR.value)
+        : (Number.isFinite(screen.R?.value) ? Number(screen.R.value) : null);
+      if (flRaw !== null) fl = ceilDb(flRaw);
+      if (fcRaw !== null) fc = ceilDb(fcRaw);
+      if (frRaw !== null) fr = ceilDb(frRaw);
+    }
+  }
 
-  return { seats: valid, rsp, hasAny: valid.length > 0 };
+  // Canonical P12 authority (room-scope)
+  const p12 = analysisResult?.gradedParameters?.primary?.[12] ?? null;
+  const level = p12?.level ?? null;
+  let minimum = null;
+  if (p12 && Number.isFinite(p12.value)) {
+    minimum = { value: p12.value, formatted: p12.formatted || `${p12.value} dB` };
+  }
+
+  const hasAny = !!(fl || fc || fr) || !!(minimum && level);
+
+  return { seats, rsp, fl, fc, fr, minimum, level, hasAny };
 }
 
 export default selectClientFrontSoundstageDynamicRange;
