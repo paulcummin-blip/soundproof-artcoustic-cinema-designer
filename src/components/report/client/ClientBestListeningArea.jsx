@@ -73,14 +73,14 @@ const CATEGORY_ORDER = ["primary", "good", "acceptable", "improvement", "not_ass
 const CATEGORY_LABELS = {
   primary: "Primary seating",
   good: "Good seating",
-  acceptable: "Acceptable seating",
+  acceptable: "Secondary seating",
   improvement: "Improvement recommended",
   not_assessed: "Not assessed",
 };
 const CATEGORY_COUNT_LABELS = {
   primary: "Primary",
   good: "Good",
-  acceptable: "Acceptable",
+  acceptable: "Secondary",
   improvement: "Improvement recommended",
   not_assessed: "Not assessed",
 };

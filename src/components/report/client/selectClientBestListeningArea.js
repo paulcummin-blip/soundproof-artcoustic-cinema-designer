@@ -120,7 +120,7 @@ function categoryForLevel(level) {
   if (level === "L1") {
     return {
       key: "acceptable",
-      category: "Acceptable seating",
+      category: "Secondary seating",
       wording: "Overall speaker level balance remains acceptable.",
     };
   }
