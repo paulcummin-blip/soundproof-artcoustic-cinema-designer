@@ -18,6 +18,7 @@ import ClientDesignHighlights from "@/components/report/client/ClientDesignHighl
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
 import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
+import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
 
 export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {
   const projectName = projectDetails?.name || "Untitled";
@@ -138,6 +139,34 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 <div className="client-report-print-result__label">Consistent Sound Across the Seats</div>
                 <div className="client-report-print-result__explanation">
                   The system is designed to maintain a consistent tonal character across the seating area, preserving clarity and detail as listeners move away from the reference position.
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        {printData?.type === "front-soundstage-dynamic-range" && (
+          <>
+            <div className="client-report-print-heading">
+              <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
+              <p className="client-report-print-heading__subtitle">RP22 Parameter 12 — Front Soundstage Dynamic Capability</p>
+            </div>
+            <div className="client-report-print-drawing">
+              <ClientFrontSoundstageDynamicRange
+                roomDims={printData.roomDims}
+                seats={printData.seats}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                screen={printData.screen}
+                placedSpeakers={printData.placedSpeakers}
+                print
+              />
+            </div>
+            <div className="client-report-print-result">
+              <div className="client-report-print-result__content">
+                <div className="client-report-print-result__label">Front Soundstage Performance</div>
+                <div className="client-report-print-result__explanation">
+                  The front soundstage has been designed to maintain consistent dynamic impact throughout the seating area. The left, centre and right speakers operate together as a single acoustic system, ensuring dialogue remains clear and effects retain their intended scale across all listening positions.
                 </div>
               </div>
             </div>

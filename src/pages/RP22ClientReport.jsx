@@ -28,6 +28,8 @@ import ClientBestListeningArea from "@/components/report/client/ClientBestListen
 import { selectClientBestListeningArea } from "@/components/report/client/selectClientBestListeningArea";
 import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
 import { selectClientTimbreConsistency } from "@/components/report/client/selectClientTimbreConsistency";
+import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
+import { selectClientFrontSoundstageDynamicRange } from "@/components/report/client/selectClientFrontSoundstageDynamicRange";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -62,6 +64,7 @@ export default function RP22ClientReport() {
     placedSpeakers,
     analysisResult,
     bassPresentation,
+    allSeatSplMetrics,
   } = authority;
 
   // ── Design highlights (pure selector, no new analysis) ──
@@ -111,6 +114,18 @@ export default function RP22ClientReport() {
       rsp,
     });
   }, [hydrating, analysisResult, seatingPositions, rsp]);
+
+  // ── Front Soundstage Dynamic Range (pure selector, no new analysis) ──
+  const frontSoundstage = useMemo(() => {
+    if (hydrating || !allSeatSplMetrics || !Array.isArray(seatingPositions)) {
+      return { seats: [], rsp: null, hasAny: false };
+    }
+    return selectClientFrontSoundstageDynamicRange({
+      allSeatSplMetrics,
+      seatingPositions,
+      rsp,
+    });
+  }, [hydrating, allSeatSplMetrics, seatingPositions, rsp]);
 
   const hasSeatingPosition = recommendedSeatingPosition.hasAny && !!rsp;
 
@@ -207,6 +222,33 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Front Soundstage Dynamic Range (after Timbre Consistency, before Design Highlights)
+    if (frontSoundstage.hasAny) {
+      pages.push({
+        id: "front-soundstage-dynamic-range",
+        visual: (
+          <ClientFrontSoundstageDynamicRange
+            roomDims={roomDims}
+            seats={frontSoundstage.seats}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            screen={screen}
+            placedSpeakers={placedSpeakers}
+          />
+        ),
+        printData: {
+          type: "front-soundstage-dynamic-range",
+          roomDims,
+          seats: frontSoundstage.seats,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+          screen,
+          placedSpeakers,
+        },
+      });
+    }
     // Design Highlights (only when supported highlights exist)
     if (highlights.length > 0) {
       pages.push({
@@ -247,7 +289,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, highlights, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
+  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, frontSoundstage, highlights, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,
