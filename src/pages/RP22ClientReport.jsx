@@ -25,6 +25,8 @@ import ClientDesignHighlights from "@/components/report/client/ClientDesignHighl
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
 import { selectClientBestListeningArea } from "@/components/report/client/selectClientBestListeningArea";
+import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
+import { selectClientTimbreConsistency } from "@/components/report/client/selectClientTimbreConsistency";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -79,6 +81,18 @@ export default function RP22ClientReport() {
       return { seats: [], rsp: null, counts: {}, hasAny: false, hasPrimary: false, explanation: "" };
     }
     return selectClientBestListeningArea({
+      analysisResult,
+      seatingPositions,
+      rsp,
+    });
+  }, [hydrating, analysisResult, seatingPositions, rsp]);
+
+  // ── Timbre Consistency (pure selector, no new analysis) ──
+  const timbreConsistency = useMemo(() => {
+    if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
+      return { seats: [], counts: {}, hasAnyValidResult: false };
+    }
+    return selectClientTimbreConsistency({
       analysisResult,
       seatingPositions,
       rsp,
@@ -161,6 +175,31 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Timbre Consistency (after Best Listening Area, before Design Highlights)
+    if (timbreConsistency.hasAnyValidResult) {
+      pages.push({
+        id: "timbre-consistency",
+        visual: (
+          <ClientTimbreConsistency
+            roomDims={roomDims}
+            seats={timbreConsistency.seats}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            counts={timbreConsistency.counts}
+          />
+        ),
+        printData: {
+          type: "timbre-consistency",
+          roomDims,
+          seats: timbreConsistency.seats,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+          counts: timbreConsistency.counts,
+        },
+      });
+    }
     // Design Highlights (only when supported highlights exist)
     if (highlights.length > 0) {
       pages.push({
@@ -202,7 +241,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, bestListeningArea, highlights, hasSeatingPosition, roomDims, seatingPositions, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
+  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, highlights, hasSeatingPosition, roomDims, seatingPositions, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,
