@@ -1572,6 +1572,39 @@ function RP22ReportInner() {
                             </section>
                         )}
 
+                        {/* ── Timbre Consistency Across the Seats (final technical content page) ── */}
+                        {timbreConsistency.hasAnyValidResult === true && (
+                            <section id="pdf-timbre-consistency" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
+                                <div className="print-avoid-break">
+                                    {/* Page heading */}
+                                    <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 11, fontWeight: 600, color: '#625143', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                                        Timbre Matching
+                                    </div>
+                                    {/* Parameter subtitle */}
+                                    <div style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif', fontSize: 10, color: '#625143', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
+                                        RP22 Parameters 16 &amp; 17 — Timbre Consistency Across the Seats
+                                    </div>
+                                    {/* Page title */}
+                                    <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
+                                        Timbre Consistency Across the Seats
+                                    </div>
+                                    {/* Drawing */}
+                                    <TechnicalTimbreConsistency
+                                        roomDims={{ widthM: stableDimensions.width, lengthM: stableDimensions.length }}
+                                        seats={timbreConsistency.seats}
+                                        rsp={primarySeatingPosition}
+                                        screenFrontPlaneM={reportScreenFrontPlaneM}
+                                        screenWidthM={reportScreenWidthM}
+                                        print
+                                    />
+                                    {/* Explanation */}
+                                    <div style={{ marginTop: 14, fontFamily: 'Didact Gothic, Century Gothic, sans-serif', fontSize: 11, color: '#3E4349', lineHeight: 1.6, maxWidth: '180mm' }}>
+                                        This drawing shows the predicted tonal variation at each real seating position. P16 presents the screen-speaker result, while P17 presents the wide, surround and overhead-speaker result.
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
                     </div>
                 </div>
             </div>
