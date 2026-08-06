@@ -60,7 +60,7 @@ function formatDb(param) {
 const BADGE_W = 32;
 const BADGE_H = 18;
 const BADGE_RX = 4;
-const BADGE_DX = 40; // horizontal spacing between slot centres
+const BADGE_DX = 28; // horizontal spacing between slot centres
 const BADGE_DY = 24; // vertical offset from seat centre to badge centre
 const DB_TEXT_DY = BADGE_DY + BADGE_H / 2 + 6; // dB text below badge
 
