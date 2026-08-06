@@ -198,6 +198,8 @@ export function selectClientTimbreConsistency({ analysisResult, seatingPositions
       y,
       p16: rawP16,
       p17: rawP17,
+      p16Level: isApplicableParam(rawP16) ? normalizeLevel(rawP16.level) : null,
+      p17Level: isApplicableParam(rawP17) ? normalizeLevel(rawP17.level) : null,
       worstLevel: worst,
       categoryKey: cat.key,
       categoryLabel: cat.label,
