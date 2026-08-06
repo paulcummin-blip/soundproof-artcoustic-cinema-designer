@@ -33,6 +33,7 @@ import { selectClientFrontSoundstageDynamicRange } from "@/components/report/cli
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
+import { useAppState } from "@/components/AppStateProvider";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -49,6 +50,10 @@ export default function RP22ClientReport() {
   );
 
   const authority = useClientReportAuthority(projectId);
+  const appState = useAppState();
+  // Active P12 target basis — the same authority that drives the App compliance
+  // panel and the Technical Report (RP22CompliancePanel / RP22ReportParameterGrid).
+  const p12Mode = appState?.p12Mode || "minimum";
   const {
     hydrating,
     projectDetails,
@@ -116,8 +121,9 @@ export default function RP22ClientReport() {
   }, [hydrating, analysisResult, seatingPositions, rsp]);
 
   // ── Front Soundstage Dynamic Range (pure selector, no new analysis) ──
-  // P12 is a room-scope parameter measured at the RSP — reads canonical
-  // gradedParameters.primary[12] + allSeatSplMetrics.get("mlp").spl.screen.
+  // P12 is a room-scope parameter measured at the RSP. The selector reads the
+  // canonical gradedParameters.primary[12] (achieved value) and re-grades the
+  // level using the active p12Mode — the same authority as App / Tech Report.
   const frontSoundstage = useMemo(() => {
     if (hydrating || !allSeatSplMetrics || !Array.isArray(seatingPositions)) {
       return { seats: [], rsp: null, fl: null, fc: null, fr: null, minimum: null, level: null, hasAny: false };
@@ -127,8 +133,9 @@ export default function RP22ClientReport() {
       allSeatSplMetrics,
       seatingPositions,
       rsp,
+      p12Mode,
     });
-  }, [hydrating, analysisResult, allSeatSplMetrics, seatingPositions, rsp]);
+  }, [hydrating, analysisResult, allSeatSplMetrics, seatingPositions, rsp, p12Mode]);
 
   const hasSeatingPosition = recommendedSeatingPosition.hasAny && !!rsp;
 
@@ -243,6 +250,10 @@ export default function RP22ClientReport() {
             fr={frontSoundstage.fr}
             minimum={frontSoundstage.minimum}
             level={frontSoundstage.level}
+            bandLabels={frontSoundstage.bandLabels}
+            targetBasisLabel={frontSoundstage.targetBasisLabel}
+            resultHeading={frontSoundstage.resultHeading}
+            resultExplanation={frontSoundstage.resultExplanation}
           />
         ),
         printData: {
@@ -259,6 +270,10 @@ export default function RP22ClientReport() {
           fr: frontSoundstage.fr,
           minimum: frontSoundstage.minimum,
           level: frontSoundstage.level,
+          bandLabels: frontSoundstage.bandLabels,
+          targetBasisLabel: frontSoundstage.targetBasisLabel,
+          resultHeading: frontSoundstage.resultHeading,
+          resultExplanation: frontSoundstage.resultExplanation,
         },
       });
     }

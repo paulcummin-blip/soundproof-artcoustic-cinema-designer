@@ -5,15 +5,19 @@
  *
  * RP22 Parameter 12 — Screen Speakers SPL Capability at RSP.
  * P12 is a ROOM parameter, measured at the Reference Seating Position.
- * This page does NOT present per-seat SPL; it shows a compact RSP summary.
  *
- * The shaded horizontal bands are a purely visual explanation of how dynamic
- * capability changes with listening distance — they are NOT calculated SPL
- * contours and no acoustic transition is implied at any boundary.
+ * The shaded horizontal bands in the drawing are a purely visual explanation
+ * of how dynamic capability changes with listening distance — they are NOT SPL
+ * contours and no acoustic transition is implied at any boundary. No text is
+ * rendered inside the drawing.
  *
- * Data authority:
- *   - gradedParameters.primary[12]  → RP22 level + minimum capability
- *   - allSeatSplMetrics.get("mlp").spl.screen → FL/FC/FR SPL at RSP
+ * The legend (band labels) and the result panel follow the ACTIVE P12 target
+ * basis (Minimum / Recommended) — the same authority as the App compliance
+ * panel and the Technical Report. The achieved FL/FC/FR SPL and the achieved
+ * minimum SPL do NOT change with the target basis; the RP22 level and the
+ * threshold band labels DO.
+ *
+ * The component never grades P12 — it renders what the selector provides.
  *
  * Works for both screen (card) and print (plain) contexts via the `print` prop.
  */
@@ -21,8 +25,7 @@
 import React, { useMemo } from "react";
 
 // ── Front-soundstage capability bands (distance from screen wall, % of length) ──
-// Purely visual — lightest at the front (preferred), stronger toward the back.
-// No text is rendered inside the drawing for these bands.
+// Purely visual — lightest at the front, stronger toward the back.
 const ZONES = [
   { key: "below-102", from: 0.80, to: 1.00, fill: "rgba(74, 35, 15, 0.20)" },
   { key: "l1",        from: 0.60, to: 0.80, fill: "rgba(98, 81, 67, 0.14)" },
@@ -30,17 +33,6 @@ const ZONES = [
   { key: "l3",        from: 0.20, to: 0.40, fill: "rgba(33, 52, 40, 0.05)" },
   { key: "l4",        from: 0.00, to: 0.20, fill: "rgba(33, 52, 40, 0.02)" },
 ];
-
-const LEGEND_ITEMS = [
-  { range: "111 dB+",      description: "Exceptional headroom",   fill: "rgba(33, 52, 40, 0.02)" },
-  { range: "108–111 dB",   description: "Very high capability",   fill: "rgba(33, 52, 40, 0.05)" },
-  { range: "105–108 dB",   description: "Strong capability",      fill: "rgba(98, 81, 67, 0.08)" },
-  { range: "102–105 dB",   description: "Reference cinema level", fill: "rgba(98, 81, 67, 0.14)" },
-  { range: "Below 102 dB", description: "Reduced headroom",       fill: "rgba(74, 35, 15, 0.20)" },
-];
-
-const CLIENT_EXPLANATION =
-  "The front soundstage provides strong cinema-level dynamic capability at the reference seating position. The left, centre and right speakers operate together as a single acoustic system, maintaining clear dialogue and preserving the impact of demanding movie soundtracks.";
 
 export default function ClientFrontSoundstageDynamicRange({
   roomDims,
@@ -55,12 +47,16 @@ export default function ClientFrontSoundstageDynamicRange({
   fr,
   minimum,
   level,
+  bandLabels,
+  targetBasisLabel,
+  resultHeading,
+  resultExplanation,
   print,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
 
-  const { svgW, svgH, scale, toPx } = useMemo(() => {
+  const { svgW, svgH, toPx } = useMemo(() => {
     const PADDING_M = 0.6;
     const totalW = W + PADDING_M * 2;
     const totalL = L + PADDING_M * 2;
@@ -71,7 +67,7 @@ export default function ClientFrontSoundstageDynamicRange({
       px: (x + PADDING_M) * SCALE,
       py: (y + PADDING_M) * SCALE,
     });
-    return { svgW: SVG_W, svgH: SVG_H, scale: SCALE, toPx };
+    return { svgW: SVG_W, svgH: SVG_H, toPx };
   }, [W, L]);
 
   const plotSeats = useMemo(
@@ -103,7 +99,7 @@ export default function ClientFrontSoundstageDynamicRange({
   const screenLeftPx = toPx(screenLeftX, screenY);
   const screenRightPx = toPx(screenRightX, screenY);
 
-  // LCR speaker positions (optional, from placedSpeakers) + SPL labels
+  // LCR speaker positions + SPL labels
   const splByRole = { FL: fl?.formatted, FC: fc?.formatted, FR: fr?.formatted };
   const lcrSpeakers = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return [];
@@ -139,6 +135,8 @@ export default function ClientFrontSoundstageDynamicRange({
         boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       };
+
+  const legend = Array.isArray(bandLabels) && bandLabels.length === 5 ? bandLabels : [];
 
   return (
     <div style={containerStyle}>
@@ -314,7 +312,7 @@ export default function ClientFrontSoundstageDynamicRange({
         )}
       </svg>
 
-      {/* ── Compact horizontal legend (client-friendly) ── */}
+      {/* ── Band labels (active target basis) ── */}
       <div style={{
         display: "flex",
         flexWrap: "wrap",
@@ -323,8 +321,8 @@ export default function ClientFrontSoundstageDynamicRange({
         margin: 0,
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
-        {LEGEND_ITEMS.map((item) => (
-          <div key={item.range} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {legend.map((item) => (
+          <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{
               display: "inline-block",
               width: 14,
@@ -333,16 +331,14 @@ export default function ClientFrontSoundstageDynamicRange({
               background: item.fill,
               border: "1px solid #DCDBD6",
             }} />
-            <span style={{ fontSize: print ? 9 : 11, color: "#625143", letterSpacing: "0.04em" }}>
-              <span style={{ fontWeight: 600, color: "#3E4349" }}>{item.range}</span>
-              {" — "}
-              {item.description}
+            <span style={{ fontSize: print ? 9 : 11, color: "#3E4349", letterSpacing: "0.04em" }}>
+              {item.label}
             </span>
           </div>
         ))}
       </div>
 
-      {/* ── Compact RSP summary (replaces per-seat matrix) ── */}
+      {/* ── Result panel (P5-style) ── */}
       <div style={{
         width: "100%",
         maxWidth: print ? 460 : 520,
@@ -350,79 +346,90 @@ export default function ClientFrontSoundstageDynamicRange({
         textAlign: "center",
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       }}>
+        {/* Primary — achieved level */}
+        {level && (
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 64,
+            padding: "8px 18px",
+            borderRadius: 999,
+            background: "#213428",
+            color: "#FFFFFF",
+            fontSize: print ? 20 : 26,
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+            marginBottom: 10,
+          }}>
+            {level}
+          </div>
+        )}
+
+        {/* Heading — dynamic by level */}
+        {resultHeading && (
+          <div style={{
+            fontSize: print ? 15 : 18,
+            fontWeight: 600,
+            color: "#213428",
+            letterSpacing: "0.01em",
+            marginBottom: 8,
+            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+          }}>
+            {resultHeading}
+          </div>
+        )}
+
+        {/* Plain-English explanation (screen only — print uses the result region) */}
+        {!print && resultExplanation && (
+          <p style={{
+            fontSize: 13,
+            color: "#625143",
+            textAlign: "center",
+            maxWidth: 480,
+            lineHeight: 1.5,
+            margin: "0 0 12px 0",
+          }}>
+            {resultExplanation}
+          </p>
+        )}
+
+        {/* Supporting line */}
         <div style={{
           fontSize: print ? 12 : 14,
           fontWeight: 600,
           color: "#213428",
-          letterSpacing: "0.04em",
-          marginBottom: 10,
-        }}>
-          Front Soundstage Capability
-        </div>
-        <div style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: print ? 20 : 32,
-          marginBottom: 12,
-        }}>
-          {[
-            { label: "FL", data: fl },
-            { label: "FC", data: fc },
-            { label: "FR", data: fr },
-          ].map((ch) => (
-            <div key={ch.label} style={{ textAlign: "center" }}>
-              <div style={{
-                fontSize: print ? 10 : 11,
-                color: "#625143",
-                letterSpacing: "0.08em",
-                marginBottom: 2,
-              }}>
-                {ch.label}
-              </div>
-              <div style={{
-                fontSize: print ? 16 : 20,
-                fontWeight: 300,
-                color: "#213428",
-                fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-              }}>
-                {ch.data?.formatted ?? "—"}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: print ? 18 : 28,
-          flexWrap: "wrap",
+          letterSpacing: "0.02em",
           paddingTop: 8,
           borderTop: "1px solid #DCDBD6",
         }}>
-          <div style={{ fontSize: print ? 10 : 12, color: "#625143" }}>
-            <span style={{ letterSpacing: "0.04em" }}>Minimum Capability: </span>
-            <span style={{ fontWeight: 600, color: "#213428" }}>{minimum?.formatted ?? "—"}</span>
-          </div>
-          <div style={{ fontSize: print ? 10 : 12, color: "#625143" }}>
-            <span style={{ letterSpacing: "0.04em" }}>RP22 Parameter 12: </span>
-            <span style={{ fontWeight: 600, color: "#213428" }}>{level ?? "—"}</span>
-          </div>
+          {minimum?.formatted ?? "—"}
+          {" minimum capability — RP22 Parameter 12"}
+        </div>
+
+        {/* Target basis (small secondary text) */}
+        <div style={{
+          fontSize: print ? 10 : 11,
+          color: "#625143",
+          letterSpacing: "0.04em",
+          marginTop: 4,
+        }}>
+          Target basis: {targetBasisLabel || "Minimum"}
+        </div>
+
+        {/* LCR details (RSP SPL — do not change with target basis) */}
+        <div style={{
+          fontSize: print ? 11 : 12,
+          color: "#625143",
+          letterSpacing: "0.02em",
+          marginTop: 10,
+        }}>
+          Left {fl?.formatted ?? "—"}
+          {" · Centre "}{fc?.formatted ?? "—"}
+          {" · Right "}{fr?.formatted ?? "—"}
         </div>
       </div>
-
-      {/* ── Client explanation (screen only — print uses the result region) ── */}
-      {!print && (
-        <p style={{
-          fontSize: 13,
-          color: "#625143",
-          textAlign: "center",
-          maxWidth: 520,
-          lineHeight: 1.5,
-          margin: 0,
-          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-        }}>
-          {CLIENT_EXPLANATION}
-        </p>
-      )}
     </div>
   );
 }

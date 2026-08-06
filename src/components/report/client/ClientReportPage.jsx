@@ -164,14 +164,18 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 fr={printData.fr}
                 minimum={printData.minimum}
                 level={printData.level}
+                bandLabels={printData.bandLabels}
+                targetBasisLabel={printData.targetBasisLabel}
+                resultHeading={printData.resultHeading}
+                resultExplanation={printData.resultExplanation}
                 print
               />
             </div>
             <div className="client-report-print-result">
               <div className="client-report-print-result__content">
-                <div className="client-report-print-result__label">Front Soundstage Capability</div>
+                <div className="client-report-print-result__label">{printData.resultHeading || "Front Soundstage Capability"}</div>
                 <div className="client-report-print-result__explanation">
-                  The front soundstage provides strong cinema-level dynamic capability at the reference seating position. The left, centre and right speakers operate together as a single acoustic system, maintaining clear dialogue and preserving the impact of demanding movie soundtracks.
+                  {printData.resultExplanation || "The left, centre and right speakers operate together as a single acoustic system, maintaining clear dialogue and preserving the impact of demanding movie soundtracks at the reference seating position."}
                 </div>
               </div>
             </div>
