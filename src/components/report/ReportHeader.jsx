@@ -171,6 +171,9 @@ export default function ReportHeader({
                         opacity: 1,
                         whiteSpace: 'nowrap',
                         flexShrink: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                     }}
                 >
                     <Eye className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
