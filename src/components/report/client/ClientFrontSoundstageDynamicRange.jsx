@@ -8,14 +8,14 @@
  *
  * The shaded horizontal bands in the drawing are a purely visual explanation
  * of how dynamic capability changes with listening distance — they are NOT SPL
- * contours and no acoustic transition is implied at any boundary. No text is
- * rendered inside the drawing.
+ * contours and no acoustic transition is implied at any boundary. Each band
+ * carries its threshold label (from `bandLabels`) at the right edge of the room.
  *
- * The legend (band labels) and the result panel follow the ACTIVE P12 target
- * basis (Minimum / Recommended) — the same authority as the App compliance
- * panel and the Technical Report. The achieved FL/FC/FR SPL and the achieved
- * minimum SPL do NOT change with the target basis; the RP22 level and the
- * threshold band labels DO.
+ * The band labels and the result panel follow the ACTIVE P12 target basis
+ * (Minimum / Recommended) — the same authority as the App compliance panel
+ * and the Technical Report. The achieved FL/FC/FR SPL and the achieved minimum
+ * SPL do NOT change with the target basis; the RP22 level and the threshold
+ * band labels DO.
  *
  * The component never grades P12 — it renders what the selector provides.
  *
@@ -33,6 +33,9 @@ const ZONES = [
   { key: "l3",        from: 0.20, to: 0.40, fill: "rgba(33, 52, 40, 0.05)" },
   { key: "l4",        from: 0.00, to: 0.20, fill: "rgba(33, 52, 40, 0.02)" },
 ];
+
+// Maps each drawing zone to its band-label key (from the selector's bandLabels).
+const ZONE_TO_LABEL_KEY = { "below-102": "fail", l1: "l1", l2: "l2", l3: "l3", l4: "l4" };
 
 export default function ClientFrontSoundstageDynamicRange({
   roomDims,
@@ -119,6 +122,13 @@ export default function ClientFrontSoundstageDynamicRange({
   const roomTopLeft = toPx(0, 0);
   const roomBottomRight = toPx(W, L);
 
+  // Band labels live inside the drawing now (no separate legend).
+  const bandLabelByKey = useMemo(() => {
+    const map = {};
+    (Array.isArray(bandLabels) ? bandLabels : []).forEach((b) => { if (b && b.key) map[b.key] = b; });
+    return map;
+  }, [bandLabels]);
+
   if (!rspValid || plotSeats.length === 0) return null;
 
   const containerStyle = print
@@ -135,8 +145,6 @@ export default function ClientFrontSoundstageDynamicRange({
         boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
       };
-
-  const legend = Array.isArray(bandLabels) && bandLabels.length === 5 ? bandLabels : [];
 
   return (
     <div style={containerStyle}>
@@ -182,16 +190,32 @@ export default function ClientFrontSoundstageDynamicRange({
           const y1 = screenY + L * zone.to;
           const tl = toPx(0, y0);
           const br = toPx(W, y1);
+          const bl = bandLabelByKey[ZONE_TO_LABEL_KEY[zone.key]];
           return (
-            <rect
-              key={zone.key}
-              x={roomTopLeft.px}
-              y={tl.py}
-              width={roomBottomRight.px - roomTopLeft.px}
-              height={br.py - tl.py}
-              fill={zone.fill}
-              stroke="none"
-            />
+            <g key={zone.key}>
+              <rect
+                x={roomTopLeft.px}
+                y={tl.py}
+                width={roomBottomRight.px - roomTopLeft.px}
+                height={br.py - tl.py}
+                fill={zone.fill}
+                stroke="none"
+              />
+              {bl && bl.label && (
+                <text
+                  x={roomBottomRight.px - 8}
+                  y={(tl.py + br.py) / 2}
+                  fill="#625143"
+                  fontSize={13}
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                  letterSpacing="0.02em"
+                >
+                  {bl.label}
+                </text>
+              )}
+            </g>
           );
         })}
 
@@ -311,32 +335,6 @@ export default function ClientFrontSoundstageDynamicRange({
           </text>
         )}
       </svg>
-
-      {/* ── Band labels (active target basis) ── */}
-      <div style={{
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "center",
-        gap: print ? 10 : 14,
-        margin: 0,
-        fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-      }}>
-        {legend.map((item) => (
-          <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{
-              display: "inline-block",
-              width: 14,
-              height: 14,
-              borderRadius: 3,
-              background: item.fill,
-              border: "1px solid #DCDBD6",
-            }} />
-            <span style={{ fontSize: print ? 9 : 11, color: "#3E4349", letterSpacing: "0.04em" }}>
-              {item.label}
-            </span>
-          </div>
-        ))}
-      </div>
 
       {/* ── Result panel (P5-style) ── */}
       <div style={{
