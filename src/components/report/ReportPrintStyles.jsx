@@ -229,7 +229,7 @@ export default function ReportPrintStyles() {
                     page-break-inside: avoid !important;
                     display: flex;
                     flex-direction: column;
-                    gap: 2mm;
+                    gap: 1.5mm;
                 }
                 .rp22-report .rp22-param-page + .rp22-param-page {
                     break-before: page;
@@ -467,7 +467,7 @@ export default function ReportPrintStyles() {
               #pdf-cover,
               #pdf-room-parameters,
               #pdf-seat-parameters {
-                zoom: 0.9 !important;
+                zoom: 0.87 !important;
               }
 
               #pdf-room-plan,
