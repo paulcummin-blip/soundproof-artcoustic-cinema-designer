@@ -229,7 +229,13 @@ export default function ReportPrintStyles() {
                     page-break-inside: avoid !important;
                     display: flex;
                     flex-direction: column;
-                    gap: 1.5mm;
+                    gap: 10mm;
+                    box-sizing: border-box;
+                    justify-content: center;
+                    min-height: 311mm;
+                }
+                .rp22-report .rp22-param-page:first-child {
+                    min-height: 294mm;
                 }
                 .rp22-report .rp22-param-page + .rp22-param-page {
                     break-before: page;
