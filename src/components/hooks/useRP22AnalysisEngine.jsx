@@ -27,6 +27,7 @@ import {
 } from "@/components/utils/rp22BassMetrics";
 import { evaluateCanonicalP2 } from "@/components/utils/rp22/canonicalP2Authority";
 import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNormalisation";
+import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -1205,26 +1206,33 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const metrics = { p1: null, p4: null, p5: null, p6: null, p9: null, p10: null, p16: null, p17: null, p20: null };
 
       // P1 - Nearest boundary distance (physical walls, not screen plane)
+      // Grading authority: gradeP1Distance (canonical P1 level helper).
+      // Distance geometry is unchanged — only the inline thresholds are replaced.
       if (isNum(seat.x) && isNum(seat.y)) {
         const yPhysical = seat.y + screenPlaneOffsetM;
-        
+
         const distLeft = seat.x;
         const distRight = (dimensions?.widthM || 0) - seat.x;
         const distFront = yPhysical;
         const distBack = (dimensions?.lengthM || 0) - yPhysical;
-        
+
         const p1ValueM = Math.min(distLeft, distRight, distFront, distBack);
-        
+
         if (isNum(p1ValueM) && p1ValueM >= 0) {
-          let level1 = 1;
-          if (p1ValueM >= 1.2) level1 = 4;
-          else if (p1ValueM >= 0.9) level1 = 3;
-          else if (p1ValueM >= 0.6) level1 = 2;
-          
+          const p1Graded = gradeP1Distance(p1ValueM);
+          // Schema adaptation only — helper remains the grading authority.
+          // Established engine contract uses numeric levels (4/3/2/1) + FAIL;
+          // helper returns string levels (L4/L3/L2/L1/FAIL).
+          const P1_LEVEL_MAP = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: "FAIL" };
+
           metrics.p1 = {
             valueM: p1ValueM,
-            level: level1,
-            formatted: `${p1ValueM.toFixed(2)}m`
+            value: p1Graded.value,
+            level: P1_LEVEL_MAP[p1Graded.level] ?? p1Graded.level,
+            formatted: p1Graded.formatted,
+            status: p1Graded.status,
+            applicable: p1Graded.applicable,
+            source: p1Graded.source,
           };
         }
       }
