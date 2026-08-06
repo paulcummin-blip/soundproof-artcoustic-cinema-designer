@@ -37,6 +37,20 @@ const ZONES = [
 // Maps each drawing zone to its band-label key (from the selector's bandLabels).
 const ZONE_TO_LABEL_KEY = { "below-102": "fail", l1: "l1", l2: "l2", l3: "l3", l4: "l4" };
 
+// Level → brand colour (mirrors P5 / P9 STATUS_COPY so the L3 badge matches exactly).
+const LEVEL_COLOR = {
+  L4: "#213428",
+  L3: "#3E4349",
+  L2: "#625143",
+  L1: "#4A230F",
+  FAIL: "#4A230F",
+  default: "#C1B6AD",
+};
+
+function levelColor(lvl) {
+  return LEVEL_COLOR[lvl] || LEVEL_COLOR.default;
+}
+
 export default function ClientFrontSoundstageDynamicRange({
   roomDims,
   seats,
@@ -336,98 +350,93 @@ export default function ClientFrontSoundstageDynamicRange({
         )}
       </svg>
 
-      {/* ── Result panel (P5-style) ── */}
-      <div style={{
-        width: "100%",
-        maxWidth: print ? 460 : 520,
-        margin: "0 auto",
-        textAlign: "center",
-        fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-      }}>
-        {/* Primary — achieved level */}
-        {level && (
+      {/* ── Result card (P5 / P9-style status card — rectangular level badge) ── */}
+      {level && (() => {
+        const color = levelColor(level);
+        return (
           <div style={{
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            minWidth: 64,
-            padding: "8px 18px",
-            borderRadius: 999,
-            background: "#213428",
-            color: "#FFFFFF",
-            fontSize: print ? 20 : 26,
-            fontWeight: 600,
-            letterSpacing: "0.04em",
-            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-            marginBottom: 10,
+            gap: 16,
+            padding: "16px 20px",
+            background: "#F1F0EE",
+            borderRadius: 12,
+            border: `1px solid ${color}40`,
+            width: "100%",
+            maxWidth: 560,
+            margin: "0 auto",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
           }}>
-            {level}
+            {/* Rectangular level badge — matches P5 / P9 exactly (48×48, radius 8) */}
+            <div style={{
+              width: 48,
+              height: 48,
+              borderRadius: 8,
+              background: `${color}25`,
+              border: `2px solid ${color}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 18,
+              fontWeight: 700,
+              color: color,
+              fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+              flexShrink: 0,
+            }}>
+              {level}
+            </div>
+            <div style={{ flex: 1 }}>
+              {/* Heading — dynamic by level */}
+              <div style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: "#213428",
+                marginBottom: 4,
+              }}>
+                {resultHeading}
+              </div>
+              {/* Plain-English explanation */}
+              {resultExplanation && (
+                <div style={{
+                  fontSize: 13,
+                  color: "#3E4349",
+                  lineHeight: 1.5,
+                  marginBottom: 8,
+                }}>
+                  {resultExplanation}
+                </div>
+              )}
+              {/* Supporting line */}
+              <div style={{
+                fontSize: 12,
+                color: "#625143",
+              }}>
+                {minimum?.formatted ?? "—"}
+                {" minimum capability — RP22 Parameter 12"}
+              </div>
+              {/* Target basis (small secondary text — driven by p12Mode) */}
+              <div style={{
+                fontSize: 11,
+                color: "#625143",
+                letterSpacing: "0.04em",
+                marginTop: 4,
+              }}>
+                Target basis: {targetBasisLabel || "Minimum"}
+              </div>
+              {/* LCR details (RSP SPL — do not change with target basis) */}
+              <div style={{
+                fontSize: 12,
+                color: "#625143",
+                marginTop: 8,
+              }}>
+                Left {fl?.formatted ?? "—"}
+                {" · Centre "}{fc?.formatted ?? "—"}
+                {" · Right "}{fr?.formatted ?? "—"}
+              </div>
+            </div>
           </div>
-        )}
-
-        {/* Heading — dynamic by level */}
-        {resultHeading && (
-          <div style={{
-            fontSize: print ? 15 : 18,
-            fontWeight: 600,
-            color: "#213428",
-            letterSpacing: "0.01em",
-            marginBottom: 8,
-            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-          }}>
-            {resultHeading}
-          </div>
-        )}
-
-        {/* Plain-English explanation (screen only — print uses the result region) */}
-        {!print && resultExplanation && (
-          <p style={{
-            fontSize: 13,
-            color: "#625143",
-            textAlign: "center",
-            maxWidth: 480,
-            lineHeight: 1.5,
-            margin: "0 0 12px 0",
-          }}>
-            {resultExplanation}
-          </p>
-        )}
-
-        {/* Supporting line */}
-        <div style={{
-          fontSize: print ? 12 : 14,
-          fontWeight: 600,
-          color: "#213428",
-          letterSpacing: "0.02em",
-          paddingTop: 8,
-          borderTop: "1px solid #DCDBD6",
-        }}>
-          {minimum?.formatted ?? "—"}
-          {" minimum capability — RP22 Parameter 12"}
-        </div>
-
-        {/* Target basis (small secondary text) */}
-        <div style={{
-          fontSize: print ? 10 : 11,
-          color: "#625143",
-          letterSpacing: "0.04em",
-          marginTop: 4,
-        }}>
-          Target basis: {targetBasisLabel || "Minimum"}
-        </div>
-
-        {/* LCR details (RSP SPL — do not change with target basis) */}
-        <div style={{
-          fontSize: print ? 11 : 12,
-          color: "#625143",
-          letterSpacing: "0.02em",
-          marginTop: 10,
-        }}>
-          Left {fl?.formatted ?? "—"}
-          {" · Centre "}{fc?.formatted ?? "—"}
-          {" · Right "}{fr?.formatted ?? "—"}
-        </div>
-      </div>
+        );
+      })()}
     </div>
   );
 }
