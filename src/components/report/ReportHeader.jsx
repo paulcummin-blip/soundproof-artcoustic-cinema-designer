@@ -158,33 +158,30 @@ export default function ReportHeader({
                     Back to Project
                 </Button>
 
-                <Button
-                    type="button"
-                    onClick={handleClientReport}
-                    disabled={!activeProjectId}
-                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] screen-only whitespace-nowrap"
-                    style={{
-                        fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                        backgroundColor: "#F9F8F6",
-                        borderColor: "#625143",
-                        color: "#625143",
-                        opacity: 1,
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}
-                >
-                    <Eye className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
-                    Visual Report
-                </Button>
+                <div className="screen-only">
+                    <Button
+                        type="button"
+                        onClick={handleClientReport}
+                        disabled={!activeProjectId}
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap flex-shrink-0 px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                        style={{
+                            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                            backgroundColor: "#F9F8F6",
+                            borderColor: "#625143",
+                            color: "#625143",
+                            opacity: 1,
+                        }}
+                    >
+                        <Eye className="w-4 h-4" style={{ color: "#625143", flexShrink: 0 }} />
+                        <span>Visual Report</span>
+                    </Button>
+                </div>
 
                 <Button
                     type="button"
                     onClick={handleExportPDF}
                     disabled={exportDisabled}
-                    title={exportDisabled ? exportDisabledMessage : "Export PDF"}
+                    title={exportDisabled ? exportDisabledMessage : "Download Technical Report (PDF)"}
                     className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
                     style={{
                         fontFamily: "Futura PT Light, Century Gothic, sans-serif",
