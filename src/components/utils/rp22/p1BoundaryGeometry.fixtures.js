@@ -157,8 +157,8 @@ export function runP1BoundaryGeometryFixtures() {
   allPass &= assertEqual(wallRear.nearestBoundary, "rear", "wall-only rear boundary");
 
   // --- 10. CURRENT PROJECT FIXTURE ---
-  // Room width 4.55, length 5.6. Audited side-speaker rectangles.
-  const ROOM = { widthM: 4.55, lengthM: 5.6 };
+  // Room width 4.55, length 4.95. Audited side-speaker rectangles.
+  const ROOM = { widthM: 4.55, lengthM: 4.95 };
   const SL = {
     id: "SL",
     role: "surround",
