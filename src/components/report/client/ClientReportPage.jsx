@@ -147,14 +147,13 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           <>
             <div className="client-report-print-heading">
               <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
-              <p className="client-report-print-heading__subtitle">RP22 Parameter 1 — RECOMMENDED SEATING POSITION</p>
+              <p className="client-report-print-heading__subtitle">RP22 Parameter 1 — Listener Distance from Room Boundaries</p>
             </div>
             <div className="client-report-print-drawing">
               <ClientRecommendedSeatingPosition
                 roomDims={printData.roomDims}
-                seatingPositions={printData.seatingPositions}
+                seats={printData.seats}
                 rsp={printData.rsp}
-                rspSourceLabel={printData.rspSourceLabel}
                 screenFrontPlaneM={printData.screenFrontPlaneM}
                 screenWidthM={printData.screenWidthM}
                 screen={printData.screen}
@@ -165,7 +164,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               <div className="client-report-print-result__content">
                 <div className="client-report-print-result__label">Recommended Seating Position</div>
                 <div className="client-report-print-result__explanation">
-                  The highlighted reference position is the point used to align the cinema's speaker and listening geometry.
+                  The two centre seats sit within the preferred listening area, giving them the greatest separation from the room boundaries. The outer seats remain good listening positions, while their closer proximity to the side walls slightly reduces their spatial performance.
                 </div>
               </div>
             </div>

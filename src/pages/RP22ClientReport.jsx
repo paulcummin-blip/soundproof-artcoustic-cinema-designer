@@ -23,6 +23,7 @@ import { useClientReportPdfExport } from "@/components/report/client/useClientRe
 import { selectClientDesignHighlights } from "@/components/report/client/selectClientDesignHighlights";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
+import { selectClientRecommendedSeatingPosition } from "@/components/report/client/selectClientRecommendedSeatingPosition";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
 import { selectClientBestListeningArea } from "@/components/report/client/selectClientBestListeningArea";
 import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
@@ -99,13 +100,19 @@ export default function RP22ClientReport() {
     });
   }, [hydrating, analysisResult, seatingPositions, rsp]);
 
-  // ── Recommended seating position availability ──
-  const hasSeatingPosition = useMemo(() => {
-    if (!roomDims || !Array.isArray(seatingPositions) || seatingPositions.length === 0 || !rsp) return false;
-    const x = Number(rsp.x);
-    const y = Number(rsp.y);
-    return Number.isFinite(x) && Number.isFinite(y);
-  }, [roomDims, seatingPositions, rsp]);
+  // ── Recommended seating position (pure selector, no new analysis) ──
+  const recommendedSeatingPosition = useMemo(() => {
+    if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
+      return { seats: [], rsp: null, hasAny: false };
+    }
+    return selectClientRecommendedSeatingPosition({
+      analysisResult,
+      seatingPositions,
+      rsp,
+    });
+  }, [hydrating, analysisResult, seatingPositions, rsp]);
+
+  const hasSeatingPosition = recommendedSeatingPosition.hasAny && !!rsp;
 
   // ── Active pages collection — drives both screen and PDF rendering order ──
   const activePages = useMemo(() => {
@@ -220,9 +227,8 @@ export default function RP22ClientReport() {
         visual: (
           <ClientRecommendedSeatingPosition
             roomDims={roomDims}
-            seatingPositions={seatingPositions}
+            seats={recommendedSeatingPosition.seats}
             rsp={rsp}
-            rspSourceLabel={rspSourceLabel}
             screenFrontPlaneM={screenFrontPlaneM}
             screenWidthM={screenWidthM}
             screen={screen}
@@ -231,7 +237,7 @@ export default function RP22ClientReport() {
         printData: {
           type: "seating-position",
           roomDims,
-          seatingPositions,
+          seats: recommendedSeatingPosition.seats,
           rsp,
           rspSourceLabel,
           screenFrontPlaneM,
@@ -241,7 +247,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, highlights, hasSeatingPosition, roomDims, seatingPositions, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
+  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, highlights, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,
