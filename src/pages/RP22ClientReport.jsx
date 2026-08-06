@@ -305,9 +305,11 @@ export default function RP22ClientReport() {
               border: "1px solid #213428",
               color: "#213428",
               opacity: 1,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
-            <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#213428" }} />
+            <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#213428", flexShrink: 0 }} />
             Back to Project
           </Button>
           <Button
@@ -320,10 +322,12 @@ export default function RP22ClientReport() {
               border: "1px solid #625143",
               color: "#625143",
               opacity: 1,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
-            <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
-            Technical RP22 Report
+            <FileText className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
+            Technical Report
           </Button>
           <Button
             type="button"
@@ -336,9 +340,11 @@ export default function RP22ClientReport() {
               border: "1px solid #213428",
               color: "#FFFFFF",
               opacity: 1,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
-            <Download className="w-4 h-4 mr-2" style={{ color: "#FFFFFF" }} />
+            <Download className="w-4 h-4 mr-2" style={{ color: "#FFFFFF", flexShrink: 0 }} />
             {exporting ? "Preparing Visual Report…" : "Download Visual Report (PDF)"}
           </Button>
         </div>

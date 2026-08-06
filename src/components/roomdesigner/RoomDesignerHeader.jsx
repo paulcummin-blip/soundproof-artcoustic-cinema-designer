@@ -105,23 +105,25 @@ export default function RoomDesignerHeader({
           <Button
             size="sm"
             variant="secondary"
-            className="font-semibold border-[#213428] text-[#213428]"
+            className="font-semibold border-[#213428] text-[#213428] whitespace-nowrap"
             onClick={handleClientReportClick}
             disabled={!effectiveProjectId}
+            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
           >
-            <Eye className="w-4 h-4 mr-2" />
+            <Eye className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
             Visual Report
           </Button>
 
           <Button
             size="sm"
             variant="secondary"
-            className="font-semibold border-[#625143] text-[#625143]"
+            className="font-semibold border-[#625143] text-[#625143] whitespace-nowrap"
             onClick={handleRP22ReportClick}
             disabled={!effectiveProjectId}
+            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
           >
-            <FileText className="w-4 h-4 mr-2" />
-            Technical RP22 Report
+            <FileText className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
+            Technical Report
           </Button>
 
           <DropdownMenu>

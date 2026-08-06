@@ -143,16 +143,18 @@ export default function ReportHeader({
                     type="button"
                     onClick={handleBackToProject}
                     disabled={!activeProjectId}
-                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] whitespace-nowrap"
                     style={{
                         fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                         backgroundColor: "#F9F8F6",
                         borderColor: "#213428",
                         color: "#213428",
                         opacity: 1,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
                     }}
                 >
-                    <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#213428" }} />
+                    <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#213428", flexShrink: 0 }} />
                     Back to Project
                 </Button>
 
@@ -160,16 +162,18 @@ export default function ReportHeader({
                     type="button"
                     onClick={handleClientReport}
                     disabled={!activeProjectId}
-                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] screen-only"
+                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] screen-only whitespace-nowrap"
                     style={{
                         fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                         backgroundColor: "#F9F8F6",
                         borderColor: "#625143",
                         color: "#625143",
                         opacity: 1,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
                     }}
                 >
-                    <Eye className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
+                    <Eye className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
                     Visual Report
                 </Button>
 
@@ -178,34 +182,38 @@ export default function ReportHeader({
                     onClick={handleExportPDF}
                     disabled={exportDisabled}
                     title={exportDisabled ? exportDisabledMessage : "Export PDF"}
-                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
                     style={{
                         fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                         backgroundColor: "#FFFFFF",
                         borderColor: "#625143",
                         color: "#625143",
                         opacity: 1,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
                     }}
                 >
-                    <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
-                    {exportDisabled ? exportDisabledMessage : "Export PDF"}
+                    <FileText className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
+                    {exportDisabled ? exportDisabledMessage : "Download Technical Report (PDF)"}
                 </Button>
 
                 <div style={{ position: 'relative' }}>
                     <Button
                         type="button"
                         onClick={() => setShowCadExportMenu(!showCadExportMenu)}
-                        className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                        className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE] whitespace-nowrap"
                         style={{
                             fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                             backgroundColor: "#FFFFFF",
                             borderColor: "#625143",
                             color: "#625143",
                             opacity: 1,
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
                         }}
                     >
-                        <Download className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
-                        Export CAD overlay
+                        <Download className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
+                        Download CAD Overlay
                     </Button>
 
                     {showCadExportMenu && (
