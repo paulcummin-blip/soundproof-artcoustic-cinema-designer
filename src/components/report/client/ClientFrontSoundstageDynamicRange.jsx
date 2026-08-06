@@ -174,7 +174,7 @@ export default function ClientFrontSoundstageDynamicRange({
             fontFamily: "Futura PT Light, Century Gothic, sans-serif",
             textAlign: "center",
           }}>
-            Spatial Resolution
+            Dynamic Range
           </h1>
           <p style={{
             margin: "6px 0 0 0",

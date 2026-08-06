@@ -147,7 +147,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "front-soundstage-dynamic-range" && (
           <>
             <div className="client-report-print-heading">
-              <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
+              <h1 className="client-report-print-heading__title">Dynamic Range</h1>
               <p className="client-report-print-heading__subtitle">RP22 Parameter 12 — Screen Speakers SPL Capability at RSP</p>
             </div>
             <div className="client-report-print-drawing">
