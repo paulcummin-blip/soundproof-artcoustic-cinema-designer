@@ -1572,6 +1572,11 @@ function RP22ReportInner() {
                             </section>
                         )}
 
+                        {/* Page break — forces Timbre Consistency onto a fresh page using the proven print-page-break-after mechanism */}
+                        {timbreConsistency.hasAnyValidResult === true && (
+                            <div className="print-page-break-after" style={{ height: 0, margin: 0, padding: 0, border: 'none', overflow: 'hidden' }} />
+                        )}
+
                         {/* ── Timbre Consistency Across the Seats (final technical content page) ── */}
                         {timbreConsistency.hasAnyValidResult === true && (
                             <section id="pdf-timbre-consistency" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
