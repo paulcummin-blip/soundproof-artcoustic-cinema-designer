@@ -121,8 +121,11 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__header-meta span {
-        margin-right: 6mm;
         white-space: nowrap;
+      }
+      body.client-report-printing .client-report-page__header-meta span + span::before {
+        content: " · ";
+        margin-right: 3mm;
       }
 
       /* ── Screen visual — hidden in print ── */
@@ -162,6 +165,10 @@ export default function ClientReportPrintStyles() {
         letter-spacing: 0.08em;
         text-transform: uppercase;
         font-family: "Didact Gothic", "Century Gothic", sans-serif;
+        text-align: left;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        max-width: 100%;
       }
 
       /* ── Drawing region — fills remaining space, SVG centred ── */
@@ -402,8 +409,11 @@ export default function ClientReportPrintStyles() {
         }
 
         .client-report-page__header-meta span {
-          margin-right: 6mm;
           white-space: nowrap;
+        }
+        .client-report-page__header-meta span + span::before {
+          content: " · ";
+          margin-right: 3mm;
         }
 
         /* ── Screen visual — hidden in print ── */
@@ -443,6 +453,10 @@ export default function ClientReportPrintStyles() {
           letter-spacing: 0.08em;
           text-transform: uppercase;
           font-family: "Didact Gothic", "Century Gothic", sans-serif;
+          text-align: left;
+          overflow-wrap: break-word;
+          word-break: break-word;
+          max-width: 100%;
         }
 
         /* ── Drawing region — fills remaining space, SVG centred ── */
