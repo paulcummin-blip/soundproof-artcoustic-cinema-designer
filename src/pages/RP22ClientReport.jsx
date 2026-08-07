@@ -91,8 +91,9 @@ export default function RP22ClientReport() {
       screenFrontPlaneM,
       screenWidthM,
       roomLengthM: roomDims.lengthM,
+      aspectRatio: screen?.aspectRatio,
     });
-  }, [hydrating, seatingPositions, screenFrontPlaneM, screenWidthM, roomDims.lengthM]);
+  }, [hydrating, seatingPositions, screenFrontPlaneM, screenWidthM, roomDims.lengthM, screen?.aspectRatio]);
 
   // ── Best Listening Area (pure selector, no new analysis) ──
   const bestListeningArea = useMemo(() => {
@@ -195,6 +196,7 @@ export default function RP22ClientReport() {
             screenWidthM={screenWidthM}
             zones={screenSeating.zones}
             explanation={screenSeating.explanation}
+            projectorLumens={screenSeating.projectorLumens}
           />
         ),
         printData: {
@@ -206,6 +208,7 @@ export default function RP22ClientReport() {
           screenWidthM,
           zones: screenSeating.zones,
           explanation: screenSeating.explanation,
+          projectorLumens: screenSeating.projectorLumens,
         },
       });
     }

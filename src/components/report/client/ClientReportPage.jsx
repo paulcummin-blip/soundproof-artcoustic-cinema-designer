@@ -260,6 +260,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 screenWidthM={printData.screenWidthM}
                 zones={printData.zones}
                 explanation={printData.explanation}
+                projectorLumens={printData.projectorLumens}
                 print
               />
             </div>

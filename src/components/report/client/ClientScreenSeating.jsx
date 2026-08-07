@@ -41,6 +41,7 @@ export default function ClientScreenSeating({
   screenWidthM,
   zones,
   explanation,
+  projectorLumens,
   print,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
@@ -338,6 +339,49 @@ export default function ClientScreenSeating({
           </div>
         ))}
       </div>
+
+      {/* ── Projector light output note (between drawing and seat matrix) ── */}
+      {projectorLumens != null && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 3,
+            padding: print ? "8px 20px" : "10px 24px",
+            background: "#F8F8F7",
+            borderRadius: 8,
+            border: "1px solid #DCDBD6",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+          }}
+        >
+          <div
+            style={{
+              fontSize: print ? 8.5 : 10,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#625143",
+              fontWeight: 600,
+            }}
+          >
+            Projector Light Output
+          </div>
+          <div
+            style={{
+              fontSize: print ? 11.5 : 14,
+              color: "#3E4349",
+              fontWeight: 500,
+              textAlign: "center",
+            }}
+          >
+            Minimum calibrated output for 108 nits:{" "}
+            {projectorLumens.toLocaleString("en-GB")} lumens
+          </div>
+          <div style={{ fontSize: print ? 8.5 : 10, color: "#625143" }}>
+            0.9 screen gain
+          </div>
+        </div>
+      )}
 
       {/* ── Compact seat matrix ── */}
       <div

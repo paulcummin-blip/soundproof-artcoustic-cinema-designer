@@ -33,6 +33,45 @@ function levelToLabel(level) {
 }
 
 /**
+ * Parse an aspect-ratio string like "16:9" or "2.35:1" into a numeric
+ * width/height ratio. Uses the SAME logic as normaliseScreenConfig
+ * (the canonical screen authority in models/screen/normalise.jsx).
+ */
+function parseAspectRatio(arStr) {
+  const str = (arStr || "16:9").toString();
+  const parts = str.includes(":") ? str.split(":").map(Number) : [16, 9];
+  const [arW, arH] = parts;
+  return (Number.isFinite(arW) && Number.isFinite(arH) && arW > 0 && arH > 0)
+    ? arW / arH
+    : 16 / 9;
+}
+
+/**
+ * Compute the minimum calibrated projector light output (lumens) required
+ * at the screen for a target luminance of 108 nits with 0.9 screen gain.
+ *
+ *   requiredLumens = (targetNits × π × visibleScreenAreaM2) / screenGain
+ *
+ * visibleScreenAreaM2 = visibleWidthM × visibleHeightM, where
+ * visibleHeightM = visibleWidthM / aspectRatio  (same derivation as
+ * normaliseScreenConfig.viewableHeightM).
+ *
+ * Result is rounded to the nearest 10 lumens.
+ *
+ * No efficiency, ageing, zoom, or headroom assumptions are included —
+ * this is the minimum calibrated output at the screen surface.
+ */
+function computeProjectorLumens(screenWidthM, aspectRatio) {
+  const W = Number(screenWidthM);
+  if (!W || W <= 0) return null;
+  const ratio = parseAspectRatio(aspectRatio);
+  const visibleHeightM = W / ratio;
+  const visibleScreenAreaM2 = W * visibleHeightM;
+  const requiredLumens = (108 * Math.PI * visibleScreenAreaM2) / 0.9;
+  return Math.round(requiredLumens / 10) * 10;
+}
+
+/**
  * Scan rp23LevelForAngleDeg from high angle (close to screen) to low
  * angle (far from screen), finding every level transition. Convert
  * each transition angle to a distance from the screen front plane.
@@ -134,9 +173,10 @@ export function selectClientScreenSeating({
   screenFrontPlaneM,
   screenWidthM,
   roomLengthM,
+  aspectRatio,
 }) {
   if (!Array.isArray(seatingPositions) || !screenWidthM || seatingPositions.length === 0) {
-    return { seats: [], zones: [], hasAny: false, explanation: "" };
+    return { seats: [], zones: [], hasAny: false, explanation: "", projectorLumens: null };
   }
 
   const W = Number(screenWidthM);
@@ -144,8 +184,12 @@ export function selectClientScreenSeating({
   const L = Number(roomLengthM) || 6.0;
 
   if (!W || W <= 0) {
-    return { seats: [], zones: [], hasAny: false, explanation: "" };
+    return { seats: [], zones: [], hasAny: false, explanation: "", projectorLumens: null };
   }
+
+  // Projector light output — uses the SAME screenWidthM (visible width) and
+  // aspectRatio from the canonical screen authority as the RP23 viewing calc.
+  const projectorLumens = computeProjectorLumens(W, aspectRatio);
 
   // Zone boundaries derived from the SAME authority function
   const zones = buildZonesFromTransitions(W, frontY, L);
@@ -178,5 +222,5 @@ export function selectClientScreenSeating({
 
   const explanation = buildExplanation(seats);
 
-  return { seats, zones, hasAny: seats.length > 0, explanation };
+  return { seats, zones, hasAny: seats.length > 0, explanation, projectorLumens };
 }
