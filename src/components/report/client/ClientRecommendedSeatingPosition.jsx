@@ -19,14 +19,26 @@
 
 import React, { useMemo } from "react";
 
+// ── ONE canonical level-fill map (opaque, tonal dark→light) ──
+// Below L1 = darkest, L4 = lightest. No opacity stacking: each
+// zone is an opaque nested rect drawn outer→inner, so the visible
+// band colour exactly matches its legend swatch.
+const LEVEL_FILLS = {
+  "below-l1": "#5C4A3A", // darkest — poor boundary distance
+  "l1":       "#7A6657",
+  "l2":       "#998574",
+  "l3":       "#B8A692",
+  "l4":       "#D7CBBE", // lightest — best boundary distance
+};
+
 // ── Wall-distance zones (metres inward from each room wall) ──
 // Thresholds match the canonical P1 grading authority.
 const ZONES = [
-  { key: "below-l1", inset: 0.0, fill: "rgba(74, 35, 15, 0.22)", label: "Below L1" },
-  { key: "l1",      inset: 0.5, fill: "rgba(98, 81, 67, 0.16)",  label: "L1" },
-  { key: "l2",      inset: 0.8, fill: "rgba(98, 81, 67, 0.09)",  label: "L2" },
-  { key: "l3",      inset: 1.2, fill: "rgba(33, 52, 40, 0.06)",  label: "L3" },
-  { key: "l4",      inset: 1.5, fill: "rgba(33, 52, 40, 0.02)",  label: "L4" },
+  { key: "below-l1", inset: 0.0, fill: LEVEL_FILLS["below-l1"], label: "Below L1" },
+  { key: "l1",      inset: 0.5, fill: LEVEL_FILLS["l1"],       label: "L1" },
+  { key: "l2",      inset: 0.8, fill: LEVEL_FILLS["l2"],       label: "L2" },
+  { key: "l3",      inset: 1.2, fill: LEVEL_FILLS["l3"],       label: "L3" },
+  { key: "l4",      inset: 1.5, fill: LEVEL_FILLS["l4"],       label: "L4" },
 ];
 
 const LEGEND_ITEMS = ZONES.map((z) => ({ label: z.label, fill: z.fill }));
