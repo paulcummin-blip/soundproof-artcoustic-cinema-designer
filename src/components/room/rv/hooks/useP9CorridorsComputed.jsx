@@ -192,6 +192,12 @@ function computeRowGuides({
   return { state, ranges, boundaries };
 }
 
+const ZONE_KEY_MAP = {
+  front: "frontZone",
+  mid: "midZone",
+  rear: "backZone",
+};
+
 export function useP9CorridorsComputed({
   selectedOverheadRow,
   rsp,
@@ -199,6 +205,7 @@ export function useP9CorridorsComputed({
   roomDims,
   getCanonicalRole,
   dolbyLayout,
+  overheadZones,
 }) {
   return useMemo(() => {
     const empty = { applicable: false, state: null, ranges: [], boundaries: [], selectedRow: null, note: null };
@@ -260,29 +267,35 @@ export function useP9CorridorsComputed({
 
     const rspPoint = { x: rspX, y: rspY, z: rspZ };
     const canonicalRoleFn = getCanonicalRole || ((role) => String(role || "").toUpperCase());
-    const yMin = 0.1;
-    const yMax = lengthM - 0.1;
 
-    // Compute guides for each applicable row
+    // Compute guides for each applicable row, sampling ONLY within that row's
+    // visible overhead placement zone Y extent (not the whole room).
     const allRanges = [];
     const allBoundaries = [];
     const rowStates = [];
 
     for (const row of applicableRows) {
+      const zoneKey = ZONE_KEY_MAP[row];
+      const zone = overheadZones?.[zoneKey];
+      if (!zone || !zone.active) continue;
+
+      const zoneYMin = Math.min(zone.y1, zone.y2);
+      const zoneYMax = Math.max(zone.y1, zone.y2);
+
       const { state: rowState, ranges, boundaries } = computeRowGuides({
         row,
         rspPoint,
         placedSpeakers,
         ohCount,
         roomCenterX,
-        yMin,
-        yMax,
+        yMin: zoneYMin,
+        yMax: zoneYMax,
         canonicalRoleFn,
       });
 
       allRanges.push(...ranges);
       allBoundaries.push(...boundaries);
-      rowStates.push({ row, state: rowState });
+      rowStates.push({ row, state: rowState, zoneYMin, zoneYMax });
     }
 
     // Overall state: worst across all rows
@@ -316,5 +329,6 @@ export function useP9CorridorsComputed({
     roomDims?.heightM,
     getCanonicalRole,
     dolbyLayout,
+    overheadZones,
   ]);
 }

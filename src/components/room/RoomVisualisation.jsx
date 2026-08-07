@@ -1835,6 +1835,7 @@ useEffect(() => {
     roomDims: { widthM, lengthM, heightM },
     getCanonicalRole,
     dolbyLayout,
+    overheadZones,
   });
 
   // Overhead speaker icons — extracted to hook

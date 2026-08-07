@@ -80,10 +80,6 @@ export default function RvP9Corridors({
     L2: { strokeWidth: 1.5, strokeOpacity: 0.35, dasharray: "4 3" },
   };
 
-  // Room-width X extent for boundary ruler lines (NOT clamped to zone edges)
-  const [roomX0px] = toPx(0, 0);
-  const [roomX1px] = toPx(widthM, 0);
-
   // Helper: convert Y (meters) to px
   const yToPx = (yM) => toPx(0, yM)[1];
 
@@ -204,36 +200,46 @@ export default function RvP9Corridors({
                 </text>
               );
             })()}
-          </g>
-        );
-      })}
 
-      {/* Boundary ruler — room-width lines for L4 / L3 / L2 transitions */}
-      {(boundaries || []).map((b, bi) => {
-        const style = BOUNDARY_STYLE[b.level] || BOUNDARY_STYLE.L4;
-        const yPx = yToPx(b.y);
-        return (
-          <g key={`p9-boundary-${bi}`}>
-            <line
-              x1={roomX0px}
-              y1={yPx}
-              x2={roomX1px}
-              y2={yPx}
-              stroke="#213428"
-              strokeWidth={style.strokeWidth}
-              strokeOpacity={style.strokeOpacity}
-              strokeDasharray={style.dasharray}
-            />
-            <text
-              x={roomX0px + 4}
-              y={yPx - 3}
-              fill="#213428"
-              fontSize={labelFontSize}
-              fontFamily="Didact Gothic, sans-serif"
-              opacity={Math.min(0.7, style.strokeOpacity + 0.15)}
-            >
-              {b.deg}° · {b.level}
-            </text>
+            {/* In-zone P9 placement guides — clipped to this zone's pieces */}
+            {rowBoundaries.map((b, bi) => {
+              const style = BOUNDARY_STYLE[b.level] || BOUNDARY_STYLE.L4;
+              const yPx = yToPx(b.y);
+              const rightmostX = Math.max(...pieces.map((p) => Math.max(p.x1, p.x2)));
+              const [labelXpx] = toPx(rightmostX, 0);
+              return (
+                <g key={`p9-guide-${row}-${bi}`}>
+                  {pieces.map((piece, pi) => {
+                    const [x0px] = toPx(Math.min(piece.x1, piece.x2), 0);
+                    const [x1px] = toPx(Math.max(piece.x1, piece.x2), 0);
+                    return (
+                      <line
+                        key={`p9-guide-line-${row}-${bi}-${pi}`}
+                        x1={x0px}
+                        y1={yPx}
+                        x2={x1px}
+                        y2={yPx}
+                        stroke="#213428"
+                        strokeWidth={style.strokeWidth}
+                        strokeOpacity={style.strokeOpacity}
+                        strokeDasharray={style.dasharray}
+                      />
+                    );
+                  })}
+                  <text
+                    x={labelXpx - 4}
+                    y={yPx - 3}
+                    fill="#213428"
+                    fontSize={labelFontSize}
+                    textAnchor="end"
+                    fontFamily="Didact Gothic, sans-serif"
+                    opacity={Math.min(0.7, style.strokeOpacity + 0.15)}
+                  >
+                    {b.deg}° · {b.level}
+                  </text>
+                </g>
+              );
+            })}
           </g>
         );
       })}
