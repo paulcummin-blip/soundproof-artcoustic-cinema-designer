@@ -54,7 +54,7 @@ function getL1Advice(representativeGaps, worstGapDeg) {
   const pair = [worst.fromRow, worst.toRow].sort();
   const [a, b] = pair;
   if (a === "front" && b === "rear") {
-    return "Bringing the front and rear overhead rows closer together would create smoother movement above the listener.";
+    return "Bringing the front and rear overhead rows closer together would create smoother movement above the listener. Where the room allows, adding a middle pair of overhead speakers can also reduce the spacing between adjacent rows and improve overhead continuity.";
   }
   if (a === "front" && b === "mid") {
     return "Bringing the front and middle overhead rows closer together would create smoother movement above the listener.";
