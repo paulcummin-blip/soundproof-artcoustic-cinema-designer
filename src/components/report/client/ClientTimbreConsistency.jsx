@@ -21,7 +21,6 @@
 
 import React from "react";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
-import ClientSplCapabilityResultCard from "./ClientSplCapabilityResultCard";
 
 // ── Category visual styles ──
 // Restrained brand-aligned palette — green spectrum for consistency,
@@ -201,7 +200,6 @@ export default function ClientTimbreConsistency({
   screenFrontPlaneM,
   screenWidthM,
   counts,
-  overallLevel,
   print,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
@@ -561,13 +559,30 @@ export default function ClientTimbreConsistency({
         </div>
       )}
 
-      {/* ── Wide low-profile conclusion card (screen only — print renders it in the result region) ── */}
+      {/* ── Wide low-profile conclusion card, no L-level badge (screen only — print renders it in the result region) ── */}
       {!print && (
-        <ClientSplCapabilityResultCard
-          level={overallLevel}
-          resultHeading="Consistent Sound Across the Seats"
-          resultExplanation="The system is designed to maintain a consistent tonal character across the seating area, preserving clarity and detail as listeners move away from the reference position."
-        />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            padding: "16px 20px",
+            background: "#F1F0EE",
+            borderRadius: 12,
+            border: "1px solid #DCDBD6",
+            width: "100%",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#213428", marginBottom: 4 }}>
+              Consistent Sound Across the Seats
+            </div>
+            <div style={{ fontSize: 13, color: "#3E4349", lineHeight: 1.5 }}>
+              The system is designed to maintain a consistent tonal character across the seating area, preserving clarity and detail as listeners move away from the reference position.
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

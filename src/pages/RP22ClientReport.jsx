@@ -240,7 +240,6 @@ export default function RP22ClientReport() {
             screenFrontPlaneM={screenFrontPlaneM}
             screenWidthM={screenWidthM}
             counts={timbreConsistency.counts}
-            overallLevel={timbreConsistency.overallLevel}
           />
         ),
         printData: {
@@ -251,7 +250,6 @@ export default function RP22ClientReport() {
           screenFrontPlaneM,
           screenWidthM,
           counts: timbreConsistency.counts,
-          overallLevel: timbreConsistency.overallLevel,
         },
       });
     }
