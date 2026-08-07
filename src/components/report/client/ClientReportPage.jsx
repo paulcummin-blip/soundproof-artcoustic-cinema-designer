@@ -61,13 +61,12 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           <img src={logoUrl} alt="Sound Proof" />
           <div className="client-report-page__header-title">Visual Report</div>
           <div className="client-report-page__header-meta">
-            <span>{projectName}</span>
-            {clientName && <span aria-hidden="true"> · </span>}
-            {clientName && <span>{clientName}</span>}
-            {projectRef && <span aria-hidden="true"> · </span>}
-            {projectRef && <span>Ref: {projectRef}</span>}
-            {createdDateStr && <span aria-hidden="true"> · </span>}
-            {createdDateStr && <span>{createdDateStr}</span>}
+            <span>{[
+              projectName,
+              clientName || null,
+              projectRef ? `Ref: ${projectRef}` : null,
+              createdDateStr || null,
+            ].filter(Boolean).join(" · ")}</span>
           </div>
         </div>
       )}
