@@ -116,6 +116,20 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 counts={printData.counts}
                 explanation={printData.explanation}
                 print
+                printPart="drawing"
+              />
+            </div>
+            <div className="client-report-print-support">
+              <ClientBestListeningArea
+                roomDims={printData.roomDims}
+                seats={printData.seats}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                counts={printData.counts}
+                explanation={printData.explanation}
+                print
+                printPart="support"
               />
             </div>
             <div className="client-report-print-result">
@@ -143,6 +157,19 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 screenWidthM={printData.screenWidthM}
                 counts={printData.counts}
                 print
+                printPart="drawing"
+              />
+            </div>
+            <div className="client-report-print-support">
+              <ClientTimbreConsistency
+                roomDims={printData.roomDims}
+                seats={printData.seats}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                counts={printData.counts}
+                print
+                printPart="support"
               />
             </div>
             <div className="client-report-print-result">
@@ -262,6 +289,21 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 explanation={printData.explanation}
                 projectorLumens={printData.projectorLumens}
                 print
+                printPart="drawing"
+              />
+            </div>
+            <div className="client-report-print-support">
+              <ClientScreenSeating
+                roomDims={printData.roomDims}
+                seats={printData.seats}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                zones={printData.zones}
+                explanation={printData.explanation}
+                projectorLumens={printData.projectorLumens}
+                print
+                printPart="support"
               />
             </div>
             <div className="client-report-print-result">
@@ -289,6 +331,19 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 screenWidthM={printData.screenWidthM}
                 screen={printData.screen}
                 print
+                printPart="drawing"
+              />
+            </div>
+            <div className="client-report-print-support">
+              <ClientRecommendedSeatingPosition
+                roomDims={printData.roomDims}
+                seats={printData.seats}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                screen={printData.screen}
+                print
+                printPart="support"
               />
             </div>
             <div className="client-report-print-result">

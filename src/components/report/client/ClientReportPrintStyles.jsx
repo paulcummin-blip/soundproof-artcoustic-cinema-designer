@@ -181,6 +181,17 @@ export default function ClientReportPrintStyles() {
         max-height: 100%;
       }
 
+      /* ── Support region — content-sized, sits between drawing and result ── */
+      body.client-report-printing .client-report-print-support {
+        flex-shrink: 0;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 4mm;
+      }
+
       /* ── Result region — sits directly beneath the drawing ── */
       body.client-report-printing .client-report-print-result {
         flex-shrink: 0;
@@ -449,6 +460,17 @@ export default function ClientReportPrintStyles() {
           height: 100%;
           max-width: 100%;
           max-height: 100%;
+        }
+
+        /* ── Support region — content-sized, sits between drawing and result ── */
+        .client-report-print-support {
+          flex-shrink: 0;
+          display: flex !important;
+          flex-direction: column;
+          align-items: center;
+          width: 100%;
+          box-sizing: border-box;
+          margin-bottom: 4mm;
         }
 
         /* ── Result region — sits directly beneath the drawing ── */

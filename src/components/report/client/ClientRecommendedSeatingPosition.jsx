@@ -43,6 +43,7 @@ export default function ClientRecommendedSeatingPosition({
   screenWidthM,
   screen,
   print,
+  printPart,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
@@ -103,9 +104,11 @@ export default function ClientRecommendedSeatingPosition({
 
   if (!rspValid || plotSeats.length === 0) return null;
 
-  const containerStyle = print
-    ? { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "0", width: "100%" }
-    : {
+  const showDrawing = !print || printPart !== "support";
+  const showSupport = !print || printPart !== "drawing";
+
+  const containerStyle = !print
+    ? {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -116,7 +119,12 @@ export default function ClientRecommendedSeatingPosition({
         border: "1px solid #DCDBD6",
         boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-      };
+      }
+    : printPart === "drawing"
+    ? { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }
+    : printPart === "support"
+    ? { width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, fontFamily: "Didact Gothic, Century Gothic, sans-serif" }
+    : { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "0", width: "100%" };
 
   return (
     <div style={containerStyle}>
@@ -161,14 +169,17 @@ export default function ClientRecommendedSeatingPosition({
         </div>
       )}
 
-      <svg
-        viewBox={`0 0 ${svgW} ${svgH}`}
-        className="client-report-print-svg"
-        style={print
-          ? { width: "100%", height: "auto", maxHeight: "none" }
-          : { width: "100%", maxWidth: 600, height: "auto" }
-        }
-      >
+      {showDrawing && (
+        <svg
+          viewBox={`0 0 ${svgW} ${svgH}`}
+          className="client-report-print-svg"
+          style={print && printPart === "drawing"
+            ? { width: "100%", height: "100%", maxWidth: "100%", maxHeight: "100%" }
+            : print
+            ? { width: "100%", height: "auto", maxHeight: "none" }
+            : { width: "100%", maxWidth: 600, height: "auto" }
+          }
+        >
         {/* ── Nested shaded zones (drawn outermost-first, inner on top) ── */}
         {ZONES.map((zone) => {
           const inset = zone.inset;
@@ -278,7 +289,9 @@ export default function ClientRecommendedSeatingPosition({
           </text>
         )}
       </svg>
+      )}
 
+      {showSupport && (<>
       {/* ── Compact horizontal legend ── */}
       <div style={{
         display: "flex",
@@ -372,6 +385,7 @@ export default function ClientRecommendedSeatingPosition({
           </tbody>
         </table>
       </div>
+      </>)}
 
       {/* ── Client explanation (screen only — print uses the result region) ── */}
       {!print && (

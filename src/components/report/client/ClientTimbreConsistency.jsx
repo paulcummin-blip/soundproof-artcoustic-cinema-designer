@@ -201,6 +201,7 @@ export default function ClientTimbreConsistency({
   screenWidthM,
   counts,
   print,
+  printPart,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
@@ -256,9 +257,11 @@ export default function ClientTimbreConsistency({
   const matrixRows = buildSeatRows(seats);
   const bestCategoryKey = getBestCategoryKey(seats);
 
-  const containerStyle = print
-    ? { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "8px 16px", width: "100%", height: "100%" }
-    : {
+  const showDrawing = !print || printPart !== "support";
+  const showSupport = !print || printPart !== "drawing";
+
+  const containerStyle = !print
+    ? {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -269,7 +272,12 @@ export default function ClientTimbreConsistency({
         border: "1px solid #DCDBD6",
         boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
         fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-      };
+      }
+    : printPart === "drawing"
+    ? { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }
+    : printPart === "support"
+    ? { width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "0 16px", fontFamily: "Didact Gothic, Century Gothic, sans-serif" }
+    : { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "8px 16px", width: "100%", height: "100%" };
 
   return (
     <div style={containerStyle}>
@@ -301,14 +309,17 @@ export default function ClientTimbreConsistency({
         </div>
       )}
 
-      <svg
-        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-        className="client-report-print-svg"
-        style={print
-          ? { width: "100%", height: "100%", maxHeight: "none", display: "block" }
-          : { width: "100%", maxWidth: 760, height: "auto" }
-        }
-      >
+      {showDrawing && (
+        <svg
+          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+          className="client-report-print-svg"
+          style={print && printPart === "drawing"
+            ? { width: "100%", height: "100%", maxWidth: "100%", maxHeight: "100%", display: "block" }
+            : print
+            ? { width: "100%", height: "100%", maxHeight: "none", display: "block" }
+            : { width: "100%", maxWidth: 760, height: "auto" }
+          }
+        >
         {/* Room outline */}
         <rect
           x={roomTopLeft.px}
@@ -407,7 +418,9 @@ export default function ClientTimbreConsistency({
           );
         })()}
       </svg>
+      )}
 
+      {showSupport && (<>
       {/* ── Category key (only categories that exist) ── */}
       <div style={{
         display: "flex",
@@ -558,6 +571,7 @@ export default function ClientTimbreConsistency({
           ))}
         </div>
       )}
+      </>)}
 
       {/* ── Wide low-profile conclusion card, no L-level badge (screen only — print renders it in the result region) ── */}
       {!print && (
