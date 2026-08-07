@@ -48,7 +48,7 @@ function parseAspectRatio(arStr) {
 
 /**
  * Compute the minimum calibrated projector light output (lumens) required
- * at the screen for a target luminance of 108 nits with 0.9 screen gain.
+ * at the screen for a target luminance of 108 nits with 0.6 screen gain.
  *
  *   requiredLumens = (targetNits × π × visibleScreenAreaM2) / screenGain
  *
@@ -67,7 +67,7 @@ function computeProjectorLumens(screenWidthM, aspectRatio) {
   const ratio = parseAspectRatio(aspectRatio);
   const visibleHeightM = W / ratio;
   const visibleScreenAreaM2 = W * visibleHeightM;
-  const requiredLumens = (108 * Math.PI * visibleScreenAreaM2) / 0.9;
+  const requiredLumens = (108 * Math.PI * visibleScreenAreaM2) / 0.6;
   return Math.round(requiredLumens / 10) * 10;
 }
 

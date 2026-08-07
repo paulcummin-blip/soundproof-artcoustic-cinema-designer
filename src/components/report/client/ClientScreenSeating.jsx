@@ -391,7 +391,7 @@ export default function ClientScreenSeating({
             {projectorLumens.toLocaleString("en-GB")} lumens
           </div>
           <div style={{ fontSize: print ? 8.5 : 10, color: "#625143" }}>
-            0.9 screen gain
+            0.6 screen gain
           </div>
         </div>
       )}
