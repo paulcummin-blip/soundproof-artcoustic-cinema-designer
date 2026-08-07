@@ -23,6 +23,7 @@ import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import SurroundSplStrip from '@/components/speakers/SurroundSplStrip';
 import LCRPanel from './LCRPanel';
+import { p2LevelForFormat } from '@/components/utils/p2ChannelAuthority';
 
 const P13_THRESHOLDS_REC = { L1: 99, L2: 102, L3: 105, L4: 108 };
 const P13_THRESHOLDS_MIN = { L1: 96, L2: 99, L3: 102, L4: 105 };
@@ -1390,12 +1391,26 @@ function SpeakerPlacementImpl(props) {
           disabled={disabled}
         >
           <SelectTrigger id="system-config" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-            <SelectValue placeholder="Select configuration" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <span className="text-2xl font-semibold" style={{ color: "#213428" }}>
+                {effectivePreset ? formatDolbyLabel(effectivePreset) : "Select configuration"}
+              </span>
+              {effectivePreset && (
+                <span style={{ fontSize: '12px', color: '#9C9A95', marginLeft: '16px', flexShrink: 0, fontWeight: 500 }}>
+                  {p2LevelForFormat(effectivePreset)}
+                </span>
+              )}
+            </span>
           </SelectTrigger>
           <SelectContent>
             {Object.keys(audioConfigurations).map(preset => (
               <SelectItem key={preset} value={preset} style={{ color: "#213428" }}>
-                {formatDolbyLabel(preset)}
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <span>{formatDolbyLabel(preset)}</span>
+                  <span style={{ fontSize: '12px', color: '#9C9A95', marginLeft: '16px', flexShrink: 0, fontWeight: 500 }}>
+                    {p2LevelForFormat(preset)}
+                  </span>
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
