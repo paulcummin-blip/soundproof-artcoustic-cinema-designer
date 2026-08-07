@@ -73,6 +73,20 @@ export default function ClientDesignHighlights({ highlights, print }) {
 
   return (
     <div style={containerStyle}>
+      {!print && (
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{
+            margin: 0,
+            fontSize: 34,
+            fontWeight: 300,
+            color: "#213428",
+            letterSpacing: "0.01em",
+            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+          }}>
+            Design Summary
+          </h1>
+        </div>
+      )}
       {grouped.map(({ category, items }) => (
         <div key={category}>
           <div style={categoryHeadingStyle}>{category}</div>

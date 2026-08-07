@@ -37,7 +37,7 @@ export default function ClientReportPrintStyles() {
       /* ── Pre-print measurement phase: body class added before window.print() ── */
       body.client-report-printing {
         background: #FFFFFF !important;
-        --client-report-logo-height: 12mm;
+        --client-report-logo-height: 16mm;
       }
 
       body.client-report-printing .client-report-screen-only {
@@ -95,10 +95,13 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__header img {
-        height: var(--client-report-logo-height, 12mm);
+        height: var(--client-report-logo-height, 16mm);
         width: auto;
         object-fit: contain;
-        margin-bottom: 3mm;
+        margin-bottom: 4mm;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
       }
 
       body.client-report-printing .client-report-page__header-title {
@@ -362,10 +365,13 @@ export default function ClientReportPrintStyles() {
         }
 
         .client-report-page__header img {
-          height: var(--client-report-logo-height, 12mm);
+          height: var(--client-report-logo-height, 16mm);
           width: auto;
           object-fit: contain;
-          margin-bottom: 3mm;
+          margin-bottom: 4mm;
+          margin-left: auto;
+          margin-right: auto;
+          display: block;
         }
 
         .client-report-page__header-title {

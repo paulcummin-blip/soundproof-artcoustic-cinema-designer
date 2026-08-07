@@ -92,7 +92,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "highlights" && (
           <>
             <div className="client-report-print-heading">
-              <h1 className="client-report-print-heading__title">Design Highlights</h1>
+              <h1 className="client-report-print-heading__title">Design Summary</h1>
             </div>
             <div className="client-report-print-drawing" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
               <ClientDesignHighlights highlights={printData.highlights} print />

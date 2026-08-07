@@ -76,17 +76,8 @@ export default function RP22ClientReport() {
     allSeatSplMetrics,
   } = authority;
 
-  // ── Design highlights (pure selector, no new analysis) ──
-  const highlights = useMemo(() => {
-    if (hydrating || !analysisResult) return [];
-    return selectClientDesignHighlights({
-      analysisResult,
-      bassPresentation,
-      p5Snapshot,
-      p9Snapshot,
-      placedSpeakers,
-    });
-  }, [hydrating, analysisResult, bassPresentation, p5Snapshot, p9Snapshot, placedSpeakers]);
+  // ── Design Summary (static intro — pure selector, no analysis) ──
+  const highlights = useMemo(() => selectClientDesignHighlights(), []);
 
   // ── Best Listening Area (pure selector, no new analysis) ──
   const bestListeningArea = useMemo(() => {
@@ -163,6 +154,19 @@ export default function RP22ClientReport() {
   // ── Active pages collection — drives both screen and PDF rendering order ──
   const activePages = useMemo(() => {
     const pages = [];
+    // Design Summary — always first (intro page)
+    if (highlights.length > 0) {
+      pages.push({
+        id: "design-summary",
+        visual: (
+          <ClientDesignHighlights highlights={highlights} />
+        ),
+        printData: {
+          type: "highlights",
+          highlights,
+        },
+      });
+    }
     if (p5Snapshot) {
       pages.push({
         id: "p5-spatial-resolution",
@@ -332,19 +336,6 @@ export default function RP22ClientReport() {
           targetBasisLabel: nonScreenSoundstage.targetBasisLabel,
           resultHeading: nonScreenSoundstage.resultHeading,
           resultExplanation: nonScreenSoundstage.resultExplanation,
-        },
-      });
-    }
-    // Design Highlights (only when supported highlights exist)
-    if (highlights.length > 0) {
-      pages.push({
-        id: "design-highlights",
-        visual: (
-          <ClientDesignHighlights highlights={highlights} />
-        ),
-        printData: {
-          type: "highlights",
-          highlights,
         },
       });
     }
