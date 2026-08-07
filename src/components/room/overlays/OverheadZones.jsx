@@ -6,6 +6,7 @@ import React from "react";
 import { useAppState } from "@/components/AppStateProvider";
 import { getListeningAreaBounds, computeRp22OverheadZoneExtents } from "@/components/utils/rp22OverheadZones";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
+import { computeP9GuideYs } from "@/components/utils/p9GuideGeometry";
 
 /**
  * OverheadZones overlay component - renders RP22 overhead bands
@@ -145,6 +146,91 @@ export default function OverheadZones({ roomRect, scale, toPx }) {
 
   if (showBack) {
     renderZone(zones.backZone, "back", "#213428");
+  }
+
+  // ── P9 level guide lines (front/rear zones only, 4+ height channels) ──
+  // Shows the Y positions at which overhead speaker placement crosses
+  // the P9 L4/L3/L2 thresholds. Uses the same elevation geometry as the
+  // canonical P9 authority (computeUpperVerticalAnglesForSeat).
+  if (heights >= 4 && bounds?.active) {
+    const frontCenterY = zones.frontZone?.active
+      ? (zones.frontZone.y1 + zones.frontZone.y2) / 2
+      : null;
+    const rearCenterY = zones.backZone?.active
+      ? (zones.backZone.y1 + zones.backZone.y2) / 2
+      : null;
+    const midCenterY = zones.midZone?.active
+      ? (zones.midZone.y1 + zones.midZone.y2) / 2
+      : null;
+    const hasMid = heights === 6;
+
+    const { frontGuides, rearGuides } = computeP9GuideYs({
+      mlpY: mlpY_m || bounds.midCenterY,
+      ceilingHeightM: roomDims?.heightM,
+      earHeightM: bounds.mlpEarHeight,
+      frontCenterY,
+      rearCenterY,
+      midCenterY,
+      hasMid,
+    });
+
+    const renderGuides = (zoneKey, zone, guides, strokeColor) => {
+      if (!zone || !zone.active || !Array.isArray(guides) || guides.length === 0) return;
+
+      const pieces = Array.isArray(zone.pieces) && zone.pieces.length
+        ? zone.pieces
+        : [{ x1: zone.x1, x2: zone.x2 }];
+      const rightmostX = Math.max(...pieces.map(p => Math.max(p.x1, p.x2)));
+
+      guides.forEach(guide => {
+        // Only render guides that fall within the zone's Y extent
+        if (guide.yM < zone.y1 || guide.yM > zone.y2) return;
+
+        const [, yPx] = toPx(0, guide.yM);
+        const [labelX] = toPx(rightmostX, 0);
+
+        // Dashed transverse line within each piece (clipped to zone width)
+        pieces.forEach((piece, idx) => {
+          const [x0px] = toPx(Math.min(piece.x1, piece.x2), 0);
+          const [x1px] = toPx(Math.max(piece.x1, piece.x2), 0);
+          elements.push(
+            <line
+              key={`p9-${zoneKey}-${guide.level}-${idx}`}
+              x1={x0px}
+              y1={yPx}
+              x2={x1px}
+              y2={yPx}
+              stroke={strokeColor}
+              strokeWidth="1.5"
+              strokeOpacity="0.5"
+              strokeDasharray="4,4"
+            />
+          );
+        });
+
+        // Small muted label at the right end of the guide line
+        elements.push(
+          <text
+            key={`p9-${zoneKey}-label-${guide.level}`}
+            x={labelX - 4}
+            y={yPx - 3}
+            textAnchor="end"
+            fill="#625143"
+            fontSize="10"
+            fontFamily="system-ui, sans-serif"
+          >
+            {guide.level}
+          </text>
+        );
+      });
+    };
+
+    if (showFront) {
+      renderGuides('front', zones.frontZone, frontGuides, "#4A230F");
+    }
+    if (showBack) {
+      renderGuides('rear', zones.backZone, rearGuides, "#213428");
+    }
   }
 
   return (
