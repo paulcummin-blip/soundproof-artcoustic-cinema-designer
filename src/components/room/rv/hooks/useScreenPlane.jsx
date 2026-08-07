@@ -69,6 +69,22 @@ export function useScreenPlane({
       const isSub      = isSubRole(r);
       if (!isFrontLCR && !isSub) continue;
 
+      // ── SCREEN SPEAKERS (FL/FC/FR) ──────────────────────────────────────
+      // Always include every active valid LCR speaker in the screen-clearance
+      // depth calculation.  Do NOT gate LCR participation by overlap with the
+      // current (yaw-blind) screen rectangle — at 0° yaw a valid LCR speaker
+      // can fall outside the axis-aligned rectangle, which would otherwise
+      // exclude it, empty the list, and resolve screen depth to 0 m (screen
+      // moves onto the wall).  The existing projected-depth maths inside
+      // computeMinimumScreenDepthM already handles yaw correctly.
+      if (isFrontLCR) {
+        frontObjectsToCalculate.push({ model: s.model, role: s.role, position: s.position });
+        continue;
+      }
+
+      // ── SUBWOOFERS ──────────────────────────────────────────────────────
+      // Subwoofer participation remains gated by rectangle overlap with the
+      // intended screen rectangle (unchanged behaviour).
       const posX = Number(s?.position?.x);
       const posY = Number(s?.position?.y);
       const dims = getModelDimsM(s?.model);
