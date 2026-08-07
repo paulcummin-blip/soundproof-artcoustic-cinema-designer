@@ -10,6 +10,7 @@ import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { useRspState } from "@/components/state/useRspState";
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import { validateInstances, bassInputAdapter, normaliseLegacySubwoofers } from "@/components/utils/subwooferInstanceMigration";
+import { migrateP12Mode, P12_MODE_MINIMUM, P12_MODE_RECOMMENDED } from "@/components/utils/p12ModeAuthority";
 
 // Stage 2: Restore canonical subwoofer instances from a local autosave payload.
 // Four-way logic:
@@ -740,7 +741,13 @@ function useDesignerState() {
   ));
   const setDesignEqEnabledSafe = useCallback((v) => setDesignEqEnabled(!!v), []);
 
-  const [p12Mode, setP12Mode] = useState(null);
+  // P12 target basis — canonical authority. Only "minimum"/"recommended" are
+  // legal runtime values. Default "minimum". Restored from local autosave with
+  // legacy migration (half-space/anechoic) so a prior session's choice survives.
+  const [p12Mode, _setP12Mode] = useState(() => migrateP12Mode(__autosavePayload?.p12Mode));
+  const setP12Mode = useCallback((next) => {
+    _setP12Mode(next === P12_MODE_RECOMMENDED ? P12_MODE_RECOMMENDED : P12_MODE_MINIMUM);
+  }, []);
   const [p12Level, setP12Level] = useState(null);
 
   const setP21EarlyReflectionPresetSafe = useCallback((next) => {
@@ -1440,6 +1447,7 @@ function useDesignerState() {
       if (typeof p.rsp_mode === "string") setRspMode(p.rsp_mode);
       if (p.manual_rsp_y_m !== undefined) setManualRspY_m(typeof p.manual_rsp_y_m === "number" ? p.manual_rsp_y_m : null);
       if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
+      if (Object.prototype.hasOwnProperty.call(p, "p12Mode")) setP12Mode(p.p12Mode);
 
       setAutosaveMeta(getAutosaveMeta());
       
@@ -1529,6 +1537,7 @@ function useDesignerState() {
       rsp_mode: rspMode,
       manual_rsp_y_m: manualRspY_m,
       designEqEnabled,
+      p12Mode,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
@@ -1588,7 +1597,8 @@ function useDesignerState() {
     roomElements,
     subwooferInstances,
     subwooferInstancesStatus,
-    subwooferInstanceMigrationState
+    subwooferInstanceMigrationState,
+    p12Mode
     ]);
 
   const restoreAutosave = useCallback(() => {
@@ -1657,6 +1667,7 @@ function useDesignerState() {
       if (p.overlays) setOverlays(p.overlays);
       if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
       if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
+      if (Object.prototype.hasOwnProperty.call(p, "p12Mode")) setP12Mode(p.p12Mode);
 
       setAutosaveMeta(getAutosaveMeta());
       return true;
@@ -1726,7 +1737,8 @@ function useDesignerState() {
       useFrontGlobal,
       useMidGlobal,
       useRearGlobal,
-      splConfig
+      splConfig,
+      p12Mode
     };
     try {
       saveAutosave(payload);
@@ -1738,7 +1750,7 @@ function useDesignerState() {
     } catch (e) {
       console.warn("Autosave failed:", e);
     }
-  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, splConfig, subwooferInstances, subwooferInstancesStatus]);
+  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, splConfig, p12Mode, subwooferInstances, subwooferInstancesStatus]);
 
   const clearWorkingCopy = useCallback(() => {
     try {
@@ -1886,6 +1898,9 @@ function useDesignerState() {
       p14Mode: 'minimum', bassTargetLevel: 1, selectedP14TargetBasis: 'minimum', selectedP14Level: 1,
       perRole: {}
     });
+
+    // P12 target basis defaults to Minimum
+    setP12Mode(P12_MODE_MINIMUM);
 
     // Design EQ defaults to On for a new/reset project
     setDesignEqEnabled(true);

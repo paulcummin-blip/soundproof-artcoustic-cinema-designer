@@ -10,6 +10,7 @@ import {
   validateInstances,
 } from "@/components/utils/subwooferInstanceMigration";
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
+import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -491,8 +492,11 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   }
 
   // 10b) P12 mode/level (stored inside spl_config on the entity)
+  // Legacy vocabulary migration: half-space -> minimum, anechoic -> recommended.
+  // Unknown/missing -> minimum. This is the ONLY place radiation vocabulary is
+  // translated to p12Mode; after hydration the two authorities are independent.
   if (typeof appState?.setP12Mode === "function") {
-    appState.setP12Mode(p?.spl_config?.p12_mode ?? null);
+    appState.setP12Mode(migrateP12Mode(p?.spl_config?.p12_mode ?? null));
   }
   if (typeof appState?.setP12Level === "function") {
     appState.setP12Level(p?.spl_config?.p12_level ?? null);

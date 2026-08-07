@@ -6,6 +6,8 @@
 // INPUT: plain JS values from appState + local state
 // OUTPUT: flat object that matches entities/Project.json
 
+import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
+
 // Helper: safely parse JSON strings or return native types unchanged
 function safeParseJson(value) {
   if (typeof value === 'string') {
@@ -266,9 +268,11 @@ export function serializeProject(input = {}) {
     use_rear_global: !!useRearGlobal,
 
     // SPL config (merged with current P12 result if available)
+    // Defensive normalisation at the serialization boundary: only canonical
+    // p12Mode values ("minimum"/"recommended") are ever persisted to p12_mode.
     spl_config: {
       ...asObject(splConfig),
-      ...(p12Mode != null ? { p12_mode: p12Mode } : {}),
+      ...(p12Mode != null ? { p12_mode: migrateP12Mode(p12Mode) } : {}),
       ...(p12Level != null ? { p12_level: p12Level } : {}),
     },
 

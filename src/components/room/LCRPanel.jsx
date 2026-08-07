@@ -12,6 +12,7 @@ import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { calculateLcrAcousticCentreBand, formatHeightM } from '@/components/utils/acoustics/acousticCentreBand';
 import { calculateTvFrontStageHeightGuidance } from '@/components/utils/acoustics/tvFrontStageHeightGuidance';
+import { P12_MODE_RECOMMENDED } from '@/components/utils/p12ModeAuthority';
 
 const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P12_THRESHOLDS_MIN = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -281,6 +282,10 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     frontSubsCfg,
   }), [speakerSystem?.placedSpeakers, subwoofers, frontSubsCfg]);
 
+  // P12 target basis is owned by appState.p12Mode (canonical "minimum"/"recommended").
+  // radiationMode remains a separate acoustical value and is NOT coupled to P12.
+  const p12ActiveMode = appState?.p12Mode === P12_MODE_RECOMMENDED ? P12_MODE_RECOMMENDED : 'minimum';
+
   const p12Computed = useMemo(() => {
     if (!allSeatSplMetrics) return null;
     const mlpMetrics = allSeatSplMetrics.get('mlp');
@@ -295,22 +300,20 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
       .map(v => Math.ceil(v));
     if (lcrTileSplDb.length === 0) return null;
     const pillBasisDb = Math.min(...lcrTileSplDb);
-    const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
-    const thresholds = isMinimumMode ? P12_THRESHOLDS_MIN : P12_THRESHOLDS_REC;
+    const thresholds = p12ActiveMode === P12_MODE_RECOMMENDED ? P12_THRESHOLDS_REC : P12_THRESHOLDS_MIN;
     const level = computeRP22Level(pillBasisDb, thresholds);
-    const currentMode = isMinimumMode ? 'half-space' : 'anechoic';
-    return { level, currentMode };
-  }, [allSeatSplMetrics, seatingPositions, splConfig?.radiationMode]);
+    return { level, currentMode: p12ActiveMode };
+  }, [allSeatSplMetrics, seatingPositions, p12ActiveMode]);
 
-  // Write P12 result into app state (picked up by the normal save path via splConfig)
+  // Write P12 LEVEL into app state. p12Mode is owned by the toggle below —
+  // the effect never writes p12Mode, so the two authorities stay decoupled.
   useEffect(() => {
     if (!p12Computed) return;
     const sig = `${p12Computed.currentMode}|${p12Computed.level}`;
     if (lastP12SentRef.current === sig) return;
     lastP12SentRef.current = sig;
-    appState?.setP12Mode?.(p12Computed.currentMode);
     appState?.setP12Level?.(p12Computed.level);
-  }, [p12Computed, appState?.setP12Mode, appState?.setP12Level]);
+  }, [p12Computed, appState?.setP12Level]);
 
   const fcModel = getByRole('FC')?.model;
   const fcMeta = fcModel ? getSpeakerModelMeta(fcModel) : null;
@@ -789,13 +792,13 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
           <Button
             type="button"
             size="sm"
-            variant={splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode ? 'default' : 'outline'}
+            variant={p12ActiveMode === 'minimum' ? 'default' : 'outline'}
             className={
-              splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode
+              p12ActiveMode === 'minimum'
                 ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
                 : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
             }
-            onClick={() => updateGlobalSpl?.({ radiationMode: 'half-space' })}
+            onClick={() => appState?.setP12Mode?.('minimum')}
             disabled={disabled}
           >
             Minimum
@@ -803,13 +806,13 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
           <Button
             type="button"
             size="sm"
-            variant={splConfig?.radiationMode === 'anechoic' ? 'default' : 'outline'}
+            variant={p12ActiveMode === P12_MODE_RECOMMENDED ? 'default' : 'outline'}
             className={
-              splConfig?.radiationMode === 'anechoic'
+              p12ActiveMode === P12_MODE_RECOMMENDED
                 ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
                 : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
             }
-            onClick={() => updateGlobalSpl?.({ radiationMode: 'anechoic' })}
+            onClick={() => appState?.setP12Mode?.(P12_MODE_RECOMMENDED)}
             disabled={disabled}
           >
             Recommended
