@@ -17,8 +17,9 @@
 import React, { useMemo } from "react";
 import { LEVEL_FILLS } from "./levelFills";
 
+// Below L1 is intentionally absent from the RP23 legend — outside the valid
+// L1 viewing envelope is left visually empty (room background), not coloured.
 const LEGEND_ITEMS = [
-  { label: "Below L1", fill: LEVEL_FILLS["below-l1"] },
   { label: "L1", fill: LEVEL_FILLS["l1"] },
   { label: "L2", fill: LEVEL_FILLS["l2"] },
   { label: "L3", fill: LEVEL_FILLS["l3"] },
@@ -26,7 +27,6 @@ const LEGEND_ITEMS = [
 ];
 
 const LABEL_COLORS = {
-  "below-l1": "#F8F8F7",
   "l1": "#F8F8F7",
   "l2": "#3E4349",
   "l3": "#3E4349",
@@ -184,7 +184,10 @@ export default function ClientScreenSeating({
         />
 
         {/* ── Banded RP23 viewing zones (longitudinal, opaque) ── */}
+        {/* Below L1 zones are intentionally skipped — outside the valid L1
+            viewing envelope the room background shows through as empty space. */}
         {(Array.isArray(zones) ? zones : []).map((zone) => {
+          if (zone.level === "below-l1") return null;
           const yStart = Math.max(0, zone.yStart);
           const yEnd = Math.min(L, zone.yEnd);
           if (yEnd <= yStart) return null;
@@ -198,7 +201,7 @@ export default function ClientScreenSeating({
                 y={tl.py}
                 width={br.px - tl.px}
                 height={heightPx}
-                fill={LEVEL_FILLS[zone.level] || LEVEL_FILLS["below-l1"]}
+                fill={LEVEL_FILLS[zone.level]}
                 stroke="none"
               />
               {heightPx > 18 && (
