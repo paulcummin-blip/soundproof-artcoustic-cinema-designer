@@ -18,7 +18,7 @@
  */
 
 import React, { useMemo } from "react";
-import { LEVEL_FILLS } from "./levelFills";
+import { LEVEL_FILLS, LEVEL_LABEL_COLORS, zoneLabelPosition } from "./levelFills";
 
 // ── Wall-distance zones (metres inward from each room wall) ──
 // Thresholds match the canonical P1 grading authority.
@@ -198,6 +198,43 @@ export default function ClientRecommendedSeatingPosition({
               fill={zone.fill}
               stroke="none"
             />
+          );
+        })}
+
+        {/* ── In-zone level labels (bottom-right of each visible ring) ── */}
+        {ZONES.map((zone, i) => {
+          const inset = zone.inset;
+          const outerRight = W - inset;
+          const outerBottom = L - inset;
+          const outerBr = toPx(outerRight, outerBottom);
+
+          let availableDepthPx;
+          if (i < ZONES.length - 1) {
+            const innerInset = ZONES[i + 1].inset;
+            const innerBr = toPx(outerRight, L - innerInset);
+            availableDepthPx = outerBr.py - innerBr.py;
+          } else {
+            availableDepthPx = outerBr.py - toPx(outerRight, inset).py;
+          }
+
+          const fontSize = print ? 9 : 11;
+          const pos = zoneLabelPosition(outerBr.px, outerBr.py, fontSize, availableDepthPx);
+          if (!pos) return null;
+
+          return (
+            <text
+              key={`label-${zone.key}`}
+              x={pos.x}
+              y={pos.y}
+              fill={LEVEL_LABEL_COLORS[zone.key] || "#3E4349"}
+              fontSize={fontSize}
+              textAnchor={pos.textAnchor}
+              fontFamily="Didact Gothic, Century Gothic, sans-serif"
+              letterSpacing="0.1em"
+              fontWeight={600}
+            >
+              {zone.label}
+            </text>
           );
         })}
 

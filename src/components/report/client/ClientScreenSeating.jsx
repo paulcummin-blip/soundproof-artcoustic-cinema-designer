@@ -15,7 +15,7 @@
  */
 
 import React, { useMemo } from "react";
-import { LEVEL_FILLS } from "./levelFills";
+import { LEVEL_FILLS, LEVEL_LABEL_COLORS, zoneLabelPosition } from "./levelFills";
 
 // Below L1 is intentionally absent from the RP23 legend — outside the valid
 // L1 viewing envelope is left visually empty (room background), not coloured.
@@ -25,13 +25,6 @@ const LEGEND_ITEMS = [
   { label: "L3", fill: LEVEL_FILLS["l3"] },
   { label: "L4", fill: LEVEL_FILLS["l4"] },
 ];
-
-const LABEL_COLORS = {
-  "l1": "#F8F8F7",
-  "l2": "#3E4349",
-  "l3": "#3E4349",
-  "l4": "#3E4349",
-};
 
 export default function ClientScreenSeating({
   roomDims,
@@ -215,21 +208,25 @@ export default function ClientScreenSeating({
                 fill={LEVEL_FILLS[zone.level]}
                 stroke="none"
               />
-              {heightPx > 18 && (
-                <text
-                  x={(tl.px + br.px) / 2}
-                  y={(tl.py + br.py) / 2}
-                  fill={LABEL_COLORS[zone.level] || "#3E4349"}
-                  fontSize={print ? 9 : 11}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
-                  letterSpacing="0.1em"
-                  fontWeight={600}
-                >
-                  {zone.label}
-                </text>
-              )}
+              {(() => {
+                const fontSize = print ? 9 : 11;
+                const pos = zoneLabelPosition(br.px, br.py, fontSize, heightPx);
+                if (!pos) return null;
+                return (
+                  <text
+                    x={pos.x}
+                    y={pos.y}
+                    fill={LEVEL_LABEL_COLORS[zone.level] || "#3E4349"}
+                    fontSize={fontSize}
+                    textAnchor={pos.textAnchor}
+                    fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                    letterSpacing="0.1em"
+                    fontWeight={600}
+                  >
+                    {zone.label}
+                  </text>
+                );
+              })()}
             </g>
           );
         })}

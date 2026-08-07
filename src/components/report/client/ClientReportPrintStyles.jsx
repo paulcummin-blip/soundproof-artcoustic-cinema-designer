@@ -123,10 +123,6 @@ export default function ClientReportPrintStyles() {
       body.client-report-printing .client-report-page__header-meta span {
         white-space: nowrap;
       }
-      body.client-report-printing .client-report-page__header-meta span + span::before {
-        content: " · ";
-        margin-right: 3mm;
-      }
 
       /* ── Screen visual — hidden in print ── */
       body.client-report-printing .client-report-page__screen-visual {
@@ -410,10 +406,6 @@ export default function ClientReportPrintStyles() {
 
         .client-report-page__header-meta span {
           white-space: nowrap;
-        }
-        .client-report-page__header-meta span + span::before {
-          content: " · ";
-          margin-right: 3mm;
         }
 
         /* ── Screen visual — hidden in print ── */

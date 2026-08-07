@@ -62,8 +62,11 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           <div className="client-report-page__header-title">Visual Report</div>
           <div className="client-report-page__header-meta">
             <span>{projectName}</span>
+            {clientName && <span aria-hidden="true"> · </span>}
             {clientName && <span>{clientName}</span>}
+            {projectRef && <span aria-hidden="true"> · </span>}
             {projectRef && <span>Ref: {projectRef}</span>}
+            {createdDateStr && <span aria-hidden="true"> · </span>}
             {createdDateStr && <span>{createdDateStr}</span>}
           </div>
         </div>
