@@ -32,6 +32,7 @@ export default function RvP9Corridors({
   state,
   note,
   selectedRow,
+  rows,
   overheadZones,
   toPx,
   widthM,
@@ -61,23 +62,15 @@ export default function RvP9Corridors({
 
   if (!applicable) return null;
 
-  // Resolve the selected row's zone pieces
-  const zoneKey = ZONE_KEY_MAP[selectedRow];
-  const zone = overheadZones?.[zoneKey];
-  if (!zone || !zone.active) return null;
+  // ─── Resolve rows to render ─────────────────────────────────────────
+  // If selectedRow is provided, render only that row. Otherwise render all
+  // applicable rows from the hook result (baseline guides without selection).
+  const rowsToRender = (rows && rows.length > 0)
+    ? rows
+    : (selectedRow ? [{ row: selectedRow, state }] : []);
 
-  const pieces = Array.isArray(zone.pieces) && zone.pieces.length
-    ? zone.pieces
-    : [{ x1: zone.x1, x2: zone.x2 }];
-  if (pieces.length === 0) return null;
+  if (rowsToRender.length === 0) return null;
 
-  const zoneYMin = Math.min(zone.y1, zone.y2);
-  const zoneYMax = Math.max(zone.y1, zone.y2);
-
-  // Helper: convert a Y (meters) to px
-  const yToPx = (yM) => toPx(0, yM)[1];
-
-  // ─── Unified rendering: L4 shading + L4/L3/L2 boundary ruler ──────────
   const labelFontSize = Math.max(8, 9 * scale);
 
   // Boundary styling per level — L4 is the reference, L3/L2 progressively subtler
@@ -91,82 +84,129 @@ export default function RvP9Corridors({
   const [roomX0px] = toPx(0, 0);
   const [roomX1px] = toPx(widthM, 0);
 
+  // Helper: convert Y (meters) to px
+  const yToPx = (yM) => toPx(0, yM)[1];
+
   return (
     <g data-layer="p9-target" pointerEvents="none">
-      {/* L4-compliant shading within zone pieces (clipped to zone Y) */}
-      {state !== "no_l4" && (ranges || []).map((range, ri) => {
-        const yStart = Math.max(range.yStart, zoneYMin);
-        const yEnd = Math.min(range.yEnd, zoneYMax);
-        if (yStart >= yEnd) return null;
+      {/* Per-row L4 shading and state messages */}
+      {rowsToRender.map(({ row, state: rowState }) => {
+        const zoneKey = ZONE_KEY_MAP[row];
+        const zone = overheadZones?.[zoneKey];
+        if (!zone || !zone.active) return null;
 
-        const yStartPx = yToPx(yStart);
-        const yEndPx = yToPx(yEnd);
-        const yTop = Math.min(yStartPx, yEndPx);
-        const hpx = Math.abs(yEndPx - yStartPx);
+        const pieces = Array.isArray(zone.pieces) && zone.pieces.length
+          ? zone.pieces
+          : [{ x1: zone.x1, x2: zone.x2 }];
+        if (pieces.length === 0) return null;
 
-        return pieces.map((piece, pi) => {
-          const [x0px] = toPx(piece.x1, 0);
-          const [x1px] = toPx(piece.x2, 0);
-          const x = Math.min(x0px, x1px);
-          const wpx = Math.abs(x1px - x0px);
-          return (
-            <rect
-              key={`p9-range-${ri}-${pi}`}
-              x={x}
-              y={yTop}
-              width={wpx}
-              height={hpx}
-              fill="#213428"
-              fillOpacity={0.06}
-              stroke="none"
-            />
-          );
-        });
-      })}
+        const zoneYMin = Math.min(zone.y1, zone.y2);
+        const zoneYMax = Math.max(zone.y1, zone.y2);
+        const rowRanges = (ranges || []).filter((r) => r.row === row);
+        const rowBoundaries = (boundaries || []).filter((b) => b.row === row);
 
-      {/* All-L4: outline zone pieces + discreet label */}
-      {state === "all_l4" && pieces.map((piece, i) => {
-        const zoneYTopPx = yToPx(zoneYMin);
-        const zoneYBotPx = yToPx(zoneYMax);
-        const yPx = Math.min(zoneYTopPx, zoneYBotPx);
-        const hpx = Math.abs(zoneYBotPx - zoneYTopPx);
-        const [x0px] = toPx(piece.x1, 0);
-        const [x1px] = toPx(piece.x2, 0);
-        const x = Math.min(x0px, x1px);
-        const wpx = Math.abs(x1px - x0px);
         return (
-          <rect
-            key={`p9-all-${i}`}
-            x={x}
-            y={yPx}
-            width={wpx}
-            height={hpx}
-            fill="#213428"
-            fillOpacity={0.07}
-            stroke="#213428"
-            strokeWidth={1}
-            strokeOpacity={0.3}
-          />
+          <g key={`p9-row-${row}`}>
+            {/* L4-compliant shading within zone pieces (clipped to zone Y) */}
+            {rowState !== "no_l4" && rowRanges.map((range, ri) => {
+              const yStart = Math.max(range.yStart, zoneYMin);
+              const yEnd = Math.min(range.yEnd, zoneYMax);
+              if (yStart >= yEnd) return null;
+
+              const yStartPx = yToPx(yStart);
+              const yEndPx = yToPx(yEnd);
+              const yTop = Math.min(yStartPx, yEndPx);
+              const hpx = Math.abs(yEndPx - yStartPx);
+
+              return pieces.map((piece, pi) => {
+                const [x0px] = toPx(piece.x1, 0);
+                const [x1px] = toPx(piece.x2, 0);
+                const x = Math.min(x0px, x1px);
+                const wpx = Math.abs(x1px - x0px);
+                return (
+                  <rect
+                    key={`p9-range-${row}-${ri}-${pi}`}
+                    x={x}
+                    y={yTop}
+                    width={wpx}
+                    height={hpx}
+                    fill="#213428"
+                    fillOpacity={0.06}
+                    stroke="none"
+                  />
+                );
+              });
+            })}
+
+            {/* All-L4: outline zone pieces + discreet label */}
+            {rowState === "all_l4" && pieces.map((piece, i) => {
+              const zoneYTopPx = yToPx(zoneYMin);
+              const zoneYBotPx = yToPx(zoneYMax);
+              const yPx = Math.min(zoneYTopPx, zoneYBotPx);
+              const hpx = Math.abs(zoneYBotPx - zoneYTopPx);
+              const [x0px] = toPx(piece.x1, 0);
+              const [x1px] = toPx(piece.x2, 0);
+              const x = Math.min(x0px, x1px);
+              const wpx = Math.abs(x1px - x0px);
+              return (
+                <rect
+                  key={`p9-all-${row}-${i}`}
+                  x={x}
+                  y={yPx}
+                  width={wpx}
+                  height={hpx}
+                  fill="#213428"
+                  fillOpacity={0.07}
+                  stroke="#213428"
+                  strokeWidth={1}
+                  strokeOpacity={0.3}
+                />
+              );
+            })}
+            {rowState === "all_l4" && (() => {
+              const zoneMidY = (zoneYMin + zoneYMax) / 2;
+              const cy = yToPx(zoneMidY);
+              const [cx] = toPx((pieces[0].x1 + pieces[0].x2) / 2, 0);
+              return (
+                <text
+                  x={cx}
+                  y={cy}
+                  fill="#213428"
+                  fontSize={Math.max(8, 9 * scale)}
+                  textAnchor="middle"
+                  fontFamily="Didact Gothic, sans-serif"
+                  opacity={0.5}
+                >
+                  L4 throughout this zone
+                </text>
+              );
+            })()}
+
+            {/* No-L4 with no boundaries: discreet zone-level message */}
+            {rowState === "no_l4" && rowBoundaries.length === 0 && (() => {
+              const zoneMidY = (zoneYMin + zoneYMax) / 2;
+              const cy = yToPx(zoneMidY);
+              const allX = pieces.flatMap((p) => [p.x1, p.x2]);
+              const xMin = Math.min(...allX);
+              const xMax = Math.max(...allX);
+              const [cx] = toPx((xMin + xMax) / 2, 0);
+              return (
+                <text
+                  x={cx}
+                  y={cy}
+                  fill="#625143"
+                  fontSize={Math.max(9, 10 * scale)}
+                  textAnchor="middle"
+                  fontFamily="Didact Gothic, sans-serif"
+                  opacity={0.5}
+                >
+                  P9 targets outside current placement range
+                </text>
+              );
+            })()}
+          </g>
         );
       })}
-      {state === "all_l4" && (() => {
-        const zoneMidY = (zoneYMin + zoneYMax) / 2;
-        const cy = yToPx(zoneMidY);
-        const [cx] = toPx((pieces[0].x1 + pieces[0].x2) / 2, 0);
-        return (
-          <text
-            x={cx}
-            y={cy}
-            fill="#213428"
-            fontSize={Math.max(8, 9 * scale)}
-            textAnchor="middle"
-            fontFamily="Didact Gothic, sans-serif"
-            opacity={0.5}
-          >
-            L4 throughout this zone
-          </text>
-        );
-      })()}
 
       {/* Boundary ruler — room-width lines for L4 / L3 / L2 transitions */}
       {(boundaries || []).map((b, bi) => {
@@ -197,29 +237,6 @@ export default function RvP9Corridors({
           </g>
         );
       })}
-
-      {/* No-L4 with no boundaries: discreet zone-level message */}
-      {state === "no_l4" && (boundaries || []).length === 0 && (() => {
-        const zoneMidY = (zoneYMin + zoneYMax) / 2;
-        const cy = yToPx(zoneMidY);
-        const allX = pieces.flatMap((p) => [p.x1, p.x2]);
-        const xMin = Math.min(...allX);
-        const xMax = Math.max(...allX);
-        const [cx] = toPx((xMin + xMax) / 2, 0);
-        return (
-          <text
-            x={cx}
-            y={cy}
-            fill="#625143"
-            fontSize={Math.max(9, 10 * scale)}
-            textAnchor="middle"
-            fontFamily="Didact Gothic, sans-serif"
-            opacity={0.5}
-          >
-            P9 targets outside current placement range
-          </text>
-        );
-      })()}
     </g>
   );
 }

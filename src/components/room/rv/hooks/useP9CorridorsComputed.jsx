@@ -103,6 +103,95 @@ function getRelevantGapDeg(result, selectedRow, ohCount) {
   return Math.max(...relevantGaps);
 }
 
+// Compute P9 guides (ranges + boundaries) for a single overhead row.
+// Moves only the specified row to candidate Y positions and runs the
+// canonical production helpers to find the relevant vertical gap.
+function computeRowGuides({
+  row,
+  rspPoint,
+  placedSpeakers,
+  ohCount,
+  roomCenterX,
+  yMin,
+  yMax,
+  canonicalRoleFn,
+}) {
+  const samples = [];
+
+  for (let y = yMin; y <= yMax; y += SAMPLE_INTERVAL_M) {
+    const candidateSpeakers = placedSpeakers.map((s) => {
+      if (getOverheadRowFromRole(s.role) === row) {
+        return { ...s, position: { ...s.position, y } };
+      }
+      return s;
+    });
+
+    const upperSpeakers = getUpperSpeakersForSeat(rspPoint, candidateSpeakers, canonicalRoleFn);
+    const result = computeUpperVerticalAnglesForSeat(rspPoint, upperSpeakers, roomCenterX);
+    const relevantGapDeg = getRelevantGapDeg(result, row, ohCount);
+    samples.push({ y, gap: relevantGapDeg });
+  }
+
+  const validSamples = samples.filter((s) => Number.isFinite(s.gap));
+  if (validSamples.length === 0) {
+    return { state: "no_l4", ranges: [], boundaries: [] };
+  }
+
+  const l4Samples = validSamples.filter((s) => s.gap <= P9_L4_MAX);
+
+  // All samples L4 → no crossings at 50/60/80
+  if (l4Samples.length === validSamples.length) {
+    const ranges = [{ yStart: validSamples[0].y, yEnd: validSamples[validSamples.length - 1].y, row }];
+    return { state: "all_l4", ranges, boundaries: [] };
+  }
+
+  // Bounded L4 — find compliant ranges
+  const ranges = [];
+  if (l4Samples.length > 0) {
+    let rangeStart = null;
+    for (let i = 0; i < validSamples.length; i++) {
+      const s = validSamples[i];
+      const isL4 = s.gap <= P9_L4_MAX;
+      if (isL4 && rangeStart === null) {
+        rangeStart = s.y;
+      } else if (!isL4 && rangeStart !== null) {
+        ranges.push({ yStart: rangeStart, yEnd: validSamples[i - 1].y, row });
+        rangeStart = null;
+      }
+    }
+    if (rangeStart !== null) {
+      ranges.push({ yStart: rangeStart, yEnd: validSamples[validSamples.length - 1].y, row });
+    }
+  }
+
+  // Boundary crossings for L4 / L3 / L2
+  const boundaries = [];
+  for (const { level, deg } of P9_THRESHOLDS) {
+    for (let i = 1; i < validSamples.length; i++) {
+      const prev = validSamples[i - 1];
+      const curr = validSamples[i];
+      const prevBelow = prev.gap <= deg;
+      const currBelow = curr.gap <= deg;
+      if (prevBelow !== currBelow) {
+        const denom = curr.gap - prev.gap;
+        let yBoundary;
+        if (Number.isFinite(denom) && Math.abs(denom) > 1e-9) {
+          const t = (deg - prev.gap) / denom;
+          yBoundary = prev.y + t * (curr.y - prev.y);
+        } else {
+          yBoundary = (prev.y + curr.y) / 2;
+        }
+        if (Number.isFinite(yBoundary) && yBoundary >= yMin && yBoundary <= yMax) {
+          boundaries.push({ y: yBoundary, level, deg, row });
+        }
+      }
+    }
+  }
+
+  const state = l4Samples.length === 0 ? "no_l4" : "bounded_l4";
+  return { state, ranges, boundaries };
+}
+
 export function useP9CorridorsComputed({
   selectedOverheadRow,
   rsp,
@@ -114,7 +203,7 @@ export function useP9CorridorsComputed({
   return useMemo(() => {
     const empty = { applicable: false, state: null, ranges: [], boundaries: [], selectedRow: null, note: null };
 
-    if (!selectedOverheadRow || !rsp || !Array.isArray(placedSpeakers)) {
+    if (!rsp || !Array.isArray(placedSpeakers)) {
       return empty;
     }
 
@@ -156,112 +245,66 @@ export function useP9CorridorsComputed({
       return empty;
     }
 
-    // Check that the selected row has speakers
-    const selectedRowSpeakers = overheadSpeakers.filter(
-      (s) => getOverheadRowFromRole(s.role) === selectedOverheadRow
-    );
-    if (selectedRowSpeakers.length === 0) {
-      return empty;
-    }
+    // Determine which rows have speakers
+    const rowsWithSpeakers = new Set(overheadSpeakers.map((s) => getOverheadRowFromRole(s.role)));
 
-    // Check that at least one other row exists (for adjacency)
-    const otherRowSpeakers = overheadSpeakers.filter(
-      (s) => getOverheadRowFromRole(s.role) !== selectedOverheadRow
-    );
-    if (otherRowSpeakers.length === 0) {
-      return empty;
+    // Determine applicable rows to compute:
+    // - If selectedOverheadRow is valid and has speakers: compute only that row
+    // - Otherwise: compute all rows that have speakers (baseline guides)
+    let applicableRows;
+    if (selectedOverheadRow && rowsWithSpeakers.has(selectedOverheadRow)) {
+      applicableRows = [selectedOverheadRow];
+    } else {
+      applicableRows = [...rowsWithSpeakers];
     }
 
     const rspPoint = { x: rspX, y: rspY, z: rspZ };
     const canonicalRoleFn = getCanonicalRole || ((role) => String(role || "").toUpperCase());
-
-    // Sample Y positions along the room length
     const yMin = 0.1;
     const yMax = lengthM - 0.1;
-    const samples = [];
 
-    for (let y = yMin; y <= yMax; y += SAMPLE_INTERVAL_M) {
-      // Build candidate speakers: move selected row to candidate Y, preserve X and Z
-      const candidateSpeakers = placedSpeakers.map((s) => {
-        if (getOverheadRowFromRole(s.role) === selectedOverheadRow) {
-          return { ...s, position: { ...s.position, y } };
-        }
-        return s;
+    // Compute guides for each applicable row
+    const allRanges = [];
+    const allBoundaries = [];
+    const rowStates = [];
+
+    for (const row of applicableRows) {
+      const { state: rowState, ranges, boundaries } = computeRowGuides({
+        row,
+        rspPoint,
+        placedSpeakers,
+        ohCount,
+        roomCenterX,
+        yMin,
+        yMax,
+        canonicalRoleFn,
       });
 
-      // Run production helpers (no new acoustic maths)
-      const upperSpeakers = getUpperSpeakersForSeat(rspPoint, candidateSpeakers, canonicalRoleFn);
-      const result = computeUpperVerticalAnglesForSeat(rspPoint, upperSpeakers, roomCenterX);
-
-      // Use pair-specific gap, not global maxVerticalGapDeg
-      const relevantGapDeg = getRelevantGapDeg(result, selectedOverheadRow, ohCount);
-
-      samples.push({ y, gap: relevantGapDeg });
+      allRanges.push(...ranges);
+      allBoundaries.push(...boundaries);
+      rowStates.push({ row, state: rowState });
     }
 
-    // Only consider samples with finite gap values
-    const validSamples = samples.filter((s) => Number.isFinite(s.gap));
-    if (validSamples.length === 0) {
-      return { applicable: true, state: "no_l4", ranges: [], boundaries: [], selectedRow: selectedOverheadRow, note: null };
+    // Overall state: worst across all rows
+    let overallState = "no_l4";
+    if (rowStates.length > 0) {
+      const hasBounded = rowStates.some((r) => r.state === "bounded_l4");
+      const hasAllL4 = rowStates.some((r) => r.state === "all_l4");
+      const hasNoL4 = rowStates.some((r) => r.state === "no_l4");
+      if (hasBounded) overallState = "bounded_l4";
+      else if (hasAllL4 && !hasNoL4) overallState = "all_l4";
+      else overallState = "no_l4";
     }
 
-    // ── L4-compliant ranges (for shading) ──────────────────────────────
-    const l4Samples = validSamples.filter((s) => s.gap <= P9_L4_MAX);
-
-    // All samples L4 → no crossings at 50/60/80
-    if (l4Samples.length === validSamples.length) {
-      const ranges = [{ yStart: validSamples[0].y, yEnd: validSamples[validSamples.length - 1].y }];
-      return { applicable: true, state: "all_l4", ranges, boundaries: [], selectedRow: selectedOverheadRow, note: null };
-    }
-
-    // Bounded L4 — find compliant ranges (consecutive L4 samples)
-    const ranges = [];
-    if (l4Samples.length > 0) {
-      let rangeStart = null;
-      for (let i = 0; i < validSamples.length; i++) {
-        const s = validSamples[i];
-        const isL4 = s.gap <= P9_L4_MAX;
-        if (isL4 && rangeStart === null) {
-          rangeStart = s.y;
-        } else if (!isL4 && rangeStart !== null) {
-          ranges.push({ yStart: rangeStart, yEnd: validSamples[i - 1].y });
-          rangeStart = null;
-        }
-      }
-      if (rangeStart !== null) {
-        ranges.push({ yStart: rangeStart, yEnd: validSamples[validSamples.length - 1].y });
-      }
-    }
-
-    // ── Boundary crossings for L4 / L3 / L2 ────────────────────────────
-    // Computed for ALL states (including no_l4) so L3/L2 transitions remain
-    // visible even when L4 is not achievable.  Not clamped to zone edges —
-    // the renderer extends lines beyond the placement band.
-    const boundaries = [];
-    for (const { level, deg } of P9_THRESHOLDS) {
-      for (let i = 1; i < validSamples.length; i++) {
-        const prev = validSamples[i - 1];
-        const curr = validSamples[i];
-        const prevBelow = prev.gap <= deg;
-        const currBelow = curr.gap <= deg;
-        if (prevBelow !== currBelow) {
-          const denom = curr.gap - prev.gap;
-          let yBoundary;
-          if (Number.isFinite(denom) && Math.abs(denom) > 1e-9) {
-            const t = (deg - prev.gap) / denom;
-            yBoundary = prev.y + t * (curr.y - prev.y);
-          } else {
-            yBoundary = (prev.y + curr.y) / 2;
-          }
-          if (Number.isFinite(yBoundary) && yBoundary >= yMin && yBoundary <= yMax) {
-            boundaries.push({ y: yBoundary, level, deg });
-          }
-        }
-      }
-    }
-
-    const state = l4Samples.length === 0 ? "no_l4" : "bounded_l4";
-    return { applicable: true, state, ranges, boundaries, selectedRow: selectedOverheadRow, note: null };
+    return {
+      applicable: true,
+      state: overallState,
+      ranges: allRanges,
+      boundaries: allBoundaries,
+      selectedRow: selectedOverheadRow ?? null,
+      rows: rowStates,
+      note: null,
+    };
   }, [
     selectedOverheadRow,
     rsp?.x,
