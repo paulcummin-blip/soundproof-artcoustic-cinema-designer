@@ -30,6 +30,8 @@ import ClientTimbreConsistency from "@/components/report/client/ClientTimbreCons
 import { selectClientTimbreConsistency } from "@/components/report/client/selectClientTimbreConsistency";
 import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
 import { selectClientFrontSoundstageDynamicRange } from "@/components/report/client/selectClientFrontSoundstageDynamicRange";
+import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScreenDynamicRange";
+import { selectClientNonScreenDynamicRange } from "@/components/report/client/selectClientNonScreenDynamicRange";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -54,6 +56,8 @@ export default function RP22ClientReport() {
   // Active P12 target basis — the same authority that drives the App compliance
   // panel and the Technical Report (RP22CompliancePanel / RP22ReportParameterGrid).
   const p12Mode = appState?.p12Mode || "minimum";
+  // Active P13 target basis — same authority chain (appState.splConfig.p13Mode).
+  const p13Mode = appState?.splConfig?.p13Mode || "minimum";
   const {
     hydrating,
     projectDetails,
@@ -136,6 +140,23 @@ export default function RP22ClientReport() {
       p12Mode,
     });
   }, [hydrating, analysisResult, allSeatSplMetrics, seatingPositions, rsp, p12Mode]);
+
+  // ── Non-Screen Dynamic Range (pure selector, no new analysis) ──
+  // P13 is a room-scope parameter measured at the RSP. The selector reads the
+  // canonical gradedParameters.primary[13] (achieved value) and re-grades the
+  // level using the active p13Mode — the same authority as App / Tech Report.
+  const nonScreenSoundstage = useMemo(() => {
+    if (hydrating || !allSeatSplMetrics || !Array.isArray(seatingPositions)) {
+      return { seats: [], rsp: null, speakerSplValues: [], minimum: null, level: null, hasAny: false };
+    }
+    return selectClientNonScreenDynamicRange({
+      analysisResult,
+      allSeatSplMetrics,
+      seatingPositions,
+      rsp,
+      p13Mode,
+    });
+  }, [hydrating, analysisResult, allSeatSplMetrics, seatingPositions, rsp, p13Mode]);
 
   const hasSeatingPosition = recommendedSeatingPosition.hasAny && !!rsp;
 
@@ -277,6 +298,43 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Non-Screen Dynamic Range (after Front Soundstage, before Design Highlights)
+    if (nonScreenSoundstage.hasAny) {
+      pages.push({
+        id: "non-screen-dynamic-range",
+        visual: (
+          <ClientNonScreenDynamicRange
+            roomDims={roomDims}
+            seats={nonScreenSoundstage.seats}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            placedSpeakers={placedSpeakers}
+            speakerSplValues={nonScreenSoundstage.speakerSplValues}
+            minimum={nonScreenSoundstage.minimum}
+            level={nonScreenSoundstage.level}
+            targetBasisLabel={nonScreenSoundstage.targetBasisLabel}
+            resultHeading={nonScreenSoundstage.resultHeading}
+            resultExplanation={nonScreenSoundstage.resultExplanation}
+          />
+        ),
+        printData: {
+          type: "non-screen-dynamic-range",
+          roomDims,
+          seats: nonScreenSoundstage.seats,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+          placedSpeakers,
+          speakerSplValues: nonScreenSoundstage.speakerSplValues,
+          minimum: nonScreenSoundstage.minimum,
+          level: nonScreenSoundstage.level,
+          targetBasisLabel: nonScreenSoundstage.targetBasisLabel,
+          resultHeading: nonScreenSoundstage.resultHeading,
+          resultExplanation: nonScreenSoundstage.resultExplanation,
+        },
+      });
+    }
     // Design Highlights (only when supported highlights exist)
     if (highlights.length > 0) {
       pages.push({
@@ -317,7 +375,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, frontSoundstage, highlights, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers]);
+  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,

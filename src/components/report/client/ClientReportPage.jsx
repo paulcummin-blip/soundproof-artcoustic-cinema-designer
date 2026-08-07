@@ -19,6 +19,16 @@ import ClientRecommendedSeatingPosition from "@/components/report/client/ClientR
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
 import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
 import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
+import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScreenDynamicRange";
+
+// Level → brand colour for P12/P13 print result badges (mirrors shared card)
+const PRINT_LEVEL_COLOR = {
+  L4: "#213428", L3: "#3E4349", L2: "#625143", L1: "#4A230F",
+  FAIL: "#4A230F", default: "#C1B6AD",
+};
+function printLevelColor(lvl) {
+  return PRINT_LEVEL_COLOR[lvl] || PRINT_LEVEL_COLOR.default;
+}
 
 export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {
   const projectName = projectDetails?.name || "Untitled";
@@ -144,43 +154,96 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             </div>
           </>
         )}
-        {printData?.type === "front-soundstage-dynamic-range" && (
-          <>
-            <div className="client-report-print-heading">
-              <h1 className="client-report-print-heading__title">Dynamic Range</h1>
-              <p className="client-report-print-heading__subtitle">RP22 Parameter 12 — Screen Speakers SPL Capability at RSP</p>
-            </div>
-            <div className="client-report-print-drawing">
-              <ClientFrontSoundstageDynamicRange
-                roomDims={printData.roomDims}
-                seats={printData.seats}
-                rsp={printData.rsp}
-                screenFrontPlaneM={printData.screenFrontPlaneM}
-                screenWidthM={printData.screenWidthM}
-                screen={printData.screen}
-                placedSpeakers={printData.placedSpeakers}
-                fl={printData.fl}
-                fc={printData.fc}
-                fr={printData.fr}
-                minimum={printData.minimum}
-                level={printData.level}
-                bandLabels={printData.bandLabels}
-                targetBasisLabel={printData.targetBasisLabel}
-                resultHeading={printData.resultHeading}
-                resultExplanation={printData.resultExplanation}
-                print
-              />
-            </div>
-            <div className="client-report-print-result">
-              <div className="client-report-print-result__content">
-                <div className="client-report-print-result__label">{printData.resultHeading || "Front Soundstage Capability"}</div>
-                <div className="client-report-print-result__explanation">
-                  {printData.resultExplanation || "The left, centre and right speakers operate together as a single acoustic system, maintaining clear dialogue and preserving the impact of demanding movie soundtracks at the reference seating position."}
+        {printData?.type === "front-soundstage-dynamic-range" && (() => {
+          const color = printLevelColor(printData.level);
+          return (
+            <>
+              <div className="client-report-print-heading">
+                <h1 className="client-report-print-heading__title">Dynamic Range</h1>
+                <p className="client-report-print-heading__subtitle">RP22 Parameter 12 — Screen Speakers SPL Capability at RSP</p>
+              </div>
+              <div className="client-report-print-drawing">
+                <ClientFrontSoundstageDynamicRange
+                  roomDims={printData.roomDims}
+                  seats={printData.seats}
+                  rsp={printData.rsp}
+                  screenFrontPlaneM={printData.screenFrontPlaneM}
+                  screenWidthM={printData.screenWidthM}
+                  placedSpeakers={printData.placedSpeakers}
+                  fl={printData.fl}
+                  fc={printData.fc}
+                  fr={printData.fr}
+                  minimum={printData.minimum}
+                  level={printData.level}
+                  targetBasisLabel={printData.targetBasisLabel}
+                  resultHeading={printData.resultHeading}
+                  resultExplanation={printData.resultExplanation}
+                  print
+                />
+              </div>
+              <div className="client-report-print-result" style={{ borderColor: `${color}40` }}>
+                <div className="client-report-print-result__badge" style={{
+                  borderColor: color, background: `${color}25`, color,
+                }}>
+                  {printData.level || "—"}
+                </div>
+                <div className="client-report-print-result__content">
+                  <div className="client-report-print-result__label">{printData.resultHeading || "Front Soundstage Capability"}</div>
+                  <div className="client-report-print-result__explanation">
+                    {printData.resultExplanation || "The left, centre and right speakers operate together as a single acoustic system, maintaining clear dialogue and preserving the impact of demanding movie soundtracks at the reference seating position."}
+                  </div>
+                  <div className="client-report-print-result__supporting">
+                    {printData.minimum?.formatted ?? "—"} minimum capability — RP22 Parameter 12
+                  </div>
                 </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          );
+        })()}
+        {printData?.type === "non-screen-dynamic-range" && (() => {
+          const color = printLevelColor(printData.level);
+          return (
+            <>
+              <div className="client-report-print-heading">
+                <h1 className="client-report-print-heading__title">Dynamic Range</h1>
+                <p className="client-report-print-heading__subtitle">RP22 Parameter 13 — Non-Screen Speakers SPL Capability at RSP</p>
+              </div>
+              <div className="client-report-print-drawing">
+                <ClientNonScreenDynamicRange
+                  roomDims={printData.roomDims}
+                  seats={printData.seats}
+                  rsp={printData.rsp}
+                  screenFrontPlaneM={printData.screenFrontPlaneM}
+                  screenWidthM={printData.screenWidthM}
+                  placedSpeakers={printData.placedSpeakers}
+                  speakerSplValues={printData.speakerSplValues}
+                  minimum={printData.minimum}
+                  level={printData.level}
+                  targetBasisLabel={printData.targetBasisLabel}
+                  resultHeading={printData.resultHeading}
+                  resultExplanation={printData.resultExplanation}
+                  print
+                />
+              </div>
+              <div className="client-report-print-result" style={{ borderColor: `${color}40` }}>
+                <div className="client-report-print-result__badge" style={{
+                  borderColor: color, background: `${color}25`, color,
+                }}>
+                  {printData.level || "—"}
+                </div>
+                <div className="client-report-print-result__content">
+                  <div className="client-report-print-result__label">{printData.resultHeading || "Surround Capability"}</div>
+                  <div className="client-report-print-result__explanation">
+                    {printData.resultExplanation || "The surround and overhead speakers maintain consistent impact and clarity across the listening area, preserving the immersion of demanding movie soundtracks at the reference seating position."}
+                  </div>
+                  <div className="client-report-print-result__supporting">
+                    {printData.minimum?.formatted ?? "—"} minimum capability — RP22 Parameter 13
+                  </div>
+                </div>
+              </div>
+            </>
+          );
+        })()}
         {printData?.type === "seating-position" && (
           <>
             <div className="client-report-print-heading">
