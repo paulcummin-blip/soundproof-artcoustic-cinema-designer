@@ -49,7 +49,7 @@ export default function RvP9Corridors({
           x={cx}
           y={cy}
           fill="#625143"
-          fontSize={Math.max(9, 10 * scale)}
+          fontSize={10}
           textAnchor="middle"
           fontFamily="Didact Gothic, sans-serif"
           opacity={0.45}
@@ -71,7 +71,7 @@ export default function RvP9Corridors({
 
   if (rowsToRender.length === 0) return null;
 
-  const labelFontSize = Math.max(8, 9 * scale);
+  const labelFontSize = 9;
 
   // Boundary styling per level — L4 is the reference, L3/L2 progressively subtler
   const BOUNDARY_STYLE = {
@@ -172,7 +172,7 @@ export default function RvP9Corridors({
                   x={cx}
                   y={cy}
                   fill="#213428"
-                  fontSize={Math.max(8, 9 * scale)}
+                  fontSize={9}
                   textAnchor="middle"
                   fontFamily="Didact Gothic, sans-serif"
                   opacity={0.5}
@@ -195,7 +195,7 @@ export default function RvP9Corridors({
                   x={cx}
                   y={cy}
                   fill="#625143"
-                  fontSize={Math.max(9, 10 * scale)}
+                  fontSize={10}
                   textAnchor="middle"
                   fontFamily="Didact Gothic, sans-serif"
                   opacity={0.5}
