@@ -32,6 +32,8 @@ import ClientFrontSoundstageDynamicRange from "@/components/report/client/Client
 import { selectClientFrontSoundstageDynamicRange } from "@/components/report/client/selectClientFrontSoundstageDynamicRange";
 import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScreenDynamicRange";
 import { selectClientNonScreenDynamicRange } from "@/components/report/client/selectClientNonScreenDynamicRange";
+import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
+import { selectClientScreenSeating } from "@/components/report/client/selectClientScreenSeating";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -78,6 +80,19 @@ export default function RP22ClientReport() {
 
   // ── Design Summary (static intro — pure selector, no analysis) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
+
+  // ── RP23 Screen Size / Seating (uses existing RP23 viewing-angle authority) ──
+  const screenSeating = useMemo(() => {
+    if (hydrating || !Array.isArray(seatingPositions) || !screenWidthM) {
+      return { seats: [], zones: [], hasAny: false, explanation: "" };
+    }
+    return selectClientScreenSeating({
+      seatingPositions,
+      screenFrontPlaneM,
+      screenWidthM,
+      roomLengthM: roomDims.lengthM,
+    });
+  }, [hydrating, seatingPositions, screenFrontPlaneM, screenWidthM, roomDims.lengthM]);
 
   // ── Best Listening Area (pure selector, no new analysis) ──
   const bestListeningArea = useMemo(() => {
@@ -164,6 +179,33 @@ export default function RP22ClientReport() {
         printData: {
           type: "highlights",
           highlights,
+        },
+      });
+    }
+    // RP23 Screen Size / Seating — after Design Summary, before RP22 pages
+    if (screenSeating.hasAny) {
+      pages.push({
+        id: "screen-seating",
+        visual: (
+          <ClientScreenSeating
+            roomDims={roomDims}
+            seats={screenSeating.seats}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            zones={screenSeating.zones}
+            explanation={screenSeating.explanation}
+          />
+        ),
+        printData: {
+          type: "screen-seating",
+          roomDims,
+          seats: screenSeating.seats,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
+          zones: screenSeating.zones,
+          explanation: screenSeating.explanation,
         },
       });
     }
@@ -366,7 +408,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers]);
+  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,

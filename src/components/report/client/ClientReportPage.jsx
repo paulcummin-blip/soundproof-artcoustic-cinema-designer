@@ -20,6 +20,7 @@ import ClientBestListeningArea from "@/components/report/client/ClientBestListen
 import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
 import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
 import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScreenDynamicRange";
+import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 
 // Level → brand colour for P12/P13 print result badges (mirrors shared card)
 const PRINT_LEVEL_COLOR = {
@@ -244,6 +245,34 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             </>
           );
         })()}
+        {printData?.type === "screen-seating" && (
+          <>
+            <div className="client-report-print-heading">
+              <h1 className="client-report-print-heading__title">Viewing Experience</h1>
+              <p className="client-report-print-heading__subtitle">RP23 — Screen Size &amp; Seating Position</p>
+            </div>
+            <div className="client-report-print-drawing">
+              <ClientScreenSeating
+                roomDims={printData.roomDims}
+                seats={printData.seats}
+                rsp={printData.rsp}
+                screenFrontPlaneM={printData.screenFrontPlaneM}
+                screenWidthM={printData.screenWidthM}
+                zones={printData.zones}
+                explanation={printData.explanation}
+                print
+              />
+            </div>
+            <div className="client-report-print-result">
+              <div className="client-report-print-result__content">
+                <div className="client-report-print-result__label">Screen Size and Seating</div>
+                <div className="client-report-print-result__explanation">
+                  {printData.explanation || "The screen size is well matched to the seating area, placing the main listening positions within the preferred viewing range."}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
         {printData?.type === "seating-position" && (
           <>
             <div className="client-report-print-heading">

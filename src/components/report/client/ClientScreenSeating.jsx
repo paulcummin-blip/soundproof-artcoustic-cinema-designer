@@ -1,18 +1,15 @@
 /**
- * ClientRecommendedSeatingPosition
- * --------------------------------
- * Client-facing P1 Visual Report page.
+ * ClientScreenSeating
+ * -------------------
+ * Client-facing RP23 Screen Size / Seating Position visual report page.
  *
- * Shows how listener distance from the room walls affects RP22 Parameter 1:
- *   - nested shaded zones measured inward from the four room walls
- *     (Below L1 / L1 / L2 / L3 / L4 — progressively calmer toward the centre)
- *   - all real seats plotted at their room coordinates
- *   - strongest seats (highest canonical P1 level) visually emphasised
- *   - compact result matrix, horizontal legend, and client explanation
+ * Shows banded longitudinal viewing zones (L1|L2|L3|L4|L3|L2|L1) derived
+ * from the SAME RP23 angle thresholds used by the live app.
+ * Per-seat levels come from selectClientScreenSeating which uses
+ * rp23LevelForAngleDeg — the exact same grading authority.
  *
- * Seat P1 distance/level come ONLY from the canonical authority:
- *   analysisResult.perSeatRp22[seatId].rp22[1]
- * The shaded zones are purely visual and never recalculate P1.
+ * Uses the SAME room template as P1/P12/P13 pages (same SVG dimensions,
+ * padding, coordinate mapping, seat markers, RSP marker).
  *
  * Works for both screen (card) and print (plain) contexts via the `print` prop.
  */
@@ -20,34 +17,36 @@
 import React, { useMemo } from "react";
 import { LEVEL_FILLS } from "./levelFills";
 
-// ── Wall-distance zones (metres inward from each room wall) ──
-// Thresholds match the canonical P1 grading authority.
-const ZONES = [
-  { key: "below-l1", inset: 0.0, fill: LEVEL_FILLS["below-l1"], label: "Below L1" },
-  { key: "l1",      inset: 0.5, fill: LEVEL_FILLS["l1"],       label: "L1" },
-  { key: "l2",      inset: 0.8, fill: LEVEL_FILLS["l2"],       label: "L2" },
-  { key: "l3",      inset: 1.2, fill: LEVEL_FILLS["l3"],       label: "L3" },
-  { key: "l4",      inset: 1.5, fill: LEVEL_FILLS["l4"],       label: "L4" },
+const LEGEND_ITEMS = [
+  { label: "Below L1", fill: LEVEL_FILLS["below-l1"] },
+  { label: "L1", fill: LEVEL_FILLS["l1"] },
+  { label: "L2", fill: LEVEL_FILLS["l2"] },
+  { label: "L3", fill: LEVEL_FILLS["l3"] },
+  { label: "L4", fill: LEVEL_FILLS["l4"] },
 ];
 
-const LEGEND_ITEMS = ZONES.map((z) => ({ label: z.label, fill: z.fill }));
+const LABEL_COLORS = {
+  "below-l1": "#F8F8F7",
+  "l1": "#F8F8F7",
+  "l2": "#3E4349",
+  "l3": "#3E4349",
+  "l4": "#3E4349",
+};
 
-const CLIENT_EXPLANATION =
-  "The two centre seats sit within the preferred listening area, giving them the greatest separation from the room boundaries. The outer seats remain good listening positions, while their closer proximity to the side walls slightly reduces their spatial performance.";
-
-export default function ClientRecommendedSeatingPosition({
+export default function ClientScreenSeating({
   roomDims,
   seats,
   rsp,
   screenFrontPlaneM,
   screenWidthM,
-  screen,
+  zones,
+  explanation,
   print,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
 
-  const { svgW, svgH, scale, toPx } = useMemo(() => {
+  const { svgW, svgH, toPx } = useMemo(() => {
     const PADDING_M = 0.6;
     const totalW = W + PADDING_M * 2;
     const totalL = L + PADDING_M * 2;
@@ -58,10 +57,9 @@ export default function ClientRecommendedSeatingPosition({
       px: (x + PADDING_M) * SCALE,
       py: (y + PADDING_M) * SCALE,
     });
-    return { svgW: SVG_W, svgH: SVG_H, scale: SCALE, toPx };
+    return { svgW: SVG_W, svgH: SVG_H, toPx };
   }, [W, L]);
 
-  // Normalise enriched seats (distance/level already resolved by selector)
   const plotSeats = useMemo(
     () =>
       (Array.isArray(seats) ? seats : [])
@@ -73,9 +71,8 @@ export default function ClientRecommendedSeatingPosition({
             id: s.id || `seat-${x.toFixed(2)}-${y.toFixed(2)}`,
             x,
             y,
-            distanceM: s.distanceM,
+            levelLabel: s.levelLabel,
             formatted: s.formatted,
-            level: s.level,
             isStrongest: s.isStrongest === true,
           };
         })
@@ -83,14 +80,13 @@ export default function ClientRecommendedSeatingPosition({
     [seats]
   );
 
-  // RSP marker (preserved)
   const rspX = Number(rsp?.x);
   const rspY = Number(rsp?.y);
   const rspValid = Number.isFinite(rspX) && Number.isFinite(rspY);
-  const rspMatchesSeat = rspValid && plotSeats.some((s) => Math.abs(s.x - rspX) < 0.01 && Math.abs(s.y - rspY) < 0.01);
+  const rspMatchesSeat =
+    rspValid && plotSeats.some((s) => Math.abs(s.x - rspX) < 0.01 && Math.abs(s.y - rspY) < 0.01);
   const rspPx = rspValid ? toPx(rspX, rspY) : null;
 
-  // Screen (front wall)
   const screenY = Number(screenFrontPlaneM) || 0.2;
   const screenW = Number(screenWidthM) || 3;
   const screenLeftX = (W - screenW) / 2;
@@ -120,73 +116,106 @@ export default function ClientRecommendedSeatingPosition({
 
   return (
     <div style={containerStyle}>
-      {/* ── Heading hierarchy: Category → Parameter reference (screen only) ── */}
+      {/* ── Heading hierarchy (screen only) ── */}
       {!print && (
         <div style={{ width: "100%", marginBottom: 8 }}>
-          <h1 style={{
-            margin: 0,
-            fontSize: 34,
-            fontWeight: 300,
-            color: "#213428",
-            letterSpacing: "0.01em",
-            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-            textAlign: "center",
-          }}>
-            Spatial Resolution
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 34,
+              fontWeight: 300,
+              color: "#213428",
+              letterSpacing: "0.01em",
+              fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+              textAlign: "center",
+            }}
+          >
+            Viewing Experience
           </h1>
-          <p style={{
-            margin: "6px 0 0 0",
-            fontSize: 12,
-            color: "#625143",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            textAlign: "center",
-            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-          }}>
-            RP22 Parameter 1 — Listener Distance from Room Boundaries
+          <p
+            style={{
+              margin: "6px 0 0 0",
+              fontSize: 12,
+              color: "#625143",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              textAlign: "center",
+              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+            }}
+          >
+            RP23 — Screen Size &amp; Seating Position
           </p>
         </div>
       )}
 
       {/* ── Descriptive page title (screen only) ── */}
       {!print && (
-        <div style={{
-          fontSize: 18,
-          fontWeight: 600,
-          color: "#213428",
-          marginBottom: 4,
-          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-        }}>
-          Recommended Seating Position
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 600,
+            color: "#213428",
+            marginBottom: 4,
+            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+          }}
+        >
+          Screen Size and Seating
         </div>
       )}
 
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
         className="client-report-print-svg"
-        style={print
-          ? { width: "100%", height: "auto", maxHeight: "none" }
-          : { width: "100%", maxWidth: 600, height: "auto" }
+        style={
+          print
+            ? { width: "100%", height: "auto", maxHeight: "none" }
+            : { width: "100%", maxWidth: 600, height: "auto" }
         }
       >
-        {/* ── Nested shaded zones (drawn outermost-first, inner on top) ── */}
-        {ZONES.map((zone) => {
-          const inset = zone.inset;
-          const w = W - inset * 2;
-          const h = L - inset * 2;
-          if (w <= 0 || h <= 0) return null;
-          const tl = toPx(inset, inset);
-          const br = toPx(inset + w, inset + h);
+        {/* Room background (area behind screen + any uncovered region) */}
+        <rect
+          x={roomTopLeft.px}
+          y={roomTopLeft.py}
+          width={roomBottomRight.px - roomTopLeft.px}
+          height={roomBottomRight.py - roomTopLeft.py}
+          fill="#F8F8F7"
+          stroke="none"
+        />
+
+        {/* ── Banded RP23 viewing zones (longitudinal, opaque) ── */}
+        {(Array.isArray(zones) ? zones : []).map((zone) => {
+          const yStart = Math.max(0, zone.yStart);
+          const yEnd = Math.min(L, zone.yEnd);
+          if (yEnd <= yStart) return null;
+          const tl = toPx(0, yStart);
+          const br = toPx(W, yEnd);
+          const heightPx = br.py - tl.py;
           return (
-            <rect
-              key={zone.key}
-              x={tl.px}
-              y={tl.py}
-              width={br.px - tl.px}
-              height={br.py - tl.py}
-              fill={zone.fill}
-              stroke="none"
-            />
+            <g key={zone.key}>
+              <rect
+                x={tl.px}
+                y={tl.py}
+                width={br.px - tl.px}
+                height={heightPx}
+                fill={LEVEL_FILLS[zone.level] || LEVEL_FILLS["below-l1"]}
+                stroke="none"
+              />
+              {heightPx > 18 && (
+                <text
+                  x={(tl.px + br.px) / 2}
+                  y={(tl.py + br.py) / 2}
+                  fill={LABEL_COLORS[zone.level] || "#3E4349"}
+                  fontSize={print ? 9 : 11}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontFamily="Didact Gothic, Century Gothic, sans-serif"
+                  letterSpacing="0.1em"
+                  fontWeight={600}
+                >
+                  {zone.label}
+                </text>
+              )}
+            </g>
           );
         })}
 
@@ -223,9 +252,10 @@ export default function ClientRecommendedSeatingPosition({
         </text>
 
         {/* ── Seats ── */}
-        {plotSeats.map((seat, idx) => {
+        {plotSeats.map((seat) => {
           const sp = toPx(seat.x, seat.y);
-          const isRspSeat = rspMatchesSeat && Math.abs(seat.x - rspX) < 0.01 && Math.abs(seat.y - rspY) < 0.01;
+          const isRspSeat =
+            rspMatchesSeat && Math.abs(seat.x - rspX) < 0.01 && Math.abs(seat.y - rspY) < 0.01;
           if (seat.isStrongest) {
             return (
               <g key={seat.id}>
@@ -280,24 +310,28 @@ export default function ClientRecommendedSeatingPosition({
       </svg>
 
       {/* ── Compact horizontal legend ── */}
-      <div style={{
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "center",
-        gap: print ? 10 : 14,
-        margin: 0,
-        fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-      }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: print ? 10 : 14,
+          margin: 0,
+          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+        }}
+      >
         {LEGEND_ITEMS.map((item) => (
           <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{
-              display: "inline-block",
-              width: 14,
-              height: 14,
-              borderRadius: 3,
-              background: item.fill,
-              border: "1px solid #DCDBD6",
-            }} />
+            <span
+              style={{
+                display: "inline-block",
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                background: item.fill,
+                border: "1px solid #DCDBD6",
+              }}
+            />
             <span style={{ fontSize: print ? 9 : 11, color: "#625143", letterSpacing: "0.04em" }}>
               {item.label}
             </span>
@@ -305,21 +339,33 @@ export default function ClientRecommendedSeatingPosition({
         ))}
       </div>
 
-      {/* ── Compact result matrix ── */}
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        width: "100%",
-        fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-      }}>
-        <table style={{
-          borderCollapse: "collapse",
-          fontSize: print ? 10 : 12,
-          color: "#3E4349",
-        }}>
+      {/* ── Compact seat matrix ── */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          width: "100%",
+          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+        }}
+      >
+        <table
+          style={{
+            borderCollapse: "collapse",
+            fontSize: print ? 10 : 12,
+            color: "#3E4349",
+          }}
+        >
           <thead>
             <tr>
-              <th style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143", borderBottom: "1px solid #DCDBD6" }} />
+              <th
+                style={{
+                  padding: "4px 10px",
+                  textAlign: "left",
+                  fontWeight: 600,
+                  color: "#625143",
+                  borderBottom: "1px solid #DCDBD6",
+                }}
+              />
               {plotSeats.map((seat, i) => (
                 <th
                   key={seat.id}
@@ -338,7 +384,9 @@ export default function ClientRecommendedSeatingPosition({
           </thead>
           <tbody>
             <tr>
-              <td style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143" }}>P1 Distance</td>
+              <td style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143" }}>
+                RP23 Viewing
+              </td>
               {plotSeats.map((seat) => (
                 <td
                   key={seat.id}
@@ -349,7 +397,7 @@ export default function ClientRecommendedSeatingPosition({
                     color: seat.isStrongest ? "#213428" : "#3E4349",
                   }}
                 >
-                  {seat.level ?? "—"}
+                  {seat.levelLabel ?? "—"}
                 </td>
               ))}
             </tr>
@@ -375,16 +423,18 @@ export default function ClientRecommendedSeatingPosition({
 
       {/* ── Client explanation (screen only — print uses the result region) ── */}
       {!print && (
-        <p style={{
-          fontSize: 13,
-          color: "#625143",
-          textAlign: "center",
-          maxWidth: 520,
-          lineHeight: 1.5,
-          margin: 0,
-          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-        }}>
-          {CLIENT_EXPLANATION}
+        <p
+          style={{
+            fontSize: 13,
+            color: "#625143",
+            textAlign: "center",
+            maxWidth: 520,
+            lineHeight: 1.5,
+            margin: 0,
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+          }}
+        >
+          {explanation}
         </p>
       )}
     </div>
