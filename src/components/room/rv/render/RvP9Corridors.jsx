@@ -39,27 +39,7 @@ export default function RvP9Corridors({
   lengthM,
   scale,
 }) {
-  // .2 layout — discreet label, no target line
-  if (!applicable && note) {
-    const [cx] = toPx(widthM / 2, 0);
-    const [, cy] = toPx(0, lengthM / 2);
-    return (
-      <g data-layer="p9-target" pointerEvents="none">
-        <text
-          x={cx}
-          y={cy}
-          fill="#625143"
-          fontSize={10}
-          textAnchor="middle"
-          fontFamily="Didact Gothic, sans-serif"
-          opacity={0.45}
-        >
-          {note}
-        </text>
-      </g>
-    );
-  }
-
+  // .2 layout (or otherwise not applicable) — render nothing
   if (!applicable) return null;
 
   // ─── Resolve rows to render ─────────────────────────────────────────
@@ -174,29 +154,6 @@ export default function RvP9Corridors({
                   opacity={0.5}
                 >
                   L4 throughout this zone
-                </text>
-              );
-            })()}
-
-            {/* No-L4 with no boundaries: discreet zone-level message */}
-            {rowState === "no_l4" && rowBoundaries.length === 0 && (() => {
-              const zoneMidY = (zoneYMin + zoneYMax) / 2;
-              const cy = yToPx(zoneMidY);
-              const allX = pieces.flatMap((p) => [p.x1, p.x2]);
-              const xMin = Math.min(...allX);
-              const xMax = Math.max(...allX);
-              const [cx] = toPx((xMin + xMax) / 2, 0);
-              return (
-                <text
-                  x={cx}
-                  y={cy}
-                  fill="#625143"
-                  fontSize={10}
-                  textAnchor="middle"
-                  fontFamily="Didact Gothic, sans-serif"
-                  opacity={0.5}
-                >
-                  P9 targets outside current placement range
                 </text>
               );
             })()}

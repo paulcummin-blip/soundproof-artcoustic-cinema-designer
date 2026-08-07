@@ -108,8 +108,8 @@ export default function RvZonesAndOverlays({
       {/* Overhead Zones / Bands */}
       {OverheadsBands}
 
-      {/* Dynamic P9 Target Corridors — interactive guidance only */}
-      {exportMode === "default" && (
+      {/* Dynamic P9 Target Corridors — gated by the same showOverheads authority */}
+      {exportMode === "default" && showOverheads && (
         <RvP9Corridors
           ranges={p9Corridors?.ranges}
           boundaries={p9Corridors?.boundaries}
