@@ -214,5 +214,11 @@ export function selectClientTimbreConsistency({ analysisResult, seatingPositions
 
   const hasAnyValidResult = seats.some((s) => s.worstLevel !== null);
 
-  return { seats, counts, hasAnyValidResult };
+  // Overall presentation level — worst (lowest-performing) seat level.
+  // Pure presentation summary of existing per-seat canonical levels, NOT a new
+  // combined RP22 calculation. The matrix still shows per-seat P16/P17 detail.
+  const applicableSeatLevels = seats.map((s) => s.worstLevel).filter(Boolean);
+  const overallLevel = worstApplicableLevel(applicableSeatLevels);
+
+  return { seats, counts, hasAnyValidResult, overallLevel };
 }

@@ -144,14 +144,24 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
                 print
               />
             </div>
-            <div className="client-report-print-result">
-              <div className="client-report-print-result__content">
-                <div className="client-report-print-result__label">Consistent Sound Across the Seats</div>
-                <div className="client-report-print-result__explanation">
-                  The system is designed to maintain a consistent tonal character across the seating area, preserving clarity and detail as listeners move away from the reference position.
+            {(() => {
+              const color = printLevelColor(printData.overallLevel);
+              return (
+                <div className="client-report-print-result" style={{ borderColor: `${color}40` }}>
+                  <div className="client-report-print-result__badge" style={{
+                    borderColor: color, background: `${color}25`, color,
+                  }}>
+                    {printData.overallLevel || "—"}
+                  </div>
+                  <div className="client-report-print-result__content">
+                    <div className="client-report-print-result__label">Consistent Sound Across the Seats</div>
+                    <div className="client-report-print-result__explanation">
+                      The system is designed to maintain a consistent tonal character across the seating area, preserving clarity and detail as listeners move away from the reference position.
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
           </>
         )}
         {printData?.type === "front-soundstage-dynamic-range" && (() => {

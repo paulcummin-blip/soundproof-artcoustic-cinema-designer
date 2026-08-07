@@ -85,15 +85,19 @@ export default function ClientSplCapabilityResultCard({
           </div>
         )}
 
-        {/* Supporting line */}
-        <div style={{ fontSize: 12, color: "#625143" }}>
-          {minimum?.formatted ?? "—"} {parameterLabel}
-        </div>
+        {/* Supporting line — only for SPL capability pages (P12/P13) */}
+        {minimum && (
+          <div style={{ fontSize: 12, color: "#625143" }}>
+            {minimum?.formatted ?? "—"} {parameterLabel}
+          </div>
+        )}
 
-        {/* Target basis */}
-        <div style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em", marginTop: 4 }}>
-          Target basis: {targetBasisLabel || "Minimum"}
-        </div>
+        {/* Target basis — only when explicitly provided */}
+        {targetBasisLabel && (
+          <div style={{ fontSize: 11, color: "#625143", letterSpacing: "0.04em", marginTop: 4 }}>
+            Target basis: {targetBasisLabel}
+          </div>
+        )}
 
         {/* Individual speaker SPL values */}
         {Array.isArray(speakerSplValues) && speakerSplValues.length > 0 && (

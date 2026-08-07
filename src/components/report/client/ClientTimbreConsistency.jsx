@@ -21,6 +21,7 @@
 
 import React from "react";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
+import ClientSplCapabilityResultCard from "./ClientSplCapabilityResultCard";
 
 // ── Category visual styles ──
 // Restrained brand-aligned palette — green spectrum for consistency,
@@ -200,6 +201,7 @@ export default function ClientTimbreConsistency({
   screenFrontPlaneM,
   screenWidthM,
   counts,
+  overallLevel,
   print,
 }) {
   const W = Number(roomDims?.widthM) || 4.5;
@@ -298,19 +300,6 @@ export default function ClientTimbreConsistency({
           }}>
             RP22 Parameters 16 &amp; 17 — Consistent sound across the seats
           </p>
-        </div>
-      )}
-
-      {/* ── Descriptive title (screen only) ── */}
-      {!print && (
-        <div style={{
-          fontSize: 18,
-          fontWeight: 600,
-          color: "#213428",
-          marginBottom: 8,
-          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-        }}>
-          Consistent Sound Across the Seats
         </div>
       )}
 
@@ -572,19 +561,13 @@ export default function ClientTimbreConsistency({
         </div>
       )}
 
-      {/* ── Main client explanation (screen only — print renders it in the result region) ── */}
+      {/* ── Wide low-profile conclusion card (screen only — print renders it in the result region) ── */}
       {!print && (
-        <p style={{
-          fontSize: 14,
-          color: "#625143",
-          textAlign: "center",
-          maxWidth: 500,
-          lineHeight: 1.5,
-          margin: 0,
-          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-        }}>
-          Screen-speaker timbre remains highly consistent at every seat. The two centre seats also achieve the strongest consistency from the wide, surround and overhead speakers, while the outer seats remain consistent listening positions.
-        </p>
+        <ClientSplCapabilityResultCard
+          level={overallLevel}
+          resultHeading="Consistent Sound Across the Seats"
+          resultExplanation="The system is designed to maintain a consistent tonal character across the seating area, preserving clarity and detail as listeners move away from the reference position."
+        />
       )}
     </div>
   );
