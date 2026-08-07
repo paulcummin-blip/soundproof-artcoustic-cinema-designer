@@ -31,8 +31,13 @@ import {
   computeUpperVerticalAnglesForSeat,
 } from "@/components/utils/rp22UpperSeatMetrics";
 
-// P9 L4 target threshold (matching the production helper classification)
+// P9 thresholds (matching the production helper classification)
 const P9_L4_MAX = 50;
+const P9_THRESHOLDS = [
+  { level: 'L4', deg: 50 },
+  { level: 'L3', deg: 60 },
+  { level: 'L2', deg: 80 },
+];
 
 const SAMPLE_INTERVAL_M = 0.05;
 
@@ -200,62 +205,63 @@ export function useP9CorridorsComputed({
       return { applicable: true, state: "no_l4", ranges: [], boundaries: [], selectedRow: selectedOverheadRow, note: null };
     }
 
+    // ── L4-compliant ranges (for shading) ──────────────────────────────
     const l4Samples = validSamples.filter((s) => s.gap <= P9_L4_MAX);
 
-    // All samples L4
+    // All samples L4 → no crossings at 50/60/80
     if (l4Samples.length === validSamples.length) {
       const ranges = [{ yStart: validSamples[0].y, yEnd: validSamples[validSamples.length - 1].y }];
       return { applicable: true, state: "all_l4", ranges, boundaries: [], selectedRow: selectedOverheadRow, note: null };
     }
 
-    // No L4 samples
-    if (l4Samples.length === 0) {
-      return { applicable: true, state: "no_l4", ranges: [], boundaries: [], selectedRow: selectedOverheadRow, note: null };
-    }
-
     // Bounded L4 — find compliant ranges (consecutive L4 samples)
-    // Does not assume first-to-last compliant samples form one range.
     const ranges = [];
-    let rangeStart = null;
-    for (let i = 0; i < validSamples.length; i++) {
-      const s = validSamples[i];
-      const isL4 = s.gap <= P9_L4_MAX;
-      if (isL4 && rangeStart === null) {
-        rangeStart = s.y;
-      } else if (!isL4 && rangeStart !== null) {
-        ranges.push({ yStart: rangeStart, yEnd: validSamples[i - 1].y });
-        rangeStart = null;
+    if (l4Samples.length > 0) {
+      let rangeStart = null;
+      for (let i = 0; i < validSamples.length; i++) {
+        const s = validSamples[i];
+        const isL4 = s.gap <= P9_L4_MAX;
+        if (isL4 && rangeStart === null) {
+          rangeStart = s.y;
+        } else if (!isL4 && rangeStart !== null) {
+          ranges.push({ yStart: rangeStart, yEnd: validSamples[i - 1].y });
+          rangeStart = null;
+        }
+      }
+      if (rangeStart !== null) {
+        ranges.push({ yStart: rangeStart, yEnd: validSamples[validSamples.length - 1].y });
       }
     }
-    if (rangeStart !== null) {
-      ranges.push({ yStart: rangeStart, yEnd: validSamples[validSamples.length - 1].y });
-    }
 
-    // Interpolate boundary crossings with numerical safety
+    // ── Boundary crossings for L4 / L3 / L2 ────────────────────────────
+    // Computed for ALL states (including no_l4) so L3/L2 transitions remain
+    // visible even when L4 is not achievable.  Not clamped to zone edges —
+    // the renderer extends lines beyond the placement band.
     const boundaries = [];
-    for (let i = 1; i < validSamples.length; i++) {
-      const prev = validSamples[i - 1];
-      const curr = validSamples[i];
-      const prevL4 = prev.gap <= P9_L4_MAX;
-      const currL4 = curr.gap <= P9_L4_MAX;
-      if (prevL4 !== currL4) {
-        const denom = curr.gap - prev.gap;
-        let yBoundary;
-        if (Number.isFinite(denom) && Math.abs(denom) > 1e-9) {
-          const t = (P9_L4_MAX - prev.gap) / denom;
-          yBoundary = prev.y + t * (curr.y - prev.y);
-        } else {
-          // Denominator is zero or non-finite — use midpoint as fallback
-          yBoundary = (prev.y + curr.y) / 2;
-        }
-        // Guard: interpolated Y must be finite and within candidate domain
-        if (Number.isFinite(yBoundary) && yBoundary >= yMin && yBoundary <= yMax) {
-          boundaries.push(yBoundary);
+    for (const { level, deg } of P9_THRESHOLDS) {
+      for (let i = 1; i < validSamples.length; i++) {
+        const prev = validSamples[i - 1];
+        const curr = validSamples[i];
+        const prevBelow = prev.gap <= deg;
+        const currBelow = curr.gap <= deg;
+        if (prevBelow !== currBelow) {
+          const denom = curr.gap - prev.gap;
+          let yBoundary;
+          if (Number.isFinite(denom) && Math.abs(denom) > 1e-9) {
+            const t = (deg - prev.gap) / denom;
+            yBoundary = prev.y + t * (curr.y - prev.y);
+          } else {
+            yBoundary = (prev.y + curr.y) / 2;
+          }
+          if (Number.isFinite(yBoundary) && yBoundary >= yMin && yBoundary <= yMax) {
+            boundaries.push({ y: yBoundary, level, deg });
+          }
         }
       }
     }
 
-    return { applicable: true, state: "bounded_l4", ranges, boundaries, selectedRow: selectedOverheadRow, note: null };
+    const state = l4Samples.length === 0 ? "no_l4" : "bounded_l4";
+    return { applicable: true, state, ranges, boundaries, selectedRow: selectedOverheadRow, note: null };
   }, [
     selectedOverheadRow,
     rsp?.x,

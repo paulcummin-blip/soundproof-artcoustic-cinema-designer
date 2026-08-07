@@ -77,88 +77,24 @@ export default function RvP9Corridors({
   // Helper: convert a Y (meters) to px
   const yToPx = (yM) => toPx(0, yM)[1];
 
-  // ─── No-L4: discreet zone-level message ───────────────────────────────
-  if (state === "no_l4") {
-    const zoneMidY = (zoneYMin + zoneYMax) / 2;
-    const cy = yToPx(zoneMidY);
-    // Center across all pieces
-    const allX = pieces.flatMap((p) => [p.x1, p.x2]);
-    const xMin = Math.min(...allX);
-    const xMax = Math.max(...allX);
-    const [cx] = toPx((xMin + xMax) / 2, 0);
-    return (
-      <g data-layer="p9-target" pointerEvents="none">
-        <text
-          x={cx}
-          y={cy}
-          fill="#625143"
-          fontSize={Math.max(9, 10 * scale)}
-          textAnchor="middle"
-          fontFamily="Didact Gothic, sans-serif"
-          opacity={0.5}
-        >
-          L4 target outside current placement range
-        </text>
-      </g>
-    );
-  }
-
-  // ─── All-L4: lightly shade + outline zone pieces, discreet label ──────
-  if (state === "all_l4") {
-    const zoneYTopPx = yToPx(zoneYMin);
-    const zoneYBotPx = yToPx(zoneYMax);
-    const yPx = Math.min(zoneYTopPx, zoneYBotPx);
-    const hpx = Math.abs(zoneYBotPx - zoneYTopPx);
-    const zoneMidY = (zoneYMin + zoneYMax) / 2;
-    const cy = yToPx(zoneMidY);
-
-    return (
-      <g data-layer="p9-target" pointerEvents="none">
-        {pieces.map((piece, i) => {
-          const [x0px] = toPx(piece.x1, 0);
-          const [x1px] = toPx(piece.x2, 0);
-          const x = Math.min(x0px, x1px);
-          const wpx = Math.abs(x1px - x0px);
-          return (
-            <rect
-              key={`p9-all-${i}`}
-              x={x}
-              y={yPx}
-              width={wpx}
-              height={hpx}
-              fill="#213428"
-              fillOpacity={0.07}
-              stroke="#213428"
-              strokeWidth={1}
-              strokeOpacity={0.3}
-            />
-          );
-        })}
-        {/* Single discreet label centered across zone */}
-        <text
-          x={toPx((pieces[0].x1 + pieces[0].x2) / 2, 0)[0]}
-          y={cy}
-          fill="#213428"
-          fontSize={Math.max(8, 9 * scale)}
-          textAnchor="middle"
-          fontFamily="Didact Gothic, sans-serif"
-          opacity={0.5}
-        >
-          L4 throughout this zone
-        </text>
-      </g>
-    );
-  }
-
-  // ─── Bounded L4: boundary markers on strips + compliant shading ──────
-  // state === "bounded_l4"
+  // ─── Unified rendering: L4 shading + L4/L3/L2 boundary ruler ──────────
   const labelFontSize = Math.max(8, 9 * scale);
+
+  // Boundary styling per level — L4 is the reference, L3/L2 progressively subtler
+  const BOUNDARY_STYLE = {
+    L4: { strokeWidth: 2, strokeOpacity: 0.6, dasharray: "6 4" },
+    L3: { strokeWidth: 1.5, strokeOpacity: 0.45, dasharray: "5 3" },
+    L2: { strokeWidth: 1.5, strokeOpacity: 0.35, dasharray: "4 3" },
+  };
+
+  // Room-width X extent for boundary ruler lines (NOT clamped to zone edges)
+  const [roomX0px] = toPx(0, 0);
+  const [roomX1px] = toPx(widthM, 0);
 
   return (
     <g data-layer="p9-target" pointerEvents="none">
-      {/* Light compliant shading on zone pieces, clipped to compliant ranges */}
-      {(ranges || []).map((range, ri) => {
-        // Constrain range to zone Y bounds
+      {/* L4-compliant shading within zone pieces (clipped to zone Y) */}
+      {state !== "no_l4" && (ranges || []).map((range, ri) => {
         const yStart = Math.max(range.yStart, zoneYMin);
         const yEnd = Math.min(range.yEnd, zoneYMax);
         if (yStart >= yEnd) return null;
@@ -188,47 +124,102 @@ export default function RvP9Corridors({
         });
       })}
 
-      {/* Boundary markers — two short horizontal lines per boundary (left + right strip) */}
-      {(boundaries || []).map((yBoundary, bi) => {
-        // Constrain boundary to zone Y bounds
-        if (yBoundary < zoneYMin || yBoundary > zoneYMax) return null;
-
-        const yPx = yToPx(yBoundary);
-
-        return pieces.map((piece, pi) => {
-          const [x0px] = toPx(piece.x1, 0);
-          const [x1px] = toPx(piece.x2, 0);
-          const x = Math.min(x0px, x1px);
-          const wpx = Math.abs(x1px - x0px);
-          return (
-            <g key={`p9-boundary-${bi}-${pi}`}>
-              <line
-                x1={x}
-                y1={yPx}
-                x2={x + wpx}
-                y2={yPx}
-                stroke="#213428"
-                strokeWidth={2}
-                strokeOpacity={0.6}
-                strokeDasharray="6 4"
-              />
-              {/* Label only on first piece to avoid duplication */}
-              {pi === 0 && (
-                <text
-                  x={x + 4}
-                  y={yPx - 3}
-                  fill="#213428"
-                  fontSize={labelFontSize}
-                  fontFamily="Didact Gothic, sans-serif"
-                  opacity={0.55}
-                >
-                  P9 L4 target
-                </text>
-              )}
-            </g>
-          );
-        });
+      {/* All-L4: outline zone pieces + discreet label */}
+      {state === "all_l4" && pieces.map((piece, i) => {
+        const zoneYTopPx = yToPx(zoneYMin);
+        const zoneYBotPx = yToPx(zoneYMax);
+        const yPx = Math.min(zoneYTopPx, zoneYBotPx);
+        const hpx = Math.abs(zoneYBotPx - zoneYTopPx);
+        const [x0px] = toPx(piece.x1, 0);
+        const [x1px] = toPx(piece.x2, 0);
+        const x = Math.min(x0px, x1px);
+        const wpx = Math.abs(x1px - x0px);
+        return (
+          <rect
+            key={`p9-all-${i}`}
+            x={x}
+            y={yPx}
+            width={wpx}
+            height={hpx}
+            fill="#213428"
+            fillOpacity={0.07}
+            stroke="#213428"
+            strokeWidth={1}
+            strokeOpacity={0.3}
+          />
+        );
       })}
+      {state === "all_l4" && (() => {
+        const zoneMidY = (zoneYMin + zoneYMax) / 2;
+        const cy = yToPx(zoneMidY);
+        const [cx] = toPx((pieces[0].x1 + pieces[0].x2) / 2, 0);
+        return (
+          <text
+            x={cx}
+            y={cy}
+            fill="#213428"
+            fontSize={Math.max(8, 9 * scale)}
+            textAnchor="middle"
+            fontFamily="Didact Gothic, sans-serif"
+            opacity={0.5}
+          >
+            L4 throughout this zone
+          </text>
+        );
+      })()}
+
+      {/* Boundary ruler — room-width lines for L4 / L3 / L2 transitions */}
+      {(boundaries || []).map((b, bi) => {
+        const style = BOUNDARY_STYLE[b.level] || BOUNDARY_STYLE.L4;
+        const yPx = yToPx(b.y);
+        return (
+          <g key={`p9-boundary-${bi}`}>
+            <line
+              x1={roomX0px}
+              y1={yPx}
+              x2={roomX1px}
+              y2={yPx}
+              stroke="#213428"
+              strokeWidth={style.strokeWidth}
+              strokeOpacity={style.strokeOpacity}
+              strokeDasharray={style.dasharray}
+            />
+            <text
+              x={roomX0px + 4}
+              y={yPx - 3}
+              fill="#213428"
+              fontSize={labelFontSize}
+              fontFamily="Didact Gothic, sans-serif"
+              opacity={Math.min(0.7, style.strokeOpacity + 0.15)}
+            >
+              {b.deg}° · {b.level}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* No-L4 with no boundaries: discreet zone-level message */}
+      {state === "no_l4" && (boundaries || []).length === 0 && (() => {
+        const zoneMidY = (zoneYMin + zoneYMax) / 2;
+        const cy = yToPx(zoneMidY);
+        const allX = pieces.flatMap((p) => [p.x1, p.x2]);
+        const xMin = Math.min(...allX);
+        const xMax = Math.max(...allX);
+        const [cx] = toPx((xMin + xMax) / 2, 0);
+        return (
+          <text
+            x={cx}
+            y={cy}
+            fill="#625143"
+            fontSize={Math.max(9, 10 * scale)}
+            textAnchor="middle"
+            fontFamily="Didact Gothic, sans-serif"
+            opacity={0.5}
+          >
+            P9 targets outside current placement range
+          </text>
+        );
+      })()}
     </g>
   );
 }
