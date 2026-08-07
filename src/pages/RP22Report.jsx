@@ -44,10 +44,6 @@ import { getP21PresetResult, levelP21_earlyReflections } from '@/components/util
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
-import ClientSpeakerBalance from '@/components/report/client/ClientSpeakerBalance';
-import { selectClientSpeakerBalance } from '@/components/report/client/selectClientSpeakerBalance';
-import TechnicalTimbreConsistency from '@/components/report/client/TechnicalTimbreConsistency';
-import { selectClientTimbreConsistency } from '@/components/report/client/selectClientTimbreConsistency';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -464,32 +460,6 @@ function RP22ReportInner() {
         dolbyLayout: canonicalP2Layout,
         includeBassAnalysis: false,
     });
-
-    // ── Speaker Balance Across the Seats (canonical P4/P6/P10 per real seat) ──
-    // Declared AFTER analysisResult to avoid temporal-dead-zone crash.
-    const speakerBalance = React.useMemo(() => {
-        if (!analysisResult || !Array.isArray(seats) || seats.length === 0) {
-            return { seats: [], rsp: null, hasAnyValid: false, hasValidP4: false, hasValidP6: false, hasValidP10: false };
-        }
-        return selectClientSpeakerBalance({
-            analysisResult,
-            seatingPositions: seats,
-            rsp: primarySeatingPosition ? { x: primarySeatingPosition.x, y: primarySeatingPosition.y } : null,
-        });
-    }, [analysisResult, seats, primarySeatingPosition]);
-
-    // ── Timbre Consistency Across the Seats (canonical P16/P17 per real seat) ──
-    // Declared AFTER analysisResult to avoid temporal-dead-zone crash.
-    const timbreConsistency = React.useMemo(() => {
-        if (!analysisResult || !Array.isArray(seats) || seats.length === 0) {
-            return { seats: [], rsp: null, hasAnyValidResult: false };
-        }
-        return selectClientTimbreConsistency({
-            analysisResult,
-            seatingPositions: seats,
-            rsp: primarySeatingPosition ? { x: primarySeatingPosition.x, y: primarySeatingPosition.y } : null,
-        });
-    }, [analysisResult, seats, primarySeatingPosition]);
 
     const reportSeatHudById = React.useMemo(() => {
         const out = {};
@@ -1127,82 +1097,6 @@ function RP22ReportInner() {
                         </CardContent>
                     </Card>
 
-                    {/* ── Speaker Balance Across the Seats (final technical content page) ── */}
-                    {speakerBalance.hasAnyValid && (
-                        <div className="max-w-7xl mx-auto" style={{ marginTop: 24 }}>
-                            <ClientSpeakerBalance
-                                roomDims={{ widthM: stableDimensions.width, lengthM: stableDimensions.length }}
-                                seats={speakerBalance.seats}
-                                rsp={speakerBalance.rsp}
-                                screenFrontPlaneM={reportScreenFrontPlaneM}
-                                screenWidthM={reportScreenWidthM}
-                                hasValidP4={speakerBalance.hasValidP4}
-                                hasValidP6={speakerBalance.hasValidP6}
-                                hasValidP10={speakerBalance.hasValidP10}
-                            />
-                        </div>
-                    )}
-
-                    {/* ── Timbre Consistency Across the Seats (final technical content page) ── */}
-                    {timbreConsistency.hasAnyValidResult === true && (
-                        <div className="max-w-7xl mx-auto" style={{ marginTop: 24 }}>
-                            {/* Category */}
-                            <div style={{ width: "100%", marginBottom: 16 }}>
-                                <h1 style={{
-                                    margin: 0,
-                                    fontSize: 34,
-                                    fontWeight: 300,
-                                    color: "#213428",
-                                    letterSpacing: "0.01em",
-                                    fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                                    textAlign: "center",
-                                }}>
-                                    Timbre Matching
-                                </h1>
-                                <p style={{
-                                    margin: "6px 0 0 0",
-                                    fontSize: 12,
-                                    color: "#625143",
-                                    letterSpacing: "0.08em",
-                                    textTransform: "uppercase",
-                                    textAlign: "center",
-                                    fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-                                }}>
-                                    RP22 Parameters 16 &amp; 17 — Timbre Consistency Across the Seats
-                                </p>
-                            </div>
-                            {/* Title */}
-                            <div style={{
-                                fontSize: 18,
-                                fontWeight: 600,
-                                color: "#213428",
-                                marginBottom: 8,
-                                fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                            }}>
-                                Timbre Consistency Across the Seats
-                            </div>
-                            {/* Explanation */}
-                            <p style={{
-                                fontSize: 14,
-                                color: "#625143",
-                                textAlign: "center",
-                                maxWidth: 600,
-                                lineHeight: 1.5,
-                                margin: "0 0 16px 0",
-                                fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-                            }}>
-                                This drawing shows the predicted tonal variation at each real seating position. P16 presents the screen-speaker result, while P17 presents the wide, surround and overhead-speaker result.
-                            </p>
-                            {/* Drawing region */}
-                            <TechnicalTimbreConsistency
-                                roomDims={{ widthM: stableDimensions.width, lengthM: stableDimensions.length }}
-                                seats={timbreConsistency.seats}
-                                rsp={primarySeatingPosition}
-                                screenFrontPlaneM={reportScreenFrontPlaneM}
-                                screenWidthM={reportScreenWidthM}
-                            />
-                        </div>
-                    )}
 
                 </div>
             </div>
@@ -1536,79 +1430,6 @@ function RP22ReportInner() {
                             </>
                         )}
 
-                        {/* ── Speaker Balance Across the Seats (final technical content page) ── */}
-                        {speakerBalance.hasAnyValid && (
-                            <section id="pdf-speaker-balance" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
-                                <div className="print-avoid-break">
-                                    {/* Category heading */}
-                                    <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 11, fontWeight: 600, color: '#625143', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
-                                        Spatial Resolution
-                                    </div>
-                                    {/* Parameter subtitle */}
-                                    <div style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif', fontSize: 10, color: '#625143', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
-                                        RP22 Parameters 4, 6 &amp; 10 — Speaker Balance Across the Seats
-                                    </div>
-                                    {/* Page title */}
-                                    <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
-                                        Speaker Balance Across the Seats
-                                    </div>
-                                    {/* Drawing — existing detailed component in print mode */}
-                                    <ClientSpeakerBalance
-                                        roomDims={{ widthM: stableDimensions.width, lengthM: stableDimensions.length }}
-                                        seats={speakerBalance.seats}
-                                        rsp={speakerBalance.rsp}
-                                        screenFrontPlaneM={reportScreenFrontPlaneM}
-                                        screenWidthM={reportScreenWidthM}
-                                        hasValidP4={speakerBalance.hasValidP4}
-                                        hasValidP6={speakerBalance.hasValidP6}
-                                        hasValidP10={speakerBalance.hasValidP10}
-                                        print
-                                    />
-                                    {/* Technical explanation — owned by the page wrapper, not the drawing */}
-                                    <div style={{ marginTop: 14, fontFamily: 'Didact Gothic, Century Gothic, sans-serif', fontSize: 11, color: '#3E4349', lineHeight: 1.6, maxWidth: '180mm' }}>
-                                        This drawing shows the relative screen, surround and overhead speaker-level balance at each real seating position. The three results remain separate so variations between speaker layers can be assessed directly.
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-
-                        {/* Page break — forces Timbre Consistency onto a fresh page using the proven print-page-break-after mechanism */}
-                        {timbreConsistency.hasAnyValidResult === true && (
-                            <div className="print-page-break-after" style={{ height: 0, margin: 0, padding: 0, border: 'none', overflow: 'hidden' }} />
-                        )}
-
-                        {/* ── Timbre Consistency Across the Seats (final technical content page) ── */}
-                        {timbreConsistency.hasAnyValidResult === true && (
-                            <section id="pdf-timbre-consistency" className="print-page-break-before" style={{ padding: '8mm 10mm', background: '#FFFFFF' }}>
-                                <div className="print-avoid-break">
-                                    {/* Page heading */}
-                                    <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 11, fontWeight: 600, color: '#625143', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
-                                        Timbre Matching
-                                    </div>
-                                    {/* Parameter subtitle */}
-                                    <div style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif', fontSize: 10, color: '#625143', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
-                                        RP22 Parameters 16 &amp; 17 — Timbre Consistency Across the Seats
-                                    </div>
-                                    {/* Page title */}
-                                    <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
-                                        Timbre Consistency Across the Seats
-                                    </div>
-                                    {/* Drawing */}
-                                    <TechnicalTimbreConsistency
-                                        roomDims={{ widthM: stableDimensions.width, lengthM: stableDimensions.length }}
-                                        seats={timbreConsistency.seats}
-                                        rsp={primarySeatingPosition}
-                                        screenFrontPlaneM={reportScreenFrontPlaneM}
-                                        screenWidthM={reportScreenWidthM}
-                                        print
-                                    />
-                                    {/* Explanation */}
-                                    <div style={{ marginTop: 14, fontFamily: 'Didact Gothic, Century Gothic, sans-serif', fontSize: 11, color: '#3E4349', lineHeight: 1.6, maxWidth: '180mm' }}>
-                                        This drawing shows the predicted tonal variation at each real seating position. P16 presents the screen-speaker result, while P17 presents the wide, surround and overhead-speaker result.
-                                    </div>
-                                </div>
-                            </section>
-                        )}
 
                     </div>
                 </div>
