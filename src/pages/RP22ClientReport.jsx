@@ -16,7 +16,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useClientReportAuthority } from "@/components/report/client/useClientReportAuthority";
 import ClientSoundAroundListener from "@/components/report/client/ClientSoundAroundListener";
-import ClientSoundAboveListener from "@/components/report/client/ClientSoundAboveListener";
+import ClientP9Overhead from "@/components/report/client/ClientP9Overhead";
+import { selectClientP9Overhead } from "@/components/report/client/selectClientP9Overhead";
 import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
@@ -118,6 +119,16 @@ export default function RP22ClientReport() {
       rsp,
     });
   }, [hydrating, analysisResult, seatingPositions, rsp]);
+
+  // ── P9 Overhead per-seat (pure selector — reads canonical perSeatRp22) ──
+  // P9 is a SEAT-scope parameter. This selector reads each seat's canonical
+  // P9 result from analysisResult.perSeatRp22 — no RSP-only room-level grade.
+  const p9Overhead = useMemo(() => {
+    if (hydrating || !analysisResult || !Array.isArray(seatingPositions)) {
+      return { seats: [], counts: {}, hasAnyValidResult: false, summary: "" };
+    }
+    return selectClientP9Overhead({ analysisResult, seatingPositions });
+  }, [hydrating, analysisResult, seatingPositions]);
 
   // ── Recommended seating position (pure selector, no new analysis) ──
   const recommendedSeatingPosition = useMemo(() => {
@@ -237,15 +248,24 @@ export default function RP22ClientReport() {
       pages.push({
         id: "p9-spatial-resolution",
         visual: (
-          <ClientSoundAboveListener
-            p9Snapshot={p9Snapshot}
+          <ClientP9Overhead
             roomDims={roomDims}
+            seats={p9Overhead.seats}
+            rsp={rsp}
+            screenFrontPlaneM={screenFrontPlaneM}
+            screenWidthM={screenWidthM}
+            counts={p9Overhead.counts}
+            summary={p9Overhead.summary}
           />
         ),
         printData: {
           type: "p9",
           p9Snapshot,
           roomDims,
+          p9Overhead,
+          rsp,
+          screenFrontPlaneM,
+          screenWidthM,
         },
       });
     }
@@ -411,7 +431,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers]);
+  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,
