@@ -169,16 +169,13 @@ export function getListeningAreaBounds(
   const minSeatY = Math.min(...seatYs);
   const maxSeatY = Math.max(...seatYs);
 
-  // 2. Apply RP22 margins (200mm front/back)
-  const frontMargin = 0.20;
-  const backMargin = 0.20;
+  // RP22 5.8.1: the listening area perimeter runs through the actual
+  // outermost listener head centres. Do NOT add ±200 mm margins.
+  let listeningFrontY = minSeatY;
+  let listeningBackY = maxSeatY;
 
-  let listeningFrontY = minSeatY - frontMargin;
-  let listeningBackY = maxSeatY + backMargin;
-
-  // 3. Clamp to room bounds (don't go outside walls)
-  // Screen wall is at Y=0, rear wall is at Y=lengthM
-  const screenWallInner = 0.05; // small offset from screen wall
+  // Clamp only to room bounds (UI/physical wall clearance, NOT RP22 authority).
+  const screenWallInner = 0.05;
   const rearWallInner = lengthM - 0.05;
 
   listeningFrontY = Math.max(screenWallInner, listeningFrontY);
@@ -296,7 +293,7 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
       : (typeof roomDims?.height === "number" ? roomDims.height : 2.5),
   };
   
-  const { widthM, lengthM, heightM } = safeRoom;
+  const { widthM, lengthM } = safeRoom;
   const { listeningFrontY, listeningBackY, midCenterY } = bounds;
 
   // Compute seat bounds and room centre for overhead clamping
@@ -319,131 +316,19 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const screenWallInner = 0.05;
   const rearWallInner = lengthM - 0.05;
 
-  // Height-aware zone calculation
-  // Use ceiling height and MLP ear height to compute front/rear offsets
+  // RP22 5.8.1 Y authority — role-specific recommendation zones.
+  // Front/Back zones are defined by the listening-area edges and the
+  // available room boundaries, NOT by 45° elevation, tan(), symmetry,
+  // or fixed ±0.5 m bands. Top Middle is RSP ±0.500 m.
+  // The three zones are role-specific and may geometrically overlap.
   const mlpY_m = midCenterY;
-  const ceilingHeightM = heightM;
-  const earHeightM = bounds.mlpEarHeight || 1.1;
-  const earToCeilingM = Math.max(0.4, ceilingHeightM - earHeightM);
-
-  // Target elevation angles for front/rear (45°)
-  const FRONT_ELEV_DEG = 45;
-  const REAR_ELEV_DEG = 45;
-  const FRONT_ELEV_RAD = FRONT_ELEV_DEG * Math.PI / 180;
-  const REAR_ELEV_RAD = REAR_ELEV_DEG * Math.PI / 180;
-
-  // Compute ideal offsets from MLP (Y direction)
-  const frontOffsetM = earToCeilingM * Math.tan(FRONT_ELEV_RAD);
-  const rearOffsetM = earToCeilingM * Math.tan(REAR_ELEV_RAD);
-
-  // Ideal centers before clamping
-  let idealFrontCenterY = mlpY_m - frontOffsetM;
-  let idealRearCenterY = mlpY_m + rearOffsetM;
-
-  // Clamp to stay within listening area and room bounds
-  const minFrontCenterY = screenWallInner;
-  const maxRearCenterY = rearWallInner;
-
-  const frontOffset = Math.min(frontOffsetM, mlpY_m - minFrontCenterY);
-  const rearOffset = Math.min(rearOffsetM, maxRearCenterY - mlpY_m);
-
-  // Keep symmetric about MLP
-  const symmetricOffset = Math.min(frontOffset, rearOffset);
-  idealFrontCenterY = mlpY_m - symmetricOffset;
-  idealRearCenterY = mlpY_m + symmetricOffset;
+  const MID_HALF_BAND_M = 0.5;
 
   // ────────────────────────────────────────────────────────────────────────────
-  // X-WIDTH CALCULATION: constrained by seats + L/R speakers
+  // X-WIDTH CALCULATION: constrained by seats + L/R speakers (RP22 5.8.1 Rule 3)
   // ────────────────────────────────────────────────────────────────────────────
-  
-  // Helper to compute lateral bounds
-  function computeOverheadLateralBounds({
-    widthM,
-    seatingPositions,
-    placedSpeakers,
-    getCanonicalRole,
-  }) {
-    const centerX = widthM / 2;
 
-    // 1) Seat span (all rows, all seats)
-    const seatXs = (seatingPositions || [])
-      .map(seat => Number(seat?.x ?? seat?.position?.x))
-      .filter(x => Number.isFinite(x));
-
-    // If no seats, fall back to a narrow strip around centre
-    const seatMinX = seatXs.length ? Math.min(...seatXs) : centerX - 0.4;
-    const seatMaxX = seatXs.length ? Math.max(...seatXs) : centerX + 0.4;
-
-    // Small safety offset so overheads are just outside the widest seats
-    const SEAT_MARGIN_M = 0.15;
-    const innerLeft = Math.max(0, seatMinX - SEAT_MARGIN_M);
-    const innerRight = Math.min(widthM, seatMaxX + SEAT_MARGIN_M);
-
-    // 2) Front L / R loudspeakers
-    const fl = (placedSpeakers || []).find(
-      s => getCanonicalRole(s.role) === "FL"
-    );
-    const fr = (placedSpeakers || []).find(
-      s => getCanonicalRole(s.role) === "FR"
-    );
-
-    const flX = Number(fl?.position?.x);
-    const frX = Number(fr?.position?.x);
-
-    // If missing, use room edges as outer limits
-    const outerLeft = Number.isFinite(flX) ? flX : 0;
-    const outerRight = Number.isFinite(frX) ? frX : widthM;
-
-    // Combine: corridors must be outside seats, but inside L/R span
-    const minX = Math.min(innerLeft, centerX);
-    const maxX = Math.max(innerRight, centerX);
-
-    const clampedMinX = Math.max(outerLeft, minX);
-    const clampedMaxX = Math.min(outerRight, maxX);
-
-    return {
-      centerX,
-      maxHalfSpan: Math.max(
-        0,
-        Math.min(centerX - clampedMinX, clampedMaxX - centerX)
-      ),
-    };
-  }
-
-  // RP22 target azimuth ranges for overhead positions
-  const FRONT_AZ_MIN = 20;  // degrees
-  const FRONT_AZ_MAX = 45;
-  const MID_AZ_MIN = 40;
-  const MID_AZ_MAX = 60;
-  const REAR_AZ_MIN = 20;
-  const REAR_AZ_MAX = 45;
-
-  // Collect all valid azimuth ranges
-  const azMins = [];
-  const azMaxs = [];
-
-  if (Number.isFinite(FRONT_AZ_MIN) && Number.isFinite(FRONT_AZ_MAX)) {
-    azMins.push(FRONT_AZ_MIN);
-    azMaxs.push(FRONT_AZ_MAX);
-  }
-  if (Number.isFinite(MID_AZ_MIN) && Number.isFinite(MID_AZ_MAX)) {
-    azMins.push(MID_AZ_MIN);
-    azMaxs.push(MID_AZ_MAX);
-  }
-  if (Number.isFinite(REAR_AZ_MIN) && Number.isFinite(REAR_AZ_MAX)) {
-    azMins.push(REAR_AZ_MIN);
-    azMaxs.push(REAR_AZ_MAX);
-  }
-
-  // Compute common azimuth range (fallback to mid-range defaults)
-  const commonAzMinDeg = azMins.length ? Math.min(...azMins) : 20;
-  const commonAzMaxDeg = azMaxs.length ? Math.max(...azMaxs) : 60;
-
-  // Single target lateral angle for all bands
-  const commonAzTargetDeg = (commonAzMinDeg + commonAzMaxDeg) / 2;
-  const commonAzTargetRad = (commonAzTargetDeg * Math.PI) / 180;
-
-  // NEW: lateral half-span driven by seats + L/R speakers only.
+  // Lateral half-span driven by seats + L/R speakers only.
   // Angle / elevation constraints are handled in the Y direction and RP22 metrics,
   // not by squeezing the side-to-side corridor.
   const halfSpanX = computeOverheadHalfSpanX({
@@ -543,38 +428,41 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
 
   const excludedSeatCount = excludedLeftSeatIds.length + excludedRightSeatIds.length;
 
-  // Band thickness (±0.5m around center)
-  const halfBandM = 0.5;
-
   const basePieces = [leftPiece, rightPiece].filter(Boolean);
 
-  // Middle zone: centered on MLP
+  // Top Middle: RSP ±0.500 m, clamped to room limits only.
   const midZone = {
     x1: x1Overhead,
     x2: x2Overhead,
-    y1: Math.max(screenWallInner, mlpY_m - halfBandM),
-    y2: Math.min(rearWallInner, mlpY_m + halfBandM),
+    y1: Math.max(screenWallInner, mlpY_m - MID_HALF_BAND_M),
+    y2: Math.min(rearWallInner, mlpY_m + MID_HALF_BAND_M),
     active: true,
-    // NEW: side corridors only (no shading over the central seating block)
     pieces: basePieces,
   };
 
-  // Front zone: centered on idealFrontCenterY
+  // Upper Front: every point satisfies y <= listeningFrontY.
+  // Region spans from the available front room boundary to the front
+  // listening-area edge. Not shortened to a 1 m strip, not forced
+  // symmetric with the rear, and NOT clamped to stop at Top Middle
+  // (role-specific zones may overlap per RP22 5.8.1).
   const frontZone = {
     x1: x1Overhead,
     x2: x2Overhead,
-    y1: Math.max(screenWallInner, idealFrontCenterY - halfBandM),
-    y2: Math.min(midZone.y1, idealFrontCenterY + halfBandM),
+    y1: screenWallInner,
+    y2: listeningFrontY,
     active: true,
     pieces: basePieces,
   };
 
-  // Back zone: centered on idealRearCenterY
+  // Upper Back: every point satisfies y >= listeningBackY.
+  // Region spans from the rear listening-area edge to the available
+  // rear room boundary. Not shortened, not forced symmetric, not
+  // clamped to start at Top Middle.
   const backZone = {
     x1: x1Overhead,
     x2: x2Overhead,
-    y1: Math.max(midZone.y2, idealRearCenterY - halfBandM),
-    y2: Math.min(rearWallInner, idealRearCenterY + halfBandM),
+    y1: listeningBackY,
+    y2: rearWallInner,
     active: true,
     pieces: basePieces,
   };
