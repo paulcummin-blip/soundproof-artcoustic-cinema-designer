@@ -401,7 +401,8 @@ export default function RvPlanCanvas({
               frontWideZones={frontWideZones}
               meterToCanvasX={meterToCanvasX}
               meterToCanvasY={meterToCanvasY}
-            />
+              seatingPositions={seatingPositions}
+              />
 
             {/* Layer 5: Other Informational Zone Overlays */}
             {exportMode !== 'clean' && !!overlaysForRendering?.LCR && ZoneComponents.LCR}

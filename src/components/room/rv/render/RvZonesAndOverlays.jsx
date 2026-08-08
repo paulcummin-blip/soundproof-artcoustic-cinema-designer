@@ -4,6 +4,7 @@ import React from "react";
 import RP22ZonesOverlay from "@/components/room/RP22ZonesOverlay";
 import { renderOverheadBandsSVG } from "@/components/room/utils/overheadZones";
 import RvP9Corridors from "@/components/room/rv/render/RvP9Corridors";
+import RvSurroundZones from "@/components/room/rv/render/RvSurroundZones";
 
 export default function RvZonesAndOverlays({
   exportMode,
@@ -30,6 +31,9 @@ export default function RvZonesAndOverlays({
   frontWideZones,
   meterToCanvasX,
   meterToCanvasY,
+
+  // Surround zones (canonical RP22 side/rear)
+  seatingPositions,
 }) {
   const showOverheads =
     !!(overlaysForRendering?.OVERHEADS_2 ||
@@ -103,6 +107,20 @@ export default function RvZonesAndOverlays({
             pointerEvents="none"
           />
         </>
+      )}
+
+      {/* Canonical RP22 Side/Rear Surround Zones — same authority as P11 */}
+      {!!(overlaysForRendering?.showZones) && (
+        <RvSurroundZones
+          seatingPositions={seatingPositions}
+          widthM={widthM}
+          lengthM={lengthM}
+          mlpPoint={mlp}
+          placedSpeakers={placedSpeakers}
+          meterToCanvasX={meterToCanvasX}
+          meterToCanvasY={meterToCanvasY}
+          showZones={true}
+        />
       )}
 
       {/* Overhead Zones / Bands */}

@@ -1111,10 +1111,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     gradedParameters.primary[11] = {
       title: p11CatalogEntry?.title || "Speaker zone compliance",
       level: p11Result.level,
-      value: p11Result.outsideCount,
+      value: p11Result.indeterminate ? null : p11Result.outsideCount,
       unit: p11CatalogEntry?.unit || "speakers",
-      status: "ok",
-      note: p11Result.outsideCount === 0
+      status: p11Result.indeterminate ? "indeterminate" : "ok",
+      note: p11Result.indeterminate
+        ? "Surround zone geometry unavailable — cannot evaluate speaker placement."
+        : p11Result.outsideCount === 0
         ? "All surround, wide and upper speakers are within the recommended RP22 placement zones."
         : `${p11Result.outsideCount} speaker${p11Result.outsideCount > 1 ? "s" : ""} outside the recommended RP22 placement zones.`,
       outsideSpeakers: p11Result.outsideSpeakers,

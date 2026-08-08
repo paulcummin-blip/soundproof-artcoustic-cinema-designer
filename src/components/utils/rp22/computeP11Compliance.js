@@ -5,14 +5,19 @@
  * recommended zonal locations.
  *
  * Authority:
- *   Overhead zones:  computeOverheadZones (wraps computeRp22OverheadZoneExtents)
+ *   Overhead zones:   computeOverheadZones (wraps computeRp22OverheadZoneExtents)
  *   Front wide zones: computeFrontWideZonesStrict
- *   Bed-layer pads:   getBedPads (SL/SR/LRS/RRS)
+ *   Side/rear zones:   computeRp22SurroundZones (RP22 5.6.1 canonical)
  *
  * All three use the SAME canonical zone geometry as the Room Designer overlays.
  * No zone geometry is duplicated or approximated inside this function.
  *
- * Grading:
+ * FAIL-SAFE:
+ *   If applicable zone authority cannot be calculated (indeterminate),
+ *   the result level is "indeterminate" — NOT a false L4.
+ *   outsideCount is still reported for speakers whose zones ARE determinate.
+ *
+ * Grading (when authority is valid for ALL checked speakers):
  *   outsideCount === 0 → L4
  *   outsideCount >= 1  → L1
  *   (No L2, L3, or FAIL for P11)
@@ -28,7 +33,11 @@
 
 import { computeOverheadZones } from "@/components/room/utils/overheadZones";
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
-import { getBedPads } from "@/components/room/padsGeometry";
+import {
+  computeRp22SurroundZones,
+  isInsideSurroundZone,
+  hasActiveSurroundBack,
+} from "@/components/utils/rp22/rp22SurroundZones";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -47,15 +56,17 @@ function getOverheadZoneKey(canonRole) {
 
 /**
  * Test whether a point (x, y) is inside an overhead zone.
- * Inactive zones return true (speaker not counted as outside).
+ * Inactive zones return true (speaker not counted as outside — preserved
+ * existing validated authority).
  */
 function isInsideOverheadZone(x, y, zone) {
   if (!zone || !zone.active) return true;
   if (!isNum(y) || y < zone.y1 || y > zone.y2) return false;
   if (!isNum(x)) return false;
-  const pieces = Array.isArray(zone.pieces) && zone.pieces.length > 0
-    ? zone.pieces
-    : [{ x1: zone.x1, x2: zone.x2 }];
+  const pieces =
+    Array.isArray(zone.pieces) && zone.pieces.length > 0
+      ? zone.pieces
+      : [{ x1: zone.x1, x2: zone.x2 }];
   return pieces.some((piece) => {
     const lo = Math.min(piece.x1, piece.x2);
     const hi = Math.max(piece.x1, piece.x2);
@@ -65,22 +76,13 @@ function isInsideOverheadZone(x, y, zone) {
 
 /**
  * Test whether a Y coordinate is inside a front wide side zone.
- * Inactive zones return true (speaker not counted as outside).
+ * Inactive zones return true (speaker not counted as outside — preserved
+ * existing validated authority).
  */
 function isInsideFrontWideZone(y, sideZone) {
   if (!sideZone || sideZone.status !== "ok") return true;
   if (!isNum(y)) return false;
   return y >= sideZone.yMin && y <= sideZone.yMax;
-}
-
-/**
- * Test whether a Y coordinate is inside a bed-layer pad.
- * Missing pads return true (speaker not counted as outside).
- */
-function isInsideBedPad(y, pad) {
-  if (!pad || !isNum(pad.min) || !isNum(pad.max)) return true;
-  if (!isNum(y)) return false;
-  return y >= pad.min && y <= pad.max;
 }
 
 /**
@@ -91,7 +93,7 @@ function isInsideBedPad(y, pad) {
  * @param {Object}   opts.dimensions        - { widthM, lengthM, heightM } or { width, length, height }
  * @param {Object}   opts.mlpPoint          - MLP/RSP { x, y, z }
  * @param {Function} opts.getSpeakerModelMeta - From speakers registry
- * @returns {{ outsideCount: number, outsideSpeakers: Array, level: string }}
+ * @returns {{ outsideCount: number, outsideSpeakers: Array, level: string, indeterminate: boolean }}
  */
 export function computeP11Compliance({
   speakers,
@@ -107,6 +109,7 @@ export function computeP11Compliance({
 
   const allSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
+  const checkSpeakers = Array.isArray(speakers) ? speakers : [];
 
   // ── Compute canonical zones (same authority as Room Designer overlays) ──
 
@@ -133,15 +136,17 @@ export function computeP11Compliance({
     enableFrontWides: true,
   });
 
-  const bedPads = getBedPads({
-    dimensions: { width: widthM, length: lengthM },
+  const surroundZones = computeRp22SurroundZones({
     seatingPositions: seats,
+    dimensions: { widthM, lengthM },
+    mlpPoint,
+    hasSurroundBack: hasActiveSurroundBack(checkSpeakers),
   });
 
   // ── Check each speaker against its applicable zone ──
 
   const outsideSpeakers = [];
-  const checkSpeakers = Array.isArray(speakers) ? speakers : [];
+  let indeterminateCount = 0;
 
   for (const speaker of checkSpeakers) {
     if (!speaker || !speaker.position) continue;
@@ -157,46 +162,71 @@ export function computeP11Compliance({
 
     let isOutside = false;
     let zoneType = null;
+    let zoneIndeterminate = false;
 
     // Overhead speakers
     const ohZoneKey = getOverheadZoneKey(role);
     if (ohZoneKey) {
       zoneType = `overhead-${ohZoneKey}`;
       const zone =
-        ohZoneKey === "front" ? overheadZones.frontZone
-        : ohZoneKey === "mid" ? overheadZones.midZone
-        : overheadZones.backZone;
+        ohZoneKey === "front"
+          ? overheadZones.frontZone
+          : ohZoneKey === "mid"
+          ? overheadZones.midZone
+          : overheadZones.backZone;
       isOutside = !isInsideOverheadZone(x, y, zone);
     }
     // Front wides
     else if (role === "LW") {
       zoneType = "front-wide-left";
       isOutside = !isInsideFrontWideZone(y, frontWideZones?.left);
-    }
-    else if (role === "RW") {
+    } else if (role === "RW") {
       zoneType = "front-wide-right";
       isOutside = !isInsideFrontWideZone(y, frontWideZones?.right);
     }
-    // Side surrounds
+    // Side surrounds — canonical RP22 surround zones
     else if (role === "SL") {
       zoneType = "side-surround-left";
-      isOutside = !isInsideBedPad(y, bedPads?.SL);
-    }
-    else if (role === "SR") {
+      const inside = isInsideSurroundZone(x, y, surroundZones?.sideLeft);
+      if (inside === null) {
+        zoneIndeterminate = true;
+      } else {
+        isOutside = !inside;
+      }
+    } else if (role === "SR") {
       zoneType = "side-surround-right";
-      isOutside = !isInsideBedPad(y, bedPads?.SR);
+      const inside = isInsideSurroundZone(x, y, surroundZones?.sideRight);
+      if (inside === null) {
+        zoneIndeterminate = true;
+      } else {
+        isOutside = !inside;
+      }
     }
-    // Rear surrounds
+    // Rear surrounds — canonical RP22 surround-back zones
     else if (role === "SBL") {
       zoneType = "rear-surround-left";
-      isOutside = !isInsideBedPad(y, bedPads?.LRS);
-    }
-    else if (role === "SBR") {
+      const inside = isInsideSurroundZone(x, y, surroundZones?.backLeft);
+      if (inside === null) {
+        zoneIndeterminate = true;
+      } else {
+        isOutside = !inside;
+      }
+    } else if (role === "SBR") {
       zoneType = "rear-surround-right";
-      isOutside = !isInsideBedPad(y, bedPads?.RRS);
+      const inside = isInsideSurroundZone(x, y, surroundZones?.backRight);
+      if (inside === null) {
+        zoneIndeterminate = true;
+      } else {
+        isOutside = !inside;
+      }
     }
     // Skip screen speakers (FL/FC/FR), subwoofers, and any other roles
     else {
+      continue;
+    }
+
+    if (zoneIndeterminate) {
+      indeterminateCount++;
       continue;
     }
 
@@ -205,8 +235,19 @@ export function computeP11Compliance({
     }
   }
 
+  // ── Fail-safe: if any speaker's zone was indeterminate, return indeterminate ──
+  if (indeterminateCount > 0) {
+    return {
+      outsideCount: outsideSpeakers.length,
+      outsideSpeakers,
+      level: "indeterminate",
+      indeterminate: true,
+      indeterminateCount,
+    };
+  }
+
   const outsideCount = outsideSpeakers.length;
   const level = outsideCount === 0 ? "L4" : "L1";
 
-  return { outsideCount, outsideSpeakers, level };
+  return { outsideCount, outsideSpeakers, level, indeterminate: false };
 }
