@@ -26,10 +26,6 @@ const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
 );
 
-const P18DebugPanel = React.lazy(() =>
-  import("@/components/room/bass/P18DebugPanel").then((m) => ({ default: m.default ?? m.P18DebugPanel }))
-);
-
 const VIEW_BUTTONS = [['controls', 'CONTROLS'], ['isometric', 'ISOMETRIC'], ['data', 'DATA']];
 
 function resolveProductLabel(rawModel) {
@@ -611,12 +607,6 @@ export default function RoomDesignerControlsPanel({
               p15ConstructionLevel={appState?.p15ConstructionLevel}
               p21EarlyReflectionPreset={appState?.p21EarlyReflectionPreset}
               freeMoveLcr={freeMoveLcr} />
-          </Suspense>
-          <Suspense fallback={<div>Loading...</div>}>
-            <P18DebugPanel
-              p18Debug={analysisResult?.__p18Debug}
-              subModel={frontSubsCfg?.model || rearSubsCfg?.model || appState?.subwoofers?.[0]?.modelKey || appState?.subwoofers?.[0]?.model}
-            />
           </Suspense>
         </CollapsiblePanel>
 
