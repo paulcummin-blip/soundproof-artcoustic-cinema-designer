@@ -3,6 +3,7 @@
 import React from "react";
 import RP22ZonesOverlay from "@/components/room/RP22ZonesOverlay";
 import { renderOverheadBandsSVG } from "@/components/room/utils/overheadZones";
+import RvP9Corridors from "@/components/room/rv/render/RvP9Corridors";
 
 export default function RvZonesAndOverlays({
   exportMode,
@@ -106,6 +107,24 @@ export default function RvZonesAndOverlays({
 
       {/* Overhead Zones / Bands */}
       {OverheadsBands}
+
+      {/* Dynamic P9 Target Corridors — gated by the same showOverheads authority */}
+      {exportMode === "default" && showOverheads && (
+        <RvP9Corridors
+          ranges={p9Corridors?.ranges}
+          boundaries={p9Corridors?.boundaries}
+          applicable={p9Corridors?.applicable}
+          state={p9Corridors?.state}
+          note={p9Corridors?.note}
+          selectedRow={p9Corridors?.selectedRow}
+          rows={p9Corridors?.rows}
+          overheadZones={overheadZones}
+          toPx={toPx}
+          widthM={widthM}
+          lengthM={lengthM}
+          scale={scale}
+        />
+      )}
       </>
       );
       }
