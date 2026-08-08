@@ -45,6 +45,7 @@ import { useRoomCoordinateConverters } from "@/components/room/rv/hooks/useRoomC
 import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWideZonesComputed";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 import { useP9CorridorsComputed } from "@/components/room/rv/hooks/useP9CorridorsComputed";
+import { useP9StaticGuides } from "@/components/room/rv/hooks/useP9StaticGuides";
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
@@ -1827,8 +1828,8 @@ useEffect(() => {
     });
   }, [placedSpeakers, speakerDragTick]);
 
-  // Dynamic P9 target corridors for selected overhead row
-  const p9Corridors = useP9CorridorsComputed({
+  // Dynamic P9 target corridors for selected overhead row (.6 layouts)
+  const p9DynamicCorridors = useP9CorridorsComputed({
     selectedOverheadRow,
     rsp: mlp,
     placedSpeakers: renderSpeakers,
@@ -1837,6 +1838,18 @@ useEffect(() => {
     dolbyLayout,
     overheadZones,
   });
+
+  // Fixed P9 reference guides for .4 layouts — independent of speaker drag
+  const p9StaticGuides = useP9StaticGuides({
+    rsp: mlp,
+    roomDims: { widthM, lengthM, heightM },
+    dolbyLayout,
+    overheadZones,
+    getCanonicalRole,
+  });
+
+  // .4 → static guides; .6 → dynamic corridors; .2 → not applicable
+  const p9Corridors = p9StaticGuides.applicable ? p9StaticGuides : p9DynamicCorridors;
 
   // Overhead speaker icons — extracted to hook
   const overheadIconElements = useOverheadIconElements({ placedSpeakers: renderSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride,   overheadRearOverride, bedLayerSpeakerMouseDownHandler: bedLayerSpeakerMouseDownHandlerWithSelection, handleIconEnter, handleIconMove, handleIconLeave });
