@@ -28,6 +28,7 @@ import {
 import { evaluateCanonicalP2 } from "@/components/utils/rp22/canonicalP2Authority";
 import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNormalisation";
 import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
+import { computeP11Compliance } from "@/components/utils/rp22/computeP11Compliance";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -613,16 +614,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       gradedParameters.primary[7] = null;
     }
 
-    // RP22 Parameter 11 — Speaker Zone Compliance (always L4, app enforces zones)
-    const p11CatalogEntry = RP22_CATALOG["11"];
-    gradedParameters.primary[11] = {
-      title: p11CatalogEntry?.title || "Speaker zone compliance",
-      level: "L4",
-      value: 0,
-      unit: p11CatalogEntry?.unit || "",
-      status: "ok",
-      note: "App enforces zone compliance"
-    };
+    // RP22 Parameter 11 — computed after speakersWithResolvedOverheads (see below)
 
     // RP22 Parameter 3 — Screen wall speakers in LCR zones (binary: L4 or FAIL)
     (() => {
@@ -1097,6 +1089,36 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
       return speaker;
     });
+
+    // RP22 Parameter 11 — Speaker Zone Compliance (canonical zonal geometry)
+    // Uses the SAME zone authority as the Room Designer overlays:
+    //   computeOverheadZones (computeRp22OverheadZoneExtents) for overheads,
+    //   computeFrontWideZonesStrict for front wides,
+    //   getBedPads for side/rear surrounds.
+    // Grading: 0 outside → L4, >=1 outside → L1. No L2/L3/FAIL.
+    const p11CatalogEntry = RP22_CATALOG["11"];
+    const p11Mlp = (mlpPointOverride && isNum(mlpPointOverride.x) && isNum(mlpPointOverride.y))
+      ? mlpPointOverride
+      : (mlp && isNum(mlp.x) && isNum(mlp.y) ? mlp : null);
+    const p11Result = computeP11Compliance({
+      speakers: speakersWithResolvedOverheads.filter(hasRealModel),
+      placedSpeakers: safeSpeakers,
+      seatingPositions: safeSeats,
+      dimensions,
+      mlpPoint: p11Mlp,
+      getSpeakerModelMeta,
+    });
+    gradedParameters.primary[11] = {
+      title: p11CatalogEntry?.title || "Speaker zone compliance",
+      level: p11Result.level,
+      value: p11Result.outsideCount,
+      unit: p11CatalogEntry?.unit || "speakers",
+      status: "ok",
+      note: p11Result.outsideCount === 0
+        ? "All surround, wide and upper speakers are within the recommended RP22 placement zones."
+        : `${p11Result.outsideCount} speaker${p11Result.outsideCount > 1 ? "s" : ""} outside the recommended RP22 placement zones.`,
+      outsideSpeakers: p11Result.outsideSpeakers,
+    };
 
     // Parse bed count from layout string (5.1, 7.1, 9.1, etc.)
     const parseLayoutBedCount = (layoutStr) => {
