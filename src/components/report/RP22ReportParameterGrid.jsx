@@ -7,9 +7,14 @@ import { useAppState } from "@/components/AppStateProvider";
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
+import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
+import { formatSeatLabel } from "@/components/utils/seatLabel";
+import TechnicalParameterCard from "@/components/report/technical/TechnicalParameterCard";
+import TechnicalParameterPage from "@/components/report/technical/TechnicalParameterPage";
+import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
 
 /* ---------- Canonical RP22 parameter definitions ---------- */
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
@@ -412,21 +417,92 @@ export default function RP22ReportParameterGrid({
     );
   };
 
+  /* ----- Build per-seat grid data for the redesigned Technical Report cards ----- */
+  const buildSeatGridData = React.useCallback((paramId) => {
+    if (!rows.length) return null;
+    const pKey = `p${Number(paramId)}`;
+
+    // P20 special case — extract from bassPresentation.perSeatP20Results
+    if (Number(paramId) === 20) {
+      return rows.map(rowObj => ({
+        row: rowObj.row,
+        seats: rowObj.seats.map(seat => {
+          const result = bassPresentation.perSeatP20Results.find(
+            item => String(item?.seatId) === String(seat?.id)
+          );
+          return {
+            id: seat?.id,
+            indexInRow: seat?.indexInRow,
+            level: result ? p20LevelText(result.level) : "—",
+            value: result && Number.isFinite(Number(result.variationDbRaw))
+              ? formatAuthoritativeP20Result(result)
+              : "—",
+            isPrimary: !!seat?.isPrimary,
+          };
+        }),
+      }));
+    }
+
+    // Standard case — extract from seat HUD snapshots
+    return rows.map(rowObj => ({
+      row: rowObj.row,
+      seats: rowObj.seats.map(seat => {
+        const snap = getSnapshotForSeat(seat);
+        const metric = snap?.rp22?.[pKey];
+        const display = getMetricDisplayState(metric, paramId);
+        return {
+          id: seat?.id,
+          indexInRow: seat?.indexInRow,
+          level: display.level || metric?.level || "—",
+          value: display.text || "—",
+          isPrimary: !!seat?.isPrimary,
+        };
+      }),
+    }));
+  }, [rows, getSnapshotForSeat, bassPresentation.perSeatP20Results]);
+
+  /* ----- Render a single redesigned Technical Report parameter card ----- */
+  const renderPrintCard = (param) => {
+    const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
+    const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
+      ? { ...param, thresholds: resolvedThresholds }
+      : param;
+    const targetBasisNote =
+      param.id === 12 ? (p12Mode === "recommended" ? "Recommended" : "Minimum") :
+      param.id === 13 ? (p13Mode === "recommended" ? "Recommended" : "Minimum") :
+      param.id === 14 ? bassPresentation.parameters.p14.detail :
+      null;
+    const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
+    const seatGridData = isSeatScope ? buildSeatGridData(param.id) : null;
+    const humanTitle = getHumanTitleForParam(param.id);
+    const category = getCategoryForParam(param.id);
+    const rspLabel = lockedSeatId ? formatSeatLabel(lockedSeatId) : null;
+    return (
+      <TechnicalParameterCard
+        key={param.id}
+        param={resolvedParam}
+        achievedValue={getHudValueForParam(param)}
+        lvl={getHudLevelForParam(param)}
+        category={category}
+        humanTitle={humanTitle}
+        seatGridData={seatGridData}
+        targetBasisNote={targetBasisNote}
+        rspLabel={rspLabel}
+      />
+    );
+  };
+
   if (isPrintVariant) {
     const groups = [];
     for (let i = 0; i < RP22_PARAMS.length; i += 3) {
       groups.push(RP22_PARAMS.slice(i, i + 3));
     }
     return (
-      <div className="rp22-params-grid rp22-params-print-groups">
+      <div className="rp22-params-grid rp22-params-print-groups tech-params-print-groups">
         {groups.map((group, groupIdx) => (
-          <div
-            key={groupIdx}
-            className="rp22-param-page print-avoid-break"
-            style={{ breakInside: "avoid", pageBreakInside: "avoid" }}
-          >
-            {group.map((param) => renderCard(param))}
-          </div>
+          <TechnicalParameterPage key={groupIdx} params={group} isFirst={groupIdx === 0}>
+            {group.map((param) => renderPrintCard(param))}
+          </TechnicalParameterPage>
         ))}
       </div>
     );

@@ -1321,9 +1321,9 @@ function RP22ReportInner() {
                           data-bass-selected-candidate={complianceBassExportData.selectedCandidateId || ""}
                         >
                              <div>
-                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters</div>
-                                <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Live report parameter cards using the same room and seat rendering path as the in-app RP22 report.</div>
-                                {bassErrorMessage && <div style={{ color: '#625143', fontSize: 11, marginBottom: 10 }}>Bass analysis unavailable</div>}
+                                 <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 16, fontWeight: 400, color: '#213428', marginBottom: 2, letterSpacing: '0.01em' }}>RP22 Parameters</div>
+                                <div style={{ color: '#625143', fontSize: 9, marginBottom: 8, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>Engineering evidence · 21 parameters · 3 per page</div>
+                                {bassErrorMessage && <div style={{ color: '#625143', fontSize: 10, marginBottom: 8, fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>Bass analysis unavailable</div>}
                                 <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                             </div>
                         </section>

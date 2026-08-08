@@ -271,6 +271,46 @@ export default function ReportPrintStyles() {
                     font-size: 8.5pt !important;
                     line-height: 1.35 !important;
                 }
+
+                /* ── Technical Report redesigned parameter pages (Stage A) ── */
+                .rp22-report .tech-params-print-groups {
+                    display: block !important;
+                    background: #F1F0EE !important;
+                    padding: 0 !important;
+                }
+
+                .rp22-report .tech-param-page {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                    min-height: 311mm !important;
+                    padding: 6mm 4mm 4mm 4mm !important;
+                    box-sizing: border-box !important;
+                    background: #F1F0EE !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+
+                .rp22-report .tech-param-page--first {
+                    min-height: 294mm !important;
+                }
+
+                .rp22-report .tech-param-page + .tech-param-page {
+                    break-before: page;
+                    page-break-before: always;
+                }
+
+                .rp22-report .tech-param-card {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+
+                .rp22-report .tech-param-page,
+                .rp22-report .tech-param-page * {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
             }
 
             @media screen {
