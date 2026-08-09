@@ -1639,10 +1639,7 @@ function RoomDesignerWithState() {
     analysisResult,
     placedSpeakers,
     stableDimensions,
-    screen: _screen,
     primarySeatingPosition: mlpAnchorEffective,
-    screenVisibleWidthInches: screenVisibleWidthInchesEffective,
-    screenFrontPlaneM: appState?.screenFrontPlaneM ?? (Number(_screen?.floatDepthM) > 0 ? Number(_screen.floatDepthM) : 0.20),
     projectId: resolvedProjectId || projectIdState || "free",
   });
 

@@ -22,7 +22,6 @@ import {
   buildArtcousticDesignRatingAuthority,
   calculateRoomDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
-import { calculateViewingAngle } from '@/components/utils/viewingAngleUtils';
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 
 // Map numeric RP22 parameter IDs to the string keys expected by buildDesignRatingInput
@@ -36,9 +35,10 @@ const SEAT_PARAM_KEY_MAP = {
  * Build a lightweight reportSeatHudById from analysisResult.perSeatRp22.
  * Maps numeric RP22 keys to string keys and computes rp23 viewing angles.
  */
-function buildLightweightSeatHudById(seats, analysisResult, screen, screenFrontPlaneM, screenVisibleWidthInches, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results) {
+function buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results) {
   const out = {};
   const perSeatRp22 = analysisResult?.perSeatRp22;
+  const perSeatRp23 = analysisResult?.perSeatRp23;
   const list = Array.isArray(seats) ? seats : [];
 
   for (const seat of list) {
@@ -54,13 +54,12 @@ function buildLightweightSeatHudById(seats, analysisResult, screen, screenFrontP
       if (metric != null) rp22[strKey] = metric;
     }
 
-    // Compute rp23 viewing angle
-    const angleDeg = calculateViewingAngle(
-      { x: Number(seat.x) || 0, y: Number(seat.y) || 0 },
-      screenVisibleWidthInches,
-      screen?.aspectRatio || '16:9',
-      { y: screenFrontPlaneM }
-    );
+    // RP23 viewing angle — consume the SAME canonical engine authority as
+    // buildSeatHudSnapshot (analysisResult.perSeatRp23[seatId].angleDeg).
+    // No local screen-geometry recalculation; no synthetic screen-plane fallback.
+    // When the engine result is null/unavailable, SCREEN is excluded from ASDR.
+    const engineRp23 = perSeatRp23?.[seat.id];
+    const angleDeg = engineRp23 && Number.isFinite(engineRp23.angleDeg) ? Number(engineRp23.angleDeg) : null;
 
     let snapshot = { rp22, rp23: { angleDeg } };
 
@@ -88,10 +87,7 @@ function buildLightweightSeatHudById(seats, analysisResult, screen, screenFrontP
  * @param {Object} params.analysisResult
  * @param {Array}  params.placedSpeakers
  * @param {Object} params.stableDimensions
- * @param {Object} params.screen
  * @param {Object} params.primarySeatingPosition
- * @param {string|number} params.screenVisibleWidthInches
- * @param {number} params.screenFrontPlaneM
  * @param {string} params.projectId
  * @returns {{ status, displayPercentage, coveragePercent } | null}
  */
@@ -101,10 +97,7 @@ export function useAppDesignRating({
   analysisResult,
   placedSpeakers,
   stableDimensions,
-  screen,
   primarySeatingPosition,
-  screenVisibleWidthInches,
-  screenFrontPlaneM,
   projectId,
 }) {
   const completedBassAuthority = useCompletedBassAuthority(projectId || 'free');
@@ -132,8 +125,8 @@ export function useAppDesignRating({
   }, [placedSpeakers]);
 
   const reportSeatHudById = useMemo(
-    () => buildLightweightSeatHudById(seats, analysisResult, screen, screenFrontPlaneM, screenVisibleWidthInches, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results),
-    [seats, analysisResult, screen, screenFrontPlaneM, screenVisibleWidthInches, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results]
+    () => buildLightweightSeatHudById(seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results),
+    [seats, analysisResult, primarySeatingPosition, completedP19Result, completedP19Results, completedP20Results]
   );
 
   const roomRating = useMemo(() => {

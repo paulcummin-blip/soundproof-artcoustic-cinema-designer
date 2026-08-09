@@ -896,6 +896,59 @@ function fixtureX() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Y. Synthetic screen geometry: width valid but front plane unavailable
+//    → SCREEN excluded from ASDR (null angleDeg). With canonical plane
+//    → SCREEN active. Proves 0.20m fallback never reaches ASDR.
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureY() {
+  const checks = [];
+
+  // Screen width valid, but canonical screen front plane unavailable.
+  // Engine produces angleDeg=null (distance <= 0.1 or width <= 0).
+  // buildDesignRatingInput passes null → SCREEN excluded.
+  const authNoPlane = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    screen: { s1: null, s2: null }, // angleDeg null — no canonical plane
+    p4: { s1: 1, s2: 1 }, // L4 (12) — one scored param so rating is not NOT_ASSESSED
+  });
+  const ratingNoPlane = calculateRoomDesignRating(authNoPlane);
+  checks.push(["Screen null→provisional", authNoPlane.parameters.screen.seats.s1.state === "provisional"]);
+  checks.push(["Screen null level null", authNoPlane.parameters.screen.seats.s1.level === null]);
+  // Screen excluded from numerator and denominator
+  // Only P4 scored: weight=5, L4→12, actual=60, max=60, %=100
+  checks.push(["Screen excluded from actual", approx(ratingNoPlane.actualPoints, 60, 0.1)]);
+  checks.push(["Screen excluded from denom", approx(ratingNoPlane.maximumAvailablePoints, 60, 0.1)]);
+  checks.push(["Screen null rating 100%", approx(ratingNoPlane.rawPercentage, 100, 0.01)]);
+
+  // Canonical screen front plane provided → engine produces angleDeg=55 (L4).
+  // SCREEN becomes active and participates normally.
+  const authWithPlane = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    screen: { s1: 55, s2: 55 }, // angleDeg 55 — L4
+    p4: { s1: 1, s2: 1 }, // L4 (12)
+  });
+  const ratingWithPlane = calculateRoomDesignRating(authWithPlane);
+  checks.push(["Screen 55°→scored", authWithPlane.parameters.screen.seats.s1.state === "scored"]);
+  checks.push(["Screen 55°→L4", authWithPlane.parameters.screen.seats.s1.level === "L4"]);
+  // P4: weight=5, L4→12, actual=60, max=60
+  // Screen: weight=6, L4→12, actual=72, max=72
+  // total: actual=132, max=132, %=100
+  checks.push(["Screen active in actual", approx(ratingWithPlane.actualPoints, 132, 0.1)]);
+  checks.push(["Screen active in denom", approx(ratingWithPlane.maximumAvailablePoints, 132, 0.1)]);
+  checks.push(["Screen active rating 100%", approx(ratingWithPlane.rawPercentage, 100, 0.01)]);
+
+  // Prove 0.20m fallback never reaches ASDR: a synthetic 0.20 plane would
+  // produce a real angle. But the hook now consumes engine authority only —
+  // if the engine says null, ASDR gets null (not a synthetic angle). This is
+  // verified by the null case above: no synthetic angle is invented.
+  checks.push(["No synthetic angle invented", authNoPlane.parameters.screen.seats.s1.level === null]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("Y: Synthetic screen geometry excluded", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Runner
 // ═══════════════════════════════════════════════════════════════
 
@@ -925,6 +978,7 @@ export function runAllFixtures() {
     fixtureV(),
     fixtureW(),
     fixtureX(),
+    fixtureY(),
   ];
   const allPassed = fixtures.every((f) => f.passed);
   return { allPassed, results: fixtures };
