@@ -114,6 +114,7 @@ export default function RP22ReportParameterGrid({
   bassAuthority = null,
   bassErrorMessage = null,
   variant = "screen",
+  contributionsByKey = null,
 }) {
   const isPrintVariant = variant === "print";
   const MASKED_PARAM_IDS = [14, 18, 19, 20];
@@ -442,6 +443,28 @@ export default function RP22ReportParameterGrid({
     }));
   }, [rows, getSnapshotForSeat, bassPresentation.perSeatP20Results]);
 
+  /* ----- Build ASDR footer string for a parameter card (only when participating) ----- */
+  const buildAsdrFooter = React.useCallback((paramId) => {
+    if (!contributionsByKey) return null;
+    const key = paramId === "screen" ? "screen" : `p${paramId}`;
+    const contrib = contributionsByKey[key];
+    if (!contrib) return null;
+    const weight = contrib.effectiveWeight;
+    const earned = Math.round(contrib.earnedPoints * 100) / 100;
+    const maximum = Math.round(contrib.maximumPoints * 100) / 100;
+    const isRecommended = contrib.mode === "recommended";
+    const isSeatScope = contrib.scope === "seat";
+    const parts = ["ASDR"];
+    if (isRecommended) parts.push("Recommended");
+    parts.push(`Weight ${weight}`);
+    if (isSeatScope) {
+      parts.push(`Room contribution ${earned} / ${maximum}`);
+    } else {
+      parts.push(`Score ${earned} / ${maximum}`);
+    }
+    return parts.join(" · ");
+  }, [contributionsByKey]);
+
   /* ----- Render a single redesigned Technical Report parameter card ----- */
   const renderPrintCard = (param) => {
     const resolvedThresholds = resolveParamThresholds(param, p12Mode, p13Mode, p14Mode);
@@ -458,6 +481,7 @@ export default function RP22ReportParameterGrid({
     const humanTitle = getHumanTitleForParam(param.id);
     const category = getCategoryForParam(param.id);
     const rspLabel = lockedSeatId ? formatSeatLabel(lockedSeatId) : null;
+    const asdrFooter = buildAsdrFooter(param.id);
     return (
       <TechnicalParameterCard
         key={param.id}
@@ -469,6 +493,7 @@ export default function RP22ReportParameterGrid({
         seatGridData={seatGridData}
         targetBasisNote={targetBasisNote}
         rspLabel={rspLabel}
+        asdrFooter={asdrFooter}
       />
     );
   };

@@ -106,6 +106,7 @@ export default function TechnicalParameterCard({
   seatGridData,
   targetBasisNote,
   rspLabel,
+  asdrFooter = null,
 }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
 
@@ -259,6 +260,23 @@ export default function TechnicalParameterCard({
       >
         <ThresholdStrip thresholds={param.thresholds} unit={param.unit} />
       </div>
+
+      {/* 7. ASDR FOOTER — subtle engineering annotation (only when participating) */}
+      {asdrFooter && (
+        <div
+          style={{
+            marginTop: "1.5mm",
+            paddingTop: "1.5mm",
+            borderTop: "1px solid #EFEEEA",
+            fontSize: "7pt",
+            color: "#625143",
+            fontFamily: BODY_FONT,
+            letterSpacing: "0.04em",
+          }}
+        >
+          {asdrFooter}
+        </div>
+      )}
     </div>
   );
 }

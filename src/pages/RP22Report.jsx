@@ -47,6 +47,7 @@ import { buildComplianceBassExportData, buildComplianceBassPresentation } from '
 import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
 import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
+import TechnicalAsdrScorecard from '@/components/report/technical/TechnicalAsdrScorecard';
 import { resolveRoomParameterLevel, normalizeRoomLevel } from '@/components/report/technical/roomParameterLevelAuthority';
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
 import {
@@ -731,6 +732,18 @@ function RP22ReportInner() {
         return ratings;
     }, [designRatingAuthority]);
 
+    // ── ASDR contributions by key — for parameter card footers ────────────
+    // Maps the canonical contributions array to a { p1: {...}, p12: {...}, screen: {...} } lookup
+    // so RP22ReportParameterGrid can display per-card ASDR footers without recalculating.
+    const asdrContributionsByKey = React.useMemo(() => {
+        if (!roomDesignRating?.contributions) return null;
+        const map = {};
+        for (const contrib of roomDesignRating.contributions) {
+            map[contrib.key] = contrib;
+        }
+        return map;
+    }, [roomDesignRating]);
+
     // ── Sightline page derived data ──────────────────────────────────────────
     const projector = React.useMemo(() => {
         return (app?.roomElements || []).find(el => el.type === 'projector');
@@ -935,6 +948,7 @@ function RP22ReportInner() {
         p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
         bassAuthority: completedBassAuthority,
         bassErrorMessage,
+        contributionsByKey: showDesignRating ? asdrContributionsByKey : null,
     };
 
     const coverBoxStyle = {
@@ -1261,6 +1275,14 @@ function RP22ReportInner() {
                                     showDesignRating={showDesignRating}
                                     roomDesignRating={roomDesignRating}
                                     seatDesignRatings={seatDesignRatings}
+                                />
+                            </div>
+
+                            {/* ── Page 3b: ASDR Scorecard ── */}
+                            <div className="print-page-break-after">
+                                <TechnicalAsdrScorecard
+                                    roomDesignRating={roomDesignRating}
+                                    showDesignRating={showDesignRating}
                                 />
                             </div>
                             </section>

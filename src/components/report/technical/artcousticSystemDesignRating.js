@@ -80,6 +80,33 @@ function getEffectiveWeight(key, mode, state) {
   return PARAM_WEIGHTS[key];
 }
 
+/** Build a concise seat-level distribution string for seat-scope contributions.
+ *  If all applicable seats share the same level, returns that level (e.g. "L4").
+ *  If seats have mixed levels, returns "3×L4 · 2×L3 · 1×L1".
+ *  FAIL seats are included in the distribution as "FAIL".
+ *  Returns null if no applicable seats. */
+function buildSeatDistribution(seatAuthorities, seatIds) {
+  const counts = {};
+  let total = 0;
+  for (const seatId of seatIds) {
+    const sa = seatAuthorities?.[seatId];
+    if (!sa || sa.state === "na") continue;
+    if (sa.state === "provisional") continue;
+    const lvl = sa.level || "FAIL";
+    counts[lvl] = (counts[lvl] || 0) + 1;
+    total += 1;
+  }
+  if (total === 0) return null;
+  const keys = Object.keys(counts);
+  if (keys.length === 1) return keys[0];
+  // Order: L4, L3, L2, L1, FAIL
+  const order = ["L4", "L3", "L2", "L1", "FAIL"];
+  return order
+    .filter((k) => counts[k])
+    .map((k) => `${counts[k]}×${k}`)
+    .join(" · ");
+}
+
 /** Parameter scope: "room" (single room result) or "seat" (per-seat results). */
 export const PARAM_SCOPE = Object.freeze({
   p1: "seat", p2: "room", p3: "room", p4: "seat", p5: "seat",
@@ -451,6 +478,7 @@ export function buildArtcousticDesignRatingAuthority(input) {
         multiplier: scored.multiplier,
         reason: scored.reason,
         seats: null,
+        mode: mode,
       };
     } else {
       // seat-scope
@@ -511,6 +539,7 @@ export function calculateRoomDesignRating(authority) {
   let applicableWeight = 0;
   let assessedWeight = 0;
   let hasProvisional = false;
+  const contributions = [];
 
   for (const key of Object.keys(PARAM_WEIGHTS)) {
     const param = authority?.parameters?.[key];
@@ -533,10 +562,17 @@ export function calculateRoomDesignRating(authority) {
 
     // param.state === "scored"
     let multiplier;
+    let resultLevel;
+    let mode = null;
+
     if (param.scope === "room") {
       multiplier = param.multiplier;
+      resultLevel = param.level;
+      // Extract mode from the original input stored on the authority parameter
+      mode = param.mode || null;
     } else {
       // seat-scope: average multipliers across applicable seats
+      const seatIds = authority?.seatIds || [];
       const seatValues = Object.values(param.seats || {});
       const applicableSeats = seatValues.filter((s) => s.state !== "na");
       if (applicableSeats.length === 0) continue;
@@ -546,12 +582,28 @@ export function calculateRoomDesignRating(authority) {
       }
       const sum = applicableSeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0);
       multiplier = sum / applicableSeats.length;
+      resultLevel = buildSeatDistribution(param.seats, seatIds);
     }
 
-    actualPoints += multiplier * weight;
-    maximumAvailablePoints += 12 * weight;
+    const earnedPoints = multiplier * weight;
+    const maximumPoints = 12 * weight;
+
+    actualPoints += earnedPoints;
+    maximumAvailablePoints += maximumPoints;
     applicableWeight += weight;
     assessedWeight += weight;
+
+    contributions.push({
+      key,
+      parameter: key === "screen" ? "screen" : Number(key.replace("p", "")),
+      scope: param.scope,
+      effectiveWeight: weight,
+      resultLevel,
+      multiplier,
+      earnedPoints,
+      maximumPoints,
+      mode,
+    });
   }
 
   const rawPercentage = maximumAvailablePoints > 0
@@ -576,6 +628,7 @@ export function calculateRoomDesignRating(authority) {
     assessedWeight,
     coveragePercent,
     hasProvisional,
+    contributions,
   };
 }
 

@@ -1178,6 +1178,206 @@ function fixtureAH() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// C4 — CONTRIBUTION BREAKDOWN FIXTURES
+// ═══════════════════════════════════════════════════════════════
+
+// AI. Sum of contribution earnedPoints equals calculateRoomDesignRating.actualPoints
+function fixtureAI() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p2: { rawValue: 12 },
+    p3: { rawValue: 0 },
+    p12: { rawValue: 111, mode: "minimum" },
+    p13: { rawValue: 105, mode: "minimum" },
+    p14: { rawValue: 118, verified: true, mode: "minimum" },
+    p1: { s1: 2.5, s2: 2.5 },
+    p4: { s1: 3, s2: 3 },
+    screen: { s1: 55, s2: 55 },
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const sumEarned = contribs.reduce((acc, c) => acc + c.earnedPoints, 0);
+  checks.push(["contributions array exists", Array.isArray(contribs) && contribs.length > 0]);
+  checks.push(["sum earnedPoints = actualPoints", approx(sumEarned, rating.actualPoints, 0.01)]);
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AI: Sum earnedPoints = actualPoints", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AJ. Sum of contribution maximumPoints equals maximumAvailablePoints
+function fixtureAJ() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p2: { rawValue: 12 },
+    p12: { rawValue: 111, mode: "minimum" },
+    p1: { s1: 2.5, s2: 2.5 },
+    screen: { s1: 55, s2: 55 },
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const sumMax = contribs.reduce((acc, c) => acc + c.maximumPoints, 0);
+  checks.push(["sum maximumPoints = maximumAvailablePoints", approx(sumMax, rating.maximumAvailablePoints, 0.01)]);
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AJ: Sum maximumPoints = maximumAvailablePoints", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AK. Missing metric does not appear in contributions
+function fixtureAK() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    // p2 is missing (not provided)
+    p12: { rawValue: 111, mode: "minimum" },
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const hasP2 = contribs.some((c) => c.key === "p2");
+  checks.push(["p2 missing from contributions", !hasP2]);
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AK: Missing metric excluded", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AL. N/A metric does not appear in contributions
+function fixtureAL() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p7: "na", // N/A
+    p12: { rawValue: 111, mode: "minimum" },
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const hasP7 = contribs.some((c) => c.key === "p7");
+  checks.push(["p7 N/A excluded from contributions", !hasP7]);
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AL: N/A metric excluded", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AM. V1 excluded metric does not appear in contributions
+function fixtureAM() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p8: { rawValue: 5 }, // V1-excluded
+    p15: { rawValue: 5 }, // V1-excluded
+    p21: { rawValue: 5 }, // V1-excluded
+    p12: { rawValue: 111, mode: "minimum" },
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const hasP8 = contribs.some((c) => c.key === "p8");
+  const hasP15 = contribs.some((c) => c.key === "p15");
+  const hasP21 = contribs.some((c) => c.key === "p21");
+  checks.push(["p8 V1-excluded from contributions", !hasP8]);
+  checks.push(["p15 V1-excluded from contributions", !hasP15]);
+  checks.push(["p21 V1-excluded from contributions", !hasP21]);
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AM: V1 excluded metrics excluded", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AN. FAIL appears with negative earnedPoints
+function fixtureAN() {
+  const checks = [];
+  // P19 with rawValue that triggers FAIL (±max, L1=5 bounded)
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p19: { s1: { rawValue: 20, verified: true }, s2: { rawValue: 20, verified: true } },
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const p19Contrib = contribs.find((c) => c.key === "p19");
+  checks.push(["p19 FAIL in contributions", !!p19Contrib]);
+  if (p19Contrib) {
+    checks.push(["p19 resultLevel = FAIL", p19Contrib.resultLevel === "FAIL"]);
+    checks.push(["p19 earnedPoints negative", p19Contrib.earnedPoints < 0]);
+    checks.push(["p19 multiplier = -5", approx(p19Contrib.multiplier, -5, 0.01)]);
+  }
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AN: FAIL negative contribution", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AO. Seat-scope metric contribution uses average definitive seat multiplier exactly once
+function fixtureAO() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p1: { s1: 2.5, s2: 2.5 }, // both L4
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const p1Contrib = contribs.find((c) => c.key === "p1");
+  checks.push(["p1 in contributions", !!p1Contrib]);
+  if (p1Contrib) {
+    // All seats L4 → multiplier 12, average = 12
+    checks.push(["p1 multiplier = 12 (avg)", approx(p1Contrib.multiplier, 12, 0.01)]);
+    // earnedPoints = 12 * weight(6) = 72, maximumPoints = 12 * 6 = 72
+    checks.push(["p1 earnedPoints = 72", approx(p1Contrib.earnedPoints, 72, 0.01)]);
+    checks.push(["p1 maximumPoints = 72", approx(p1Contrib.maximumPoints, 72, 0.01)]);
+    checks.push(["p1 scope = seat", p1Contrib.scope === "seat"]);
+  }
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AO: Seat-scope average multiplier", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AP. Effective P2 weight = 7
+function fixtureAP() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p2: { rawValue: 12 },
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const p2Contrib = contribs.find((c) => c.key === "p2");
+  checks.push(["p2 in contributions", !!p2Contrib]);
+  if (p2Contrib) {
+    checks.push(["p2 effectiveWeight = 7", p2Contrib.effectiveWeight === 7]);
+  }
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AP: P2 weight = 7", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AQ. Recommended P12/P13/P14 effective weights are exposed in contributions
+function fixtureAQ() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p12: { rawValue: 111, mode: "recommended" }, // L4 rec
+    p13: { rawValue: 108, mode: "recommended" }, // L4 rec
+    p14: { rawValue: 126, verified: true, mode: "recommended" }, // L4 rec
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const p12 = contribs.find((c) => c.key === "p12");
+  const p13 = contribs.find((c) => c.key === "p13");
+  const p14 = contribs.find((c) => c.key === "p14");
+  if (p12) checks.push(["p12 rec effectiveWeight = 10", p12.effectiveWeight === 10]);
+  if (p13) checks.push(["p13 rec effectiveWeight = 9", p13.effectiveWeight === 9]);
+  if (p14) checks.push(["p14 rec effectiveWeight = 11", p14.effectiveWeight === 11]);
+  if (p12) checks.push(["p12 mode = recommended", p12.mode === "recommended"]);
+  if (p14) checks.push(["p14 mode = recommended", p14.mode === "recommended"]);
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AQ: Recommended weights in contributions", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// AR. Screen omitted when unavailable
+function fixtureAR() {
+  const checks = [];
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p12: { rawValue: 111, mode: "minimum" },
+    // screen not provided → all seats provisional → excluded
+  });
+  const rating = calculateRoomDesignRating(auth);
+  const contribs = rating.contributions || [];
+  const hasScreen = contribs.some((c) => c.key === "screen");
+  checks.push(["screen omitted when unavailable", !hasScreen]);
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AR: Screen omitted when unavailable", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Runner
 // ═══════════════════════════════════════════════════════════════
 
@@ -1217,6 +1417,16 @@ export function runAllFixtures() {
     fixtureAF(),
     fixtureAG(),
     fixtureAH(),
+    fixtureAI(),
+    fixtureAJ(),
+    fixtureAK(),
+    fixtureAL(),
+    fixtureAM(),
+    fixtureAN(),
+    fixtureAO(),
+    fixtureAP(),
+    fixtureAQ(),
+    fixtureAR(),
   ];
   const allPassed = fixtures.every((f) => f.passed);
   return { allPassed, results: fixtures };
