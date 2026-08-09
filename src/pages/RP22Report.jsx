@@ -33,6 +33,7 @@ import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
 import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 import SightlineGraphic from '../components/report/SightlineGraphic';
 import ScreenWallConstructionGraphic from '../components/report/ScreenWallConstructionGraphic';
+import SpeakerPositionPlan from '../components/report/SpeakerPositionPlan';
 import { fovForDistance } from '../components/utils/screenMetrics';
 import ElevationDrawing from '../components/report/ElevationDrawing';
 import FrontElevation from '../components/room/FrontElevation';
@@ -1163,8 +1164,23 @@ function RP22ReportInner() {
                         )}
 
                         {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-positions" style={{ background: "transparent", padding: 0, margin: 0 }}>
-                                <div className="plan-fitbox"><img src={planSpeakerDimsImageDataUrl} alt="Room plan (speaker positions)" style={{ background: "transparent" }} /></div>
+                            <section id="pdf-room-plan-positions" className="print-page-break-before" style={{ background: '#FFFFFF', padding: 0, margin: 0 }}>
+                                <SpeakerPositionPlan
+                                    projectName={projectDetails?.name || ''}
+                                    clientName={projectDetails?.client_name || ''}
+                                    planImageDataUrl={planSpeakerDimsImageDataUrl}
+                                    placedSpeakers={placedSpeakers}
+                                    subwooferInstances={app?.subwooferInstances}
+                                    subwoofers={app?.subwoofers}
+                                    roomWidthM={stableDimensions.width}
+                                    roomLengthM={stableDimensions.length}
+                                    screenFrontPlaneM={reportScreenFrontPlaneM}
+                                    projector={projector}
+                                    primarySeatingPosition={primarySeatingPosition}
+                                    lcrAimMode={app?.lcrAimMode}
+                                    getSpeakerVisibility={app?.getSpeakerVisibility}
+                                    dolbyLayout={dolbyLayout}
+                                />
                             </section>
                         )}
 

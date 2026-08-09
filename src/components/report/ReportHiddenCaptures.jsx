@@ -130,6 +130,14 @@ export default function ReportHiddenCaptures({
         ...liveOverlays,
     }), [liveOverlays]);
 
+    // Speaker plan capture — clean plan with room dims + throw, no perimeter speaker dims
+    const overlaysSpeakerPlan = useMemo(() => ({
+        ...liveOverlays,
+        ROOM_DIMS: true,
+        EXPORT_RSP_LABEL: true,
+        EXPORT_CEILING_LABEL: true,
+    }), [liveOverlays]);
+
     return (
         <>
             {/* Clean plan (no dimensions, with RP22 zone labels) */}
@@ -182,9 +190,10 @@ export default function ReportHiddenCaptures({
                 <RvStaticCanvas
                     {...commonProps}
                     appState={app}
-                    overlays={overlaysDims}
-                    speakerPositionsView="plan"
+                    overlays={overlaysSpeakerPlan}
+                    speakerPositionsView="off"
                     showMlpRuler={false}
+                    showThrowDistance={true}
                 />
             </div>
 
