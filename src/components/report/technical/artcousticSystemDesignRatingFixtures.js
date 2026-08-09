@@ -932,10 +932,10 @@ function fixtureY() {
   checks.push(["Screen 55°→scored", authWithPlane.parameters.screen.seats.s1.state === "scored"]);
   checks.push(["Screen 55°→L4", authWithPlane.parameters.screen.seats.s1.level === "L4"]);
   // P4: weight=5, L4→12, actual=60, max=60
-  // Screen: weight=6, L4→12, actual=72, max=72
-  // total: actual=132, max=132, %=100
-  checks.push(["Screen active in actual", approx(ratingWithPlane.actualPoints, 132, 0.1)]);
-  checks.push(["Screen active in denom", approx(ratingWithPlane.maximumAvailablePoints, 132, 0.1)]);
+  // Screen: weight=7, L4→12, actual=84, max=84
+  // total: actual=144, max=144, %=100
+  checks.push(["Screen active in actual", approx(ratingWithPlane.actualPoints, 144, 0.1)]);
+  checks.push(["Screen active in denom", approx(ratingWithPlane.maximumAvailablePoints, 144, 0.1)]);
   checks.push(["Screen active rating 100%", approx(ratingWithPlane.rawPercentage, 100, 0.01)]);
 
   // Prove 0.20m fallback never reaches ASDR: a synthetic 0.20 plane would
