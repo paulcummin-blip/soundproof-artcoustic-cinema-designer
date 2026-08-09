@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useSyncExternalStore } from "react";
 import { installConsolePolyfill } from "@/components/utils/consolePolyfill";
 
 // Install console polyfill immediately
@@ -26,6 +26,8 @@ import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
 import PriceSummary from "@/components/pricing/PriceSummary";
+import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
+import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
 
 const menuItems = [
@@ -48,6 +50,10 @@ export default function Layout({ children, currentPageName }) {
     difficultyMultiplier: 1.0,
     priceMode: "incVat",
   });
+
+  // ASDR visibility (shared between app and report) + rating data from RoomDesigner
+  const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
+  const [asdrRating, setAsdrRating] = React.useState(null);
 
   // Active project meta for sidebar (name + client)
   const [activeProjectSummary, setActiveProjectSummary] = React.useState({
@@ -108,6 +114,9 @@ export default function Layout({ children, currentPageName }) {
     const interval = setInterval(() => {
       if (typeof window !== 'undefined' && window.__ROOM_DESIGNER_PRICE__) {
         setPriceSummary(window.__ROOM_DESIGNER_PRICE__);
+      }
+      if (typeof window !== 'undefined' && window.__ROOM_DESIGNER_ASDR__) {
+        setAsdrRating(window.__ROOM_DESIGNER_ASDR__.rating || null);
       }
     }, 500); // Poll every 500ms for updates
     
@@ -273,6 +282,15 @@ export default function Layout({ children, currentPageName }) {
                   finalTotal={priceSummary.finalTotal}
                   difficultyMultiplier={priceSummary.difficultyMultiplier}
                   priceMode={priceSummary.priceMode}
+                />
+              </div>
+            )}
+
+            {showAsdr && (
+              <div className="border-t border-brand-border">
+                <DesignRatingSummary
+                  showAsdr={showAsdr}
+                  rating={asdrRating}
                 />
               </div>
             )}

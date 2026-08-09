@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAppState } from '../components/AppStateProvider';
 // TEMP DEBUG: remove after sub persistence proven
@@ -54,6 +54,7 @@ import {
   calculateRoomDesignRating,
   calculateSeatDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
+import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/asdrVisibilityStore';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -72,7 +73,7 @@ function RP22ReportInner() {
     const [projectDetails, setProjectDetails] = useState(null);
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
-    const [showDesignRating, setShowDesignRating] = useState(false);
+    const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
 
     const { projectId: routeProjectId } = useParams();
     const [searchParams] = useSearchParams();
@@ -1085,21 +1086,6 @@ function RP22ReportInner() {
                         totalRoomParameters={roomScopedParamCount}
                         totalSeatParameters={seatScopedParamCount}
                     />
-
-                    {/* ── Artcoustic System Design Rating toggle ── */}
-                    <div className="flex items-center gap-3 px-1 py-1">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={showDesignRating}
-                                onChange={e => setShowDesignRating(e.target.checked)}
-                                className="w-4 h-4 accent-[#213428] cursor-pointer"
-                            />
-                            <span className="text-sm text-[#3E4349] font-medium">
-                                Show Artcoustic System Design Rating
-                            </span>
-                        </label>
-                    </div>
 
                     {/* ── Report assumptions + RP23 row + RP22 Parameters — all inside one card so widths match ── */}
                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">

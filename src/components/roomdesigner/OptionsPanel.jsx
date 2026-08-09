@@ -16,6 +16,8 @@ const emptyManualItem = () => ({
 export default function OptionsPanel({
   showPrices,
   setShowPrices,
+  showAsdr,
+  setShowAsdr,
   difficultyMultiplier,
   setDifficultyMultiplier,
   priceData,
@@ -75,6 +77,11 @@ export default function OptionsPanel({
       <div className="flex items-center justify-between">
         <Label htmlFor="show-prices" className="text-sm font-medium">Show Prices</Label>
         <Switch id="show-prices" checked={showPrices} onCheckedChange={setShowPrices} />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Label htmlFor="show-asdr" className="text-sm font-medium">Show Artcoustic System Design Rating</Label>
+        <Switch id="show-asdr" checked={showAsdr} onCheckedChange={setShowAsdr} />
       </div>
 
       {showPrices && activePriceData && (

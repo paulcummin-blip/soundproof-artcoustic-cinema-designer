@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Save, AlertCircle, RotateCcw, Compass, Layers3, Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
 import { Project } from "@/entities/Project"; // Import the Project entity SDK
@@ -74,6 +74,8 @@ import SideElevation from "@/components/room/SideElevation";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
 import { useElevationDragHandlers } from "@/components/roomdesigner/hooks/useElevationDragHandlers";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
+import { subscribeAsdrVisibility, getAsdrVisibility, setAsdrVisibility } from "@/components/state/asdrVisibilityStore";
+import { useAppDesignRating } from "@/components/hooks/useAppDesignRating";
 
 // Safe lazy imports that work with both named and default exports
 const RoomDimensions = React.lazy(() =>
@@ -293,7 +295,8 @@ function RoomDesignerWithState() {
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
 
   // NEW: Options panel state
-  const [showPrices, setShowPrices] = useState(false);
+  const [showPrices, setShowPrices] = useState(true);
+  const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
@@ -1629,6 +1632,30 @@ function RoomDesignerWithState() {
   // Subwoofer sync extracted to useSubwooferSync hook (must be before any conditional return)
   useSubwooferSync({ appState, stableDimensions, frontSubsCfg: _frontSubsCfg, rearSubsCfg: _rearSubsCfg });
 
+  // ── Artcoustic System Design Rating (app compact card) ──
+  const appDesignRating = useAppDesignRating({
+    appState,
+    seats,
+    analysisResult,
+    placedSpeakers,
+    stableDimensions,
+    screen: _screen,
+    primarySeatingPosition: mlpAnchorEffective,
+    screenVisibleWidthInches: screenVisibleWidthInchesEffective,
+    screenFrontPlaneM: appState?.screenFrontPlaneM ?? (Number(_screen?.floatDepthM) > 0 ? Number(_screen.floatDepthM) : 0.20),
+    projectId: resolvedProjectId || projectIdState || "free",
+  });
+
+  // Publish ASDR rating to window for sidebar consumption
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__ROOM_DESIGNER_ASDR__ = {
+        showAsdr,
+        rating: appDesignRating,
+      };
+    }
+  }, [showAsdr, appDesignRating]);
+
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
     return <div className="p-6 text-sm">Loading Room Designer…</div>;
@@ -1972,6 +1999,8 @@ function RoomDesignerWithState() {
             freeMoveLcr={freeMoveLcr}
             showPrices={showPrices}
             setShowPrices={setShowPrices}
+            showAsdr={showAsdr}
+            setShowAsdr={setAsdrVisibility}
             difficultyMultiplier={difficultyMultiplier}
             setDifficultyMultiplier={setDifficultyMultiplier}
             priceData={priceData}

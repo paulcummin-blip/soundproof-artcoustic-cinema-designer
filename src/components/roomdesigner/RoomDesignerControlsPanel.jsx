@@ -134,6 +134,8 @@ export default function RoomDesignerControlsPanel({
   // Options
   showPrices,
   setShowPrices,
+  showAsdr,
+  setShowAsdr,
   difficultyMultiplier,
   setDifficultyMultiplier,
   priceData,
@@ -617,6 +619,8 @@ export default function RoomDesignerControlsPanel({
           <OptionsPanel
             showPrices={showPrices}
             setShowPrices={setShowPrices}
+            showAsdr={showAsdr}
+            setShowAsdr={setShowAsdr}
             difficultyMultiplier={difficultyMultiplier}
             setDifficultyMultiplier={setDifficultyMultiplier}
             priceData={priceData}
