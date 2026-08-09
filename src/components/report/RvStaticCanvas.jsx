@@ -324,10 +324,12 @@ export default function RvStaticCanvas({
     if (!hasRoomRect) return {};
     const base = { ...(overlays || {}) };
     base.FRONT_WIDE = frontWideZones;
-    base.enableFrontWides = appState?.enableFrontWides || false;
+    // Report-safe: never inject enableFrontWides from interactive appState.
+    // All placement zones are interactive-only — reports use a whitelist.
+    base.enableFrontWides = false;
     base.enableRp22Angles = false;
     return base;
-  }, [overlays, hasRoomRect, frontWideZones, appState?.enableFrontWides]);
+  }, [overlays, hasRoomRect, frontWideZones]);
 
   // ── Augmented zones (LCR adapter — matches RoomVisualisation) ──────────────
   const augmentedZones = useMemo(() => {

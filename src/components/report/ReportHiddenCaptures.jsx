@@ -51,8 +51,6 @@ export default function ReportHiddenCaptures({
         : undefined;
 
     const allLiveSubs = app?.subwoofers;
-    const appOverlays = app?.overlays;
-    const enableFrontWides = app?.enableFrontWides;
     const frontSubsCfg = app?.frontSubsCfg;
     const rearSubsCfg = app?.rearSubsCfg;
     const roomElements = app?.roomElements;
@@ -74,12 +72,6 @@ export default function ReportHiddenCaptures({
         () => (Array.isArray(allLiveSubs) ? allLiveSubs.filter((sub) => sub?.group === 'rear') : []),
         [allLiveSubs]
     );
-
-    const liveOverlays = useMemo(() => ({
-        ...(appOverlays || {}),
-        FRONT_WIDE: appOverlays?.FRONT_WIDE,
-        enableFrontWides,
-    }), [appOverlays, enableFrontWides]);
 
     const stableRoomElements = useMemo(
         () => (Array.isArray(roomElements) ? roomElements : []),
@@ -117,26 +109,28 @@ export default function ReportHiddenCaptures({
         frontSubsCfg, rearSubsCfg, stableRoomElements, lcrAimMode, aimAtMLP,
     ]);
 
-    // Memoize each overlay variant so they are stable across re-renders.
+    // ── REPORT-SAFE OVERLAY DEFINITIONS ───────────────────────────────────────
+    // Whitelist-only: never inherit interactive Room Designer overlay state.
+    // All speaker-placement/guidance zones (showZones, FRONT_WIDE, enableFrontWides,
+    // OVERHEADS_2/4/6, enableRp22Angles) are interactive-only and excluded from reports.
+    // Only dimension/label overlays explicitly required by each drawing are enabled.
     const overlaysClean = useMemo(() => ({
-        ...liveOverlays,
         ROOM_DIMS: true,
         EXPORT_ROW_FRONT_DIST: true,
         EXPORT_RSP_LABEL: true,
         EXPORT_CEILING_LABEL: true,
-    }), [liveOverlays]);
+    }), []);
 
     const overlaysDims = useMemo(() => ({
-        ...liveOverlays,
-    }), [liveOverlays]);
+        ROOM_DIMS: true,
+    }), []);
 
     // Speaker plan capture — clean plan with room dims + throw, no perimeter speaker dims
     const overlaysSpeakerPlan = useMemo(() => ({
-        ...liveOverlays,
         ROOM_DIMS: true,
         EXPORT_RSP_LABEL: true,
         EXPORT_CEILING_LABEL: true,
-    }), [liveOverlays]);
+    }), []);
 
     return (
         <>
