@@ -437,11 +437,12 @@ function fixtureM() {
     p4: { s1: 1, s2: null }, // s2 missing
   });
   const rating = calculateRoomDesignRating(auth);
-  checks.push(["Room provisional", rating.hasProvisional === true]);
-  // P4 weight=5 should NOT be in assessedWeight
-  checks.push(["P4 excluded from assessed", rating.assessedWeight === 0 || !rating.assessedWeight >= 5]);
-  // P4 IS in applicableWeight (provisional but applicable)
-  checks.push(["P4 in applicableWeight", rating.applicableWeight >= 5]);
+  checks.push(["hasProvisional diagnostic", rating.hasProvisional === true]);
+  // P4 is provisional → excluded from both numerator and denominator
+  checks.push(["P4 excluded from assessed", rating.assessedWeight === 0]);
+  checks.push(["P4 excluded from applicable", rating.applicableWeight === 0]);
+  // No scored params → NOT_ASSESSED (not PROVISIONAL)
+  checks.push(["Room NOT_ASSESSED", rating.status === "NOT_ASSESSED"]);
 
   const failed = checks.filter(([, v]) => !v).map(([label]) => label);
   return makeResult("M: One seat missing→excluded", failed.length === 0, `Failed: ${failed.join(", ")}`);
@@ -685,21 +686,20 @@ function fixtureS() {
 
   // Score should be 100% (all scorable at L4)
   checks.push(["Score 100%", approx(rating.rawPercentage, 100, 0.01)]);
-  // Status PROVISIONAL (P8/P15/P21 excluded)
-  checks.push(["Status PROVISIONAL", rating.status === "PROVISIONAL"]);
-  // Coverage < 100%
-  checks.push(["Coverage < 100%", rating.coveragePercent < 100]);
-  // Coverage ≈ 93.39% (113 assessed / 121 applicable)
-  checks.push(["Coverage ≈ 93.39%", approx(rating.coveragePercent, 93.39, 0.5)]);
-  // applicableWeight includes excluded (121 = 113 + 8)
-  checks.push(["applicableWeight=121", rating.applicableWeight === 121]);
-  // assessedWeight excludes P8/P15/P21 (113)
-  checks.push(["assessedWeight=113", rating.assessedWeight === 113]);
-  // Not COMPLETE
-  checks.push(["Not COMPLETE", rating.status !== "COMPLETE"]);
+  // Status COMPLETE — V1-excluded params do NOT make it PROVISIONAL
+  checks.push(["Status COMPLETE", rating.status === "COMPLETE"]);
+  // Coverage 100% — all applicable (scored) params are assessed
+  checks.push(["Coverage 100%", approx(rating.coveragePercent, 100, 0.01)]);
+  // applicableWeight = scorable total = 116 (with P2 weight 7)
+  checks.push(["applicableWeight=116", rating.applicableWeight === 116]);
+  // assessedWeight = 116 (all scored)
+  checks.push(["assessedWeight=116", rating.assessedWeight === 116]);
+  // hasProvisional is true (diagnostic) but status is not PROVISIONAL
+  checks.push(["hasProvisional diagnostic", rating.hasProvisional === true]);
+  checks.push(["Status not PROVISIONAL", rating.status !== "PROVISIONAL"]);
 
   const failed = checks.filter(([, v]) => !v).map(([label]) => label);
-  return makeResult("S: Assumption coverage", failed.length === 0, `Failed: ${failed.join(", ")}`);
+  return makeResult("S: V1-excluded do not affect score", failed.length === 0, `Failed: ${failed.join(", ")}`);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -782,6 +782,120 @@ function fixtureU() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// V. Missing metric does not change percentage
+//    P4 = L4, P5 = L3, P6 = missing → denominator includes only P4 + P5
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureV() {
+  const checks = [];
+
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p4: { s1: 1, s2: 1 },    // L4 (12)
+    p5: { s1: 60, s2: 60 },  // L3 (8)
+    p6: { s1: null, s2: null }, // missing → provisional
+  });
+  const rating = calculateRoomDesignRating(auth);
+
+  // P4 weight=5, L4→12, contribution=60, max=60
+  // P5 weight=6, L3→8, contribution=48, max=72
+  // P6 excluded (provisional — not in numerator or denominator)
+  // actualPoints = 60 + 48 = 108
+  // maximumAvailablePoints = 60 + 72 = 132
+  checks.push(["Missing P6 not in actual", approx(rating.actualPoints, 108, 0.1)]);
+  checks.push(["Missing P6 not in denom", approx(rating.maximumAvailablePoints, 132, 0.1)]);
+  checks.push(["Rating = 108/132", approx(rating.rawPercentage, 81.82, 0.5)]);
+  checks.push(["Status COMPLETE (not PROVISIONAL)", rating.status === "COMPLETE"]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("V: Missing metric excluded from denominator", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// W. N/A topology does not change percentage + active param effect
+//    B: No front wides → P7 excluded
+//    C: Adding P7=L1 lowers rating
+//    D: Adding P7=L4 keeps rating high
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureW() {
+  const checks = [];
+
+  // B: No front wides → P7 = na → excluded
+  const authNoWides = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p7: { na: true },
+    p4: { s1: 1, s2: 1 }, // L4
+  });
+  const ratingNoWides = calculateRoomDesignRating(authNoWides);
+  // Only P4 scored: weight=5, L4→12, actual=60, max=60, %=100
+  checks.push(["No wides P7=na", authNoWides.parameters.p7.state === "na"]);
+  checks.push(["No wides rating 100%", approx(ratingNoWides.rawPercentage, 100, 0.01)]);
+
+  // C: Front wides added, P7 = L1 → rating should decrease
+  const authWidesL1 = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p7: { rawValue: 9 },    // L1 (±max, L1=10 bounded → 9 ≤ 10 → L1)
+    p4: { s1: 1, s2: 1 },   // L4
+  });
+  const ratingWidesL1 = calculateRoomDesignRating(authWidesL1);
+  // P4: weight=5, L4→12, actual=60, max=60
+  // P7: weight=4, L1→2, actual=8, max=48
+  // total: actual=68, max=108, %=62.96
+  checks.push(["Wides L1 < no wides", ratingWidesL1.rawPercentage < ratingNoWides.rawPercentage]);
+  checks.push(["Wides L1 rating ≈62.96%", approx(ratingWidesL1.rawPercentage, 62.96, 0.5)]);
+
+  // D: Front wides added, P7 = L4 → rating should be higher than L1
+  const authWidesL4 = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p7: { rawValue: 2 },    // L4
+    p4: { s1: 1, s2: 1 },   // L4
+  });
+  const ratingWidesL4 = calculateRoomDesignRating(authWidesL4);
+  // P4: weight=5, L4→12, actual=60, max=60
+  // P7: weight=4, L4→12, actual=48, max=48
+  // total: actual=108, max=108, %=100
+  checks.push(["Wides L4 > wides L1", ratingWidesL4.rawPercentage > ratingWidesL1.rawPercentage]);
+  checks.push(["Wides L4 rating 100%", approx(ratingWidesL4.rawPercentage, 100, 0.01)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("W: N/A topology + active param effect", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// X. P2 weight = 7 — confirm contribution uses weight 7
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureX() {
+  const checks = [];
+
+  checks.push(["PARAM_WEIGHTS.p2 = 7", PARAM_WEIGHTS.p2 === 7]);
+
+  // P2 = L4 → contribution = 12 * 7 = 84
+  const authL4 = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p2: { rawValue: 15 }, // L4
+  });
+  const ratingL4 = calculateRoomDesignRating(authL4);
+  checks.push(["P2 L4 actual = 84", approx(ratingL4.actualPoints, 84, 0.1)]);
+  checks.push(["P2 L4 max = 84", approx(ratingL4.maximumAvailablePoints, 84, 0.1)]);
+  checks.push(["P2 L4 % = 100", approx(ratingL4.rawPercentage, 100, 0.01)]);
+
+  // P2 = L1 → contribution = 2 * 7 = 14
+  const authL1 = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p2: { rawValue: 5 }, // L1
+  });
+  const ratingL1 = calculateRoomDesignRating(authL1);
+  checks.push(["P2 L1 actual = 14", approx(ratingL1.actualPoints, 14, 0.1)]);
+  checks.push(["P2 L1 max = 84", approx(ratingL1.maximumAvailablePoints, 84, 0.1)]);
+  checks.push(["P2 L1 % ≈ 16.67", approx(ratingL1.rawPercentage, 16.67, 0.5)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("X: P2 weight = 7", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Runner
 // ═══════════════════════════════════════════════════════════════
 
@@ -808,6 +922,9 @@ export function runAllFixtures() {
     fixtureS(),
     fixtureT(),
     fixtureU(),
+    fixtureV(),
+    fixtureW(),
+    fixtureX(),
   ];
   const allPassed = fixtures.every((f) => f.passed);
   return { allPassed, results: fixtures };

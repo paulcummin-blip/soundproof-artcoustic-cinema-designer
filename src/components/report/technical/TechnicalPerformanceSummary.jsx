@@ -187,18 +187,7 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
               ? "NOT ASSESSED"
               : formatRatingPct(designRating)}
           </div>
-          {designRating.status === "PROVISIONAL" && (
-            <div
-              style={{
-                fontSize: "6.5pt",
-                color: COLORS.label,
-                marginTop: "0.5mm",
-                fontFamily: FONT_BODY,
-              }}
-            >
-              PROVISIONAL · {Math.round(designRating.coveragePercent)}% COVERAGE
-            </div>
-          )}
+
         </div>
       )}
     </div>
@@ -337,20 +326,7 @@ export default function TechnicalPerformanceSummary({
                 ? "NOT ASSESSED"
                 : formatRatingPct(roomDesignRating)}
             </div>
-            {roomDesignRating.status !== "NOT_ASSESSED" && (
-              <div
-                style={{
-                  fontSize: "8pt",
-                  color: COLORS.secondary,
-                  marginTop: "2mm",
-                  fontFamily: FONT_BODY,
-                }}
-              >
-                {roomDesignRating.status === "PROVISIONAL"
-                  ? `PROVISIONAL · ${Math.round(roomDesignRating.coveragePercent)}% RATING COVERAGE`
-                  : `${Math.round(roomDesignRating.coveragePercent)}% RATING COVERAGE`}
-              </div>
-            )}
+
             <div
               style={{
                 fontSize: "7pt",

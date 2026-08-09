@@ -20,6 +20,28 @@ import { isBassPublicationVerified } from "./artcousticSystemDesignRating";
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
 /**
+ * Count the number of distinct zonal speaker categories that have at least
+ * one placed speaker. P11 is only meaningful when 2+ categories are present.
+ *
+ * Categories: side-surround, rear-surround, front-wide,
+ *             overhead-front, overhead-mid, overhead-rear
+ */
+function countP11ApplicableCategories(placedSpeakers) {
+  if (!Array.isArray(placedSpeakers)) return 0;
+  const cats = new Set();
+  for (const s of placedSpeakers) {
+    const r = String(s?.role || "").toUpperCase();
+    if (r === "SL" || r === "SR") cats.add("side-surround");
+    else if (r === "SBL" || r === "SBR") cats.add("rear-surround");
+    else if (r === "LW" || r === "RW") cats.add("front-wide");
+    else if (r === "TFL" || r === "TFR") cats.add("overhead-front");
+    else if (r === "TML" || r === "TMR") cats.add("overhead-mid");
+    else if (r === "TBL" || r === "TBR" || r === "TRL" || r === "TRR") cats.add("overhead-rear");
+  }
+  return cats.size;
+}
+
+/**
  * Extract a numeric raw value from a seat HUD metric, checking common field names.
  */
 function extractRawValue(metric) {
@@ -65,6 +87,7 @@ export function buildDesignRatingInput({
   reportP13Mode = "minimum",
   reportP14Mode = "minimum",
   hasFrontWides = false,
+  placedSpeakers = [],
 }) {
   const bassVerified = isBassPublicationVerified(completedBassAuthority);
   const seatIds = (Array.isArray(seats) ? seats : []).map((s) => s?.id).filter(Boolean);
@@ -88,14 +111,17 @@ export function buildDesignRatingInput({
     p7 = null; // provisional (front wides exist but no data yet)
   }
 
-  // P11: Speaker zone compliance (special input format)
-  const p11 = room[11]
-    ? {
+  // P11: Speaker zone compliance — only applicable when 2+ zonal speaker
+  // categories are present (meaningful zonal comparison). The canonical P11
+  // authority itself is preserved — this is a topology applicability gate only.
+  const p11Applicable = countP11ApplicableCategories(placedSpeakers) >= 2;
+  const p11 = (!p11Applicable || !room[11])
+    ? null
+    : {
         outsideCount: room[11].value,
         level: room[11].level,
         indeterminate: room[11].status === "indeterminate",
-      }
-    : null;
+      };
 
   // P12: Screen speakers SPL capability at RSP
   const p12 = isNum(room[12]?.value)

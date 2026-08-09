@@ -41,7 +41,7 @@ import { isAuthoritativeBassContract } from "@/components/room/bass/completedBas
 
 /** Fixed V1 importance weights per parameter. */
 export const PARAM_WEIGHTS = Object.freeze({
-  p1: 6, p2: 4, p3: 3, p4: 5, p5: 6, p6: 5, p7: 4,
+  p1: 6, p2: 7, p3: 3, p4: 5, p5: 6, p6: 5, p7: 4,
   p8: 2, p9: 5, p10: 5, p11: 4, p12: 8, p13: 7, p14: 9,
   p15: 3, p16: 5, p17: 5, p18: 7, p19: 9, p20: 9, p21: 3,
   screen: 7,
@@ -500,20 +500,17 @@ export function calculateRoomDesignRating(authority) {
 
     const weight = PARAM_WEIGHTS[key];
 
-    // V1-excluded: applicable but unscoreable — contributes to coverage, not score
+    // V1-excluded: excluded from both numerator and denominator
     if (V1_EXCLUDED_PARAMS.has(key)) {
-      applicableWeight += weight;
-      hasProvisional = true;
+      hasProvisional = true; // diagnostic only — does not affect status
       continue;
     }
 
-    if (param.state === "na") continue; // N/A contributes to neither
-
-    applicableWeight += weight;
+    if (param.state === "na") continue; // N/A excluded from both
 
     if (param.state === "provisional") {
-      hasProvisional = true;
-      continue; // not assessed
+      hasProvisional = true; // diagnostic only — does not affect status
+      continue; // not assessed — excluded from both
     }
 
     // param.state === "scored"
@@ -526,7 +523,7 @@ export function calculateRoomDesignRating(authority) {
       const applicableSeats = seatValues.filter((s) => s.state !== "na");
       if (applicableSeats.length === 0) continue;
       if (applicableSeats.some((s) => s.state === "provisional")) {
-        hasProvisional = true;
+        hasProvisional = true; // diagnostic only
         continue;
       }
       const sum = applicableSeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0);
@@ -535,6 +532,7 @@ export function calculateRoomDesignRating(authority) {
 
     actualPoints += multiplier * weight;
     maximumAvailablePoints += 12 * weight;
+    applicableWeight += weight;
     assessedWeight += weight;
   }
 
@@ -548,8 +546,6 @@ export function calculateRoomDesignRating(authority) {
 
   const status = maximumAvailablePoints === 0
     ? "NOT_ASSESSED"
-    : hasProvisional
-    ? "PROVISIONAL"
     : "COMPLETE";
 
   return {
@@ -593,34 +589,33 @@ export function calculateSeatDesignRating(authority, seatId) {
 
     const weight = PARAM_WEIGHTS[key];
 
-    // V1-excluded: applicable but unscoreable — contributes to coverage, not score
+    // V1-excluded: excluded from both numerator and denominator
     if (V1_EXCLUDED_PARAMS.has(key)) {
-      applicableWeight += weight;
-      hasProvisional = true;
+      hasProvisional = true; // diagnostic only — does not affect status
       continue;
     }
 
     if (param.scope === "room") {
       if (param.state === "na") continue;
-      applicableWeight += weight;
       if (param.state === "provisional") {
-        hasProvisional = true;
+        hasProvisional = true; // diagnostic only
         continue;
       }
       actualPoints += (param.multiplier ?? 0) * weight;
       maximumAvailablePoints += 12 * weight;
+      applicableWeight += weight;
       assessedWeight += weight;
     } else {
       // seat-scope
       const seatAuth = param.seats?.[seatId];
       if (!seatAuth || seatAuth.state === "na") continue;
-      applicableWeight += weight;
       if (seatAuth.state === "provisional") {
-        hasProvisional = true;
+        hasProvisional = true; // diagnostic only
         continue;
       }
       actualPoints += (seatAuth.multiplier ?? 0) * weight;
       maximumAvailablePoints += 12 * weight;
+      applicableWeight += weight;
       assessedWeight += weight;
     }
   }
@@ -635,8 +630,6 @@ export function calculateSeatDesignRating(authority, seatId) {
 
   const status = maximumAvailablePoints === 0
     ? "NOT_ASSESSED"
-    : hasProvisional
-    ? "PROVISIONAL"
     : "COMPLETE";
 
   return {

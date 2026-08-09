@@ -129,6 +129,7 @@ export function useAppDesignRating({
         reportP13Mode,
         reportP14Mode,
         hasFrontWides,
+        placedSpeakers,
       });
       const authority = buildArtcousticDesignRatingAuthority(input);
       return calculateRoomDesignRating(authority);
@@ -136,7 +137,7 @@ export function useAppDesignRating({
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
     }
-  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, hasFrontWides]);
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, hasFrontWides, placedSpeakers]);
 
   return roomRating;
 }

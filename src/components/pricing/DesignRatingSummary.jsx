@@ -15,12 +15,8 @@ export default function DesignRatingSummary({ showAsdr = false, rating = null })
 
   const status = rating?.status || 'NOT_ASSESSED';
   const pct = rating?.displayPercentage;
-  const coverage = rating?.coveragePercent;
 
   const displayPct = pct != null ? Math.round(pct) : null;
-  const displayCoverage = coverage != null ? Math.round(coverage) : null;
-
-  const isProvisional = status === 'PROVISIONAL';
   const isNotAssessed = status === 'NOT_ASSESSED';
 
   return (
@@ -52,15 +48,6 @@ export default function DesignRatingSummary({ showAsdr = false, rating = null })
         )}
       </div>
 
-      <div style={{ fontSize: 10, color: '#625143', marginTop: 4 }}>
-        {isNotAssessed
-          ? ''
-          : isProvisional
-          ? `PROVISIONAL${displayCoverage != null ? ` · ${displayCoverage}% COVERAGE` : ''}`
-          : displayCoverage != null
-          ? `${displayCoverage}% COVERAGE`
-          : ''}
-      </div>
     </div>
   );
 }

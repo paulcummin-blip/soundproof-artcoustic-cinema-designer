@@ -712,9 +712,10 @@ function RP22ReportInner() {
             reportP13Mode,
             reportP14Mode,
             hasFrontWides,
+            placedSpeakers,
         });
         return buildArtcousticDesignRatingAuthority(input);
-    }, [showDesignRating, seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, hasFrontWides]);
+    }, [showDesignRating, seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, hasFrontWides, placedSpeakers]);
 
     const roomDesignRating = React.useMemo(() => {
         if (!designRatingAuthority) return null;
