@@ -7,7 +7,7 @@
  *   1. Parameter header  — "RP22 PARAMETER N" + human-readable title
  *   2. Result area       — rectangular level badge (left) + prominent value (right)
  *   3. Technical explanation — 2-3 lines, visually subordinate
- *   4. Technical metadata  — SCOPE, TARGET BASIS, RSP, WORST SEAT (small, secondary)
+ *   4. Technical metadata  — SCOPE, TARGET BASIS, RSP (small, secondary)
  *   5. Seat grid           — compact per-seat grid for seat-scope parameters
  *   6. Threshold strip     — horizontal footer (L4 ≤50° | L3 ≤60° | …)
  *
@@ -97,26 +97,6 @@ function ThresholdStrip({ thresholds, unit }) {
   );
 }
 
-function findWorstSeatLabel(seatGridData) {
-  if (!seatGridData) return null;
-  const levelOrder = { FAIL: -1, "—": Infinity, "N/A": Infinity };
-  let worst = null;
-  let worstLevel = Infinity;
-  for (const row of seatGridData) {
-    for (const seat of row.seats || []) {
-      const lvlStr = String(seat.level || "").toUpperCase();
-      const parsed = lvlStr.match(/^L([1-4])$/);
-      const lvl = parsed ? parseInt(parsed[1], 10) : (levelOrder[lvlStr] ?? Infinity);
-      if (lvl < worstLevel) {
-        worstLevel = lvl;
-        worst = seat;
-      }
-    }
-  }
-  if (!worst || worstLevel === Infinity) return null;
-  return `Row ${worst.row} Seat ${worst.indexInRow ?? "?"}`;
-}
-
 export default function TechnicalParameterCard({
   param,
   achievedValue,
@@ -128,7 +108,6 @@ export default function TechnicalParameterCard({
   rspLabel,
 }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
-  const worstSeat = isSeatScope ? findWorstSeatLabel(seatGridData) : null;
 
   return (
     <div
@@ -259,11 +238,6 @@ export default function TechnicalParameterCard({
         {isSeatScope && rspLabel && (
           <span>
             <strong style={{ fontWeight: 600 }}>RSP:</strong> {rspLabel}
-          </span>
-        )}
-        {worstSeat && (
-          <span>
-            <strong style={{ fontWeight: 600 }}>WORST SEAT:</strong> {worstSeat}
           </span>
         )}
       </div>

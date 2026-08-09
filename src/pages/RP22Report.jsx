@@ -1322,7 +1322,7 @@ function RP22ReportInner() {
                         >
                              <div>
                                  <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 16, fontWeight: 400, color: '#213428', marginBottom: 2, letterSpacing: '0.01em' }}>RP22 Parameters</div>
-                                <div style={{ color: '#625143', fontSize: 9, marginBottom: 8, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>Engineering evidence · 21 parameters · 3 per page</div>
+                                <div style={{ color: '#625143', fontSize: 9, marginBottom: 8, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>Engineering Evidence</div>
                                 {bassErrorMessage && <div style={{ color: '#625143', fontSize: 10, marginBottom: 8, fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>Bass analysis unavailable</div>}
                                 <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                             </div>
