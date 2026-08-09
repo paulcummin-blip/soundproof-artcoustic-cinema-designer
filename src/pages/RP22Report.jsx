@@ -1169,17 +1169,10 @@ function RP22ReportInner() {
                                     projectName={projectDetails?.name || ''}
                                     clientName={projectDetails?.client_name || ''}
                                     planImageDataUrl={planSpeakerDimsImageDataUrl}
-                                    placedSpeakers={placedSpeakers}
-                                    subwooferInstances={app?.subwooferInstances}
-                                    subwoofers={app?.subwoofers}
                                     roomWidthM={stableDimensions.width}
                                     roomLengthM={stableDimensions.length}
                                     screenFrontPlaneM={reportScreenFrontPlaneM}
                                     projector={projector}
-                                    primarySeatingPosition={primarySeatingPosition}
-                                    lcrAimMode={app?.lcrAimMode}
-                                    getSpeakerVisibility={app?.getSpeakerVisibility}
-                                    dolbyLayout={dolbyLayout}
                                 />
                             </section>
                         )}
