@@ -392,9 +392,9 @@ function RP22ReportInner() {
             });
             if (minDist <= 0.05 && closestSeat) return closestSeat;
         }
-        // Fallback: seat carrying isPrimary: true (matches detailed parameter grid authority)
-        const primarySeat = seats.find(s => s?.isPrimary && s?.id);
-        return primarySeat?.id || null;
+        // No fallback: if no physical seat is within 0.05 m of the canonical RSP,
+        // no seat carries the RSP badge.
+        return null;
     }, [seats, primarySeatingPosition]);
 
     // resolveScreenMetricsSnapshot — always reads from the live screen object.
@@ -620,6 +620,66 @@ function RP22ReportInner() {
         Object.keys(rows).forEach(rowNum => { rows[rowNum].sort((a, b) => a.seatNum - b.seatNum); });
         return Object.keys(rows).map(Number).sort((a, b) => a - b).map(rowNum => ({ rowNum, seats: rows[rowNum] }));
     }, [seatLevelCounts]);
+
+    // ── Seat compromise comparison (Page 3 only, relative observation) ────────
+    // For each seat-scope RP22 parameter, find the best achieved assessed level
+    // across all physical seats. A seat incurs a "major gap" for a parameter when
+    // it is two or more RP22 levels below that best. A seat is labelled
+    // "MORE COMPROMISED" only when it has at least 4 major gaps AND those gaps
+    // represent at least 50% of its comparable assessed seat-scope parameters.
+    // This is a relative design observation, NOT an RP22 Performance Level.
+    const seatCompromiseById = React.useMemo(() => {
+        const paramKeys = RP22_SEAT_PARAMETERS.map((parameter) => `p${parameter.number}`);
+        const normalizeLvl = (rawLevel) => {
+            if (rawLevel == null) return null;
+            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
+                if (rawLevel >= 1 && rawLevel <= 4) return rawLevel;
+                return null;
+            }
+            if (typeof rawLevel === "string") {
+                const m = rawLevel.trim().match(/^L([1-4])$/i);
+                if (m) return parseInt(m[1], 10);
+            }
+            return null;
+        };
+        const seatIds = safeArray(seats).map(s => s?.id).filter(Boolean);
+        const seatLevelsByParam = {};      // paramKey -> { seatId -> numericLevel }
+        const comparableParamsBySeat = {}; // seatId -> Set<paramKey>
+        seatIds.forEach(seatId => {
+            const seatHudRp22 = reportSeatHudById?.[seatId]?.rp22 || {};
+            comparableParamsBySeat[seatId] = new Set();
+            paramKeys.forEach(key => {
+                const metric = seatHudRp22[key];
+                if (!metric) return;
+                const lvl = normalizeLvl(metric.level);
+                if (lvl == null) return; // ignore —, N/A, Not Calculated, FAIL
+                if (!seatLevelsByParam[key]) seatLevelsByParam[key] = {};
+                seatLevelsByParam[key][seatId] = lvl;
+                comparableParamsBySeat[seatId].add(key);
+            });
+        });
+        const bestByParam = {};
+        Object.keys(seatLevelsByParam).forEach(key => {
+            const levels = Object.values(seatLevelsByParam[key]);
+            if (levels.length) bestByParam[key] = Math.max(...levels);
+        });
+        const out = {};
+        seatIds.forEach(seatId => {
+            let majorGapCount = 0;
+            const comparableCount = (comparableParamsBySeat[seatId] || new Set()).size;
+            paramKeys.forEach(key => {
+                if (!bestByParam[key]) return;
+                const seatLvl = seatLevelsByParam[key]?.[seatId];
+                if (seatLvl == null) return;
+                const gap = bestByParam[key] - seatLvl;
+                if (gap >= 2) majorGapCount += 1;
+            });
+            const majorGapPct = comparableCount > 0 ? majorGapCount / comparableCount : 0;
+            const isCompromised = majorGapCount >= 4 && majorGapPct >= 0.5;
+            out[seatId] = { majorGapCount, comparableCount, majorGapPct, isCompromised };
+        });
+        return out;
+    }, [seats, reportSeatHudById]);
 
     // ── Sightline page derived data ──────────────────────────────────────────
     const projector = React.useMemo(() => {
@@ -1147,6 +1207,7 @@ function RP22ReportInner() {
                                     totalRoomParameters={roomScopedParamCount}
                                     totalSeatParameters={seatScopedParamCount}
                                     rspSeatId={rspSeatId}
+                                    seatCompromiseById={seatCompromiseById}
                                 />
                             </div>
                             </section>

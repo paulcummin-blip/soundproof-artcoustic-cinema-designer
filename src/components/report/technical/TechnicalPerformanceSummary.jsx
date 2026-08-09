@@ -52,7 +52,7 @@ function LevelCountBlock({ level, count }) {
 }
 
 /** Compact per-seat summary card: seat label, Active count, level distribution. */
-function SeatSummaryCard({ seat, isRsp }) {
+function SeatSummaryCard({ seat, isRsp, isCompromised }) {
   const seatNum = extractSeatCol(seat.seatId);
   const { counts, activeCount } = seat;
 
@@ -102,6 +102,27 @@ function SeatSummaryCard({ seat, isRsp }) {
         )}
       </div>
 
+      {/* MORE COMPROMISED — relative design observation (not an RP22 level) */}
+      {isCompromised && (
+        <div
+          style={{
+            fontSize: "6.5pt",
+            fontWeight: 700,
+            color: "#8B5E34",
+            background: "#F5EDE3",
+            border: "1px solid #E0D4C2",
+            padding: "0.8mm 2mm",
+            borderRadius: 2,
+            letterSpacing: "0.08em",
+            fontFamily: FONT_BODY,
+            lineHeight: 1,
+            alignSelf: "flex-start",
+          }}
+        >
+          MORE COMPROMISED
+        </div>
+      )}
+
       {/* Active count */}
       <div
         style={{
@@ -145,6 +166,7 @@ export default function TechnicalPerformanceSummary({
   totalRoomParameters,
   totalSeatParameters,
   rspSeatId,
+  seatCompromiseById,
 }) {
   return (
     <div
@@ -291,12 +313,33 @@ export default function TechnicalPerformanceSummary({
                   key={seat.seatId}
                   seat={seat}
                   isRsp={String(seat.seatId) === String(rspSeatId)}
+                  isCompromised={!!seatCompromiseById?.[seat.seatId]?.isCompromised}
                 />
               ))}
             </div>
           </div>
         ))}
       </div>
+
+      {/* ── Seat comparison summary line ── */}
+      {(() => {
+        const compromisedCount = (seatCountsByRow || []).reduce(
+          (sum, row) => sum + (row.seats || []).filter(s => seatCompromiseById?.[s.seatId]?.isCompromised).length,
+          0
+        );
+        if (compromisedCount === 0) {
+          return (
+            <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
+              Calculated seat performance is broadly consistent across the listening area.
+            </div>
+          );
+        }
+        return (
+          <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
+            Some positions show material compromise across multiple calculated seat-scope RP22 parameters.
+          </div>
+        );
+      })()}
 
       {/* ── Explanatory note ── */}
       <div
@@ -313,6 +356,8 @@ export default function TechnicalPerformanceSummary({
       >
         Room parameters assess system-wide performance. Seat parameters are evaluated
         independently at each listening position.
+        <br />
+        Seat comparison reflects relative differences between calculated seat-scope RP22 parameters. It is not an RP22 Performance Level.
       </div>
     </div>
   );
