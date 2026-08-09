@@ -282,7 +282,7 @@ export default function ReportPrintStyles() {
                 .rp22-report .tech-param-page {
                     break-inside: avoid !important;
                     page-break-inside: avoid !important;
-                    min-height: 311mm !important;
+                    min-height: 268mm !important;
                     padding: 6mm 4mm 4mm 4mm !important;
                     box-sizing: border-box !important;
                     background: #F1F0EE !important;
@@ -291,7 +291,7 @@ export default function ReportPrintStyles() {
                 }
 
                 .rp22-report .tech-param-page--first {
-                    min-height: 294mm !important;
+                    min-height: 250mm !important;
                 }
 
                 .rp22-report .tech-param-page + .tech-param-page {

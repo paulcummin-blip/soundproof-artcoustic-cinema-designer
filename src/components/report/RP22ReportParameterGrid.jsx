@@ -61,6 +61,20 @@ const formatMetricFallback = (n, unit) => {
   return `${n.toFixed(2)} ${u}`.trim();
 };
 
+/**
+ * Extract the canonical 1-based seat column index within its row.
+ * Prefers seat.indexInRow if canonically set; otherwise parses the
+ * column from the seat ID pattern "seat-r{row}-c{col}"; falls back to
+ * 1-based array index within the row.
+ */
+const extractSeatIndexInRow = (seat, fallbackIdx) => {
+  if (Number.isFinite(Number(seat?.indexInRow))) return Number(seat.indexInRow);
+  const sid = String(seat?.id || "");
+  const match = sid.match(/^seat-r(\d+)-c(\d+)$/);
+  if (match) return parseInt(match[2], 10);
+  return fallbackIdx + 1;
+};
+
 const getMetricDisplayState = (metric, paramId = null) => {
   if (!metric || typeof metric !== "object") return { text: "Not Calculated", level: "—" };
 
@@ -426,13 +440,13 @@ export default function RP22ReportParameterGrid({
     if (Number(paramId) === 20) {
       return rows.map(rowObj => ({
         row: rowObj.row,
-        seats: rowObj.seats.map(seat => {
+        seats: rowObj.seats.map((seat, idx) => {
           const result = bassPresentation.perSeatP20Results.find(
             item => String(item?.seatId) === String(seat?.id)
           );
           return {
             id: seat?.id,
-            indexInRow: seat?.indexInRow,
+            indexInRow: extractSeatIndexInRow(seat, idx),
             level: result ? p20LevelText(result.level) : "—",
             value: result && Number.isFinite(Number(result.variationDbRaw))
               ? formatAuthoritativeP20Result(result)
@@ -446,13 +460,13 @@ export default function RP22ReportParameterGrid({
     // Standard case — extract from seat HUD snapshots
     return rows.map(rowObj => ({
       row: rowObj.row,
-      seats: rowObj.seats.map(seat => {
+      seats: rowObj.seats.map((seat, idx) => {
         const snap = getSnapshotForSeat(seat);
         const metric = snap?.rp22?.[pKey];
         const display = getMetricDisplayState(metric, paramId);
         return {
           id: seat?.id,
-          indexInRow: seat?.indexInRow,
+          indexInRow: extractSeatIndexInRow(seat, idx),
           level: display.level || metric?.level || "—",
           value: display.text || "—",
           isPrimary: !!seat?.isPrimary,

@@ -20,21 +20,21 @@ export default function TechnicalSeatGrid({ data }) {
   if (!data || !data.length) return null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {data.map((row) => {
         const seats = row.seats || [];
         if (!seats.length) return null;
         return (
           <div
             key={`row-${row.row}`}
-            style={{ display: "flex", alignItems: "flex-start", gap: 6 }}
+            style={{ display: "flex", alignItems: "flex-start", gap: 8 }}
           >
             {/* Row label */}
             <span
               style={{
-                fontSize: "7.5pt",
+                fontSize: "8pt",
                 color: "#625143",
-                minWidth: 30,
+                minWidth: 28,
                 flexShrink: 0,
                 paddingTop: 2,
                 fontWeight: 600,
@@ -44,13 +44,12 @@ export default function TechnicalSeatGrid({ data }) {
               Row {row.row}
             </span>
 
-            {/* Seat cells */}
+            {/* Seat cells — distributed evenly across available width */}
             <div
               style={{
                 display: "flex",
                 gap: 4,
                 flex: 1,
-                justifyContent: "flex-end",
               }}
             >
               {seats.map((seat) => (
@@ -60,12 +59,14 @@ export default function TechnicalSeatGrid({ data }) {
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    gap: 1,
+                    gap: 1.5,
+                    flex: 1,
+                    minWidth: 0,
                   }}
                 >
                   <span
                     style={{
-                      fontSize: "6.5pt",
+                      fontSize: "8pt",
                       color: "#9B8E82",
                       lineHeight: 1,
                       fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
@@ -77,11 +78,12 @@ export default function TechnicalSeatGrid({ data }) {
                   {seat.value && seat.value !== "—" && seat.value !== "N/A" && (
                     <span
                       style={{
-                        fontSize: "6.5pt",
+                        fontSize: "7.5pt",
                         color: "#625143",
                         lineHeight: 1.2,
                         fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
-                        whiteSpace: "nowrap",
+                        whiteSpace: "normal",
+                        textAlign: "center",
                       }}
                     >
                       {seat.value}
