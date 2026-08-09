@@ -48,6 +48,12 @@ import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentati
 import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
 import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
 import { resolveRoomParameterLevel, normalizeRoomLevel } from '@/components/report/technical/roomParameterLevelAuthority';
+import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
+import {
+  buildArtcousticDesignRatingAuthority,
+  calculateRoomDesignRating,
+  calculateSeatDesignRating,
+} from '@/components/report/technical/artcousticSystemDesignRating';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -66,6 +72,7 @@ function RP22ReportInner() {
     const [projectDetails, setProjectDetails] = useState(null);
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
+    const [showDesignRating, setShowDesignRating] = useState(false);
 
     const { projectId: routeProjectId } = useParams();
     const [searchParams] = useSearchParams();
@@ -681,6 +688,47 @@ function RP22ReportInner() {
         return out;
     }, [seats, reportSeatHudById]);
 
+    // ── Artcoustic System Design Rating ────────────────────────────────────
+    // Wires Page 3 into the approved Stage B adapter. The UI layer supplies
+    // ONLY existing canonical authority inputs — no thresholds, FAIL rules,
+    // or bass scoring are reimplemented. The adapter is the sole scoring authority.
+    const hasFrontWides = React.useMemo(() => {
+        return placedSpeakers.some(s => {
+            const r = String(s?.role || '').toUpperCase();
+            return r === 'LW' || r === 'RW';
+        });
+    }, [placedSpeakers]);
+
+    const designRatingAuthority = React.useMemo(() => {
+        if (!showDesignRating) return null;
+        const input = buildDesignRatingInput({
+            seats,
+            analysisResult,
+            reportSeatHudById,
+            completedBassAuthority,
+            completedBassPresentation,
+            reportP12Mode,
+            reportP13Mode,
+            reportP14Mode,
+            hasFrontWides,
+        });
+        return buildArtcousticDesignRatingAuthority(input);
+    }, [showDesignRating, seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, hasFrontWides]);
+
+    const roomDesignRating = React.useMemo(() => {
+        if (!designRatingAuthority) return null;
+        return calculateRoomDesignRating(designRatingAuthority);
+    }, [designRatingAuthority]);
+
+    const seatDesignRatings = React.useMemo(() => {
+        if (!designRatingAuthority) return null;
+        const ratings = {};
+        for (const seatId of designRatingAuthority.seatIds) {
+            ratings[seatId] = calculateSeatDesignRating(designRatingAuthority, seatId);
+        }
+        return ratings;
+    }, [designRatingAuthority]);
+
     // ── Sightline page derived data ──────────────────────────────────────────
     const projector = React.useMemo(() => {
         return (app?.roomElements || []).find(el => el.type === 'projector');
@@ -1038,6 +1086,21 @@ function RP22ReportInner() {
                         totalSeatParameters={seatScopedParamCount}
                     />
 
+                    {/* ── Artcoustic System Design Rating toggle ── */}
+                    <div className="flex items-center gap-3 px-1 py-1">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={showDesignRating}
+                                onChange={e => setShowDesignRating(e.target.checked)}
+                                className="w-4 h-4 accent-[#213428] cursor-pointer"
+                            />
+                            <span className="text-sm text-[#3E4349] font-medium">
+                                Show Artcoustic System Design Rating
+                            </span>
+                        </label>
+                    </div>
+
                     {/* ── Report assumptions + RP23 row + RP22 Parameters — all inside one card so widths match ── */}
                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                         <CardHeader>
@@ -1208,6 +1271,9 @@ function RP22ReportInner() {
                                     totalSeatParameters={seatScopedParamCount}
                                     rspSeatId={rspSeatId}
                                     seatCompromiseById={seatCompromiseById}
+                                    showDesignRating={showDesignRating}
+                                    roomDesignRating={roomDesignRating}
+                                    seatDesignRatings={seatDesignRatings}
                                 />
                             </div>
                             </section>

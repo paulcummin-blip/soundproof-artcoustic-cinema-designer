@@ -51,8 +51,16 @@ function LevelCountBlock({ level, count }) {
   );
 }
 
+/** Format a design rating percentage for display. */
+function formatRatingPct(rating) {
+  if (!rating || rating.status === "NOT_ASSESSED") return null;
+  const pct = rating.displayPercentage;
+  if (!Number.isFinite(pct)) return null;
+  return `${Math.round(pct)}%`;
+}
+
 /** Compact per-seat summary card: seat label, Active count, level distribution. */
-function SeatSummaryCard({ seat, isRsp, isCompromised }) {
+function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designRating }) {
   const seatNum = extractSeatCol(seat.seatId);
   const { counts, activeCount } = seat;
 
@@ -155,6 +163,44 @@ function SeatSummaryCard({ seat, isRsp, isCompromised }) {
           × {(seat.total ?? 0) - (activeCount ?? 0)}
         </span>
       </div>
+
+      {/* Design Rating — secondary to seat name, prominent enough to compare */}
+      {showDesignRating && designRating && (
+        <div
+          style={{
+            marginTop: "1mm",
+            paddingTop: "2mm",
+            borderTop: `1px solid ${COLORS.border}`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: "7.5pt",
+              fontWeight: 700,
+              color: COLORS.secondary,
+              letterSpacing: "0.06em",
+              fontFamily: FONT_BODY,
+            }}
+          >
+            DESIGN RATING{" "}
+            {designRating.status === "NOT_ASSESSED"
+              ? "NOT ASSESSED"
+              : formatRatingPct(designRating)}
+          </div>
+          {designRating.status === "PROVISIONAL" && (
+            <div
+              style={{
+                fontSize: "6.5pt",
+                color: COLORS.label,
+                marginTop: "0.5mm",
+                fontFamily: FONT_BODY,
+              }}
+            >
+              PROVISIONAL · {Math.round(designRating.coveragePercent)}% COVERAGE
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -167,6 +213,9 @@ export default function TechnicalPerformanceSummary({
   totalSeatParameters,
   rspSeatId,
   seatCompromiseById,
+  showDesignRating = false,
+  roomDesignRating = null,
+  seatDesignRatings = null,
 }) {
   return (
     <div
@@ -253,6 +302,68 @@ export default function TechnicalPerformanceSummary({
           <LevelCountBlock level="L1" count={roomLevelCounts?.L1 ?? 0} />
           <LevelCountBlock level="—" count={roomLevelCounts?.unassessed ?? 0} />
         </div>
+
+        {/* Artcoustic System Design Rating — room scope */}
+        {showDesignRating && roomDesignRating && (
+          <div
+            style={{
+              marginTop: "5mm",
+              paddingTop: "4mm",
+              borderTop: `1px solid ${COLORS.border}`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "8pt",
+                fontWeight: 700,
+                color: COLORS.secondary,
+                letterSpacing: "0.1em",
+                fontFamily: FONT_BODY,
+                marginBottom: "2mm",
+              }}
+            >
+              ARTCOUSTIC SYSTEM DESIGN RATING
+            </div>
+            <div
+              style={{
+                fontSize: "24pt",
+                fontWeight: 400,
+                color: COLORS.primary,
+                fontFamily: FONT_HEADING,
+                lineHeight: 1,
+              }}
+            >
+              {roomDesignRating.status === "NOT_ASSESSED"
+                ? "NOT ASSESSED"
+                : formatRatingPct(roomDesignRating)}
+            </div>
+            {roomDesignRating.status !== "NOT_ASSESSED" && (
+              <div
+                style={{
+                  fontSize: "8pt",
+                  color: COLORS.secondary,
+                  marginTop: "2mm",
+                  fontFamily: FONT_BODY,
+                }}
+              >
+                {roomDesignRating.status === "PROVISIONAL"
+                  ? `PROVISIONAL · ${Math.round(roomDesignRating.coveragePercent)}% RATING COVERAGE`
+                  : `${Math.round(roomDesignRating.coveragePercent)}% RATING COVERAGE`}
+              </div>
+            )}
+            <div
+              style={{
+                fontSize: "7pt",
+                color: COLORS.label,
+                marginTop: "2mm",
+                fontStyle: "italic",
+                fontFamily: FONT_BODY,
+              }}
+            >
+              Sound Proof proprietary design metric. Not part of CEDIA RP22 or RP23.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Seat parameters ── */}
@@ -314,6 +425,8 @@ export default function TechnicalPerformanceSummary({
                   seat={seat}
                   isRsp={String(seat.seatId) === String(rspSeatId)}
                   isCompromised={!!seatCompromiseById?.[seat.seatId]?.isCompromised}
+                  showDesignRating={showDesignRating}
+                  designRating={seatDesignRatings?.[seat.seatId] ?? null}
                 />
               ))}
             </div>
@@ -359,6 +472,23 @@ export default function TechnicalPerformanceSummary({
         <br />
         Seat comparison reflects relative differences between calculated seat-scope RP22 parameters. It is not an RP22 Performance Level.
       </div>
+
+      {/* Design Rating footer — one concise line */}
+      {showDesignRating && (
+        <div
+          style={{
+            marginTop: "3mm",
+            fontSize: "7.5pt",
+            color: COLORS.secondary,
+            fontFamily: FONT_BODY,
+            lineHeight: 1.4,
+          }}
+        >
+          Artcoustic System Design Rating is a proprietary Sound Proof design metric based on the
+          calculated performance and importance of the assessed design parameters. It is not an
+          RP22 or RP23 Performance Level.
+        </div>
+      )}
     </div>
   );
 }
