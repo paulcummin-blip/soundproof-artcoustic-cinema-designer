@@ -267,18 +267,16 @@ export default function RvRoomBaseLayers(props) {
 
             const lensY = Number(projector?.y_lens_m);
             const screenY = Number(screenFrontPlaneM);
-            const bodyDepth = Number(projector?.body_depth_m) || 0.517;
             if (!Number.isFinite(lensY) || !Number.isFinite(screenY)) return null;
 
-            const projectorFrontY = lensY - bodyDepth / 2;
-            const throwDistanceM = projectorFrontY - screenY;
+            const throwDistanceM = lensY - screenY;
             if (!Number.isFinite(throwDistanceM) || throwDistanceM <= 0) return null;
 
             const lensX = Number(projector?.x_lens_m);
             const centerX = Number.isFinite(lensX) ? lensX : (widthM / 2);
 
             const [x1, y1] = toPx(centerX, screenY);
-            const [x2, y2] = toPx(centerX, projectorFrontY);
+            const [x2, y2] = toPx(centerX, lensY);
             const midY = (y1 + y2) / 2;
 
             return (
