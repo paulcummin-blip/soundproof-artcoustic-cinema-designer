@@ -1,5 +1,6 @@
 // components/pricing/PriceSummary.jsx
 import React from 'react';
+import { useTerritory } from "./territoryStore";
 
 /**
  * Price summary card for the sidebar.
@@ -12,6 +13,10 @@ export default function PriceSummary({
   difficultyMultiplier = 1.0,
   priceMode = "incVat"
 }) {
+  const { config: territoryConfig } = useTerritory();
+  const priceListAvailable = !!territoryConfig?.priceListAvailable;
+  const territoryLabel = territoryConfig?.label || '';
+
   // Don't render anything when prices are hidden
   if (!showPrices) {
     return null;
@@ -38,15 +43,28 @@ export default function PriceSummary({
         margin: '0 16px 12px 16px',
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8 }}>
-        System Price, {priceMode === "exVat" ? "ex VAT" : "inc VAT"}
+      <div style={{ fontSize: 10, fontWeight: 500, color: '#625143', marginBottom: 6 }}>
+        Territory: {territoryLabel}
       </div>
-      
-      <div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#213428' }}>
-          {formatPrice(finalTotal)}
-        </div>
-      </div>
+      {priceListAvailable ? (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8 }}>
+            System Price, {priceMode === "exVat" ? "ex VAT" : "inc VAT"}
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#213428' }}>
+            {formatPrice(finalTotal)}
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8 }}>
+            System Price
+          </div>
+          <div style={{ fontSize: 13, color: '#625143' }}>
+            Price list not available for {territoryLabel}
+          </div>
+        </>
+      )}
     </div>
   );
 }

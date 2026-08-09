@@ -1,6 +1,7 @@
 // components/pricing/usePriceCalculation.jsx
 import { useMemo } from 'react';
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
+import { useTerritory } from "./territoryStore";
 
 const VAT_RATE = 0.2;
 const CPH_1000D_PRICE_EX_VAT = 675;
@@ -150,6 +151,9 @@ export function usePriceCalculation({
   manualExtras = [],
   soundbarSelections = {},
 }) {
+  const { territory, config: territoryConfig } = useTerritory();
+  const priceListAvailable = !!territoryConfig?.priceListAvailable;
+
   return useMemo(() => {
     const mode = priceMode === 'exVat' ? 'exVat' : 'incVat';
     const linesByKey = new Map();
@@ -176,6 +180,36 @@ export function usePriceCalculation({
 
     if (subwooferCount > 0) {
       addProductLine(linesByKey, 'cph-1000d', subwooferCount, ['Subwoofer amp'], soundbarSelections);
+    }
+
+    // Territory without a connected price list: return product structure with
+    // quantities intact but ALL monetary fields null. No UK fallback, no £0.
+    if (!priceListAvailable) {
+      const unavailableBreakdown = Array.from(linesByKey.values()).map((line) => ({
+        ...line,
+        price: null,
+        unitPriceExVat: null,
+        subtotal: null,
+        subtotalExVat: null,
+        displayUnitPrice: null,
+        displaySubtotal: null,
+      }));
+
+      return {
+        priceListAvailable: false,
+        territoryCode: territory,
+        territoryLabel: territoryConfig.label,
+        baseTotal: null,
+        finalTotal: null,
+        displayTotal: null,
+        difficultyMultiplier: Number.isFinite(difficultyMultiplier) && difficultyMultiplier > 0 ? difficultyMultiplier : 1.0,
+        breakdown: unavailableBreakdown,
+        baseTotalExVat: null,
+        vatAmount: null,
+        finalTotalExVat: null,
+        finalTotalIncVat: null,
+        priceMode: mode,
+      };
     }
 
     const productBreakdown = Array.from(linesByKey.values()).map((line) => ({
@@ -222,6 +256,9 @@ export function usePriceCalculation({
     const baseTotal = displayAmount(baseTotalExVat, mode);
 
     return {
+      priceListAvailable: true,
+      territoryCode: territory,
+      territoryLabel: territoryConfig.label,
       baseTotal,
       finalTotal: displayTotal,
       difficultyMultiplier: multiplier,
@@ -233,5 +270,5 @@ export function usePriceCalculation({
       displayTotal,
       priceMode: mode,
     };
-  }, [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections]);
+  }, [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections, priceListAvailable, territory]);
 }

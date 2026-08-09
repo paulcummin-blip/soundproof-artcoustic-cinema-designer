@@ -2,6 +2,8 @@ import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SOUNDBAR_PRICE_OPTIONS, usePriceCalculation } from "@/components/pricing/usePriceCalculation";
+import { useTerritory, setTerritory } from "@/components/pricing/territoryStore";
+import { TERRITORY_OPTIONS } from "@/components/pricing/territoryConfig";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value || 0));
@@ -40,7 +42,9 @@ export default function OptionsPanel({
     soundbarSelections,
   });
 
+  const { territory } = useTerritory();
   const activePriceData = commercialPriceData || priceData;
+  const priceListAvailable = activePriceData?.priceListAvailable !== false;
 
   React.useEffect(() => {
     if (typeof window === 'undefined' || !activePriceData) return;
@@ -53,6 +57,8 @@ export default function OptionsPanel({
       priceMode,
       vatAmount: activePriceData.vatAmount,
       difficultyMultiplier: activePriceData.difficultyMultiplier,
+      priceListAvailable: activePriceData.priceListAvailable,
+      territoryLabel: activePriceData.territoryLabel,
     };
   }, [
     showPrices,
@@ -61,6 +67,8 @@ export default function OptionsPanel({
     activePriceData?.displayTotal,
     activePriceData?.vatAmount,
     activePriceData?.difficultyMultiplier,
+    activePriceData?.priceListAvailable,
+    activePriceData?.territoryLabel,
     priceMode,
   ]);
 
@@ -84,6 +92,22 @@ export default function OptionsPanel({
         <Switch id="show-asdr" checked={showAsdr} onCheckedChange={setShowAsdr} />
       </div>
 
+      {showPrices && (
+        <div className="flex items-center justify-between gap-3">
+          <Label htmlFor="territory" className="text-xs font-medium text-[#3E4349]">Territory</Label>
+          <select
+            id="territory"
+            value={territory}
+            onChange={(e) => setTerritory(e.target.value)}
+            className="text-xs px-2 py-1 border border-gray-300 rounded bg-white"
+          >
+            {TERRITORY_OPTIONS.map((t) => (
+              <option key={t.code} value={t.code}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {showPrices && activePriceData && (
         <>
           <div className="p-3 bg-[#F3F2EF] rounded-lg border border-[#DCDBD6] space-y-3">
@@ -102,17 +126,25 @@ export default function OptionsPanel({
 
             <div>
               <div className="text-xs font-medium text-[#3E4349] mb-1">
-                System Price, {priceMode === 'incVat' ? 'inc VAT' : 'ex VAT'}
+                System Price{priceListAvailable ? `, ${priceMode === 'incVat' ? 'inc VAT' : 'ex VAT'}` : ''}
               </div>
-              <div className="text-2xl font-bold text-[#213428]">{formatPrice(activePriceData.displayTotal ?? activePriceData.finalTotal)}</div>
-              {activePriceData.difficultyMultiplier !== 1.0 && (
-                <div className="text-xs text-[#625143] mt-1">
-                  Base {formatPrice(activePriceData.baseTotal)} × {activePriceData.difficultyMultiplier.toFixed(2)}
-                </div>
-              )}
-              {priceMode === 'incVat' && (
-                <div className="text-xs text-[#625143] mt-1">
-                  VAT {formatPrice(activePriceData.vatAmount)} included
+              {priceListAvailable ? (
+                <>
+                  <div className="text-2xl font-bold text-[#213428]">{formatPrice(activePriceData.displayTotal ?? activePriceData.finalTotal)}</div>
+                  {activePriceData.difficultyMultiplier !== 1.0 && (
+                    <div className="text-xs text-[#625143] mt-1">
+                      Base {formatPrice(activePriceData.baseTotal)} × {activePriceData.difficultyMultiplier.toFixed(2)}
+                    </div>
+                  )}
+                  {priceMode === 'incVat' && (
+                    <div className="text-xs text-[#625143] mt-1">
+                      VAT {formatPrice(activePriceData.vatAmount)} included
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-sm text-[#625143] py-1">
+                  Price list not available for {activePriceData.territoryLabel}
                 </div>
               )}
             </div>
@@ -150,8 +182,8 @@ export default function OptionsPanel({
                         {line.note && <div className="text-[11px] text-amber-700 mt-1">{line.note}</div>}
                       </div>
                       <div>{line.qty ?? line.count}</div>
-                      <div>{formatPrice(line.displayUnitPrice ?? line.price)}</div>
-                      <div className="font-medium">{formatPrice(line.displaySubtotal ?? line.subtotal)}</div>
+                      <div>{priceListAvailable ? formatPrice(line.displayUnitPrice ?? line.price) : '—'}</div>
+                      <div className="font-medium">{priceListAvailable ? formatPrice(line.displaySubtotal ?? line.subtotal) : '—'}</div>
                     </div>
                   );
                 })
@@ -159,71 +191,73 @@ export default function OptionsPanel({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-gray-700">Manual extras</div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDifficultyRating((value) => !value)}
-                  className="text-[10px] px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#625143] hover:bg-[#F3F2EF]"
-                >
-                  DR
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setManualExtras((items) => [...items, emptyManualItem()])}
-                  className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white hover:bg-[#F3F2EF]"
-                >
-                  Add manual item
-                </button>
+          {priceListAvailable && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium text-gray-700">Manual extras</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDifficultyRating((value) => !value)}
+                    className="text-[10px] px-2 py-1 rounded border border-[#DCDBD6] bg-white text-[#625143] hover:bg-[#F3F2EF]"
+                  >
+                    DR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualExtras((items) => [...items, emptyManualItem()])}
+                    className="text-xs px-2 py-1 rounded border border-[#DCDBD6] bg-white hover:bg-[#F3F2EF]"
+                  >
+                    Add manual item
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {manualExtras.length > 0 && (
-              <div className="space-y-2">
-                {manualExtras.map((item) => (
-                  <div key={item.id} className="grid grid-cols-[1fr_56px_92px_auto] gap-2 items-center">
-                    <input
-                      type="text"
-                      placeholder="Category / item"
-                      value={item.description}
-                      onChange={(e) => updateManualItem(item.id, { description: e.target.value })}
-                      className="px-2 py-1 border border-gray-300 rounded text-xs"
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={item.quantity}
-                      onChange={(e) => updateManualItem(item.id, { quantity: e.target.value })}
-                      className="px-2 py-1 border border-gray-300 rounded text-xs"
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Unit £"
-                      value={item.unitPriceExVat}
-                      onChange={(e) => updateManualItem(item.id, { unitPriceExVat: e.target.value })}
-                      className="px-2 py-1 border border-gray-300 rounded text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeManualItem(item.id)}
-                      className="text-xs px-2 py-1 rounded border border-red-200 text-red-700 bg-white hover:bg-red-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+              {manualExtras.length > 0 && (
+                <div className="space-y-2">
+                  {manualExtras.map((item) => (
+                    <div key={item.id} className="grid grid-cols-[1fr_56px_92px_auto] gap-2 items-center">
+                      <input
+                        type="text"
+                        placeholder="Category / item"
+                        value={item.description}
+                        onChange={(e) => updateManualItem(item.id, { description: e.target.value })}
+                        className="px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={item.quantity}
+                        onChange={(e) => updateManualItem(item.id, { quantity: e.target.value })}
+                        className="px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Unit £"
+                        value={item.unitPriceExVat}
+                        onChange={(e) => updateManualItem(item.id, { unitPriceExVat: e.target.value })}
+                        className="px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeManualItem(item.id)}
+                        className="text-xs px-2 py-1 rounded border border-red-200 text-red-700 bg-white hover:bg-red-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
-      {showDifficultyRating && (
+      {showDifficultyRating && priceListAvailable && (
         <div className="space-y-2">
           <Label htmlFor="difficulty" className="text-sm font-medium">Difficulty Rating</Label>
           <div className="text-xs text-gray-500 mb-2">
