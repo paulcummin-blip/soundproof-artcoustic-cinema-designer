@@ -83,15 +83,15 @@ export default function SpeakerPositionPlan({
       </div>
 
       {/* ── Coordinate datum + key dimensions ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 8, color: COLORS.muted }}>
-        <div>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, fontSize: 8, color: COLORS.muted, gap: 10 }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           <strong style={{ color: COLORS.text }}>Coordinate datum:</strong>{' '}
-          X = distance from left room wall · Y = distance from front room datum · Z = centre height above finished floor
+          X from left wall · Y from front datum · Z centre height AFFL
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <span><strong style={{ color: COLORS.text }}>Room:</strong> {fmtM(roomWidthM)} × {fmtM(roomLengthM)}</span>
-          {Number.isFinite(Number(screenFrontPlaneM)) && <span><strong style={{ color: COLORS.text }}>Screen plane:</strong> {fmtM(screenFrontPlaneM)}</span>}
-          {throwDistM != null && <span><strong style={{ color: COLORS.text }}>Throw:</strong> {throwDistM.toFixed(2)} m</span>}
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+          <span style={{ whiteSpace: 'nowrap' }}><strong style={{ color: COLORS.text }}>Room:</strong> {fmtM(roomWidthM)} × {fmtM(roomLengthM)}</span>
+          {Number.isFinite(Number(screenFrontPlaneM)) && <span style={{ whiteSpace: 'nowrap' }}><strong style={{ color: COLORS.text }}>Screen plane:</strong> {fmtM(screenFrontPlaneM)}</span>}
+          {throwDistM != null && <span style={{ whiteSpace: 'nowrap' }}><strong style={{ color: COLORS.text }}>Throw:</strong> {throwDistM.toFixed(2)} m</span>}
         </div>
       </div>
 
