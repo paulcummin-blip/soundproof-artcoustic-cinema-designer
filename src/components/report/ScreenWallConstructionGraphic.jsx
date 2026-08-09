@@ -528,6 +528,8 @@ export default function ScreenWallConstructionGraphic({
           <text x={PAGE.margin + 18} y={PAGE.height - PAGE.margin - 38} fontSize="7.5" fill={COLORS.muted} fontFamily={BODY_FONT}>
             <tspan x={PAGE.margin + 18} dy="0">Dimensions govern. Verify dimensions on site before construction.</tspan>
             <tspan x={PAGE.margin + 18} dy="11">Speaker and sub positions are generated from the current design. Acoustic centres should remain within the indicated band where practical.</tspan>
+            <tspan x={PAGE.margin + 18} dy="11">Coordinates refer to speaker and subwoofer centres unless stated otherwise.</tspan>
+            <tspan x={PAGE.margin + 18} dy="11">Verify final mounting requirements before installation.</tspan>
             <tspan x={PAGE.margin + 18} dy="11">Angle speakers toward the RSP where mounting permits.</tspan>
           </text>
         </g>

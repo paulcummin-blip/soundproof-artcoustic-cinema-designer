@@ -95,14 +95,6 @@ export default function SpeakerPositionPlan({
         </div>
       </div>
 
-      {/* ── Notes ── */}
-      <div style={{ marginTop: 'auto', paddingTop: 6, borderTop: `1px solid ${COLORS.divider}`, fontSize: 7.5, color: COLORS.muted, lineHeight: 1.5 }}>
-        <div>Dimensions govern. Do not scale from drawing.</div>
-        <div>All positions are generated from the current Sound Proof design.</div>
-        <div>Coordinates refer to speaker/subwoofer centres unless stated otherwise.</div>
-        <div>Verify final site dimensions and mounting requirements before installation.</div>
-      </div>
-
     </div>
   );
 }
