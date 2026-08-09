@@ -1275,9 +1275,13 @@ function RP22ReportInner() {
                                         screenTotalHeightM={sightlineScreenMetrics.screenTotalHeightM}
                                         screenBottomHeightM={sightlineScreenMetrics.screenBottomHeightM}
                                         screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
+                                        screenFrontPlaneM={reportScreenFrontPlaneM}
                                         placedSpeakers={placedSpeakers}
                                         frontSubs={frontSubs}
                                         frontSubsCfg={app?.frontSubsCfg}
+                                        primarySeatingPosition={primarySeatingPosition}
+                                        lcrAimMode={app?.lcrAimMode}
+                                        speakerClearanceM={app?.speaker_clearance_m}
                                     />
                                     </div>
                                 </section>
