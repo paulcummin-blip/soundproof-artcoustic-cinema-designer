@@ -5,7 +5,8 @@ import RP22ComplianceParameterTile from "@/components/rp22/RP22ComplianceParamet
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { useAppState } from "@/components/AppStateProvider";
 import { getLevelColors } from "@/components/utils/rp22Colors";
-import { getP21PresetResult, levelP21_earlyReflections } from "@/components/utils/rp22/levels";
+import { getP21PresetResult } from "@/components/utils/rp22/levels";
+import { resolveParamThresholds, resolveRoomParameterLevel } from "@/components/report/technical/roomParameterLevelAuthority";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
 import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
@@ -18,27 +19,6 @@ import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/
 
 /* ---------- Canonical RP22 parameter definitions ---------- */
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
-
-/* ---------- P12/P13 mode-aware threshold resolver ---------- */
-
-// Minimum thresholds (RP22 spec defaults)
-const P12_THRESHOLDS_MINIMUM = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 };
-const P12_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
-const P13_THRESHOLDS_MINIMUM = { direction: ">=", L1: 96, L2: 99, L3: 102, L4: 105 };
-const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 99, L2: 102, L3: 105, L4: 108 };
-const P14_THRESHOLDS_MINIMUM = { direction: ">=", L1: 109, L2: 112, L3: 115, L4: 118 };
-const P14_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 114, L2: 117, L3: 120, L4: 123 };
-
-function resolveParamThresholds(param, p12Mode, p13Mode, p14Mode) {
-  if (param.id === 12) {
-    return p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM;
-  }
-  if (param.id === 13) {
-    return p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM;
-  }
-  if (param.id === 14) return p14Mode === "recommended" ? P14_THRESHOLDS_RECOMMENDED : P14_THRESHOLDS_MINIMUM;
-  return param.thresholds;
-}
 
 /* ---------- Data helpers (mirrored from RP22CompliancePanel) ---------- */
 
@@ -180,35 +160,22 @@ export default function RP22ReportParameterGrid({
     const isRoomScope = String(param?.scope || "").toLowerCase() === "room";
 
     if (isRoomScope) {
-      const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
-
-      // P12/P13: re-grade from raw value using the user-selected mode thresholds
-      if ((pid === 12 || pid === 13) && res && res.status !== "no_data" && Number.isFinite(res.value)) {
-        const thresholds = resolveParamThresholds(param, p12Mode, p13Mode);
-        const v = res.value;
-        if (v >= thresholds.L4) return "L4";
-        if (v >= thresholds.L3) return "L3";
-        if (v >= thresholds.L2) return "L2";
-        if (v >= thresholds.L1) return "L1";
-        return "—";
-      }
-
-      if (pid === 21 && res?.status === "error") return "—";
-      if (pid === 21 && res && res.status !== "no_data" && res.status !== "fail" && Number.isFinite(res.value)) return levelP21_earlyReflections(res.value).level;
-      if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) return res.level;
-      if (pid === 3) { const p3 = analysisResult?.gradedParameters?.primary?.[3]; return (p3 && p3.status === "ok") ? p3.level : "—"; }
-      if (pid === 8) return "L4";
-      if (pid === 11) return "L4";
-      if (pid === 15) { const MAP = { standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" }; return MAP[p15ConstructionLevel || "standard"] || "—"; }
-      if (pid === 21) return getP21PresetResult(p21EarlyReflectionPreset || "l2").level;
-      return "—";
+      return resolveRoomParameterLevel(pid, {
+        analysisResult,
+        p12Mode,
+        p13Mode,
+        p14Mode,
+        p15ConstructionLevel,
+        p21EarlyReflectionPreset,
+        bassPresentation,
+      });
     }
 
     // Seat scope
     const snap = seatSnapshotsById?.[lockedSeatId] || seatSnapshotsById?.["mlp"] || (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) || null;
     const metric = snap?.rp22?.[`p${pid}`];
     return getMetricDisplayState(metric, pid).level || "—";
-  }, [analysisResult, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, bassPresentation]);
+  }, [analysisResult, p15ConstructionLevel, p21EarlyReflectionPreset, seatSnapshotsById, lockedSeatId, mlpSeatId, p12Mode, p13Mode, p14Mode, bassPresentation]);
 
   /* ----- getHudValueForParam (exact logic from RP22CompliancePanel) ----- */
   const getHudValueForParam = React.useCallback((param) => {

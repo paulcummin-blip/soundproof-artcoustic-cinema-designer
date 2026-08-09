@@ -36,7 +36,7 @@ function formatDateShort(value) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 }
 
 export default function TechnicalProjectOverview({
@@ -345,7 +345,7 @@ export default function TechnicalProjectOverview({
 
       {/* ── System configuration card ── */}
       <div className="print-avoid-break" style={{ ...cardStyle, marginBottom: 0 }}>
-        <div style={sectionLabelStyle}>SYSTEM CONFIGURATION</div>
+        <div style={sectionLabelStyle}>SELECTED LOUDSPEAKER MODELS</div>
         <div style={{ display: "flex", flexDirection: "column", gap: "3mm" }}>
           {[
             { label: "LCR", models: systemSummary?.lcr },

@@ -87,10 +87,14 @@ function SeatSummaryCard({ seat, isRsp }) {
           <span
             style={{
               fontSize: "7pt",
-              fontWeight: 600,
-              color: COLORS.primary,
+              fontWeight: 700,
+              color: "#FFFFFF",
+              background: COLORS.primary,
+              padding: "0.8mm 2mm",
+              borderRadius: 2,
               letterSpacing: "0.1em",
               fontFamily: FONT_BODY,
+              lineHeight: 1,
             }}
           >
             RSP
@@ -106,7 +110,7 @@ function SeatSummaryCard({ seat, isRsp }) {
           fontFamily: FONT_BODY,
         }}
       >
-        Active: {activeCount ?? 0}
+        Active: {activeCount ?? 0} of {seat.total ?? 0}
       </div>
 
       {/* Level distribution */}
@@ -122,12 +126,21 @@ function SeatSummaryCard({ seat, isRsp }) {
         <LevelCountBlock level="L2" count={counts?.L2 ?? 0} />
         <LevelCountBlock level="L1" count={counts?.L1 ?? 0} />
       </div>
+
+      {/* Unassessed */}
+      <div style={{ display: "flex", alignItems: "center", gap: "3mm" }}>
+        <TechnicalLevelBadge level="—" size="small" />
+        <span style={{ fontSize: "10pt", color: COLORS.body, fontFamily: FONT_BODY }}>
+          × {(seat.total ?? 0) - (activeCount ?? 0)}
+        </span>
+      </div>
     </div>
   );
 }
 
 export default function TechnicalPerformanceSummary({
   roomLevelCounts,
+  roomCalculatedCount,
   seatCountsByRow,
   totalRoomParameters,
   totalSeatParameters,
@@ -202,13 +215,13 @@ export default function TechnicalPerformanceSummary({
               fontFamily: FONT_BODY,
             }}
           >
-            {totalRoomParameters} parameters
+            {totalRoomParameters} parameters · {roomCalculatedCount ?? 0} calculated
           </span>
         </div>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(5, 1fr)",
             gap: "4mm",
           }}
         >
@@ -216,6 +229,7 @@ export default function TechnicalPerformanceSummary({
           <LevelCountBlock level="L3" count={roomLevelCounts?.L3 ?? 0} />
           <LevelCountBlock level="L2" count={roomLevelCounts?.L2 ?? 0} />
           <LevelCountBlock level="L1" count={roomLevelCounts?.L1 ?? 0} />
+          <LevelCountBlock level="—" count={roomLevelCounts?.unassessed ?? 0} />
         </div>
       </div>
 

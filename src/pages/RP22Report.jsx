@@ -46,6 +46,7 @@ import { buildComplianceBassExportData, buildComplianceBassPresentation } from '
 import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
 import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
+import { resolveRoomParameterLevel, normalizeRoomLevel } from '@/components/report/technical/roomParameterLevelAuthority';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -281,6 +282,10 @@ function RP22ReportInner() {
     const canonicalP2Layout = app?.dolbyLayout ?? app?.dolbyConfig ?? app?.speakerSystem?.dolbyLayout ?? app?.speakerSystem?.dolbyPreset ?? null;
     const reportSevenBedMode = String(app?.sevenBedLayoutType || app?.speakerSystem?.sevenBedLayoutType || (app?.speakerSystem?.useWidesInsteadOfRears ? "wides" : "") || "rears").toLowerCase();
 
+    const reportP12Mode = app?.p12Mode || "minimum";
+    const reportP13Mode = app?.splConfig?.p13Mode || "minimum";
+    const reportP14Mode = completedBassPresentation.parameters.p14.targetBasis || app?.splConfig?.p14Mode || "minimum";
+
     const cleanAspectLabel = (v) => {
         const s = String(v ?? "").trim();
         if (!s) return "";
@@ -377,14 +382,18 @@ function RP22ReportInner() {
 
     const rspSeatId = React.useMemo(() => {
         const greenDot = primarySeatingPosition;
-        if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
-        let closestSeat = null; let minDist = Infinity;
-        seats.forEach(s => {
-            if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
-            const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
-            if (d < minDist) { minDist = d; closestSeat = s.id; }
-        });
-        return (minDist <= 0.05) ? closestSeat : null;
+        if (greenDot && Number.isFinite(greenDot.x) && Number.isFinite(greenDot.y)) {
+            let closestSeat = null; let minDist = Infinity;
+            seats.forEach(s => {
+                if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
+                const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
+                if (d < minDist) { minDist = d; closestSeat = s.id; }
+            });
+            if (minDist <= 0.05 && closestSeat) return closestSeat;
+        }
+        // Fallback: seat carrying isPrimary: true (matches detailed parameter grid authority)
+        const primarySeat = seats.find(s => s?.isPrimary && s?.id);
+        return primarySeat?.id || null;
     }, [seats, primarySeatingPosition]);
 
     // resolveScreenMetricsSnapshot — always reads from the live screen object.
@@ -520,36 +529,16 @@ function RP22ReportInner() {
     const getRoomResult = React.useCallback((paramId) => analysisResult?.gradedParameters?.primary?.[paramId] ?? null, [analysisResult]);
 
     const getDisplayedRoomLevel = React.useCallback((paramId) => {
-        if ([14, 18, 19].includes(paramId)) return completedBassPresentation.parameters[`p${paramId}`].level;
-        const normaliseLvl = (rawLevel) => {
-            if (rawLevel == null) return null;
-            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) { if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`; return null; }
-            if (typeof rawLevel === "string") { const m = rawLevel.trim().match(/^L([1-4])$/i); if (m) return `L${m[1]}`; }
-            return null;
-        };
-        const res = getRoomResult(paramId);
-        if (res) {
-            if (res.status && typeof res.status === "string") { const s = res.status.toLowerCase(); if (s === "no_data" || s === "fail" || s === "error") return null; }
-            if (paramId === 21 && Number.isFinite(res.value)) return levelP21_earlyReflections(res.value).level;
-            const lvl = normaliseLvl(res.level);
-            if (lvl) return lvl;
-        }
-        if (paramId === 2) {
-          const p2 = getRoomResult(2);
-          if (p2 && p2.status === "ok" && String(p2.level).toUpperCase() === 'FAIL') return 'FAIL';
-          return null;
-        }
-        if (paramId === 3) {
-          const p3 = analysisResult?.gradedParameters?.primary?.[3];
-          if (p3 && p3.status === "ok" && p3.level) return String(p3.level).toUpperCase() === 'FAIL' ? 'FAIL' : normaliseLvl(p3.level);
-          return null;
-        }
-        if (paramId === 8) return "L4";
-        if (paramId === 11) return "L4";
-        if (paramId === 15) return ({ standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" })[app?.p15ConstructionLevel || 'standard'] || null;
-        if (paramId === 21) return getP21PresetResult(app?.p21EarlyReflectionPreset || 'l2').level;
-        return null;
-    }, [analysisResult, getRoomResult, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset, completedBassPresentation]);
+        return resolveRoomParameterLevel(paramId, {
+            analysisResult,
+            p12Mode: reportP12Mode,
+            p13Mode: reportP13Mode,
+            p14Mode: reportP14Mode,
+            p15ConstructionLevel: app?.p15ConstructionLevel,
+            p21EarlyReflectionPreset: app?.p21EarlyReflectionPreset,
+            bassPresentation: completedBassPresentation,
+        });
+    }, [analysisResult, reportP12Mode, reportP13Mode, reportP14Mode, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset, completedBassPresentation]);
 
     const getSeatResults = React.useCallback((paramId) => {
         if (!analysisResult?.perSeatRp22) return [];
@@ -562,13 +551,19 @@ function RP22ReportInner() {
     }, [analysisResult]);
 
     const roomLevelCounts = React.useMemo(() => {
-        const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
-        for (const id of [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 21]) {
-            const lvl = getDisplayedRoomLevel(id);
-            if (lvl && lvl.match(/^L[1-4]$/)) counts[lvl] += 1;
+        const counts = { L4: 0, L3: 0, L2: 0, L1: 0, unassessed: 0 };
+        for (const param of orderedParams) {
+            const raw = getDisplayedRoomLevel(param.id);
+            const lvl = normalizeRoomLevel(raw);
+            if (lvl) counts[lvl] += 1;
+            else counts.unassessed += 1;
         }
         return counts;
-    }, [getDisplayedRoomLevel]);
+    }, [getDisplayedRoomLevel, orderedParams]);
+
+    const roomCalculatedCount = React.useMemo(() => {
+        return roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1;
+    }, [roomLevelCounts]);
 
     const lastSeatIdsRef = React.useRef([]);
     const lastSeatLevelCountsRef = React.useRef([]);
@@ -1146,6 +1141,7 @@ function RP22ReportInner() {
                             <div className="print-page-break-after">
                                 <TechnicalPerformanceSummary
                                     roomLevelCounts={roomLevelCounts}
+                                    roomCalculatedCount={roomCalculatedCount}
                                     seatCountsByRow={seatCountsByRow}
                                     totalRoomParameters={roomScopedParamCount}
                                     totalSeatParameters={seatScopedParamCount}
