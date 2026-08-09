@@ -181,7 +181,7 @@ function fixtureC() {
   checks.push(["P11 outsideCount=5→L1 (not FAIL)", getRoomLevel(c2, "p11") === "L1"]);
 
   // P20 open-ended — 5 dB should be L1, not FAIL
-  const c3 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p20: { s1: 5, s2: 5 } });
+  const c3 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p20: { s1: { rawValue: 5, verified: true }, s2: { rawValue: 5, verified: true } } });
   checks.push(["P20 5dB→L1 (not FAIL)", getSeatLevel(c3, "p20", "s1") === "L1"]);
 
   // P5 open-ended — 85° should be L1, not FAIL
@@ -241,15 +241,15 @@ function fixtureE() {
   const e2 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p9: { s1: "na", s2: "na" } });
   checks.push(["P9 na state", e2.parameters.p9.state === "na"]);
 
-  // P18 genuinely topology N/A
-  const e3 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { na: true } });
+  // P18 genuinely topology N/A (verified N/A — fail-closed requires verified: true)
+  const e3 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { na: true, verified: true } });
   checks.push(["P18 na state", e3.parameters.p18.state === "na"]);
 
   // Room rating should not be provisional just because of N/A
   const e4 = buildArtcousticDesignRatingAuthority({
     seats: SEAT_LIST,
     p7: { na: true },
-    p18: { na: true },
+    p18: { na: true, verified: true },
     p9: { s1: "na", s2: "na" },
   });
   const roomRating = calculateRoomDesignRating(e4);
@@ -466,7 +466,8 @@ function fixtureN() {
   const rating = calculateRoomDesignRating(auth);
   // P9 weight=5, avg=12 (only s1), contribution=60, max=60
   checks.push(["P9 N/A seat avg", approx(rating.actualPoints, 60, 0.1)]);
-  checks.push(["P9 N/A not provisional", rating.hasProvisional === false]);
+  // P9 should be scored despite one N/A seat (N/A excluded from average without making P9 provisional)
+  checks.push(["P9 scored despite N/A seat", auth.parameters.p9.state === "scored"]);
 
   const failed = checks.filter(([, v]) => !v).map(([label]) => label);
   return makeResult("N: N/A seat excluded from avg", failed.length === 0, `Failed: ${failed.join(", ")}`);
@@ -539,7 +540,7 @@ function fixtureQ() {
     p16: { s1: 1.5, s2: 1.5 },
     p17: { s1: 1.5, s2: 1.5 },
     p19: { s1: { rawValue: 2, verified: true }, s2: { rawValue: 2, verified: true } },
-    p20: { s1: 2, s2: 2 },
+    p20: { s1: { rawValue: 2, verified: true }, s2: { rawValue: 2, verified: true } },
     screen: { s1: 55, s2: 55 },
     p2: { rawValue: 15 },
     p3: { rawValue: 0 },
@@ -578,7 +579,7 @@ function fixtureR() {
     p16: { s1: 4.5, s2: 4.5 },     // L1
     p17: { s1: 2, s2: 2 },         // L4 (P17 has no L1 — L2 is lowest at 3)
     p19: { s1: { rawValue: 4.5, verified: true }, s2: { rawValue: 4.5, verified: true } }, // L1
-    p20: { s1: 4, s2: 4 },         // L1
+    p20: { s1: { rawValue: 4, verified: true }, s2: { rawValue: 4, verified: true } },         // L1
     screen: { s1: 35, s2: 35 },    // L1
     p2: { rawValue: 5 },           // L1
     p3: { rawValue: 0 },           // L4
@@ -603,7 +604,7 @@ function fixtureR() {
     p16: { s1: 4.5, s2: 4.5 },
     p17: { s1: 2, s2: 2 },
     p19: { s1: { rawValue: 6, verified: true }, s2: { rawValue: 6, verified: true } }, // FAIL
-    p20: { s1: 5, s2: 5 },         // L1 (open-ended, not FAIL)
+    p20: { s1: { rawValue: 5, verified: true }, s2: { rawValue: 5, verified: true } },         // L1 (open-ended, not FAIL)
     screen: { s1: 35, s2: 35 },
     p2: { rawValue: 5 },
     p3: { rawValue: 0 },
@@ -632,7 +633,7 @@ function fixtureR() {
     p16: { s1: 4.5, s2: 4.5 },
     p17: { s1: 2, s2: 2 },
     p19: { s1: { rawValue: 4.5, verified: true }, s2: { rawValue: 4.5, verified: true } },
-    p20: { s1: 4, s2: 4 },
+    p20: { s1: { rawValue: 4, verified: true }, s2: { rawValue: 4, verified: true } },
     screen: { s1: 25, s2: 25 },    // FAIL
     p2: { rawValue: 5 },
     p3: { rawValue: 0 },
@@ -648,6 +649,136 @@ function fixtureR() {
 
   const failed = checks.filter(([, v]) => !v).map(([label]) => label);
   return makeResult("R: FAIL penalty material", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// S. Assumption coverage: P8/P15/P21 in coverage, not in score
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureS() {
+  const checks = [];
+
+  // All scorable params at L4, P8/P15/P21 V1-excluded
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p1: { s1: 1.6, s2: 1.6 },
+    p4: { s1: 1, s2: 1 },
+    p5: { s1: 50, s2: 50 },
+    p6: { s1: 1, s2: 1 },
+    p9: { s1: 50, s2: 50 },
+    p10: { s1: 1, s2: 1 },
+    p16: { s1: 1.5, s2: 1.5 },
+    p17: { s1: 1.5, s2: 1.5 },
+    p19: { s1: { rawValue: 2, verified: true }, s2: { rawValue: 2, verified: true } },
+    p20: { s1: { rawValue: 2, verified: true }, s2: { rawValue: 2, verified: true } },
+    screen: { s1: 55, s2: 55 },
+    p2: { rawValue: 15 },
+    p3: { rawValue: 0 },
+    p7: { rawValue: 2 },
+    p11: { outsideCount: 0, level: "L4", indeterminate: false },
+    p12: { rawValue: 111, mode: "minimum" },
+    p13: { rawValue: 105, mode: "minimum" },
+    p14: { rawValue: 118, verified: true, mode: "minimum" },
+    p18: { rawValue: 15, verified: true },
+  });
+  const rating = calculateRoomDesignRating(auth);
+
+  // Score should be 100% (all scorable at L4)
+  checks.push(["Score 100%", approx(rating.rawPercentage, 100, 0.01)]);
+  // Status PROVISIONAL (P8/P15/P21 excluded)
+  checks.push(["Status PROVISIONAL", rating.status === "PROVISIONAL"]);
+  // Coverage < 100%
+  checks.push(["Coverage < 100%", rating.coveragePercent < 100]);
+  // Coverage ≈ 93.39% (113 assessed / 121 applicable)
+  checks.push(["Coverage ≈ 93.39%", approx(rating.coveragePercent, 93.39, 0.5)]);
+  // applicableWeight includes excluded (121 = 113 + 8)
+  checks.push(["applicableWeight=121", rating.applicableWeight === 121]);
+  // assessedWeight excludes P8/P15/P21 (113)
+  checks.push(["assessedWeight=113", rating.assessedWeight === 113]);
+  // Not COMPLETE
+  checks.push(["Not COMPLETE", rating.status !== "COMPLETE"]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("S: Assumption coverage", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// T. Bass fail-closed: rawValue without verified → provisional
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureT() {
+  const checks = [];
+
+  // P14 without verified → provisional
+  const t1 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p14: { rawValue: 118, mode: "minimum" } });
+  checks.push(["P14 no verified→provisional", t1.parameters.p14.state === "provisional"]);
+
+  // P18 without verified → provisional
+  const t2 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { rawValue: 18 } });
+  checks.push(["P18 no verified→provisional", t2.parameters.p18.state === "provisional"]);
+
+  // P19 seat without verified → provisional
+  const t3 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p19: { s1: { rawValue: 2 }, s2: { rawValue: 2 } } });
+  checks.push(["P19 no verified→provisional", t3.parameters.p19.seats.s1.state === "provisional"]);
+
+  // P20 seat without verified → provisional
+  const t4 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p20: { s1: { rawValue: 2 }, s2: { rawValue: 2 } } });
+  checks.push(["P20 no verified→provisional", t4.parameters.p20.seats.s1.state === "provisional"]);
+
+  // Bare number for P14 → provisional
+  const t5 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p14: 118 });
+  checks.push(["P14 bare number→provisional", t5.parameters.p14.state === "provisional"]);
+
+  // Bare number for P19 seat → provisional
+  const t6 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p19: { s1: 2, s2: 2 } });
+  checks.push(["P19 bare number→provisional", t6.parameters.p19.seats.s1.state === "provisional"]);
+
+  // With verified: true → scored
+  const t7 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p14: { rawValue: 118, verified: true, mode: "minimum" } });
+  checks.push(["P14 verified true→scored", t7.parameters.p14.state === "scored"]);
+
+  const t8 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { rawValue: 18, verified: true } });
+  checks.push(["P18 verified true→scored", t8.parameters.p18.state === "scored"]);
+
+  const t9 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p19: { s1: { rawValue: 2, verified: true }, s2: { rawValue: 2, verified: true } } });
+  checks.push(["P19 verified true→scored", t9.parameters.p19.seats.s1.state === "scored"]);
+
+  const t10 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p20: { s1: { rawValue: 2, verified: true }, s2: { rawValue: 2, verified: true } } });
+  checks.push(["P20 verified true→scored", t10.parameters.p20.seats.s1.state === "scored"]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("T: Bass fail-closed", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// U. Genuine verified N/A remains excluded without penalty
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureU() {
+  const checks = [];
+
+  // P18 verified N/A → na
+  const u1 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { na: true, verified: true } });
+  checks.push(["P18 verified na→na", u1.parameters.p18.state === "na"]);
+
+  // P18 unverified N/A → provisional (not na)
+  const u2 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { na: true } });
+  checks.push(["P18 unverified na→provisional", u2.parameters.p18.state === "provisional"]);
+
+  // P18 verified-false N/A → provisional
+  const u3 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p18: { na: true, verified: false } });
+  checks.push(["P18 verified-false na→provisional", u3.parameters.p18.state === "provisional"]);
+
+  // P20 verified N/A per seat → na
+  const u4 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p20: { s1: { na: true, verified: true }, s2: { na: true, verified: true } } });
+  checks.push(["P20 verified na→na", u4.parameters.p20.state === "na"]);
+
+  // P20 unverified N/A per seat → provisional
+  const u5 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p20: { s1: { na: true }, s2: { na: true } } });
+  checks.push(["P20 unverified na→provisional", u5.parameters.p20.state === "provisional"]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("U: Verified N/A", failed.length === 0, `Failed: ${failed.join(", ")}`);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -674,6 +805,9 @@ export function runAllFixtures() {
     fixtureP(),
     fixtureQ(),
     fixtureR(),
+    fixtureS(),
+    fixtureT(),
+    fixtureU(),
   ];
   const allPassed = fixtures.every((f) => f.passed);
   return { allPassed, results: fixtures };

@@ -47,11 +47,11 @@ export const PARAM_WEIGHTS = Object.freeze({
   screen: 7,
 });
 
-/** Sum of all configured importance weights. */
-export const TOTAL_WEIGHT = 121;
+/** Sum of all configured importance weights (derived from PARAM_WEIGHTS). */
+export const TOTAL_WEIGHT = Object.values(PARAM_WEIGHTS).reduce((a, b) => a + b, 0);
 
-/** Configured reference maximum (121 × 12). Not used as a fixed denominator. */
-export const MAX_REFERENCE_POINTS = 1452;
+/** Configured reference maximum (TOTAL_WEIGHT × 12). Not used as a fixed denominator. */
+export const MAX_REFERENCE_POINTS = TOTAL_WEIGHT * 12;
 
 /** Performance multipliers per level. */
 export const LEVEL_MULTIPLIERS = Object.freeze({
@@ -60,6 +60,9 @@ export const LEVEL_MULTIPLIERS = Object.freeze({
 
 /** V1 excluded assumption metrics — applicable but unscoreable, always provisional. */
 export const V1_EXCLUDED_PARAMS = Object.freeze(new Set(["p8", "p15", "p21"]));
+
+/** Bass-authority parameters that require explicit publication verification to score. */
+const BASS_PARAMS = new Set(["p14", "p18", "p19", "p20"]);
 
 /** Parameter scope: "room" (single room result) or "seat" (per-seat results). */
 export const PARAM_SCOPE = Object.freeze({
@@ -98,24 +101,36 @@ export function isBassPublicationVerified(completedBassAuthority) {
  *
  * Accepted input forms:
  *   null / undefined           → provisional (missing)
- *   "na"                       → genuine N/A
+ *   "na"                       → genuine N/A (provisional if requireVerified)
  *   "provisional"              → explicit provisional
- *   number                     → scored with that raw value
- *   { na: true }               → genuine N/A
+ *   number                     → scored (provisional if requireVerified)
+ *   { na: true }               → genuine N/A (provisional if requireVerified && verified !== true)
  *   { provisional: true }      → explicit provisional
  *   { indeterminate: true }    → provisional (indeterminate)
- *   { verified: false }        → provisional (not verified — bass guard)
- *   { rawValue: number }       → scored
+ *   { verified: false }        → provisional (not verified)
+ *   { rawValue: number }       → scored (provisional if requireVerified && verified !== true)
+ *
+ * @param {*} input - The parameter input value
+ * @param {boolean} requireVerified - When true (bass params), verified must
+ *   explicitly equal true to score or N/A; otherwise fail-closed to provisional.
  */
-function normalizeInput(input) {
+function normalizeInput(input, requireVerified = false) {
   if (input == null) return { state: "provisional", rawValue: null, reason: "missing" };
-  if (input === "na") return { state: "na", rawValue: null, reason: null };
+  if (input === "na") {
+    if (requireVerified) return { state: "provisional", rawValue: null, reason: "not-verified" };
+    return { state: "na", rawValue: null, reason: null };
+  }
   if (input === "provisional") return { state: "provisional", rawValue: null, reason: "explicit-provisional" };
   if (typeof input === "number") {
     if (!Number.isFinite(input)) return { state: "provisional", rawValue: null, reason: "non-finite" };
+    if (requireVerified) return { state: "provisional", rawValue: null, reason: "not-verified" };
     return { state: "scored", rawValue: input, reason: null };
   }
   if (typeof input === "object") {
+    // Bass fail-closed: verified must explicitly equal true for N/A or scored
+    if (requireVerified && input.verified !== true) {
+      return { state: "provisional", rawValue: null, reason: "not-verified" };
+    }
     if (input.na === true) return { state: "na", rawValue: null, reason: null };
     if (input.provisional === true) return { state: "provisional", rawValue: null, reason: input.reason || "explicit-provisional" };
     if (input.indeterminate === true) return { state: "provisional", rawValue: null, reason: "indeterminate" };
@@ -237,20 +252,17 @@ function scoreP11(input) {
 }
 
 function scoreP12(rawValue, mode) {
-  const cat = RP22_CATALOG["12"];
-  const thresholds = resolveParamThresholds(cat, mode || "minimum", null, null);
+  const thresholds = resolveParamThresholds({ id: 12 }, mode || "minimum", null, null);
   return applyCatalogThresholds(rawValue, thresholds, "min");
 }
 
 function scoreP13(rawValue, mode) {
-  const cat = RP22_CATALOG["13"];
-  const thresholds = resolveParamThresholds(cat, null, mode || "minimum", null);
+  const thresholds = resolveParamThresholds({ id: 13 }, null, mode || "minimum", null);
   return applyCatalogThresholds(rawValue, thresholds, "min");
 }
 
 function scoreP14(rawValue, mode) {
-  const cat = RP22_CATALOG["14"];
-  const thresholds = resolveParamThresholds(cat, null, null, mode || "minimum");
+  const thresholds = resolveParamThresholds({ id: 14 }, null, null, mode || "minimum");
   return applyCatalogThresholds(rawValue, thresholds, "min");
 }
 
@@ -307,7 +319,7 @@ function scoreRoomParam(key, input) {
     return { state: "scored", level: result.level, multiplier: multiplierForLevel(result.level), reason: null };
   }
 
-  const norm = normalizeInput(input);
+  const norm = normalizeInput(input, BASS_PARAMS.has(key));
   if (norm.state === "na") return { state: "na", level: null, multiplier: null, reason: null };
   if (norm.state === "provisional") {
     return { state: "provisional", level: null, multiplier: null, reason: norm.reason };
@@ -335,7 +347,7 @@ function scoreRoomParam(key, input) {
  * @returns {{ state: string, level: string|null, multiplier: number|null, reason: string|null }}
  */
 function scoreSeatParam(key, input) {
-  const norm = normalizeInput(input);
+  const norm = normalizeInput(input, BASS_PARAMS.has(key));
   if (norm.state === "na") return { state: "na", level: null, multiplier: null, reason: null };
   if (norm.state === "provisional") {
     return { state: "provisional", level: null, multiplier: null, reason: norm.reason };
@@ -482,11 +494,18 @@ export function calculateRoomDesignRating(authority) {
   let assessedWeight = 0;
   let hasProvisional = false;
 
-  for (const key of SCORABLE_KEYS) {
+  for (const key of Object.keys(PARAM_WEIGHTS)) {
     const param = authority?.parameters?.[key];
     if (!param) continue;
 
     const weight = PARAM_WEIGHTS[key];
+
+    // V1-excluded: applicable but unscoreable — contributes to coverage, not score
+    if (V1_EXCLUDED_PARAMS.has(key)) {
+      applicableWeight += weight;
+      hasProvisional = true;
+      continue;
+    }
 
     if (param.state === "na") continue; // N/A contributes to neither
 
@@ -568,11 +587,18 @@ export function calculateSeatDesignRating(authority, seatId) {
   let assessedWeight = 0;
   let hasProvisional = false;
 
-  for (const key of SCORABLE_KEYS) {
+  for (const key of Object.keys(PARAM_WEIGHTS)) {
     const param = authority?.parameters?.[key];
     if (!param) continue;
 
     const weight = PARAM_WEIGHTS[key];
+
+    // V1-excluded: applicable but unscoreable — contributes to coverage, not score
+    if (V1_EXCLUDED_PARAMS.has(key)) {
+      applicableWeight += weight;
+      hasProvisional = true;
+      continue;
+    }
 
     if (param.scope === "room") {
       if (param.state === "na") continue;
