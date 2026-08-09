@@ -300,7 +300,7 @@ function RoomDesignerWithState() {
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
-  const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("summary");
+  const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("off");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
   const [leftPanelView, setLeftPanelView] = useState('plan'); // 'plan' | 'front' | 'side'

@@ -104,7 +104,7 @@ export default function RoomDesignerPlanToolbar({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
         <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Live Impact</span>
         <select
-          value={liveImpactMode || 'summary'}
+          value={liveImpactMode || 'off'}
           onChange={(e) => setLiveImpactMode?.(e.target.value)}
           style={{ fontSize: 11, padding: '4px 6px', borderRadius: 4, border: '1px solid #DCDBD6', background: '#FFFFFF', color: '#3E4349', cursor: 'pointer', fontWeight: 500 }}
         >
