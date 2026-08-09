@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon } from '@/components/report/SpeakerFaceIcons';
-import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
+import { yHalfExtentM_physical } from '@/components/room/rv/RenderPrimitives';
+import { calculateAzimuth } from '@/components/utils/aimingUtils';
+import { SCREEN_BUFFER_M } from '@/components/room/rv/utils/rvGeometry';
 
 const HEADING_FONT = '"Futura PT Light", "Century Gothic", sans-serif';
 const BODY_FONT = '"Didact Gothic", "Century Gothic", sans-serif';
@@ -187,7 +189,7 @@ export default function ScreenWallConstructionGraphic({
   const screenBottom = num(screenBottomHeightM);
   const screenTop = finite(screenTopHeightM) ? Number(screenTopHeightM) : screenBottom + screenOuterH;
   const frontPlane = num(screenFrontPlaneM, 0);
-  const minAllowed = num(speakerClearanceM, 0.02);
+  const minAllowed = SCREEN_BUFFER_M;
 
   const drawArea = { x: 40, y: 200, width: 500, height: 380 };
   const scale = Math.min(drawArea.width / roomW, drawArea.height / roomH);
@@ -223,7 +225,7 @@ export default function ScreenWallConstructionGraphic({
         const pos = item.position;
         let yaw = 0;
         if (aim === 'angled' && primarySeatingPosition && Number.isFinite(primarySeatingPosition.x) && Number.isFinite(primarySeatingPosition.y)) {
-          yaw = safeYawToMLP(pos, { x: primarySeatingPosition.x, y: primarySeatingPosition.y }) ?? 0;
+          yaw = calculateAzimuth(pos, { x: primarySeatingPosition.x, y: primarySeatingPosition.y }) ?? 0;
         }
         roleMap.set(canon, {
           role: canon,
@@ -285,8 +287,9 @@ export default function ScreenWallConstructionGraphic({
     let minClearance = Infinity;
     drawnSpeakers.forEach((s) => {
       if (!Number.isFinite(s.yM)) return;
-      const frontFaceY = s.yM + s.dims.depthM / 2;
-      const c = frontPlane - frontFaceY;
+      const halfExtent = yHalfExtentM_physical(s.dims.depthM, s.dims.widthM, s.yaw);
+      const nearestFrontY = s.yM + halfExtent;
+      const c = frontPlane - nearestFrontY;
       if (Number.isFinite(c) && c < minClearance) minClearance = c;
     });
     return Number.isFinite(minClearance) ? minClearance : null;
