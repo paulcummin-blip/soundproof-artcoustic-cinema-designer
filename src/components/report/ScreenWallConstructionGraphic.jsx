@@ -368,7 +368,7 @@ export default function ScreenWallConstructionGraphic({
         </g>
 
         {/* Drawing label */}
-        <text x={wallX + wallPxW / 2} y={drawArea.y - 10} fontSize="10" fill={COLORS.muted} textAnchor="middle" fontFamily={BODY_FONT} letterSpacing="1.2">
+        <text x={wallX + wallPxW / 2} y={Math.max(PAGE.margin + 82, wallY - 90)} fontSize="10" fill={COLORS.muted} textAnchor="middle" fontFamily={BODY_FONT} letterSpacing="1.2">
           FRONT ELEVATION
         </text>
 
@@ -523,9 +523,9 @@ export default function ScreenWallConstructionGraphic({
 
         {/* Notes */}
         <g>
-          <line x1={PAGE.margin + 18} y1={PAGE.height - PAGE.margin - 48} x2={PAGE.width - PAGE.margin - 18} y2={PAGE.height - PAGE.margin - 48} stroke={COLORS.extension} strokeWidth="0.8" />
-          <text x={PAGE.margin + 18} y={PAGE.height - PAGE.margin - 34} fontSize="8" fill={COLORS.text} fontFamily={BODY_FONT} fontWeight="600">NOTES</text>
-          <text x={PAGE.margin + 18} y={PAGE.height - PAGE.margin - 20} fontSize="7.5" fill={COLORS.muted} fontFamily={BODY_FONT}>
+          <line x1={PAGE.margin + 18} y1={PAGE.height - PAGE.margin - 66} x2={PAGE.width - PAGE.margin - 18} y2={PAGE.height - PAGE.margin - 66} stroke={COLORS.extension} strokeWidth="0.8" />
+          <text x={PAGE.margin + 18} y={PAGE.height - PAGE.margin - 52} fontSize="8" fill={COLORS.text} fontFamily={BODY_FONT} fontWeight="600">NOTES</text>
+          <text x={PAGE.margin + 18} y={PAGE.height - PAGE.margin - 38} fontSize="7.5" fill={COLORS.muted} fontFamily={BODY_FONT}>
             <tspan x={PAGE.margin + 18} dy="0">Dimensions govern. Verify dimensions on site before construction.</tspan>
             <tspan x={PAGE.margin + 18} dy="11">Speaker and sub positions are generated from the current design. Acoustic centres should remain within the indicated band where practical.</tspan>
             <tspan x={PAGE.margin + 18} dy="11">Angle speakers toward the RSP where mounting permits.</tspan>
