@@ -44,6 +44,8 @@ import { getP21PresetResult, levelP21_earlyReflections } from '@/components/util
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { buildComplianceBassExportData, buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
+import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
+import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -1125,176 +1127,32 @@ function RP22ReportInner() {
                                 </div>
                             </div>
 
-                            {/* ── Page 2: Project details, geometry, system summary, counts ── */}
-                            <div className="print-page-break-after print-summary">
-                                <div className="rp22-cover-stack" style={{ maxWidth: '195mm', margin: '0 auto 0', display: 'flex', flexDirection: 'column', gap: '3mm' }}>
-                                    <div className="print-avoid-break rp22-cover-card" style={{ marginBottom: '0', textAlign: 'left' }}>
-                                        <ProjectDetailsCard
-                                            project={frontPageProjectDetails}
-                                            extraItems={frontPageProjectDetails?.extraItems || []}
-                                            title={`Project details  –  System Configuration  –  ${exportSystemConfiguration || '—'}`}
-                                            subtitle=""
-                                            className="bg-[#FBFAF8] border-[1.5px] border-[#D9D5CE] shadow-none rounded-[10px]"
-                                            contentClassName="px-[10mm] py-[8mm]"
-                                            headerClassName="mb-[4mm]"
-                                            titleClassName="text-center text-[15pt] font-bold leading-[1.15] text-[#1B1A1A]"
-                                            subtitleClassName="hidden"
-                                            gridClassName="grid grid-cols-2 gap-x-[8mm] gap-y-[3mm] lg:grid-cols-2"
-                                            labelClassName="text-[10px] font-medium uppercase tracking-[0.06em] leading-[1.1] text-[#625143]"
-                                            valueClassName="mt-[1mm] truncate text-[12px] font-medium leading-[1.3] text-[#1B1A1A]"
-                                            hideProjectId={true}
-                                        />
-                                    </div>
+                            {/* ── Page 2: Project & System Overview ── */}
+                            <div className="print-page-break-after">
+                                <TechnicalProjectOverview
+                                    projectDetails={projectDetails}
+                                    exportDateLabel={exportDateLabel}
+                                    exportSystemConfiguration={exportSystemConfiguration}
+                                    screenChoiceLabel={formatScreenChoiceLabel(app?.screen)}
+                                    screenMetrics={resolveScreenMetricsSnapshot()}
+                                    rowCentralSeats={rowCentralSeats}
+                                    screenFrontPlaneM={app?.screenFrontPlaneM}
+                                    screen={screen}
+                                    systemSummary={systemSummary}
+                                />
+                            </div>
 
-                                    {/* Screen & Viewing Geometry */}
-                                    <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
-                                        <div style={coverBoxTitleStyle}>Screen &amp; Viewing Geometry</div>
-                                        {(() => {
-                                            // Screen dims — resolve width from TV preset first, then fall back to visibleWidthInches
-                                            const TV_PRESET_WIDTH_MM = { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 };
-                                            const tvPresetKey = app?.screen?.tvPresetKey;
-                                            const tvWidthMm = Number(app?.screen?.tvWidthMm);
-                                            const resolvedWidthIn = (() => {
-                                               if (tvPresetKey && TV_PRESET_WIDTH_MM[tvPresetKey]) {
-                                                   return TV_PRESET_WIDTH_MM[tvPresetKey] / 25.4;
-                                               }
-                                               if (Number.isFinite(tvWidthMm) && tvWidthMm > 0) {
-                                                   return tvWidthMm / 25.4;
-                                               }
-                                               return Number(app?.screen?.visibleWidthInches) || 0;
-                                            })();
-                                            const liveAspect = app?.screen?.aspectRatio || "16:9";
-                                            const liveBorderM = Number(app?.screen?.borderThicknessM);
-                                            const borderThicknessM = Number.isFinite(liveBorderM) && liveBorderM >= 0 ? liveBorderM : 0.08;
-                                            const { viewWm, viewHm, overallWm, overallHm } = (resolvedWidthIn > 0)
-                                               ? computeScreenMetrics(resolvedWidthIn, liveAspect, borderThicknessM)
-                                               : { viewWm: null, viewHm: null, overallWm: null, overallHm: null };
-                                            const choiceLabel = formatScreenChoiceLabel(app?.screen) || "Not specified";
-                                            const hasViewable = Number.isFinite(viewWm) && viewWm > 0 && Number.isFinite(viewHm) && viewHm > 0;
-                                            const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;
-                                            const fmtCm = (m) => `${Math.round(m * 100)}`;
-
-                                            // Per-row geometry — use the same representative row seat source as all
-                                            // other report/export RP23 sections: rowCentralSeats.
-                                            const screenFrontM = app?.screenFrontPlaneM ?? 0;
-                                            const screenY = Number.isFinite(screenFrontM) ? screenFrontM : 0;
-                                            const scrW = viewWm || 0;
-                                            const scrH = viewHm || 0;
-                                            const scrBottom = Number(app?.screen?.heightFromFloorM ?? app?.screenHeight ?? 0.5);
-                                            const scrTop = scrBottom + scrH;
-                                            const buildRowGeoEntry = (eyeY, eyeZ, rowNumber) => {
-                                                const dist = Math.abs(eyeY - screenY);
-                                                const hAngle = dist > 0 ? 2 * Math.atan((scrW / 2) / dist) * (180 / Math.PI) : 0;
-                                                const vTop = dist > 0 ? Math.atan2(scrTop - eyeZ, dist) * (180 / Math.PI) : 0;
-                                                const vBot = dist > 0 ? Math.atan2(scrBottom - eyeZ, dist) * (180 / Math.PI) : 0;
-                                                return { rowNumber, viewingDistanceM: dist, horizontalViewingAngleDeg: hAngle, totalVerticalAngleDeg: vTop - vBot };
-                                            };
-                                            const rowGeo = rowCentralSeats
-                                                .map(seat => buildRowGeoEntry(
-                                                    seat.y,
-                                                    Number.isFinite(seat.z) ? seat.z : 1.2,
-                                                    seat.rowNumber || 1
-                                                ))
-                                                .filter(Boolean);
-
-                                            return (
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: '8mm', rowGap: '4mm' }}>
-                                                    <div>
-                                                        <div style={coverSectionTitleStyle}>Screen size — {choiceLabel}</div>
-                                                        <div style={{ display: 'grid', rowGap: '2.5mm' }}>
-                                                            <div style={coverLabelValueRowStyle}>
-                                                                <div style={coverLabelStyle}>Viewable area</div>
-                                                                {hasViewable ? <div style={coverValueStyle}>{fmtCm(viewWm)} × {fmtCm(viewHm)} cm</div> : <div style={coverValueStyle}>Not specified</div>}
-                                                            </div>
-                                                            <div style={coverLabelValueRowStyle}>
-                                                                <div style={coverLabelStyle}>Overall with border</div>
-                                                                {hasOverall ? <div style={coverValueStyle}>{fmtCm(overallWm)} × {fmtCm(overallHm)} cm</div> : <div style={coverValueStyle}>Not specified</div>}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <div style={coverSectionTitleStyle}>Viewing geometry — per row</div>
-                                                        {rowGeo.length > 0 ? (
-                                                            <div>
-                                                                <div style={{ display: 'grid', rowGap: '3mm' }}>
-                                                                    {rowGeo.map(row => {
-                                                                                        const hDeg = row.horizontalViewingAngleDeg;
-                                                                                        const displayHorizontalDeg = rp23DisplayAngleDeg(hDeg);
-                                                                                        const rp23AngleStr = Number.isFinite(displayHorizontalDeg) ? `${displayHorizontalDeg}°` : '—';
-                                                                                        const rp23Level = rp23LevelForAngleDeg(hDeg);
-                                                                                        return (
-                                                                                            <div key={row.rowNumber} style={{ paddingBottom: '2mm', borderBottom: '1px solid #F0EFEA', display: 'grid', gridTemplateColumns: '1fr auto', columnGap: '6mm', alignItems: 'start' }}>
-                                                                                                {/* Left: existing geometry values */}
-                                                                                                <div>
-                                                                                                    <div style={{ ...coverLabelStyle, marginBottom: '1.5mm' }}>Row {row.rowNumber}</div>
-                                                                                                    <div style={coverLabelValueRowStyle}>
-                                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Horizontal angle</div>
-                                                                                                        <div style={coverValueStyle}>{rp23AngleStr}</div>
-                                                                                                    </div>
-                                                                                                    <div style={coverLabelValueRowStyle}>
-                                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Vertical angle</div>
-                                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.totalVerticalAngleDeg) ? `${row.totalVerticalAngleDeg.toFixed(1)}°` : '—'}</div>
-                                                                                                    </div>
-                                                                                                    <div style={coverLabelValueRowStyle}>
-                                                                                                        <div style={{ ...coverLabelStyle, fontWeight: 400 }}>Distance from wall</div>
-                                                                                                        <div style={coverValueStyle}>{Number.isFinite(row.viewingDistanceM) ? `${Math.round(row.viewingDistanceM * 100)} cm` : '—'}</div>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                {/* Right: RP23 block */}
-                                                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '28mm' }}>
-                                                                                                    <div style={{ fontSize: '8pt', fontWeight: 600, color: '#625143', marginBottom: '2mm', textAlign: 'center', whiteSpace: 'nowrap' }}>RP23 viewing angle</div>
-                                                                                                    <div style={{ fontSize: '10pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '2mm', textAlign: 'center' }}>{rp23AngleStr}</div>
-                                                                                                    <PrintRp23Pill level={rp23Level} />
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        );
-                                                                                    })}
-                                                                </div>
-                                                                {/* RP23 reference ranges */}
-                                                                <div style={{ marginTop: '4mm', paddingTop: '3mm', borderTop: '1px solid #E8E6E1', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontSize: '9pt', color: '#6F6B64' }}>
-                                                                    <div><div style={{ fontWeight: 600 }}>L4</div><div>50°–65°</div></div>
-                                                                    <div><div style={{ fontWeight: 600 }}>L3</div><div>45°–70°</div></div>
-                                                                    <div><div style={{ fontWeight: 600 }}>L2</div><div>40°–80°</div></div>
-                                                                    <div><div style={{ fontWeight: 600 }}>L1</div><div>33°–90°</div></div>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div style={coverValueStyle}>Not specified</div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-
-                                    {/* System Summary */}
-                                     <div style={coverBoxStyle} className="print-avoid-break rp22-cover-card">
-                                         <div style={coverBoxTitleStyle}>System summary</div>
-                                         <div style={coverBoxSubtitleStyle}>Selected loudspeaker models</div>
-                                         <div style={{ display: 'grid', rowGap: '4mm' }}>
-                                             {[['LCR', systemSummary.lcr], ['Surrounds', systemSummary.surrounds], ['Overheads', systemSummary.overheads], ['Subwoofers', systemSummary.subs]].map(([label, models], i, arr) => (
-                                                 <div key={label} style={{ display: 'grid', gridTemplateColumns: '32mm 1fr', columnGap: '6mm', alignItems: 'start', paddingBottom: i < arr.length - 1 ? '4mm' : 0, borderBottom: i < arr.length - 1 ? '1px solid #EEEAE3' : 'none' }}>
-                                                     <div style={{ fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A', lineHeight: 1.3 }}>{label}</div>
-                                                     <div style={{ fontSize: '11.5pt', color: '#3E4349', lineHeight: 1.3 }}>{models.join(', ')}</div>
-                                                 </div>
-                                             ))}
-                                         </div>
-                                     </div>
-
-                                    </div>
-
-                                    {/* ReportCountsDashboard at bottom of project/summary page */}
-                                    <div style={{ maxWidth: '195mm', width: '100%', margin: '5mm auto 0', paddingTop: '5mm' }}>
-                                     <ReportCountsDashboard
-                                         roomLevelCounts={roomLevelCounts}
-                                         seatCountsByRow={seatCountsByRow}
-                                         analysisResult={analysisResult}
-                                         totalRoomParameters={roomScopedParamCount}
-                                         totalSeatParameters={seatScopedParamCount}
-                                     />
-                                    </div>
-                                    </div>
-                                    </section>
+                            {/* ── Page 3: RP22 Performance Summary ── */}
+                            <div className="print-page-break-after">
+                                <TechnicalPerformanceSummary
+                                    roomLevelCounts={roomLevelCounts}
+                                    seatCountsByRow={seatCountsByRow}
+                                    totalRoomParameters={roomScopedParamCount}
+                                    totalSeatParameters={seatScopedParamCount}
+                                    rspSeatId={rspSeatId}
+                                />
+                            </div>
+                            </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
                             <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>

@@ -294,6 +294,14 @@ export default function ReportPrintStyles() {
                     min-height: 250mm !important;
                 }
 
+                /* Stage B — Technical Report overview & summary pages */
+                .rp22-report .tech-overview-page,
+                .rp22-report .tech-summary-page {
+                    background: #F1F0EE !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+
                 .rp22-report .tech-param-page + .tech-param-page {
                     break-before: page;
                     page-break-before: always;
