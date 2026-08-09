@@ -51,9 +51,11 @@ function CentreBolts({ midX, topY, bottomY, r }) {
 // ─── Q-Series face icons ──────────────────────────────────────────────────────
 
 export function Q43FaceIcon({ x, y, width, height }) {
+  // Q4-3 cabinet is 4:3 (280×210mm). viewBox matches artwork aspect so the
+  // image fills the complete physical cabinet viewport without double aspect-fit.
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/689388d97_Q4-3front.png" preserveAspectRatio="xMidYMid meet" />
+    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 75" xmlns="http://www.w3.org/2000/svg">
+      <image x="0" y="0" width="100" height="75" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/689388d97_Q4-3front.png" preserveAspectRatio="xMidYMid meet" />
     </svg>
   );
 }
