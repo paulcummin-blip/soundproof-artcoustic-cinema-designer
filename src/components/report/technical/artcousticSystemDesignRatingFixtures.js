@@ -949,6 +949,235 @@ function fixtureY() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Z. P12 Minimum weight = 8 (Recommended SPL weighting)
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureZ() {
+  const checks = [];
+
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p12: { rawValue: 111, mode: "minimum" }, // L4 (>= 108)
+  });
+  checks.push(["P12 min effectiveWeight = 8", auth.parameters.p12.effectiveWeight === 8]);
+  checks.push(["P12 min baseWeight = 8", auth.parameters.p12.weight === 8]);
+
+  const rating = calculateRoomDesignRating(auth);
+  // P12 L4: weight 8, multiplier 12, actual = 96, max = 96
+  checks.push(["P12 min L4 actual = 96", approx(rating.actualPoints, 96, 0.1)]);
+  checks.push(["P12 min L4 max = 96", approx(rating.maximumAvailablePoints, 96, 0.1)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("Z: P12 Minimum weight", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AA. P12 Recommended weight = 10
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAA() {
+  const checks = [];
+
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p12: { rawValue: 111, mode: "recommended" }, // L4 (>= 108)
+  });
+  checks.push(["P12 rec effectiveWeight = 10", auth.parameters.p12.effectiveWeight === 10]);
+  checks.push(["P12 rec baseWeight = 8", auth.parameters.p12.weight === 8]);
+
+  const rating = calculateRoomDesignRating(auth);
+  // P12 L4: weight 10, multiplier 12, actual = 120, max = 120
+  checks.push(["P12 rec L4 actual = 120", approx(rating.actualPoints, 120, 0.1)]);
+  checks.push(["P12 rec L4 max = 120", approx(rating.maximumAvailablePoints, 120, 0.1)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AA: P12 Recommended weight", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AB. P13 Minimum weight = 7
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAB() {
+  const checks = [];
+
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p13: { rawValue: 108, mode: "minimum" }, // L4 (>= 105)
+  });
+  checks.push(["P13 min effectiveWeight = 7", auth.parameters.p13.effectiveWeight === 7]);
+
+  const rating = calculateRoomDesignRating(auth);
+  // P13 L4: weight 7, multiplier 12, actual = 84, max = 84
+  checks.push(["P13 min L4 actual = 84", approx(rating.actualPoints, 84, 0.1)]);
+  checks.push(["P13 min L4 max = 84", approx(rating.maximumAvailablePoints, 84, 0.1)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AB: P13 Minimum weight", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AC. P13 Recommended weight = 9
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAC() {
+  const checks = [];
+
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p13: { rawValue: 111, mode: "recommended" }, // L4 (>= 108)
+  });
+  checks.push(["P13 rec effectiveWeight = 9", auth.parameters.p13.effectiveWeight === 9]);
+
+  const rating = calculateRoomDesignRating(auth);
+  // P13 L4: weight 9, multiplier 12, actual = 108, max = 108
+  checks.push(["P13 rec L4 actual = 108", approx(rating.actualPoints, 108, 0.1)]);
+  checks.push(["P13 rec L4 max = 108", approx(rating.maximumAvailablePoints, 108, 0.1)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AC: P13 Recommended weight", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AD. P14 Minimum verified weight = 9
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAD() {
+  const checks = [];
+
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p14: { rawValue: 121, verified: true, mode: "minimum" }, // L4 (>= 118)
+  });
+  checks.push(["P14 min verified effectiveWeight = 9", auth.parameters.p14.effectiveWeight === 9]);
+  checks.push(["P14 min verified scored", auth.parameters.p14.state === "scored"]);
+
+  const rating = calculateRoomDesignRating(auth);
+  // P14 L4: weight 9, multiplier 12, actual = 108, max = 108
+  checks.push(["P14 min L4 actual = 108", approx(rating.actualPoints, 108, 0.1)]);
+  checks.push(["P14 min L4 max = 108", approx(rating.maximumAvailablePoints, 108, 0.1)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AD: P14 Minimum verified weight", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AE. P14 Recommended verified weight = 11
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAE() {
+  const checks = [];
+
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p14: { rawValue: 126, verified: true, mode: "recommended" }, // L4 (>= 123)
+  });
+  checks.push(["P14 rec verified effectiveWeight = 11", auth.parameters.p14.effectiveWeight === 11]);
+  checks.push(["P14 rec verified scored", auth.parameters.p14.state === "scored"]);
+
+  const rating = calculateRoomDesignRating(auth);
+  // P14 L4: weight 11, multiplier 12, actual = 132, max = 132
+  checks.push(["P14 rec L4 actual = 132", approx(rating.actualPoints, 132, 0.1)]);
+  checks.push(["P14 rec L4 max = 132", approx(rating.maximumAvailablePoints, 132, 0.1)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AE: P14 Recommended verified weight", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AF. P14 Recommended unverified — excluded entirely
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAF() {
+  const checks = [];
+
+  const auth = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p14: { rawValue: 126, mode: "recommended" }, // no verified → provisional
+  });
+  checks.push(["P14 rec unverified→provisional", auth.parameters.p14.state === "provisional"]);
+  // Effective weight stays at base (9) because not scored
+  checks.push(["P14 rec unverified effectiveWeight = 9 (base)", auth.parameters.p14.effectiveWeight === 9]);
+
+  const rating = calculateRoomDesignRating(auth);
+  // P14 excluded from both numerator and denominator
+  checks.push(["P14 rec unverified actual = 0", approx(rating.actualPoints, 0, 0.1)]);
+  checks.push(["P14 rec unverified max = 0", approx(rating.maximumAvailablePoints, 0, 0.1)]);
+  checks.push(["P14 rec unverified NOT_ASSESSED", rating.status === "NOT_ASSESSED"]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AF: P14 Recommended unverified excluded", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AG. Recommended L4 has greater weighted influence than Minimum L4
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAG() {
+  const checks = [];
+
+  const authMin = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p12: { rawValue: 111, mode: "minimum" }, // L4
+  });
+  const ratingMin = calculateRoomDesignRating(authMin);
+
+  const authRec = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p12: { rawValue: 111, mode: "recommended" }, // L4
+  });
+  const ratingRec = calculateRoomDesignRating(authRec);
+
+  checks.push(["Rec L4 actual > Min L4 actual", ratingRec.actualPoints > ratingMin.actualPoints]);
+  checks.push(["Rec L4 max > Min L4 max", ratingRec.maximumAvailablePoints > ratingMin.maximumAvailablePoints]);
+  checks.push(["Rec L4 actual = 120", approx(ratingRec.actualPoints, 120, 0.1)]);
+  checks.push(["Min L4 actual = 96", approx(ratingMin.actualPoints, 96, 0.1)]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AG: Recommended L4 greater influence", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AH. Recommended L1 also uses the higher effective weight
+//     (confirms Recommended is an importance increase, not a free bonus)
+// ═══════════════════════════════════════════════════════════════
+
+function fixtureAH() {
+  const checks = [];
+
+  // P12 minimum L1: rawValue 101, mode "minimum" → L1 (>= 99, < 102), weight 8, multiplier 2
+  const authMinL1 = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p12: { rawValue: 101, mode: "minimum" }, // L1
+  });
+  const ratingMinL1 = calculateRoomDesignRating(authMinL1);
+  checks.push(["P12 min L1 effectiveWeight = 8", authMinL1.parameters.p12.effectiveWeight === 8]);
+  checks.push(["P12 min L1 level = L1", authMinL1.parameters.p12.level === "L1"]);
+  // actual = 2 * 8 = 16, max = 12 * 8 = 96
+  checks.push(["P12 min L1 actual = 16", approx(ratingMinL1.actualPoints, 16, 0.1)]);
+  checks.push(["P12 min L1 max = 96", approx(ratingMinL1.maximumAvailablePoints, 96, 0.1)]);
+
+  // P12 recommended L1: rawValue 102, mode "recommended" → L1 (>= 102, < 105), weight 10, multiplier 2
+  const authRecL1 = buildArtcousticDesignRatingAuthority({
+    seats: SEAT_LIST,
+    p12: { rawValue: 102, mode: "recommended" }, // L1
+  });
+  const ratingRecL1 = calculateRoomDesignRating(authRecL1);
+  checks.push(["P12 rec L1 effectiveWeight = 10", authRecL1.parameters.p12.effectiveWeight === 10]);
+  checks.push(["P12 rec L1 level = L1", authRecL1.parameters.p12.level === "L1"]);
+  // actual = 2 * 10 = 20, max = 12 * 10 = 120
+  checks.push(["P12 rec L1 actual = 20", approx(ratingRecL1.actualPoints, 20, 0.1)]);
+  checks.push(["P12 rec L1 max = 120", approx(ratingRecL1.maximumAvailablePoints, 120, 0.1)]);
+
+  // Recommended L1 actual > Minimum L1 actual — importance increase, not free bonus
+  checks.push(["Rec L1 actual > Min L1 actual", ratingRecL1.actualPoints > ratingMinL1.actualPoints]);
+  checks.push(["Rec L1 max > Min L1 max", ratingRecL1.maximumAvailablePoints > ratingMinL1.maximumAvailablePoints]);
+
+  const failed = checks.filter(([, v]) => !v).map(([label]) => label);
+  return makeResult("AH: Recommended L1 higher weight", failed.length === 0, `Failed: ${failed.join(", ")}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Runner
 // ═══════════════════════════════════════════════════════════════
 
@@ -979,6 +1208,15 @@ export function runAllFixtures() {
     fixtureW(),
     fixtureX(),
     fixtureY(),
+    fixtureZ(),
+    fixtureAA(),
+    fixtureAB(),
+    fixtureAC(),
+    fixtureAD(),
+    fixtureAE(),
+    fixtureAF(),
+    fixtureAG(),
+    fixtureAH(),
   ];
   const allPassed = fixtures.every((f) => f.passed);
   return { allPassed, results: fixtures };

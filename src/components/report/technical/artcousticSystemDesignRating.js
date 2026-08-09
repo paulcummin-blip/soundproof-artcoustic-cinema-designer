@@ -64,6 +64,22 @@ export const V1_EXCLUDED_PARAMS = Object.freeze(new Set(["p8", "p15", "p21"]));
 /** Bass-authority parameters that require explicit publication verification to score. */
 const BASS_PARAMS = new Set(["p14", "p18", "p19", "p20"]);
 
+/** Weight bonus applied to SPL capability parameters when assessed against Recommended targets. */
+const RECOMMENDED_WEIGHT_BONUS = 2;
+
+/** Parameters eligible for the Recommended weight bonus (SPL capability params only). */
+const RECOMMENDED_WEIGHTED_PARAMS = new Set(["p12", "p13", "p14"]);
+
+/** Derive the effective weight for a parameter based on its assessment mode and scoring state.
+ *  Base weight is used unless the parameter is P12/P13/P14, mode is "recommended",
+ *  and the parameter is actively scored. */
+function getEffectiveWeight(key, mode, state) {
+  if (RECOMMENDED_WEIGHTED_PARAMS.has(key) && mode === "recommended" && state === "scored") {
+    return PARAM_WEIGHTS[key] + RECOMMENDED_WEIGHT_BONUS;
+  }
+  return PARAM_WEIGHTS[key];
+}
+
 /** Parameter scope: "room" (single room result) or "seat" (per-seat results). */
 export const PARAM_SCOPE = Object.freeze({
   p1: "seat", p2: "room", p3: "room", p4: "seat", p5: "seat",
@@ -426,8 +442,10 @@ export function buildArtcousticDesignRatingAuthority(input) {
 
     if (scope === "room") {
       const scored = scoreRoomParam(key, paramInput);
+      const mode = typeof paramInput === "object" && paramInput ? paramInput.mode : null;
+      const effectiveWeight = getEffectiveWeight(key, mode, scored.state);
       parameters[key] = {
-        key, weight, scope,
+        key, weight, effectiveWeight, scope,
         state: scored.state,
         level: scored.level,
         multiplier: scored.multiplier,
@@ -498,7 +516,7 @@ export function calculateRoomDesignRating(authority) {
     const param = authority?.parameters?.[key];
     if (!param) continue;
 
-    const weight = PARAM_WEIGHTS[key];
+    const weight = param.effectiveWeight ?? PARAM_WEIGHTS[key];
 
     // V1-excluded: excluded from both numerator and denominator
     if (V1_EXCLUDED_PARAMS.has(key)) {
@@ -587,7 +605,7 @@ export function calculateSeatDesignRating(authority, seatId) {
     const param = authority?.parameters?.[key];
     if (!param) continue;
 
-    const weight = PARAM_WEIGHTS[key];
+    const weight = param.effectiveWeight ?? PARAM_WEIGHTS[key];
 
     // V1-excluded: excluded from both numerator and denominator
     if (V1_EXCLUDED_PARAMS.has(key)) {
