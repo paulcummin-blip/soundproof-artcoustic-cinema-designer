@@ -1279,12 +1279,14 @@ function RP22ReportInner() {
                             </div>
 
                             {/* ── Page 3b: ASDR Scorecard ── */}
-                            <div className="print-page-break-after">
-                                <TechnicalAsdrScorecard
-                                    roomDesignRating={roomDesignRating}
-                                    showDesignRating={showDesignRating}
-                                />
-                            </div>
+                            {showDesignRating && roomDesignRating && (
+                                <div className="print-page-break-after">
+                                    <TechnicalAsdrScorecard
+                                        roomDesignRating={roomDesignRating}
+                                        showDesignRating={showDesignRating}
+                                    />
+                                </div>
+                            )}
                             </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
