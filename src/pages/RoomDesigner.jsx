@@ -1732,7 +1732,7 @@ function RoomDesignerWithState() {
           projectId={resolvedProjectId || projectIdState || "free"}
           baselineRating={appDesignRating}
           allowUkPricing={priceData?.priceListAvailable === true && priceData?.territoryCode === "UK"}
-          soundbarSelections={appState?.soundbarSelections || {}}
+          soundbarSelections={appState?.soundbarSelections || null}
           onRecommendationsChange={setDesignRecommendations}
         />
       )}
