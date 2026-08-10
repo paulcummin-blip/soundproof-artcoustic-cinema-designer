@@ -49,6 +49,10 @@ export default function Layout({ children, currentPageName }) {
     finalTotal: 0,
     difficultyMultiplier: 1.0,
     priceMode: "incVat",
+    territoryLabel: '',
+    territoryCode: 'UK',
+    currency: 'GBP',
+    priceListAvailable: true,
   });
 
   // ASDR visibility (shared between app and report) + rating data from RoomDesigner
@@ -282,6 +286,10 @@ export default function Layout({ children, currentPageName }) {
                   finalTotal={priceSummary.finalTotal}
                   difficultyMultiplier={priceSummary.difficultyMultiplier}
                   priceMode={priceSummary.priceMode}
+                  territoryLabel={priceSummary.territoryLabel}
+                  territoryCode={priceSummary.territoryCode}
+                  currency={priceSummary.currency}
+                  priceListAvailable={priceSummary.priceListAvailable}
                 />
               </div>
             )}

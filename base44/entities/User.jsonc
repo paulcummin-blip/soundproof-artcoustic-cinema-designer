@@ -35,6 +35,16 @@
       "default": "Designer Lite",
       "description": "Business-level Role used by the Role & Permission Engine to determine module access"
     },
+    "territory": {
+      "type": "string",
+      "enum": [
+        "UK",
+        "IE",
+        "IN"
+      ],
+      "default": "UK",
+      "description": "Pricing territory assigned to this user by an administrator. Drives the territory price list via usePriceCalculation. Null/missing resolves to UK at read time."
+    },
     "license_account_type": {
       "type": "string",
       "enum": [

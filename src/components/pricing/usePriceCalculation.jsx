@@ -1,7 +1,8 @@
 // components/pricing/usePriceCalculation.jsx
 import { useMemo } from 'react';
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
-import { useTerritory } from "./territoryStore";
+import { useAuth } from "@/lib/AuthContext";
+import { DEFAULT_TERRITORY, getTerritoryConfig } from "./territoryConfig";
 
 const VAT_RATE = 0.2;
 const CPH_1000D_PRICE_EX_VAT = 675;
@@ -151,7 +152,9 @@ export function usePriceCalculation({
   manualExtras = [],
   soundbarSelections = {},
 }) {
-  const { territory, config: territoryConfig } = useTerritory();
+  const { user } = useAuth();
+  const territory = user?.territory || DEFAULT_TERRITORY;
+  const territoryConfig = getTerritoryConfig(territory);
   const priceListAvailable = !!territoryConfig?.priceListAvailable;
 
   return useMemo(() => {
@@ -199,6 +202,7 @@ export function usePriceCalculation({
         priceListAvailable: false,
         territoryCode: territory,
         territoryLabel: territoryConfig.label,
+        currency: territoryConfig.currency,
         baseTotal: null,
         finalTotal: null,
         displayTotal: null,
@@ -259,6 +263,7 @@ export function usePriceCalculation({
       priceListAvailable: true,
       territoryCode: territory,
       territoryLabel: territoryConfig.label,
+      currency: territoryConfig.currency,
       baseTotal,
       finalTotal: displayTotal,
       difficultyMultiplier: multiplier,

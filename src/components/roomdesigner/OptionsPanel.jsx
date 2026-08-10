@@ -2,8 +2,6 @@ import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SOUNDBAR_PRICE_OPTIONS, usePriceCalculation } from "@/components/pricing/usePriceCalculation";
-import { useTerritory, setTerritory } from "@/components/pricing/territoryStore";
-import { TERRITORY_OPTIONS } from "@/components/pricing/territoryConfig";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value || 0));
@@ -42,7 +40,6 @@ export default function OptionsPanel({
     soundbarSelections,
   });
 
-  const { territory } = useTerritory();
   const activePriceData = commercialPriceData || priceData;
   const priceListAvailable = activePriceData?.priceListAvailable !== false;
 
@@ -59,6 +56,8 @@ export default function OptionsPanel({
       difficultyMultiplier: activePriceData.difficultyMultiplier,
       priceListAvailable: activePriceData.priceListAvailable,
       territoryLabel: activePriceData.territoryLabel,
+      territoryCode: activePriceData.territoryCode,
+      currency: activePriceData.currency,
     };
   }, [
     showPrices,
@@ -69,6 +68,8 @@ export default function OptionsPanel({
     activePriceData?.difficultyMultiplier,
     activePriceData?.priceListAvailable,
     activePriceData?.territoryLabel,
+    activePriceData?.territoryCode,
+    activePriceData?.currency,
     priceMode,
   ]);
 
@@ -91,22 +92,6 @@ export default function OptionsPanel({
         <Label htmlFor="show-asdr" className="text-sm font-medium">Show Artcoustic System Design Rating</Label>
         <Switch id="show-asdr" checked={showAsdr} onCheckedChange={setShowAsdr} />
       </div>
-
-      {showPrices && (
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="territory" className="text-xs font-medium text-[#3E4349]">Territory</Label>
-          <select
-            id="territory"
-            value={territory}
-            onChange={(e) => setTerritory(e.target.value)}
-            className="text-xs px-2 py-1 border border-gray-300 rounded bg-white"
-          >
-            {TERRITORY_OPTIONS.map((t) => (
-              <option key={t.code} value={t.code}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {showPrices && activePriceData && (
         <>

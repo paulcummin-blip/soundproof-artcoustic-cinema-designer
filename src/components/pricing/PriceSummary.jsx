@@ -1,33 +1,34 @@
 // components/pricing/PriceSummary.jsx
 import React from 'react';
-import { useTerritory } from "./territoryStore";
 
 /**
  * Price summary card for the sidebar.
  * Shows equipment total with multiplier applied (hidden when showPrices is false).
+ * Territory metadata is passed in as props from the canonical usePriceCalculation
+ * resolver via Layout — PriceSummary does NOT resolve territory independently.
  */
-export default function PriceSummary({ 
-  showPrices = false, 
-  baseTotal = 0, 
-  finalTotal = 0, 
+export default function PriceSummary({
+  showPrices = false,
+  baseTotal = 0,
+  finalTotal = 0,
   difficultyMultiplier = 1.0,
-  priceMode = "incVat"
+  priceMode = "incVat",
+  territoryLabel = '',
+  territoryCode = 'UK',
+  currency = 'GBP',
+  priceListAvailable = true,
 }) {
-  const { config: territoryConfig } = useTerritory();
-  const priceListAvailable = !!territoryConfig?.priceListAvailable;
-  const territoryLabel = territoryConfig?.label || '';
-
   // Don't render anything when prices are hidden
   if (!showPrices) {
     return null;
   }
-  
+
   // Format price with thousand separators
   const formatPrice = (value) => {
     const rounded = Math.round(value);
     return new Intl.NumberFormat('en-GB', {
       style: 'currency',
-      currency: 'GBP',
+      currency: currency || 'GBP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(rounded);

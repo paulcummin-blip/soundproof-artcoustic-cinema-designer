@@ -41,6 +41,24 @@ export default function AdminUserLicensingDetail() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState(null);
+  const [territorySaving, setTerritorySaving] = useState(false);
+  const [territoryMsg, setTerritoryMsg] = useState(null);
+
+  const TERRITORY_LABELS = { UK: 'UK', IE: 'Ireland', IN: 'India' };
+
+  async function handleTerritoryChange(newTerritory) {
+    setTerritorySaving(true);
+    setTerritoryMsg(null);
+    try {
+      await base44.entities.User.update(targetUser.id, { territory: newTerritory });
+      setTargetUser((prev) => ({ ...prev, territory: newTerritory }));
+      setTerritoryMsg({ type: 'success', text: 'Territory updated.' });
+    } catch (err) {
+      setTerritoryMsg({ type: 'error', text: err?.message || 'Failed to update territory.' });
+    } finally {
+      setTerritorySaving(false);
+    }
+  }
 
   useEffect(() => {
     if (!isInternal) return;
@@ -126,6 +144,22 @@ export default function AdminUserLicensingDetail() {
         <Field label="Override" value={targetUser.license_override_allowance ?? "—"} />
         <Field label="Effective Allowance" value={effectiveAllowance} />
         <Field label="Licensing Enabled" value={targetUser.license_enabled ? "Yes" : "No"} />
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Territory</div>
+          <select
+            value={targetUser.territory || 'UK'}
+            disabled={territorySaving}
+            onChange={(e) => handleTerritoryChange(e.target.value)}
+            style={{ fontSize: 14, fontWeight: 600, color: BRAND.text, padding: "4px 8px", border: `1px solid ${BRAND.border}`, borderRadius: 6, background: "#fff", cursor: territorySaving ? "not-allowed" : "pointer" }}
+          >
+            <option value="UK">UK</option>
+            <option value="IE">Ireland</option>
+            <option value="IN">India</option>
+          </select>
+          {territoryMsg && (
+            <div style={{ fontSize: 11, color: territoryMsg.type === 'success' ? '#213428' : BRAND.red, marginTop: 4 }}>{territoryMsg.text}</div>
+          )}
+        </div>
       </div>
 
       {actionMessage && (
