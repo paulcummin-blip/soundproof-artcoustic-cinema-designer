@@ -171,11 +171,27 @@ export class BassBackgroundAnalysisController {
 
   updateInputs({ valid, fingerprint, legacyFingerprint = null, payload, identity = null, collectDiagnostics = false, diagnosticToken = null }) {
     if (!valid || !fingerprint) {
+      const nextFingerprint = fingerprint || null;
+      const alreadyIdle =
+        this.state.status === "idle" &&
+        this.state.currentCalibrationFingerprint === nextFingerprint &&
+        this.state.currentJobFingerprint == null &&
+        this.state.resultFingerprint == null &&
+        this.state.result == null &&
+        this.activeRequest == null &&
+        this.timer == null &&
+        this.pending == null;
+
+      // Invalid/unavailable inputs are a stable state, not an event. Re-emitting
+      // the same idle snapshot wakes BassBackgroundAnalysisOwner again and can
+      // form an effect → store emit → render → effect loop.
+      if (alreadyIdle) return { action: "idle_unchanged" };
+
       this.cancelActive();
       const staleResult = this.state.result || this.state.staleResult;
       this.pending = null;
       this.emit({
-        status: "idle", currentCalibrationFingerprint: fingerprint || null,
+        status: "idle", currentCalibrationFingerprint: nextFingerprint,
         currentJobFingerprint: null, resultFingerprint: null,
         result: null, staleResult, previousResultStale: !!staleResult,
         cacheStatus: "none", errorMessage: null, progress: null, progressStage: null,
