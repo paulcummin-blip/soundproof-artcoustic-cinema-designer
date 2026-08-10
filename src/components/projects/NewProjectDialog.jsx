@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Project } from "@/entities/Project";
 import { useAuth } from "@/lib/AuthContext";
+import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
+import { normalizeStatusId } from "@/components/projects/statusDefaults";
 
 export const dolbyConfigs = [
   { value: "5.1", label: "5.1 Surround — P2 - L1" },
@@ -41,7 +43,7 @@ export const splOptions = [
 const EMPTY_FORM = {
   name: "",
   client_name: "",
-  project_status: "Prospective",
+  project_status: "prospective",
   room_length: "",
   room_width: "",
   room_height: "",
@@ -55,6 +57,7 @@ const EMPTY_FORM = {
 export default function NewProjectDialog({ open, onOpenChange, onProjectCreated, editProject, onProjectUpdated }) {
   const isEditMode = !!editProject;
   const { user } = useAuth();
+  const { activeStatuses } = useProjectStatuses();
 
   const [formData, setFormData] = useState(EMPTY_FORM);
 
@@ -64,7 +67,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
       setFormData({
         name: editProject.name || "",
         client_name: editProject.client || "",
-        project_status: editProject.status || "Prospective",
+        project_status: normalizeStatusId(editProject.status || "prospective"),
         room_length: editProject.roomLength != null ? String(editProject.roomLength) : "",
         room_width: editProject.roomWidth != null ? String(editProject.roomWidth) : "",
         room_height: editProject.roomHeight != null ? String(editProject.roomHeight) : "",
@@ -155,10 +158,11 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[#DCDBD6]">
-                  <SelectItem value="Prospective" className="text-[#1B1A1A]">Prospective</SelectItem>
-                  <SelectItem value="Live" className="text-[#1B1A1A]">Live</SelectItem>
-                  <SelectItem value="Completed" className="text-[#1B1A1A]">Completed</SelectItem>
-                  <SelectItem value="Lost" className="text-[#1B1A1A]">Lost</SelectItem>
+                  {activeStatuses.map((s) => (
+                    <SelectItem key={s.status_id} value={s.status_id} className="text-[#1B1A1A]">
+                      {s.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

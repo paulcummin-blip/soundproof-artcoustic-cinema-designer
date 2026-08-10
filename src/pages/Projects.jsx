@@ -4,6 +4,9 @@ import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import { useProjectActions } from "@/components/state/project-session";
 import { base44 } from "@/api/base44Client";
 import NewProjectDialog, { dolbyConfigs, splOptions } from "@/components/projects/NewProjectDialog";
+import ManageStatusesDialog from "@/components/projects/ManageStatusesDialog";
+import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
+import { normalizeStatusId, getStatusColor } from "@/components/projects/statusDefaults";
 
 // Build lookup maps from the shared label arrays
 const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(c => [c.value, c.label]));
@@ -30,8 +33,8 @@ const BRAND = {
 };
 
 // ---- Status helpers ----
-const STATUS = ["Live", "Prospective", "Lost", "Completed"];
-
+// Legacy fallback colours/alpha for the default statuses (used before the
+// dynamic ProjectStatus definitions have loaded).
 const STATUS_COLORS = {
   live: "#213428",
   prospective: "#625143",
@@ -54,9 +57,15 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function getStatusStyle(status) {
-  const key = String(status || "").trim().toLowerCase();
-  const color = STATUS_COLORS[key] || "#DCDBD6";
+function getStatusStyle(status, statuses) {
+  const key = normalizeStatusId(status);
+  let color;
+  if (statuses && statuses.length) {
+    const def = statuses.find((s) => s.status_id === key);
+    color = def?.color || STATUS_COLORS[key] || "#DCDBD6";
+  } else {
+    color = STATUS_COLORS[key] || "#DCDBD6";
+  }
   const alpha = STATUS_ALPHA[key] || 0.10;
   const tint = hexToRgba(color, alpha);
   return { color, tint };
@@ -64,7 +73,7 @@ function getStatusStyle(status) {
 
 function matchesStatus(p, filter) {
   if (!filter || filter === "All Statuses") return true;
-  return (p.status || "").toLowerCase() === filter.toLowerCase();
+  return normalizeStatusId(p.status) === normalizeStatusId(filter);
 }
 
 function safeContains(hay, needle) {
@@ -108,6 +117,15 @@ export default function ProjectsPage() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [sortKey, setSortKey] = useState("recent");
+  const [manageOpen, setManageOpen] = useState(false);
+
+  // Configurable project status definitions (account-scoped)
+  const {
+    statuses, activeStatuses, archivedStatuses,
+    loading: statusesLoading,
+    reload: reloadStatuses,
+    addStatus, renameStatus, reorderStatuses, archiveStatus, unarchiveStatus,
+  } = useProjectStatuses();
 
   // New Project dialog state (canonical NewProjectDialog)
   const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
@@ -117,7 +135,7 @@ export default function ProjectsPage() {
   const [draft, setDraft] = useState({
     name: "",
     client: "",
-    status: "Prospective",
+    status: "prospective",
   });
 
   // If not null, dialog is editing an existing project
@@ -150,7 +168,7 @@ export default function ProjectsPage() {
                 id: p.id,
                 name: p.name || "Untitled Project",
                 client: p.client_name || "",
-                status: p.project_status || "Prospective",
+                status: normalizeStatusId(p.project_status || "Prospective"),
                 roomLength: p.room_length || null,
                 roomWidth: p.room_width || null,
                 roomHeight: p.room_height || null,
@@ -189,7 +207,7 @@ export default function ProjectsPage() {
                 id: p.id,
                 name: p.name || "Untitled Project",
                 client: p.client_name || "",
-                status: p.project_status || "Prospective",
+                status: normalizeStatusId(p.project_status || "Prospective"),
                 createdAt: Date.now(),
               };
             }
@@ -221,26 +239,35 @@ export default function ProjectsPage() {
     // filter
     items = items.filter((p) => matchesStatus(p, statusFilter));
 
-    // search
+    // search — project name only (case-insensitive, partial, trimmed)
     const term = (q || "").trim();
     if (term) {
-      items = items.filter(
-        (p) =>
-          safeContains(p.name, term) ||
-          safeContains(p.client, term) ||
-          safeContains(p.status, term)
-      );
+      items = items.filter((p) => safeContains(p.name, term));
     }
 
     // sort
     if (sortKey === "client") {
       items.sort((a, b) => (a.client || "").localeCompare(b.client || ""));
+    } else if (sortKey === "project_az") {
+      items.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    } else if (sortKey === "project_za") {
+      items.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
     } else {
       items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     }
 
     return items;
   }, [projects, q, statusFilter, sortKey]);
+
+  // Count projects per status_id (for archive-in-use warnings)
+  const statusUsageCounts = useMemo(() => {
+    const m = {};
+    projects.forEach((p) => {
+      const id = normalizeStatusId(p.status);
+      m[id] = (m[id] || 0) + 1;
+    });
+    return m;
+  }, [projects]);
 
   // ---- UI bits ----
   function openDialog() {
@@ -253,7 +280,7 @@ export default function ProjectsPage() {
       id: newProject.id,
       name: newProject.name || "Untitled Project",
       client: newProject.client_name || "",
-      status: newProject.project_status || "Prospective",
+      status: normalizeStatusId(newProject.project_status || "Prospective"),
       roomLength: newProject.room_length || null,
       roomWidth: newProject.room_width || null,
       roomHeight: newProject.room_height || null,
@@ -278,7 +305,7 @@ export default function ProjectsPage() {
               ...p,
               name: updated.name || p.name,
               client: updated.client_name || "",
-              status: updated.project_status || p.status,
+              status: normalizeStatusId(updated.project_status || p.status),
               roomLength: updated.room_length ?? p.roomLength,
               roomWidth: updated.room_width ?? p.roomWidth,
               roomHeight: updated.room_height ?? p.roomHeight,
@@ -527,14 +554,7 @@ export default function ProjectsPage() {
 
   function ProjectCard({ p, onEdit }) {
     const prog = holdProgress[p.id] || 0;
-    const barColor =
-      p.status === "Live"
-        ? BRAND.green
-        : p.status === "Prospective"
-        ? BRAND.amber
-        : p.status === "Lost"
-        ? BRAND.red
-        : BRAND.blue;
+    const barColor = getStatusColor(p.status, statuses);
 
     const [localStatus, setLocalStatus] = useState(p.status);
     const [statusError, setStatusError] = useState(null);
@@ -570,7 +590,7 @@ export default function ProjectsPage() {
       }
     }
 
-    const { color: statusColor, tint: statusTint } = getStatusStyle(localStatus);
+    const { color: statusColor, tint: statusTint } = getStatusStyle(localStatus, statuses);
 
     return (
       <div
@@ -672,11 +692,19 @@ export default function ProjectsPage() {
                 opacity: isSaving ? 0.6 : 1,
               }}
             >
-              {STATUS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              {(() => {
+                const opts = activeStatuses.slice();
+                const curId = normalizeStatusId(localStatus);
+                if (curId && !opts.some((s) => s.status_id === curId)) {
+                  const archived = statuses.find((s) => s.status_id === curId);
+                  if (archived) opts.push(archived);
+                }
+                return opts.map((s) => (
+                  <option key={s.status_id} value={s.status_id}>
+                    {s.label}
+                  </option>
+                ));
+              })()}
             </select>
             {statusError && (
               <div style={{ fontSize: 11, color: BRAND.red, marginTop: 4 }}>
@@ -807,7 +835,7 @@ export default function ProjectsPage() {
       {/* Controls */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
         <input
-          placeholder="Search projects…"
+          placeholder="Search project name…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           style={{
@@ -834,16 +862,44 @@ export default function ProjectsPage() {
             minWidth: 180,
           }}
         >
-          <option>All Statuses</option>
-          <option>Live</option>
-          <option>Prospective</option>
-          <option>Lost</option>
-          <option>Completed</option>
+          <option value="All Statuses">All Statuses</option>
+          {activeStatuses.map((s) => (
+            <option key={s.status_id} value={s.status_id}>
+              {s.label}
+            </option>
+          ))}
+          {archivedStatuses.length > 0 && (
+            <optgroup label="Archived">
+              {archivedStatuses.map((s) => (
+                <option key={s.status_id} value={s.status_id}>
+                  {s.label}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
+
+        <button
+          type="button"
+          onClick={() => setManageOpen(true)}
+          style={{
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: `1px solid ${BRAND.border}`,
+            background: BRAND.card,
+            color: BRAND.text,
+            fontSize: 14,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+          title="Configure project statuses"
+        >
+          Manage Statuses
+        </button>
 
         <select
           value={sortKey}
-          onChange={(e) => setSortKey(e.target.value === "client" ? "client" : "recent")}
+          onChange={(e) => setSortKey(e.target.value)}
           style={{
             padding: "12px 14px",
             borderRadius: 10,
@@ -856,6 +912,8 @@ export default function ProjectsPage() {
         >
           <option value="recent">Recently Added</option>
           <option value="client">Client A–Z</option>
+          <option value="project_az">Project A–Z</option>
+          <option value="project_za">Project Z–A</option>
         </select>
       </div>
 
@@ -1011,6 +1069,21 @@ export default function ProjectsPage() {
         onProjectUpdated={handleProjectUpdated}
       />
 
+      {/* Manage Project Statuses */}
+      <ManageStatusesDialog
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        statuses={statuses}
+        activeStatuses={activeStatuses}
+        archivedStatuses={archivedStatuses}
+        onAdd={addStatus}
+        onRename={renameStatus}
+        onReorder={reorderStatuses}
+        onArchive={archiveStatus}
+        onUnarchive={unarchiveStatus}
+        statusUsageCounts={statusUsageCounts}
+      />
+
       {/* Edit Project Modal (existing projects only) */}
       {dialogOpen && (
         <div
@@ -1089,9 +1162,9 @@ export default function ProjectsPage() {
                   onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))}
                   style={fieldStyle()}
                 >
-                  {STATUS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
+                  {activeStatuses.map((s) => (
+                    <option key={s.status_id} value={s.status_id}>
+                      {s.label}
                     </option>
                   ))}
                 </select>

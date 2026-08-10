@@ -1,0 +1,43 @@
+{
+  "name": "ProjectStatus",
+  "type": "object",
+  "description": "Configurable project workflow status definition, scoped to an account/workspace. Projects reference the stable status_id; the display label lives here.",
+  "properties": {
+    "status_id": {
+      "type": "string",
+      "description": "Stable unique status identifier (slug for defaults, generated id for custom). Referenced by Project.project_status."
+    },
+    "label": {
+      "type": "string",
+      "description": "Display label shown in UI"
+    },
+    "sort_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Order in lists (lower first)"
+    },
+    "is_archived": {
+      "type": "boolean",
+      "default": false,
+      "description": "Archived statuses are hidden from new assignment but retained on existing projects."
+    },
+    "color": {
+      "type": "string",
+      "description": "Optional hex color for badge/pill display"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Owning account/workspace ID. Statuses are scoped per account \u2014 one dealer's custom statuses never appear for another."
+    },
+    "is_default": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this is a seeded default status (Live/Prospective/Lost/Completed)."
+    }
+  },
+  "required": [
+    "status_id",
+    "label",
+    "account_id"
+  ]
+}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { normalizeStatusId, getStatusLabel } from "@/components/projects/statusDefaults";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -52,7 +53,9 @@ function ProjectStatusPill({ value }) {
     lost: "#4A230F",
     completed: "#C1B6AD",
   };
-  const color = colorMap[(value || "").toLowerCase()] || BRAND.subtext;
+  const id = normalizeStatusId(value);
+  const color = colorMap[id] || BRAND.subtext;
+  const label = getStatusLabel(value, []);
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,
@@ -61,7 +64,7 @@ function ProjectStatusPill({ value }) {
       background: BRAND.card, fontSize: 11, fontWeight: 600, color,
     }}>
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: color }} />
-      {value || "—"}
+      {label || "—"}
     </span>
   );
 }
