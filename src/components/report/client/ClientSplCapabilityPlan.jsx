@@ -44,6 +44,14 @@ const ROLE_COLORS = {
 
 const SCREEN_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 
+// Listener-layer (bed-layer) non-screen roles shown in the P13 client drawing.
+// Upper / overhead roles (TFL, TFR, TML, TMR, TRL, TRR, TBL, TBR, TFM, TRM, …)
+// are intentionally excluded from the P13 visual to avoid floor-projected
+// clutter in the 2D plan. P13 calculation authority is unaffected.
+const LISTENER_LAYER_NON_SCREEN_ROLES = new Set([
+  "SL", "SR", "SBL", "SBR", "LW", "RW",
+]);
+
 function canonicalize(role) {
   const r = String(role || "").toUpperCase();
   if (r === "L") return "FL";
@@ -111,7 +119,9 @@ export default function ClientSplCapabilityPlan({
       .map((s) => {
         const canon = canonicalize(s.role);
         const isScreen = SCREEN_ROLES.has(canon);
-        const show = mode === "screen" ? isScreen : !isScreen;
+        const show = mode === "screen"
+          ? isScreen
+          : LISTENER_LAYER_NON_SCREEN_ROLES.has(canon);
         if (!show) return null;
         return { role: canon, x: Number(s.position.x), y: Number(s.position.y) };
       })
@@ -158,7 +168,7 @@ export default function ClientSplCapabilityPlan({
         y1={screenLeftPx.py}
         x2={screenRightPx.px}
         y2={screenRightPx.py}
-        stroke="#3E4349"
+        stroke="#625143"
         strokeWidth={5}
         strokeLinecap="round"
       />
