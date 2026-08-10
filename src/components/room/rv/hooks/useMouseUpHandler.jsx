@@ -45,18 +45,33 @@ export function useMouseUpHandler({
   // RSP marker draft commit
   mlpDragInfo,
   onSetManualRspY_m,
+  onSetManualRspX_m,
+  onSetRspMode,
 }) {
   const handleMouseUp = useCallback((e) => {
-    // RSP marker drag: commit the final draft Y once on release.
+    // RSP marker drag: commit the final draft {x, y} once on release.
+    // On first committed drag from AUTO, switch to manual_position so both
+    // X and Y are persisted and the green dot remains the canonical RSP.
     if (dragType === "mlpMarker") {
+      const finalX = mlpDragInfo?.x;
       const finalY = mlpDragInfo?.y;
-      if (Number.isFinite(finalY) && typeof onSetManualRspY_m === "function") {
+      const hasX = Number.isFinite(finalX);
+      const hasY = Number.isFinite(finalY);
+      if (hasY && typeof onSetManualRspY_m === "function") {
         onSetManualRspY_m(finalY);
+      }
+      if (hasX && typeof onSetManualRspX_m === "function") {
+        onSetManualRspX_m(finalX);
+      }
+      // Switch to manual_position on first committed drag so the persisted
+      // coordinates become the canonical RSP authority.
+      if ((hasX || hasY) && typeof onSetRspMode === "function") {
+        onSetRspMode("manual_position");
       }
       recordTemporaryP18P19DragEnd({
         dragEndCount: ++temporaryRSPDragEndCount,
-        committedRspCoordinate: Number.isFinite(finalY) ? { x: null, y: finalY, z: 1.2 } : null,
-        exactStateSetter: "onSetManualRspY_m (commit on release)",
+        committedRspCoordinate: hasY ? { x: hasX ? finalX : null, y: finalY, z: 1.2 } : null,
+        exactStateSetter: "onSetManualRspX_m + onSetManualRspY_m (commit on release)",
       });
     }
 
@@ -189,7 +204,7 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions, mlpDragInfo, onSetManualRspY_m]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions, mlpDragInfo, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode]);
 
   return { handleMouseUp };
 }

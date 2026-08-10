@@ -61,13 +61,15 @@ export function useMlpCalculation({
   roomLengthM,
   seatingBlockOffset, // retained in signature for caller compatibility; no longer affects RSP lock
   lockedMlpY,        // authoritative RSP Y (screen-derived or manual); always wins when finite
+  lockedMlpX,        // authoritative RSP X (manual off-centre); falls back to centreline when null
 }) {
   const mlp = useMemo(() => {
     // ── RSP LOCK: if lockedMlpY is finite, always use it.
     // seatingBlockOffset (Front Row Distance) does NOT affect this lock.
     if (Number.isFinite(lockedMlpY)) {
       const cx = Number.isFinite(roomWidthM) ? roomWidthM / 2 : 0;
-      return { x: cx, y: clampMlpY(lockedMlpY, roomLengthM), z: 1.2 };
+      const x = Number.isFinite(lockedMlpX) ? lockedMlpX : cx;
+      return { x, y: clampMlpY(lockedMlpY, roomLengthM), z: 1.2 };
     }
 
     // 1) Explicit mlpPoint — only used when lockedMlpY is not available
@@ -104,6 +106,7 @@ export function useMlpCalculation({
     roomWidthM,
     roomLengthM,
     lockedMlpY,
+    lockedMlpX,
   ]);
 
   return mlp;

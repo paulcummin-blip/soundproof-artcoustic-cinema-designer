@@ -2,8 +2,10 @@
  * RvMlpMarker
  *
  * Renders the green RSP dot on the plan canvas.
- * When rspMode === "manual_position", the dot becomes draggable and shows
- * a grab-cursor + pulse ring as a visual affordance.
+ * The dot is ALWAYS draggable — the user can initiate dragging from the
+ * current AUTO position. On first committed drag, the mode switches to
+ * manual_position (handled by useMouseUpHandler).
+ * A grab-cursor + pulse ring is shown as a visual affordance in all modes.
  */
 import React from "react";
 
@@ -22,45 +24,41 @@ export default function RvMlpMarker({
   const isManual = rspMode === "manual_position";
 
   return (
-    <g data-testid="mlp-marker" style={{ pointerEvents: isManual ? "all" : "none" }}>
+    <g data-testid="mlp-marker" style={{ pointerEvents: "all" }}>
       {/* Invisible oversized hit target — ensures easy grab even at zoom */}
-      {isManual && (
-        <circle
-          cx={x}
-          cy={y}
-          r={14}
-          fill="transparent"
-          pointerEvents="all"
-          style={{ cursor: "grab" }}
-          onMouseDown={onMouseDown}
-        />
-      )}
+      <circle
+        cx={x}
+        cy={y}
+        r={14}
+        fill="transparent"
+        pointerEvents="all"
+        style={{ cursor: "grab" }}
+        onMouseDown={onMouseDown}
+      />
 
-      {/* Pulse ring — only shown in manual mode as drag affordance */}
-      {isManual && (
-        <circle
-          cx={x}
-          cy={y}
-          r={10}
-          fill="none"
-          stroke="#22c55e"
-          strokeWidth={1.5}
-          opacity={0.4}
-          pointerEvents="none"
-        />
-      )}
+      {/* Pulse ring — drag affordance, shown in all modes */}
+      <circle
+        cx={x}
+        cy={y}
+        r={10}
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth={1.5}
+        opacity={isManual ? 0.4 : 0.25}
+        pointerEvents="none"
+      />
 
       {/* Main dot */}
       <circle
         cx={x}
         cy={y}
-        r={isManual ? 6 : 4}
+        r={isManual ? 6 : 5}
         fill="#22c55e"
         stroke="#ffffff"
         strokeWidth={2}
         opacity={0.9}
         pointerEvents="none"
-        style={{ cursor: isManual ? "grab" : "default" }}
+        style={{ cursor: "grab" }}
       />
 
       {/* Label */}

@@ -186,6 +186,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     rspMode = 'auto_from_screen',
     manualRspY_m,
     onSetManualRspY_m,
+    manualRspX_m,
+    onSetManualRspX_m,
+    onSetRspMode,
     allSeatSplMetrics: allSeatSplMetricsProp = null,
     speakerPositionsView = 'off',
     showMlpRuler = false,
@@ -281,17 +284,22 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     return Math.max(minY, Math.min(maxY, y));
   };
 
-  // The fixed RSP is always the pure 57.5° position from screen, independent of seat offset.
-  // useEffectiveRsp is the single read-path: manual_position wins when manualRspY_m is finite.
-  const { effectiveRspY_m } = useEffectiveRsp({
+  // The fixed RSP is the canonical green dot. useEffectiveRsp is the single
+  // read-path: manual_position wins when manualRspY_m is finite.
+  // Both X and Y are resolved here — X is room centreline in AUTO, or
+  // manualRspX_m in manual_position.
+  const { effectiveRspY_m, effectiveRspX_m } = useEffectiveRsp({
     rspMode,
     manualRspY_m,
+    manualRspX_m,
+    roomWidthM: widthM,
     screenFrontPlaneM: Number.isFinite(Number(appState?.screenFrontPlaneM)) ? Number(appState.screenFrontPlaneM) : 0,
     screenWidthM: Number(screen?.visibleWidthM ?? (Number(screen?.visibleWidthInches || 100) * 0.0254)),
     currentMlpY_m: appState?.mlpY_m ?? null,
     rowDerivedRspYByMode: {},
   });
   const _fixedRspY = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : undefined;
+  const _fixedRspX = Number.isFinite(effectiveRspX_m) ? effectiveRspX_m : undefined;
 
   const mlp = useMlpCalculation({
     mlpPoint,
@@ -301,6 +309,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     roomLengthM: lengthM,
     seatingBlockOffset: 0, // always treat as 0 so lockedMlpY wins (fixed RSP dot)
     lockedMlpY: _fixedRspY,
+    lockedMlpX: _fixedRspX,
   });
   const mlpDotX_m = mlp.x;
   const mlpDotY_m = mlp.y;
@@ -1203,7 +1212,6 @@ const byId = useEntitiesById({
     canvasToRoom,
     lengthM,
     widthM,
-    mlpDotX_m,
     setMlpDragInfo,
     dragOffsetRoomRef,
   });
@@ -1496,6 +1504,8 @@ const byId = useEntitiesById({
     commitDraftSpeakerPositions,
     mlpDragInfo,
     onSetManualRspY_m,
+    onSetManualRspX_m,
+    onSetRspMode,
   });
 
   // Wrap mouseup so mlpDragActiveRef is always cleared, regardless of drag type
@@ -1960,16 +1970,17 @@ useEffect(() => {
     handleMouseDown(e, 'mlp-marker-dot', 'mlpMarker');
   }, [handleMouseDown]);
 
-  // During RSP drag, render the marker from the draft Y (mlpDragInfo) so it
+  // During RSP drag, render the marker from the draft {x, y} (mlpDragInfo) so it
   // follows the pointer live without triggering the canonical RSP authority
   // chain (useEffectiveRsp → mlpY_m → seat responses → RP22).
   const _mlpMarkerDragging = dragType === 'mlpMarker' && mlpDragInfo?.visible && Number.isFinite(mlpDragInfo?.y);
   const _mlpMarkerY = _mlpMarkerDragging ? mlpDragInfo.y : mlpDotY_m;
+  const _mlpMarkerX = (_mlpMarkerDragging && Number.isFinite(mlpDragInfo?.x)) ? mlpDragInfo.x : mlpDotX_m;
 
   const MLPMarker = (
     <RvMlpMarker
       toPx={toPx}
-      mlpDotX_m={mlpDotX_m}
+      mlpDotX_m={_mlpMarkerX}
       mlpDotY_m={_mlpMarkerY}
       _overlays={_overlays}
       exportMode={exportMode}
