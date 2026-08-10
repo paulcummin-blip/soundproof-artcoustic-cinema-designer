@@ -11,6 +11,7 @@ import { useRspState } from "@/components/state/useRspState";
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import { validateInstances, bassInputAdapter, normaliseLegacySubwoofers } from "@/components/utils/subwooferInstanceMigration";
 import { migrateP12Mode, P12_MODE_MINIMUM, P12_MODE_RECOMMENDED } from "@/components/utils/p12ModeAuthority";
+import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 
 // Stage 2: Restore canonical subwoofer instances from a local autosave payload.
 // Four-way logic:
@@ -786,6 +787,22 @@ function useDesignerState() {
       ? __autosavePayload.viewingPriority
       : "balanced"
   ));
+
+  // Keep the project-scoped priority valid as rows are added/removed.
+  // This runs in the provider (not only in the dropdown) so stale values are
+  // corrected even when the Seating Layout panel is collapsed.
+  const viewingPriorityRowCount = useMemo(() => {
+    const configuredRows = Array.isArray(seatsPerRowByRow) ? seatsPerRowByRow.length : 0;
+    const declaredRows = Number.isFinite(Number(seatingRows)) ? Number(seatingRows) : 0;
+    const liveRows = Array.isArray(seatingPositions)
+      ? seatingPositions.reduce((max, seat) => Math.max(max, Number(seat?.rowNumber) || 1), 0)
+      : 0;
+    return Math.max(1, configuredRows, declaredRows, liveRows);
+  }, [seatsPerRowByRow, seatingRows, seatingPositions]);
+
+  useEffect(() => {
+    setViewingPriority((current) => normaliseViewingPriority(current, viewingPriorityRowCount));
+  }, [viewingPriorityRowCount]);
   // ── END VIEWING PRIORITY ───────────────────────────────────────────────────
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
