@@ -18,10 +18,36 @@ import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine"
 import { useAppDesignRating } from "@/components/hooks/useAppDesignRating";
 import {
   buildDesignRecommendationCandidates,
+  isViewingGeometryCandidate,
   rankDesignRecommendations,
 } from "./designRecommendationCandidates";
+import { buildPerRowViewingData } from "@/components/utils/viewingAngleUtils";
+import {
+  buildViewingPrioritySummary,
+  normaliseViewingPriority,
+} from "@/components/utils/viewingPriorityAuthority";
 
 const EMPTY_SELECTIONS = Object.freeze({});
+
+function viewingSummaryPublicationSnapshot(summary) {
+  if (!summary) return null;
+  return {
+    priorityMode: summary.priorityMode || null,
+    worstRowLevel: summary.worstRowLevel || null,
+    bestRowLevel: summary.bestRowLevel || null,
+    levelSpread: summary.levelSpread ?? null,
+    angleSpreadDeg: summary.angleSpreadDeg ?? null,
+    totalDeviationFrom57_5: summary.totalDeviationFrom57_5 ?? null,
+    rows: Array.isArray(summary.rows)
+      ? summary.rows.map((row) => ({
+          rowNumber: row?.rowNumber ?? null,
+          viewingAngleDeg: row?.viewingAngleDeg ?? null,
+          viewingDistanceM: row?.viewingDistanceM ?? null,
+          rp23Level: row?.rp23Level || null,
+        }))
+      : [],
+  };
+}
 
 function recommendationItemPublicationSnapshot(item) {
   return {
@@ -48,6 +74,11 @@ function recommendationItemPublicationSnapshot(item) {
     p12Level: item?.p12Level || null,
     p12BaselineLevel: item?.p12BaselineLevel || null,
     caveat: item?.caveat || null,
+    viewingBefore: viewingSummaryPublicationSnapshot(item?.viewingBefore),
+    viewingAfter: viewingSummaryPublicationSnapshot(item?.viewingAfter),
+    viewingComparison: item?.viewingComparison || null,
+    viewingPriorityMode: item?.viewingPriorityMode || null,
+    viewingTradeoff: item?.viewingTradeoff === true,
   };
 }
 
@@ -216,6 +247,53 @@ export default function DesignRecommendationEngine({
     allowUkPricing,
   ]);
 
+  const viewingContext = useMemo(() => {
+    const planeCandidates = [
+      Number(appState?.screenFrontPlaneM),
+      Number(screen?.screenPlaneY_m),
+      Number(screen?.floatDepthM),
+      0,
+    ];
+    const screenFrontPlaneM = planeCandidates.find((value) => Number.isFinite(value));
+    const beforeRows = buildPerRowViewingData({
+      seatingPositions: seats,
+      screen,
+      screenFrontPlaneM,
+    });
+
+    // Stage D is intentionally inert for one-row projects.
+    if (beforeRows.length < 2) return null;
+
+    const priorityMode = normaliseViewingPriority(
+      appState?.viewingPriority,
+      beforeRows.length
+    );
+    const before = buildViewingPrioritySummary(beforeRows, priorityMode);
+    const afterByCandidateId = {};
+
+    for (const candidate of candidates) {
+      if (!isViewingGeometryCandidate(candidate)) continue;
+      const afterRows = buildPerRowViewingData({
+        seatingPositions: candidate.seats,
+        screen: candidate.screen,
+        screenFrontPlaneM,
+      });
+      if (afterRows.length < 2) continue;
+      afterByCandidateId[candidate.id] = buildViewingPrioritySummary(
+        afterRows,
+        priorityMode
+      );
+    }
+
+    return { priorityMode, before, afterByCandidateId };
+  }, [
+    appState?.screenFrontPlaneM,
+    appState?.viewingPriority,
+    candidates,
+    screen,
+    seats,
+  ]);
+
   const candidateSignature = useMemo(
     () => candidates.map((candidate) => candidate.id).join("|"),
     [candidates]
@@ -261,7 +339,11 @@ export default function DesignRecommendationEngine({
   const isSettled = candidateCount === 0 || completedCount >= candidateCount;
 
   const recommendations = useMemo(() => ({
-    ...rankDesignRecommendations({ baselineRating, evaluatedCandidates }),
+    ...rankDesignRecommendations({
+      baselineRating,
+      evaluatedCandidates,
+      viewingContext,
+    }),
     candidateCount,
     completedCount,
     pendingCount,
@@ -274,7 +356,15 @@ export default function DesignRecommendationEngine({
     // one candidate, which is not a settled-state authority.
     isEvaluating: candidateCount > 0 && completedCount === 0,
     bassScenarioPolicy: "Current verified bass result held constant; subwoofer alternatives are not evaluated in V1.",
-  }), [baselineRating, evaluatedCandidates, candidateCount, completedCount, pendingCount, isSettled]);
+  }), [
+    baselineRating,
+    evaluatedCandidates,
+    viewingContext,
+    candidateCount,
+    completedCount,
+    pendingCount,
+    isSettled,
+  ]);
 
   // Candidate inputs can be recreated with equivalent values when a parent
   // renders. Do not publish an equivalent recommendation object back to that
