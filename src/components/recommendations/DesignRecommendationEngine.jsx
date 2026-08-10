@@ -28,6 +28,7 @@ import {
 } from "@/components/utils/viewingPriorityAuthority";
 
 const EMPTY_SELECTIONS = Object.freeze({});
+const LCR_EVALUATION_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 
 function viewingSummaryPublicationSnapshot(summary) {
   if (!summary) return null;
@@ -74,6 +75,13 @@ function recommendationItemPublicationSnapshot(item) {
     p12Level: item?.p12Level || null,
     p12BaselineLevel: item?.p12BaselineLevel || null,
     caveat: item?.caveat || null,
+    recommendationDirection: item?.recommendationDirection || null,
+    materialUpgradeLabel: item?.materialUpgradeLabel || null,
+    lcrPowerBeforeW: item?.lcrPowerBeforeW ?? null,
+    lcrPowerAfterW: item?.lcrPowerAfterW ?? null,
+    amplifierUpgradeRequired: item?.amplifierUpgradeRequired === true,
+    amplifierCostIncluded: item?.amplifierCostIncluded === true,
+    physicalFit: item?.physicalFit || null,
     viewingBefore: viewingSummaryPublicationSnapshot(item?.viewingBefore),
     viewingAfter: viewingSummaryPublicationSnapshot(item?.viewingAfter),
     viewingComparison: item?.viewingComparison || null,
@@ -106,10 +114,47 @@ function CandidateRatingEvaluator({
     dolbyPreset: candidate.dolbyLayout,
   });
 
+  const candidateAppState = useMemo(() => {
+    const proposedPowerW = Number(candidate?.lcrPowerAfterW);
+    if (!candidate?.amplifierUpgradeRequired || !Number.isFinite(proposedPowerW) || proposedPowerW <= 0) {
+      return appState;
+    }
+
+    const baseGetEffectiveSplInputs = appState?.getEffectiveSplInputs;
+    return {
+      ...appState,
+      splConfig: {
+        ...(appState?.splConfig || {}),
+        lcrW: proposedPowerW,
+      },
+      getEffectiveSplInputs: (role) => {
+        const baseInputs = baseGetEffectiveSplInputs?.(role) || {
+          powerW: Number(appState?.splConfig?.lcrW) || 100,
+          eqHeadroomDb: Number(appState?.splConfig?.globalEqHeadroomDb) || 0,
+          radiationMode: appState?.splConfig?.radiationMode || "half-space",
+        };
+        if (!LCR_EVALUATION_ROLES.has(String(role || "").toUpperCase())) return baseInputs;
+
+        const currentRolePowerW = Number(baseInputs?.powerW);
+        return {
+          ...baseInputs,
+          powerW: Math.max(
+            Number.isFinite(currentRolePowerW) && currentRolePowerW > 0 ? currentRolePowerW : 100,
+            proposedPowerW
+          ),
+        };
+      },
+    };
+  }, [
+    appState,
+    candidate?.amplifierUpgradeRequired,
+    candidate?.lcrPowerAfterW,
+  ]);
+
   const seatSplMetrics = useAllSeatSplMetrics({
     _seatingPositions: candidate.seats,
     analysisSpeakers,
-    appState,
+    appState: candidateAppState,
     mlpAnchorEffective: candidate.mlpPoint,
     getSpeakerModelMeta,
   });
@@ -236,6 +281,7 @@ export default function DesignRecommendationEngine({
     mlpPoint,
     soundbarSelections: safeSoundbarSelections,
     allowUkPricing,
+    lcrPowerW: appState?.splConfig?.lcrW,
   }), [
     seats,
     placedSpeakers,
@@ -245,6 +291,7 @@ export default function DesignRecommendationEngine({
     mlpPoint,
     safeSoundbarSelections,
     allowUkPricing,
+    appState?.splConfig?.lcrW,
   ]);
 
   const viewingContext = useMemo(() => {
