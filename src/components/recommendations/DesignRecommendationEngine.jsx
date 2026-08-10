@@ -55,13 +55,37 @@ function CandidateRatingEvaluator({
     getSpeakerModelMeta,
   });
 
+  const primarySeatingPosition = useMemo(() => {
+    if (!Array.isArray(candidate.seats) || candidate.seats.length === 0) return null;
+    const anchor = candidate.mlpPoint;
+    if (!anchor || !Number.isFinite(Number(anchor.y))) return candidate.seats[0] || null;
+    let closest = null;
+    let minimumDistance = Infinity;
+    for (const seat of candidate.seats) {
+      const distance = Math.hypot(
+        (Number(seat?.x) || 0) - (Number(anchor.x) || 0),
+        (Number(seat?.y) || 0) - Number(anchor.y)
+      );
+      if (distance < minimumDistance) {
+        minimumDistance = distance;
+        closest = seat;
+      }
+    }
+    return closest
+      ? { ...closest, x: Number(dimensions?.width) / 2 }
+      : null;
+  }, [candidate.seats, candidate.mlpPoint, dimensions?.width]);
+
   const analysisResult = useRP22AnalysisEngine({
     diagnosticOwner: `asdr-recommendation:${candidate.id}`,
-    placedSpeakers: analysisSpeakers,
+    placedSpeakers: candidate.placedSpeakers,
     visiblePlanSpeakers: analysisSpeakers,
     seatingPositions: candidate.seats,
+    primarySeatingPosition,
     dimensions,
     mlpBasis: "front",
+    sevenBedLayoutType: appState?.sevenBedLayoutType,
+    extraSurroundCount: appState?.extraSurroundCount,
     mlpPointOverride: candidate.mlpPoint,
     seatSplMetrics,
     p15ConstructionLevel: appState?.p15ConstructionLevel,
