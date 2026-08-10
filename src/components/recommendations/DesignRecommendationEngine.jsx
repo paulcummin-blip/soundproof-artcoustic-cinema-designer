@@ -118,6 +118,15 @@ function CandidateRatingEvaluator({
     rating?.coveragePercent,
   ]);
 
+  // A malformed or temporarily unavailable candidate must not hold the whole
+  // recommendation panel in a permanent loading state. Valid results replace
+  // this settled-null marker if they become available later.
+  useEffect(() => {
+    if (rating) return undefined;
+    const timeoutId = window.setTimeout(() => onResult(candidate, null), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [candidate.id, onResult, Boolean(rating)]);
+
   return null;
 }
 
