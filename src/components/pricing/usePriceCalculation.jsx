@@ -84,7 +84,7 @@ function getModelLabel(modelKey) {
   return meta?.notFound ? String(modelKey) : (meta?.label || String(modelKey));
 }
 
-function getCommercialPrice(modelKey, soundbarSelections = {}) {
+export function getCommercialPrice(modelKey, soundbarSelections = {}) {
   const key = normaliseModelKey(modelKey);
   const soundbarOptions = SOUNDBAR_PRICE_OPTIONS[key];
 
