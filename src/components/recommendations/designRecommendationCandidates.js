@@ -91,6 +91,7 @@ export function buildDesignRecommendationCandidates({
   mlpPoint = null,
   soundbarSelections = {},
   allowUkPricing = true,
+  lcrPowerW = 100,
 }) {
   const candidates = [];
   const safeSeats = Array.isArray(seats) ? seats : [];
@@ -155,7 +156,11 @@ export function buildDesignRecommendationCandidates({
     }
   }
 
-  // LCR selection: nearest cheaper and nearest dearer compatible discrete model.
+  // LCR selection:
+  // - keep the existing single nearest-cheaper cost-down candidate;
+  // - evaluate every registry-backed stronger compatible discrete LCR model.
+  // Stronger products are not score-estimated here: each scenario still runs
+  // through the canonical SPL → RP22 → ASDR chain below.
   const currentLcr = safeSpeakers.filter((speaker) => LCR_ROLES.has(roleOf(speaker)));
   const currentKeys = currentLcr.map((speaker) => normaliseModelKey(speaker?.model)).filter(Boolean);
   const canCompareDiscreteLcr = currentLcr.length >= 3 && currentKeys.length === currentLcr.length;
@@ -166,6 +171,9 @@ export function buildDesignRecommendationCandidates({
           return sum == null || !finite(price) ? null : sum + Number(price);
         }, 0)
       : null;
+    const currentLcrPowerW = finite(lcrPowerW) && Number(lcrPowerW) > 0
+      ? Number(lcrPowerW)
+      : 100;
 
     const currentRepresentative = getSpeakerModelMeta(currentKeys[0]);
     const currentCapability = Number(currentRepresentative?.max_spl_cont_db_1m_halfspace ?? currentRepresentative?.max_spl ?? 0);
@@ -177,6 +185,7 @@ export function buildDesignRecommendationCandidates({
         model,
         price: allowUkPricing ? priceForModel(model.key, soundbarSelections) : null,
         capability: Number(model.max_spl_cont_db_1m_halfspace ?? model.max_spl ?? 0),
+        maxPowerW: finite(model.max_power) ? Number(model.max_power) : null,
       }))
       .filter((entry) => !currentKeys.includes(entry.model.key));
 
@@ -187,28 +196,63 @@ export function buildDesignRecommendationCandidates({
       : null;
     const stronger = discreteModels
       .filter((entry) => entry.capability > currentCapability)
-      .sort((a, b) => (a.capability - b.capability) || ((Number(a.price) || Infinity) - (Number(b.price) || Infinity)))[0];
+      .sort((a, b) => (a.capability - b.capability) || ((Number(a.price) || Infinity) - (Number(b.price) || Infinity)));
 
-    for (const entry of [cheaper, stronger]) {
-      if (!entry) continue;
+    const lcrSelections = [
+      ...(cheaper ? [{ entry: cheaper, direction: "cost-down", powerAfterW: currentLcrPowerW }] : []),
+      ...stronger.map((entry) => ({
+        entry,
+        direction: "upgrade",
+        // The canonical SPL engine independently clamps this to the model's
+        // registry power handling. No arbitrary wattage tiers are invented.
+        powerAfterW: finite(entry.maxPowerW)
+          ? Math.max(currentLcrPowerW, Number(entry.maxPowerW))
+          : currentLcrPowerW,
+      })),
+    ];
+
+    for (const { entry, direction, powerAfterW } of lcrSelections) {
       const nextSpeakers = safeSpeakers.map((speaker) =>
         LCR_ROLES.has(roleOf(speaker)) ? { ...speaker, model: entry.model.key } : speaker
       );
       const nextCost = finite(entry.price) ? Number(entry.price) * currentLcr.length : null;
+      const amplifierUpgradeRequired = direction === "upgrade" && powerAfterW > currentLcrPowerW;
+      const powerSuffix = direction === "upgrade"
+        ? `:amp-${Math.round(currentLcrPowerW)}-${Math.round(powerAfterW)}`
+        : "";
+
       pushCandidate(candidates, {
-        id: `lcr:${entry.model.key}`,
+        id: `lcr:${entry.model.key}${powerSuffix}`,
         kind: "lcr",
+        recommendationDirection: direction,
         title: `Use ${entry.model.label} for LCR`,
-        description: "Changes all three discrete screen channels to the same model.",
+        description: amplifierUpgradeRequired
+          ? `Changes all three discrete screen channels and evaluates ${Math.round(powerAfterW)} W/ch LCR amplification.`
+          : "Changes all three discrete screen channels to the same model.",
         seats: safeSeats,
         placedSpeakers: nextSpeakers,
         screen,
         dolbyLayout,
         mlpPoint,
         costDeltaExVat: finite(currentCost) && finite(nextCost) ? nextCost - currentCost : null,
+        lcrQuantity: currentLcr.length,
+        speakerUnitPriceExVat: finite(entry.price) ? Number(entry.price) : null,
+        currentModelCapabilityDb: currentCapability,
+        candidateModelCapabilityDb: entry.capability,
+        lcrPowerBeforeW: currentLcrPowerW,
+        lcrPowerAfterW: powerAfterW,
+        amplifierUpgradeRequired,
+        amplifierCostIncluded: false,
+        physicalFit: {
+          widthMm: finite(entry.model.widthMm) ? Number(entry.model.widthMm) : null,
+          heightMm: finite(entry.model.heightMm) ? Number(entry.model.heightMm) : null,
+          depthMm: finite(entry.model.depthMm) ? Number(entry.model.depthMm) : null,
+        },
         disruption: "Low",
         confidence: "High",
-        caveat: null,
+        caveat: amplifierUpgradeRequired
+          ? `Requires LCR amplification to increase from ${Math.round(currentLcrPowerW)} W/ch to ${Math.round(powerAfterW)} W/ch. Amplifier hardware cost is not included.`
+          : null,
       });
     }
   }
