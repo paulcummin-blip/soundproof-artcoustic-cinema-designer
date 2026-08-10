@@ -23,6 +23,34 @@ import {
 
 const EMPTY_SELECTIONS = Object.freeze({});
 
+function recommendationItemPublicationSnapshot(item) {
+  return {
+    id: item?.id || null,
+    kind: item?.kind || null,
+    title: item?.title || null,
+    currentPercentage: item?.currentPercentage ?? null,
+    newPercentage: item?.newPercentage ?? null,
+    scoreDelta: item?.scoreDelta ?? null,
+    scoreDeltaPoints: item?.scoreDeltaPoints ?? null,
+    costDeltaExVat: item?.costDeltaExVat ?? null,
+    savingExVat: item?.savingExVat ?? null,
+    affectedParameters: Array.isArray(item?.affectedParameters) ? item.affectedParameters : [],
+    parameterLevelChanges: Array.isArray(item?.parameterLevelChanges)
+      ? item.parameterLevelChanges.map((change) => ({
+          display: change?.display || null,
+          beforeLevel: change?.beforeLevel || null,
+          afterLevel: change?.afterLevel || null,
+        }))
+      : [],
+    priorityLabel: item?.priorityLabel || null,
+    disruption: item?.disruption || null,
+    confidence: item?.confidence || null,
+    p12Level: item?.p12Level || null,
+    p12BaselineLevel: item?.p12BaselineLevel || null,
+    caveat: item?.caveat || null,
+  };
+}
+
 function CandidateRatingEvaluator({
   candidate,
   appState,
@@ -254,7 +282,16 @@ export default function DesignRecommendationEngine({
   // parent: setter -> parent render -> rebuilt candidates -> setter otherwise
   // forms a self-sustaining report/Room Designer render loop.
   const recommendationPublicationSignature = useMemo(
-    () => JSON.stringify(recommendations),
+    () => JSON.stringify({
+      candidateCount: recommendations.candidateCount,
+      completedCount: recommendations.completedCount,
+      pendingCount: recommendations.pendingCount,
+      evaluatedCount: recommendations.evaluatedCount,
+      isSettled: recommendations.isSettled,
+      isEvaluating: recommendations.isEvaluating,
+      improvements: recommendations.improvements.map(recommendationItemPublicationSnapshot),
+      savings: recommendations.savings.map(recommendationItemPublicationSnapshot),
+    }),
     [recommendations]
   );
   const lastPublishedRecommendationSignatureRef = useRef(null);
