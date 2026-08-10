@@ -271,6 +271,7 @@ export function buildDesignRecommendationCandidates({
         id: `lcr:${entry.model.key}${powerSuffix}`,
         kind: "lcr",
         recommendationDirection: direction,
+        candidateModelKey: entry.model.key,
         title: `Use ${entry.model.label} for LCR`,
         description: amplifierUpgradeRequired
           ? `Changes all three discrete screen channels and evaluates ${Math.round(powerAfterW)} W/ch LCR amplification.`
@@ -294,7 +295,7 @@ export function buildDesignRecommendationCandidates({
           heightMm: finite(entry.model.heightMm) ? Number(entry.model.heightMm) : null,
           depthMm: finite(entry.model.depthMm) ? Number(entry.model.depthMm) : null,
         },
-        disruption: "Low",
+        disruption: amplifierUpgradeRequired ? "Medium" : "Low",
         confidence: "High",
         caveat: amplifierUpgradeRequired
           ? `Includes LCR amplification increase from ${Math.round(currentLcrPowerW)} W/ch to ${Math.round(powerAfterW)} W/ch. Amplifier hardware cost is not included.`
@@ -581,9 +582,24 @@ export function rankDesignRecommendations({
       return b.scoreDelta - a.scoreDelta;
     });
 
+  // Multiple power scenarios for one speaker model are evaluated, but only
+  // the best one may occupy the shortlist. A powered variant remains visible
+  // when it solves a better RP22 profile; an equivalent result is represented
+  // by the lower-disruption model-only scenario.
+  const shortlistedImprovements = [];
+  const shortlistedLcrModels = new Set();
+  for (const item of rankedImprovements) {
+    if (item.kind === "lcr" && item.recommendationDirection === "upgrade") {
+      const modelKey = item.candidateModelKey || item.title;
+      if (shortlistedLcrModels.has(modelKey)) continue;
+      shortlistedLcrModels.add(modelKey);
+    }
+    shortlistedImprovements.push(item);
+    if (shortlistedImprovements.length >= 3) break;
+  }
+
   let bestMaterialLcrMarked = false;
-  const improvements = rankedImprovements
-    .slice(0, 3)
+  const improvements = shortlistedImprovements
     .map((item) => {
       if (item.kind !== "lcr" || item.recommendationDirection !== "upgrade") return item;
       const materialUpgradeLabel = bestMaterialLcrMarked
