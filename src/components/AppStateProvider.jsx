@@ -649,6 +649,7 @@ function useDesignerState() {
   const [screenPlaneLocked, setScreenPlaneLocked] = useState(false);
   const [lockedScreenFrontPlaneM, setLockedScreenFrontPlaneM] = useState(null);
   const [mlpY_m, setMlpY_m] = useState(null);
+  const [mlpX_m, setMlpX_m] = useState(null);
   const [rowCentersM, _setRowCentersM] = useState([]);
 
   const setRowCentersM = useCallback(
@@ -776,7 +777,7 @@ function useDesignerState() {
   }, []);
 
   // ── RSP STATE (composed from isolated hook) ──────────────────────────────
-  const { rspMode, setRspMode, manualRspY_m, setManualRspY_m, resetRspState } = useRspState(__autosavePayload);
+  const { rspMode, setRspMode, manualRspY_m, setManualRspY_m, manualRspX_m, setManualRspX_m, resetRspState } = useRspState(__autosavePayload);
   // ── END RSP STATE ─────────────────────────────────────────────────────────
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
@@ -1536,6 +1537,7 @@ function useDesignerState() {
       extraSurroundCount,
       rsp_mode: rspMode,
       manual_rsp_y_m: manualRspY_m,
+      manual_rsp_x_m: manualRspX_m,
       designEqEnabled,
       p12Mode,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
@@ -1959,6 +1961,7 @@ function useDesignerState() {
     screenPlaneLocked, setScreenPlaneLocked,
     lockedScreenFrontPlaneM, setLockedScreenFrontPlaneM,
     mlpY_m, setMlpY_m,
+    mlpX_m, setMlpX_m,
     rowCentersM, setRowCentersM,
     overheadGlobalModel, setOverheadGlobalModel,
     overheadFrontOverride, setOverheadFrontOverride,
@@ -2015,6 +2018,8 @@ function useDesignerState() {
     setRspMode,
     manualRspY_m,
     setManualRspY_m,
+    manualRspX_m,
+    setManualRspX_m,
     resetRspState,
     };
   }, [
@@ -2059,6 +2064,7 @@ function useDesignerState() {
     lockedScreenFrontPlaneM, setLockedScreenFrontPlaneM,
     mlp,
     mlpY_m, setMlpY_m,
+    mlpX_m, setMlpX_m,
     rowCentersM, setRowCentersM,
     overheadGlobalModel, setOverheadGlobalModel,
     overheadFrontOverride, setOverheadFrontOverride,
@@ -2114,6 +2120,8 @@ function useDesignerState() {
     setRspMode,
     manualRspY_m,
     setManualRspY_m,
+    manualRspX_m,
+    setManualRspX_m,
     resetRspState,
   ]);
 

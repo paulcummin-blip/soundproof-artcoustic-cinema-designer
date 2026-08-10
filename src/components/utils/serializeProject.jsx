@@ -106,6 +106,7 @@ export function serializeProject(input = {}) {
     // RSP mode + manual RSP Y (from appState)
     rspMode = "auto_from_screen",
     manualRspY_m = null,
+    manualRspX_m = null,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
