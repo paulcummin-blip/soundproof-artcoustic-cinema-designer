@@ -1953,6 +1953,8 @@ function RoomDesignerWithState() {
             onManualRspX_mChange={appState?.setManualRspX_m}
             manualRspY_m={appState?.manualRspY_m ?? null}
             onManualRspY_mChange={appState?.setManualRspY_m}
+            viewingPriority={appState?.viewingPriority ?? "balanced"}
+            onViewingPriorityChange={appState?.setViewingPriority}
           />
         )}
       />
