@@ -484,7 +484,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const temporaryTimestamp = new Date().toISOString();
     const safeSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
     const safeSeats = Array.isArray(seatingPositions) ? seatingPositions : [];
-    if (SHOW_DEBUG_LOGS) console.log("[RP22 ENGINE TRACE]", JSON.stringify({
+    if (SHOW_DEBUG_LOGS && globalThis.__B44_LOGS) console.log("[RP22 ENGINE TRACE]", JSON.stringify({
       owner: diagnosticOwner,
       runId: temporaryRunId,
       timestamp: temporaryTimestamp,
