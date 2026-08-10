@@ -249,9 +249,13 @@ export function useClientReportAuthority(projectId) {
   const manualRspY_m = app?.manualRspY_m ?? null;
   const currentMlpY_m = app?.mlpY_m ?? null;
 
-  const { effectiveRspY_m, rspSourceLabel } = useEffectiveRsp({
+  const manualRspX_m = app?.manualRspX_m ?? null;
+
+  const { effectiveRspX_m, effectiveRspY_m, rspSourceLabel } = useEffectiveRsp({
     rspMode,
     manualRspY_m,
+    manualRspX_m,
+    roomWidthM: roomDims.widthM,
     screenFrontPlaneM,
     screenWidthM,
     rowCentersM: app?.rowCentersM || [],
@@ -260,13 +264,13 @@ export function useClientReportAuthority(projectId) {
     rowDerivedRspYByMode,
   });
 
-  // RSP x is always room centre; y from effectiveRspY_m with safe fallback
+  // Stage B1: RSP uses canonical green-dot X (effectiveRspX_m) — no centreline reconstruction.
   const rsp = useMemo(() => {
-    const cx = roomDims.widthM / 2;
+    const x = Number.isFinite(effectiveRspX_m) ? effectiveRspX_m : (roomDims.widthM / 2);
     const y = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : currentMlpY_m;
     if (!Number.isFinite(y)) return null;
-    return { x: cx, y, z: 1.2 };
-  }, [roomDims.widthM, effectiveRspY_m, currentMlpY_m]);
+    return { x, y, z: 1.2 };
+  }, [roomDims.widthM, effectiveRspX_m, effectiveRspY_m, currentMlpY_m]);
 
   // ── 5) Analysis speakers (bed-layer, layout-allowed) ─────────────────────
   const placedSpeakers = useMemo(
@@ -316,7 +320,6 @@ export function useClientReportAuthority(projectId) {
     placedSpeakers,
     visiblePlanSpeakers: analysisSpeakers,
     seatingPositions,
-    primarySeatingPosition: rsp,
     dimensions: stableDimensions,
     mlpBasis,
     sevenBedLayoutType: app?.sevenBedLayoutType,
@@ -465,10 +468,14 @@ export function useClientReportAuthority(projectId) {
   // Uses the authoritative locked seat (not synthetic RSP) for P9 grading.
   // Representative (averaged) row positions are visual-only.
   const p9Snapshot = useMemo(() => {
-    if (!authoritativeSeat || !placedSpeakers.length) return null;
+    if (!rsp || !placedSpeakers.length) return null;
 
+    // Stage B1: P9 headline geometry uses the synthetic green-dot RSP (rsp),
+    // not the nearest real authoritativeSeat. authoritativeSeat is retained
+    // in the return object for presentation/identification only.
+    const p9RefSeat = { ...rsp, id: "mlp", isPrimary: true };
     const roomCenterX = roomDims.widthM / 2;
-    const upperSpeakers = getUpperSpeakersForSeat(authoritativeSeat, placedSpeakers, getCanonicalRole);
+    const upperSpeakers = getUpperSpeakersForSeat(p9RefSeat, placedSpeakers, getCanonicalRole);
 
     // A. No overheads
     if (upperSpeakers.length === 0) {
@@ -491,7 +498,7 @@ export function useClientReportAuthority(projectId) {
       };
     }
 
-    const result = computeUpperVerticalAnglesForSeat(authoritativeSeat, upperSpeakers, roomCenterX);
+    const result = computeUpperVerticalAnglesForSeat(p9RefSeat, upperSpeakers, roomCenterX);
     const { maxVerticalGapDeg, gaps, worstGap, rowElevations } = result;
 
     // Build representative rows for visual drawing (merge left+right by row)
@@ -516,8 +523,8 @@ export function useClientReportAuthority(projectId) {
     for (const group of rowMap.values()) {
       const avgY = group.sumY / group.count;
       const avgZ = group.sumZ / group.count;
-      const dz = avgZ - authoritativeSeat.z;
-      const dy = avgY - authoritativeSeat.y;
+      const dz = avgZ - p9RefSeat.z;
+      const dy = avgY - p9RefSeat.y;
       const elevDeg = Math.atan2(dz, dy) * 180 / Math.PI;
       representativeRows.push({
         rowName: group.rowName,
@@ -593,11 +600,13 @@ export function useClientReportAuthority(projectId) {
   // so the parity safeguard can still compare helper vs canonical.
   // Client P5 is intentionally RSP-based (not canonical per-seat).
   // canonicalP5 override removed — p5Snapshot already computes from the effective RSP.
+  // Stage B1: P9 headline reads the synthetic green-dot RSP (id="mlp") from the engine,
+  // matching the live engine's canonical RSP — not the nearest real authoritativeSeat.
   const canonicalP9 = useMemo(() => {
-    if (!analysisResult || !authoritativeSeat) return null;
-    const c = analysisResult.perSeatRp22?.[authoritativeSeat.id]?.rp22?.[9];
+    if (!analysisResult || !rsp) return null;
+    const c = analysisResult.perSeatRp22?.["mlp"]?.rp22?.[9];
     return (c && Number.isFinite(c.value)) ? c : null;
-  }, [analysisResult, authoritativeSeat]);
+  }, [analysisResult, rsp]);
 
   // Client P5 is RSP-based. p5Snapshot already computes from the effective RSP
   // via computeSurroundRingGaps + rp22LevelForP5. The real-seat engine result
@@ -635,19 +644,19 @@ export function useClientReportAuthority(projectId) {
   // Display fields are already canonical in the final snapshots; this warns if the
   // helper geometry diverges from the canonical engine result by more than 0.5°.
   useEffect(() => {
-    if (!analysisResult || !authoritativeSeat) return;
+    if (!analysisResult || !rsp) return;
     const isDev = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV;
     if (!isDev) return;
 
     // P5 is intentionally RSP-based for the Client Report; no canonical parity check.
-    // P9 remains canonical per-seat; warn on helper vs engine divergence.
+    // P9 headline is canonical green-dot RSP; warn on helper vs engine divergence.
     if (p9SnapshotFinal && p9SnapshotFinal.applicable && canonicalP9 && Number.isFinite(canonicalP9.value) && Number.isFinite(p9SnapshotFinal.geometryWorstGapDeg)) {
       const delta = Math.abs(p9SnapshotFinal.geometryWorstGapDeg - canonicalP9.value);
       if (delta > 0.5) {
-        console.warn(`[ClientReportAuthority] P9 divergence: helper=${p9SnapshotFinal.geometryWorstGapDeg.toFixed(1)}° canonical=${canonicalP9.value.toFixed(1)}° (seat=${authoritativeSeat.id})`);
+        console.warn(`[ClientReportAuthority] P9 divergence: helper=${p9SnapshotFinal.geometryWorstGapDeg.toFixed(1)}° canonical=${canonicalP9.value.toFixed(1)}° (rsp=mlp)`);
       }
     }
-  }, [analysisResult, authoritativeSeat, p9SnapshotFinal, canonicalP9]);
+  }, [analysisResult, rsp, p9SnapshotFinal, canonicalP9]);
 
   return {
     projectId,

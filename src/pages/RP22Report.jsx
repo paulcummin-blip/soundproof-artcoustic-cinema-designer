@@ -530,7 +530,7 @@ function RP22ReportInner() {
 
     const analysisResult = useRP22AnalysisEngine({
         diagnosticOwner: "rp22-report-page-authority",
-        placedSpeakers, visiblePlanSpeakers: analysisSpeakers, seatingPositions: seats, primarySeatingPosition,
+        placedSpeakers, visiblePlanSpeakers: analysisSpeakers, seatingPositions: seats,
         dimensions: stableDimensions, mlpBasis,
         sevenBedLayoutType: app?.sevenBedLayoutType,
         extraSurroundCount: app?.extraSurroundCount,

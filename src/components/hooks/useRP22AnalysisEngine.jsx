@@ -543,8 +543,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     // Detailed Param 5 (pairs list and stats) using CW back-arc gaps (wrap omitted)
     // Uses isEligibleP5Surround to match the per-seat grader — includes SL2/SR2/SL3/SR3...
+    // Stage B1: P5 RSP/reference follows the canonical green-dot (mlpPointOverride)
+    // when available. pickMLP (seat-row centroid) is a defensive legacy fallback only.
     const mlpSrc = primarySeats.length ? primarySeats : seatsWithRoles;
-    const mlp = pickMLP(mlpBasis, mlpSrc);
+    const mlp = (mlpPointOverride && isNum(mlpPointOverride.x) && isNum(mlpPointOverride.y))
+      ? { x: Number(mlpPointOverride.x), y: Number(mlpPointOverride.y), z: isNum(mlpPointOverride.z) ? Number(mlpPointOverride.z) : 1.2 }
+      : pickMLP(mlpBasis, mlpSrc);
     const speakersForP5Detail = Array.isArray(visiblePlanSpeakers) ? visiblePlanSpeakers : safeSpeakers;
 
     const surrounds = speakersForP5Detail

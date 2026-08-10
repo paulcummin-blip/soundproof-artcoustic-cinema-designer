@@ -109,7 +109,6 @@ function CandidateRatingEvaluator({
     placedSpeakers: candidate.placedSpeakers,
     visiblePlanSpeakers: analysisSpeakers,
     seatingPositions: candidate.seats,
-    primarySeatingPosition,
     dimensions,
     mlpBasis: "front",
     sevenBedLayoutType: appState?.sevenBedLayoutType,

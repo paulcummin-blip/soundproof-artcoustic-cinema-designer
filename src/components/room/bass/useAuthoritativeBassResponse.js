@@ -12,11 +12,13 @@ import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibili
 const POSITION_LABELS = ["left", "right"];
 const clampAbsorption = (value) => Math.max(0, Math.min(0.95, Number(value) || 0.30));
 
-export function buildAuthoritativeRspPosition(roomDims, mlpY_m) {
+export function buildAuthoritativeRspPosition(roomDims, mlpY_m, mlpX_m) {
   const widthM = Number(roomDims?.widthM);
   const y = Number(mlpY_m);
   if (!Number.isFinite(widthM) || !Number.isFinite(y) || widthM <= 0 || y <= 0) return null;
-  return { id: "rsp", x: widthM / 2, y, z: 1.2, __isSyntheticRsp: true };
+  // Stage B1: use canonical green-dot X (mlpX_m) when finite; else room centreline.
+  const x = Number.isFinite(Number(mlpX_m)) ? Number(mlpX_m) : widthM / 2;
+  return { id: "rsp", x, y, z: 1.2, __isSyntheticRsp: true };
 }
 
 function resolveSubGroup(subId, fallbackGroup) {
@@ -272,7 +274,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const rearSubsCfg = appState?.rearSubsCfg;
   const splConfig = appState?.splConfig;
   const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
-  const rspPosition = useMemo(() => buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m), [roomDims?.widthM, appState?.mlpY_m]);
+  const rspPosition = useMemo(() => buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m), [roomDims?.widthM, appState?.mlpY_m, appState?.mlpX_m]);
 
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
   const [roomDamping, setRoomDamping] = useState(DEFAULTS.roomDamping);

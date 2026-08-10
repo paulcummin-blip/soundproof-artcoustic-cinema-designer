@@ -559,9 +559,11 @@ function RoomDesignerWithState() {
     return result?.rowDerivedRspYByMode ?? {};
   }, [_seatingPositions, stableDimensions.width, stableDimensions.length]);
 
-  const { effectiveRspY_m, rspSourceLabel } = useEffectiveRsp({
+  const { effectiveRspX_m, effectiveRspY_m, rspSourceLabel } = useEffectiveRsp({
     rspMode: appState?.rspMode || "auto_from_screen",
     manualRspY_m: appState?.manualRspY_m ?? null,
+    manualRspX_m: appState?.manualRspX_m ?? null,
+    roomWidthM: Number(stableDimensions?.width) || 0,
     screenFrontPlaneM: appState?.screenFrontPlaneM,
     screenWidthM: _rspScreenWidthM,
     rowCentersM: appState?.rowCentersM || [],
