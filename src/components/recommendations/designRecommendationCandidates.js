@@ -198,27 +198,73 @@ export function buildDesignRecommendationCandidates({
       .filter((entry) => entry.capability > currentCapability)
       .sort((a, b) => (a.capability - b.capability) || ((Number(a.price) || Infinity) - (Number(b.price) || Infinity)));
 
-    const lcrSelections = [
-      ...(cheaper ? [{ entry: cheaper, direction: "cost-down", powerAfterW: currentLcrPowerW }] : []),
-      ...stronger.map((entry) => ({
+    const strongerSelections = stronger.flatMap((entry) => {
+      const modelOnly = {
         entry,
         direction: "upgrade",
-        // The canonical SPL engine independently clamps this to the model's
-        // registry power handling. No arbitrary wattage tiers are invented.
-        powerAfterW: finite(entry.maxPowerW)
-          ? Math.max(currentLcrPowerW, Number(entry.maxPowerW))
-          : currentLcrPowerW,
-      })),
+        powerAfterW: currentLcrPowerW,
+        amplifierUpgradeRequired: false,
+      };
+
+      // Add one registry-backed powered scenario only when the current
+      // amplification would hold this model below its continuous SPL cap.
+      // The full scenario still goes through the canonical SPL → RP22 → ASDR
+      // chain; this calculation only decides whether the extra candidate is
+      // physically meaningful.
+      const sensitivityDb = Number(entry.model.sensitivity_dB_1w1m);
+      const availableCurrentPowerW = finite(entry.maxPowerW)
+        ? Math.min(currentLcrPowerW, entry.maxPowerW)
+        : currentLcrPowerW;
+      const currentPowerLimitedSplDb =
+        finite(sensitivityDb) && availableCurrentPowerW > 0
+          ? sensitivityDb + 10 * Math.log10(availableCurrentPowerW)
+          : null;
+      const canBenefitFromMorePower =
+        finite(entry.maxPowerW) &&
+        entry.maxPowerW > currentLcrPowerW &&
+        finite(entry.capability) &&
+        finite(currentPowerLimitedSplDb) &&
+        currentPowerLimitedSplDb < entry.capability - 0.01;
+
+      return canBenefitFromMorePower
+        ? [
+            modelOnly,
+            {
+              entry,
+              direction: "upgrade",
+              powerAfterW: entry.maxPowerW,
+              amplifierUpgradeRequired: true,
+            },
+          ]
+        : [modelOnly];
+    });
+
+    const lcrSelections = [
+      ...(cheaper
+        ? [{
+            entry: cheaper,
+            direction: "cost-down",
+            powerAfterW: currentLcrPowerW,
+            amplifierUpgradeRequired: false,
+          }]
+        : []),
+      ...strongerSelections,
     ];
 
-    for (const { entry, direction, powerAfterW } of lcrSelections) {
+    for (const {
+      entry,
+      direction,
+      powerAfterW,
+      amplifierUpgradeRequired,
+    } of lcrSelections) {
       const nextSpeakers = safeSpeakers.map((speaker) =>
         LCR_ROLES.has(roleOf(speaker)) ? { ...speaker, model: entry.model.key } : speaker
       );
       const nextCost = finite(entry.price) ? Number(entry.price) * currentLcr.length : null;
-      const amplifierUpgradeRequired = direction === "upgrade" && powerAfterW > currentLcrPowerW;
       const powerSuffix = direction === "upgrade"
-        ? `:amp-${Math.round(currentLcrPowerW)}-${Math.round(powerAfterW)}`
+        ? amplifierUpgradeRequired
+          ? `:amp-${Math.round(currentLcrPowerW)}-${Math.round(powerAfterW)}`
+          : `:amp-${Math.round(currentLcrPowerW)}`
         : "";
 
       pushCandidate(candidates, {
@@ -251,7 +297,7 @@ export function buildDesignRecommendationCandidates({
         disruption: "Low",
         confidence: "High",
         caveat: amplifierUpgradeRequired
-          ? `Requires LCR amplification to increase from ${Math.round(currentLcrPowerW)} W/ch to ${Math.round(powerAfterW)} W/ch. Amplifier hardware cost is not included.`
+          ? `Includes LCR amplification increase from ${Math.round(currentLcrPowerW)} W/ch to ${Math.round(powerAfterW)} W/ch. Amplifier hardware cost is not included.`
           : null,
       });
     }
