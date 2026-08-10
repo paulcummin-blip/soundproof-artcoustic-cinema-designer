@@ -22,7 +22,7 @@ export default function RvSeatRowLabels({
         const [seatX, seatY] = toPx(xM, yM);
 
         return (
-          <React.Fragment key={`labels-${seat.id}`}>
+          <g key={`labels-${seat.id}`}>
             {/* Front wall distance label (Speaker Positions plan only) */}
             {speakerPositionsView === 'plan' && rowFrontWallLabelSeatIds.has(seat.id) && (
               <text
@@ -41,7 +41,7 @@ export default function RvSeatRowLabels({
             
             {/* Row distance label (ROOM_DIMS overlay only) */}
             {_overlays?.ROOM_DIMS && exportMode !== 'dimensions' && rowDistanceLabelSeatIds.has(seat.id) && (
-              <>
+              <g>
                 <text
                   x={seatX + 22}
                   y={seatY}
@@ -63,9 +63,9 @@ export default function RvSeatRowLabels({
                 >
                   {yM.toFixed(2)}m
                 </text>
-              </>
+              </g>
             )}
-          </React.Fragment>
+          </g>
         );
       })}
     </>
