@@ -1,32 +1,14 @@
-import React, { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Save, RotateCcw, ChevronDown, FolderOpen, FileText, Eye } from "lucide-react";
+import { RotateCcw, FileText, Eye } from "lucide-react";
 import ViewModeToggle from "@/components/roomdesigner/ViewModeToggle";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 export default function RoomDesignerHeader({
   showResetConfirm,
   setShowResetConfirm,
   isFrozen,
   handleResetPositions,
-  handleSaveProject,
   showLocalHint,
   loadState,
   autosaveStatus,
@@ -34,15 +16,10 @@ export default function RoomDesignerHeader({
   projectIdState,
   activeProjectId,
   isProjectMode,
-  onFreeUse,
-  onNewProject,
-  onSaveToExistingProject,
-  existingProjects,
   viewMode,
   onViewModeChange,
 }) {
   const navigate = useNavigate();
-  const [overwriteCandidate, setOverwriteCandidate] = useState(null); // { id, name }
 
   const effectiveProjectId = activeProjectId || projectIdState || null;
 
@@ -58,34 +35,7 @@ export default function RoomDesignerHeader({
     }
   };
 
-  const handleExistingProjectClick = (project) => {
-    setOverwriteCandidate({ id: project.id, name: project.name });
-  };
-
-  const handleOverwriteConfirm = () => {
-    if (overwriteCandidate) {
-      onSaveToExistingProject(overwriteCandidate.id, overwriteCandidate.name);
-    }
-    setOverwriteCandidate(null);
-  };
-
   return (
-    <>
-    <AlertDialog open={!!overwriteCandidate} onOpenChange={(open) => { if (!open) setOverwriteCandidate(null); }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Overwrite existing project?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will overwrite &ldquo;{overwriteCandidate?.name}&rdquo; with the current Room Designer state. This cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>No</AlertDialogCancel>
-          <AlertDialogAction onClick={handleOverwriteConfirm} className="bg-[#213428] hover:bg-[#3E4349] text-white">Yes, overwrite</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-
     <header className="p-4 bg-white border-b border-[#DCDBD6] flex-shrink-0">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[#1B1A1A] font-header">Cinema Designer</h1>
@@ -125,36 +75,6 @@ export default function RoomDesignerHeader({
             <FileText className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
             Technical Report
           </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="brand-btn">
-                <Save className="w-4 h-4 mr-2" />
-                Save to Project
-                <ChevronDown className="w-3 h-3 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-white border-[#DCDBD6]">
-              <DropdownMenuItem onClick={onNewProject} className="cursor-pointer font-medium">
-                <FolderOpen className="w-4 h-4 mr-2" />
-                New Project
-              </DropdownMenuItem>
-              {existingProjects && existingProjects.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  {existingProjects.map((p) => (
-                    <DropdownMenuItem
-                      key={p.id}
-                      onClick={() => handleExistingProjectClick(p)}
-                      className="cursor-pointer"
-                    >
-                      <span className="truncate">{p.name || "Untitled"}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
       <div className="mt-2 text-xs flex items-center gap-4">
@@ -181,6 +101,5 @@ export default function RoomDesignerHeader({
           )}
       </div>
     </header>
-    </>
   );
 }

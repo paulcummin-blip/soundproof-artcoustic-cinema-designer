@@ -62,7 +62,6 @@ import { useSeatingRebuild } from "@/components/hooks/useSeatingRebuild";
 import { useSubwooferSync } from "@/components/hooks/useSubwooferSync";
 import { useInRoomDepths } from "@/components/hooks/useInRoomDepths";
 import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
-import NewProjectDialog from "@/components/projects/NewProjectDialog";
 import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
 import ViewModeLayout from "@/components/roomdesigner/ViewModeLayout";
 import AimLoudspeakerControls from "@/components/roomdesigner/AimLoudspeakerControls";
@@ -133,8 +132,6 @@ function RoomDesignerWithState() {
   // Single source of truth for the project ID
   // userProjectOverride: null = defer to session/URL, "free" = explicit Free Use, "<id>" = explicit project choice
   const [userProjectOverride, setUserProjectOverride] = useState(null);
-  const [existingProjects, setExistingProjects] = useState([]);
-  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
 
   // Only resolve from explicit URL param — session state is for display only.
   // Generic /RoomDesigner (no ?project=) must open as Free Use, not re-attach a stale project.
@@ -260,17 +257,6 @@ function RoomDesignerWithState() {
   // Don't block render - allow local-only mode
   const showLocalHint = !isProjectMode;
 
-  // Fetch existing projects for the "Save to Project" dropdown (name + id only)
-  useEffect(() => {
-    let cancelled = false;
-    Project.list('-updated_date', 50).then((list) => {
-      if (!cancelled && Array.isArray(list)) {
-        setExistingProjects(list.map((p) => ({ id: p.id, name: p.name || "Untitled" })));
-      }
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-
   // Free Use: detach from any project, stay local
   const handleFreeUse = React.useCallback(() => {
     setUserProjectOverride("free");
@@ -280,11 +266,6 @@ function RoomDesignerWithState() {
       url.searchParams.delete("projectId");
       window.history.replaceState({}, "", url.toString());
     } catch (e) { /* ignore */ }
-  }, []);
-
-  // New Project: open dialog
-  const handleNewProject = React.useCallback(() => {
-    setShowNewProjectDialog(true);
   }, []);
 
 
@@ -1072,8 +1053,7 @@ function RoomDesignerWithState() {
     autosaveStatus,
     handleSaveProject: triggerSaveProject,
     reloadProject
-  } = useProjectLoader(
-    appState, // Pass appState here
+  } = useProjectLoader(    appState, // Pass appState here
     {
       projectIdFromUrl: resolvedProjectId,
       isProjectMode,
@@ -1128,30 +1108,6 @@ function RoomDesignerWithState() {
       extraSurroundCount: appState?.extraSurroundCount,
       setExtraSurroundCount: appState?.setExtraSurroundCount,
     });
-
-  // Called after NewProjectDialog creates the project
-  const handleNewProjectCreated = React.useCallback(async (created) => {
-    if (!created?.id) return;
-    setUserProjectOverride(created.id);
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("project", created.id);
-      window.history.replaceState({}, "", url.toString());
-    } catch (e) { /* ignore */ }
-    setExistingProjects((prev) => [{ id: created.id, name: created.name || "Untitled" }, ...prev]);
-    setTimeout(() => { triggerSaveProject?.(); }, 100);
-  }, [triggerSaveProject]);
-
-  // Called after overwrite confirmation for an existing project
-  const handleSaveToExistingProject = React.useCallback((id) => {
-    setUserProjectOverride(id);
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("project", id);
-      window.history.replaceState({}, "", url.toString());
-    } catch (e) { /* ignore */ }
-    setTimeout(() => { triggerSaveProject?.(); }, 100);
-  }, [triggerSaveProject]);
 
   useEffect(() => {
     if (appState && typeof appState.setSubWarnings === 'function') {
@@ -1567,24 +1523,6 @@ function RoomDesignerWithState() {
     compat,
   });
 
-  // Manual Save Project function now just calls the one from useProjectLoader
-  const handleSaveProject = React.useCallback(async () => {
-    // If no active project, save locally instead
-    if (!resolvedProjectId) {
-      if (typeof appState?.saveWorkingCopyNow === 'function') {
-        appState.saveWorkingCopyNow();
-        // Simple toast feedback
-        if (typeof window !== 'undefined' && window.alert) {
-          console.log("Saved locally (no active project)");
-        }
-      }
-      return;
-    }
-
-    // Otherwise, save to cloud project
-    await triggerSaveProject();
-  }, [triggerSaveProject, resolvedProjectId, appState]);
-
   // decide which overlay toggles are relevant for the current system configuration
   const overlayRelevance = React.useMemo(() => {
     const preset = String(dolbyPreset || "5.1");
@@ -1754,18 +1692,11 @@ function RoomDesignerWithState() {
           }
         `}</style>
 
-      <NewProjectDialog
-        open={showNewProjectDialog}
-        onOpenChange={setShowNewProjectDialog}
-        onProjectCreated={handleNewProjectCreated}
-      />
-
       <RoomDesignerHeader
         showResetConfirm={showResetConfirm}
         setShowResetConfirm={setShowResetConfirm}
         isFrozen={isFrozen}
         handleResetPositions={handleResetPositions}
-        handleSaveProject={handleSaveProject}
         showLocalHint={showLocalHint}
         loadState={loadState}
         autosaveStatus={autosaveStatus}
@@ -1774,9 +1705,6 @@ function RoomDesignerWithState() {
         activeProjectId={activeProjectId}
         isProjectMode={isProjectMode}
         onFreeUse={handleFreeUse}
-        onNewProject={handleNewProject}
-        onSaveToExistingProject={handleSaveToExistingProject}
-        existingProjects={existingProjects}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
       />
