@@ -173,13 +173,13 @@ export default function DesignRatingSummary({
                 title="IMPROVE THE DESIGN"
                 items={improvements}
                 mode="improvement"
-                emptyText="No material RP22 or multi-row viewing improvement was verified among the current low-change alternatives."
+                emptyText="No material improvement identified."
               />
               <RecommendationGroup
                 title="REDUCE PROJECT COST"
                 items={savings}
                 mode="saving"
-                emptyText="No cost-saving option that preserves the current RP22 level profile was verified."
+                emptyText="No material cost-saving compromise identified."
               />
               <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6', fontSize: 8.5, lineHeight: 1.4, color: '#8A867D' }}>
                 Bass is held at the current verified result. Subwoofer alternatives will be added only when scenario re-runs are connected and trusted.

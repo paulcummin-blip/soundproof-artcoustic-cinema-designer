@@ -19,6 +19,10 @@ import {
   getParameterLevelChanges,
   getPriorityLabel,
 } from "./designRecommendationProfile.js";
+import {
+  isMaterialImprovement,
+  isMaterialCostSaving,
+} from "./recommendationMaterialityAuthority.js";
 
 const LCR_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 const WIDE_ROLES = new Set(["LW", "RW"]);
@@ -415,8 +419,15 @@ export function rankDesignRecommendations({
   // RP22 improvements remain primary. A multi-row geometry candidate may
   // additionally qualify when its RP22 profile is preserved and the canonical
   // selected viewing objective improves materially.
+  //
+  // FINAL GATE: 5pp materiality filter — only candidates that move the
+  // unrounded ASDR by at least +5.0 percentage points are surfaced. This
+  // is applied AFTER the RP22-first hierarchy and Viewing Priority
+  // comparator. Candidates below the threshold are still evaluated
+  // canonically above; they are filtered out of presentation only.
   const improvements = evaluated
     .filter((item) => item.isRecommendationImprovement)
+    .filter((item) => isMaterialImprovement(item.scoreDelta))
     .sort((a, b) => {
       const cmp = compareImprovementTuples(a.improvementProfile, b.improvementProfile);
       if (cmp !== 0) return cmp;
@@ -438,12 +449,15 @@ export function rankDesignRecommendations({
 
   // ── SAVINGS ──
   // A candidate qualifies when it saves money while preserving the current
-  // RP22 level profile: no new FAIL, acceptable degradation, AND ASDR loss ≤ 5pp.
+  // RP22 level profile: no new FAIL, acceptable degradation, AND passes the
+  // 5pp materiality filter (ASDR must drop by at least 5pp — a genuine
+  // compromise, not a tiny numerical change). This is the FINAL gate after
+  // all existing cost-down protections.
   // Ranking: degradation score (lower = better preservation) → saving amount → ASDR loss.
   const savings = evaluated
     .filter((item) => finite(item.savingExVat) && item.savingExVat > 0)
     .filter((item) => !item.hasNewFail) // No-FAIL cost-down rule
-    .filter((item) => Math.max(0, -item.scoreDelta) <= 5) // 5pp cap (secondary guard)
+    .filter((item) => isMaterialCostSaving(item.scoreDelta)) // 5pp material compromise (final gate)
     .map((item) => ({ ...item, scoreLoss: Math.max(0, -item.scoreDelta) }))
     .sort((a, b) => {
       const degA = a.degradationProfile.degradationScore;

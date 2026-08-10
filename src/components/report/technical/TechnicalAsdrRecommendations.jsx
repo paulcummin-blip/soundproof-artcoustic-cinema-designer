@@ -200,8 +200,8 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
   const bestImprovement = improvements[0] || null;
   const bestSaving = savings[0] || null;
 
-  const emptyImprovement = "No material RP22 or multi-row viewing improvement identified without greater design change.";
-  const emptySaving = "No meaningful cost reduction identified without material performance loss.";
+  const emptyImprovement = "No material improvement identified.";
+  const emptySaving = "No material cost-saving compromise identified.";
 
   return (
     <div style={{ marginTop: "3mm" }}>
