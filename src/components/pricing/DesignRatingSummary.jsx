@@ -1,5 +1,6 @@
 // components/pricing/DesignRatingSummary.jsx
 import React from 'react';
+import { formatViewingRecommendationSummary } from '@/components/recommendations/viewingRecommendationPresentation';
 
 function formatPoints(value, signed = false) {
   const number = Number(value);
@@ -35,6 +36,7 @@ function RecommendationRow({ item, mode }) {
   const cost = formatMoney(item?.costDeltaExVat);
   const showP12 = isSaving && item?.kind === 'lcr' && item?.p12Level;
   const p12Warning = item?.p12Level === 'L1' && ['L2', 'L3', 'L4'].includes(item?.p12BaselineLevel);
+  const viewingText = formatViewingRecommendationSummary(item);
 
   let valueText;
   if (isSaving) {
@@ -65,6 +67,11 @@ function RecommendationRow({ item, mode }) {
       <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
         {valueText}
       </div>
+      {viewingText && (
+        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: item?.viewingTradeoff ? '#9a6800' : '#625143' }}>
+          {viewingText}
+        </div>
+      )}
       <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
         Rating {from}% → {to}% · {formatPoints(item.scoreDelta, true)}
       </div>
@@ -166,7 +173,7 @@ export default function DesignRatingSummary({
                 title="IMPROVE THE DESIGN"
                 items={improvements}
                 mode="improvement"
-                emptyText="No RP22 level improvement was verified among the current low-change alternatives."
+                emptyText="No material RP22 or multi-row viewing improvement was verified among the current low-change alternatives."
               />
               <RecommendationGroup
                 title="REDUCE PROJECT COST"
