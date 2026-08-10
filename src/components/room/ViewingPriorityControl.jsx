@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Eye } from 'lucide-react';
 import { normaliseViewingPriority } from '@/components/utils/viewingPriorityAuthority';
@@ -64,7 +64,7 @@ export default function ViewingPriorityControl({
           className="w-full"
           style={{ border: '1px solid #C1B6AD', backgroundColor: '#ffffff', fontSize: 12 }}
         >
-          <SelectValue />
+          <span>{options.find((opt) => opt.value === safeValue)?.label ?? "Balanced across rows"}</span>
         </SelectTrigger>
         <SelectContent>
           {options.map((opt) => (
