@@ -64,32 +64,40 @@ export function runLcrUpgradeAssertions() {
   const upgradeModels = upgrades.map(
     (candidate) => candidate.placedSpeakers.find((speaker) => speaker.role === "FL")?.model
   );
+  const uniqueUpgradeModels = [...new Set(upgradeModels)];
 
   check(
     "All stronger compatible EVOLVE 3-1 upgrades are generated",
     ["evolve-4-2", "q4-3", "q6-3", "evolve-6-3", "evolve-8-4", "q4-5", "q8-5"],
-    upgradeModels
+    uniqueUpgradeModels
   );
-  check("Q8-5 is evaluated", true, upgradeModels.includes("q8-5"));
+  check("Q8-5 is evaluated", true, uniqueUpgradeModels.includes("q8-5"));
   check(
     "Only discrete LCR registry models are included",
     true,
-    upgradeModels.every((model) => {
+    uniqueUpgradeModels.every((model) => {
       const meta = getSpeakerModelMeta(model);
       return meta?.category === "LCR" && !meta?.frontStageType;
     })
   );
   check(
-    "Registry max power is attached to each combined upgrade scenario",
-    [120, 120, 120, 180, 240, 400, 800],
+    "Model-only candidates stay at current power; useful registry-max variants are added",
+    [100, 100, 100, 100, 100, 100, 400, 100, 800],
     upgrades.map((candidate) => candidate.lcrPowerAfterW)
   );
+  const poweredUpgrades = upgrades.filter((candidate) => candidate.amplifierUpgradeRequired);
   check(
-    "Amplifier upgrades expose an unpriced-hardware caveat",
+    "Only current-power-limited models receive an amplifier variant",
+    ["q4-5", "q8-5"],
+    poweredUpgrades.map(
+      (candidate) => candidate.placedSpeakers.find((speaker) => speaker.role === "FL")?.model
+    )
+  );
+  check(
+    "Amplifier variants expose an unpriced-hardware caveat",
     true,
-    upgrades.every(
+    poweredUpgrades.every(
       (candidate) =>
-        candidate.amplifierUpgradeRequired === true &&
         candidate.amplifierCostIncluded === false &&
         candidate.caveat?.includes("Amplifier hardware cost is not included")
     )
@@ -186,7 +194,7 @@ export function runLcrUpgradeAssertions() {
     passed: tests.filter((test) => test.pass).length,
     total: tests.length,
     allPassed: tests.every((test) => test.pass),
-    generatedUpgradeModels: upgradeModels,
+    generatedUpgradeModels: uniqueUpgradeModels,
     generatedUpgradePowersW: upgrades.map((candidate) => candidate.lcrPowerAfterW),
     materialOrdering: materialResult.improvements.map((item) => item.id),
     solvedProfileOrdering: solvedProfileResult.improvements.map((item) => item.id),
