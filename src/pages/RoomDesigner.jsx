@@ -1659,7 +1659,7 @@ function RoomDesignerWithState() {
         recommendations: designRecommendations,
       };
     }
-  }, [showAsdr, appDesignRating, designRecommendations]);
+  }, [showAsdr, appDesignRating, designRecommendations, resolvedProjectId, projectIdState]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
