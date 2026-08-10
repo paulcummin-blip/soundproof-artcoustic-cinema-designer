@@ -185,7 +185,7 @@ export default function TechnicalAsdrScorecard({
       className="tech-asdr-scorecard"
       style={{
         background: COLORS.bg,
-        padding: "8mm 10mm",
+        padding: "8mm 10mm 5mm 10mm",
         boxSizing: "border-box",
         WebkitPrintColorAdjust: "exact",
         printColorAdjust: "exact",
@@ -341,7 +341,7 @@ export default function TechnicalAsdrScorecard({
       {/* ── Evaluated recommendations (best improvement / best cost saving) ── */}
       <TechnicalAsdrRecommendations recommendations={recommendations} />
 
-      {/* ── Client language note ── */}
+      {/* ── Client language note (proprietary disclaimer) ── */}
       <div
         style={{
           marginTop: "2mm",
@@ -350,6 +350,8 @@ export default function TechnicalAsdrScorecard({
           fontFamily: FONT_BODY,
           lineHeight: 1.5,
           fontStyle: "italic",
+          breakInside: "avoid",
+          pageBreakInside: "avoid",
         }}
       >
         The Artcoustic System Design Rating is a proprietary Sound Proof design metric.

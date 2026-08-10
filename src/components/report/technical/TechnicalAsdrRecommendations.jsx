@@ -225,11 +225,13 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
       </div>
       <div
         style={{
-          marginTop: "2.5mm",
+          marginTop: "2mm",
           fontSize: "7.5pt",
           color: COLORS.muted,
           fontFamily: FONT_BODY,
           lineHeight: 1.4,
+          breakInside: "avoid",
+          pageBreakInside: "avoid",
         }}
       >
         Recommendations are evaluated independently. Combining changes may produce a different result and should be re-evaluated.

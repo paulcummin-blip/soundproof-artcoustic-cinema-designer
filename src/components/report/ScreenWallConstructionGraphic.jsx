@@ -527,15 +527,23 @@ export default function ScreenWallConstructionGraphic({
             const subNoteY = drawnSubs[0]
               ? tableStartY + (scheduleRows.length + 1) * rowH + 12
               : tableStartY + (scheduleRows.length + 1) * rowH;
-            const notesGap = 20;
+            const notesGap = 18;
             const dividerY = subNoteY + notesGap;
             const headingY = dividerY + 14;
             const firstLineY = headingY + 14;
+            const lastLineY = firstLineY + 44; // 4 × dy=11 after first line
+            const frameBottom = PAGE.height - PAGE.margin;
+            const minBottomClearance = 30;
+            // If notes would be too close to frame bottom, shift the whole block up
+            const shiftUp = Math.max(0, lastLineY + minBottomClearance - frameBottom);
+            const adjustedDividerY = dividerY - shiftUp;
+            const adjustedHeadingY = headingY - shiftUp;
+            const adjustedFirstLineY = firstLineY - shiftUp;
             return (
               <g>
-                <line x1={PAGE.margin + 18} y1={dividerY} x2={PAGE.width - PAGE.margin - 18} y2={dividerY} stroke={COLORS.extension} strokeWidth="0.8" />
-                <text x={PAGE.margin + 18} y={headingY} fontSize="8" fill={COLORS.text} fontFamily={BODY_FONT} fontWeight="600">NOTES</text>
-                <text x={PAGE.margin + 18} y={firstLineY} fontSize="7.5" fill={COLORS.muted} fontFamily={BODY_FONT}>
+                <line x1={PAGE.margin + 18} y1={adjustedDividerY} x2={PAGE.width - PAGE.margin - 18} y2={adjustedDividerY} stroke={COLORS.extension} strokeWidth="0.8" />
+                <text x={PAGE.margin + 18} y={adjustedHeadingY} fontSize="8" fill={COLORS.text} fontFamily={BODY_FONT} fontWeight="600">NOTES</text>
+                <text x={PAGE.margin + 18} y={adjustedFirstLineY} fontSize="7.5" fill={COLORS.muted} fontFamily={BODY_FONT}>
                   <tspan x={PAGE.margin + 18} dy="0">Dimensions govern. Verify dimensions on site before construction.</tspan>
                   <tspan x={PAGE.margin + 18} dy="11">Speaker and sub positions are generated from the current design. Acoustic centres should remain within the indicated band where practical.</tspan>
                   <tspan x={PAGE.margin + 18} dy="11">Coordinates refer to speaker and subwoofer centres unless stated otherwise.</tspan>
