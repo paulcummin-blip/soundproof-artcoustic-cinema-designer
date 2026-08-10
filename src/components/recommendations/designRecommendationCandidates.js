@@ -216,8 +216,8 @@ export function buildDesignRecommendationCandidates({
           mlpPoint,
           costDeltaExVat: finite(saving) ? -Number(saving) : null,
           disruption: "Medium",
-          confidence: "High",
-          caveat: null,
+          confidence: "Medium",
+          caveat: "Reduces spatial resolution as well as equipment cost. Review the listening experience before applying.",
         });
       }
     }
@@ -239,8 +239,8 @@ export function buildDesignRecommendationCandidates({
           mlpPoint,
           costDeltaExVat: finite(saving) ? -Number(saving) : null,
           disruption: "Medium",
-          confidence: "High",
-          caveat: null,
+          confidence: "Medium",
+          caveat: "Reduces spatial resolution as well as equipment cost. Review the listening experience before applying.",
         });
       }
     }
@@ -269,6 +269,11 @@ function changedParameters(baseline, candidate) {
       const nb = Number(b.replace(/\D/g, "")) || 999;
       return na - nb;
     });
+}
+
+function extractP12Level(rating) {
+  const contribution = (rating?.contributions || []).find((c) => c.key === "p12");
+  return contribution?.resultLevel || null;
 }
 
 function uniqueById(items) {
@@ -306,6 +311,8 @@ export function rankDesignRecommendations({ baselineRating, evaluatedCandidates 
         costDeltaExVat: costDelta,
         savingExVat: costDelta != null && costDelta < 0 ? -costDelta : null,
         affectedParameters: changedParameters(baselineRating, entry.rating),
+        p12Level: extractP12Level(entry.rating),
+        p12BaselineLevel: extractP12Level(baselineRating),
       };
     });
 

@@ -21,6 +21,8 @@ function formatMoney(value) {
 function RecommendationRow({ item, mode }) {
   const from = Math.round(Number(item?.currentPercentage) || 0);
   const to = Math.round(Number(item?.newPercentage) || 0);
+  const showP12 = mode === 'saving' && item?.kind === 'lcr' && item?.p12Level;
+  const p12Warning = item?.p12Level === 'L1' && ['L2', 'L3', 'L4'].includes(item?.p12BaselineLevel);
   const impact = Array.isArray(item?.affectedParameters) && item.affectedParameters.length
     ? item.affectedParameters.join(', ')
     : 'ASDR';
@@ -57,6 +59,19 @@ function RecommendationRow({ item, mode }) {
       <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
         {item.disruption} disruption · {item.confidence} confidence
       </div>
+      {showP12 && (
+        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#3E4349' }}>
+          P12 after change: {item.p12Level}
+          {p12Warning && (
+            <span style={{ color: '#9a6800' }}> · Leaves limited screen-channel dynamic-range capability.</span>
+          )}
+        </div>
+      )}
+      {item.caveat && (
+        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B', fontStyle: 'italic' }}>
+          {item.caveat}
+        </div>
+      )}
     </div>
   );
 }
@@ -132,6 +147,9 @@ export default function DesignRatingSummary({
 
           {!isEvaluating && recommendations && (
             <>
+              <div style={{ marginTop: 8, fontSize: 8.5, lineHeight: 1.4, color: '#8A867D' }}>
+                Each option is evaluated independently. Combining changes may produce a different result and should be re-evaluated.
+              </div>
               <RecommendationGroup
                 title="IMPROVE THE DESIGN"
                 items={improvements}
