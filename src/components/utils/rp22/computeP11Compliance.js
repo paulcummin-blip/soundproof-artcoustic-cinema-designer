@@ -35,7 +35,7 @@ import { computeOverheadZones } from "@/components/room/utils/overheadZones";
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import {
   computeRp22SurroundZones,
-  isInsideSurroundZone,
+  isInsideSurroundRole,
   hasActiveSurroundBack,
 } from "@/components/utils/rp22/rp22SurroundZones";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
@@ -184,10 +184,10 @@ export function computeP11Compliance({
       zoneType = "front-wide-right";
       isOutside = !isInsideFrontWideZone(y, frontWideZones?.right);
     }
-    // Side surrounds — canonical RP22 surround zones
+    // Side surrounds — canonical RP22 surround zones (with directly-behind exclusion)
     else if (role === "SL") {
       zoneType = "side-surround-left";
-      const inside = isInsideSurroundZone(x, y, surroundZones?.sideLeft);
+      const inside = isInsideSurroundRole(x, y, "SL", surroundZones);
       if (inside === null) {
         zoneIndeterminate = true;
       } else {
@@ -195,7 +195,7 @@ export function computeP11Compliance({
       }
     } else if (role === "SR") {
       zoneType = "side-surround-right";
-      const inside = isInsideSurroundZone(x, y, surroundZones?.sideRight);
+      const inside = isInsideSurroundRole(x, y, "SR", surroundZones);
       if (inside === null) {
         zoneIndeterminate = true;
       } else {
@@ -205,7 +205,7 @@ export function computeP11Compliance({
     // Rear surrounds — canonical RP22 surround-back zones
     else if (role === "SBL") {
       zoneType = "rear-surround-left";
-      const inside = isInsideSurroundZone(x, y, surroundZones?.backLeft);
+      const inside = isInsideSurroundRole(x, y, "SBL", surroundZones);
       if (inside === null) {
         zoneIndeterminate = true;
       } else {
@@ -213,7 +213,7 @@ export function computeP11Compliance({
       }
     } else if (role === "SBR") {
       zoneType = "rear-surround-right";
-      const inside = isInsideSurroundZone(x, y, surroundZones?.backRight);
+      const inside = isInsideSurroundRole(x, y, "SBR", surroundZones);
       if (inside === null) {
         zoneIndeterminate = true;
       } else {
