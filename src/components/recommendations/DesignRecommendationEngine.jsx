@@ -171,10 +171,6 @@ export default function DesignRecommendationEngine({
   );
   const [resultsById, setResultsById] = useState({});
 
-  useEffect(() => {
-    setResultsById({});
-  }, [candidateSignature, baselineRating?.actualPoints, baselineRating?.maximumAvailablePoints]);
-
   const handleResult = useCallback((candidate, rating) => {
     setResultsById((previous) => {
       const current = previous[candidate.id];
@@ -191,10 +187,10 @@ export default function DesignRecommendationEngine({
     });
   }, []);
 
-  const evaluatedCandidates = useMemo(
-    () => Object.values(resultsById),
-    [resultsById]
-  );
+  const evaluatedCandidates = useMemo(() => {
+    const activeIds = new Set(candidates.map((candidate) => candidate.id));
+    return Object.values(resultsById).filter((entry) => activeIds.has(entry?.candidate?.id));
+  }, [resultsById, candidateSignature, candidates]);
 
   const recommendations = useMemo(() => ({
     ...rankDesignRecommendations({ baselineRating, evaluatedCandidates }),
