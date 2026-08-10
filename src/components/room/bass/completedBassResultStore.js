@@ -36,7 +36,7 @@ const syncSignatures = new Map();
 // directly by BassBackgroundAnalysisOwner through this same module. We do not
 // attach an entity realtime listener: ProjectAnalysisCache records exceed the
 // broadcast field limit, so those broadcasts are stubs and only create noisy
-// SDK errors before a full hydrate is required anyway.
+// SDK console errors before a full hydrate is required anyway.
 const projectAuthorityState = new Map();
 
 function ensureProjectAuthorityState(key) {
