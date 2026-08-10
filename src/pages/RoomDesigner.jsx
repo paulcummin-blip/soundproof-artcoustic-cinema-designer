@@ -849,6 +849,7 @@ function RoomDesignerWithState() {
     extraSurroundCount: appState?.extraSurroundCount,
     p15ConstructionLevel: appState?.p15ConstructionLevel,
     screen: _effectiveScreen,
+    dolbyLayout: dolbyPreset,
     mlpPointOverride: _effectiveMlpPointOverride, // Use same MLP as FW overlay (green dot)
     seatSplMetrics: _effectiveSeatSplMetrics,
     overheadState: {
