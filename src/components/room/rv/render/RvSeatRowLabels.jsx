@@ -15,7 +15,7 @@ export default function RvSeatRowLabels({
   const RY_M = 0.125;
 
   return (
-    <>
+    <g className="seat-row-labels">
       {seats.map((seat) => {
         const xM = Number(seat.x ?? seat.position?.x ?? 0);
         const yM = Number(seat.y ?? seat.position?.y ?? 0);
@@ -68,6 +68,6 @@ export default function RvSeatRowLabels({
           </g>
         );
       })}
-    </>
+    </g>
   );
 }
