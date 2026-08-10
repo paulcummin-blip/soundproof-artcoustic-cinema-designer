@@ -11,6 +11,7 @@
 import { MODELS, getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { getCommercialPrice } from "@/components/pricing/usePriceCalculation";
 import { screenRows } from "@/components/data/screenSizes";
+import { compareViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 import {
   computeImprovementProfile,
   computeDegradationProfile,
@@ -22,6 +23,11 @@ import {
 const LCR_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 const WIDE_ROLES = new Set(["LW", "RW"]);
 const MID_UPPER_ROLES = new Set(["TML", "TMR", "TL", "TR"]);
+const VIEWING_GEOMETRY_KINDS = new Set(["seating", "screen", "row-spacing"]);
+
+export function isViewingGeometryCandidate(candidate) {
+  return VIEWING_GEOMETRY_KINDS.has(String(candidate?.kind || ""));
+}
 
 const finite = (value) =>
   value !== null &&
@@ -278,6 +284,57 @@ function uniqueById(items) {
   });
 }
 
+function viewingLevelSignature(summary) {
+  return (summary?.rows || [])
+    .map((row) => `${Number(row?.rowNumber) || 0}:${row?.rp23Level || "—"}`)
+    .join("|");
+}
+
+/**
+ * Qualification guard only — ranking itself always delegates to the canonical
+ * viewingPriorityAuthority comparator. A geometry-only recommendation is
+ * material when the per-row RP23 profile changes or the inter-row angle spread
+ * changes by at least one degree. Total-deviation-only numerical movement may
+ * resolve a tie, but is not surfaced as an improvement by itself.
+ */
+function isMaterialViewingChange(before, after) {
+  if ((before?.rows?.length || 0) < 2 || (after?.rows?.length || 0) < 2) return false;
+  if (viewingLevelSignature(before) !== viewingLevelSignature(after)) return true;
+  return Math.abs(Number(after.angleSpreadDeg) - Number(before.angleSpreadDeg)) >= 1;
+}
+
+function viewingMetadataForCandidate(candidate, viewingContext) {
+  if (!isViewingGeometryCandidate(candidate) || !viewingContext?.before) return null;
+  const after = viewingContext.afterByCandidateId?.[candidate.id] || null;
+  const before = viewingContext.before;
+  if (!after || (before.rows?.length || 0) < 2 || (after.rows?.length || 0) < 2) return null;
+
+  const priorityMode = viewingContext.priorityMode || "balanced";
+  const comparator = Math.sign(compareViewingPriority(after, before, priorityMode));
+  const direction = comparator < 0 ? "better" : comparator > 0 ? "worse" : "same";
+  const material = isMaterialViewingChange(before, after);
+
+  return {
+    before,
+    after,
+    priorityMode,
+    comparison: {
+      direction,
+      material,
+      comparator,
+      isImprovement: material && direction === "better",
+      isWorse: material && direction === "worse",
+    },
+  };
+}
+
+function compareApplicableViewingCandidates(a, b) {
+  if (!isViewingGeometryCandidate(a) || !isViewingGeometryCandidate(b)) return 0;
+  if (!a?.viewingAfter || !b?.viewingAfter) return 0;
+  if (a.viewingPriorityMode !== b.viewingPriorityMode) return 0;
+  return compareViewingPriority(a.viewingAfter, b.viewingAfter, a.viewingPriorityMode);
+}
+
 /**
  * Lexicographic comparison of improvement tuples.
  * Priority: failRemoved > l1Removed > l2Removed > l3ToL4 > l4Gained > affectedParamCount
@@ -300,7 +357,11 @@ function compareImprovementTuples(a, b) {
  * SAVINGS eligibility: saves money, no new FAIL, acceptable profile degradation,
  *   AND ASDR loss ≤ 5pp (secondary guard).
  */
-export function rankDesignRecommendations({ baselineRating, evaluatedCandidates = [] }) {
+export function rankDesignRecommendations({
+  baselineRating,
+  evaluatedCandidates = [],
+  viewingContext = null,
+}) {
   const baselinePct = Number(baselineRating?.displayPercentage);
   const baselinePoints = Number(baselineRating?.actualPoints);
   if (!finite(baselinePct)) return { improvements: [], savings: [], evaluatedCount: 0 };
@@ -316,6 +377,10 @@ export function rankDesignRecommendations({ baselineRating, evaluatedCandidates 
 
       const improvementProfile = computeImprovementProfile(baselineRating, entry.rating);
       const degradationProfile = computeDegradationProfile(baselineRating, entry.rating);
+      const viewing = viewingMetadataForCandidate(entry.candidate, viewingContext);
+      const viewingTradeoff =
+        viewing?.comparison?.isWorse === true &&
+        (improvementProfile.isImprovement || (costDelta != null && costDelta < 0));
 
       return {
         ...entry.candidate,
@@ -332,6 +397,14 @@ export function rankDesignRecommendations({ baselineRating, evaluatedCandidates 
         degradationProfile,
         priorityLabel: getPriorityLabel(improvementProfile),
         isRealImprovement: improvementProfile.isImprovement,
+        isRecommendationImprovement:
+          improvementProfile.isImprovement ||
+          (viewing?.comparison?.isImprovement === true && !improvementProfile.hasDegradation),
+        viewingBefore: viewing?.before || null,
+        viewingAfter: viewing?.after || null,
+        viewingComparison: viewing?.comparison || null,
+        viewingPriorityMode: viewing?.priorityMode || null,
+        viewingTradeoff,
         hasNewFail: degradationProfile.hasNewFail,
         p12Level: extractP12Level(entry.rating),
         p12BaselineLevel: extractP12Level(baselineRating),
@@ -339,14 +412,16 @@ export function rankDesignRecommendations({ baselineRating, evaluatedCandidates 
     });
 
   // ── IMPROVEMENTS ──
-  // A candidate qualifies only when it produces a genuine RP22 level/profile
-  // improvement: at least one parameter's level/distribution improves and no
-  // parameter degrades. ASDR percentage is a secondary ranking signal.
+  // RP22 improvements remain primary. A multi-row geometry candidate may
+  // additionally qualify when its RP22 profile is preserved and the canonical
+  // selected viewing objective improves materially.
   const improvements = evaluated
-    .filter((item) => item.isRealImprovement)
+    .filter((item) => item.isRecommendationImprovement)
     .sort((a, b) => {
       const cmp = compareImprovementTuples(a.improvementProfile, b.improvementProfile);
       if (cmp !== 0) return cmp;
+      const viewingCmp = compareApplicableViewingCandidates(a, b);
+      if (viewingCmp !== 0) return viewingCmp;
       // Secondary: cost (lower better), disruption (lower), confidence (higher), ASDR (higher)
       const costA = a.costDeltaExVat ?? Infinity;
       const costB = b.costDeltaExVat ?? Infinity;
@@ -374,6 +449,8 @@ export function rankDesignRecommendations({ baselineRating, evaluatedCandidates 
       const degA = a.degradationProfile.degradationScore;
       const degB = b.degradationProfile.degradationScore;
       if (degA !== degB) return degA - degB; // lower degradation = better
+      const viewingCmp = compareApplicableViewingCandidates(a, b);
+      if (viewingCmp !== 0) return viewingCmp;
       if (a.savingExVat !== b.savingExVat) return b.savingExVat - a.savingExVat; // higher saving = better
       return a.scoreDelta - b.scoreDelta; // lower ASDR loss = better
     })
