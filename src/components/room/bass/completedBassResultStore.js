@@ -30,6 +30,86 @@ const listeners = new Set();
 const writeQueues = new Map();
 const syncSignatures = new Map();
 
+// ── Project-keyed refcounted authority manager ──────────────────────────
+// Ensures ONE realtime subscription + ONE initial hydration per project,
+// regardless of how many React consumers call useCompletedBassAuthority.
+// Recommendation candidates are READERS, not persistent subscribers.
+const projectAuthorityState = new Map();
+
+function ensureProjectAuthorityState(key) {
+  if (!projectAuthorityState.has(key)) {
+    projectAuthorityState.set(key, {
+      refCount: 0,
+      hydrationInFlight: null,
+      realtimeSubscription: null,
+      hydrationStarted: false,
+    });
+  }
+  return projectAuthorityState.get(key);
+}
+
+function startProjectHydration(key) {
+  const state = ensureProjectAuthorityState(key);
+  if (state.hydrationInFlight) return state.hydrationInFlight;
+  state.hydrationInFlight = hydrateCompletedBassAuthority(key).finally(() => {
+    state.hydrationInFlight = null;
+  });
+  return state.hydrationInFlight;
+}
+
+function startProjectSubscription(key) {
+  const state = ensureProjectAuthorityState(key);
+  if (state.realtimeSubscription) return;
+  state.realtimeSubscription = base44.entities.ProjectAnalysisCache.subscribe((event) => {
+    if (String(event?.data?.project_id || "") === key) startProjectHydration(key);
+  });
+}
+
+function stopProjectSubscription(key) {
+  const state = projectAuthorityState.get(key);
+  if (state?.realtimeSubscription) {
+    state.realtimeSubscription();
+    state.realtimeSubscription = null;
+  }
+}
+
+function acquireProjectAuthority(key) {
+  const state = ensureProjectAuthorityState(key);
+  state.refCount += 1;
+  if (!state.hydrationStarted) {
+    state.hydrationStarted = true;
+    startProjectHydration(key);
+  }
+  if (key !== "free") startProjectSubscription(key);
+}
+
+function releaseProjectAuthority(key) {
+  const state = projectAuthorityState.get(key);
+  if (!state) return;
+  state.refCount = Math.max(0, state.refCount - 1);
+  if (state.refCount === 0) {
+    stopProjectSubscription(key);
+    state.hydrationStarted = false;
+    state.hydrationInFlight = null;
+  }
+}
+
+// Stable signature for snapshot equality — ignores transient object identity,
+// timestamps, and noise. Uses the canonical result fingerprint + status.
+function authoritySignature(a) {
+  if (!a) return "";
+  return JSON.stringify({
+    s: a.status,
+    a: a.authorityStatus,
+    cf: a.currentFingerprint || null,
+    rf: a.contract?.job?.resultFingerprint || null,
+    sc: a.contract?.selectedCandidateId || null,
+    sc2: a.structurallyComplete,
+    au: a.authoritative,
+    e: a.errorMessage || null,
+  });
+}
+
 const projectKey = (projectId) => String(projectId || "free");
 const emptyAuthority = (projectId) => ({
   projectId: projectKey(projectId),
@@ -174,7 +254,14 @@ export async function hydrateCompletedBassAuthority(projectId) {
     status: record.status,
     completedByFingerprint: record.completed_by_fingerprint,
   } : null;
-  return setMemory(key, resolvePersistedBassAuthority(key, persisted));
+  const next = resolvePersistedBassAuthority(key, persisted);
+  // Ignore unchanged snapshot — don't publish a new store object or notify
+  // listeners merely because a realtime callback fired. Compares canonical
+  // result fingerprint + status + authority flags, not object identity.
+  if (current && authoritySignature(current) === authoritySignature(next)) {
+    return current;
+  }
+  return setMemory(key, next);
 }
 
 export function getCompletedBassAuthority(projectId) {
@@ -192,11 +279,10 @@ export function useCompletedBassAuthority(projectId) {
     () => getCompletedBassAuthority(key),
   );
   useEffect(() => {
-    hydrateCompletedBassAuthority(key);
-    const unsubscribe = key === "free" ? null : base44.entities.ProjectAnalysisCache.subscribe((event) => {
-      if (String(event?.data?.project_id || "") === key) hydrateCompletedBassAuthority(key);
-    });
-    return () => unsubscribe?.();
+    // ONE subscription + ONE hydration per project, shared across all
+    // consumers (baseline + recommendation candidates) via refcounting.
+    acquireProjectAuthority(key);
+    return () => releaseProjectAuthority(key);
   }, [key]);
   return authority;
 }

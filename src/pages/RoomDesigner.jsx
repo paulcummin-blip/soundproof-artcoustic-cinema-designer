@@ -654,7 +654,7 @@ function RoomDesignerWithState() {
   // ── END RSP ───────────────────────────────────────────────────────────────
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
-  console.log('[ROOM placedSpeakers]', placedSpeakers.map(s => String(s?.role)));
+  if (SHOW_DEBUG_LOGS) console.log('[ROOM placedSpeakers]', placedSpeakers.map(s => String(s?.role)));
   const engineSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
   // ANALYSIS MUST ONLY USE SPEAKERS THAT ARE ACTUALLY "IN THE DRAWING"

@@ -1,5 +1,6 @@
 // hooks/useRP22AnalysisEngine.js
 import { useMemo } from 'react';
+import { SHOW_DEBUG_LOGS } from "@/components/utils/diagnostics";
 import { degreesBetweenVectors } from '../utils/geometryUtils';
 import { pickMLP } from '../utils/seatingUtils';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
@@ -483,7 +484,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const temporaryTimestamp = new Date().toISOString();
     const safeSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
     const safeSeats = Array.isArray(seatingPositions) ? seatingPositions : [];
-    console.log("[RP22 ENGINE TRACE]", JSON.stringify({
+    if (SHOW_DEBUG_LOGS) console.log("[RP22 ENGINE TRACE]", JSON.stringify({
       owner: diagnosticOwner,
       runId: temporaryRunId,
       timestamp: temporaryTimestamp,
