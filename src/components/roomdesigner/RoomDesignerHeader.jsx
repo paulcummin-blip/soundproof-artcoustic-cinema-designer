@@ -9,7 +9,6 @@ export default function RoomDesignerHeader({
   setShowResetConfirm,
   isFrozen,
   handleResetPositions,
-  showLocalHint,
   loadState,
   autosaveStatus,
   reloadProject,
@@ -78,25 +77,15 @@ export default function RoomDesignerHeader({
         </div>
       </div>
       <div className="mt-2 text-xs flex items-center gap-4">
-          {/* Scratch mode: single clear message, no project-style statuses */}
-          {!isProjectMode && (
-            <div className="text-xs text-amber-600 inline-flex items-center gap-2">
-              Free Use — local draft, not linked to a project
-            </div>
-          )}
-          {!isProjectMode && autosaveStatus === "local" && (
-            <span className="text-gray-500">Saved locally</span>
-          )}
-
-          {/* Project mode only statuses */}
-          {isProjectMode && loadState.phase === "loading" && <div className="text-xs text-gray-500 inline-flex items-center gap-2"> Loading project... </div>}
-          {isProjectMode && loadState.phase === "loaded" && <div className="text-xs text-gray-600 inline-flex items-center gap-2"> Loaded "{loadState.name}" </div>}
-          {isProjectMode && loadState.phase === "error" && <div className="text-xs text-red-600 inline-flex items-center gap-2"> Error: {loadState.error} <Button size="xs" variant="outline" className="ml-2 h-6 px-2" onClick={() => {const ctrl = new AbortController();reloadProject(ctrl.signal);}}><RotateCcw className="w-3 h-3 mr-1" /> Retry</Button> </div>}
-          {isProjectMode && autosaveStatus === "saving" && <span className="text-gray-500 font-medium">Saving...</span>}
-          {isProjectMode && autosaveStatus === "saved" && <span className="text-green-700 font-medium">Saved</span>}
-          {isProjectMode && autosaveStatus === "dirty" && <span className="text-amber-600 font-medium">Pending changes...</span>}
-          {isProjectMode && autosaveStatus === "hydrating" && <span>Loading project data...</span>}
-          {isProjectMode && projectIdState && (
+          {/* A valid project is always present — project-mode statuses only */}
+          {loadState.phase === "loading" && <div className="text-xs text-gray-500 inline-flex items-center gap-2"> Loading project... </div>}
+          {loadState.phase === "loaded" && <div className="text-xs text-gray-600 inline-flex items-center gap-2"> Loaded "{loadState.name}" </div>}
+          {loadState.phase === "error" && <div className="text-xs text-red-600 inline-flex items-center gap-2"> Error: {loadState.error} <Button size="xs" variant="outline" className="ml-2 h-6 px-2" onClick={() => {const ctrl = new AbortController();reloadProject(ctrl.signal);}}><RotateCcw className="w-3 h-3 mr-1" /> Retry</Button> </div>}
+          {autosaveStatus === "saving" && <span className="text-gray-500 font-medium">Saving...</span>}
+          {autosaveStatus === "saved" && <span className="text-green-700 font-medium">Saved</span>}
+          {autosaveStatus === "dirty" && <span className="text-amber-600 font-medium">Pending changes...</span>}
+          {autosaveStatus === "hydrating" && <span>Loading project data...</span>}
+          {projectIdState && (
             <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
           )}
       </div>

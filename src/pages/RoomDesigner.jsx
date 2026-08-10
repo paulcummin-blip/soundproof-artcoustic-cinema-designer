@@ -129,17 +129,12 @@ function RoomDesignerWithState() {
   const sessionActiveProjectId = useActiveProjectId();
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
 
-  // Single source of truth for the project ID
-  // userProjectOverride: null = defer to session/URL, "free" = explicit Free Use, "<id>" = explicit project choice
-  const [userProjectOverride, setUserProjectOverride] = useState(null);
-
-  // Only resolve from explicit URL param — session state is for display only.
-  // Generic /RoomDesigner (no ?project=) must open as Free Use, not re-attach a stale project.
-  const baseResolvedId = initialProjectIdFromUrl || null;
-  const resolvedProjectId = baseResolvedId
-    ? baseResolvedId
-    : (userProjectOverride === "free" ? null : (userProjectOverride || null));
-  const isProjectMode = !!resolvedProjectId;
+  // Single source of truth for the project ID.
+  // A valid project identity is always required — the page shell redirects to
+  // Projects when neither a URL param nor a session active project is present,
+  // so resolvedProjectId is guaranteed non-null inside RoomDesignerWithState.
+  const resolvedProjectId = initialProjectIdFromUrl || sessionActiveProjectId || null;
+  const isProjectMode = true;
 
   // NEW: Refs for speaker rescue on room resize
   const prevRoomDimsRef = useRef(null);
@@ -253,20 +248,6 @@ function RoomDesignerWithState() {
 
   // Use session active project ID (from Projects page), fallback to URL param for legacy support
   const activeProjectId = sessionActiveProjectId || initialProjectIdFromUrl;
-
-  // Don't block render - allow local-only mode
-  const showLocalHint = !isProjectMode;
-
-  // Free Use: detach from any project, stay local
-  const handleFreeUse = React.useCallback(() => {
-    setUserProjectOverride("free");
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("project");
-      url.searchParams.delete("projectId");
-      window.history.replaceState({}, "", url.toString());
-    } catch (e) { /* ignore */ }
-  }, []);
 
 
 
@@ -1137,7 +1118,7 @@ function RoomDesignerWithState() {
     if (prev && prev.width === W && prev.length === L) return;
     prevRoomDimsRef.current = { width: W, length: L };
     // On first pass (prev === null): still run rescue if any speaker is out of bounds.
-    // This ensures loaded projects get the same correction as interactive Free Use resizes.
+    // This ensures loaded projects get the same correction as interactive resizes.
     const INSET = 0.01; let anyOutOfBounds = false;
     const rescued = placedSpeakers.map((spk) => { if (!spk.position || !Number.isFinite(spk.position.x) || !Number.isFinite(spk.position.y)) return spk; const x = spk.position.x; const y = spk.position.y; if (!(x < 0 || x > W || y < 0 || y > L)) return spk; anyOutOfBounds = true; return { ...spk, position: { ...spk.position, x: Math.max(INSET, Math.min(W - INSET, x)), y: Math.max(INSET, Math.min(L - INSET, y)) } }; });
     if (anyOutOfBounds) setSpeakers((prev) => preserveSurroundModels(prev, rescued, appState));
@@ -1318,8 +1299,8 @@ function RoomDesignerWithState() {
   }, [_sevenBedLayoutType, dolbyPreset, placedSpeakers, setSpeakers, stableDimensions.width, stableDimensions.length, _isFrozen]);
 
   // Speaker reconciliation extracted to useSpeakerReconciliation hook
-  // Clean slate: Free Use (scratch) or immediately after a user-triggered reset
-  const isCleanSlateMode = loadState?.phase === "scratch" || !!didUserRequestResetRef.current;
+  // Clean slate: immediately after a user-triggered reset
+  const isCleanSlateMode = !!didUserRequestResetRef.current;
 
   useSpeakerReconciliation({
     appState, dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers,
@@ -1697,14 +1678,12 @@ function RoomDesignerWithState() {
         setShowResetConfirm={setShowResetConfirm}
         isFrozen={isFrozen}
         handleResetPositions={handleResetPositions}
-        showLocalHint={showLocalHint}
         loadState={loadState}
         autosaveStatus={autosaveStatus}
         reloadProject={reloadProject}
         projectIdState={projectIdState}
         activeProjectId={activeProjectId}
         isProjectMode={isProjectMode}
-        onFreeUse={handleFreeUse}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
       />

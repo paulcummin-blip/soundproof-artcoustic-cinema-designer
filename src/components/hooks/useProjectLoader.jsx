@@ -71,15 +71,15 @@ appState, // Pass appState directly for setters
   setExtraSurroundCount,
   // stableDimensions alias (needed in save/autosave buildProjectData)
   stableDimensions,
-  // Explicit mode: true = real saved project, false = local draft
+  // isProjectMode is retained for signature compatibility; a valid project is
+  // always required (the page shell redirects to Projects when none is present),
+  // so the local-draft / scratch path is retired.
   isProjectMode,
 }) {
   const [projectIdState, setProjectIdState] = useState(projectIdFromUrl);
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
-  const [loadState, setLoadState] = useState(
-    isProjectMode ? { phase: "idle", error: null, name: null } : { phase: "scratch" }
-  );
-  const [autosaveStatus, setAutosaveStatus] = useState(isProjectMode ? "idle" : "local");
+  const [loadState, setLoadState] = useState({ phase: "idle", error: null, name: null });
+  const [autosaveStatus, setAutosaveStatus] = useState("idle");
   const hydratedRoomDimsProjectIdRef = useRef(null);
 
   // SHARED PAYLOAD BUILDER — single source of truth for both autosave and manual save.
@@ -388,8 +388,9 @@ appState, // Pass appState directly for setters
   useEffect(() => {
     const effectiveProjectId = activeProjectId || projectIdState || null;
     if (!effectiveProjectId) {
-      // Scratch mode: stay as "local", never touch backend
-      setAutosaveStatus("local");
+      // No project — the page shell should have redirected to Projects.
+      // Defensive guard: do not touch the backend without a project identity.
+      setAutosaveStatus("idle");
       return;
     }
 
@@ -617,70 +618,13 @@ appState, // Pass appState directly for setters
     const effectiveProjectId = activeProjectId || projectIdState || null;
 
     // Derive current boot target key
-    const currentTargetKey = effectiveProjectId
-      ? "project:" + effectiveProjectId
-      : "scratch";
+    const currentTargetKey = "project:" + effectiveProjectId;
 
     // Already booted for this exact target? Do nothing.
     if (lastBootTargetRef.current === currentTargetKey) return;
 
-    // Scratch mode: skip backend load entirely, ensure state reflects local draft
-    if (!effectiveProjectId) {
-      appState?.setProjectHydrationReady?.(true);
-      setLoadState({ phase: "scratch" });
-      setAutosaveStatus("local");
-      // Free Use starter: always apply clean state on scratch boot, overrides any stale autosave
-      {
-        const freeUseRoom = { widthM: 4.0, lengthM: 6.0, heightM: 2.4 };
-        if (typeof appState?.setRoomDims === "function") {
-          appState.setRoomDims(freeUseRoom);
-        }
-        if (typeof setScreen === "function") {
-          setScreen((prev) => ({
-            ...prev,
-            visibleWidthInches: 120,
-            aspectRatio: prev?.aspectRatio || "16:9",
-            mountMode: "floating",
-            floatDepthM: typeof prev?.floatDepthM === "number" ? prev.floatDepthM : 0.2,
-            heightFromFloorM: 0.5,
-          }));
-        }
-        // 57.5° seating row for 120" screen, measured from the screen plane (not the front wall)
-        const cx = freeUseRoom.widthM / 2;
-        const THETA = 57.5 * Math.PI / 180;
-        const viewWidthM = 120 * 0.0254;
-        const d = (viewWidthM / 2) / Math.tan(THETA / 2);
-        const screenPlaneY = 0.20; // matches default floatDepthM used by MLP effect fallback
-        const y = Math.max(0.4, Math.min(freeUseRoom.lengthM - 0.4, screenPlaneY + d));
-        const spacing = 0.6;
-
-        // Publish matching seating/MLP state so all downstream logic starts from the same anchor
-        if (typeof appState?.setSeatingRows === "function") appState.setSeatingRows(1);
-        if (typeof appState?.setSeatsPerRow === "function") appState.setSeatsPerRow(3);
-        if (typeof appState?.setSeatsPerRowByRow === "function") appState.setSeatsPerRowByRow([3]);
-        if (typeof appState?.setSeatSpacing === "function") appState.setSeatSpacing(0.6);
-        if (typeof appState?.setRowSpacingM === "function") appState.setRowSpacingM(1.8);
-        if (typeof appState?.setSeatingBlockOffset === "function") appState.setSeatingBlockOffset(0);
-        if (typeof appState?.setMlpBasis === "function") appState.setMlpBasis("front");
-        if (typeof appState?.setRowCentersM === "function") appState.setRowCentersM([y]);
-        if (typeof appState?.setMlpY_m === "function") appState.setMlpY_m(y);
-        if (typeof appState?.setMlpOverride === "function") appState.setMlpOverride(null);
-
-        if (typeof setSeatingPositions === "function") {
-          setSeatingPositions([
-            { id: "seat-left",   x: cx - spacing, y, z: 1.2, rowNumber: 1, seatNumber: 1 },
-            { id: "seat-center", x: cx,            y, z: 1.2, rowNumber: 1, seatNumber: 2, isPrimary: true },
-            { id: "seat-right",  x: cx + spacing,  y, z: 1.2, rowNumber: 1, seatNumber: 3 },
-          ]);
-        }
-        // Explicitly clear speakers — no preset seeding
-        if (typeof setSpeakerSystem === "function") {
-          setSpeakerSystem((prev) => ({ ...(prev || {}), placedSpeakers: [] }));
-        }
-      }
-      lastBootTargetRef.current = currentTargetKey;
-      return;
-    }
+    // A valid project is always present (the page shell redirects to Projects
+    // when none exists), so there is no scratch/local-draft boot path here.
 
     const controller = new AbortController();
 
@@ -704,12 +648,6 @@ appState, // Pass appState directly for setters
   );
 
   const manualSaveProject = useCallback(async () => {
-    // Scratch mode: no backend write, stay local
-    if (!isProjectMode) {
-      setAutosaveStatus("local");
-      return { success: true, local: true };
-    }
-
     setAutosaveStatus("saving");
 
     // Work out which project we are saving into:
@@ -768,21 +706,10 @@ appState, // Pass appState directly for setters
           setProjectIdState(effectiveProjectId);
         }
       } else {
-        // First-time save: create a brand new project.
-        savedProject = await Project.create(projectData);
-
-        if (savedProject?.id) {
-          const newId = savedProject.id;
-          setProjectIdState(newId);
-          // Keep URL in sync so future loads work correctly
-          try {
-            const url = new URL(window.location.href);
-            url.searchParams.set("project", newId);
-            window.history.replaceState({}, "", url.toString());
-          } catch (e) {
-            if (globalThis.__B44_LOGS) console.error("Failed to update URL with new project id:", e);
-          }
-        }
+        // A project identity is required to save. Projects are created only via
+        // the Projects flow, never silently from inside Room Designer.
+        setAutosaveStatus("error");
+        return { success: false, error: "No project is open. Open a project from Projects first." };
       }
 
       if (savedProject) {
