@@ -131,9 +131,9 @@ export default function ViewingAnglePanel({
 
       return {
         rowNumber: rn,
-        angle,
-        distToScreen,
-        levelCode, // 'L1'|'L2'|'L3'|'L4'|null
+        viewingAngleDeg: angle,
+        viewingDistanceM: distToScreen,
+        rp23Level: levelCode, // 'L1'|'L2'|'L3'|'L4'|null
       };
     });
   }, [seatingPositions, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
@@ -179,9 +179,9 @@ export default function ViewingAnglePanel({
           </div>
           {/* Rows */}
           {perRowData.map((row, idx) => {
-            const levelNum = row.levelCode ? parseInt(row.levelCode.replace('L', ''), 10) : 0;
+            const levelNum = row.rp23Level ? parseInt(row.rp23Level.replace('L', ''), 10) : 0;
             const colors = getLevelColors(levelNum);
-            const levelLabel = row.levelCode ?? 'Fail';
+            const levelLabel = row.rp23Level ?? 'Fail';
             const isEven = idx % 2 === 1;
             return (
               <div
@@ -198,10 +198,10 @@ export default function ViewingAnglePanel({
               >
                 <div style={{ fontSize: 13, color: '#625143', fontWeight: 600 }}>R{row.rowNumber}</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#1B1A1A', letterSpacing: '-0.5px' }}>
-                  {row.angle != null ? `${row.angle.toFixed(1)}°` : '—'}
+                  {row.viewingAngleDeg != null ? `${row.viewingAngleDeg.toFixed(1)}°` : '—'}
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#1B1A1A', letterSpacing: '-0.5px' }}>
-                  {`${row.distToScreen.toFixed(2)} m`}
+                  {`${row.viewingDistanceM.toFixed(2)} m`}
                 </div>
                 <div style={{
                   fontSize: '13px',
