@@ -107,6 +107,9 @@ export function serializeProject(input = {}) {
     rspMode = "auto_from_screen",
     manualRspY_m = null,
     manualRspX_m = null,
+
+    // Viewing priority (multi-row viewing intent)
+    viewingPriority = "balanced",
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -281,5 +284,10 @@ export function serializeProject(input = {}) {
     rsp_mode: typeof rspMode === "string" && rspMode ? rspMode : "auto_from_screen",
     manual_rsp_y_m: Number.isFinite(Number(manualRspY_m)) ? Number(manualRspY_m) : null,
     manual_rsp_x_m: Number.isFinite(Number(manualRspX_m)) ? Number(manualRspX_m) : null,
+
+    // Viewing priority (multi-row viewing intent) — project-scoped
+    viewing_priority: typeof viewingPriority === "string" && viewingPriority
+      ? viewingPriority
+      : "balanced",
   };
 }

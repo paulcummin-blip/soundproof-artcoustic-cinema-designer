@@ -336,6 +336,19 @@
       "description": "Explicit RSP X position in meters when rsp_mode is manual_position. Null = use room centreline.",
       "nullable": true
     },
+    "viewing_priority": {
+      "type": "string",
+      "enum": [
+        "balanced",
+        "row_1",
+        "row_2",
+        "row_3",
+        "row_4",
+        "row_5"
+      ],
+      "default": "balanced",
+      "description": "Multi-row viewing intent. 'balanced' = lexicographic balanced comparator across all rows; 'row_N' = prioritise row N. Normalised against current row count at runtime."
+    },
     "account_id": {
       "type": "string",
       "description": "ID of the Account this project belongs to"

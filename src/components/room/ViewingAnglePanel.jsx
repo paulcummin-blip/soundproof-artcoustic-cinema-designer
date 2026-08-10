@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Eye, Ruler } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
 import { calculateViewingAngle, assignRP23Level, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
+import { buildViewingPrioritySummary, describeViewingBalance } from '@/components/utils/viewingPriorityAuthority';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { Switch } from '@/components/ui/switch';
@@ -14,7 +15,8 @@ export default function ViewingAnglePanel({
   mlpOverride,
   mlpDotOffsetM,
   showMlpRuler = false,
-  onShowMlpRulerChange
+  onShowMlpRulerChange,
+  viewingPriority = "balanced",
 }) {
   // Pull derived MLP from app state
   const { mlpY_m, screenFrontPlaneM: appScreenFrontPlaneM } = useAppState() || {};
@@ -222,8 +224,34 @@ export default function ViewingAnglePanel({
               </div>
             );
           })}
-        </div>
-      )}
-    </div>);
+          </div>
+          )}
 
-}
+          {/* VIEWING BALANCE summary — multi-row only. No fake RP23 balance level. */}
+          {perRowData.length >= 2 && (() => {
+          const summary = buildViewingPrioritySummary(perRowData, viewingPriority);
+          const balanceText = describeViewingBalance(summary);
+          if (!balanceText) return null;
+          return (
+          <div style={{
+            border: '1px solid #C1B6AD',
+            borderRadius: 8,
+            padding: '8px 12px',
+            backgroundColor: '#F8F8F7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#625143', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Viewing Balance
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#1B1A1A', textAlign: 'right' }}>
+              {balanceText}
+            </span>
+          </div>
+          );
+          })()}
+          </div>);
+
+          }

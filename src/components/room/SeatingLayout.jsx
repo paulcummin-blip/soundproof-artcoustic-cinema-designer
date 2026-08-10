@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { clampViewingOffset } from "@/components/utils/screenMetrics";
 import RP22GradingPill from '../ui/RP22GradingPill';
 import ViewingAnglePanel from './ViewingAnglePanel';
+import ViewingPriorityControl from './ViewingPriorityControl';
 import { useAppState } from '@/components/AppStateProvider';
 
 // Single source of truth for target MLP Y computation - now using WIDTH for horizontal FOV
@@ -101,6 +102,9 @@ export default function SeatingLayout({
   onManualRspX_mChange,
   manualRspY_m = null,
   onManualRspY_mChange,
+  // Viewing priority (multi-row viewing intent)
+  viewingPriority = "balanced",
+  onViewingPriorityChange,
 }) {
   // Build rowsArray purely from props (parent is the source of truth)
   const rowsArray = React.useMemo(() => {
@@ -938,6 +942,13 @@ export default function SeatingLayout({
     </div>
   </div>
 
+  {/* Viewing Priority — multi-row viewing intent (hidden for single-row rooms) */}
+  <ViewingPriorityControl
+        rowCount={rowCount}
+        viewingPriority={viewingPriority}
+        onViewingPriorityChange={onViewingPriorityChange}
+        disabled={disabled} />
+
   {/* Viewing Angle Panel */}
   <ViewingAnglePanel
         screen={screen}
@@ -946,7 +957,8 @@ export default function SeatingLayout({
         mlpOverride={mlpOverride}
         mlpDotOffsetM={seatingBlockOffset}
         showMlpRuler={showMlpRuler}
-        onShowMlpRulerChange={onShowMlpRulerChange} />
+        onShowMlpRulerChange={onShowMlpRulerChange}
+        viewingPriority={viewingPriority} />
 
     </div>);
 

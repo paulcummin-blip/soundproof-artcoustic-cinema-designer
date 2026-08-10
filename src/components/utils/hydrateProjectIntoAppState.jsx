@@ -522,6 +522,14 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     setManualRspX_m(Number.isFinite(x) ? x : null);
   }
 
+  // 10e) VIEWING PRIORITY (multi-row viewing intent) — project-scoped
+  if (typeof appState?.setViewingPriority === "function") {
+    const vp = typeof p?.viewing_priority === "string" && p.viewing_priority
+      ? p.viewing_priority
+      : "balanced";
+    appState.setViewingPriority(vp);
+  }
+
   // 11) PLACED SPEAKERS
   const loadedSpeakers = (() => {
     const v1 = parseMaybe(p?.selected_speakers, null);

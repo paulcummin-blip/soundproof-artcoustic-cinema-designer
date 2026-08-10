@@ -780,6 +780,14 @@ function useDesignerState() {
   const { rspMode, setRspMode, manualRspY_m, setManualRspY_m, manualRspX_m, setManualRspX_m, resetRspState } = useRspState(__autosavePayload);
   // ── END RSP STATE ─────────────────────────────────────────────────────────
 
+  // ── VIEWING PRIORITY (multi-row viewing intent) ──────────────────────────
+  const [viewingPriority, setViewingPriority] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.viewingPriority === "string")
+      ? __autosavePayload.viewingPriority
+      : "balanced"
+  ));
+  // ── END VIEWING PRIORITY ───────────────────────────────────────────────────
+
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
@@ -1447,6 +1455,7 @@ function useDesignerState() {
       if (Array.isArray(p.rowEarHeights) && p.rowEarHeights.length > 0) setRowEarHeights(p.rowEarHeights);
       if (typeof p.rsp_mode === "string") setRspMode(p.rsp_mode);
       if (p.manual_rsp_y_m !== undefined) setManualRspY_m(typeof p.manual_rsp_y_m === "number" ? p.manual_rsp_y_m : null);
+      if (typeof p.viewingPriority === "string") setViewingPriority(p.viewingPriority);
       if (typeof p.designEqEnabled === "boolean") setDesignEqEnabled(p.designEqEnabled);
       if (Object.prototype.hasOwnProperty.call(p, "p12Mode")) setP12Mode(p.p12Mode);
 
@@ -1538,6 +1547,7 @@ function useDesignerState() {
       rsp_mode: rspMode,
       manual_rsp_y_m: manualRspY_m,
       manual_rsp_x_m: manualRspX_m,
+      viewingPriority,
       designEqEnabled,
       p12Mode,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
@@ -1600,7 +1610,8 @@ function useDesignerState() {
     subwooferInstances,
     subwooferInstancesStatus,
     subwooferInstanceMigrationState,
-    p12Mode
+    p12Mode,
+    viewingPriority,
     ]);
 
   const restoreAutosave = useCallback(() => {
@@ -2021,6 +2032,8 @@ function useDesignerState() {
     manualRspX_m,
     setManualRspX_m,
     resetRspState,
+    viewingPriority,
+    setViewingPriority,
     };
   }, [
     dimensions, setDimensions,
@@ -2123,6 +2136,8 @@ function useDesignerState() {
     manualRspX_m,
     setManualRspX_m,
     resetRspState,
+    viewingPriority,
+    setViewingPriority,
   ]);
 
   value.setP21EarlyReflectionPreset = setP21EarlyReflectionPresetSafe;

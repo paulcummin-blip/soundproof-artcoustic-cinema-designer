@@ -130,6 +130,7 @@ appState, // Pass appState directly for setters
       p12Level: appState.p12Level,
       rspMode: appState?.rspMode,
       manualRspY_m: appState?.manualRspY_m,
+      viewingPriority: appState?.viewingPriority,
     });
     return projectData;
   }, [
@@ -607,7 +608,8 @@ appState, // Pass appState directly for setters
   appState?.subwooferInstancesStatus,
   appState?.subwooferInstanceMigrationState,
   appState?.rspMode,
-  appState?.manualRspY_m]
+  appState?.manualRspY_m,
+  appState?.viewingPriority]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults
