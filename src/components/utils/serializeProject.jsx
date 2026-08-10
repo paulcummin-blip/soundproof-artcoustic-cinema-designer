@@ -7,6 +7,7 @@
 // OUTPUT: flat object that matches entities/Project.json
 
 import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
+import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 
 // Helper: safely parse JSON strings or return native types unchanged
 function safeParseJson(value) {
@@ -285,9 +286,17 @@ export function serializeProject(input = {}) {
     manual_rsp_y_m: Number.isFinite(Number(manualRspY_m)) ? Number(manualRspY_m) : null,
     manual_rsp_x_m: Number.isFinite(Number(manualRspX_m)) ? Number(manualRspX_m) : null,
 
-    // Viewing priority (multi-row viewing intent) — project-scoped
-    viewing_priority: typeof viewingPriority === "string" && viewingPriority
-      ? viewingPriority
-      : "balanced",
+    // Viewing priority (multi-row viewing intent) — project-scoped.
+    // Normalise at the persistence boundary as a final guard against stale
+    // row_N values during the same render in which a row is removed.
+    viewing_priority: normaliseViewingPriority(
+      viewingPriority,
+      Math.max(
+        1,
+        asArray(seatsPerRowByRow).length,
+        Number(seatingRows) || 0,
+        ...asArray(seatingPositions).map((seat) => Number(seat?.rowNumber) || 1)
+      )
+    ),
   };
 }
