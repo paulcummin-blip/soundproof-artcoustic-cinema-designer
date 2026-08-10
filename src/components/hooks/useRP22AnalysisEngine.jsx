@@ -1687,6 +1687,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     dolbyLayout,
     screen?.mountMode,
     screen?.floatDepthM,
+    screen?.visibleWidthInches,
+    screen?.frontPlaneM,
     seatResponses,
     includeBassAnalysis,
     designEqUsableLfHz,
