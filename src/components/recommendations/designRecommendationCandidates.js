@@ -16,7 +16,11 @@ const LCR_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 const WIDE_ROLES = new Set(["LW", "RW"]);
 const MID_UPPER_ROLES = new Set(["TML", "TMR", "TL", "TR"]);
 
-const finite = (value) => Number.isFinite(Number(value));
+const finite = (value) =>
+  value !== null &&
+  value !== undefined &&
+  value !== "" &&
+  Number.isFinite(Number(value));
 const roleOf = (speaker) => String(speaker?.role || "").toUpperCase();
 
 function cloneSeatWithDelta(seat, deltaY) {
