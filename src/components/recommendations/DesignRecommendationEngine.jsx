@@ -21,6 +21,8 @@ import {
   rankDesignRecommendations,
 } from "./designRecommendationCandidates";
 
+const EMPTY_SELECTIONS = Object.freeze({});
+
 function CandidateRatingEvaluator({
   candidate,
   appState,
@@ -130,9 +132,10 @@ export default function DesignRecommendationEngine({
   projectId,
   baselineRating,
   allowUkPricing = true,
-  soundbarSelections = {},
+  soundbarSelections = null,
   onRecommendationsChange,
 }) {
+  const safeSoundbarSelections = soundbarSelections || EMPTY_SELECTIONS;
   const candidates = useMemo(() => buildDesignRecommendationCandidates({
     seats,
     placedSpeakers,
@@ -140,7 +143,7 @@ export default function DesignRecommendationEngine({
     dolbyLayout,
     dimensions,
     mlpPoint,
-    soundbarSelections,
+    soundbarSelections: safeSoundbarSelections,
     allowUkPricing,
   }), [
     seats,
@@ -149,7 +152,7 @@ export default function DesignRecommendationEngine({
     dolbyLayout,
     dimensions,
     mlpPoint,
-    soundbarSelections,
+    safeSoundbarSelections,
     allowUkPricing,
   ]);
 
