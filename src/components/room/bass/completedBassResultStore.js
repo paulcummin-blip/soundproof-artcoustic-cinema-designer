@@ -31,9 +31,12 @@ const writeQueues = new Map();
 const syncSignatures = new Map();
 
 // ── Project-keyed refcounted authority manager ──────────────────────────
-// Ensures ONE realtime subscription + ONE initial hydration per project,
-// regardless of how many React consumers call useCompletedBassAuthority.
-// Recommendation candidates are READERS, not persistent subscribers.
+// Ensures ONE initial hydration per project regardless of how many React
+// consumers call useCompletedBassAuthority. Runtime updates are published
+// directly by BassBackgroundAnalysisOwner through this same module. We do not
+// attach an entity realtime listener: ProjectAnalysisCache records exceed the
+// broadcast field limit, so those broadcasts are stubs and only create noisy
+// SDK errors before a full hydrate is required anyway.
 const projectAuthorityState = new Map();
 
 function ensureProjectAuthorityState(key) {
@@ -41,7 +44,6 @@ function ensureProjectAuthorityState(key) {
     projectAuthorityState.set(key, {
       refCount: 0,
       hydrationInFlight: null,
-      realtimeSubscription: null,
       hydrationStarted: false,
     });
   }
@@ -57,22 +59,6 @@ function startProjectHydration(key) {
   return state.hydrationInFlight;
 }
 
-function startProjectSubscription(key) {
-  const state = ensureProjectAuthorityState(key);
-  if (state.realtimeSubscription) return;
-  state.realtimeSubscription = base44.entities.ProjectAnalysisCache.subscribe((event) => {
-    if (String(event?.data?.project_id || "") === key) startProjectHydration(key);
-  });
-}
-
-function stopProjectSubscription(key) {
-  const state = projectAuthorityState.get(key);
-  if (state?.realtimeSubscription) {
-    state.realtimeSubscription();
-    state.realtimeSubscription = null;
-  }
-}
-
 function acquireProjectAuthority(key) {
   const state = ensureProjectAuthorityState(key);
   state.refCount += 1;
@@ -80,7 +66,6 @@ function acquireProjectAuthority(key) {
     state.hydrationStarted = true;
     startProjectHydration(key);
   }
-  if (key !== "free") startProjectSubscription(key);
 }
 
 function releaseProjectAuthority(key) {
@@ -88,7 +73,6 @@ function releaseProjectAuthority(key) {
   if (!state) return;
   state.refCount = Math.max(0, state.refCount - 1);
   if (state.refCount === 0) {
-    stopProjectSubscription(key);
     state.hydrationStarted = false;
     state.hydrationInFlight = null;
   }
@@ -292,8 +276,9 @@ export function useCompletedBassAuthority(projectId) {
     () => getCompletedBassAuthority(key),
   );
   useEffect(() => {
-    // ONE subscription + ONE hydration per project, shared across all
-    // consumers (baseline + recommendation candidates) via refcounting.
+    // ONE hydration per project, shared across all consumers (baseline +
+    // recommendation candidates) via refcounting. Runtime authority changes
+    // publish directly through this module; route remounts rehydrate once.
     acquireProjectAuthority(key);
     return () => releaseProjectAuthority(key);
   }, [key]);
