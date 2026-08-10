@@ -151,7 +151,7 @@ export default function TechnicalProjectOverview({
           {[
             { label: "PROJECT", value: projectDetails?.name || "—" },
             { label: "CLIENT", value: projectDetails?.client_name || "—" },
-            { label: "DATE", value: exportDateLabel || "—" },
+            { label: "DATE", value: formatDateShort(projectDetails?.created_date) },
             { label: "LAST UPDATED", value: formatDateShort(projectDetails?.updated_date) },
           ].map((item) => (
             <div key={item.label}>
