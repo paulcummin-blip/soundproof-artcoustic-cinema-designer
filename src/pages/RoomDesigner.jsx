@@ -1,11 +1,6 @@
 "use client";
 import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense, useSyncExternalStore } from "react";
-import { Button } from "@/components/ui/button";
-import { Save, AlertCircle, RotateCcw, Compass, Layers3, Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
-import { Project } from "@/entities/Project"; // Import the Project entity SDK
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Ruler, Speaker } from "lucide-react";
 import { SidebarInset } from "@/components/ui/sidebar"; // NEW: Import SidebarInset
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import ResizableTwoColumnLayout from "@/components/ui/ResizableTwoColumnLayout";
@@ -25,7 +20,6 @@ import { useActiveProjectId } from "@/components/state/project-session";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
-import { getQueryParam } from "@/components/utils/query";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { serializeProject } from "@/components/utils/serializeProject";
 import { equalizeBedAngles } from "@/components/optimizer/equalizeBedAngles";
