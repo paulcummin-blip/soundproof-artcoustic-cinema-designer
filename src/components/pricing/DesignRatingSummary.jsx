@@ -37,6 +37,14 @@ function RecommendationRow({ item, mode }) {
   const showP12 = isSaving && item?.kind === 'lcr' && item?.p12Level;
   const p12Warning = item?.p12Level === 'L1' && ['L2', 'L3', 'L4'].includes(item?.p12BaselineLevel);
   const viewingText = formatViewingRecommendationSummary(item);
+  const powerBeforeW = Number(item?.lcrPowerBeforeW);
+  const powerAfterW = Number(item?.lcrPowerAfterW);
+  const amplifierText =
+    item?.amplifierUpgradeRequired === true &&
+    Number.isFinite(powerBeforeW) &&
+    Number.isFinite(powerAfterW)
+      ? `Amplification: ${Math.round(powerBeforeW)} → ${Math.round(powerAfterW)} W/ch`
+      : null;
 
   let valueText;
   if (isSaving) {
@@ -49,7 +57,10 @@ function RecommendationRow({ item, mode }) {
   } else if (Number(item?.costDeltaExVat) < 0) {
     valueText = `${levelChangeText ? levelChangeText + ' · ' : ''}saves ${formatMoney(Math.abs(item.costDeltaExVat))} ex VAT`;
   } else if (cost) {
-    valueText = `${levelChangeText ? levelChangeText + ' · ' : ''}${cost} ex VAT`;
+    const priceScope = item?.amplifierUpgradeRequired
+      ? ' (LCR speakers; amplifier not priced)'
+      : '';
+    valueText = `${levelChangeText ? levelChangeText + ' · ' : ''}${cost} ex VAT${priceScope}`;
   } else {
     valueText = levelChangeText || 'Profile improved';
   }
@@ -61,12 +72,22 @@ function RecommendationRow({ item, mode }) {
           {item.priorityLabel}
         </div>
       )}
+      {item?.materialUpgradeLabel && (
+        <div style={{ fontSize: 9, fontWeight: 800, color: '#625143', marginBottom: 3, letterSpacing: '0.05em' }}>
+          {item.materialUpgradeLabel}
+        </div>
+      )}
       <div style={{ fontSize: 11, lineHeight: 1.35, fontWeight: 700, color: '#213428' }}>
         {item.title}
       </div>
       <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
         {valueText}
       </div>
+      {amplifierText && (
+        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#3E4349' }}>
+          {amplifierText}
+        </div>
+      )}
       {viewingText && (
         <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: item?.viewingTradeoff ? '#9a6800' : '#625143' }}>
           {viewingText}
