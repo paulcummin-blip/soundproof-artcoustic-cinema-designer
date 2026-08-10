@@ -74,6 +74,75 @@ export function rp23DisplayAngleDeg(angleDeg) {
 }
 
 /**
+ * Resolve the canonical visible screen width used by the live viewing panel.
+ * TV presets retain their measured visible-width authority; projector/manual
+ * screens consume the persisted visible width.
+ */
+export function resolveVisibleScreenWidthInches(screen = null) {
+  const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
+  const tvKey = screen?.tvPresetKey;
+  const tvMm = Number(screen?.tvWidthMm);
+  if (tvKey && TV_KEY_TO_INCHES[tvKey]) return TV_KEY_TO_INCHES[tvKey];
+  if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
+  const visibleWidthInches = Number(screen?.visibleWidthInches);
+  return Number.isFinite(visibleWidthInches) && visibleWidthInches > 0
+    ? visibleWidthInches
+    : 100;
+}
+
+/**
+ * Build canonical per-row viewing data for all consumers.
+ *
+ * This owns no RP23 thresholds: it delegates angle calculation and grading to
+ * calculateViewingAngle / rp23LevelForAngleDeg, then returns the input shape
+ * consumed by viewingPriorityAuthority.
+ */
+export function buildPerRowViewingData({
+  seatingPositions = [],
+  screen = null,
+  screenFrontPlaneM = null,
+} = {}) {
+  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return [];
+
+  const planeM = Number(screenFrontPlaneM);
+  if (!Number.isFinite(planeM)) return [];
+
+  const visibleWidthInches = resolveVisibleScreenWidthInches(screen);
+  const byRow = new Map();
+
+  for (const seat of seatingPositions) {
+    const rowNumber = Number(seat?.rowNumber ?? 1);
+    if (!Number.isFinite(rowNumber) || rowNumber <= 0) continue;
+    if (!byRow.has(rowNumber)) byRow.set(rowNumber, []);
+    byRow.get(rowNumber).push(seat);
+  }
+
+  return [...byRow.entries()]
+    .sort(([rowA], [rowB]) => rowA - rowB)
+    .map(([rowNumber, rowSeats]) => {
+      const centreY = rowSeats.reduce(
+        (sum, seat) => sum + (Number(seat?.y) || 0),
+        0
+      ) / rowSeats.length;
+      const viewingAngleDeg = calculateViewingAngle(
+        { y: centreY },
+        visibleWidthInches,
+        screen?.aspectRatio || "16:9",
+        { y: planeM }
+      );
+
+      return {
+        rowNumber,
+        viewingAngleDeg,
+        viewingDistanceM: Math.max(0, centreY - planeM),
+        rp23Level: viewingAngleDeg == null
+          ? null
+          : rp23LevelForAngleDeg(viewingAngleDeg),
+      };
+    });
+}
+
+/**
  * Assign RP23 level based on viewing angle (legacy compatibility)
  * @param {number} viewingAngle - Viewing angle in degrees
  * @returns {object} RP23 level information
