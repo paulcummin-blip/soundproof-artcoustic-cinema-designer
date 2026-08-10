@@ -148,6 +148,9 @@ export default function RoomDesignerControlsPanel({
   onManualRspX_mChange,
   manualRspY_m,
   onManualRspY_mChange,
+  // Viewing priority
+  viewingPriority,
+  onViewingPriorityChange,
 }) {
   const [rightPanelView, setRightPanelView] = useState('controls');
 
@@ -501,7 +504,9 @@ export default function RoomDesignerControlsPanel({
               manualRspX_m={manualRspX_m}
               onManualRspX_mChange={onManualRspX_mChange}
               manualRspY_m={manualRspY_m}
-              onManualRspY_mChange={onManualRspY_mChange} />
+              onManualRspY_mChange={onManualRspY_mChange}
+              viewingPriority={viewingPriority}
+              onViewingPriorityChange={onViewingPriorityChange} />
           </Suspense>
         </CollapsiblePanel>
 
