@@ -35,6 +35,8 @@ function RecommendationRow({ item, mode }) {
       : `${formatPoints(-item.scoreLoss)} rating impact`;
   } else if (item?.costDeltaExVat === 0) {
     valueText = `${formatPoints(item.scoreDelta, true)} · £0 equipment`;
+  } else if (Number(item?.costDeltaExVat) < 0) {
+    valueText = `${formatPoints(item.scoreDelta, true)} · saves ${formatMoney(Math.abs(item.costDeltaExVat))} ex VAT`;
   } else if (cost) {
     valueText = `${formatPoints(item.scoreDelta, true)} · ${cost} ex VAT`;
   } else {
