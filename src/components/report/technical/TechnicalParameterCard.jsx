@@ -74,7 +74,7 @@ function ThresholdStrip({ thresholds, unit }) {
         const value = thresholds[k];
         const formatted = formatThresholdValue(value, unit, thresholds.direction);
         return (
-          <React.Fragment key={k}>
+          <span key={k} style={{ display: "contents" }}>
             {i > 0 && (
               <span
                 style={{
@@ -90,7 +90,7 @@ function ThresholdStrip({ thresholds, unit }) {
               <strong style={{ color: "#3E4349", fontWeight: 700 }}>{k}</strong>{" "}
               {formatted}
             </span>
-          </React.Fragment>
+          </span>
         );
       })}
     </div>
