@@ -99,6 +99,25 @@ function RP22ReportInner() {
         searchParams.get("projectId") ||
         searchParams.get("id") ||
         activeProjectId;
+
+    // SPA handoff: Room Designer has already run the canonical recommendation
+    // candidates for this exact project. Reuse that settled authority instead
+    // of mounting a second route-local evaluator with separately hydrated
+    // inputs. A direct report load has no handoff and still evaluates normally.
+    useEffect(() => {
+        const shared = typeof window !== "undefined" ? window.__ROOM_DESIGNER_ASDR__ : null;
+        const sharedProjectId = String(shared?.projectId || "");
+        const requestedProjectId = String(effectiveProjectId || "free");
+        if (
+            sharedProjectId === requestedProjectId &&
+            shared?.recommendations?.isSettled === true
+        ) {
+            setDesignRecommendations(shared.recommendations);
+        } else {
+            setDesignRecommendations(null);
+        }
+    }, [effectiveProjectId]);
+
     const completedBassAuthority = useCompletedBassAuthority(effectiveProjectId || "free");
     const completedBassContract = completedBassAuthority.contract;
     const bassErrorMessage = completedBassAuthority.errorMessage || null;
@@ -1070,7 +1089,7 @@ function RP22ReportInner() {
             <ReportPrintStyles />
 
             {/* ── Canonical ASDR recommendation engine (renders nothing; publishes evaluated shortlists) ── */}
-            {showDesignRating && roomDesignRating && (
+            {showDesignRating && roomDesignRating && !designRecommendations?.isSettled && (
                 <DesignRecommendationEngine
                     appState={app}
                     seats={seats}
