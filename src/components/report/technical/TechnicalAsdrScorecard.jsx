@@ -17,6 +17,7 @@
 
 import React from "react";
 import { getHumanTitleForParam } from "./technicalParameterMeta";
+import TechnicalAsdrRecommendations from "./TechnicalAsdrRecommendations";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -160,6 +161,7 @@ function ScorecardGroup({ label, contribs }) {
 export default function TechnicalAsdrScorecard({
   roomDesignRating,
   showDesignRating = false,
+  recommendations = null,
 }) {
   if (!showDesignRating || !roomDesignRating) {
     return null;
@@ -183,7 +185,7 @@ export default function TechnicalAsdrScorecard({
       className="tech-asdr-scorecard"
       style={{
         background: COLORS.bg,
-        minHeight: "268mm",
+        minHeight: "232mm",
         padding: "8mm 10mm",
         boxSizing: "border-box",
         WebkitPrintColorAdjust: "exact",
@@ -193,7 +195,7 @@ export default function TechnicalAsdrScorecard({
       }}
     >
       {/* ── Page heading ── */}
-      <div style={{ marginBottom: "5mm" }}>
+      <div style={{ marginBottom: "4mm" }}>
         <div
           style={{
             fontFamily: FONT_HEADING,
@@ -228,7 +230,7 @@ export default function TechnicalAsdrScorecard({
           border: `1px solid ${COLORS.border}`,
           borderRadius: 6,
           padding: "6mm 8mm",
-          marginBottom: "5mm",
+          marginBottom: "4mm",
           breakInside: "avoid",
           pageBreakInside: "avoid",
         }}
@@ -337,10 +339,13 @@ export default function TechnicalAsdrScorecard({
         ))}
       </div>
 
+      {/* ── Evaluated recommendations (best improvement / best cost saving) ── */}
+      <TechnicalAsdrRecommendations recommendations={recommendations} />
+
       {/* ── Client language note ── */}
       <div
         style={{
-          marginTop: "5mm",
+          marginTop: "3mm",
           fontSize: "8pt",
           color: COLORS.secondary,
           fontFamily: FONT_BODY,

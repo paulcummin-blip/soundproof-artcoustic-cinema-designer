@@ -56,6 +56,9 @@ import {
   calculateSeatDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
 import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/asdrVisibilityStore';
+import DesignRecommendationEngine from '@/components/recommendations/DesignRecommendationEngine';
+import { useAuth } from '@/lib/AuthContext';
+import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -75,6 +78,17 @@ function RP22ReportInner() {
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
+
+    // ── ASDR recommendation wiring ───────────────────────────────────────
+    // The report consumes the SAME canonical DesignRecommendationEngine used
+    // by the live Room Designer. No recommendation logic is duplicated here —
+    // the engine component runs the same candidate re-runs and publishes its
+    // evaluated shortlists via onRecommendationsChange.
+    const { user: reportUser } = useAuth();
+    const reportTerritory = reportUser?.territory || DEFAULT_TERRITORY;
+    const reportTerritoryConfig = getTerritoryConfig(reportTerritory);
+    const reportAllowUkPricing = !!reportTerritoryConfig?.priceListAvailable && reportTerritory === "UK";
+    const [designRecommendations, setDesignRecommendations] = React.useState(null);
 
     const { projectId: routeProjectId } = useParams();
     const [searchParams] = useSearchParams();
@@ -1021,6 +1035,24 @@ function RP22ReportInner() {
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <ReportPrintStyles />
 
+            {/* ── Canonical ASDR recommendation engine (renders nothing; publishes evaluated shortlists) ── */}
+            {showDesignRating && roomDesignRating && (
+                <DesignRecommendationEngine
+                    appState={app}
+                    seats={seats}
+                    placedSpeakers={placedSpeakers}
+                    screen={screen}
+                    dolbyLayout={reportDolbyLayout}
+                    dimensions={stableDimensions}
+                    mlpPoint={primarySeatingPosition}
+                    projectId={effectiveProjectId || "free"}
+                    baselineRating={roomDesignRating}
+                    allowUkPricing={reportAllowUkPricing}
+                    soundbarSelections={app?.soundbarSelections || null}
+                    onRecommendationsChange={setDesignRecommendations}
+                />
+            )}
+
             <div className="screen-only">
                 <ReportHiddenCaptures
                     app={app}
@@ -1284,6 +1316,7 @@ function RP22ReportInner() {
                                     <TechnicalAsdrScorecard
                                         roomDesignRating={roomDesignRating}
                                         showDesignRating={showDesignRating}
+                                        recommendations={designRecommendations}
                                     />
                                 </div>
                             )}
