@@ -97,6 +97,8 @@ export default function SeatingLayout({
   // RSP mode
   rspMode = "auto_from_screen",
   onRspModeChange,
+  manualRspX_m = null,
+  onManualRspX_mChange,
   manualRspY_m = null,
   onManualRspY_mChange,
 }) {
@@ -818,8 +820,58 @@ export default function SeatingLayout({
         })()}
 
         {rspMode === "manual_position" && (
-          <div className="space-y-1 pt-1">
-            <Label className="text-xs" style={{ color: '#625143' }}>RSP Position (m)</Label>
+          <div className="space-y-2 pt-1">
+            <Label className="text-xs" style={{ color: '#625143' }}>RSP X Position (m)</Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={disabled}
+                onClick={() => {
+                  const roomW = Number(dimensions?.width) || 10;
+                  const base = Number.isFinite(manualRspX_m) ? manualRspX_m : roomW / 2;
+                  const next = Math.max(0.2, Math.min(roomW - 0.2, Math.round((base - 0.01) * 1000) / 1000));
+                  onManualRspX_mChange?.(next);
+                }}
+                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
+                –
+              </Button>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.2"
+                max={Number(dimensions?.width) ? (Number(dimensions.width) - 0.2).toFixed(2) : "20"}
+                value={Number.isFinite(manualRspX_m) ? (Math.round(manualRspX_m * 100) / 100).toFixed(2) : ''}
+                disabled={disabled}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  const roomW = Number(dimensions?.width) || 0;
+                  if (Number.isFinite(val) && roomW > 0) {
+                    const clamped = Math.max(0.2, Math.min(roomW - 0.2, Math.round(val * 1000) / 1000));
+                    onManualRspX_mChange?.(clamped);
+                  }
+                }}
+                className="h-10 flex-1 text-center"
+                style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={disabled}
+                onClick={() => {
+                  const roomW = Number(dimensions?.width) || 10;
+                  const base = Number.isFinite(manualRspX_m) ? manualRspX_m : roomW / 2;
+                  const next = Math.max(0.2, Math.min(roomW - 0.2, Math.round((base + 0.01) * 1000) / 1000));
+                  onManualRspX_mChange?.(next);
+                }}
+                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
+                +
+              </Button>
+            </div>
+
+            <Label className="text-xs" style={{ color: '#625143' }}>RSP Y Position (m)</Label>
             <div className="flex items-center gap-2">
               <Button
                 type="button"
@@ -864,6 +916,24 @@ export default function SeatingLayout({
             </div>
           </div>
         )}
+
+        {/* Reset RSP to 57.5° — restores auto_from_screen and clears manual X/Y */}
+        <div className="pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            onClick={() => {
+              onRspModeChange?.("auto_from_screen");
+              onManualRspX_mChange?.(null);
+              onManualRspY_mChange?.(null);
+            }}
+            style={{ width: '100%', border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#213428', fontWeight: 600, fontSize: 12 }}>
+            <RotateCcw className="w-3.5 h-3.5 mr-1" />
+            Reset RSP to 57.5°
+          </Button>
+        </div>
       </div>
     </div>
   </div>

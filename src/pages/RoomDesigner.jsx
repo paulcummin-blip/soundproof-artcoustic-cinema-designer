@@ -515,33 +515,8 @@ function RoomDesignerWithState() {
   _screen?.floatDepthM]
   );
 
-  // Use computed MLP as the effective anchor (for backwards compatibility)
-  // SEPARATION: mlpAnchorEffective is the true RSP position.
-  // It is driven exclusively by appState.mlpY_m (which is set from seatingBlockOffset + screen).
-  // It must NOT shift when seatingArrangementBasis changes — only Viewing Offset moves the RSP.
-  const mlpAnchorEffective = useMemo(() => {
-    const roomWidthM = Number(stableDimensions?.width) || 0;
-    const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
-
-    // Single source of truth: always use mlpY_m (set by the MLP useEffect from seatingBlockOffset).
-    const mlpY = appState?.mlpY_m;
-    if (Number.isFinite(mlpY)) {
-      return { x: cx, y: mlpY, z: 1.2 };
-    }
-
-    // Fallback: if mlpY_m not yet computed, derive from primary seat as a one-time bootstrap.
-    const seats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
-    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
-      const primarySeat = seats.find(s => s.isPrimary);
-      if (primarySeat) {
-        const cy = Number(primarySeat.y ?? primarySeat.position?.y);
-        const cz = Number(primarySeat.z ?? primarySeat.position?.z);
-        if (Number.isFinite(cy)) return { x: cx, y: cy, z: Number.isFinite(cz) ? cz : 1.2 };
-      }
-    }
-
-    return null;
-  }, [appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions]);
+  // ── mlpAnchorEffective moved below X publication effect (Stage B1) ──────────
+  // It now uses appState.mlpX_m (canonical green-dot X) instead of roomWidth/2.
 
   // ── RSP: effectiveRspY_m from useEffectiveRsp ────────────────────────────────
   // screenWidthM is derived the same way the existing MLP effect derives it.
@@ -589,7 +564,48 @@ function RoomDesignerWithState() {
     });
   }, [_rspModeForEffect, effectiveRspY_m, appState?.setMlpY_m]);
 
-  // One-time initialisation: when rspMode first becomes "manual_position" and
+  // Stage B1: Publish canonical green-dot X (effectiveRspX_m) → appState.mlpX_m.
+  // Same rounding/tolerance pattern as Y publication to avoid loops.
+  useEffect(() => {
+    if (_rspModeForEffect !== "auto_from_screen" && _rspModeForEffect !== "manual_position") return;
+    if (!Number.isFinite(effectiveRspX_m)) return;
+    if (typeof appState?.setMlpX_m !== "function") return;
+
+    const mlpXRounded = Math.round(effectiveRspX_m * 1000) / 1000;
+    appState.setMlpX_m((prev) => {
+      const prevRounded = Number.isFinite(prev) ? Math.round(prev * 1000) : null;
+      const newRounded = Math.round(mlpXRounded * 1000);
+      return prevRounded === newRounded ? prev : mlpXRounded;
+    });
+  }, [_rspModeForEffect, effectiveRspX_m, appState?.setMlpX_m]);
+
+  // Stage B1: mlpAnchorEffective is the true canonical green-dot RSP position.
+  // X comes from appState.mlpX_m (published from effectiveRspX_m), Y from appState.mlpY_m.
+  // No centreline reconstruction — manual off-centre X is preserved.
+  const mlpAnchorEffective = useMemo(() => {
+    const roomWidthM = Number(stableDimensions?.width) || 0;
+    const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
+
+    const mlpX = Number(appState?.mlpX_m);
+    const mlpY = Number(appState?.mlpY_m);
+    const x = Number.isFinite(mlpX) ? mlpX : cx;
+    if (Number.isFinite(mlpY)) {
+      return { x, y: mlpY, z: 1.2 };
+    }
+
+    // Fallback: if mlpY_m not yet computed, derive from primary seat as a one-time bootstrap.
+    const seats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
+    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
+      const primarySeat = seats.find(s => s.isPrimary);
+      if (primarySeat) {
+        const cy = Number(primarySeat.y ?? primarySeat.position?.y);
+        const cz = Number(primarySeat.z ?? primarySeat.position?.z);
+        if (Number.isFinite(cy)) return { x, y: cy, z: Number.isFinite(cz) ? cz : 1.2 };
+      }
+    }
+
+    return null;
+  }, [appState?.mlpX_m, appState?.mlpY_m, stableDimensions?.width, appState?.seatingPositions]);
   // manualRspY_m is not yet set, seed it from the current mlpY_m.
   // A ref prevents this from firing more than once per mode entry.
   const _didInitManualRspRef = useRef(false);
@@ -710,13 +726,13 @@ function RoomDesignerWithState() {
   stableScreen.widthMeters :
   (Number(stableScreen?.visibleWidthInches) || 0) * 0.0254;
 
-  // Derive primarySeatingPosition: seat closest to the fixed RSP anchor (mlpAnchorEffective).
-  // This is now independent of seatingArrangementBasis.
+  // Derive primarySeatingPosition: seat closest to the canonical green-dot RSP.
+  // Used for UI/report labelling only — NOT passed to the engine (engine uses mlpPointOverride).
+  // Stage B1: no centreline lock — preserves the real seat coordinate for presentation.
   const primarySeatingPosition = useMemo(() => {
     if (!Array.isArray(seats) || seats.length === 0) return null;
     const anchor = mlpAnchorEffective;
     if (!anchor || !Number.isFinite(anchor.y)) return seats[0] || null;
-    // Find seat with minimum Euclidean distance to the fixed RSP anchor
     let closest = null;
     let minDist = Infinity;
     for (const seat of seats) {
@@ -725,10 +741,8 @@ function RoomDesignerWithState() {
       const dist = Math.hypot(dx, dy);
       if (dist < minDist) { minDist = dist; closest = seat; }
     }
-    // Lock X to centerline for analysis purposes
-    const roomWidth = stableDimensions.width;
-    return closest ? { ...closest, x: roomWidth / 2 } : null;
-  }, [seats, mlpAnchorEffective, stableDimensions.width]);
+    return closest || null;
+  }, [seats, mlpAnchorEffective]);
 
   // ✅ Compute frontWideZones BEFORE analysisResult to avoid TDZ
   const enableFrontWides = _enableFrontWides;
@@ -802,7 +816,6 @@ function RoomDesignerWithState() {
     placedSpeakers: _effectivePlacedSpeakers,
     visiblePlanSpeakers: _effectiveVisiblePlanSpeakers,
     seatingPositions: seats,
-    primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: "front", // fixed stable value — does not vary with seating arrangement
     sevenBedLayoutType: appState?.sevenBedLayoutType,
@@ -1783,8 +1796,11 @@ function RoomDesignerWithState() {
                   showRoomModesOverlay={showRoomModesOverlay}
                   freeMoveLcr={freeMoveLcr}
                   rspMode={appState?.rspMode || "auto_from_screen"}
+                  manualRspX_m={appState?.manualRspX_m ?? null}
                   manualRspY_m={appState?.manualRspY_m ?? null}
+                  onSetManualRspX_m={appState?.setManualRspX_m}
                   onSetManualRspY_m={appState?.setManualRspY_m}
+                  onSetRspMode={appState?.setRspMode}
                   liveImpactMode={safeLiveImpactMode} />}
 
                 {leftPanelView === 'front' && (
@@ -1933,6 +1949,8 @@ function RoomDesignerWithState() {
             _rearSubsCfg={_rearSubsCfg}
             rspMode={appState?.rspMode || "auto_from_screen"}
             onRspModeChange={appState?.setRspMode}
+            manualRspX_m={appState?.manualRspX_m ?? null}
+            onManualRspX_mChange={appState?.setManualRspX_m}
             manualRspY_m={appState?.manualRspY_m ?? null}
             onManualRspY_mChange={appState?.setManualRspY_m}
           />

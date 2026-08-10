@@ -144,6 +144,8 @@ export default function RoomDesignerControlsPanel({
   // RSP mode
   rspMode,
   onRspModeChange,
+  manualRspX_m,
+  onManualRspX_mChange,
   manualRspY_m,
   onManualRspY_mChange,
 }) {
@@ -496,6 +498,8 @@ export default function RoomDesignerControlsPanel({
               onRowEarHeightsChange={appState?.setRowEarHeights}
               rspMode={rspMode}
               onRspModeChange={onRspModeChange}
+              manualRspX_m={manualRspX_m}
+              onManualRspX_mChange={onManualRspX_mChange}
               manualRspY_m={manualRspY_m}
               onManualRspY_mChange={onManualRspY_mChange} />
           </Suspense>
