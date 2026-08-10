@@ -216,14 +216,38 @@ export default function DesignRecommendationEngine({
     return Object.values(resultsById).filter((entry) => activeIds.has(entry?.candidate?.id));
   }, [resultsById, candidateSignature, candidates]);
 
+  // Terminal completion count — every candidate ID that has reported a terminal
+  // result (valid rating OR timeout/null). Distinct from evaluatedCandidates
+  // (used for ranking) and from valid results. A timed-out candidate still
+  // counts as completed so it cannot block export indefinitely.
+  const completedCount = useMemo(() => {
+    const activeIds = new Set(candidates.map((candidate) => candidate.id));
+    let count = 0;
+    for (const id of Object.keys(resultsById)) {
+      if (activeIds.has(id)) count += 1;
+    }
+    return count;
+  }, [resultsById, candidateSignature, candidates]);
+
+  const candidateCount = candidates.length;
+  const pendingCount = Math.max(0, candidateCount - completedCount);
+  const isSettled = candidateCount === 0 || completedCount >= candidateCount;
+
   const recommendations = useMemo(() => ({
     ...rankDesignRecommendations({ baselineRating, evaluatedCandidates }),
-    candidateCount: candidates.length,
-    // Reveal useful results as soon as the first canonical re-run settles.
-    // Remaining candidates continue to refine the shortlist in the background.
-    isEvaluating: candidates.length > 0 && evaluatedCandidates.length === 0,
+    candidateCount,
+    completedCount,
+    pendingCount,
+    // isSettled: true when all candidates have terminated (valid or timeout/null)
+    // OR when there are no candidates. The export gate consumes this so the PDF
+    // cannot capture a partial shortlist or an "Evaluating…" placeholder.
+    isSettled,
+    // isEvaluating (legacy, for progressive live UI): true only BEFORE the first
+    // candidate terminates. Do NOT use for export gating — it flips false after
+    // one candidate, which is not a settled-state authority.
+    isEvaluating: candidateCount > 0 && completedCount === 0,
     bassScenarioPolicy: "Current verified bass result held constant; subwoofer alternatives are not evaluated in V1.",
-  }), [baselineRating, evaluatedCandidates, candidates.length]);
+  }), [baselineRating, evaluatedCandidates, candidateCount, completedCount, pendingCount, isSettled]);
 
   useEffect(() => {
     onRecommendationsChange?.(recommendations);

@@ -737,6 +737,11 @@ function RP22ReportInner() {
         return calculateRoomDesignRating(designRatingAuthority);
     }, [designRatingAuthority]);
 
+    // Export gate: block PDF export until the recommendation engine has settled
+    // (all candidates terminated — valid rating OR timeout/null). Only applies
+    // when ASDR is enabled and a baseline rating exists (i.e. the engine mounts).
+    const recommendationsPending = showDesignRating && !!roomDesignRating && !designRecommendations?.isSettled;
+
     const seatDesignRatings = React.useMemo(() => {
         if (!designRatingAuthority) return null;
         const ratings = {};
@@ -1092,8 +1097,8 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId) || bassReportPending}
-                        exportDisabledMessage={bassReportPending ? "Bass analysis updating" : "Report loading"}
+                        exportDisabled={reportHydrating || (effectiveProjectId && reportReadyProjectId !== effectiveProjectId) || bassReportPending || recommendationsPending}
+                        exportDisabledMessage={bassReportPending ? "Bass analysis updating" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
                             // lcrAimMode === 'angled' → compute yaw from speaker position to MLP
