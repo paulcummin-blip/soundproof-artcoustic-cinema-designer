@@ -18,35 +18,47 @@ function formatMoney(value) {
   }).format(number);
 }
 
+function formatLevelChanges(levelChanges) {
+  if (!Array.isArray(levelChanges) || levelChanges.length === 0) return '';
+  return levelChanges
+    .map((c) => `${c.display}: ${c.beforeLevel} → ${c.afterLevel}`)
+    .join(' · ');
+}
+
 function RecommendationRow({ item, mode }) {
   const from = Math.round(Number(item?.currentPercentage) || 0);
   const to = Math.round(Number(item?.newPercentage) || 0);
-  const showP12 = mode === 'saving' && item?.kind === 'lcr' && item?.p12Level;
-  const p12Warning = item?.p12Level === 'L1' && ['L2', 'L3', 'L4'].includes(item?.p12BaselineLevel);
-  const impact = Array.isArray(item?.affectedParameters) && item.affectedParameters.length
-    ? item.affectedParameters.join(', ')
-    : 'ASDR';
+  const isSaving = mode === 'saving';
+  const levelChanges = Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [];
+  const levelChangeText = formatLevelChanges(levelChanges);
   const saving = formatMoney(item?.savingExVat);
   const cost = formatMoney(item?.costDeltaExVat);
-  const isSaving = mode === 'saving';
+  const showP12 = isSaving && item?.kind === 'lcr' && item?.p12Level;
+  const p12Warning = item?.p12Level === 'L1' && ['L2', 'L3', 'L4'].includes(item?.p12BaselineLevel);
 
   let valueText;
   if (isSaving) {
+    const preservation = levelChangeText || 'Profile preserved';
     valueText = saving
-      ? `Save ${saving} ex VAT · ${item.scoreLoss <= 0.05 ? 'no rating loss' : formatPoints(-item.scoreLoss)}`
-      : `${formatPoints(-item.scoreLoss)} rating impact`;
+      ? `Save ${saving} ex VAT · ${preservation}`
+      : preservation;
   } else if (item?.costDeltaExVat === 0) {
-    valueText = `${formatPoints(item.scoreDelta, true)} · £0 equipment`;
+    valueText = levelChangeText || 'Profile improved';
   } else if (Number(item?.costDeltaExVat) < 0) {
-    valueText = `${formatPoints(item.scoreDelta, true)} · saves ${formatMoney(Math.abs(item.costDeltaExVat))} ex VAT`;
+    valueText = `${levelChangeText ? levelChangeText + ' · ' : ''}saves ${formatMoney(Math.abs(item.costDeltaExVat))} ex VAT`;
   } else if (cost) {
-    valueText = `${formatPoints(item.scoreDelta, true)} · ${cost} ex VAT`;
+    valueText = `${levelChangeText ? levelChangeText + ' · ' : ''}${cost} ex VAT`;
   } else {
-    valueText = `${formatPoints(item.scoreDelta, true)} · price not connected`;
+    valueText = levelChangeText || 'Profile improved';
   }
 
   return (
     <div style={{ padding: '9px 0', borderTop: '1px solid #ECEAE6' }}>
+      {item?.priorityLabel && (
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#9a3500', marginBottom: 3, letterSpacing: '0.04em' }}>
+          {item.priorityLabel}
+        </div>
+      )}
       <div style={{ fontSize: 11, lineHeight: 1.35, fontWeight: 700, color: '#213428' }}>
         {item.title}
       </div>
@@ -54,7 +66,7 @@ function RecommendationRow({ item, mode }) {
         {valueText}
       </div>
       <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
-        Rating {from}% → {to}% · {impact}
+        Rating {from}% → {to}% · {formatPoints(item.scoreDelta, true)}
       </div>
       <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
         {item.disruption} disruption · {item.confidence} confidence
@@ -154,13 +166,13 @@ export default function DesignRatingSummary({
                 title="IMPROVE THE DESIGN"
                 items={improvements}
                 mode="improvement"
-                emptyText="No score improvement was verified among the current low-change alternatives."
+                emptyText="No RP22 level improvement was verified among the current low-change alternatives."
               />
               <RecommendationGroup
                 title="REDUCE PROJECT COST"
                 items={savings}
                 mode="saving"
-                emptyText="No priced saving below the five-point impact limit was verified."
+                emptyText="No cost-saving option that preserves the current RP22 level profile was verified."
               />
               <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6', fontSize: 8.5, lineHeight: 1.4, color: '#8A867D' }}>
                 Bass is held at the current verified result. Subwoofer alternatives will be added only when scenario re-runs are connected and trusted.

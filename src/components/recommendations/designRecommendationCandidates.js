@@ -11,6 +11,13 @@
 import { MODELS, getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { getCommercialPrice } from "@/components/pricing/usePriceCalculation";
 import { screenRows } from "@/components/data/screenSizes";
+import {
+  computeImprovementProfile,
+  computeDegradationProfile,
+  getAffectedParameters,
+  getParameterLevelChanges,
+  getPriorityLabel,
+} from "./designRecommendationProfile.js";
 
 const LCR_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 const WIDE_ROLES = new Set(["LW", "RW"]);
@@ -249,27 +256,13 @@ export function buildDesignRecommendationCandidates({
   return candidates;
 }
 
-function contributionMap(rating) {
-  const map = new Map();
-  for (const item of rating?.contributions || []) {
-    map.set(item.key, Number(item.earnedPoints) || 0);
-  }
-  return map;
-}
+// ── Profile-based ranking ──
+// See designRecommendationProfile.js for the canonical RP22 level-profile
+// comparison logic. The ASDR percentage is a secondary signal; primary
+// classification and ranking use achieved RP22 levels.
 
-function changedParameters(baseline, candidate) {
-  const before = contributionMap(baseline);
-  const after = contributionMap(candidate);
-  const keys = new Set([...before.keys(), ...after.keys()]);
-  return [...keys]
-    .filter((key) => Math.abs((after.get(key) || 0) - (before.get(key) || 0)) >= 0.01)
-    .map((key) => key === "screen" ? "Screen" : key.toUpperCase())
-    .sort((a, b) => {
-      const na = Number(a.replace(/\D/g, "")) || 999;
-      const nb = Number(b.replace(/\D/g, "")) || 999;
-      return na - nb;
-    });
-}
+const DISRUPTION_RANK = { Low: 1, Medium: 2, High: 3 };
+const CONFIDENCE_RANK = { Low: 1, Medium: 2, High: 3 };
 
 function extractP12Level(rating) {
   const contribution = (rating?.contributions || []).find((c) => c.key === "p12");
@@ -286,7 +279,26 @@ function uniqueById(items) {
 }
 
 /**
+ * Lexicographic comparison of improvement tuples.
+ * Priority: failRemoved > l1Removed > l2Removed > l3ToL4 > l4Gained > affectedParamCount
+ * A candidate removing one FAIL always ranks above any number of L3→L4 improvements.
+ */
+function compareImprovementTuples(a, b) {
+  const ta = [a.failRemoved, a.l1Removed, a.l2Removed, a.l3ToL4, a.l4Gained, a.affectedParams.length];
+  const tb = [b.failRemoved, b.l1Removed, b.l2Removed, b.l3ToL4, b.l4Gained, b.affectedParams.length];
+  for (let i = 0; i < ta.length; i++) {
+    if (ta[i] !== tb[i]) return tb[i] - ta[i]; // higher = better
+  }
+  return 0;
+}
+
+/**
  * Convert evaluated candidates into concise "improve" and "save" shortlists.
+ *
+ * IMPROVEMENT eligibility: genuine RP22 level/profile improvement (at least one
+ *   parameter improves, no parameter degrades). ASDR percentage is secondary.
+ * SAVINGS eligibility: saves money, no new FAIL, acceptable profile degradation,
+ *   AND ASDR loss ≤ 5pp (secondary guard).
  */
 export function rankDesignRecommendations({ baselineRating, evaluatedCandidates = [] }) {
   const baselinePct = Number(baselineRating?.displayPercentage);
@@ -301,6 +313,10 @@ export function rankDesignRecommendations({ baselineRating, evaluatedCandidates 
       const scoreDelta = nextPct - baselinePct;
       const scoreDeltaPoints = finite(nextPoints) && finite(baselinePoints) ? nextPoints - baselinePoints : null;
       const costDelta = finite(entry.candidate.costDeltaExVat) ? Number(entry.candidate.costDeltaExVat) : null;
+
+      const improvementProfile = computeImprovementProfile(baselineRating, entry.rating);
+      const degradationProfile = computeDegradationProfile(baselineRating, entry.rating);
+
       return {
         ...entry.candidate,
         rating: entry.rating,
@@ -310,43 +326,58 @@ export function rankDesignRecommendations({ baselineRating, evaluatedCandidates 
         scoreDeltaPoints,
         costDeltaExVat: costDelta,
         savingExVat: costDelta != null && costDelta < 0 ? -costDelta : null,
-        affectedParameters: changedParameters(baselineRating, entry.rating),
+        affectedParameters: getAffectedParameters(baselineRating, entry.rating),
+        parameterLevelChanges: getParameterLevelChanges(baselineRating, entry.rating),
+        improvementProfile,
+        degradationProfile,
+        priorityLabel: getPriorityLabel(improvementProfile),
+        isRealImprovement: improvementProfile.isImprovement,
+        hasNewFail: degradationProfile.hasNewFail,
         p12Level: extractP12Level(entry.rating),
         p12BaselineLevel: extractP12Level(baselineRating),
       };
     });
 
-  const improving = evaluated.filter((item) => item.scoreDelta > 0.05);
-  const free = improving
-    .filter((item) => item.costDeltaExVat === 0)
-    .sort((a, b) => b.scoreDelta - a.scoreDelta);
-  const efficient = improving
-    .filter((item) => item.costDeltaExVat == null || item.costDeltaExVat > 0)
+  // ── IMPROVEMENTS ──
+  // A candidate qualifies only when it produces a genuine RP22 level/profile
+  // improvement: at least one parameter's level/distribution improves and no
+  // parameter degrades. ASDR percentage is a secondary ranking signal.
+  const improvements = evaluated
+    .filter((item) => item.isRealImprovement)
     .sort((a, b) => {
-      const ea = a.costDeltaExVat > 0 ? a.scoreDelta / a.costDeltaExVat : a.scoreDelta / 1000;
-      const eb = b.costDeltaExVat > 0 ? b.scoreDelta / b.costDeltaExVat : b.scoreDelta / 1000;
-      return eb - ea || b.scoreDelta - a.scoreDelta;
-    });
-  const biggest = [...improving].sort((a, b) => b.scoreDelta - a.scoreDelta);
+      const cmp = compareImprovementTuples(a.improvementProfile, b.improvementProfile);
+      if (cmp !== 0) return cmp;
+      // Secondary: cost (lower better), disruption (lower), confidence (higher), ASDR (higher)
+      const costA = a.costDeltaExVat ?? Infinity;
+      const costB = b.costDeltaExVat ?? Infinity;
+      if (costA !== costB) return costA - costB;
+      const disA = DISRUPTION_RANK[a.disruption] ?? 99;
+      const disB = DISRUPTION_RANK[b.disruption] ?? 99;
+      if (disA !== disB) return disA - disB;
+      const confA = CONFIDENCE_RANK[a.confidence] ?? 0;
+      const confB = CONFIDENCE_RANK[b.confidence] ?? 0;
+      if (confA !== confB) return confB - confA;
+      return b.scoreDelta - a.scoreDelta;
+    })
+    .slice(0, 3);
 
-  const improvements = uniqueById([free[0], efficient[0], biggest[0], ...free, ...efficient, ...biggest]).slice(0, 3);
-
-  const savingCandidates = evaluated
+  // ── SAVINGS ──
+  // A candidate qualifies when it saves money while preserving the current
+  // RP22 level profile: no new FAIL, acceptable degradation, AND ASDR loss ≤ 5pp.
+  // Ranking: degradation score (lower = better preservation) → saving amount → ASDR loss.
+  const savings = evaluated
     .filter((item) => finite(item.savingExVat) && item.savingExVat > 0)
+    .filter((item) => !item.hasNewFail) // No-FAIL cost-down rule
+    .filter((item) => Math.max(0, -item.scoreDelta) <= 5) // 5pp cap (secondary guard)
     .map((item) => ({ ...item, scoreLoss: Math.max(0, -item.scoreDelta) }))
-    .filter((item) => item.scoreLoss <= 5);
-
-  const noLoss = savingCandidates
-    .filter((item) => item.scoreLoss <= 0.05)
-    .sort((a, b) => b.savingExVat - a.savingExVat);
-  const retainedValue = [...savingCandidates].sort((a, b) => {
-    const va = a.savingExVat / Math.max(0.25, a.scoreLoss);
-    const vb = b.savingExVat / Math.max(0.25, b.scoreLoss);
-    return vb - va || b.savingExVat - a.savingExVat;
-  });
-  const largestSafe = [...savingCandidates].sort((a, b) => b.savingExVat - a.savingExVat || a.scoreLoss - b.scoreLoss);
-
-  const savings = uniqueById([noLoss[0], retainedValue[0], largestSafe[0], ...retainedValue]).slice(0, 3);
+    .sort((a, b) => {
+      const degA = a.degradationProfile.degradationScore;
+      const degB = b.degradationProfile.degradationScore;
+      if (degA !== degB) return degA - degB; // lower degradation = better
+      if (a.savingExVat !== b.savingExVat) return b.savingExVat - a.savingExVat; // higher saving = better
+      return a.scoreDelta - b.scoreDelta; // lower ASDR loss = better
+    })
+    .slice(0, 3);
 
   return { improvements, savings, evaluatedCount: evaluated.length };
 }
