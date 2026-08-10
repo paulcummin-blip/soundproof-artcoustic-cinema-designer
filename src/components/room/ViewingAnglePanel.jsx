@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Eye, Ruler } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
-import { calculateViewingAngle, assignRP23Level, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
+import { calculateViewingAngle, assignRP23Level, buildPerRowViewingData } from '@/components/utils/viewingAngleUtils';
 import { buildViewingPrioritySummary, describeViewingBalance } from '@/components/utils/viewingPriorityAuthority';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { getLevelColors } from '@/components/utils/rp22Colors';
@@ -90,53 +90,15 @@ export default function ViewingAnglePanel({
   // seatingPositions triggers recompute on every drag tick via mlpOverride.
   }, [mlpOverride, mlpY_m, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
 
-  // Per-row analysis — groups seatingPositions by rowNumber, computes row centre, FOV, distance, level.
-  // Updates live because seatingPositions changes on every drag tick (via mlpOverride path upstream).
-  const perRowData = useMemo(() => {
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return [];
-
-    const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
-    const tvKey = screen?.tvPresetKey;
-    const tvMm = Number(screen?.tvWidthMm);
-    const visibleWidthInches = (() => {
-      if (tvKey && TV_KEY_TO_INCHES[tvKey]) return TV_KEY_TO_INCHES[tvKey];
-      if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
-      return Number(screen?.visibleWidthInches) || 100;
-    })();
-
-    // Group seats by rowNumber (key used: seat.rowNumber, integer 1-based)
-    const byRow = {};
-    for (const seat of seatingPositions) {
-      const rn = seat.rowNumber ?? 1;
-      if (!byRow[rn]) byRow[rn] = [];
-      byRow[rn].push(seat);
-    }
-
-    const rowNumbers = Object.keys(byRow).map(Number).sort((a, b) => a - b);
-
-    return rowNumbers.map(rn => {
-      const seats = byRow[rn];
-      // Row centre = average X and Y of all seats in that row
-      const centreX = seats.reduce((s, seat) => s + (Number(seat.x) || 0), 0) / seats.length;
-      const centreY = seats.reduce((s, seat) => s + (Number(seat.y) || 0), 0) / seats.length;
-
-      const distToScreen = Math.max(0, centreY - screenFrontPlaneM);
-      const angle = calculateViewingAngle(
-        { y: centreY },
-        visibleWidthInches,
-        screen?.aspectRatio || '16:9',
-        { y: screenFrontPlaneM }
-      );
-      const levelCode = angle != null ? rp23LevelForAngleDeg(angle) : null;
-
-      return {
-        rowNumber: rn,
-        viewingAngleDeg: angle,
-        viewingDistanceM: distToScreen,
-        rp23Level: levelCode, // 'L1'|'L2'|'L3'|'L4'|null
-      };
-    });
-  }, [seatingPositions, screenFrontPlaneM, screen?.visibleWidthInches, screen?.aspectRatio, screen?.tvPresetKey, screen?.tvWidthMm]);
+  // Canonical per-row analysis shared with Stage D recommendation evaluation.
+  const perRowData = useMemo(
+    () => buildPerRowViewingData({
+      seatingPositions,
+      screen,
+      screenFrontPlaneM,
+    }),
+    [seatingPositions, screen, screenFrontPlaneM]
+  );
 
   if (!rp23Data) {
     return (
