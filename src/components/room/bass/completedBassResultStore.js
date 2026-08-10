@@ -106,6 +106,8 @@ function authoritySignature(a) {
     sc: a.contract?.selectedCandidateId || null,
     sc2: a.structurallyComplete,
     au: a.authoritative,
+    ex: a.exportable,
+    pr: a.publicationRejectionReason || null,
     e: a.errorMessage || null,
   });
 }
@@ -130,7 +132,18 @@ function notify() {
 }
 
 function setMemory(projectId, authority) {
-  memoryByProject.set(projectKey(projectId), authority);
+  const key = projectKey(projectId);
+  const previous = memoryByProject.get(key);
+
+  // Publishing the same semantic authority again must be a no-op. The bass
+  // owner can legitimately recompute an equivalent blocked/updating snapshot
+  // during React renders; notifying every ASDR candidate for that identical
+  // snapshot creates a self-sustaining rerender loop.
+  if (previous && authoritySignature(previous) === authoritySignature(authority)) {
+    return previous;
+  }
+
+  memoryByProject.set(key, authority);
   notify();
   return authority;
 }
