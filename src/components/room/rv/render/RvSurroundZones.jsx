@@ -27,12 +27,23 @@ import {
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
-const SIDE_FILL = "rgba(33, 52, 40, 0.12)";
-const SIDE_STROKE = "rgba(33, 52, 40, 0.30)";
-const BACK_FILL = "rgba(74, 35, 15, 0.12)";
-const BACK_STROKE = "rgba(74, 35, 15, 0.30)";
-const EXCLUSION_STROKE = "rgba(120, 40, 40, 0.35)";
-const FADE_STROKE = "rgba(33, 52, 40, 0.18)";
+// Opaque colours — transparency controlled by fillOpacity/strokeOpacity ONLY (no double-alpha)
+const SIDE_FILL = "#213428";
+const SIDE_STROKE = "#213428";
+const BACK_FILL = "#4A230F";
+const BACK_STROKE = "#4A230F";
+const EXCLUSION_STROKE = "#782828";
+const FADE_STROKE = "#213428";
+
+// Single opacity values (applied via fillOpacity/strokeOpacity, never via rgba alpha + opacity)
+const SIDE_FILL_OPACITY = 0.12;
+const SIDE_STROKE_OPACITY = 0.35;
+const BACK_FILL_OPACITY = 0.12;
+const BACK_STROKE_OPACITY = 0.35;
+const EXCLUSION_STROKE_OPACITY = 0.30;
+const FADE_STROKE_OPACITY = 0.25;
+const FADE_FORWARD_STOP = 0.03;
+const FADE_LISTENING_STOP = 0.12;
 
 function zoneToRect(zone, meterToCanvasX, meterToCanvasY) {
   if (!zone || !zone.active) return null;
@@ -68,8 +79,9 @@ function renderSideZone(zone, key, meterToCanvasX, meterToCanvasY) {
       width={r.wPx}
       height={r.hPx}
       fill={SIDE_FILL}
-      opacity={0.13}
+      fillOpacity={SIDE_FILL_OPACITY}
       stroke={SIDE_STROKE}
+      strokeOpacity={SIDE_STROKE_OPACITY}
       strokeWidth={0.5}
       strokeDasharray="4,3"
       pointerEvents="none"
@@ -88,8 +100,9 @@ function renderBackZone(zone, key, meterToCanvasX, meterToCanvasY) {
       width={r.wPx}
       height={r.hPx}
       fill={BACK_FILL}
-      opacity={0.13}
+      fillOpacity={BACK_FILL_OPACITY}
       stroke={BACK_STROKE}
+      strokeOpacity={BACK_STROKE_OPACITY}
       strokeWidth={0.5}
       strokeDasharray="4,3"
       pointerEvents="none"
@@ -118,9 +131,9 @@ function renderExclusionBoundary(zones, meterToCanvasX, meterToCanvasY) {
       height={r.hPx}
       fill="none"
       stroke={EXCLUSION_STROKE}
+      strokeOpacity={EXCLUSION_STROKE_OPACITY}
       strokeWidth={0.5}
       strokeDasharray="2,4"
-      opacity={0.5}
       pointerEvents="none"
     />
   );
@@ -164,8 +177,8 @@ function renderForwardExtremity(zones, side, meterToCanvasX, meterToCanvasY) {
           x2={xPx}
           y2={yBotPx}
         >
-          <stop offset="0" stopColor={SIDE_FILL} stopOpacity="0" />
-          <stop offset="1" stopColor={SIDE_FILL} stopOpacity="0.10" />
+          <stop offset="0" stopColor={SIDE_FILL} stopOpacity={FADE_FORWARD_STOP} />
+          <stop offset="1" stopColor={SIDE_FILL} stopOpacity={FADE_LISTENING_STOP} />
         </linearGradient>
       </defs>
       <rect
@@ -175,9 +188,9 @@ function renderForwardExtremity(zones, side, meterToCanvasX, meterToCanvasY) {
         height={hPx}
         fill={`url(#${gid})`}
         stroke={FADE_STROKE}
+        strokeOpacity={FADE_STROKE_OPACITY}
         strokeWidth={0.4}
         strokeDasharray="3,4"
-        opacity={0.7}
         pointerEvents="none"
       />
     </g>
