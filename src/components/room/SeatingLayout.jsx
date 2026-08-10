@@ -5,8 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Users, Eye, Ruler, RotateCcw } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Users, Eye, Ruler, RotateCcw, Move } from 'lucide-react';
 
 import { clampViewingOffset } from "@/components/utils/screenMetrics";
 import RP22GradingPill from '../ui/RP22GradingPill';
@@ -181,6 +180,48 @@ export default function SeatingLayout({
     const validValues = mlpOptions.map((opt) => opt.value);
     return validValues.includes(mlpBasis) ? mlpBasis : 'front';
   }, [mlpBasis, mlpOptions]);
+
+  // Live row centres from seatingPositions — shared by the Front Row Distance
+  // control and the Move seats to RSP button so both use the same authority.
+  const liveCenters = useMemo(() => {
+    if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
+      const byRow = {};
+      for (const seat of seatingPositions) {
+        const rn = seat.rowNumber ?? 1;
+        if (!byRow[rn]) byRow[rn] = [];
+        byRow[rn].push(Number(seat.y) || 0);
+      }
+      const sorted = Object.keys(byRow).map(Number).sort((a, b) => a - b);
+      return sorted.map(rn => {
+        const ys = byRow[rn];
+        return Math.round((ys.reduce((s, v) => s + v, 0) / ys.length) * 100) / 100;
+      });
+    }
+    return null;
+  }, [seatingPositions]);
+
+  // Effective RSP Y — the canonical green-dot Y used by all engine modules.
+  // Manual: manualRspY_m. Auto / row-derived: 57.5° target from screen plane.
+  const effectiveRspY = useMemo(() => {
+    if (rspMode === 'manual_position' && Number.isFinite(manualRspY_m)) {
+      return manualRspY_m;
+    }
+    return targetMlpY57_5(screen, screenFrontPlaneM);
+  }, [rspMode, manualRspY_m, screen, screenFrontPlaneM]);
+
+  // Move seats to RSP — single-row only. Moves the complete row longitudinally
+  // so the row centre Y aligns with the current canonical green-dot RSP Y.
+  // Preserves seat count, spacing, ear height, and lateral positions.
+  const handleMoveSeatsToRsp = useCallback(() => {
+    if (rowCount !== 1) return;
+    const centers = liveCenters ?? [];
+    const frontRowY = centers[0];
+    if (!Number.isFinite(frontRowY)) return;
+    const offset = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
+    const frontRowYAtZeroOffset = frontRowY - offset;
+    const newOffset = effectiveRspY - frontRowYAtZeroOffset;
+    onSeatingBlockOffsetChange?.(clampViewingOffset(Math.round(newOffset * 100) / 100));
+  }, [rowCount, liveCenters, seatingBlockOffset, effectiveRspY, onSeatingBlockOffsetChange]);
 
   // Update MLP basis if it becomes invalid
   useEffect(() => {
@@ -691,22 +732,6 @@ export default function SeatingLayout({
       {(() => {
         // Derive row centres from seatingPositions (same logic as ViewingAnglePanel).
         // Falls back to rowCentersM only when seatingPositions is empty.
-        const liveCenters = (() => {
-          if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
-            const byRow = {};
-            for (const seat of seatingPositions) {
-              const rn = seat.rowNumber ?? 1;
-              if (!byRow[rn]) byRow[rn] = [];
-              byRow[rn].push(Number(seat.y) || 0);
-            }
-            const sorted = Object.keys(byRow).map(Number).sort((a, b) => a - b);
-            return sorted.map(rn => {
-              const ys = byRow[rn];
-              return Math.round((ys.reduce((s, v) => s + v, 0) / ys.length) * 100) / 100;
-            });
-          }
-          return null;
-        })();
         const centers = liveCenters ?? (Array.isArray(rowCentersM) && rowCentersM.length > 0 ? rowCentersM : null);
         const offset = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
 
@@ -795,132 +820,10 @@ export default function SeatingLayout({
 
 
 
-      {/* RSP Mode */}
+      {/* RSP Controls — direct manipulation via long-press on the green dot.
+          Manual X/Y inputs are removed from the UI; the green dot is the sole
+          RSP authority. Internal auto/manual state is preserved for persistence. */}
       <div className="space-y-2 col-span-2">
-        <Label className="text-sm font-medium" style={{ color: '#3E4349' }}>
-          RSP Mode
-        </Label>
-        {/* Normalise legacy row-derived values to auto_from_screen for display */}
-        {(() => {
-          const ROW_DERIVED = ['front_row_center', 'middle_row_center', 'back_row_center', 'all_rows_average'];
-          const displayMode = ROW_DERIVED.includes(rspMode) ? 'auto_from_screen' : (rspMode || 'auto_from_screen');
-          return (
-            <Select
-              value={displayMode}
-              onValueChange={(val) => onRspModeChange?.(val)}
-              disabled={disabled}
-              modal={false}>
-              <SelectTrigger style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}>
-                <span>
-                  {{ auto_from_screen: 'Auto from Screen Size', manual_position: 'Manual Position' }[displayMode] ?? 'Auto from Screen Size'}
-                </span>
-              </SelectTrigger>
-              <SelectContent position="popper" sideOffset={6} className="z-[70]">
-                <SelectItem value="auto_from_screen">Auto from Screen Size</SelectItem>
-                <SelectItem value="manual_position">Manual Position</SelectItem>
-              </SelectContent>
-            </Select>
-          );
-        })()}
-
-        {rspMode === "manual_position" && (
-          <div className="space-y-2 pt-1">
-            <Label className="text-xs" style={{ color: '#625143' }}>RSP X Position (m)</Label>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={disabled}
-                onClick={() => {
-                  const roomW = Number(dimensions?.width) || 10;
-                  const base = Number.isFinite(manualRspX_m) ? manualRspX_m : roomW / 2;
-                  const next = Math.max(0.2, Math.min(roomW - 0.2, Math.round((base - 0.01) * 1000) / 1000));
-                  onManualRspX_mChange?.(next);
-                }}
-                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
-                –
-              </Button>
-              <Input
-                type="number"
-                step="0.01"
-                min="0.2"
-                max={Number(dimensions?.width) ? (Number(dimensions.width) - 0.2).toFixed(2) : "20"}
-                value={Number.isFinite(manualRspX_m) ? (Math.round(manualRspX_m * 100) / 100).toFixed(2) : ''}
-                disabled={disabled}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  const roomW = Number(dimensions?.width) || 0;
-                  if (Number.isFinite(val) && roomW > 0) {
-                    const clamped = Math.max(0.2, Math.min(roomW - 0.2, Math.round(val * 1000) / 1000));
-                    onManualRspX_mChange?.(clamped);
-                  }
-                }}
-                className="h-10 flex-1 text-center"
-                style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={disabled}
-                onClick={() => {
-                  const roomW = Number(dimensions?.width) || 10;
-                  const base = Number.isFinite(manualRspX_m) ? manualRspX_m : roomW / 2;
-                  const next = Math.max(0.2, Math.min(roomW - 0.2, Math.round((base + 0.01) * 1000) / 1000));
-                  onManualRspX_mChange?.(next);
-                }}
-                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
-                +
-              </Button>
-            </div>
-
-            <Label className="text-xs" style={{ color: '#625143' }}>RSP Y Position (m)</Label>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={disabled}
-                onClick={() => {
-                  const base = Number.isFinite(manualRspY_m) ? manualRspY_m : 2.0;
-                  onManualRspY_mChange?.(Math.round((base - 0.01) * 1000) / 1000);
-                }}
-                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
-                –
-              </Button>
-              <Input
-                type="number"
-                step="0.01"
-                min="0.1"
-                max="20"
-                value={Number.isFinite(manualRspY_m) ? (Math.round(manualRspY_m * 100) / 100).toFixed(2) : ''}
-                disabled={disabled}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (Number.isFinite(val) && val > 0) {
-                    onManualRspY_mChange?.(Math.round(val * 1000) / 1000);
-                  }
-                }}
-                className="h-10 flex-1 text-center"
-                style={{ backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A' }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={disabled}
-                onClick={() => {
-                  const base = Number.isFinite(manualRspY_m) ? manualRspY_m : 2.0;
-                  onManualRspY_mChange?.(Math.round((base + 0.01) * 1000) / 1000);
-                }}
-                style={{ minWidth: 32, padding: 0, border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#1B1A1A' }}>
-                +
-              </Button>
-            </div>
-          </div>
-        )}
-
         {/* Reset RSP to 57.5° — restores auto_from_screen and clears manual X/Y */}
         <div className="pt-1">
           <Button
@@ -938,6 +841,24 @@ export default function SeatingLayout({
             Reset RSP to 57.5°
           </Button>
         </div>
+
+        {/* Move seats to RSP — single-row only. Moves the row so its centre Y
+            aligns with the current canonical green-dot RSP Y. Hidden for
+            multi-row projects (Viewing Priority governs those). */}
+        {rowCount === 1 && (
+          <div className="pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              onClick={handleMoveSeatsToRsp}
+              style={{ width: '100%', border: '1px solid #C1B6AD', backgroundColor: '#ffffff', color: '#213428', fontWeight: 600, fontSize: 12 }}>
+              <Move className="w-3.5 h-3.5 mr-1" />
+              Move seats to RSP
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   </div>

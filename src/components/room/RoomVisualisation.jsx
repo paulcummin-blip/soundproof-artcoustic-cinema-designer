@@ -1970,6 +1970,17 @@ useEffect(() => {
     handleMouseDown(e, 'mlp-marker-dot', 'mlpMarker');
   }, [handleMouseDown]);
 
+  // Long-press activation: seed the draft mlpDragInfo with the EXACT current
+  // effective RSP {x, y} so the green dot NEVER jumps on activation. This
+  // also ensures a no-move release commits the current position and switches
+  // rspMode to manual_position.
+  const handleMlpLongPressActivate = useCallback((currentX, currentY) => {
+    const x = Number(currentX);
+    const y = Number(currentY);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    setMlpDragInfo({ visible: true, x, y });
+  }, [setMlpDragInfo]);
+
   // During RSP drag, render the marker from the draft {x, y} (mlpDragInfo) so it
   // follows the pointer live without triggering the canonical RSP authority
   // chain (useEffectiveRsp → mlpY_m → seat responses → RP22).
@@ -1986,6 +1997,7 @@ useEffect(() => {
       exportMode={exportMode}
       rspMode={rspMode}
       onMouseDown={handleMlpMarkerMouseDown}
+      onLongPressActivate={handleMlpLongPressActivate}
     />
   );
 

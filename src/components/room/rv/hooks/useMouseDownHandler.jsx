@@ -101,9 +101,11 @@ export function useMouseDownHandler({
         }
       }
 
-      // RSP marker drag — only active in manual_position mode
+      // RSP marker drag — activated by long-press in RvMlpMarker (any mode).
+      // The long-press gate (3.0s hold) is the sole interaction guard; the
+      // rspMode is no longer checked here. On commit (useMouseUpHandler),
+      // the mode switches to manual_position and both X/Y are persisted.
       if (type === 'mlpMarker') {
-        if (rspMode !== 'manual_position') return;
         // Capture pointer-to-marker offset in room coordinates so the first
         // drag frame preserves the user's grab point instead of snapping the
         // marker centre onto the cursor.
