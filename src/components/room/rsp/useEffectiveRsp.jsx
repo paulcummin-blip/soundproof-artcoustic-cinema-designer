@@ -1,15 +1,15 @@
 /**
  * useEffectiveRsp
  * ---------------
- * Focused hook for computing the effective RSP (Reference Seating Position) Y
- * coordinate from the chosen rspMode and its associated inputs.
+ * Focused hook for computing the effective RSP (Reference Seating Position)
+ * from the chosen rspMode and its associated inputs.
  *
- * Phase 1: auto_from_screen implemented.
- * Phase 2: manual_position implemented.
- * Phase 3A: row-derived modes implemented via rowDerivedRspYByMode input.
+ * Stage B1: Now returns both X and Y coordinates.
+ *   AUTO / row-derived: X = room centreline (roomWidthM / 2)
+ *   MANUAL: X = manualRspX_m (if finite), else room centreline
  *
  * Returns:
- *   { effectiveRspY_m: number|null, rspSourceLabel: string }
+ *   { effectiveRspX_m: number|null, effectiveRspY_m: number|null, rspSourceLabel: string }
  */
 
 import { useMemo } from "react";
@@ -19,14 +19,15 @@ import { distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
  * @param {object} params
  * @param {string}      params.rspMode              - e.g. "auto_from_screen"
  * @param {number|null} params.manualRspY_m          - explicit Y when mode is manual_position
+ * @param {number|null} params.manualRspX_m          - explicit X when mode is manual_position
+ * @param {number}      params.roomWidthM            - room width in metres (for centreline X)
  * @param {number}      params.screenFrontPlaneM     - Y of screen front face (metres)
  * @param {number}      params.screenWidthM          - viewable screen width in metres
  * @param {number[]}    params.rowCentersM           - array of row-centre Y values (reserved)
  * @param {object[]}    params.seatingPositions      - seat objects (reserved)
  * @param {number|null} params.currentMlpY_m         - existing mlpY_m, used as fallback
- * @param {object}      params.rowDerivedRspYByMode  - precomputed Y per row-derived mode:
- *                        { front_row_center, middle_row_center, back_row_center, all_rows_average }
- * @returns {{ effectiveRspY_m: number|null, rspSourceLabel: string }}
+ * @param {object}      params.rowDerivedRspYByMode  - precomputed Y per row-derived mode
+ * @returns {{ effectiveRspX_m: number|null, effectiveRspY_m: number|null, rspSourceLabel: string }}
  */
 /** Maps row-derived rspMode values to their display label. */
 const ROW_MODE_LABELS = {
@@ -39,6 +40,8 @@ const ROW_MODE_LABELS = {
 export function useEffectiveRsp({
   rspMode,
   manualRspY_m,
+  manualRspX_m,
+  roomWidthM,
   screenFrontPlaneM,
   screenWidthM,
   rowCentersM,
@@ -47,6 +50,8 @@ export function useEffectiveRsp({
   rowDerivedRspYByMode = {},
 }) {
   return useMemo(() => {
+    const centrelineX = Number.isFinite(Number(roomWidthM)) ? Number(roomWidthM) / 2 : null;
+
     // ── auto_from_screen ────────────────────────────────────────────────────
     if (rspMode === "auto_from_screen") {
       const planeM = Number(screenFrontPlaneM);
@@ -56,6 +61,7 @@ export function useEffectiveRsp({
         const dist = distanceFor57_5FromWidth(widthM);
         if (Number.isFinite(dist)) {
           return {
+            effectiveRspX_m: centrelineX,
             effectiveRspY_m: planeM + dist,
             rspSourceLabel: "Auto from screen",
           };
@@ -68,8 +74,13 @@ export function useEffectiveRsp({
     // ── manual_position ─────────────────────────────────────────────────────
     if (rspMode === "manual_position") {
       const manualY = Number(manualRspY_m);
+      const manualX = Number(manualRspX_m);
       if (Number.isFinite(manualY)) {
-        return { effectiveRspY_m: manualY, rspSourceLabel: "Manual RSP" };
+        return {
+          effectiveRspX_m: Number.isFinite(manualX) ? manualX : centrelineX,
+          effectiveRspY_m: manualY,
+          rspSourceLabel: "Manual RSP",
+        };
       }
       // manualRspY_m not yet set — fall through to currentMlpY_m fallback
     }
@@ -79,6 +90,7 @@ export function useEffectiveRsp({
       const precomputed = Number((rowDerivedRspYByMode ?? {})[rspMode]);
       if (Number.isFinite(precomputed)) {
         return {
+          effectiveRspX_m: centrelineX,
           effectiveRspY_m: precomputed,
           rspSourceLabel: ROW_MODE_LABELS[rspMode],
         };
@@ -94,12 +106,15 @@ export function useEffectiveRsp({
       : null;
 
     return {
+      effectiveRspX_m: centrelineX,
       effectiveRspY_m: fallbackY,
       rspSourceLabel: "Current RSP",
     };
   }, [
     rspMode,
     manualRspY_m,
+    manualRspX_m,
+    roomWidthM,
     screenFrontPlaneM,
     screenWidthM,
     currentMlpY_m,

@@ -276,8 +276,9 @@ export function serializeProject(input = {}) {
       ...(p12Level != null ? { p12_level: p12Level } : {}),
     },
 
-    // RSP mode + manual RSP Y
+    // RSP mode + manual RSP position (x, y)
     rsp_mode: typeof rspMode === "string" && rspMode ? rspMode : "auto_from_screen",
     manual_rsp_y_m: Number.isFinite(Number(manualRspY_m)) ? Number(manualRspY_m) : null,
+    manual_rsp_x_m: Number.isFinite(Number(manualRspX_m)) ? Number(manualRspX_m) : null,
   };
 }

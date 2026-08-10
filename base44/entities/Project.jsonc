@@ -331,6 +331,11 @@
       "description": "Explicit RSP Y position in meters when rsp_mode is manual_position. Null = not set.",
       "nullable": true
     },
+    "manual_rsp_x_m": {
+      "type": "number",
+      "description": "Explicit RSP X position in meters when rsp_mode is manual_position. Null = use room centreline.",
+      "nullable": true
+    },
     "account_id": {
       "type": "string",
       "description": "ID of the Account this project belongs to"
