@@ -1722,6 +1722,7 @@ function RoomDesignerWithState() {
       <BassBackgroundAnalysisOwner key={resolvedProjectId || "free"} scopeId={resolvedProjectId || "free"}>
       {showAsdr && (
         <DesignRecommendationEngine
+          key={`asdr-recommendations:${resolvedProjectId || projectIdState || "free"}`}
           appState={appState}
           seats={seats}
           placedSpeakers={placedSpeakers}
