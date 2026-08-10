@@ -76,6 +76,7 @@ import { useElevationDragHandlers } from "@/components/roomdesigner/hooks/useEle
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { subscribeAsdrVisibility, getAsdrVisibility, setAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAppDesignRating } from "@/components/hooks/useAppDesignRating";
+import DesignRecommendationEngine from "@/components/recommendations/DesignRecommendationEngine";
 
 // Safe lazy imports that work with both named and default exports
 const RoomDimensions = React.lazy(() =>
@@ -1643,15 +1644,18 @@ function RoomDesignerWithState() {
     projectId: resolvedProjectId || projectIdState || "free",
   });
 
-  // Publish ASDR rating to window for sidebar consumption
+  const [designRecommendations, setDesignRecommendations] = React.useState(null);
+
+  // Publish ASDR rating + evaluated recommendations to the shared sidebar.
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       window.__ROOM_DESIGNER_ASDR__ = {
         showAsdr,
         rating: appDesignRating,
+        recommendations: designRecommendations,
       };
     }
-  }, [showAsdr, appDesignRating]);
+  }, [showAsdr, appDesignRating, designRecommendations]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
@@ -1716,6 +1720,22 @@ function RoomDesignerWithState() {
       </AlertDialog>
 
       <BassBackgroundAnalysisOwner key={resolvedProjectId || "free"} scopeId={resolvedProjectId || "free"}>
+      {showAsdr && (
+        <DesignRecommendationEngine
+          appState={appState}
+          seats={seats}
+          placedSpeakers={placedSpeakers}
+          screen={_screen}
+          dolbyLayout={dolbyPreset}
+          dimensions={stableDimensions}
+          mlpPoint={mlpAnchorEffective}
+          projectId={resolvedProjectId || projectIdState || "free"}
+          baselineRating={appDesignRating}
+          allowUkPricing={priceData?.priceListAvailable === true && priceData?.territoryCode === "UK"}
+          soundbarSelections={appState?.soundbarSelections || {}}
+          onRecommendationsChange={setDesignRecommendations}
+        />
+      )}
       <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
         <style>{`
           .brand-btn{
