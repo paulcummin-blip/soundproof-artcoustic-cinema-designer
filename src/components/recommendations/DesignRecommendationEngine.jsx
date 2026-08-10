@@ -10,7 +10,7 @@
  * No RP22 thresholds or ASDR scoring rules are copied here.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
 import { useAllSeatSplMetrics } from "@/components/hooks/useAllSeatSplMetrics";
@@ -249,9 +249,20 @@ export default function DesignRecommendationEngine({
     bassScenarioPolicy: "Current verified bass result held constant; subwoofer alternatives are not evaluated in V1.",
   }), [baselineRating, evaluatedCandidates, candidateCount, completedCount, pendingCount, isSettled]);
 
+  // Candidate inputs can be recreated with equivalent values when a parent
+  // renders. Do not publish an equivalent recommendation object back to that
+  // parent: setter -> parent render -> rebuilt candidates -> setter otherwise
+  // forms a self-sustaining report/Room Designer render loop.
+  const recommendationPublicationSignature = useMemo(
+    () => JSON.stringify(recommendations),
+    [recommendations]
+  );
+  const lastPublishedRecommendationSignatureRef = useRef(null);
   useEffect(() => {
+    if (lastPublishedRecommendationSignatureRef.current === recommendationPublicationSignature) return;
+    lastPublishedRecommendationSignatureRef.current = recommendationPublicationSignature;
     onRecommendationsChange?.(recommendations);
-  }, [onRecommendationsChange, recommendations]);
+  }, [onRecommendationsChange, recommendations, recommendationPublicationSignature]);
 
   return (
     <>
