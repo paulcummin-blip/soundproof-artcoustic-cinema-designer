@@ -209,7 +209,7 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
             Evaluating low-change alternatives…
           </div>
         ) : (
-          <>
+          <div style={{ display: "contents" }}>
             {bestImprovement ? (
               <RecommendationCard heading="Best improvement" item={bestImprovement} mode="improvement" />
             ) : (
@@ -220,7 +220,7 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
             ) : (
               <EmptyCard heading="Best cost saving" text={emptySaving} />
             )}
-          </>
+          </div>
         )}
       </div>
       <div
