@@ -187,6 +187,31 @@ export function runLcrUpgradeAssertions() {
     duplicatePowerResult.improvements.map((item) => item.id)
   );
 
+  const usefulModelOnly = {
+    ...lcrCandidate("q8-5-model-only", 11400),
+    candidateModelKey: "q8-5",
+    amplifierUpgradeRequired: false,
+    disruption: "Low",
+  };
+  const usefulPowered = {
+    ...lcrCandidate("q8-5-powered", 11400),
+    candidateModelKey: "q8-5",
+    amplifierUpgradeRequired: true,
+    disruption: "Medium",
+  };
+  const usefulPowerResult = rankDesignRecommendations({
+    baselineRating: baseline,
+    evaluatedCandidates: [
+      evaluated(usefulModelOnly, rating(57, [roomParam("p12", "L3"), roomParam("p5", "L4")])),
+      evaluated(usefulPowered, rating(59, [roomParam("p12", "L4"), roomParam("p5", "L4")])),
+    ],
+  });
+  check(
+    "Powered variant is recommended when it reaches the better RP22 profile",
+    ["q8-5-powered"],
+    usefulPowerResult.improvements.map((item) => item.id)
+  );
+
   const degrading = lcrCandidate("plus-6-with-degradation", 2200);
   const degradationResult = rankDesignRecommendations({
     baselineRating: rating(52, [roomParam("p12", "L2"), roomParam("p5", "L3")]),
