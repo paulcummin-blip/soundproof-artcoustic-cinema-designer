@@ -162,6 +162,31 @@ export function runLcrUpgradeAssertions() {
     solvedProfileResult.improvements[0]?.materialUpgradeLabel
   );
 
+  const modelOnly = {
+    ...lcrCandidate("q4-5-model-only", 6850),
+    candidateModelKey: "q4-5",
+    amplifierUpgradeRequired: false,
+    disruption: "Low",
+  };
+  const poweredSameResult = {
+    ...lcrCandidate("q4-5-powered", 6850),
+    candidateModelKey: "q4-5",
+    amplifierUpgradeRequired: true,
+    disruption: "Medium",
+  };
+  const duplicatePowerResult = rankDesignRecommendations({
+    baselineRating: baseline,
+    evaluatedCandidates: [
+      evaluated(poweredSameResult, rating(59, [roomParam("p12", "L4"), roomParam("p5", "L4")])),
+      evaluated(modelOnly, rating(59, [roomParam("p12", "L4"), roomParam("p5", "L4")])),
+    ],
+  });
+  check(
+    "Equivalent powered and model-only results occupy one slot and prefer lower disruption",
+    ["q4-5-model-only"],
+    duplicatePowerResult.improvements.map((item) => item.id)
+  );
+
   const degrading = lcrCandidate("plus-6-with-degradation", 2200);
   const degradationResult = rankDesignRecommendations({
     baselineRating: rating(52, [roomParam("p12", "L2"), roomParam("p5", "L3")]),
