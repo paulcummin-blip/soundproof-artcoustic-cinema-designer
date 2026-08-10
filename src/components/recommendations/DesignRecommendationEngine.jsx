@@ -76,6 +76,7 @@ function recommendationItemPublicationSnapshot(item) {
     p12BaselineLevel: item?.p12BaselineLevel || null,
     caveat: item?.caveat || null,
     recommendationDirection: item?.recommendationDirection || null,
+    candidateModelKey: item?.candidateModelKey || null,
     materialUpgradeLabel: item?.materialUpgradeLabel || null,
     lcrPowerBeforeW: item?.lcrPowerBeforeW ?? null,
     lcrPowerAfterW: item?.lcrPowerAfterW ?? null,
