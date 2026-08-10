@@ -191,7 +191,7 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
   const emptySaving = "No meaningful cost reduction identified without material performance loss.";
 
   return (
-    <div style={{ marginTop: "4mm" }}>
+    <div style={{ marginTop: "3mm" }}>
       <div style={{ display: "flex", gap: "4mm", alignItems: "stretch" }}>
         {isEvaluating ? (
           <div

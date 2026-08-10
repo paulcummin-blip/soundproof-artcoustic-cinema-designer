@@ -185,7 +185,6 @@ export default function TechnicalAsdrScorecard({
       className="tech-asdr-scorecard"
       style={{
         background: COLORS.bg,
-        minHeight: "232mm",
         padding: "8mm 10mm",
         boxSizing: "border-box",
         WebkitPrintColorAdjust: "exact",
@@ -345,7 +344,7 @@ export default function TechnicalAsdrScorecard({
       {/* ── Client language note ── */}
       <div
         style={{
-          marginTop: "3mm",
+          marginTop: "2mm",
           fontSize: "8pt",
           color: COLORS.secondary,
           fontFamily: FONT_BODY,
