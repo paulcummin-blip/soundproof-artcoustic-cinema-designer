@@ -397,6 +397,49 @@ function compareImprovementTuples(a, b) {
   return 0;
 }
 
+function levelChangeSignature(item) {
+  return JSON.stringify(
+    (item?.parameterLevelChanges || []).map((change) => [
+      change?.key || "",
+      change?.beforeLevel || "",
+      change?.afterLevel || "",
+    ])
+  );
+}
+
+/**
+ * Value ordering applies only after the canonical RP22 severity tuple ties.
+ * When two LCR upgrades reach the same final RP22 profile, the lower-cost
+ * legitimate solution wins: unused raw headroom is not rewarded.
+ */
+function compareLcrMaterialUpgrades(a, b) {
+  const bothLcrUpgrades =
+    a?.kind === "lcr" &&
+    b?.kind === "lcr" &&
+    a?.recommendationDirection === "upgrade" &&
+    b?.recommendationDirection === "upgrade";
+  if (!bothLcrUpgrades) return 0;
+
+  const costA = a.costDeltaExVat ?? Infinity;
+  const costB = b.costDeltaExVat ?? Infinity;
+  const sameSolvedProfile = levelChangeSignature(a) === levelChangeSignature(b);
+
+  if (sameSolvedProfile) {
+    if (costA !== costB) return costA - costB;
+  } else if (a.scoreDelta !== b.scoreDelta) {
+    return b.scoreDelta - a.scoreDelta;
+  }
+
+  if (costA !== costB) return costA - costB;
+  const disA = DISRUPTION_RANK[a.disruption] ?? 99;
+  const disB = DISRUPTION_RANK[b.disruption] ?? 99;
+  if (disA !== disB) return disA - disB;
+  const confA = CONFIDENCE_RANK[a.confidence] ?? 0;
+  const confB = CONFIDENCE_RANK[b.confidence] ?? 0;
+  if (confA !== confB) return confB - confA;
+  return b.scoreDelta - a.scoreDelta;
+}
+
 /**
  * Convert evaluated candidates into concise "improve" and "save" shortlists.
  *
@@ -469,7 +512,7 @@ export function rankDesignRecommendations({
   // is applied AFTER the RP22-first hierarchy and Viewing Priority
   // comparator. Candidates below the threshold are still evaluated
   // canonically above; they are filtered out of presentation only.
-  const improvements = evaluated
+  const rankedImprovements = evaluated
     .filter((item) => item.isRecommendationImprovement)
     .filter((item) => isMaterialImprovement(item.scoreDelta))
     .sort((a, b) => {
@@ -477,6 +520,8 @@ export function rankDesignRecommendations({
       if (cmp !== 0) return cmp;
       const viewingCmp = compareApplicableViewingCandidates(a, b);
       if (viewingCmp !== 0) return viewingCmp;
+      const lcrValueCmp = compareLcrMaterialUpgrades(a, b);
+      if (lcrValueCmp !== 0) return lcrValueCmp;
       // Secondary: cost (lower better), disruption (lower), confidence (higher), ASDR (higher)
       const costA = a.costDeltaExVat ?? Infinity;
       const costB = b.costDeltaExVat ?? Infinity;
@@ -488,8 +533,19 @@ export function rankDesignRecommendations({
       const confB = CONFIDENCE_RANK[b.confidence] ?? 0;
       if (confA !== confB) return confB - confA;
       return b.scoreDelta - a.scoreDelta;
-    })
-    .slice(0, 3);
+    });
+
+  let bestMaterialLcrMarked = false;
+  const improvements = rankedImprovements
+    .slice(0, 3)
+    .map((item) => {
+      if (item.kind !== "lcr" || item.recommendationDirection !== "upgrade") return item;
+      const materialUpgradeLabel = bestMaterialLcrMarked
+        ? "MATERIAL UPGRADE"
+        : "BEST VALUE MATERIAL UPGRADE";
+      bestMaterialLcrMarked = true;
+      return { ...item, materialUpgradeLabel };
+    });
 
   // ── SAVINGS ──
   // A candidate qualifies when it saves money while preserving the current
