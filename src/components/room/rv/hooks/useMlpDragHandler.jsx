@@ -5,10 +5,12 @@
  *
  * Ownership model (draft/commit separation):
  *   Drag move  → mlpDragInfo (visual draft only, no acoustic recalc)
- *   Mouse up   → setManualRspX_m() + setManualRspY_m() + setRspMode("manual_position") once
+ *   Mouse up   → setManualRspY_m() + setRspMode("manual_position") once
  *
- * The marker is always draggable. On first committed drag from AUTO, the mode
- * switches to manual_position and both X and Y are persisted.
+ * Y-AXIS ONLY: X is always pinned to the room centreline (roomWid / 2).
+ * The pointer X is ignored; only Y follows the pointer. The marker never
+ * moves horizontally. On first committed drag from AUTO, the mode switches
+ * to manual_position and only Y is persisted.
  *
  * Does NOT touch:
  *   - seatingBlockOffset
@@ -41,17 +43,20 @@ export function useMlpDragHandler({
     const roomLen = Number(lengthM) || 6.0;
     const roomWid = Number(widthM) || 4.5;
 
-    // roomPos is already in room coordinates — no conversion needed
-    const rawX = Number(roomPos?.x);
+    // roomPos is already in room coordinates — no conversion needed.
+    // RSP drag is Y-AXIS ONLY: X is always the room centreline (roomWid / 2).
+    // The pointer X is ignored entirely; only Y follows the pointer.
     const rawY = Number(roomPos?.y);
 
-    // Clamp to room bounds with a small margin
+    // X is fixed at centreline — never moves horizontally.
+    const centrelineX = roomWid / 2;
+
+    // Clamp Y to room bounds with a small margin
     const MARGIN = 0.20;
-    const clampedX = Math.max(MARGIN, Math.min(roomWid - MARGIN, rawX));
     const clampedY = Math.max(MARGIN, Math.min(roomLen - MARGIN, rawY));
 
     // 1 cm resolution
-    const roundedX = Math.round(clampedX * 100) / 100;
+    const roundedX = Math.round(centrelineX * 100) / 100;
     const roundedY = Math.round(clampedY * 100) / 100;
 
     // Draft mode: update visual draft only — do NOT write canonical RSP state.

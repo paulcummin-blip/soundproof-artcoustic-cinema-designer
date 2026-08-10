@@ -13,8 +13,9 @@
  *   repositioned. On activation, the draft is seeded with the exact current
  *   effective RSP {x, y} so the dot NEVER jumps.
  *
- *   After release, the canonical mouse-up handler commits the final {x, y},
- *   persists manualRspX_m / manualRspY_m, and sets rspMode to manual_position.
+ *   After release, the canonical mouse-up handler commits the final Y only
+ *   (X is always centreline), persists manualRspY_m, and sets rspMode to
+ *   manual_position.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 

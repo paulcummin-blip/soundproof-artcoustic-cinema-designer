@@ -49,29 +49,29 @@ export function useMouseUpHandler({
   onSetRspMode,
 }) {
   const handleMouseUp = useCallback((e) => {
-    // RSP marker drag: commit the final draft {x, y} once on release.
-    // On first committed drag from AUTO, switch to manual_position so both
-    // X and Y are persisted and the green dot remains the canonical RSP.
+    // RSP marker drag: commit the final draft Y once on release.
+    // RSP drag is Y-AXIS ONLY — X is never persisted; it always derives from
+    // the room centreline via useEffectiveRsp. On first committed drag from
+    // AUTO, switch to manual_position so the persisted Y becomes canonical.
     if (dragType === "mlpMarker") {
-      const finalX = mlpDragInfo?.x;
       const finalY = mlpDragInfo?.y;
-      const hasX = Number.isFinite(finalX);
       const hasY = Number.isFinite(finalY);
       if (hasY && typeof onSetManualRspY_m === "function") {
         onSetManualRspY_m(finalY);
       }
-      if (hasX && typeof onSetManualRspX_m === "function") {
-        onSetManualRspX_m(finalX);
+      // Clear any stale off-centre manual X so old project data is ignored.
+      if (hasY && typeof onSetManualRspX_m === "function") {
+        onSetManualRspX_m(null);
       }
       // Switch to manual_position on first committed drag so the persisted
-      // coordinates become the canonical RSP authority.
-      if ((hasX || hasY) && typeof onSetRspMode === "function") {
+      // Y becomes the canonical RSP authority (X stays centreline).
+      if (hasY && typeof onSetRspMode === "function") {
         onSetRspMode("manual_position");
       }
       recordTemporaryP18P19DragEnd({
         dragEndCount: ++temporaryRSPDragEndCount,
-        committedRspCoordinate: hasY ? { x: hasX ? finalX : null, y: finalY, z: 1.2 } : null,
-        exactStateSetter: "onSetManualRspX_m + onSetManualRspY_m (commit on release)",
+        committedRspCoordinate: hasY ? { x: null, y: finalY, z: 1.2 } : null,
+        exactStateSetter: "onSetManualRspY_m (Y-only commit on release)",
       });
     }
 

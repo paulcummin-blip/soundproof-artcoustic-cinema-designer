@@ -4,9 +4,9 @@
  * Focused hook for computing the effective RSP (Reference Seating Position)
  * from the chosen rspMode and its associated inputs.
  *
- * Stage B1: Now returns both X and Y coordinates.
- *   AUTO / row-derived: X = room centreline (roomWidthM / 2)
- *   MANUAL: X = manualRspX_m (if finite), else room centreline
+ * Stage B1: Returns both X and Y coordinates.
+ *   AUTO / row-derived / MANUAL: X = room centreline (roomWidthM / 2)
+ *   MANUAL drag is Y-axis only — manualRspX_m is ignored (schema-compatible only).
  *
  * Returns:
  *   { effectiveRspX_m: number|null, effectiveRspY_m: number|null, rspSourceLabel: string }
@@ -72,12 +72,13 @@ export function useEffectiveRsp({
     }
 
     // ── manual_position ─────────────────────────────────────────────────────
+    // X is ALWAYS the room centreline — manual RSP drag is Y-axis only.
+    // manualRspX_m is ignored (kept in schema for compatibility but harmless).
     if (rspMode === "manual_position") {
       const manualY = Number(manualRspY_m);
-      const manualX = Number(manualRspX_m);
       if (Number.isFinite(manualY)) {
         return {
-          effectiveRspX_m: Number.isFinite(manualX) ? manualX : centrelineX,
+          effectiveRspX_m: centrelineX,
           effectiveRspY_m: manualY,
           rspSourceLabel: "Manual RSP",
         };
