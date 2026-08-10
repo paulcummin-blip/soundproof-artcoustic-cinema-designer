@@ -15,6 +15,7 @@
  */
 
 import React from "react";
+import { formatViewingRecommendationSummary } from "@/components/recommendations/viewingRecommendationPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -75,6 +76,7 @@ function RecommendationCard({ heading, item, mode }) {
   const to = formatPct(item?.newPercentage);
   const affected = Array.isArray(item?.affectedParameters) ? item.affectedParameters : [];
   const affectedText = affected.length ? affected.join(" · ") : null;
+  const viewingText = formatViewingRecommendationSummary(item);
 
   // Cost / saving line — unknown is never shown as £0.
   let costLine = null;
@@ -143,6 +145,17 @@ function RecommendationCard({ heading, item, mode }) {
           P12 after change: {item.p12Level}
         </div>
       )}
+      {viewingText && (
+        <div style={{
+          fontSize: "7.5pt",
+          color: item?.viewingTradeoff ? "#9a6800" : COLORS.secondary,
+          fontFamily: FONT_BODY,
+          lineHeight: 1.3,
+          marginBottom: "1mm",
+        }}>
+          {viewingText}
+        </div>
+      )}
       <div style={{ fontSize: "8.5pt", color: COLORS.muted, fontFamily: FONT_BODY, marginBottom: caveatText ? "1mm" : 0 }}>
         {item.disruption} disruption · {item.confidence} confidence
       </div>
@@ -187,7 +200,7 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
   const bestImprovement = improvements[0] || null;
   const bestSaving = savings[0] || null;
 
-  const emptyImprovement = "No material RP22 improvement identified without greater design change.";
+  const emptyImprovement = "No material RP22 or multi-row viewing improvement identified without greater design change.";
   const emptySaving = "No meaningful cost reduction identified without material performance loss.";
 
   return (
