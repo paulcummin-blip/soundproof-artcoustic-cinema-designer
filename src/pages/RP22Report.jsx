@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import RP22GradingPill from '../components/ui/RP22GradingPill';
-import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
@@ -18,6 +17,7 @@ import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
 import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectIntoAppState';
 import { useAnalysisSpeakers } from '@/components/hooks/useAnalysisSpeakers';
+import { useAllSeatSplMetrics } from '@/components/hooks/useAllSeatSplMetrics';
 import { useSubwooferSync } from '@/components/hooks/useSubwooferSync';
 import { base44 } from '@/api/base44Client';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
@@ -460,25 +460,20 @@ function RP22ReportInner() {
         dolbyPreset: reportDolbyLayout,
     });
 
-    const allSeatSplMetrics = React.useMemo(() => {
-        if (!hasSeats || !hasSpeakers) return [];
-        const getCanonicalRole = (role) => {
-            const map = { SL: 'SL', LS: 'SL', SR: 'SR', RS: 'SR', SBL: 'SBL', SBR: 'SBR', LW: 'LW', RW: 'RW', FL: 'FL', L: 'FL', FC: 'FC', C: 'FC', FR: 'FR', R: 'FR', TFL: 'TFL', TFR: 'TFR', TML: 'TML', TMR: 'TMR', TRL: 'TRL', TRR: 'TRR' };
-            return map[String(role || '').toUpperCase()] || String(role || '').toUpperCase();
-        };
-        return computeAllSeatSplMetrics({
-            seats, placedSpeakers, getCanonicalRole,
-            getEffectiveSplInputs: app?.getEffectiveSplInputs || (() => ({ powerW: 100, eqHeadroomDb: 0 })),
-            getModelDimsM: (model) => {
-                const meta = getSpeakerModelMeta(model);
-                if (meta && !meta.notFound) return { ...meta, sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || 87, power_handling_w: meta.max_power || Infinity, max_spl_cont_db_1m: meta.max_spl || null };
-                return { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 };
-            },
-            screenLoss_dB: Number(app?.splConfig?.screenLossDb) || 0,
-            eqHeadroom_dB: Number(app?.splConfig?.globalEqHeadroomDb) || 0,
-            mlpPoint: primarySeatingPosition
-        });
-    }, [seats, placedSpeakers, primarySeatingPosition, app?.splConfig, app?.getEffectiveSplInputs, hasSeats, hasSpeakers]);
+    // ── Canonical seat SPL authority (unified with Room Designer) ────────
+    // Uses the same useAllSeatSplMetrics hook as the live Room Designer so the
+    // report inherits identical model-capability resolution (including the
+    // _s → base-model SPL cap inheritance for evolve-2-1_s etc.), role
+    // normalisation, room-dimension extraction, and SPL config. The report no
+    // longer owns a parallel computeAllSeatSplMetrics adapter, role map, or
+    // model-capability fallback.
+    const allSeatSplMetrics = useAllSeatSplMetrics({
+        _seatingPositions: seats,
+        analysisSpeakers,
+        appState: app,
+        mlpAnchorEffective: reportMlpAnchorEffective,
+        getSpeakerModelMeta,
+    });
 
     const analysisResult = useRP22AnalysisEngine({
         diagnosticOwner: "rp22-report-page-authority",
