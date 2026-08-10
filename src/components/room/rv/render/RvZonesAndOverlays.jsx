@@ -110,7 +110,8 @@ export default function RvZonesAndOverlays({
       )}
 
       {/* Canonical RP22 Side/Rear Surround Zones — same authority as P11 */}
-      {!!(overlaysForRendering?.showZones) && (
+      {/* Toggle-driven: SIDE_SURROUND controls side zones, REAR_SURROUND controls back zones */}
+      {(!!(overlaysForRendering?.SIDE_SURROUND) || !!(overlaysForRendering?.REAR_SURROUND)) && (
         <RvSurroundZones
           seatingPositions={seatingPositions}
           widthM={widthM}
@@ -119,7 +120,8 @@ export default function RvZonesAndOverlays({
           placedSpeakers={placedSpeakers}
           meterToCanvasX={meterToCanvasX}
           meterToCanvasY={meterToCanvasY}
-          showZones={true}
+          showSideSurround={!!(overlaysForRendering?.SIDE_SURROUND)}
+          showRearSurround={!!(overlaysForRendering?.REAR_SURROUND)}
         />
       )}
 

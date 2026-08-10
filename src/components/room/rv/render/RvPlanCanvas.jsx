@@ -405,9 +405,8 @@ export default function RvPlanCanvas({
               />
 
             {/* Layer 5: Other Informational Zone Overlays */}
+            {/* SIDE_SURROUND / REAR_SURROUND now rendered canonically via RvSurroundZones in RvZonesAndOverlays */}
             {exportMode !== 'clean' && !!overlaysForRendering?.LCR && ZoneComponents.LCR}
-            {exportMode !== 'clean' && !!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
-            {exportMode !== 'clean' && !!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
             {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && <RvDolbyZones hasRoomRect={hasRoomRect} overlaysForRendering={overlaysForRendering} mlp={mlp} toPx={toPx} widthM={widthM} lengthM={lengthM} dolbyLayout={dolbyLayout} getDolbyZoneSpecs={getDolbyZoneSpecs} arcPathForBand={arcPathForBand} />}
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}

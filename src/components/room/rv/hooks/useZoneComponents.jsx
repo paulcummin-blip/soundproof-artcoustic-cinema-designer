@@ -369,13 +369,11 @@ export function useZoneComponents({
           <LCRZoneComponent side="right" />
         </g>
       ),
-      SIDE_SURROUND: (
-        <g pointerEvents="none">
-          <SideSurroundZoneComponent side="left" />
-          <SideSurroundZoneComponent side="right" />
-        </g>
-      ),
-      REAR_SURROUND: <RearSurroundZoneComponent />,
+      // SIDE_SURROUND / REAR_SURROUND retired from this path.
+      // Canonical RP22 zones now rendered by RvSurroundZones (via RvZonesAndOverlays),
+      // using computeRp22SurroundZones — the same authority as P11 compliance.
+      SIDE_SURROUND: null,
+      REAR_SURROUND: null,
 
       OVERHEADS: (() => {
         // Only render when the user has the Overheads overlay toggle enabled
