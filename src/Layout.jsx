@@ -58,6 +58,7 @@ export default function Layout({ children, currentPageName }) {
   // ASDR visibility (shared between app and report) + rating data from RoomDesigner
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [asdrRating, setAsdrRating] = React.useState(null);
+  const [asdrRecommendations, setAsdrRecommendations] = React.useState(null);
 
   // Active project meta for sidebar (name + client)
   const [activeProjectSummary, setActiveProjectSummary] = React.useState({
@@ -121,6 +122,7 @@ export default function Layout({ children, currentPageName }) {
       }
       if (typeof window !== 'undefined' && window.__ROOM_DESIGNER_ASDR__) {
         setAsdrRating(window.__ROOM_DESIGNER_ASDR__.rating || null);
+        setAsdrRecommendations(window.__ROOM_DESIGNER_ASDR__.recommendations || null);
       }
     }, 500); // Poll every 500ms for updates
     
@@ -299,6 +301,7 @@ export default function Layout({ children, currentPageName }) {
                 <DesignRatingSummary
                   showAsdr={showAsdr}
                   rating={asdrRating}
+                  recommendations={asdrRecommendations}
                 />
               </div>
             )}
