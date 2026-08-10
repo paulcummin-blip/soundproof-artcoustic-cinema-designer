@@ -199,7 +199,9 @@ export default function DesignRecommendationEngine({
   const recommendations = useMemo(() => ({
     ...rankDesignRecommendations({ baselineRating, evaluatedCandidates }),
     candidateCount: candidates.length,
-    isEvaluating: candidates.length > 0 && evaluatedCandidates.length < candidates.length,
+    // Reveal useful results as soon as the first canonical re-run settles.
+    // Remaining candidates continue to refine the shortlist in the background.
+    isEvaluating: candidates.length > 0 && evaluatedCandidates.length === 0,
     bassScenarioPolicy: "Current verified bass result held constant; subwoofer alternatives are not evaluated in V1.",
   }), [baselineRating, evaluatedCandidates, candidates.length]);
 
