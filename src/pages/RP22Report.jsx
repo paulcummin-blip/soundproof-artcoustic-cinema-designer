@@ -122,6 +122,40 @@ function RP22ReportInner() {
             return;
         }
 
+        // ── FAST PATH (SPA navigation from Room Designer) ──────────────────
+        // If the shared AppStateProvider is already hydrated for the EXACT
+        // requested project (identity match via session store + usable
+        // hydrated design state via isProjectHydrationReady), skip the
+        // redundant network hydration and mark ready immediately. Project
+        // details (name/client) are fetched non-blocking for the header.
+        // Hard refresh fails this check (isProjectHydrationReady=false) and
+        // falls through to the full fetch/hydrate path below.
+        const sharedProviderReady =
+            activeProjectId === effectiveProjectId &&
+            app?.isProjectHydrationReady === true &&
+            Number.isFinite(Number(app?.roomDims?.widthM)) &&
+            Number.isFinite(Number(app?.roomDims?.lengthM));
+
+        if (sharedProviderReady) {
+            setReportHydrating(false);
+            setReportReadyProjectId(effectiveProjectId);
+            base44.entities.Project.filter({ id: effectiveProjectId }).then((results) => {
+                if (cancelled) return;
+                const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
+                if (!p) return;
+                setProjectDetails({
+                    id: p.id,
+                    name: p.name,
+                    client_name: p.client_name,
+                    project_status: p.project_status,
+                    notes: p.notes,
+                    created_date: p.created_date,
+                    updated_date: p.updated_date,
+                });
+            }).catch(() => { /* non-blocking metadata fetch */ });
+            return () => { cancelled = true; };
+        }
+
         if (reportReadyProjectId === effectiveProjectId && reportHydrating === false) {
             return;
         }

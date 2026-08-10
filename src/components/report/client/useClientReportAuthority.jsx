@@ -31,6 +31,7 @@ import { useCompletedBassAuthority } from "@/components/room/bass/completedBassR
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { computeAllSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { useActiveProjectId } from "@/components/state/project-session";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
@@ -69,6 +70,7 @@ function normalizeSeat(seat) {
 
 export function useClientReportAuthority(projectId) {
   const app = useAppState();
+  const activeProjectId = useActiveProjectId();
 
   const [projectDetails, setProjectDetails] = useState(null);
   const [hydrating, setHydrating] = useState(true);
@@ -85,6 +87,36 @@ export function useClientReportAuthority(projectId) {
       setHydrating(false);
       setHydratedProjectId(null);
       return;
+    }
+
+    // ── FAST PATH (SPA navigation from Room Designer) ──────────────────────
+    // If the shared AppStateProvider is already hydrated for the EXACT
+    // requested project (identity match via session store + usable hydrated
+    // design state via isProjectHydrationReady), skip the redundant network
+    // hydration and mark ready immediately. Project details fetched
+    // non-blocking. Hard refresh fails this check and falls through to the
+    // full fetch/hydrate path below.
+    const sharedProviderReady =
+      activeProjectId === projectId &&
+      app?.isProjectHydrationReady === true &&
+      Number.isFinite(Number(app?.roomDims?.widthM)) &&
+      Number.isFinite(Number(app?.roomDims?.lengthM));
+
+    if (sharedProviderReady) {
+      setHydrating(false);
+      setHydratedProjectId(projectId);
+      base44.entities.Project.filter({ id: projectId }).then((results) => {
+        if (cancelled) return;
+        const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
+        if (!p) return;
+        setProjectDetails({
+          id: p.id,
+          name: p.name,
+          client_name: p.client_name,
+          created_date: p.created_date,
+        });
+      }).catch(() => { /* non-blocking metadata fetch */ });
+      return () => { cancelled = true; };
     }
 
     if (hydratedProjectId === projectId && !hydrating) return;
