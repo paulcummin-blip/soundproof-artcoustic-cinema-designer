@@ -7,6 +7,7 @@ import NewProjectDialog, { dolbyConfigs, splOptions } from "@/components/project
 import ManageStatusesDialog from "@/components/projects/ManageStatusesDialog";
 import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
 import { normalizeStatusId, getStatusColor } from "@/components/projects/statusDefaults";
+import { useProjectsSortPreference } from "@/components/projects/useProjectsSortPreference";
 
 // Build lookup maps from the shared label arrays
 const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(c => [c.value, c.label]));
@@ -118,6 +119,16 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [sortKey, setSortKey] = useState("recent");
   const [manageOpen, setManageOpen] = useState(false);
+
+  // Per-user sort preference (persisted to the signed-in user's profile)
+  const { savedSort, loaded: sortPrefLoaded, persistSort } = useProjectsSortPreference();
+  const appliedSavedSort = useRef(false);
+  useEffect(() => {
+    if (!appliedSavedSort.current && sortPrefLoaded) {
+      setSortKey(savedSort);
+      appliedSavedSort.current = true;
+    }
+  }, [savedSort, sortPrefLoaded]);
 
   // Configurable project status definitions (account-scoped)
   const {
@@ -899,7 +910,11 @@ export default function ProjectsPage() {
 
         <select
           value={sortKey}
-          onChange={(e) => setSortKey(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setSortKey(v);
+            persistSort(v);
+          }}
           style={{
             padding: "12px 14px",
             borderRadius: 10,
