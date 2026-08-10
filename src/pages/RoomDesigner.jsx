@@ -1653,6 +1653,7 @@ function RoomDesignerWithState() {
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       window.__ROOM_DESIGNER_ASDR__ = {
+        projectId: resolvedProjectId || projectIdState || "free",
         showAsdr,
         rating: appDesignRating,
         recommendations: designRecommendations,
