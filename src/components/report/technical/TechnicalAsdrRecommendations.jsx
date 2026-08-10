@@ -77,6 +77,14 @@ function RecommendationCard({ heading, item, mode }) {
   const affected = Array.isArray(item?.affectedParameters) ? item.affectedParameters : [];
   const affectedText = affected.length ? affected.join(" · ") : null;
   const viewingText = formatViewingRecommendationSummary(item);
+  const powerBeforeW = Number(item?.lcrPowerBeforeW);
+  const powerAfterW = Number(item?.lcrPowerAfterW);
+  const amplifierLine =
+    item?.amplifierUpgradeRequired === true &&
+    Number.isFinite(powerBeforeW) &&
+    Number.isFinite(powerAfterW)
+      ? `Amplification: ${Math.round(powerBeforeW)} → ${Math.round(powerAfterW)} W/ch`
+      : null;
 
   // Cost / saving line — unknown is never shown as £0.
   let costLine = null;
@@ -92,7 +100,9 @@ function RecommendationCard({ heading, item, mode }) {
     } else if (Number(cost) === 0) {
       costLine = "Equipment: £0";
     } else if (Number(cost) > 0) {
-      costLine = `Equipment: ${formatMoney(cost)} ex VAT`;
+      costLine = item?.amplifierUpgradeRequired
+        ? `LCR speakers: ${formatMoney(cost)} ex VAT · amplifier not priced`
+        : `Equipment: ${formatMoney(cost)} ex VAT`;
     } else {
       costLine = `saves ${formatMoney(Math.abs(cost))} ex VAT`;
     }
@@ -115,6 +125,18 @@ function RecommendationCard({ heading, item, mode }) {
       }}
     >
       <CardHeading>{heading}</CardHeading>
+      {item?.materialUpgradeLabel && (
+        <div style={{
+          fontSize: "7pt",
+          fontWeight: 700,
+          color: COLORS.secondary,
+          letterSpacing: "0.08em",
+          fontFamily: FONT_BODY,
+          marginBottom: "1mm",
+        }}>
+          {item.materialUpgradeLabel}
+        </div>
+      )}
       <div
         style={{
           fontSize: "10pt",
@@ -135,6 +157,11 @@ function RecommendationCard({ heading, item, mode }) {
       <div style={{ fontSize: "9pt", color: COLORS.body, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
         Rating {from} → {to}
       </div>
+      {amplifierLine && (
+        <div style={{ fontSize: "8.5pt", color: COLORS.body, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
+          {amplifierLine}
+        </div>
+      )}
       {affectedText && (
         <div style={{ fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
           {isSaving ? "Affected" : "Improves"}: {affectedText}
