@@ -93,6 +93,44 @@ function RecommendationRow({ item, mode }) {
   );
 }
 
+function BestPracticeRow({ item }) {
+  const genuineLevelChanges = (Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [])
+    .filter((c) => c?.isImproved);
+  const levelChangeText = formatLevelChanges(genuineLevelChanges);
+
+  return (
+    <div style={{ padding: '9px 0', borderTop: '1px solid #ECEAE6' }}>
+      <div style={{ fontSize: 9, fontWeight: 800, color: '#213428', marginBottom: 3, letterSpacing: '0.05em' }}>
+        {item?.recommendationClass || 'BEST-PRACTICE IMPROVEMENT'}
+      </div>
+      <div style={{ fontSize: 11, lineHeight: 1.35, fontWeight: 700, color: '#213428' }}>
+        {item.title}
+      </div>
+      <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
+        {item.description}
+      </div>
+      {item?.technicalLine && (
+        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#625143' }}>
+          {item.technicalLine}
+        </div>
+      )}
+      {levelChangeText && (
+        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#213428', fontWeight: 600 }}>
+          {levelChangeText}
+        </div>
+      )}
+      {item.caveat && (
+        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
+          {item.caveat}
+        </div>
+      )}
+      <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
+        {item.disruption} disruption · {item.confidence} confidence
+      </div>
+    </div>
+  );
+}
+
 function RecommendationGroup({ title, items, emptyText, mode }) {
   return (
     <section style={{ marginTop: 12 }}>
@@ -100,7 +138,9 @@ function RecommendationGroup({ title, items, emptyText, mode }) {
         {title}
       </div>
       {items.length
-        ? items.map((item) => <RecommendationRow key={item.id} item={item} mode={mode} />)
+        ? items.map((item) => mode === 'best-practice'
+          ? <BestPracticeRow key={item.id} item={item} />
+          : <RecommendationRow key={item.id} item={item} mode={mode} />)
         : <div style={{ padding: '8px 0 2px', fontSize: 10, lineHeight: 1.4, color: '#77736B' }}>{emptyText}</div>}
     </section>
   );
@@ -123,6 +163,7 @@ export default function DesignRatingSummary({
   const isNotAssessed = status === 'NOT_ASSESSED';
   const improvements = Array.isArray(recommendations?.improvements) ? recommendations.improvements : [];
   const savings = Array.isArray(recommendations?.savings) ? recommendations.savings : [];
+  const bestPractice = Array.isArray(recommendations?.bestPractice) ? recommendations.bestPractice : [];
   const isEvaluating = recommendations?.isEvaluating === true;
 
   return (
@@ -179,6 +220,14 @@ export default function DesignRatingSummary({
                 mode="saving"
                 emptyText="No material simplification identified."
               />
+              {bestPractice.length > 0 && (
+                <RecommendationGroup
+                  title="BEST-PRACTICE IMPROVEMENTS"
+                  items={bestPractice}
+                  mode="best-practice"
+                  emptyText=""
+                />
+              )}
               <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6', fontSize: 8.5, lineHeight: 1.4, color: '#8A867D' }}>
                 Bass is held at the current verified result. Subwoofer alternatives will be added only when scenario re-runs are connected and trusted.
               </div>

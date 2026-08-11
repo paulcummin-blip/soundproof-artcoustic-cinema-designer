@@ -90,6 +90,9 @@ function recommendationItemPublicationSnapshot(item) {
     recommendationDirection: item?.recommendationDirection || null,
     candidateModelKey: item?.candidateModelKey || null,
     materialUpgradeLabel: item?.materialUpgradeLabel || null,
+    recommendationClass: item?.recommendationClass || null,
+    technicalLine: item?.technicalLine || null,
+    applyAction: item?.applyAction || null,
     lcrPowerBeforeW: item?.lcrPowerBeforeW ?? null,
     lcrPowerAfterW: item?.lcrPowerAfterW ?? null,
     amplifierUpgradeRequired: item?.amplifierUpgradeRequired === true,
@@ -129,39 +132,46 @@ function CandidateRatingEvaluator({
 
   const candidateAppState = useMemo(() => {
     const proposedPowerW = Number(candidate?.lcrPowerAfterW);
-    if (!candidate?.amplifierUpgradeRequired || !Number.isFinite(proposedPowerW) || proposedPowerW <= 0) {
-      return appState;
-    }
+    const hasPowerOverride = candidate?.amplifierUpgradeRequired && Number.isFinite(proposedPowerW) && proposedPowerW > 0;
+    const aimingOverride = candidate?.aimingOverride;
+
+    if (!hasPowerOverride && !aimingOverride) return appState;
 
     const baseGetEffectiveSplInputs = appState?.getEffectiveSplInputs;
     return {
       ...appState,
-      splConfig: {
-        ...(appState?.splConfig || {}),
-        lcrW: proposedPowerW,
-      },
-      getEffectiveSplInputs: (role) => {
-        const baseInputs = baseGetEffectiveSplInputs?.(role) || {
-          powerW: Number(appState?.splConfig?.lcrW) || 100,
-          eqHeadroomDb: Number(appState?.splConfig?.globalEqHeadroomDb) || 0,
-          radiationMode: appState?.splConfig?.radiationMode || "half-space",
-        };
-        if (!LCR_EVALUATION_ROLES.has(String(role || "").toUpperCase())) return baseInputs;
-
-        const currentRolePowerW = Number(baseInputs?.powerW);
-        return {
-          ...baseInputs,
-          powerW: Math.max(
-            Number.isFinite(currentRolePowerW) && currentRolePowerW > 0 ? currentRolePowerW : 100,
-            proposedPowerW
-          ),
-        };
-      },
+      splConfig: hasPowerOverride
+        ? { ...(appState?.splConfig || {}), lcrW: proposedPowerW }
+        : appState?.splConfig,
+      getEffectiveSplInputs: hasPowerOverride
+        ? (role) => {
+            const baseInputs = baseGetEffectiveSplInputs?.(role) || {
+              powerW: Number(appState?.splConfig?.lcrW) || 100,
+              eqHeadroomDb: Number(appState?.splConfig?.globalEqHeadroomDb) || 0,
+              radiationMode: appState?.splConfig?.radiationMode || "half-space",
+            };
+            if (!LCR_EVALUATION_ROLES.has(String(role || "").toUpperCase())) return baseInputs;
+            const currentRolePowerW = Number(baseInputs?.powerW);
+            return {
+              ...baseInputs,
+              powerW: Math.max(
+                Number.isFinite(currentRolePowerW) && currentRolePowerW > 0 ? currentRolePowerW : 100,
+                proposedPowerW
+              ),
+            };
+          }
+        : appState?.getEffectiveSplInputs,
+      // Stage E2: aiming override for best-practice candidates.
+      lcrAimMode: aimingOverride?.lcrAimMode ?? appState?.lcrAimMode,
+      aimFrontWidesAtMLP: aimingOverride?.aimFrontWidesAtMLP ?? appState?.aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP: aimingOverride?.aimSideSurroundsAtMLP ?? appState?.aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP: aimingOverride?.aimRearSurroundsAtMLP ?? appState?.aimRearSurroundsAtMLP,
     };
   }, [
     appState,
     candidate?.amplifierUpgradeRequired,
     candidate?.lcrPowerAfterW,
+    candidate?.aimingOverride,
   ]);
 
   const seatSplMetrics = useAllSeatSplMetrics({
@@ -216,19 +226,19 @@ function CandidateRatingEvaluator({
       useFrontGlobal: appState?.useFrontGlobal,
       useMidGlobal: appState?.useMidGlobal,
       useRearGlobal: appState?.useRearGlobal,
-      aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
-      aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
-      aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
+      aimFrontWidesAtMLP: candidateAppState?.aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP: candidateAppState?.aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP: candidateAppState?.aimRearSurroundsAtMLP,
       speakerSystem: candidateSpeakerSystem,
       sevenBedLayoutType: appState?.sevenBedLayoutType,
       getSpeakerVisibility: appState?.getSpeakerVisibility,
-      lcrAimMode: appState?.lcrAimMode,
+      lcrAimMode: candidateAppState?.lcrAimMode,
     },
     aimState: {
-      lcrAimMode: appState?.lcrAimMode,
-      aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
-      aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
-      aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
+      lcrAimMode: candidateAppState?.lcrAimMode,
+      aimFrontWidesAtMLP: candidateAppState?.aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP: candidateAppState?.aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP: candidateAppState?.aimRearSurroundsAtMLP,
       speakerSystem: candidateSpeakerSystem,
       sevenBedLayoutType: appState?.sevenBedLayoutType,
       getSpeakerVisibility: appState?.getSpeakerVisibility,
@@ -303,6 +313,7 @@ export default function DesignRecommendationEngine({
     soundbarSelections: safeSoundbarSelections,
     allowUkPricing,
     lcrPowerW: appState?.splConfig?.lcrW,
+    appState,
   }), [
     seats,
     placedSpeakers,
@@ -313,6 +324,10 @@ export default function DesignRecommendationEngine({
     safeSoundbarSelections,
     allowUkPricing,
     appState?.splConfig?.lcrW,
+    appState?.lcrAimMode,
+    appState?.aimFrontWidesAtMLP,
+    appState?.aimSideSurroundsAtMLP,
+    appState?.aimRearSurroundsAtMLP,
   ]);
 
   const viewingContext = useMemo(() => {
@@ -456,6 +471,7 @@ export default function DesignRecommendationEngine({
       isEvaluating: recommendations.isEvaluating,
       improvements: recommendations.improvements.map(recommendationItemPublicationSnapshot),
       savings: recommendations.savings.map(recommendationItemPublicationSnapshot),
+      bestPractice: (recommendations.bestPractice || []).map(recommendationItemPublicationSnapshot),
     }),
     [recommendations]
   );

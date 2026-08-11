@@ -10,6 +10,7 @@
 
 import { MODELS, getSpeakerModelMeta, normaliseModelKey, getLcrRecommendationFamily } from "@/components/models/speakers/registry";
 import { resolveUsefulLcrPowerW } from "./usefulLcrPower";
+import { buildBestPracticeAimingCandidates } from "./bestPracticeAimingCandidates";
 import { getCommercialPrice } from "@/components/pricing/usePriceCalculation";
 import { screenRows } from "@/components/data/screenSizes";
 import { compareViewingPriority, compareViewingPriorityFine } from "@/components/utils/viewingPriorityAuthority";
@@ -35,6 +36,10 @@ const VIEWING_GEOMETRY_KINDS = new Set(["seating", "screen", "row-spacing"]);
 
 export function isViewingGeometryCandidate(candidate) {
   return VIEWING_GEOMETRY_KINDS.has(String(candidate?.kind || ""));
+}
+
+export function isBestPracticeCandidate(candidate) {
+  return String(candidate?.kind || "") === "best-practice";
 }
 
 const finite = (value) =>
@@ -118,6 +123,7 @@ export function buildDesignRecommendationCandidates({
   soundbarSelections = {},
   allowUkPricing = true,
   lcrPowerW = 100,
+  appState = null,
 }) {
   const candidates = [];
   const safeSeats = Array.isArray(seats) ? seats : [];
@@ -421,6 +427,18 @@ export function buildDesignRecommendationCandidates({
     }
   }
 
+  // Stage E2: Best-practice aiming candidates (separate eligibility path).
+  for (const bp of buildBestPracticeAimingCandidates({
+    placedSpeakers: safeSpeakers,
+    mlpPoint,
+    appState,
+    seats: safeSeats,
+    screen,
+    dolbyLayout,
+  })) {
+    pushCandidate(candidates, bp);
+  }
+
   return candidates;
 }
 
@@ -576,7 +594,33 @@ export function rankDesignRecommendations({
 }) {
   const baselinePct = Number(baselineRating?.displayPercentage);
   const baselinePoints = Number(baselineRating?.actualPoints);
-  if (!finite(baselinePct)) return { improvements: [], savings: [], evaluatedCount: 0 };
+
+  // Stage E2: Best-practice candidates have a separate eligibility path.
+  // They do NOT require an RP22/RP23 level gain and receive no invented
+  // ASDR points. Eligibility is determined at candidate-generation time
+  // (the aiming issue exists). The evaluator may still detect a genuine
+  // level change for display; only improvements are surfaced.
+  const bestPractice = evaluatedCandidates
+    .filter((entry) => entry?.candidate?.kind === "best-practice")
+    .map((entry) => {
+      const rating = entry.rating;
+      const hasValidRating = rating && Number.isFinite(Number(rating?.displayPercentage));
+      const allLevelChanges = hasValidRating
+        ? getParameterLevelChanges(baselineRating, rating)
+        : [];
+      const genuineLevelChanges = allLevelChanges.filter((c) => c?.isImproved);
+      return {
+        ...entry.candidate,
+        rating: hasValidRating ? rating : null,
+        parameterLevelChanges: genuineLevelChanges,
+        affectedParameters: hasValidRating
+          ? getAffectedParameters(baselineRating, rating)
+          : [],
+      };
+    })
+    .slice(0, 2);
+
+  if (!finite(baselinePct)) return { improvements: [], savings: [], bestPractice, evaluatedCount: evaluatedCandidates.length };
 
   const evaluated = evaluatedCandidates
     .filter((entry) => entry?.candidate && finite(entry?.rating?.displayPercentage))
@@ -732,5 +776,5 @@ export function rankDesignRecommendations({
     })
     .slice(0, 3);
 
-  return { improvements, savings, evaluatedCount: evaluated.length };
+  return { improvements, savings, bestPractice, evaluatedCount: evaluated.length };
 }

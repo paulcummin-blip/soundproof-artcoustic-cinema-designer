@@ -174,6 +174,60 @@ function RecommendationCard({ heading, item, mode }) {
   );
 }
 
+function BestPracticeCard({ item }) {
+  const genuineLevelChanges = (Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [])
+    .filter((c) => c?.isImproved);
+  const levelChangeText = formatLevelChanges(genuineLevelChanges);
+
+  return (
+    <div
+      style={{
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 6,
+        padding: "4mm 5mm",
+        breakInside: "avoid",
+        pageBreakInside: "avoid",
+        flex: 1,
+        minWidth: 0,
+      }}
+    >
+      <CardHeading>{item?.recommendationClass || "Best-Practice Improvement"}</CardHeading>
+      <div style={{
+        fontSize: "10pt",
+        fontWeight: 600,
+        color: COLORS.primary,
+        fontFamily: FONT_BODY,
+        lineHeight: 1.3,
+        marginBottom: "1.5mm",
+      }}>
+        {item.title}
+      </div>
+      <div style={{ fontSize: "9pt", color: COLORS.body, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
+        {item.description}
+      </div>
+      {item?.technicalLine && (
+        <div style={{ fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
+          {item.technicalLine}
+        </div>
+      )}
+      {levelChangeText && (
+        <div style={{ fontSize: "8.5pt", color: COLORS.primary, fontFamily: FONT_BODY, fontWeight: 600, marginBottom: "1mm" }}>
+          {levelChangeText}
+        </div>
+      )}
+      {item?.caveat && (
+        <div style={{ fontSize: "8pt", color: COLORS.muted, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
+          {item.caveat}
+        </div>
+      )}
+      <div style={{ fontSize: "8.5pt", color: COLORS.muted, fontFamily: FONT_BODY }}>
+        {item.disruption} disruption · {item.confidence} confidence
+      </div>
+    </div>
+  );
+}
+
 function EmptyCard({ heading, text }) {
   return (
     <div
@@ -201,6 +255,7 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
 
   const improvements = Array.isArray(recommendations.improvements) ? recommendations.improvements : [];
   const savings = Array.isArray(recommendations.savings) ? recommendations.savings : [];
+  const bestPractice = Array.isArray(recommendations.bestPractice) ? recommendations.bestPractice : [];
   const isEvaluating = recommendations.isEvaluating === true;
 
   const bestImprovement = improvements[0] || null;
@@ -242,6 +297,13 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
           </div>
         )}
       </div>
+      {bestPractice.length > 0 && (
+        <div style={{ display: "flex", gap: "4mm", alignItems: "stretch", marginTop: "3mm" }}>
+          {bestPractice.map((item) => (
+            <BestPracticeCard key={item.id} item={item} />
+          ))}
+        </div>
+      )}
       <div
         style={{
           marginTop: "2mm",
