@@ -439,6 +439,7 @@ export default function RP22ClientReport() {
           <ClientAcousticTreatment
             roomDims={roomDims}
             seatingPositions={seatingPositions}
+            placedSpeakers={placedSpeakers}
             rsp={rsp}
             acousticTreatmentEnabled={!!appState?.acousticTreatmentEnabled}
             selectedAbfuserQty={Number(appState?.selectedAbfuserQty) || 0}
@@ -448,6 +449,7 @@ export default function RP22ClientReport() {
           type: "acoustic-treatment",
           roomDims,
           seatingPositions,
+          placedSpeakers,
           rsp,
           acousticTreatmentEnabled: !!appState?.acousticTreatmentEnabled,
           selectedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,

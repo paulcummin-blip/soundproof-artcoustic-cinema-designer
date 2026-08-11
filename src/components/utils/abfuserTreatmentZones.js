@@ -1,0 +1,145 @@
+// abfuserTreatmentZones.js
+// --------------------------------
+// Shared utility: derives Abfuser treatment zones from actual room geometry,
+// speaker positions, and seating positions using the image-source method.
+//
+// This is a SOUND PROOF PRACTICAL GUIDANCE RULE — not an RP22 prescription.
+// RP22 establishes WHY these treatment regions matter; Sound Proof converts
+// their physical extent into a practical Artcoustic product recommendation.
+
+export const ABFUSER_SKU = "500027";
+export const ABFUSER_LABEL = "Artcoustic Abfuser, Black";
+
+export const ABFUSER_PANEL_LENGTH_M = 1.10;
+export const ABFUSER_PANEL_WIDTH_M = 0.70;
+export const ABFUSER_PANEL_AREA_M2 = ABFUSER_PANEL_WIDTH_M * ABFUSER_PANEL_LENGTH_M; // 0.77
+
+// Visual wall-band depth (plan-view thickness only — makes the zone visible)
+export const ZONE_DEPTH_M = 0.12;
+// Padding added to each end of a derived zone
+const ZONE_PADDING_M = 0.20;
+// Margin outside the seating envelope for the rear zone
+const REAR_MARGIN_M = 0.20;
+
+function getFrontSpeakers(placedSpeakers) {
+  if (!Array.isArray(placedSpeakers)) return [];
+  return placedSpeakers.filter((s) => {
+    const role = s?.role || s?.label;
+    return role === "FL" || role === "FC" || role === "FR";
+  });
+}
+
+function getSeats(seatingPositions) {
+  if (!Array.isArray(seatingPositions)) return [];
+  return seatingPositions
+    .map((s) => ({
+      x: Number(s?.x ?? s?.position?.x),
+      y: Number(s?.y ?? s?.position?.y),
+    }))
+    .filter((s) => Number.isFinite(s.x) && Number.isFinite(s.y));
+}
+
+function getSpeakerPos(s) {
+  const x = Number(s?.position?.x ?? s?.x);
+  const y = Number(s?.position?.y ?? s?.y);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+/**
+ * Image-source side-wall reflection Y.
+ * Mirrors the source across the wall, finds where mirror→listener crosses the wall.
+ * Returns null if the reflection is not between source and listener.
+ */
+function sideWallReflectionY(src, listener, wallX, isLeftWall) {
+  const mirrorX = isLeftWall ? -src.x : 2 * wallX - src.x;
+  const dx = listener.x - mirrorX;
+  if (Math.abs(dx) < 1e-6) return null;
+  const t = (wallX - mirrorX) / dx;
+  if (t < 0 || t > 1) return null;
+  return src.y + t * (listener.y - src.y);
+}
+
+/**
+ * Compute treatment zones and recommended quantity from actual geometry.
+ *
+ * @param {Object} params
+ * @param {Object} params.roomDims - { widthM, lengthM }
+ * @param {Array}  params.placedSpeakers - speaker objects with role + position
+ * @param {Array}  params.seatingPositions - seat objects with x, y
+ * @returns {Object|null} zone data or null if room is invalid
+ */
+export function computeAbfuserTreatmentZones({ roomDims, placedSpeakers, seatingPositions }) {
+  const widthM = Number(roomDims?.widthM);
+  const lengthM = Number(roomDims?.lengthM);
+
+  if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || widthM <= 0 || lengthM <= 0) {
+    return null;
+  }
+
+  const frontSpeakers = getFrontSpeakers(placedSpeakers);
+  const seats = getSeats(seatingPositions);
+
+  // ── Side reflection zones (image-source method) ──
+  const leftYs = [];
+  const rightYs = [];
+
+  for (const spk of frontSpeakers) {
+    const src = getSpeakerPos(spk);
+    if (!src) continue;
+    for (const seat of seats) {
+      const yLeft = sideWallReflectionY(src, seat, 0, true);
+      if (Number.isFinite(yLeft) && yLeft >= 0 && yLeft <= lengthM) leftYs.push(yLeft);
+      const yRight = sideWallReflectionY(src, seat, widthM, false);
+      if (Number.isFinite(yRight) && yRight >= 0 && yRight <= lengthM) rightYs.push(yRight);
+    }
+  }
+
+  // Fallback: nominal zone if no valid reflections (e.g. no speakers/seats)
+  const useFallbackSide = leftYs.length === 0 && rightYs.length === 0;
+  const leftMin = useFallbackSide ? lengthM * 0.2 : Math.min(...leftYs);
+  const leftMax = useFallbackSide ? lengthM * 0.6 : Math.max(...leftYs);
+  const rightMin = useFallbackSide ? lengthM * 0.2 : Math.min(...rightYs);
+  const rightMax = useFallbackSide ? lengthM * 0.6 : Math.max(...rightYs);
+
+  const leftStart = Math.max(0, leftMin - ZONE_PADDING_M);
+  const leftEnd = Math.min(lengthM, leftMax + ZONE_PADDING_M);
+  const rightStart = Math.max(0, rightMin - ZONE_PADDING_M);
+  const rightEnd = Math.min(lengthM, rightMax + ZONE_PADDING_M);
+
+  const leftLength = Math.max(0, leftEnd - leftStart);
+  const rightLength = Math.max(0, rightEnd - rightStart);
+
+  // ── Rear zone (from seating X envelope) ──
+  let rearMinX, rearMaxX;
+  if (seats.length > 0) {
+    const seatXs = seats.map((s) => s.x);
+    rearMinX = Math.max(0, Math.min(...seatXs) - REAR_MARGIN_M);
+    rearMaxX = Math.min(widthM, Math.max(...seatXs) + REAR_MARGIN_M);
+  } else {
+    rearMinX = widthM * 0.2;
+    rearMaxX = widthM * 0.8;
+  }
+  const rearWidth = Math.max(0, rearMaxX - rearMinX);
+
+  // ── Recommended quantity (zone-size based) ──
+  const leftPanels = Math.max(1, Math.ceil(leftLength / ABFUSER_PANEL_LENGTH_M));
+  const rightPanels = Math.max(1, Math.ceil(rightLength / ABFUSER_PANEL_LENGTH_M));
+  const rearPanels = Math.max(2, Math.ceil(rearWidth / ABFUSER_PANEL_LENGTH_M));
+  const recommendedQty = leftPanels + rightPanels + rearPanels;
+
+  const treatmentSurfaceArea = recommendedQty * ABFUSER_PANEL_AREA_M2;
+
+  return {
+    leftZone: { start: leftStart, end: leftEnd, length: leftLength },
+    rightZone: { start: rightStart, end: rightEnd, length: rightLength },
+    rearZone: { minX: rearMinX, maxX: rearMaxX, width: rearWidth },
+    zoneDepth: ZONE_DEPTH_M,
+    leftPanels,
+    rightPanels,
+    rearPanels,
+    recommendedQty,
+    treatmentSurfaceArea,
+    panelArea: ABFUSER_PANEL_AREA_M2,
+    usedFallback: useFallbackSide,
+  };
+}

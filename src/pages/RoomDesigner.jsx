@@ -257,8 +257,8 @@ function RoomDesignerWithState() {
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
   const recommendedAbfuserQty = useMemo(
-    () => calculateRecommendedAbfuserQty(appState?.roomDims),
-    [appState?.roomDims?.widthM, appState?.roomDims?.lengthM]
+    () => calculateRecommendedAbfuserQty(appState?.roomDims, appState?.speakerSystem?.placedSpeakers, appState?.seatingPositions),
+    [appState?.roomDims?.widthM, appState?.roomDims?.lengthM, appState?.speakerSystem?.placedSpeakers, appState?.seatingPositions]
   );
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
