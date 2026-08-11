@@ -33,7 +33,7 @@ const STROKE = {
 };
 
 // Map room-space (Y=depth, Z=height) → SVG (x,y)
-// Origin top-left; room front-wall is right edge; floor is bottom.
+// Origin top-left; room front-wall is left edge; floor is bottom.
 function makeTransform({ roomLengthM, roomHeightM, svgW, svgH, pad }) {
   const usableW = svgW - pad * 2;
   const usableH = svgH - pad * 2;
@@ -114,8 +114,8 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
     >
       {/* Room outline */}
       <rect
-        x={rx1} y={ry1}
-        width={rx0 - rx1} height={ry0 - ry1}
+        x={rx0} y={ry1}
+        width={rx1 - rx0} height={ry0 - ry1}
         {...STROKE.room}
       />
 
