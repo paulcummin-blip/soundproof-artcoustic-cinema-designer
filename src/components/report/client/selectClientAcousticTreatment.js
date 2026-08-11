@@ -158,15 +158,20 @@ export function selectClientAcousticTreatment({
     }
   }
 
-  // Rear panels: distribute across the rear wall
+  // Rear panels: distribute across the rear wall.
+  // Panel CENTRES are distributed within [rearMargin + half-width, widthM - rearMargin - half-width]
+  // so the full 0.70 m panel rectangle stays inside the room walls.
+  // In narrow rooms the span compresses (panels may touch/overlap) but never exit the room.
   if (rearQty > 0) {
-    const rearSpan = widthM - 0.4;
+    const rearMargin = 0.10;
+    const rearSpan = Math.max(0, widthM - ABFUSER_WIDTH_M - rearMargin * 2);
+    const firstCenter = rearMargin + ABFUSER_WIDTH_M / 2;
     for (let i = 0; i < rearQty; i++) {
       const frac = rearQty === 1 ? 0.5 : i / (rearQty - 1);
-      const panelX = 0.2 + frac * rearSpan;
+      const panelCenterX = firstCenter + frac * rearSpan;
       panels.push({
         id: `panel-rear-${i}`,
-        x: panelX - ABFUSER_WIDTH_M / 2,
+        x: panelCenterX - ABFUSER_WIDTH_M / 2,
         y: rearZoneStartY + 0.05,
         width: ABFUSER_WIDTH_M,
         height: ABFUSER_HEIGHT_M,
