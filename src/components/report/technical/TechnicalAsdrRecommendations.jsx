@@ -16,6 +16,7 @@
 
 import React from "react";
 import { formatViewingRecommendationSummary } from "@/components/recommendations/viewingRecommendationPresentation";
+import { formatP12P13Consequences, hasAdditionalCalibrationHeadroom } from "@/components/recommendations/p12RecommendationPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -71,11 +72,14 @@ function RecommendationCard({ heading, item, mode }) {
   const isSaving = mode === "saving";
   const from = formatPct(item?.currentPercentage);
   const to = formatPct(item?.newPercentage);
-  const levelChanges = Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [];
+  const levelChanges = (Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [])
+    .filter((c) => c?.display !== "P12" && c?.display !== "P13");
   const levelChangeText = formatLevelChanges(levelChanges);
+  const p12P13Text = formatP12P13Consequences(item).join(" · ");
+  const combinedChangeText = [p12P13Text, levelChangeText].filter(Boolean).join(" · ");
   const consequenceText = isSaving
-    ? (levelChangeText || "Profile preserved")
-    : (levelChangeText || "Profile improved");
+    ? (combinedChangeText || "Profile preserved")
+    : (combinedChangeText || "Profile improved");
   const viewingText = formatViewingRecommendationSummary(item);
   const powerBeforeW = Number(item?.lcrPowerBeforeW);
   const powerAfterW = Number(item?.lcrPowerAfterW);
@@ -85,6 +89,9 @@ function RecommendationCard({ heading, item, mode }) {
     Number.isFinite(powerAfterW)
       ? `Amplification: ${Math.round(powerBeforeW)} → ${Math.round(powerAfterW)} W/ch`
       : null;
+  const headroomNote = hasAdditionalCalibrationHeadroom(item)
+    ? "Provides additional calibration/EQ headroom."
+    : null;
 
   const caveatText = shortenCaveat(item?.caveat, item?.kind);
 
@@ -137,6 +144,11 @@ function RecommendationCard({ heading, item, mode }) {
       {amplifierLine && (
         <div style={{ fontSize: "8.5pt", color: COLORS.body, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
           {amplifierLine}
+        </div>
+      )}
+      {headroomNote && (
+        <div style={{ fontSize: "8pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic", marginBottom: "1mm" }}>
+          {headroomNote}
         </div>
       )}
       {viewingText && (

@@ -9,6 +9,7 @@
  */
 
 import { MODELS, getSpeakerModelMeta, normaliseModelKey, getLcrRecommendationFamily } from "@/components/models/speakers/registry";
+import { resolveUsefulLcrPowerW } from "./usefulLcrPower";
 import { getCommercialPrice } from "@/components/pricing/usePriceCalculation";
 import { screenRows } from "@/components/data/screenSizes";
 import { compareViewingPriority, compareViewingPriorityFine } from "@/components/utils/viewingPriorityAuthority";
@@ -42,6 +43,28 @@ const finite = (value) =>
   value !== "" &&
   Number.isFinite(Number(value));
 const roleOf = (speaker) => String(speaker?.role || "").toUpperCase();
+
+/**
+ * Power-cap gate (Stage E1). Returns true when the model can benefit from more
+ * amplifier power — i.e. the current available power holds the 1 m SPL below
+ * the canonical continuous SPL cap, AND the useful power point exceeds the
+ * current power. Physics matches centralSplEngine.getSPL1mCapability: the cap
+ * is applied at 1 m before propagation loss, so a speaker already at its cap
+ * cannot benefit from more power at any distance.
+ */
+function canModelBenefitFromMorePower(modelMeta, currentPowerW, capabilityDb) {
+  const usefulPowerW = resolveUsefulLcrPowerW(modelMeta);
+  if (!finite(usefulPowerW) || usefulPowerW <= currentPowerW) return false;
+  if (!finite(capabilityDb)) return false;
+  const maxPowerW = Number(modelMeta?.max_power);
+  const availableCurrentPowerW = finite(maxPowerW) && maxPowerW > 0
+    ? Math.min(currentPowerW, maxPowerW)
+    : currentPowerW;
+  const sensDb = Number(modelMeta?.sensitivity_dB_1w1m);
+  if (!finite(sensDb) || availableCurrentPowerW <= 0) return false;
+  const currentPowerLimitedSplDb = sensDb + 10 * Math.log10(availableCurrentPowerW);
+  return currentPowerLimitedSplDb < capabilityDb - 0.01;
+}
 
 function cloneSeatWithDelta(seat, deltaY) {
   const nextY = Number(seat?.y) + deltaY;
@@ -204,6 +227,42 @@ export function buildDesignRecommendationCandidates({
       }))
       .filter((entry) => !currentKeys.includes(entry.model.key));
 
+    // Stage E1: Current-model power-only candidate. Keeps the existing LCR
+    // speaker and increases available LCR amplification to the model's useful
+    // power point. This is the lowest-disruption Dynamic Range improvement
+    // (speaker unchanged). The candidate still runs through the full canonical
+    // evaluator; it is only published when it crosses a unique P12/P13
+    // threshold (isRecommendationImprovement gate in rankDesignRecommendations).
+    if (canModelBenefitFromMorePower(currentRepresentative, currentLcrPowerW, currentCapability)) {
+      const currentUsefulPowerW = resolveUsefulLcrPowerW(currentRepresentative);
+      pushCandidate(candidates, {
+        id: `lcr:power-only:${currentKeys[0]}:amp-${Math.round(currentLcrPowerW)}-${Math.round(currentUsefulPowerW)}`,
+        kind: "lcr",
+        recommendationDirection: "upgrade",
+        candidateModelKey: currentKeys[0],
+        title: `Increase LCR amplification to ${Math.round(currentUsefulPowerW)} W/ch`,
+        description: `Keeps the current ${currentRepresentative?.label || "LCR"} model and evaluates ${Math.round(currentUsefulPowerW)} W/ch LCR amplification.`,
+        seats: safeSeats,
+        placedSpeakers: safeSpeakers,
+        screen,
+        dolbyLayout,
+        mlpPoint,
+        costDeltaExVat: null,
+        lcrQuantity: currentLcr.length,
+        speakerUnitPriceExVat: null,
+        currentModelCapabilityDb: currentCapability,
+        candidateModelCapabilityDb: currentCapability,
+        lcrPowerBeforeW: currentLcrPowerW,
+        lcrPowerAfterW: currentUsefulPowerW,
+        amplifierUpgradeRequired: true,
+        amplifierCostIncluded: false,
+        physicalFit: null,
+        disruption: "Low",
+        confidence: "High",
+        caveat: `Increases LCR amplification from ${Math.round(currentLcrPowerW)} W/ch to ${Math.round(currentUsefulPowerW)} W/ch. Amplifier hardware cost is not included.`,
+      });
+    }
+
     // Stage A: LCR alternatives are generated from capability/compatibility only.
     // All weaker compatible discrete models become cost-down candidates; all
     // stronger compatible discrete models become upgrade candidates. Price is
@@ -231,33 +290,21 @@ export function buildDesignRecommendationCandidates({
         amplifierUpgradeRequired: false,
       };
 
-      // Add one registry-backed powered scenario only when the current
-      // amplification would hold this model below its continuous SPL cap.
-      // The full scenario still goes through the canonical SPL → RP22 → ASDR
-      // chain; this calculation only decides whether the extra candidate is
-      // physically meaningful.
-      const sensitivityDb = Number(entry.model.sensitivity_dB_1w1m);
-      const availableCurrentPowerW = finite(entry.maxPowerW)
-        ? Math.min(currentLcrPowerW, entry.maxPowerW)
-        : currentLcrPowerW;
-      const currentPowerLimitedSplDb =
-        finite(sensitivityDb) && availableCurrentPowerW > 0
-          ? sensitivityDb + 10 * Math.log10(availableCurrentPowerW)
-          : null;
-      const canBenefitFromMorePower =
-        finite(entry.maxPowerW) &&
-        entry.maxPowerW > currentLcrPowerW &&
-        finite(entry.capability) &&
-        finite(currentPowerLimitedSplDb) &&
-        currentPowerLimitedSplDb < entry.capability - 0.01;
+      // Stage E1: Add one powered scenario only when the current amplification
+      // holds this model below its continuous SPL cap. The powered point is the
+      // model's useful power (smallest canonical option reaching the cap), NOT
+      // the registry max_power — power above the cap is wasted. The full
+      // scenario still goes through the canonical SPL → RP22 → ASDR chain.
+      const usefulPowerW = resolveUsefulLcrPowerW(entry.model);
+      const canPowerUp = canModelBenefitFromMorePower(entry.model, currentLcrPowerW, entry.capability);
 
-      return canBenefitFromMorePower
+      return canPowerUp
         ? [
             modelOnly,
             {
               entry,
               direction: "upgrade",
-              powerAfterW: entry.maxPowerW,
+              powerAfterW: usefulPowerW,
               amplifierUpgradeRequired: true,
             },
           ]
@@ -290,7 +337,9 @@ export function buildDesignRecommendationCandidates({
         kind: "lcr",
         recommendationDirection: direction,
         candidateModelKey: entry.model.key,
-        title: `Use ${entry.model.label} for LCR`,
+        title: amplifierUpgradeRequired
+          ? `Use ${entry.model.label} for LCR at ${Math.round(powerAfterW)} W/ch`
+          : `Use ${entry.model.label} for LCR`,
         description: amplifierUpgradeRequired
           ? `Changes all three discrete screen channels and evaluates ${Math.round(powerAfterW)} W/ch LCR amplification.`
           : "Changes all three discrete screen channels to the same model.",
@@ -588,10 +637,18 @@ export function rankDesignRecommendations({
         hasNewFail: degradationProfile.hasNewFail,
         p12Level: extractP12Level(entry.rating),
         p12BaselineLevel: extractP12Level(baselineRating),
+        p12RawDb: finite(entry.p12RawDb) ? Number(entry.p12RawDb) : null,
+        p12BaselineRawDb: finite(baselineRating?.p12RawDb) ? Number(baselineRating.p12RawDb) : null,
         p12MinimumLevel: gradeSplParamRaw(entry.p12RawDb, 12, "minimum"),
         p12RecommendedLevel: gradeSplParamRaw(entry.p12RawDb, 12, "recommended"),
+        p12BaselineMinimumLevel: gradeSplParamRaw(baselineRating?.p12RawDb, 12, "minimum"),
+        p12BaselineRecommendedLevel: gradeSplParamRaw(baselineRating?.p12RawDb, 12, "recommended"),
+        p13RawDb: finite(entry.p13RawDb) ? Number(entry.p13RawDb) : null,
+        p13BaselineRawDb: finite(baselineRating?.p13RawDb) ? Number(baselineRating.p13RawDb) : null,
         p13MinimumLevel: gradeSplParamRaw(entry.p13RawDb, 13, "minimum"),
         p13RecommendedLevel: gradeSplParamRaw(entry.p13RawDb, 13, "recommended"),
+        p13BaselineMinimumLevel: gradeSplParamRaw(baselineRating?.p13RawDb, 13, "minimum"),
+        p13BaselineRecommendedLevel: gradeSplParamRaw(baselineRating?.p13RawDb, 13, "recommended"),
       };
     });
 

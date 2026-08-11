@@ -1,6 +1,7 @@
 // components/pricing/DesignRatingSummary.jsx
 import React from 'react';
 import { formatViewingRecommendationSummary } from '@/components/recommendations/viewingRecommendationPresentation';
+import { formatP12P13Consequences, hasAdditionalCalibrationHeadroom } from '@/components/recommendations/p12RecommendationPresentation';
 
 function formatPoints(value, signed = false) {
   const number = Number(value);
@@ -20,8 +21,12 @@ function RecommendationRow({ item, mode }) {
   const from = Math.round(Number(item?.currentPercentage) || 0);
   const to = Math.round(Number(item?.newPercentage) || 0);
   const isSaving = mode === 'saving';
-  const levelChanges = Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [];
+  // P12/P13 are rendered as dual Minimum/Recommended consequences with raw dB;
+  // exclude them from the generic level-change list to avoid duplication.
+  const levelChanges = (Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [])
+    .filter((c) => c?.display !== 'P12' && c?.display !== 'P13');
   const levelChangeText = formatLevelChanges(levelChanges);
+  const p12P13Text = formatP12P13Consequences(item).join(' · ');
   const viewingText = formatViewingRecommendationSummary(item);
   const powerBeforeW = Number(item?.lcrPowerBeforeW);
   const powerAfterW = Number(item?.lcrPowerAfterW);
@@ -31,10 +36,14 @@ function RecommendationRow({ item, mode }) {
     Number.isFinite(powerAfterW)
       ? `Amplification: ${Math.round(powerBeforeW)} → ${Math.round(powerAfterW)} W/ch`
       : null;
+  const headroomNote = hasAdditionalCalibrationHeadroom(item)
+    ? 'Provides additional calibration/EQ headroom.'
+    : null;
 
+  const combinedChangeText = [p12P13Text, levelChangeText].filter(Boolean).join(' · ');
   const valueText = isSaving
-    ? (levelChangeText || 'Profile preserved')
-    : (levelChangeText || 'Profile improved');
+    ? (combinedChangeText || 'Profile preserved')
+    : (combinedChangeText || 'Profile improved');
 
   return (
     <div style={{ padding: '9px 0', borderTop: '1px solid #ECEAE6' }}>
@@ -57,6 +66,11 @@ function RecommendationRow({ item, mode }) {
       {amplifierText && (
         <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#3E4349' }}>
           {amplifierText}
+        </div>
+      )}
+      {headroomNote && (
+        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#625143', fontStyle: 'italic' }}>
+          {headroomNote}
         </div>
       )}
       {viewingText && (
