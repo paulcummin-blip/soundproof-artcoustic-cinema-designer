@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, useLayoutEffect, forwardRef } from "react";
+import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, useLayoutEffect, useSyncExternalStore, forwardRef } from "react";
 
 import SeatHud from "@/components/room/SeatHud";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
@@ -63,6 +63,7 @@ import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwoofe
 import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler";
 import { useMlpDragHandler } from "@/components/room/rv/hooks/useMlpDragHandler";
 import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
+import { subscribeMlpGrab, getMlpGrab, setMlpGrab } from "@/components/state/mlpGrabStore";
 import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement";
 import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
 import { useShiftSeatsToAngle } from "@/components/room/rv/hooks/useShiftSeatsToAngle";
@@ -1204,9 +1205,13 @@ const byId = useEntitiesById({
   // MLP/RSP drag proximity dimension guides (Stage 1) — temporary, drag-only.
   const [mlpDragInfo, setMlpDragInfo] = useState(null);
 
+  // GRABBED state for the RSP pick-up / free-move / click-to-place interaction.
+  // Owned by mlpGrabStore so SeatingLayout's Reset button can cancel it.
+  const mlpGrabbed = useSyncExternalStore(subscribeMlpGrab, getMlpGrab);
+
   useEffect(() => {
-    if (dragType !== 'mlpMarker') setMlpDragInfo(null);
-  }, [dragType]);
+    if (dragType !== 'mlpMarker' && !mlpGrabbed) setMlpDragInfo(null);
+  }, [dragType, mlpGrabbed]);
 
   const { handleMlpDrag } = useMlpDragHandler({
     canvasToRoom,
@@ -1508,9 +1513,15 @@ const byId = useEntitiesById({
     onSetRspMode,
   });
 
-  // Wrap mouseup so mlpDragActiveRef is always cleared, regardless of drag type
+  // Wrap mouseup so mlpDragActiveRef is always cleared, regardless of drag type.
+  // EXCEPTION: when the RSP is GRABBED (pick-up / free-move mode), releasing the
+  // mouse button must NOT end the grabbed state — the user releases after the
+  // 3 s long-press and then free-moves without a button held. The grabbed state
+  // ends only on click-to-place or Escape cancel.
   const handleMouseUp = useCallback((e) => {
-    mlpDragActiveRef.current = false;
+    if (!getMlpGrab()) {
+      mlpDragActiveRef.current = false;
+    }
     _handleMouseUpRaw(e);
   }, [_handleMouseUpRaw]);
 
@@ -1962,29 +1973,89 @@ useEffect(() => {
     getCanonicalRole,
   });
 
-  // MLPMarker is rendered by RvMlpMarker (see JSX below)
-  const handleMlpMarkerMouseDown = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    mlpDragActiveRef.current = true;
-    handleMouseDown(e, 'mlp-marker-dot', 'mlpMarker');
-  }, [handleMouseDown]);
+  // --- RSP pick-up / free-move / click-to-place interaction ---
+  //
+  // LOCKED → hold 3 s → GRABBED → release button (no commit) → free-move Y →
+  // single click → place → LOCKED.  Escape while GRABBED → cancel → LOCKED.
 
-  // Long-press activation: seed the draft mlpDragInfo with the EXACT current
-  // effective RSP {x, y} so the green dot NEVER jumps on activation. This
-  // also ensures a no-move release commits the current position and switches
-  // rspMode to manual_position.
+  // Long-press activation: enter GRABBED, seed floating Y from the EXACT current
+  // canonical RSP {x, y} so the dot NEVER jumps.  X is always centreline.
   const handleMlpLongPressActivate = useCallback((currentX, currentY) => {
     const x = Number(currentX);
     const y = Number(currentY);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    setMlpGrab(true);
+    mlpDragActiveRef.current = true;
     setMlpDragInfo({ visible: true, x, y });
   }, [setMlpDragInfo]);
 
-  // During RSP drag, render the marker from the draft {x, y} (mlpDragInfo) so it
+  // Compute a clamped Y (1 cm resolution, room-bounded) from a pointer event.
+  const _computeMlpYFromPointer = useCallback((e) => {
+    if (!svgRef.current) return null;
+    const svgElement = svgRef.current;
+    const point = svgElement.createSVGPoint();
+    point.x = e.clientX;
+    point.y = e.clientY;
+    const ctm = svgElement.getScreenCTM();
+    if (!ctm) return null;
+    const svgPoint = point.matrixTransform(ctm.inverse());
+    const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
+    const roomLen = Number(lengthM) || 6.0;
+    const MARGIN = 0.20;
+    const rawY = Number(cursorRoom?.y);
+    if (!Number.isFinite(rawY)) return null;
+    const clampedY = Math.max(MARGIN, Math.min(roomLen - MARGIN, rawY));
+    return Math.round(clampedY * 100) / 100;
+  }, [svgRef, canvasToRoom, lengthM]);
+
+  // Single click to place: commit floating Y, switch to manual_position, exit
+  // GRABBED.  The click location determines the final Y.
+  const handleMlpPlaceClick = useCallback((e) => {
+    if (!getMlpGrab()) return;
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    const finalY = _computeMlpYFromPointer(e);
+    if (Number.isFinite(finalY)) {
+      onSetManualRspY_m?.(finalY);
+      onSetManualRspX_m?.(null);
+      onSetRspMode?.("manual_position");
+    }
+    setMlpGrab(false);
+    mlpDragActiveRef.current = false;
+    setMlpDragInfo(null);
+  }, [_computeMlpYFromPointer, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode]);
+
+  // Cancel: Escape while GRABBED → restore last committed Y → LOCKED.
+  const handleMlpCancel = useCallback(() => {
+    setMlpGrab(false);
+    mlpDragActiveRef.current = false;
+    setMlpDragInfo(null);
+  }, []);
+
+  // SVG background mousedown — while GRABBED, any click on the canvas places.
+  const handleSvgMouseDown = useCallback((e) => {
+    if (!getMlpGrab()) return;
+    handleMlpPlaceClick(e);
+  }, [handleMlpPlaceClick]);
+
+  // Escape key listener — cancel GRABBED on Escape.
+  useEffect(() => {
+    if (!mlpGrabbed) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleMlpCancel();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mlpGrabbed, handleMlpCancel]);
+
+  // While GRABBED, render the marker from the draft {x, y} (mlpDragInfo) so it
   // follows the pointer live without triggering the canonical RSP authority
   // chain (useEffectiveRsp → mlpY_m → seat responses → RP22).
-  const _mlpMarkerDragging = dragType === 'mlpMarker' && mlpDragInfo?.visible && Number.isFinite(mlpDragInfo?.y);
+  const _mlpMarkerDragging = mlpGrabbed && mlpDragInfo?.visible && Number.isFinite(mlpDragInfo?.y);
   const _mlpMarkerY = _mlpMarkerDragging ? mlpDragInfo.y : mlpDotY_m;
   const _mlpMarkerX = (_mlpMarkerDragging && Number.isFinite(mlpDragInfo?.x)) ? mlpDragInfo.x : mlpDotX_m;
 
@@ -1996,8 +2067,9 @@ useEffect(() => {
       _overlays={_overlays}
       exportMode={exportMode}
       rspMode={rspMode}
-      onMouseDown={handleMlpMarkerMouseDown}
+      grabbed={mlpGrabbed}
       onLongPressActivate={handleMlpLongPressActivate}
+      onPlaceClick={handleMlpPlaceClick}
     />
   );
 
@@ -2053,6 +2125,8 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         svgH={svgH}
         handleMouseMove={handleMouseMove}
         handleMouseUp={handleMouseUp}
+        handleSvgMouseDown={handleSvgMouseDown}
+        mlpGrabbed={mlpGrabbed}
         roomRect={roomRect}
         placedSpeakers={placedSpeakers}
         getCanonicalRole={getCanonicalRole}

@@ -3,19 +3,23 @@
  *
  * Renders the green RSP dot on the plan canvas.
  *
- * LONG-PRESS DRAG MODEL (Stage B2 UX cleanup):
- *   The green dot is normally LOCKED. The user must hold the pointer down
- *   on the dot for 3.0 seconds to unlock it for dragging.
+ * PICK-UP / FREE-MOVE / CLICK-TO-PLACE MODEL:
  *
- *   pointer down → hold 3s → GRABBED → drag → release → LOCKED
+ *   LOCKED (default)
+ *     → press and hold green dot for 3.0 seconds
+ *     → GRABBED activates (dot does NOT jump — seeded from canonical Y)
+ *     → release mouse button (no commit — just ends the long-press gesture)
+ *     → RSP follows pointer Y freely (no button held)
+ *     → single click places RSP at current floating Y
+ *     → LOCKED again
  *
- *   A short click or short hold does NOTHING — the RSP is never accidentally
- *   repositioned. On activation, the draft is seeded with the exact current
- *   effective RSP {x, y} so the dot NEVER jumps.
+ *   Short click / hold < 3 s → NO ACTION.
  *
- *   After release, the canonical mouse-up handler commits the final Y only
- *   (X is always centreline), persists manualRspY_m, and sets rspMode to
- *   manual_position.
+ * State is explicit (LOCKED / LONG_PRESS_PENDING / GRABBED). The GRABBED state
+ * is owned by the parent via the `grabbed` prop (backed by mlpGrabStore) so it
+ * survives mouse-button release and can be cancelled by Escape or Reset.
+ *
+ * X is always the room centreline — only Y follows the pointer.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
@@ -28,13 +32,13 @@ export default function RvMlpMarker({
   _overlays,
   exportMode,
   rspMode,
-  onMouseDown,
+  grabbed,
   onLongPressActivate,
+  onPlaceClick,
 }) {
   const timerRef = useRef(null);
   const pointerDownEventRef = useRef(null);
   const [holding, setHolding] = useState(false);
-  const [grabbed, setGrabbed] = useState(false);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -57,45 +61,41 @@ export default function RvMlpMarker({
   const handlePointerDown = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // While GRABBED, a pointer-down is a PLACE click, not a new hold.
+    if (grabbed) {
+      if (typeof onPlaceClick === "function") onPlaceClick(e);
+      return;
+    }
+
+    // LOCKED → start the 3 s long-press timer (LONG_PRESS_PENDING).
     pointerDownEventRef.current = e;
     setHolding(true);
 
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       setHolding(false);
-      setGrabbed(true);
-
-      // Enter the existing drag flow — useMouseDownHandler captures the
-      // offset from the current marker position so the first drag frame
-      // preserves the grab point.
-      const storedEvent = pointerDownEventRef.current;
-      if (storedEvent) {
-        onMouseDown(storedEvent);
-      }
-
-      // Seed the draft with the EXACT current effective RSP so the dot
-      // never jumps on activation. This also ensures a no-move release
-      // commits the current position and switches to manual_position.
+      // Activate GRABBED — seed floating Y from the EXACT current canonical
+      // RSP Y so the dot never jumps on activation.
       if (typeof onLongPressActivate === "function") {
         onLongPressActivate(mlpDotX_m, mlpDotY_m);
       }
     }, LONG_PRESS_DURATION_MS);
-  }, [onMouseDown, onLongPressActivate, mlpDotX_m, mlpDotY_m]);
+  }, [grabbed, onLongPressActivate, onPlaceClick, mlpDotX_m, mlpDotY_m]);
 
-  const handlePointerUp = useCallback((e) => {
+  const handlePointerUp = useCallback((_e) => {
     if (grabbed) {
-      // Grabbed: the SVG's onMouseUp handles the commit. Just clean up.
-      setGrabbed(false);
+      // GRABBED: the parent handles place-on-click. Releasing the button here
+      // only ends the long-press gesture — do NOT commit or exit GRABBED.
       return;
     }
-    // Short click / short hold before 3s — cancel, do nothing.
+    // Short click / hold < 3 s before activation → cancel, no action.
     cancelHold();
   }, [grabbed, cancelHold]);
 
   const handlePointerLeave = useCallback((_e) => {
-    // Cancel hold if the pointer leaves the dot before the 3s threshold.
-    // Once grabbed, pointer capture is not on this element, so we don't
-    // interfere with the drag.
+    // Cancel hold if the pointer leaves the dot before the 3 s threshold.
+    // Once grabbed, the SVG-level mouse-move takes over, so we don't interfere.
     if (holding && !grabbed) {
       cancelHold();
     }
@@ -103,7 +103,6 @@ export default function RvMlpMarker({
 
   const handlePointerCancel = useCallback((_e) => {
     cancelHold();
-    setGrabbed(false);
   }, [cancelHold]);
 
   if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) return null;
@@ -114,11 +113,11 @@ export default function RvMlpMarker({
   // Visual feedback states:
   //   default  → subtle pulse ring
   //   holding  → brighter, thicker ring (building up)
-  //   grabbed  → solid ring + grabbing cursor
-  const ringOpacity = grabbed ? 0.7 : holding ? 0.55 : isManual ? 0.4 : 0.25;
-  const ringStrokeWidth = holding && !grabbed ? 3 : 1.5;
+  //   grabbed  → solid ring + crosshair cursor (active free-move)
+  const ringOpacity = grabbed ? 0.75 : holding ? 0.55 : isManual ? 0.4 : 0.25;
+  const ringStrokeWidth = grabbed ? 3 : holding && !grabbed ? 3 : 1.5;
   const dotRadius = grabbed ? 6 : isManual ? 6 : 5;
-  const cursor = grabbed ? "grabbing" : "grab";
+  const cursor = grabbed ? "crosshair" : "grab";
 
   return (
     <g data-testid="mlp-marker" style={{ pointerEvents: "all" }}>

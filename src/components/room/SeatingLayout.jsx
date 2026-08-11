@@ -12,6 +12,7 @@ import RP22GradingPill from '../ui/RP22GradingPill';
 import ViewingAnglePanel from './ViewingAnglePanel';
 import ViewingPriorityControl from './ViewingPriorityControl';
 import { useAppState } from '@/components/AppStateProvider';
+import { cancelMlpGrab } from '@/components/state/mlpGrabStore';
 
 // Single source of truth for target MLP Y computation - now using WIDTH for horizontal FOV
 const RAD = Math.PI / 180;
@@ -832,6 +833,7 @@ export default function SeatingLayout({
             size="sm"
             disabled={disabled}
             onClick={() => {
+              cancelMlpGrab();
               onRspModeChange?.("auto_from_screen");
               onManualRspX_mChange?.(null);
               onManualRspY_mChange?.(null);

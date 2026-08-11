@@ -41,6 +41,7 @@ export default function RvPlanCanvas({
   svgH,
   handleMouseMove,
   handleMouseUp,
+  handleSvgMouseDown,
   roomRect,
   placedSpeakers,
   getCanonicalRole,
@@ -160,6 +161,7 @@ export default function RvPlanCanvas({
   roomElementDragInfo,
   mlpDragInfo,
   dragType,
+  mlpGrabbed,
   isSeatSnapping = false,
   liveImpactMode = "summary",
 }) {
@@ -293,6 +295,7 @@ export default function RvPlanCanvas({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onMouseDown={handleSvgMouseDown}
         >
 
           {!roomRect || !Number.isFinite(scale) ? (
@@ -690,8 +693,8 @@ export default function RvPlanCanvas({
               />
             )}
 
-            {/* RSP / MLP drag dimensions — Stage 1, temporary while dragging only */}
-            {dragType === 'mlpMarker' && mlpDragInfo?.visible && (
+            {/* RSP / MLP drag dimensions — visible while GRABBED (free-move) */}
+            {mlpGrabbed && mlpDragInfo?.visible && (
               <RvMlpDragDims
                 dragInfo={mlpDragInfo}
                 scale={scale}
