@@ -108,8 +108,8 @@ function runLiverpoolRegression() {
   ok = assertEqual(ab?.listeningCenterX, 2.275, "Liverpool listeningCenterX") && ok;
 
   // Side rear cutoff removed — sideLeft.yMax must be roomRearY, NOT listeningBackY
-  ok = assertEqual(zones.sideLeft.yMax, 4.95, "Liverpool sideLeft.yMax == roomRearY (not truncated)") && ok;
-  ok = assertEqual(zones.sideRight.yMax, 4.95, "Liverpool sideRight.yMax == roomRearY (not truncated)") && ok;
+  ok = assertEqual(zones.sideLeft.yMax, 5.0, "Liverpool sideLeft.yMax == roomRearY (not truncated)") && ok;
+  ok = assertEqual(zones.sideRight.yMax, 5.0, "Liverpool sideRight.yMax == roomRearY (not truncated)") && ok;
 
   // Directly-behind exclusion active
   ok = assertEqual(zones.directlyBehindExclusion?.active, true, "Liverpool directlyBehindExclusion active") && ok;
@@ -222,7 +222,7 @@ function runForwardExtremityRegression() {
 
   const ab = zones.authorityBounds;
   const listeningFrontY = ab.listeningFrontY; // 1.5
-  const validLeftX = 0.5; // within sideLeft X range [0.05, 1.075]
+  const validLeftX = 0.5; // within sideLeft X range [0, 1.075]
 
   let ok = true;
 
@@ -301,14 +301,14 @@ function runNoSurroundBackRegression() {
   let ok = true;
 
   // Side zones NOT truncated — yMax == roomRearY
-  ok = assertEqual(zones.sideLeft.yMax, 4.95, "5.x sideLeft.yMax == roomRearY") && ok;
-  ok = assertEqual(zones.sideRight.yMax, 4.95, "5.x sideRight.yMax == roomRearY") && ok;
+  ok = assertEqual(zones.sideLeft.yMax, 5.0, "5.x sideLeft.yMax == roomRearY") && ok;
+  ok = assertEqual(zones.sideRight.yMax, 5.0, "5.x sideRight.yMax == roomRearY") && ok;
 
   // Side zones use same lateral geometry as with SBL/SBR
-  ok = assertEqual(zones.sideLeft.xMin, 0.05, "5.x sideLeft.xMin == roomLeftX") && ok;
+  ok = assertEqual(zones.sideLeft.xMin, 0, "5.x sideLeft.xMin == roomLeftX") && ok;
   ok = assertEqual(zones.sideLeft.xMax, 1.075, "5.x sideLeft.xMax == listeningLeftX") && ok;
   ok = assertEqual(zones.sideRight.xMin, 3.475, "5.x sideRight.xMin == listeningRightX") && ok;
-  ok = assertEqual(zones.sideRight.xMax, 4.50, "5.x sideRight.xMax == roomRightX") && ok;
+  ok = assertEqual(zones.sideRight.xMax, 4.55, "5.x sideRight.xMax == roomRightX") && ok;
 
   // Back zones inactive
   ok = assertEqual(zones.backLeft?.active, false, "5.x backLeft inactive") && ok;

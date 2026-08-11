@@ -114,9 +114,11 @@ export function computeRp22SurroundZones({
   const listeningBackY = bounds.listeningBackY;
   const listeningCenterX = (listeningLeftX + listeningRightX) / 2;
 
-  // ── Room bounds (generic physical boundary handling) ──
-  // 0.05 m is a generic room-geometry safety inset, NOT an RP22 rule.
-  const WALL_INSET = 0.05;
+  // ── Room bounds (wall surface is the zone outer boundary) ──
+  // WALL_INSET = 0: the zone extends to the actual room wall surface.
+  // The canonical wall-placement authority puts speaker cabinet centres at
+  // halfDepth + 10 mm gap from the wall; the zone must include those positions.
+  const WALL_INSET = 0;
   const FORWARD_EXTENSION = 0.500; // RP22 5.6.1: up to 500 mm forward of front row
 
   const roomLeftX = WALL_INSET;

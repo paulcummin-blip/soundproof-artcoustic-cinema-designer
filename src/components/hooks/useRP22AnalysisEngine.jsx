@@ -1369,12 +1369,20 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
               }
             }
 
-            // Grade from raw float — do NOT floor/round before grading
-            let level6 = 1;
-            if      (maxDeltaRaw <= 2)  level6 = 4;
-            else if (maxDeltaRaw <= 4)  level6 = 3;
-            else if (maxDeltaRaw <= 6)  level6 = 2;
-            else if (maxDeltaRaw <= 10) level6 = 1;
+            // ── Sound Proof P6 design-grading policy ──
+            // Full-precision geometry is preserved in maxDeltaRaw (diagnostics only).
+            // The DESIGN VALUE is Math.floor(maxDeltaRaw) — a Sound Proof convention so
+            // fractions of a predicted dB do not cause a Performance Level loss.
+            // This flooring is a Sound Proof design-grading policy, NOT a claim that
+            // RP22 mandates rounding. RP22 thresholds themselves are unchanged.
+            const p6DesignDb = Math.floor(maxDeltaRaw);
+
+            let level6;
+            if      (p6DesignDb <= 2)  level6 = 4;
+            else if (p6DesignDb <= 4)  level6 = 3;
+            else if (p6DesignDb <= 6)  level6 = 2;
+            else if (p6DesignDb <= 10) level6 = 1;
+            else                       level6 = 0; // FAIL — > 10 dB
 
             if (globalThis.__B44_LOGS) {
               console.log('[RP22 P6 normalized]', {
@@ -1382,15 +1390,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
                 rolesUsed,
                 normalizedByRole,
                 maxDeltaRaw,
+                p6DesignDb,
                 level: level6,
               });
             }
 
             metrics.p6 = {
-              valueDb:         maxDeltaRaw,
+              valueDb:         p6DesignDb,
               level:           level6,
-              formatted:       `${Math.floor(maxDeltaRaw)} dB`,
-              // Debug payload
+              formatted:       `${p6DesignDb} dB`,
+              // Debug payload — raw full-precision preserved for diagnostics
               rolesUsed,
               normalizedByRole,
               rspByRole,

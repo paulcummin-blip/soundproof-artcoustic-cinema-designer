@@ -480,14 +480,46 @@ export default function RP22ReportParameterGrid({
     const seatGridData = isSeatScope ? buildSeatGridData(param.id) : null;
     const humanTitle = getHumanTitleForParam(param.id);
     const category = getCategoryForParam(param.id);
-    const rspLabel = lockedSeatId ? formatSeatLabel(lockedSeatId) : null;
     const asdrFooter = buildAsdrFooter(param.id);
+
+    // P6 presentation: show worst seat spread across all seats, omit RSP label.
+    // P6 is normalised to the green RSP (0 dB by definition); showing a fallback
+    // real seat as "RSP" is misleading. The per-seat grid below shows individual levels.
+    let achievedValue = getHudValueForParam(param);
+    let lvl = getHudLevelForParam(param);
+    let rspLabel = lockedSeatId ? formatSeatLabel(lockedSeatId) : null;
+
+    if (param.id === 6) {
+      let worstP6Raw = null;
+      for (const seat of seats) {
+        const snap = getSnapshotForSeat(seat);
+        const raw = snap?.rp22?.p6?.maxDeltaRaw;
+        if (Number.isFinite(raw) && (worstP6Raw === null || raw > worstP6Raw)) {
+          worstP6Raw = raw;
+        }
+      }
+      if (worstP6Raw !== null && Number.isFinite(worstP6Raw)) {
+        const worstDesignDb = Math.floor(worstP6Raw);
+        achievedValue = `Worst seat spread: ${worstDesignDb} dB`;
+        let worstLevel;
+        if      (worstDesignDb <= 2)  worstLevel = 4;
+        else if (worstDesignDb <= 4)  worstLevel = 3;
+        else if (worstDesignDb <= 6)  worstLevel = 2;
+        else if (worstDesignDb <= 10) worstLevel = 1;
+        else                          worstLevel = 0;
+        lvl = worstLevel;
+      } else {
+        achievedValue = "Worst seat spread: —";
+      }
+      rspLabel = null;
+    }
+
     return (
       <TechnicalParameterCard
         key={param.id}
         param={resolvedParam}
-        achievedValue={getHudValueForParam(param)}
-        lvl={getHudLevelForParam(param)}
+        achievedValue={achievedValue}
+        lvl={lvl}
         category={category}
         humanTitle={humanTitle}
         seatGridData={seatGridData}
