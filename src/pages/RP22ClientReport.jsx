@@ -36,6 +36,7 @@ import { selectClientNonScreenDynamicRange } from "@/components/report/client/se
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import { selectClientScreenSeating } from "@/components/report/client/selectClientScreenSeating";
 import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTreatment";
+import ClientRecommendationFooter from "@/components/report/client/ClientRecommendationFooter";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -82,6 +83,24 @@ export default function RP22ClientReport() {
 
   // ── Design Summary (static intro — pure selector, no analysis) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
+
+  // ── Published recommendations (from Room Designer ASDR engine) ──
+  // Read from the shared window store populated by DesignRecommendationEngine.
+  // The footer renders only when recommendations are settled and available.
+  const [publishedRecommendations, setPublishedRecommendations] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    const read = () => {
+      if (cancelled) return;
+      const recs = typeof window !== "undefined" ? window.__ROOM_DESIGNER_ASDR__?.recommendations : null;
+      if (recs && recs.isSettled !== false) {
+        setPublishedRecommendations(recs);
+      }
+    };
+    read();
+    const interval = setInterval(read, 1000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [projectId]);
 
   // ── RP23 Screen Size / Seating (uses existing RP23 viewing-angle authority) ──
   const screenSeating = useMemo(() => {
@@ -187,11 +206,15 @@ export default function RP22ClientReport() {
       pages.push({
         id: "design-summary",
         visual: (
-          <ClientDesignHighlights highlights={highlights} />
+          <ClientDesignHighlights
+            highlights={highlights}
+            recommendationFooter={<ClientRecommendationFooter recommendations={publishedRecommendations} />}
+          />
         ),
         printData: {
           type: "highlights",
           highlights,
+          recommendations: publishedRecommendations,
         },
       });
     }
@@ -457,7 +480,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty]);
+  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,

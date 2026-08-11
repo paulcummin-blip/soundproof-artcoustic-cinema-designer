@@ -11,6 +11,7 @@ import {
   formatCapabilityReserveText,
   formatAmplificationGuidance,
 } from '@/components/recommendations/p12RecommendationPresentation';
+import { applyRecommendationDisplayOrder } from '@/components/recommendations/recommendationDisplayOrder';
 
 function formatPoints(value, signed = false) {
   const number = Number(value);
@@ -239,9 +240,10 @@ export default function DesignRatingSummary({
   const pct = rating?.displayPercentage;
   const displayPct = pct != null ? Math.round(pct) : null;
   const isNotAssessed = status === 'NOT_ASSESSED';
-  const improvements = Array.isArray(recommendations?.improvements) ? recommendations.improvements : [];
-  const savings = Array.isArray(recommendations?.savings) ? recommendations.savings : [];
-  const bestPractice = Array.isArray(recommendations?.bestPractice) ? recommendations.bestPractice : [];
+  const orderedRecommendations = applyRecommendationDisplayOrder(recommendations);
+  const improvements = Array.isArray(orderedRecommendations?.improvements) ? orderedRecommendations.improvements : [];
+  const savings = Array.isArray(orderedRecommendations?.savings) ? orderedRecommendations.savings : [];
+  const bestPractice = Array.isArray(orderedRecommendations?.bestPractice) ? orderedRecommendations.bestPractice : [];
   const isEvaluating = recommendations?.isEvaluating === true;
 
   return (

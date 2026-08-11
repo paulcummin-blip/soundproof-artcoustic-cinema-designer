@@ -23,7 +23,7 @@ const ICONS = { MessageCircle, Headphones, ChevronUp, Waves, Zap };
 
 const CATEGORY_ORDER = ["Spatial Resolution", "Dynamic Range", "Timbre Matching"];
 
-export default function ClientDesignHighlights({ highlights, print }) {
+export default function ClientDesignHighlights({ highlights, print, recommendationFooter }) {
   const grouped = useMemo(() => {
     const map = {};
     for (const h of (highlights || [])) {
@@ -143,6 +143,7 @@ export default function ClientDesignHighlights({ highlights, print }) {
           </div>
         </div>
       ))}
+      {recommendationFooter}
     </div>
   );
 }
