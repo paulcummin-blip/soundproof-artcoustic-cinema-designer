@@ -13,8 +13,16 @@
  *   "P12: 109 dBC · Minimum L4 · Recommended L3"
  */
 
+import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+
 function isLevel(v) {
   return typeof v === "string" && /^L[1-4]$/.test(v);
+}
+
+function designDb(paramId, rawDb) {
+  const v = Number(rawDb);
+  if (!Number.isFinite(v)) return null;
+  return resolveRp22DesignValue(paramId, v);
 }
 
 /**
@@ -22,8 +30,9 @@ function isLevel(v) {
  * Returns null when no candidate level is available.
  */
 function formatDualConsequence(label, rawDb, baselineMin, candidateMin, baselineRec, candidateRec) {
+  const paramId = parseInt(String(label).replace(/\D/g, ""), 10) || 12;
   const raw = Number(rawDb);
-  const rawText = Number.isFinite(raw) ? `${Math.round(raw)} dBC` : null;
+  const rawText = Number.isFinite(raw) ? `${resolveRp22DesignValue(paramId, raw)} dBC` : null;
 
   const minChanged = isLevel(baselineMin) && isLevel(candidateMin) && baselineMin !== candidateMin;
   const recChanged = isLevel(baselineRec) && isLevel(candidateRec) && baselineRec !== candidateRec;
@@ -83,4 +92,94 @@ export function hasAdditionalCalibrationHeadroom(item) {
   const currentCap = Number(item?.currentModelCapabilityDb);
   if (Number.isFinite(candidateCap) && Number.isFinite(currentCap) && candidateCap > currentCap) return true;
   return item?.amplifierUpgradeRequired === true;
+}
+
+// ── Stage E1: Structured LCR capability presentation ──────────────────
+
+/**
+ * Format one level consequence line: "Minimum L3 → L4" or "Minimum L4".
+ */
+function formatLevelLine(label, baselineLevel, candidateLevel) {
+  const changed = isLevel(baselineLevel) && isLevel(candidateLevel) && baselineLevel !== candidateLevel;
+  if (changed) return `${label} ${baselineLevel} → ${candidateLevel}`;
+  if (isLevel(candidateLevel)) return `${label} ${candidateLevel}`;
+  return null;
+}
+
+/**
+ * Format the P12 capability line: "P12: 106 → 113 dBC (+7 dB)"
+ * Returns null when no candidate design value is available.
+ */
+export function formatP12CapabilityLine(item) {
+  const candidateDesign = designDb(12, item?.p12RawDb);
+  const baselineDesign = designDb(12, item?.p12BaselineRawDb);
+  if (candidateDesign == null) return null;
+  if (baselineDesign != null) {
+    const gain = candidateDesign - baselineDesign;
+    const gainText = gain > 0 ? ` (+${gain} dB)` : gain < 0 ? ` (${gain} dB)` : "";
+    return `P12: ${baselineDesign} → ${candidateDesign} dBC${gainText}`;
+  }
+  return `P12: ${candidateDesign} dBC`;
+}
+
+/**
+ * Format the P13 capability line: "P13: 102 → 105 dBC (+3 dB)"
+ */
+export function formatP13CapabilityLine(item) {
+  const candidateDesign = designDb(13, item?.p13RawDb);
+  const baselineDesign = designDb(13, item?.p13BaselineRawDb);
+  if (candidateDesign == null) return null;
+  if (baselineDesign != null) {
+    const gain = candidateDesign - baselineDesign;
+    const gainText = gain > 0 ? ` (+${gain} dB)` : gain < 0 ? ` (${gain} dB)` : "";
+    return `P13: ${baselineDesign} → ${candidateDesign} dBC${gainText}`;
+  }
+  return `P13: ${candidateDesign} dBC`;
+}
+
+/**
+ * Format P12 Minimum/Recommended consequence lines.
+ * Returns { minLine, recLine } or null.
+ */
+export function formatP12MinRecLines(item) {
+  const minLine = formatLevelLine("Minimum", item?.p12BaselineMinimumLevel, item?.p12MinimumLevel);
+  const recLine = formatLevelLine("Recommended", item?.p12BaselineRecommendedLevel, item?.p12RecommendedLevel);
+  return (minLine || recLine) ? { minLine, recLine } : null;
+}
+
+/**
+ * Format P13 Minimum/Recommended consequence lines.
+ */
+export function formatP13MinRecLines(item) {
+  const minLine = formatLevelLine("Minimum", item?.p13BaselineMinimumLevel, item?.p13MinimumLevel);
+  const recLine = formatLevelLine("Recommended", item?.p13BaselineRecommendedLevel, item?.p13RecommendedLevel);
+  return (minLine || recLine) ? { minLine, recLine } : null;
+}
+
+/**
+ * Format capability reserve: "Capability reserve: +2 dB above Recommended L4"
+ * Returns null when reserve <= 0 or not available.
+ */
+export function formatCapabilityReserveText(item) {
+  const reserveDb = Number(item?.p12CapabilityReserveDb);
+  if (!Number.isFinite(reserveDb) || reserveDb <= 0) return null;
+  return `Capability reserve: +${Math.round(reserveDb)} dB above Recommended L4`;
+}
+
+/**
+ * Format amplification guidance for LCR candidates.
+ * Case A: No amplifier change — "No amplifier change required · Full modelled capability reached at approximately X W/ch"
+ * Case B/C: Amplifier upgrade — "Recommended amplification: approximately X W/ch"
+ * Returns null for non-LCR candidates or when useful power is not available.
+ */
+export function formatAmplificationGuidance(item) {
+  if (item?.kind !== "lcr") return null;
+  const usefulPowerW = Number(item?.usefulPowerW);
+  if (!Number.isFinite(usefulPowerW) || usefulPowerW <= 0) return null;
+
+  if (item?.amplifierUpgradeRequired === true) {
+    return `Recommended amplification: approximately ${Math.round(usefulPowerW)} W/ch`;
+  }
+
+  return `No amplifier change required · Full modelled capability reached at approximately ${Math.round(usefulPowerW)} W/ch`;
 }

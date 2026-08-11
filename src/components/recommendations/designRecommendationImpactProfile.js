@@ -421,3 +421,27 @@ export function compareDegradationImpact(a, b) {
   if (a.seatsDegraded !== b.seatsDegraded) return a.seatsDegraded - b.seatsDegraded;
   return 0;
 }
+
+/**
+ * LCR capability reserve comparator (Stage E1).
+ *
+ * Tie-break ONLY — applies after primary RP22 impact and viewing consequence,
+ * but before disruption/confidence/ASDR. Compares canonical P12 design
+ * capability (p12RawDb) descending. Higher genuine capability ranks first.
+ *
+ * Returns 0 when either candidate is not an LCR material upgrade, or when
+ * either has a non-finite P12 design value. Never overrides a candidate with
+ * genuinely greater primary RP22 impact — those are already separated by
+ * compareImprovementImpact before this runs.
+ */
+export function compareLcrCapabilityReserve(a, b) {
+  const aIsLcrUpgrade = a?.kind === "lcr" && a?.recommendationDirection === "upgrade";
+  const bIsLcrUpgrade = b?.kind === "lcr" && b?.recommendationDirection === "upgrade";
+  if (!aIsLcrUpgrade || !bIsLcrUpgrade) return 0;
+
+  const aP12 = Number(a?.p12DesignDb ?? a?.p12RawDb);
+  const bP12 = Number(b?.p12DesignDb ?? b?.p12RawDb);
+  if (!Number.isFinite(aP12) || !Number.isFinite(bP12)) return 0;
+
+  return bP12 - aP12;
+}

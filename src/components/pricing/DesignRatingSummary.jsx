@@ -1,7 +1,16 @@
 // components/pricing/DesignRatingSummary.jsx
 import React from 'react';
 import { formatViewingRecommendationSummary } from '@/components/recommendations/viewingRecommendationPresentation';
-import { formatP12P13Consequences, hasAdditionalCalibrationHeadroom } from '@/components/recommendations/p12RecommendationPresentation';
+import {
+  formatP12P13Consequences,
+  hasAdditionalCalibrationHeadroom,
+  formatP12CapabilityLine,
+  formatP13CapabilityLine,
+  formatP12MinRecLines,
+  formatP13MinRecLines,
+  formatCapabilityReserveText,
+  formatAmplificationGuidance,
+} from '@/components/recommendations/p12RecommendationPresentation';
 
 function formatPoints(value, signed = false) {
   const number = Number(value);
@@ -21,26 +30,40 @@ function RecommendationRow({ item, mode }) {
   const from = Math.round(Number(item?.currentPercentage) || 0);
   const to = Math.round(Number(item?.newPercentage) || 0);
   const isSaving = mode === 'saving';
+  const isLcrUpgrade = item?.kind === 'lcr' && item?.recommendationDirection === 'upgrade';
   // P12/P13 are rendered as dual Minimum/Recommended consequences with raw dB;
   // exclude them from the generic level-change list to avoid duplication.
   const levelChanges = (Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [])
     .filter((c) => c?.display !== 'P12' && c?.display !== 'P13');
   const levelChangeText = formatLevelChanges(levelChanges);
-  const p12P13Text = formatP12P13Consequences(item).join(' · ');
   const viewingText = formatViewingRecommendationSummary(item);
+  const headroomNote = hasAdditionalCalibrationHeadroom(item)
+    ? 'Provides additional calibration/EQ headroom.'
+    : null;
+
+  // LCR upgrade: structured capability presentation
+  const p12CapabilityLine = isLcrUpgrade ? formatP12CapabilityLine(item) : null;
+  const p13CapabilityLine = isLcrUpgrade ? formatP13CapabilityLine(item) : null;
+  const p12MinRec = isLcrUpgrade ? formatP12MinRecLines(item) : null;
+  const p13MinRec = isLcrUpgrade ? formatP13MinRecLines(item) : null;
+  const capabilityReserveText = isLcrUpgrade ? formatCapabilityReserveText(item) : null;
+  const amplificationText = isLcrUpgrade ? formatAmplificationGuidance(item) : null;
+
+  // Non-LCR: existing combined text
+  const p12P13Text = !isLcrUpgrade ? formatP12P13Consequences(item).join(' · ') : null;
   const powerBeforeW = Number(item?.lcrPowerBeforeW);
   const powerAfterW = Number(item?.lcrPowerAfterW);
-  const amplifierText =
+  const oldAmplifierText =
+    !isLcrUpgrade &&
     item?.amplifierUpgradeRequired === true &&
     Number.isFinite(powerBeforeW) &&
     Number.isFinite(powerAfterW)
       ? `Amplification: ${Math.round(powerBeforeW)} → ${Math.round(powerAfterW)} W/ch`
       : null;
-  const headroomNote = hasAdditionalCalibrationHeadroom(item)
-    ? 'Provides additional calibration/EQ headroom.'
-    : null;
 
-  const combinedChangeText = [p12P13Text, levelChangeText].filter(Boolean).join(' · ');
+  const combinedChangeText = isLcrUpgrade
+    ? levelChangeText
+    : [p12P13Text, levelChangeText].filter(Boolean).join(' · ');
   const valueText = isSaving
     ? (combinedChangeText || 'Profile preserved')
     : (combinedChangeText || 'Profile improved');
@@ -60,12 +83,67 @@ function RecommendationRow({ item, mode }) {
       <div style={{ fontSize: 11, lineHeight: 1.35, fontWeight: 700, color: '#213428' }}>
         {item.title}
       </div>
-      <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
-        {valueText}
-      </div>
-      {amplifierText && (
+
+      {/* LCR upgrade structured presentation */}
+      {isLcrUpgrade && (
+        <>
+          {p12CapabilityLine && (
+            <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#213428', fontWeight: 600 }}>
+              {p12CapabilityLine}
+            </div>
+          )}
+          {p12MinRec?.minLine && (
+            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
+              {p12MinRec.minLine}
+            </div>
+          )}
+          {p12MinRec?.recLine && (
+            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
+              {p12MinRec.recLine}
+            </div>
+          )}
+          {p13CapabilityLine && (
+            <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#213428', fontWeight: 600 }}>
+              {p13CapabilityLine}
+            </div>
+          )}
+          {p13MinRec?.minLine && (
+            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
+              {p13MinRec.minLine}
+            </div>
+          )}
+          {p13MinRec?.recLine && (
+            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
+              {p13MinRec.recLine}
+            </div>
+          )}
+          {capabilityReserveText && (
+            <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#213428', fontWeight: 600 }}>
+              {capabilityReserveText}
+            </div>
+          )}
+          {amplificationText && (
+            <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#3E4349' }}>
+              {amplificationText}
+            </div>
+          )}
+          {levelChangeText && (
+            <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
+              {levelChangeText}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Non-LCR value text */}
+      {!isLcrUpgrade && valueText && (
+        <div style={{ marginTop: 3, fontSize: 10, lineHeight: 1.35, color: '#3E4349' }}>
+          {valueText}
+        </div>
+      )}
+      {oldAmplifierText && (
         <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#3E4349' }}>
-          {amplifierText}
+          {oldAmplifierText}
         </div>
       )}
       {headroomNote && (

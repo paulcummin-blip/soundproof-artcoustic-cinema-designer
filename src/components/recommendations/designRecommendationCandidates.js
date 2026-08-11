@@ -27,7 +27,9 @@ import {
   buildDegradationImpactProfile,
   compareImprovementImpact,
   compareDegradationImpact,
+  compareLcrCapabilityReserve,
 } from "./designRecommendationImpactProfile.js";
+import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 const LCR_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 const WIDE_ROLES = new Set(["LW", "RW"]);
@@ -260,6 +262,7 @@ export function buildDesignRecommendationCandidates({
         candidateModelCapabilityDb: currentCapability,
         lcrPowerBeforeW: currentLcrPowerW,
         lcrPowerAfterW: currentUsefulPowerW,
+        usefulPowerW: currentUsefulPowerW,
         amplifierUpgradeRequired: true,
         amplifierCostIncluded: false,
         physicalFit: null,
@@ -286,14 +289,17 @@ export function buildDesignRecommendationCandidates({
       direction: "cost-down",
       powerAfterW: currentLcrPowerW,
       amplifierUpgradeRequired: false,
+      usefulPowerW: resolveUsefulLcrPowerW(entry.model),
     }));
 
     const strongerSelections = stronger.flatMap((entry) => {
+      const usefulPowerW = resolveUsefulLcrPowerW(entry.model);
       const modelOnly = {
         entry,
         direction: "upgrade",
         powerAfterW: currentLcrPowerW,
         amplifierUpgradeRequired: false,
+        usefulPowerW,
       };
 
       // Stage E1: Add one powered scenario only when the current amplification
@@ -301,7 +307,6 @@ export function buildDesignRecommendationCandidates({
       // model's useful power (smallest canonical option reaching the cap), NOT
       // the registry max_power — power above the cap is wasted. The full
       // scenario still goes through the canonical SPL → RP22 → ASDR chain.
-      const usefulPowerW = resolveUsefulLcrPowerW(entry.model);
       const canPowerUp = canModelBenefitFromMorePower(entry.model, currentLcrPowerW, entry.capability);
 
       return canPowerUp
@@ -312,6 +317,7 @@ export function buildDesignRecommendationCandidates({
               direction: "upgrade",
               powerAfterW: usefulPowerW,
               amplifierUpgradeRequired: true,
+              usefulPowerW,
             },
           ]
         : [modelOnly];
@@ -327,6 +333,7 @@ export function buildDesignRecommendationCandidates({
       direction,
       powerAfterW,
       amplifierUpgradeRequired,
+      usefulPowerW,
     } of lcrSelections) {
       const nextSpeakers = safeSpeakers.map((speaker) =>
         LCR_ROLES.has(roleOf(speaker)) ? { ...speaker, model: entry.model.key } : speaker
@@ -361,6 +368,7 @@ export function buildDesignRecommendationCandidates({
         candidateModelCapabilityDb: entry.capability,
         lcrPowerBeforeW: currentLcrPowerW,
         lcrPowerAfterW: powerAfterW,
+        usefulPowerW: finite(usefulPowerW) ? Number(usefulPowerW) : null,
         amplifierUpgradeRequired,
         amplifierCostIncluded: false,
         physicalFit: {
@@ -693,6 +701,17 @@ export function rankDesignRecommendations({
         p13RecommendedLevel: gradeSplParamRaw(entry.p13RawDb, 13, "recommended"),
         p13BaselineMinimumLevel: gradeSplParamRaw(baselineRating?.p13RawDb, 13, "minimum"),
         p13BaselineRecommendedLevel: gradeSplParamRaw(baselineRating?.p13RawDb, 13, "recommended"),
+        p12DesignDb: finite(entry.p12RawDb) ? resolveRp22DesignValue(12, Number(entry.p12RawDb)) : null,
+        p12CapabilityGainDb: (() => {
+          const baselineDesign = finite(baselineRating?.p12RawDb) ? resolveRp22DesignValue(12, Number(baselineRating.p12RawDb)) : null;
+          const candidateDesign = finite(entry.p12RawDb) ? resolveRp22DesignValue(12, Number(entry.p12RawDb)) : null;
+          return (baselineDesign != null && candidateDesign != null) ? candidateDesign - baselineDesign : null;
+        })(),
+        p12CapabilityReserveDb: (() => {
+          const candidateDesign = finite(entry.p12RawDb) ? resolveRp22DesignValue(12, Number(entry.p12RawDb)) : null;
+          return (candidateDesign != null && candidateDesign > 111) ? candidateDesign - 111 : null;
+        })(),
+        usefulPowerW: finite(entry.candidate?.usefulPowerW) ? Number(entry.candidate.usefulPowerW) : null,
       };
     });
 
@@ -714,6 +733,8 @@ export function rankDesignRecommendations({
       if (cmp !== 0) return cmp;
       const viewingCmp = compareApplicableViewingCandidates(a, b);
       if (viewingCmp !== 0) return viewingCmp;
+      const capabilityCmp = compareLcrCapabilityReserve(a, b);
+      if (capabilityCmp !== 0) return capabilityCmp;
       const lcrValueCmp = compareLcrMaterialUpgrades(a, b);
       if (lcrValueCmp !== 0) return lcrValueCmp;
       // Stage A: price removed. Secondary: disruption (lower), confidence (higher), ASDR (higher)
