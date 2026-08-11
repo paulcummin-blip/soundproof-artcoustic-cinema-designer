@@ -352,6 +352,7 @@ export default function TechnicalProjectOverview({
             { label: "SURROUNDS", models: systemSummary?.surrounds },
             { label: "OVERHEADS", models: systemSummary?.overheads },
             { label: "SUBWOOFERS", models: systemSummary?.subs },
+            { label: "ACOUSTIC TREATMENT", models: systemSummary?.acousticTreatment },
           ].map(({ label, models }, i, arr) => (
             <div
               key={label}

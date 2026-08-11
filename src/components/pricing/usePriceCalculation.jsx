@@ -34,6 +34,7 @@ const FIXED_RETAIL_PRICES_EX_VAT = {
   "sub3-12": 3116.67,
   "sub4-12": 5500,
   "cph-1000d": CPH_1000D_PRICE_EX_VAT,
+  "500027": 466.67,
 };
 
 export const SOUNDBAR_PRICE_OPTIONS = {
@@ -108,6 +109,36 @@ export function getCommercialPrice(modelKey, soundbarSelections = {}) {
   return { key, priceExVat: 0, sizeLabel: '', sizeValue: '', isSoundbar: false, note: 'price not set' };
 }
 
+const ABFUSER_LABEL = "Artcoustic Abfuser, Black";
+
+function addAbfuserLine(linesByKey, qty) {
+  if (!qty || qty <= 0) return;
+  const priceExVat = Number(FIXED_RETAIL_PRICES_EX_VAT["500027"]) || 0;
+  const existing = linesByKey.get("500027");
+  if (existing) {
+    existing.count = qty;
+    existing.qty = qty;
+    existing.subtotalExVat = priceExVat * qty;
+    return;
+  }
+  linesByKey.set("500027", {
+    model: "500027",
+    description: ABFUSER_LABEL,
+    price: priceExVat,
+    unitPriceExVat: priceExVat,
+    count: qty,
+    qty,
+    subtotal: priceExVat * qty,
+    subtotalExVat: priceExVat * qty,
+    rolesList: ["Acoustic treatment"],
+    note: "",
+    isSoundbar: false,
+    sizeValue: "",
+    sizeLabel: "",
+    isAbfuser: true,
+  });
+}
+
 function addProductLine(linesByKey, modelKey, qty, roles, soundbarSelections) {
   if (!modelKey || modelKey === 'off' || modelKey === 'OFF') return;
 
@@ -151,6 +182,8 @@ export function usePriceCalculation({
   priceMode = 'incVat',
   manualExtras = [],
   soundbarSelections = {},
+  acousticTreatmentEnabled = false,
+  selectedAbfuserQty = 0,
 }) {
   const { user } = useAuth();
   const territory = user?.territory || DEFAULT_TERRITORY;
@@ -183,6 +216,10 @@ export function usePriceCalculation({
 
     if (subwooferCount > 0) {
       addProductLine(linesByKey, 'cph-1000d', subwooferCount, ['Subwoofer amp'], soundbarSelections);
+    }
+
+    if (acousticTreatmentEnabled && Number(selectedAbfuserQty) > 0) {
+      addAbfuserLine(linesByKey, Number(selectedAbfuserQty));
     }
 
     // Territory without a connected price list: return product structure with
@@ -275,5 +312,5 @@ export function usePriceCalculation({
       displayTotal,
       priceMode: mode,
     };
-  }, [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections, priceListAvailable, territory]);
+  }, [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections, priceListAvailable, territory, acousticTreatmentEnabled, selectedAbfuserQty]);
 }

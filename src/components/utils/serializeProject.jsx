@@ -111,6 +111,10 @@ export function serializeProject(input = {}) {
 
     // Viewing priority (multi-row viewing intent)
     viewingPriority = "balanced",
+
+    // Acoustic treatment (Abfuser product selection)
+    acousticTreatmentEnabled = false,
+    selectedAbfuserQty = 0,
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -298,5 +302,9 @@ export function serializeProject(input = {}) {
         ...asArray(seatingPositions).map((seat) => Number(seat?.rowNumber) || 1)
       )
     ),
+
+    // Acoustic treatment (Abfuser product selection)
+    acoustic_treatment_enabled: !!acousticTreatmentEnabled,
+    selected_abfuser_qty: acousticTreatmentEnabled ? (Math.max(0, Math.floor(Number(selectedAbfuserQty) || 0))) : 0,
   };
 }

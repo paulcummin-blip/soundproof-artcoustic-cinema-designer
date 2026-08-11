@@ -954,8 +954,14 @@ function RP22ReportInner() {
         if (frontSubs > 0 && frontModel) { const name = getDisplayName(frontModel) || frontModel; subList.push(frontSubs > 1 ? `${name} × ${frontSubs} (front)` : `${name} (front)`); }
         if (rearSubs > 0 && rearModel) { const name = getDisplayName(rearModel) || rearModel; subList.push(rearSubs > 1 ? `${name} × ${rearSubs} (rear)` : `${name} (rear)`); }
         summary.subs = subList.length > 0 ? subList : ['None specified'];
+        // Acoustic treatment (Abfuser product selection)
+        if (app?.acousticTreatmentEnabled && Number(app?.selectedAbfuserQty) > 0) {
+          summary.acousticTreatment = [`Artcoustic Abfuser × ${Math.floor(Number(app.selectedAbfuserQty))}`];
+        } else {
+          summary.acousticTreatment = ['None specified'];
+        }
         return summary;
-    }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility]);
+    }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility, app?.acousticTreatmentEnabled, app?.selectedAbfuserQty]);
 
     const exportSystemConfiguration = React.useMemo(() => {
         const dolbyPreset = app?.dolbyLayout || "5.1";

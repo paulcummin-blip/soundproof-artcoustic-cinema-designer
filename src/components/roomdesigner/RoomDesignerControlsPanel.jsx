@@ -151,6 +151,12 @@ export default function RoomDesignerControlsPanel({
   // Viewing priority
   viewingPriority,
   onViewingPriorityChange,
+  // Acoustic treatment
+  acousticTreatmentEnabled,
+  setAcousticTreatmentEnabled,
+  selectedAbfuserQty,
+  setSelectedAbfuserQty,
+  recommendedAbfuserQty,
 }) {
   const [rightPanelView, setRightPanelView] = useState('controls');
 
@@ -635,6 +641,11 @@ export default function RoomDesignerControlsPanel({
             placedSpeakers={placedSpeakers}
             frontSubsCfg={_frontSubsCfg}
             rearSubsCfg={_rearSubsCfg}
+            acousticTreatmentEnabled={acousticTreatmentEnabled}
+            setAcousticTreatmentEnabled={setAcousticTreatmentEnabled}
+            selectedAbfuserQty={selectedAbfuserQty}
+            setSelectedAbfuserQty={setSelectedAbfuserQty}
+            recommendedAbfuserQty={recommendedAbfuserQty}
           />
         </CollapsiblePanel>
       </div>

@@ -35,6 +35,7 @@ import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScr
 import { selectClientNonScreenDynamicRange } from "@/components/report/client/selectClientNonScreenDynamicRange";
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import { selectClientScreenSeating } from "@/components/report/client/selectClientScreenSeating";
+import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTreatment";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -430,8 +431,31 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Acoustic Treatment (always last — only when enabled)
+    if (appState?.acousticTreatmentEnabled && Number(appState?.selectedAbfuserQty) > 0) {
+      pages.push({
+        id: "acoustic-treatment",
+        visual: (
+          <ClientAcousticTreatment
+            roomDims={roomDims}
+            seatingPositions={seatingPositions}
+            rsp={rsp}
+            acousticTreatmentEnabled={!!appState?.acousticTreatmentEnabled}
+            selectedAbfuserQty={Number(appState?.selectedAbfuserQty) || 0}
+          />
+        ),
+        printData: {
+          type: "acoustic-treatment",
+          roomDims,
+          seatingPositions,
+          rsp,
+          acousticTreatmentEnabled: !!appState?.acousticTreatmentEnabled,
+          selectedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
+        },
+      });
+    }
     return pages;
-  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers]);
+  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,

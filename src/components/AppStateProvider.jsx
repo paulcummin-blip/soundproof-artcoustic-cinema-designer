@@ -805,6 +805,23 @@ function useDesignerState() {
   }, [viewingPriorityRowCount]);
   // ── END VIEWING PRIORITY ───────────────────────────────────────────────────
 
+  // ── ACOUSTIC TREATMENT (Abfuser product selection) ──────────────────────
+  const [acousticTreatmentEnabled, setAcousticTreatmentEnabled] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.acousticTreatmentEnabled === "boolean")
+      ? __autosavePayload.acousticTreatmentEnabled
+      : false
+  ));
+  const [selectedAbfuserQty, _setSelectedAbfuserQty] = useState(() => (
+    (__autosavePayload && Number.isFinite(Number(__autosavePayload.selectedAbfuserQty)))
+      ? Number(__autosavePayload.selectedAbfuserQty)
+      : 0
+  ));
+  const setSelectedAbfuserQty = useCallback((v) => {
+    const n = Math.max(0, Math.floor(Number(v) || 0));
+    _setSelectedAbfuserQty(n);
+  }, []);
+  // ── END ACOUSTIC TREATMENT ────────────────────────────────────────────────
+
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
@@ -1567,6 +1584,8 @@ function useDesignerState() {
       viewingPriority,
       designEqEnabled,
       p12Mode,
+      acousticTreatmentEnabled,
+      selectedAbfuserQty,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
@@ -1629,6 +1648,8 @@ function useDesignerState() {
     subwooferInstanceMigrationState,
     p12Mode,
     viewingPriority,
+    acousticTreatmentEnabled,
+    selectedAbfuserQty,
     ]);
 
   const restoreAutosave = useCallback(() => {
@@ -1935,6 +1956,10 @@ function useDesignerState() {
     // Design EQ defaults to On for a new/reset project
     setDesignEqEnabled(true);
 
+    // Acoustic treatment defaults to off
+    setAcousticTreatmentEnabled(false);
+    setSelectedAbfuserQty(0);
+
     // Per-seat metrics
     setPerSeatMetrics({});
 
@@ -2051,6 +2076,10 @@ function useDesignerState() {
     resetRspState,
     viewingPriority,
     setViewingPriority,
+    acousticTreatmentEnabled,
+    setAcousticTreatmentEnabled,
+    selectedAbfuserQty,
+    setSelectedAbfuserQty,
     };
   }, [
     dimensions, setDimensions,
@@ -2155,6 +2184,10 @@ function useDesignerState() {
     resetRspState,
     viewingPriority,
     setViewingPriority,
+    acousticTreatmentEnabled,
+    setAcousticTreatmentEnabled,
+    selectedAbfuserQty,
+    setSelectedAbfuserQty,
   ]);
 
   value.setP21EarlyReflectionPreset = setP21EarlyReflectionPresetSafe;

@@ -24,11 +24,23 @@ export default function OptionsPanel({
   placedSpeakers = [],
   frontSubsCfg = null,
   rearSubsCfg = null,
+  acousticTreatmentEnabled = false,
+  setAcousticTreatmentEnabled = () => {},
+  selectedAbfuserQty = 0,
+  setSelectedAbfuserQty = () => {},
+  recommendedAbfuserQty = 0,
 }) {
   const [priceMode, setPriceMode] = React.useState('incVat');
   const [manualExtras, setManualExtras] = React.useState([]);
   const [soundbarSelections, setSoundbarSelections] = React.useState({});
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
+
+  const handleAcousticTreatmentToggle = (nextEnabled) => {
+    setAcousticTreatmentEnabled(nextEnabled);
+    if (nextEnabled && !selectedAbfuserQty && recommendedAbfuserQty > 0) {
+      setSelectedAbfuserQty(recommendedAbfuserQty);
+    }
+  };
 
   const commercialPriceData = usePriceCalculation({
     placedSpeakers,
@@ -38,6 +50,8 @@ export default function OptionsPanel({
     priceMode,
     manualExtras,
     soundbarSelections,
+    acousticTreatmentEnabled,
+    selectedAbfuserQty,
   });
 
   const activePriceData = commercialPriceData || priceData;
@@ -91,6 +105,36 @@ export default function OptionsPanel({
       <div className="flex items-center justify-between">
         <Label htmlFor="show-asdr" className="text-sm font-medium">Show Artcoustic System Design Rating</Label>
         <Switch id="show-asdr" checked={showAsdr} onCheckedChange={setShowAsdr} />
+      </div>
+
+      <div className="space-y-2 pt-2 border-t border-[#DCDBD6]">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="acoustic-treatment" className="text-sm font-medium">Acoustic Treatment</Label>
+          <Switch
+            id="acoustic-treatment"
+            checked={acousticTreatmentEnabled}
+            onCheckedChange={handleAcousticTreatmentToggle}
+          />
+        </div>
+        {acousticTreatmentEnabled && (
+          <div className="space-y-1.5 pl-1">
+            <div className="text-xs text-[#625143]">
+              Recommended: {recommendedAbfuserQty} × Artcoustic Abfuser
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="abfuser-qty" className="text-xs font-medium text-[#3E4349] whitespace-nowrap">Quantity</Label>
+              <input
+                id="abfuser-qty"
+                type="number"
+                min="0"
+                step="1"
+                value={selectedAbfuserQty}
+                onChange={(e) => setSelectedAbfuserQty(parseInt(e.target.value, 10) || 0)}
+                className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {showPrices && activePriceData && (

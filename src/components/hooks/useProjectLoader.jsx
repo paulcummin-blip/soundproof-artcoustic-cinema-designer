@@ -131,6 +131,8 @@ appState, // Pass appState directly for setters
       rspMode: appState?.rspMode,
       manualRspY_m: appState?.manualRspY_m,
       viewingPriority: appState?.viewingPriority,
+      acousticTreatmentEnabled: appState?.acousticTreatmentEnabled,
+      selectedAbfuserQty: appState?.selectedAbfuserQty,
     });
     return projectData;
   }, [
@@ -141,6 +143,7 @@ appState, // Pass appState directly for setters
     lcrAimMode, enableFrontWides, freeMoveLcr,
     overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
     useFrontGlobal, useMidGlobal, useRearGlobal,
+    appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty,
   ]);
 
   const parseMaybe = useCallback((val, fallback) => {
@@ -309,6 +312,8 @@ appState, // Pass appState directly for setters
           p12Level: p?.spl_config?.p12_level ?? null,
           rspMode: p?.rsp_mode || "auto_from_screen",
           manualRspY_m: (() => { const v = Number(p?.manual_rsp_y_m); return Number.isFinite(v) ? v : null; })(),
+          acousticTreatmentEnabled: !!p?.acoustic_treatment_enabled,
+          selectedAbfuserQty: (() => { const v = Number(p?.selected_abfuser_qty); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; })(),
         });
         delete loadedProjectData.name;
         delete loadedProjectData.client_name;
@@ -609,7 +614,9 @@ appState, // Pass appState directly for setters
   appState?.subwooferInstanceMigrationState,
   appState?.rspMode,
   appState?.manualRspY_m,
-  appState?.viewingPriority]
+  appState?.viewingPriority,
+  appState?.acousticTreatmentEnabled,
+  appState?.selectedAbfuserQty]
   );
 
   // Boot logic: run when hydrated or target changes – either load a project or initialise defaults

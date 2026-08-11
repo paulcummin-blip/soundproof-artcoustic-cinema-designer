@@ -38,6 +38,7 @@ import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/sea
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
+import { calculateRecommendedAbfuserQty } from "@/components/utils/abfuserRecommendation";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
@@ -255,6 +256,10 @@ function RoomDesignerWithState() {
   const [showPrices, setShowPrices] = useState(true);
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
+  const recommendedAbfuserQty = useMemo(
+    () => calculateRecommendedAbfuserQty(appState?.roomDims),
+    [appState?.roomDims?.widthM, appState?.roomDims?.lengthM]
+  );
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("off");
@@ -1955,6 +1960,11 @@ function RoomDesignerWithState() {
             onManualRspY_mChange={appState?.setManualRspY_m}
             viewingPriority={appState?.viewingPriority ?? "balanced"}
             onViewingPriorityChange={appState?.setViewingPriority}
+            acousticTreatmentEnabled={appState?.acousticTreatmentEnabled ?? false}
+            setAcousticTreatmentEnabled={appState?.setAcousticTreatmentEnabled}
+            selectedAbfuserQty={appState?.selectedAbfuserQty ?? 0}
+            setSelectedAbfuserQty={appState?.setSelectedAbfuserQty}
+            recommendedAbfuserQty={recommendedAbfuserQty}
           />
         )}
       />

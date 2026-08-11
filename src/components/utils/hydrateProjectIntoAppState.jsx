@@ -530,6 +530,15 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     appState.setViewingPriority(vp);
   }
 
+  // 10f) ACOUSTIC TREATMENT (Abfuser product selection)
+  if (typeof appState?.setAcousticTreatmentEnabled === "function") {
+    appState.setAcousticTreatmentEnabled(!!p?.acoustic_treatment_enabled);
+  }
+  if (typeof appState?.setSelectedAbfuserQty === "function") {
+    const qty = Number(p?.selected_abfuser_qty);
+    appState.setSelectedAbfuserQty(Number.isFinite(qty) && qty > 0 ? Math.floor(qty) : 0);
+  }
+
   // 11) PLACED SPEAKERS
   const loadedSpeakers = (() => {
     const v1 = parseMaybe(p?.selected_speakers, null);
