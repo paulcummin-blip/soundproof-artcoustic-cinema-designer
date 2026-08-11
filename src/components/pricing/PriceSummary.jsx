@@ -44,9 +44,6 @@ export default function PriceSummary({
         margin: '0 16px 12px 16px',
       }}
     >
-      <div style={{ fontSize: 10, fontWeight: 500, color: '#625143', marginBottom: 6 }}>
-        Territory: {territoryLabel}
-      </div>
       {priceListAvailable ? (
         <>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8 }}>
