@@ -91,6 +91,7 @@ function ScorecardRow({ contrib, isLast }) {
 
   return (
     <div
+      className="tech-asdr-scorecard-row"
       style={{
         display: "grid",
         gridTemplateColumns: "1fr 60mm 18mm 36mm",
@@ -132,8 +133,9 @@ function ScorecardRow({ contrib, isLast }) {
 function ScorecardGroup({ label, contribs }) {
   if (!contribs || contribs.length === 0) return null;
   return (
-    <div style={{ marginBottom: "4mm" }}>
+    <div className="tech-asdr-scorecard-group" style={{ marginBottom: "4mm" }}>
       <div
+        className="tech-asdr-scorecard-group-heading"
         style={{
           fontSize: "8pt",
           fontWeight: 700,
@@ -194,7 +196,7 @@ export default function TechnicalAsdrScorecard({
       }}
     >
       {/* ── Page heading ── */}
-      <div style={{ marginBottom: "4mm" }}>
+      <div className="tech-asdr-scorecard-heading" style={{ marginBottom: "4mm" }}>
         <div
           style={{
             fontFamily: FONT_HEADING,
@@ -223,7 +225,7 @@ export default function TechnicalAsdrScorecard({
 
       {/* ── Overall result card ── */}
       <div
-        className="print-avoid-break"
+        className="print-avoid-break tech-asdr-rating-card"
         style={{
           background: COLORS.cardBg,
           border: `1px solid ${COLORS.border}`,
@@ -297,13 +299,13 @@ export default function TechnicalAsdrScorecard({
 
       {/* ── Scorecard table ── */}
       <div
-        className="print-avoid-break"
+        className="tech-asdr-scorecard-table"
         style={{
           background: COLORS.cardBg,
           border: `1px solid ${COLORS.border}`,
           borderRadius: 6,
-          breakInside: "avoid",
-          pageBreakInside: "avoid",
+          breakInside: "auto",
+          pageBreakInside: "auto",
         }}
       >
         {/* Column headers */}
