@@ -97,6 +97,7 @@ function RecommendationCard({ heading, item, mode }) {
 
   return (
     <div
+      className="tech-asdr-recommendation-card"
       style={{
         background: COLORS.cardBg,
         border: `1px solid ${COLORS.border}`,
@@ -181,6 +182,7 @@ function BestPracticeCard({ item }) {
 
   return (
     <div
+      className="tech-asdr-recommendation-card"
       style={{
         background: COLORS.cardBg,
         border: `1px solid ${COLORS.border}`,
@@ -231,6 +233,7 @@ function BestPracticeCard({ item }) {
 function EmptyCard({ heading, text }) {
   return (
     <div
+      className="tech-asdr-recommendation-card"
       style={{
         background: COLORS.cardBg,
         border: `1px solid ${COLORS.border}`,
@@ -265,7 +268,7 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
   const emptySaving = "No material simplification identified.";
 
   return (
-    <div style={{ marginTop: "3mm" }}>
+    <div className="tech-asdr-recommendations" style={{ marginTop: "3mm" }}>
       <div style={{ display: "flex", gap: "4mm", alignItems: "stretch" }}>
         {isEvaluating ? (
           <div
