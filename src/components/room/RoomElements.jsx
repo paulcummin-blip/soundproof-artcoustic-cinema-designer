@@ -161,12 +161,12 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
   return (
     <div className="space-y-4 font-body">
       {/* CREATE CONTROLS — side-by-side, whole-card clickable */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-[18px] mt-3 mb-4">
         {/* CREATE ROOM ELEMENT — warm taupe/brown */}
         <button
           type="button"
           onClick={addDoor}
-          className="group flex items-center justify-between rounded-lg border p-3 text-left transition-all duration-150 border-[#C4B5A8] bg-[rgba(98,81,67,0.06)] hover:bg-[rgba(98,81,67,0.1)] hover:border-[#625143] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#625143] focus-visible:ring-offset-1 active:translate-y-[1px]"
+          className="group flex items-center justify-between rounded-lg border px-3 py-[22px] text-left transition-all duration-150 border-[#C4B5A8] bg-[rgba(98,81,67,0.06)] hover:bg-[rgba(98,81,67,0.1)] hover:border-[#625143] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#625143] focus-visible:ring-offset-1 active:translate-y-[1px]"
           aria-label="Create Room Element"
         >
           <span className="text-xs font-semibold" style={{ color: '#625143', letterSpacing: 0.3 }}>
@@ -179,7 +179,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
         <button
           type="button"
           onClick={addProjector}
-          className="group flex items-center justify-between rounded-lg border p-3 text-left transition-all duration-150 border-[#7A9B8C] bg-[rgba(33,52,40,0.06)] hover:bg-[rgba(33,52,40,0.1)] hover:border-[#213428] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428] focus-visible:ring-offset-1 active:translate-y-[1px]"
+          className="group flex items-center justify-between rounded-lg border px-3 py-[22px] text-left transition-all duration-150 border-[#7A9B8C] bg-[rgba(33,52,40,0.06)] hover:bg-[rgba(33,52,40,0.1)] hover:border-[#213428] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428] focus-visible:ring-offset-1 active:translate-y-[1px]"
           aria-label="Create Projector"
           title="Add Projector"
         >
