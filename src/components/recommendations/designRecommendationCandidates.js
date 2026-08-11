@@ -20,6 +20,12 @@ import {
   getPriorityLabel,
 } from "./designRecommendationProfile.js";
 import { resolveParamThresholds } from "@/components/report/technical/roomParameterLevelAuthority";
+import {
+  buildImprovementImpactProfile,
+  buildDegradationImpactProfile,
+  compareImprovementImpact,
+  compareDegradationImpact,
+} from "./designRecommendationImpactProfile.js";
 
 const LCR_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 const WIDE_ROLES = new Set(["LW", "RW"]);
@@ -449,19 +455,10 @@ function compareApplicableViewingCandidates(a, b) {
   return compareViewingPriority(a.viewingAfter, b.viewingAfter, a.viewingPriorityMode);
 }
 
-/**
- * Lexicographic comparison of improvement tuples.
- * Priority: failRemoved > l1Removed > l2Removed > l3ToL4 > l4Gained > affectedParamCount
- * A candidate removing one FAIL always ranks above any number of L3→L4 improvements.
- */
-function compareImprovementTuples(a, b) {
-  const ta = [a.failRemoved, a.l1Removed, a.l2Removed, a.l3ToL4, a.l4Gained, a.affectedParams.length];
-  const tb = [b.failRemoved, b.l1Removed, b.l2Removed, b.l3ToL4, b.l4Gained, b.affectedParams.length];
-  for (let i = 0; i < ta.length; i++) {
-    if (ta[i] !== tb[i]) return tb[i] - ta[i]; // higher = better
-  }
-  return 0;
-}
+// Retired in Stage B: replaced by compareImprovementImpact (reach-coupled
+// performance-impact vector in designRecommendationImpactProfile.js). The old
+// bucket tuple (failRemoved/l1Removed/...) made L1→L2 and L1→L3 equivalent.
+// Kept as a comment for traceability.
 
 function levelChangeSignature(item) {
   return JSON.stringify(
@@ -474,9 +471,9 @@ function levelChangeSignature(item) {
 }
 
 /**
- * Value ordering applies only after the canonical RP22 severity tuple ties.
- * When two LCR upgrades reach the same final RP22 profile, the lower-cost
- * legitimate solution wins: unused raw headroom is not rewarded.
+ * LCR upgrade tie-break (Stage A: price-free). Applies only after the Stage B
+ * impact vector and the viewing comparator tie. For equal solved performance
+ * profiles, order by disruption (lower), confidence (higher), then ASDR.
  */
 function compareLcrMaterialUpgrades(a, b) {
   const bothLcrUpgrades =
@@ -530,13 +527,17 @@ export function rankDesignRecommendations({
 
       const improvementProfile = computeImprovementProfile(baselineRating, entry.rating);
       const degradationProfile = computeDegradationProfile(baselineRating, entry.rating);
+      const improvementImpact = buildImprovementImpactProfile(baselineRating, entry.rating, entry.candidate);
+      const degradationImpact = buildDegradationImpactProfile(baselineRating, entry.rating, entry.candidate);
       const viewing = viewingMetadataForCandidate(entry.candidate, viewingContext);
       const hasSimplification =
         entry.candidate?.kind === "channel-count" ||
         (entry.candidate?.kind === "lcr" && entry.candidate?.recommendationDirection === "cost-down");
+      const improvementImpactHasGain =
+        improvementImpact.totalLevelGain > 0 || improvementImpact.failFixedAtPrimaryReach > 0;
       const viewingTradeoff =
         viewing?.comparison?.isWorse === true &&
-        (improvementProfile.isImprovement || hasSimplification);
+        (improvementProfile.isImprovement || improvementImpactHasGain || hasSimplification);
 
       return {
         ...entry.candidate,
@@ -551,11 +552,17 @@ export function rankDesignRecommendations({
         parameterLevelChanges: getParameterLevelChanges(baselineRating, entry.rating),
         improvementProfile,
         degradationProfile,
+        improvementImpact,
+        degradationImpact,
         priorityLabel: getPriorityLabel(improvementProfile),
-        isRealImprovement: improvementProfile.isImprovement,
+        isRealImprovement: improvementProfile.isImprovement || improvementImpactHasGain,
         isRecommendationImprovement:
-          improvementProfile.isImprovement ||
-          (viewing?.comparison?.isImprovement === true && !improvementProfile.hasDegradation),
+          ((improvementProfile.isImprovement || improvementImpactHasGain) &&
+            !improvementProfile.hasDegradation &&
+            !(degradationImpact.totalLevelLoss > 0)) ||
+          (viewing?.comparison?.isImprovement === true &&
+            !improvementProfile.hasDegradation &&
+            !(degradationImpact.totalLevelLoss > 0)),
         viewingBefore: viewing?.before || null,
         viewingAfter: viewing?.after || null,
         viewingComparison: viewing?.comparison || null,
@@ -577,16 +584,15 @@ export function rankDesignRecommendations({
   // additionally qualify when its RP22 profile is preserved and the canonical
   // selected viewing objective improves materially.
   //
-  // Materiality is determined solely by the canonical RP22 improvement-profile
-  // authority (isRecommendationImprovement): at least one parameter level
-  // improves with no degradation. No minimum ASDR percentage-point movement
-  // is required — a blanket pp threshold was mathematically incompatible
-  // with single-parameter single-level RP22 improvements (e.g. P12 L3→L4
-  // produces only ~2.3pp in a full design).
+  // Materiality is determined by the Stage B performance-impact authority:
+  // a positive RP22 level movement (or P12/P13 unique threshold crossing) with
+  // no degradation. Ranking uses the reach-coupled impact vector
+  // (primaryReach → failFixed → maxGain → breadth → totalGain → seatsImproved).
+  // No minimum ASDR percentage-point movement is required.
   const rankedImprovements = evaluated
     .filter((item) => item.isRecommendationImprovement)
     .sort((a, b) => {
-      const cmp = compareImprovementTuples(a.improvementProfile, b.improvementProfile);
+      const cmp = compareImprovementImpact(a.improvementImpact, b.improvementImpact);
       if (cmp !== 0) return cmp;
       const viewingCmp = compareApplicableViewingCandidates(a, b);
       if (viewingCmp !== 0) return viewingCmp;
@@ -626,23 +632,28 @@ export function rankDesignRecommendations({
       return { ...item, materialUpgradeLabel: "MATERIAL UPGRADE" };
     });
 
-  // ── SAVINGS (Stage A — price-free) ──
+  // ── SAVINGS (Stage A price-free · Stage B reach-coupled loss vector) ──
   // A candidate qualifies when it genuinely simplifies the design (removes
-  // equipment, channels, or speaker capability) with no new FAIL and a valid
-  // degradation profile. Price/saving amount is NOT an eligibility or ranking
-  // authority. A zero-performance-loss simplification (ASDR unchanged) is the
-  // ideal and ranks highest. Ranking: degradation score (lower = better
-  // preservation) → viewing comparator → ASDR loss.
+  // equipment, channels, or speaker capability) with no new FAIL. Price is NOT
+  // an eligibility or ranking authority. Ranking uses the Stage B loss vector
+  // (highestReachDegraded → maxLoss → breadth → totalLoss → seatsDegraded),
+  // ascending (lower = safer). A zero-performance-loss simplification naturally
+  // ranks first (highestReachDegraded = NONE).
   const savings = evaluated
     .filter((item) => item.hasSimplification) // Stage A: eligibility is performance-only (removes equipment/channels/capability), not price
     .filter((item) => !item.hasNewFail) // No-FAIL cost-down rule
     .map((item) => ({ ...item, scoreLoss: Math.max(0, -item.scoreDelta) }))
     .sort((a, b) => {
-      const degA = a.degradationProfile.degradationScore;
-      const degB = b.degradationProfile.degradationScore;
-      if (degA !== degB) return degA - degB; // lower degradation = better
+      const cmp = compareDegradationImpact(a.degradationImpact, b.degradationImpact);
+      if (cmp !== 0) return cmp; // Stage B: reach-coupled loss vector, lower = safer
       const viewingCmp = compareApplicableViewingCandidates(a, b);
       if (viewingCmp !== 0) return viewingCmp;
+      const disA = DISRUPTION_RANK[a.disruption] ?? 99;
+      const disB = DISRUPTION_RANK[b.disruption] ?? 99;
+      if (disA !== disB) return disA - disB;
+      const confA = CONFIDENCE_RANK[a.confidence] ?? 0;
+      const confB = CONFIDENCE_RANK[b.confidence] ?? 0;
+      if (confA !== confB) return confB - confA;
       return a.scoreDelta - b.scoreDelta; // lower ASDR loss = better
     })
     .slice(0, 3);

@@ -144,7 +144,30 @@ export function useAppDesignRating({
         placedSpeakers,
       });
       const authority = buildArtcousticDesignRatingAuthority(input);
-      return calculateRoomDesignRating(authority);
+      const rating = calculateRoomDesignRating(authority);
+
+      // Stage B: expose per-seat levels + P12/P13 raw for RSP reach classification.
+      // No formula change — reuses the authority's already-computed per-seat levels
+      // and the analysisResult raw values. ASDR percentage/weights/thresholds are
+      // unchanged.
+      const seatLevels = {};
+      for (const [key, param] of Object.entries(authority?.parameters || {})) {
+        if (param?.scope === "seat" && param.seats) {
+          const perSeat = {};
+          for (const [seatId, sa] of Object.entries(param.seats)) {
+            perSeat[seatId] = sa?.state === "scored" ? sa.level : null;
+          }
+          seatLevels[key] = perSeat;
+        }
+      }
+      const p12RawDb = Number.isFinite(Number(analysisResult?.gradedParameters?.primary?.[12]?.value))
+        ? Number(analysisResult.gradedParameters.primary[12].value)
+        : null;
+      const p13RawDb = Number.isFinite(Number(analysisResult?.gradedParameters?.primary?.[13]?.value))
+        ? Number(analysisResult.gradedParameters.primary[13].value)
+        : null;
+
+      return { ...rating, seatLevels, p12RawDb, p13RawDb };
     } catch (e) {
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
