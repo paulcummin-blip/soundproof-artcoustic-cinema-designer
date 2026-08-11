@@ -280,8 +280,8 @@ export default function ReportPrintStyles() {
                 }
 
                 .rp22-report .tech-param-page {
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
                     min-height: 268mm !important;
                     padding: 6mm 4mm 4mm 4mm !important;
                     box-sizing: border-box !important;
@@ -302,9 +302,9 @@ export default function ReportPrintStyles() {
                     print-color-adjust: exact !important;
                 }
 
-                .rp22-report .tech-param-page + .tech-param-page {
-                    break-before: page;
-                    page-break-before: always;
+                .rp22-report .tech-param-page:not(:last-child) {
+                    break-after: page;
+                    page-break-after: always;
                 }
 
                 .rp22-report .tech-param-card {
@@ -312,6 +312,52 @@ export default function ReportPrintStyles() {
                     page-break-inside: avoid !important;
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
+                }
+
+                /* Keep the ASDR scorecard and all recommendation cards on one print page
+                   for the standard active-parameter set. If a larger scorecard must flow,
+                   it may break only between complete category groups. */
+                .rp22-report .tech-asdr-scorecard {
+                    padding: 6mm 10mm 3mm 10mm !important;
+                }
+
+                .rp22-report .tech-asdr-scorecard-heading {
+                    margin-bottom: 3mm !important;
+                }
+
+                .rp22-report .tech-asdr-rating-card {
+                    padding: 4mm 6mm !important;
+                    margin-bottom: 3mm !important;
+                }
+
+                .rp22-report .tech-asdr-scorecard-table {
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
+                }
+
+                .rp22-report .tech-asdr-scorecard-group {
+                    margin-bottom: 2mm !important;
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+
+                .rp22-report .tech-asdr-scorecard-group-heading {
+                    padding: 1.2mm 4mm !important;
+                }
+
+                .rp22-report .tech-asdr-scorecard-row {
+                    padding: 1.25mm 4mm !important;
+                    font-size: 8.5pt !important;
+                }
+
+                .rp22-report .tech-asdr-recommendations {
+                    margin-top: 2mm !important;
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+
+                .rp22-report .tech-asdr-recommendation-card {
+                    padding: 3mm 4mm !important;
                 }
 
                 .rp22-report .tech-param-page,
