@@ -1,0 +1,63 @@
+{
+  "name": "ProductPrice",
+  "type": "object",
+  "description": "Canonical editable retail price for a Sound Proof commercial product. One record per SKU. Admin-only authority \u2014 Stage 2 will rewire usePriceCalculation to read from here.",
+  "properties": {
+    "sku": {
+      "type": "string",
+      "description": "Unique product lookup key. Matches the model key used by getCommercialPrice (e.g. 'q4-3', 'evolve-2-1_s', 'sub2-12', 'cph-1000d', '500027'). For soundbar size variants, the composite key 'model:value' (e.g. 'c4-1:1222', 'multi-lcr:1441-l')."
+    },
+    "label": {
+      "type": "string",
+      "description": "Display name shown in admin table and future price breakdowns."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Loudspeaker",
+        "Subwoofer",
+        "Amplifier",
+        "Acoustic Treatment",
+        "Accessory"
+      ],
+      "description": "Product category for grouping and filtering."
+    },
+    "price_ex_vat": {
+      "type": "number",
+      "description": "Canonical retail price ex VAT in GBP. null = price not set. Do NOT convert null to zero.",
+      "nullable": true
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Inactive products are retained for historical reference but excluded from new price lookups."
+    }
+  },
+  "required": [
+    "sku",
+    "label",
+    "category"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

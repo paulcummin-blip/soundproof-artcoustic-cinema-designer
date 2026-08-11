@@ -78,11 +78,11 @@ export default function AdminDashboard() {
       href: "/admin/datasets",
     },
     {
-      title: "Pricing",
-      description: "Price lists, discounts and difficulty multipliers.",
+      title: "Product Prices",
+      description: "Canonical retail price authority for all commercial products.",
       status: "Healthy",
       count: "—",
-      href: "/admin/pricing",
+      href: "/admin/product-prices",
     },
     {
       title: "RP22 Configuration",

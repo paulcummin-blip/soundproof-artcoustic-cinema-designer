@@ -345,7 +345,7 @@ export default function TechnicalProjectOverview({
 
       {/* ── System configuration card ── */}
       <div className="print-avoid-break" style={{ ...cardStyle, marginBottom: 0 }}>
-        <div style={sectionLabelStyle}>SELECTED LOUDSPEAKER MODELS</div>
+        <div style={sectionLabelStyle}>PRODUCTS SELECTED</div>
         <div style={{ display: "flex", flexDirection: "column", gap: "3mm" }}>
           {[
             { label: "LCR", models: systemSummary?.lcr },

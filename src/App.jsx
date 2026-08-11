@@ -17,6 +17,7 @@ import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
 import AdminDatasetManager from './pages/AdminDatasetManager';
 import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
+import AdminProductPrices from './pages/AdminProductPrices';
 import RP22ClientReport from './pages/RP22ClientReport';
 
 const { Pages, Layout, mainPage } = pagesConfig;
@@ -67,6 +68,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/project-licensing" element={<AdminProjectLicensing />} />
         <Route path="/admin/project-licensing/:userId" element={<AdminUserLicensingDetail />} />
         <Route path="/admin/pricing" element={<AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." />} />
+        <Route path="/admin/product-prices" element={<AdminProductPrices />} />
         <Route path="/admin/rp22-config" element={<AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." />} />
         <Route path="/admin/audit-log" element={<AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." />} />
         <Route path="/admin/billing" element={<AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." />} />
