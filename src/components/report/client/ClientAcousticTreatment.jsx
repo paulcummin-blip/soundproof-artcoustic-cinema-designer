@@ -73,9 +73,11 @@ export default function ClientAcousticTreatment({
   // The "WHY X?" heading and explanation always use the SELECTED quantity
   // so the heading and result card are always internally consistent.
   const whyHeading = `WHY ${selectedQty} ABFUSERS?`;
+  const sideWord = (qb.leftPanels || 1) >= 2 ? "two Abfusers" : "one Abfuser";
+  const rearWord = (qb.rearPanels || 2) >= 4 ? "two pairs" : "a pair";
   const whyBody = isSelectedOverride
     ? `The designer has selected ${selectedQty} Abfusers for this room. The standard Sound Proof recommendation for this listening area is ${recommendedQty}. The selected quantity provides ${selectedQty < recommendedQty ? "focused" : "expanded"} coverage of the priority treatment areas.`
-    : `This room requires treatment at the two primary side-wall reflection areas, with an additional pair recommended across the rear treatment zone. ${selectedQty} Abfusers provide strategic coverage of these priority areas without unnecessarily over-treating the room.`;
+    : `This room has ${(qb.leftPanels || 1) >= 2 ? "extended first-reflection areas" : "first-reflection areas"} along both side walls, so ${sideWord} ${((qb.leftPanels || 1) >= 2) ? "are" : "is"} recommended for each side to provide useful coverage without treating the entire wall. A further ${rearWord} ${((qb.rearPanels || 2) >= 4) ? "are" : "is"} recommended across the rear treatment zone to help manage returning reflections while preserving a natural, immersive soundfield.`;
 
   const resultCardHeading = isSelectedOverride
     ? "SELECTED ACOUSTIC TREATMENT"
@@ -179,7 +181,7 @@ export default function ClientAcousticTreatment({
           WHY THESE AREAS?
         </div>
         <p style={{ margin: 0, fontSize: "10pt", lineHeight: 1.5, color: COLORS.body, fontFamily: FONT_BODY }}>
-          RP22 identifies the first lateral reflection areas from the front soundstage as useful treatment locations in high-channel-count cinema systems. It also recommends managed absorption, diffusion and scattering toward the rear of the room to preserve clarity while supporting an immersive soundfield.
+          RP22 identifies the first lateral reflection areas from the front soundstage as useful treatment locations in high-channel-count cinema systems. It also recommends managed absorption, diffusion and scattering toward the rear of the room to preserve clarity while supporting an immersive soundfield. The panel quantity is Sound Proof practical guidance, not an RP22 specification.
         </p>
         <p style={{ margin: "2mm 0 0 0", fontSize: "9pt", lineHeight: 1.4, color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
           The goal is to control reflections — not eliminate them all.

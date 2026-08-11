@@ -25,9 +25,14 @@ const ZONE_PADDING_M = 0.20;
 // Margin outside the seating envelope for the rear zone
 const REAR_MARGIN_M = 0.20;
 
-// Listening-area escalation thresholds
-const SIDE_DEPTH_THRESHOLD_M = 2.8;  // deep listening area → 2 panels per side
-const REAR_WIDTH_THRESHOLD_M = 3.5;   // wide listening area → 4 rear panels
+// Sound Proof practical coverage guidance (NOT an RP22 percentage).
+// RP22 establishes the treatment-region intent; Sound Proof converts the
+// zone extent into a practical Artcoustic product quantity.
+const COVERAGE_RATIO = 0.40;
+// Normal portrait wall mounting: 700 mm along-wall coverage dimension.
+const ABFUSER_LINEAR_COVERAGE_M = 0.70;
+// Rear panels are counted in pairs (2 × 0.70 m = 1.40 m).
+const REAR_PAIR_COVERAGE_M = 2 * ABFUSER_LINEAR_COVERAGE_M;
 
 function getFrontSpeakers(placedSpeakers) {
   if (!Array.isArray(placedSpeakers)) return [];
@@ -139,10 +144,13 @@ export function computeAbfuserTreatmentZones({ roomDims, placedSpeakers, seating
     listeningAreaDepth = Math.max(...seatYs) - Math.min(...seatYs);
   }
 
-  // ── Strategic quantity (simple ladder, not zone-length coverage) ──
-  const leftPanels = listeningAreaDepth >= SIDE_DEPTH_THRESHOLD_M ? 2 : 1;
-  const rightPanels = listeningAreaDepth >= SIDE_DEPTH_THRESHOLD_M ? 2 : 1;
-  const rearPanels = listeningAreaWidth >= REAR_WIDTH_THRESHOLD_M ? 4 : 2;
+  // ── Quantity from actual treatment-zone extent (40% linear coverage) ──
+  // Side walls: scale independently from each side's reflection-zone length.
+  const leftPanels = Math.max(1, Math.ceil((leftLength * COVERAGE_RATIO) / ABFUSER_LINEAR_COVERAGE_M));
+  const rightPanels = Math.max(1, Math.ceil((rightLength * COVERAGE_RATIO) / ABFUSER_LINEAR_COVERAGE_M));
+  // Rear wall: scale from rear-zone width, rounded to PAIRS (never odd).
+  const rearPairs = Math.max(1, Math.ceil((rearWidth * COVERAGE_RATIO) / REAR_PAIR_COVERAGE_M));
+  const rearPanels = rearPairs * 2;
   const recommendedQty = leftPanels + rightPanels + rearPanels;
 
   const treatmentSurfaceArea = recommendedQty * ABFUSER_PANEL_AREA_M2;
