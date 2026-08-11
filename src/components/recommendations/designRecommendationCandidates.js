@@ -11,7 +11,7 @@
 import { MODELS, getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { getCommercialPrice } from "@/components/pricing/usePriceCalculation";
 import { screenRows } from "@/components/data/screenSizes";
-import { compareViewingPriority } from "@/components/utils/viewingPriorityAuthority";
+import { compareViewingPriority, compareViewingPriorityFine } from "@/components/utils/viewingPriorityAuthority";
 import {
   computeImprovementProfile,
   computeDegradationProfile,
@@ -452,7 +452,10 @@ function compareApplicableViewingCandidates(a, b) {
   if (!isViewingGeometryCandidate(a) || !isViewingGeometryCandidate(b)) return 0;
   if (!a?.viewingAfter || !b?.viewingAfter) return 0;
   if (a.viewingPriorityMode !== b.viewingPriorityMode) return 0;
-  return compareViewingPriority(a.viewingAfter, b.viewingAfter, a.viewingPriorityMode);
+  // Stage C: fine-only comparator — excludes the high-level RP23 level already
+  // represented in the common impact vector, so the same level movement cannot
+  // be double-weighted. Uses only fine geometry/balance signals.
+  return compareViewingPriorityFine(a.viewingAfter, b.viewingAfter, a.viewingPriorityMode);
 }
 
 // Retired in Stage B: replaced by compareImprovementImpact (reach-coupled
@@ -527,9 +530,12 @@ export function rankDesignRecommendations({
 
       const improvementProfile = computeImprovementProfile(baselineRating, entry.rating);
       const degradationProfile = computeDegradationProfile(baselineRating, entry.rating);
-      const improvementImpact = buildImprovementImpactProfile(baselineRating, entry.rating, entry.candidate);
-      const degradationImpact = buildDegradationImpactProfile(baselineRating, entry.rating, entry.candidate);
       const viewing = viewingMetadataForCandidate(entry.candidate, viewingContext);
+      const viewingChange = viewing
+        ? { beforeLevel: viewing?.before?.worstRowLevel, afterLevel: viewing?.after?.worstRowLevel }
+        : null;
+      const improvementImpact = buildImprovementImpactProfile(baselineRating, entry.rating, entry.candidate, viewingChange);
+      const degradationImpact = buildDegradationImpactProfile(baselineRating, entry.rating, entry.candidate, viewingChange);
       const hasSimplification =
         entry.candidate?.kind === "channel-count" ||
         (entry.candidate?.kind === "lcr" && entry.candidate?.recommendationDirection === "cost-down");
@@ -584,10 +590,11 @@ export function rankDesignRecommendations({
   // additionally qualify when its RP22 profile is preserved and the canonical
   // selected viewing objective improves materially.
   //
-  // Materiality is determined by the Stage B performance-impact authority:
-  // a positive RP22 level movement (or P12/P13 unique threshold crossing) with
-  // no degradation. Ranking uses the reach-coupled impact vector
-  // (primaryReach → failFixed → maxGain → breadth → totalGain → seatsImproved).
+  // Materiality is determined by the Stage B/C performance-impact authority:
+  // a positive RP22 level movement, P12/P13 unique threshold crossing, or
+  // viewing RP23 level movement, with no degradation. Ranking uses the
+  // reach-coupled impact vector (primaryReach → failFixed → maxGain → breadth
+  // → totalGain → seatsImproved), with viewing entering at CORE reach.
   // No minimum ASDR percentage-point movement is required.
   const rankedImprovements = evaluated
     .filter((item) => item.isRecommendationImprovement)

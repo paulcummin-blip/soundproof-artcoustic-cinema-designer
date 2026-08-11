@@ -273,6 +273,87 @@ export function compareViewingPriority(summaryA, summaryB, priorityMode = "balan
   return comparePrioritisedViewing(summaryA, summaryB, n);
 }
 
+// ── Fine-only comparator (Stage C) ────────────────────────────────────────
+
+/**
+ * Fine-only viewing comparator for Stage C recommendation ranking.
+ *
+ * The common performance-impact vector already represents the high-level RP23
+ * level movement (worstRowLevel before → after). This fine comparator EXCLUDES
+ * the absolute worstRowLevel (and every other absolute RP23 level) so the same
+ * level movement cannot be double-weighted. It compares only fine geometry /
+ * balance signals: level spread, angle spread, total deviation from 57.5°,
+ * and row balance.
+ *
+ * For prioritised-row mode the prioritised row's DEVIATION (geometry) remains a
+ * valid fine signal; its absolute LEVEL is excluded to avoid re-weighting an
+ * RP23 level already represented in the common vector when the prioritised
+ * row is the worst row.
+ *
+ * Used ONLY as a late tie-break after the common impact vector ties.
+ * Eligibility (isImprovement / isWorse) still uses the full compareViewingPriority.
+ */
+export function compareViewingPriorityFine(summaryA, summaryB, priorityMode = "balanced") {
+  if (isBalancedMode(priorityMode)) {
+    return compareBalancedViewingFine(summaryA, summaryB);
+  }
+  const n = prioritisedRowNumber(priorityMode);
+  return comparePrioritisedViewingFine(summaryA, summaryB, n);
+}
+
+function compareBalancedViewingFine(summaryA, summaryB) {
+  const a = buildViewingPrioritySummary(summaryA?.rows, "balanced");
+  const b = buildViewingPrioritySummary(summaryB?.rows, "balanced");
+
+  // Skip worstRowLevel (criterion 1) — already represented in common impact vector.
+  // 1. Smaller RP23 level spread
+  if (a.levelSpread !== b.levelSpread) return a.levelSpread - b.levelSpread;
+  // 2. Smaller horizontal viewing-angle spread
+  if (Math.abs(a.angleSpreadDeg - b.angleSpreadDeg) > 1e-9) {
+    return a.angleSpreadDeg - b.angleSpreadDeg;
+  }
+  // 3. Smaller total deviation from 57.5°
+  if (Math.abs(a.totalDeviationFrom57_5 - b.totalDeviationFrom57_5) > 1e-9) {
+    return a.totalDeviationFrom57_5 - b.totalDeviationFrom57_5;
+  }
+  // 4. Stable deterministic tie-break: row count, then sum of angles
+  if (a.rows.length !== b.rows.length) return b.rows.length - a.rows.length;
+  const sumA = a.rows.reduce((s, r) => s + r.viewingAngleDeg, 0);
+  const sumB = b.rows.reduce((s, r) => s + r.viewingAngleDeg, 0);
+  return sumA - sumB;
+}
+
+function comparePrioritisedViewingFine(summaryA, summaryB, rowNumber) {
+  const n = Number(rowNumber);
+  if (!Number.isFinite(n) || n <= 0) return compareBalancedViewingFine(summaryA, summaryB);
+
+  const a = buildViewingPrioritySummary(summaryA?.rows, `row_${n}`);
+  const b = buildViewingPrioritySummary(summaryB?.rows, `row_${n}`);
+
+  const aRow = a.rows.find((r) => r.rowNumber === n);
+  const bRow = b.rows.find((r) => r.rowNumber === n);
+  if (aRow && !bRow) return -1;
+  if (!aRow && bRow) return 1;
+  if (!aRow && !bRow) return compareBalancedViewingFine(summaryA, summaryB);
+
+  // Skip prioritised-row LEVEL (criterion 1) and worstRowLevel-of-remaining
+  // (criterion 3) — both are absolute RP23 levels already represented in the
+  // common impact vector. Keep prioritised-row DEVIATION (geometry) and the
+  // spread/deviation fine signals.
+  // 1. Prioritised-row deviation from 57.5° (smaller wins)
+  if (Math.abs(aRow.deviationFrom57_5 - bRow.deviationFrom57_5) > 1e-9) {
+    return aRow.deviationFrom57_5 - bRow.deviationFrom57_5;
+  }
+  // 2. Overall level spread (smaller wins)
+  if (a.levelSpread !== b.levelSpread) return a.levelSpread - b.levelSpread;
+  // 3. Overall angle spread (smaller wins)
+  if (Math.abs(a.angleSpreadDeg - b.angleSpreadDeg) > 1e-9) {
+    return a.angleSpreadDeg - b.angleSpreadDeg;
+  }
+  // 4. Overall total deviation from 57.5° (smaller wins)
+  return a.totalDeviationFrom57_5 - b.totalDeviationFrom57_5;
+}
+
 // ── UI Helpers ────────────────────────────────────────────────────────────
 
 /**

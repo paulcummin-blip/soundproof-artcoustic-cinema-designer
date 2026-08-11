@@ -160,7 +160,7 @@ function buildContributionMap(rating) {
  * { primaryReach, failFixedAtPrimaryReach, maxGainAtPrimaryReach,
  *   breadthAtPrimaryReach, totalLevelGain, seatsImproved }
  */
-export function buildImprovementImpactProfile(baselineRating, candidateRating, candidate) {
+export function buildImprovementImpactProfile(baselineRating, candidateRating, candidate, viewingChange = null) {
   const baselineContribs = buildContributionMap(baselineRating);
   const candidateContribs = buildContributionMap(candidateRating);
   const baselineSeatLevels = baselineRating?.seatLevels || {};
@@ -235,6 +235,20 @@ export function buildImprovementImpactProfile(baselineRating, candidateRating, c
     }
   }
 
+  // Viewing consequence (Stage C): CORE reach, no FAIL state.
+  // Viewing does not contribute to seatsImproved (physical seat-scope RP22 only).
+  if (viewingChange && viewingChange.beforeLevel && viewingChange.afterLevel) {
+    const vBeforeRank = rankOf(viewingChange.beforeLevel);
+    const vAfterRank = rankOf(viewingChange.afterLevel);
+    if (vBeforeRank != null && vAfterRank != null) {
+      const vGain = vAfterRank - vBeforeRank;
+      if (vGain > 0) {
+        consequences.push({ reach: REACH.CORE, gain: vGain, failFixed: 0 });
+        totalLevelGain += vGain;
+      }
+    }
+  }
+
   let primaryReach = REACH.NONE;
   for (const c of consequences) {
     if (c.reach > primaryReach) primaryReach = c.reach;
@@ -270,7 +284,7 @@ export function buildImprovementImpactProfile(baselineRating, candidateRating, c
  *
  * Loss magnitudes are positive integers (beforeRank - afterRank).
  */
-export function buildDegradationImpactProfile(baselineRating, candidateRating, candidate) {
+export function buildDegradationImpactProfile(baselineRating, candidateRating, candidate, viewingChange = null) {
   const baselineContribs = buildContributionMap(baselineRating);
   const candidateContribs = buildContributionMap(candidateRating);
   const baselineSeatLevels = baselineRating?.seatLevels || {};
@@ -333,6 +347,20 @@ export function buildDegradationImpactProfile(baselineRating, candidateRating, c
         const reach = classifyDegradedReach(degradedSeats, applicableSeats, rspSeatId);
         consequences.push({ reach, loss: maxLoss });
         totalLevelLoss += maxLoss;
+      }
+    }
+  }
+
+  // Viewing consequence (Stage C): CORE reach, no FAIL state.
+  // Viewing does not contribute to seatsDegraded (physical seat-scope RP22 only).
+  if (viewingChange && viewingChange.beforeLevel && viewingChange.afterLevel) {
+    const vBeforeRank = rankOf(viewingChange.beforeLevel);
+    const vAfterRank = rankOf(viewingChange.afterLevel);
+    if (vBeforeRank != null && vAfterRank != null) {
+      const vLoss = vBeforeRank - vAfterRank;
+      if (vLoss > 0) {
+        consequences.push({ reach: REACH.CORE, loss: vLoss });
+        totalLevelLoss += vLoss;
       }
     }
   }
