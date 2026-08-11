@@ -19,10 +19,7 @@ import {
   getParameterLevelChanges,
   getPriorityLabel,
 } from "./designRecommendationProfile.js";
-import {
-  isMaterialImprovement,
-  isMaterialCostSaving,
-} from "./recommendationMaterialityAuthority.js";
+import { resolveParamThresholds } from "@/components/report/technical/roomParameterLevelAuthority";
 
 const LCR_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
 const WIDE_ROLES = new Set(["LW", "RW"]);
@@ -370,6 +367,23 @@ function extractP12Level(rating) {
   return contribution?.resultLevel || null;
 }
 
+/**
+ * Grade a raw SPL value against both Minimum and Recommended RP22 thresholds.
+ * Returns the level under the specified mode, or null if the raw value is
+ * not finite. Uses the canonical resolveParamThresholds authority — no
+ * new thresholds are defined here.
+ */
+function gradeSplParamRaw(rawDb, paramId, mode) {
+  if (!Number.isFinite(Number(rawDb))) return null;
+  const thresholds = resolveParamThresholds({ id: paramId }, mode, null, null);
+  const v = Number(rawDb);
+  if (v >= thresholds.L4) return "L4";
+  if (v >= thresholds.L3) return "L3";
+  if (v >= thresholds.L2) return "L2";
+  if (v >= thresholds.L1) return "L1";
+  return "FAIL";
+}
+
 function uniqueById(items) {
   const seen = new Set();
   return items.filter((item) => {
@@ -546,6 +560,10 @@ export function rankDesignRecommendations({
         hasNewFail: degradationProfile.hasNewFail,
         p12Level: extractP12Level(entry.rating),
         p12BaselineLevel: extractP12Level(baselineRating),
+        p12MinimumLevel: gradeSplParamRaw(entry.p12RawDb, 12, "minimum"),
+        p12RecommendedLevel: gradeSplParamRaw(entry.p12RawDb, 12, "recommended"),
+        p13MinimumLevel: gradeSplParamRaw(entry.p13RawDb, 13, "minimum"),
+        p13RecommendedLevel: gradeSplParamRaw(entry.p13RawDb, 13, "recommended"),
       };
     });
 
@@ -554,14 +572,14 @@ export function rankDesignRecommendations({
   // additionally qualify when its RP22 profile is preserved and the canonical
   // selected viewing objective improves materially.
   //
-  // FINAL GATE: 5pp materiality filter — only candidates that move the
-  // unrounded ASDR by at least +5.0 percentage points are surfaced. This
-  // is applied AFTER the RP22-first hierarchy and Viewing Priority
-  // comparator. Candidates below the threshold are still evaluated
-  // canonically above; they are filtered out of presentation only.
+  // Materiality is determined solely by the canonical RP22 improvement-profile
+  // authority (isRecommendationImprovement): at least one parameter level
+  // improves with no degradation. No minimum ASDR percentage-point movement
+  // is required — a blanket pp threshold was mathematically incompatible
+  // with single-parameter single-level RP22 improvements (e.g. P12 L3→L4
+  // produces only ~2.3pp in a full design).
   const rankedImprovements = evaluated
     .filter((item) => item.isRecommendationImprovement)
-    .filter((item) => isMaterialImprovement(item.scoreDelta))
     .sort((a, b) => {
       const cmp = compareImprovementTuples(a.improvementProfile, b.improvementProfile);
       if (cmp !== 0) return cmp;
@@ -611,15 +629,15 @@ export function rankDesignRecommendations({
 
   // ── SAVINGS ──
   // A candidate qualifies when it saves money while preserving the current
-  // RP22 level profile: no new FAIL, acceptable degradation, AND passes the
-  // 5pp materiality filter (ASDR must drop by at least 5pp — a genuine
-  // compromise, not a tiny numerical change). This is the FINAL gate after
-  // all existing cost-down protections.
+  // RP22 level profile: no new FAIL, and acceptable degradation per the
+  // canonical degradation profile. A zero-performance-loss saving (ASDR
+  // unchanged) is the ideal and ranks highest. No minimum ASDR drop is
+  // required — the previous 5pp drop requirement was inverted: it hid
+  // perfect-preservation savings while showing only degrading ones.
   // Ranking: degradation score (lower = better preservation) → saving amount → ASDR loss.
   const savings = evaluated
     .filter((item) => finite(item.savingExVat) && item.savingExVat > 0)
     .filter((item) => !item.hasNewFail) // No-FAIL cost-down rule
-    .filter((item) => isMaterialCostSaving(item.scoreDelta)) // 5pp material compromise (final gate)
     .map((item) => ({ ...item, scoreLoss: Math.max(0, -item.scoreDelta) }))
     .sort((a, b) => {
       const degA = a.degradationProfile.degradationScore;

@@ -74,6 +74,10 @@ function recommendationItemPublicationSnapshot(item) {
     confidence: item?.confidence || null,
     p12Level: item?.p12Level || null,
     p12BaselineLevel: item?.p12BaselineLevel || null,
+    p12MinimumLevel: item?.p12MinimumLevel || null,
+    p12RecommendedLevel: item?.p12RecommendedLevel || null,
+    p13MinimumLevel: item?.p13MinimumLevel || null,
+    p13RecommendedLevel: item?.p13RecommendedLevel || null,
     caveat: item?.caveat || null,
     recommendationDirection: item?.recommendationDirection || null,
     candidateModelKey: item?.candidateModelKey || null,
@@ -233,9 +237,15 @@ function CandidateRatingEvaluator({
     projectId,
   });
 
+  const p12RawDb = analysisResult?.gradedParameters?.primary?.[12]?.value;
+  const p13RawDb = analysisResult?.gradedParameters?.primary?.[13]?.value;
+
   useEffect(() => {
     if (!rating) return;
-    onResult(candidate, rating);
+    onResult(candidate, rating, {
+      p12RawDb: Number.isFinite(Number(p12RawDb)) ? Number(p12RawDb) : null,
+      p13RawDb: Number.isFinite(Number(p13RawDb)) ? Number(p13RawDb) : null,
+    });
   }, [
     candidate,
     onResult,
@@ -244,6 +254,8 @@ function CandidateRatingEvaluator({
     rating?.actualPoints,
     rating?.maximumAvailablePoints,
     rating?.coveragePercent,
+    p12RawDb,
+    p13RawDb,
   ]);
 
   // A malformed or temporarily unavailable candidate must not hold the whole
@@ -348,7 +360,7 @@ export default function DesignRecommendationEngine({
   );
   const [resultsById, setResultsById] = useState({});
 
-  const handleResult = useCallback((candidate, rating) => {
+  const handleResult = useCallback((candidate, rating, metadata) => {
     setResultsById((previous) => {
       const current = previous[candidate.id];
       if (
@@ -360,7 +372,15 @@ export default function DesignRecommendationEngine({
       ) {
         return previous;
       }
-      return { ...previous, [candidate.id]: { candidate, rating } };
+      return {
+        ...previous,
+        [candidate.id]: {
+          candidate,
+          rating,
+          p12RawDb: metadata?.p12RawDb ?? null,
+          p13RawDb: metadata?.p13RawDb ?? null,
+        },
+      };
     });
   }, []);
 
