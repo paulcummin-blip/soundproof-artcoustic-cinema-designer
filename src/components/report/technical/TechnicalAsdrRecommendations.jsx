@@ -110,18 +110,6 @@ function RecommendationCard({ heading, item, mode }) {
       }}
     >
       <CardHeading>{heading}</CardHeading>
-      {item?.materialUpgradeLabel && (
-        <div style={{
-          fontSize: "7pt",
-          fontWeight: 700,
-          color: COLORS.secondary,
-          letterSpacing: "0.08em",
-          fontFamily: FONT_BODY,
-          marginBottom: "1mm",
-        }}>
-          {item.materialUpgradeLabel}
-        </div>
-      )}
       <div
         style={{
           fontSize: "10pt",

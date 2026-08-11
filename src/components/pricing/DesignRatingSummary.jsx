@@ -76,11 +76,6 @@ function RecommendationRow({ item, mode }) {
           {item.priorityLabel}
         </div>
       )}
-      {item?.materialUpgradeLabel && (
-        <div style={{ fontSize: 9, fontWeight: 800, color: '#625143', marginBottom: 3, letterSpacing: '0.05em' }}>
-          {item.materialUpgradeLabel}
-        </div>
-      )}
       <div style={{ fontSize: 11, lineHeight: 1.35, fontWeight: 700, color: '#213428' }}>
         {item.title}
       </div>
