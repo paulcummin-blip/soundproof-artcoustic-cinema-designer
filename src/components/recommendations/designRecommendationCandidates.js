@@ -153,11 +153,13 @@ export function buildDesignRecommendationCandidates({
     }
   }
 
-  // LCR selection:
-  // - keep the existing single nearest-cheaper cost-down candidate;
-  // - evaluate every registry-backed stronger compatible discrete LCR model.
-  // Stronger products are not score-estimated here: each scenario still runs
-  // through the canonical SPL → RP22 → ASDR chain below.
+  // LCR selection (Stage A — price-free):
+  // - evaluate every registry-backed weaker compatible discrete LCR model as a
+  //   cost-down candidate;
+  // - evaluate every registry-backed stronger compatible discrete LCR model as
+  //   an upgrade candidate.
+  // No model is chosen by price. Each scenario still runs through the canonical
+  // SPL → RP22 → ASDR chain below and is ranked on solved performance.
   const currentLcr = safeSpeakers.filter((speaker) => LCR_ROLES.has(roleOf(speaker)));
   const currentKeys = currentLcr.map((speaker) => normaliseModelKey(speaker?.model)).filter(Boolean);
   const canCompareDiscreteLcr = currentLcr.length >= 3 && currentKeys.length === currentLcr.length;
@@ -186,14 +188,24 @@ export function buildDesignRecommendationCandidates({
       }))
       .filter((entry) => !currentKeys.includes(entry.model.key));
 
-    const cheaper = finite(currentCost)
-      ? discreteModels
-          .filter((entry) => finite(entry.price) && Number(entry.price) * currentLcr.length < currentCost)
-          .sort((a, b) => (Number(b.price) - Number(a.price)) || (b.capability - a.capability))[0]
-      : null;
+    // Stage A: LCR alternatives are generated from capability/compatibility only.
+    // All weaker compatible discrete models become cost-down candidates; all
+    // stronger compatible discrete models become upgrade candidates. Price is
+    // not used to select or order candidates — each scenario is solved by the
+    // canonical SPL → RP22 → ASDR chain and ranked on performance.
+    const weaker = discreteModels
+      .filter((entry) => entry.capability < currentCapability)
+      .sort((a, b) => b.capability - a.capability); // strongest weaker first
     const stronger = discreteModels
       .filter((entry) => entry.capability > currentCapability)
-      .sort((a, b) => (a.capability - b.capability) || ((Number(a.price) || Infinity) - (Number(b.price) || Infinity)));
+      .sort((a, b) => a.capability - b.capability); // weakest stronger first
+
+    const weakerSelections = weaker.map((entry) => ({
+      entry,
+      direction: "cost-down",
+      powerAfterW: currentLcrPowerW,
+      amplifierUpgradeRequired: false,
+    }));
 
     const strongerSelections = stronger.flatMap((entry) => {
       const modelOnly = {
@@ -237,14 +249,7 @@ export function buildDesignRecommendationCandidates({
     });
 
     const lcrSelections = [
-      ...(cheaper
-        ? [{
-            entry: cheaper,
-            direction: "cost-down",
-            powerAfterW: currentLcrPowerW,
-            amplifierUpgradeRequired: false,
-          }]
-        : []),
+      ...weakerSelections,
       ...strongerSelections,
     ];
 
@@ -481,17 +486,13 @@ function compareLcrMaterialUpgrades(a, b) {
     b?.recommendationDirection === "upgrade";
   if (!bothLcrUpgrades) return 0;
 
-  const costA = a.costDeltaExVat ?? Infinity;
-  const costB = b.costDeltaExVat ?? Infinity;
+  // Stage A: price removed. For equal solved performance profiles, order by
+  // disruption (lower), confidence (higher), then ASDR scoreDelta. A different
+  // solved profile is ranked by ASDR scoreDelta alone.
   const sameSolvedProfile = levelChangeSignature(a) === levelChangeSignature(b);
-
-  if (sameSolvedProfile) {
-    if (costA !== costB) return costA - costB;
-  } else if (a.scoreDelta !== b.scoreDelta) {
-    return b.scoreDelta - a.scoreDelta;
+  if (!sameSolvedProfile) {
+    if (a.scoreDelta !== b.scoreDelta) return b.scoreDelta - a.scoreDelta;
   }
-
-  if (costA !== costB) return costA - costB;
   const disA = DISRUPTION_RANK[a.disruption] ?? 99;
   const disB = DISRUPTION_RANK[b.disruption] ?? 99;
   if (disA !== disB) return disA - disB;
@@ -530,9 +531,12 @@ export function rankDesignRecommendations({
       const improvementProfile = computeImprovementProfile(baselineRating, entry.rating);
       const degradationProfile = computeDegradationProfile(baselineRating, entry.rating);
       const viewing = viewingMetadataForCandidate(entry.candidate, viewingContext);
+      const hasSimplification =
+        entry.candidate?.kind === "channel-count" ||
+        (entry.candidate?.kind === "lcr" && entry.candidate?.recommendationDirection === "cost-down");
       const viewingTradeoff =
         viewing?.comparison?.isWorse === true &&
-        (improvementProfile.isImprovement || (costDelta != null && costDelta < 0));
+        (improvementProfile.isImprovement || hasSimplification);
 
       return {
         ...entry.candidate,
@@ -557,6 +561,7 @@ export function rankDesignRecommendations({
         viewingComparison: viewing?.comparison || null,
         viewingPriorityMode: viewing?.priorityMode || null,
         viewingTradeoff,
+        hasSimplification,
         hasNewFail: degradationProfile.hasNewFail,
         p12Level: extractP12Level(entry.rating),
         p12BaselineLevel: extractP12Level(baselineRating),
@@ -587,10 +592,7 @@ export function rankDesignRecommendations({
       if (viewingCmp !== 0) return viewingCmp;
       const lcrValueCmp = compareLcrMaterialUpgrades(a, b);
       if (lcrValueCmp !== 0) return lcrValueCmp;
-      // Secondary: cost (lower better), disruption (lower), confidence (higher), ASDR (higher)
-      const costA = a.costDeltaExVat ?? Infinity;
-      const costB = b.costDeltaExVat ?? Infinity;
-      if (costA !== costB) return costA - costB;
+      // Stage A: price removed. Secondary: disruption (lower), confidence (higher), ASDR (higher)
       const disA = DISRUPTION_RANK[a.disruption] ?? 99;
       const disB = DISRUPTION_RANK[b.disruption] ?? 99;
       if (disA !== disB) return disA - disB;
@@ -616,27 +618,23 @@ export function rankDesignRecommendations({
     if (shortlistedImprovements.length >= 3) break;
   }
 
-  let bestMaterialLcrMarked = false;
   const improvements = shortlistedImprovements
     .map((item) => {
       if (item.kind !== "lcr" || item.recommendationDirection !== "upgrade") return item;
-      const materialUpgradeLabel = bestMaterialLcrMarked
-        ? "MATERIAL UPGRADE"
-        : "BEST VALUE MATERIAL UPGRADE";
-      bestMaterialLcrMarked = true;
-      return { ...item, materialUpgradeLabel };
+      // Stage A: neutral performance label — "BEST VALUE" is a financial
+      // judgement on incomplete price information and is removed.
+      return { ...item, materialUpgradeLabel: "MATERIAL UPGRADE" };
     });
 
-  // ── SAVINGS ──
-  // A candidate qualifies when it saves money while preserving the current
-  // RP22 level profile: no new FAIL, and acceptable degradation per the
-  // canonical degradation profile. A zero-performance-loss saving (ASDR
-  // unchanged) is the ideal and ranks highest. No minimum ASDR drop is
-  // required — the previous 5pp drop requirement was inverted: it hid
-  // perfect-preservation savings while showing only degrading ones.
-  // Ranking: degradation score (lower = better preservation) → saving amount → ASDR loss.
+  // ── SAVINGS (Stage A — price-free) ──
+  // A candidate qualifies when it genuinely simplifies the design (removes
+  // equipment, channels, or speaker capability) with no new FAIL and a valid
+  // degradation profile. Price/saving amount is NOT an eligibility or ranking
+  // authority. A zero-performance-loss simplification (ASDR unchanged) is the
+  // ideal and ranks highest. Ranking: degradation score (lower = better
+  // preservation) → viewing comparator → ASDR loss.
   const savings = evaluated
-    .filter((item) => finite(item.savingExVat) && item.savingExVat > 0)
+    .filter((item) => item.hasSimplification) // Stage A: eligibility is performance-only (removes equipment/channels/capability), not price
     .filter((item) => !item.hasNewFail) // No-FAIL cost-down rule
     .map((item) => ({ ...item, scoreLoss: Math.max(0, -item.scoreDelta) }))
     .sort((a, b) => {
@@ -645,7 +643,6 @@ export function rankDesignRecommendations({
       if (degA !== degB) return degA - degB; // lower degradation = better
       const viewingCmp = compareApplicableViewingCandidates(a, b);
       if (viewingCmp !== 0) return viewingCmp;
-      if (a.savingExVat !== b.savingExVat) return b.savingExVat - a.savingExVat; // higher saving = better
       return a.scoreDelta - b.scoreDelta; // lower ASDR loss = better
     })
     .slice(0, 3);
