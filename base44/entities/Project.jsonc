@@ -389,6 +389,16 @@
       "type": "number",
       "default": 0,
       "description": "Analytics only \u2014 number of exports. Not wired to any tracking yet."
+    },
+    "acoustic_treatment_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether acoustic treatment (Artcoustic Abfuser) is enabled for this project."
+    },
+    "selected_abfuser_qty": {
+      "type": "number",
+      "default": 0,
+      "description": "Designer-selected Abfuser quantity. Drives System Price and RP22 Products Selected. 0 when acoustic treatment is off."
     }
   },
   "required": [
