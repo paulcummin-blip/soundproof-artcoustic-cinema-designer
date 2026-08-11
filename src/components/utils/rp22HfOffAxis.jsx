@@ -12,6 +12,7 @@ import { resolveSpeakerYaw } from "@/components/utils/speakerAimResolver";
 import { computeMeasuredP17Response } from "@/components/utils/rp22/measuredP17Engine";
 import { validatePolarModel } from "@/components/utils/rp22/polarModelValidation";
 import { levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
+import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
 const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC", "TRL", "TRR"]);
@@ -336,7 +337,7 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
 
   if (!worstRole || !isNum(worstDelta) || worstDelta === -Infinity) return null;
 
-  const value = Number(worstDelta.toFixed(1));
+  const value = resolveRp22DesignValue(16, worstDelta);
 
   // Check if any LCR exceeds 55° off-axis (at the current seat)
   const hasLcrBeyondLimit = Object.values(perSpeaker).some(
@@ -353,8 +354,8 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
 
   return {
     value,
-    formatted: `±${value.toFixed(1)} dB`,
-    hudLabel: `${worstRole} ±${value.toFixed(1)} dB`,
+    formatted: `±${value} dB`,
+    hudLabel: `${worstRole} ±${value} dB`,
     level,
     p16BeyondLcrLimit: hasLcrBeyondLimit,
     debug: {
@@ -933,7 +934,7 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     }
 
     perSeat[seatId] = {
-      p17Db: Number(Math.max(0, maxDelta).toFixed(1)),  // clamp to 0 (RSP yields 0.0 dB)
+      p17Db: resolveRp22DesignValue(17, Math.max(0, maxDelta)),  // 0.5 dB design floor
       worstRole,
       worstAngleDeg: isNum(worstAngleDeg) ? Number(worstAngleDeg.toFixed(1)) : null,
       worstLossDb: isNum(worstLossDb) ? Number(worstLossDb.toFixed(1)) : null,

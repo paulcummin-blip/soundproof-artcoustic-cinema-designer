@@ -62,7 +62,8 @@ export function levelP17_wsFR(dB) {
 }
 
 export function floorP20Deviation(dB) {
-  return Number.isFinite(dB) ? Math.floor(dB) : null;
+  // Sound Proof 0.5 dB design precision — favourable floor for ±dB deviation.
+  return Number.isFinite(dB) ? Math.floor(dB * 2) / 2 : null;
 }
 
 export function formatP20Deviation(dB) {
@@ -74,8 +75,8 @@ export function levelP20_lfConsistency(dB) {
   const floored = floorP20Deviation(dB);
   if (floored == null) return { level: 'N/A', ok: false };
   if (floored <= 2) return { level: 'L4', ok: true };
-  if (floored === 3) return { level: 'L3', ok: true };
-  if (floored === 4) return { level: 'L2', ok: true };
+  if (floored <= 3) return { level: 'L3', ok: true };
+  if (floored <= 4) return { level: 'L2', ok: true };
   return { level: 'L1', ok: true };
 }
 

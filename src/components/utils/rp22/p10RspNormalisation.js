@@ -14,6 +14,8 @@
 //   - Preserve existing insufficient-data behaviour (< 2 valid channels → null).
 //   - P10 is independent from P9 and P6.
 
+import { resolveRp22DesignValue } from "./resolveRp22DesignValue";
+
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
 // Canonical upper channels per RP22 spec (exactly these six)
@@ -60,15 +62,16 @@ export function computeP10RspNormalisedSpread(seatUppers, rspUppers) {
   const minNorm = Math.min(...normalisedDeltas);
   const spread = maxNorm - minNorm;
 
-  // Round to 0.1 dB (existing P10 presentation path)
-  const deltaRounded = Math.round(spread * 10) / 10;
+  // Sound Proof 1 dB design floor — favourable whole-dB quantisation for
+  // ordinary dB difference parameters (Group A).
+  const deltaRounded = resolveRp22DesignValue(10, spread);
   const level = gradeP10(deltaRounded);
 
   return {
     spread,
     deltaRounded,
     level,
-    formatted: `±${deltaRounded.toFixed(1)} dB`,
+    formatted: `±${deltaRounded} dB`,
     rolesUsed,
     normalisedDeltas,
   };

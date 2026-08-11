@@ -13,6 +13,7 @@ import { applyDesignEqCurve, calculateDesignEqCurve } from "@/components/utils/d
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
 import { getSpeakerModelMeta, getSubwooferCurve } from "@/components/models/speakers/registry";
 import { levelP20_lfConsistency, numericRp22Level } from "@/components/utils/rp22/levels";
+import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 export { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 
 export { applyDesignEqCurve, calculateDesignEqCurve };
@@ -199,16 +200,20 @@ export function computeParam14LfeCapability(rspResponse, designEqEnabled, band =
   const minSpl = Math.min(...bandUsed.map((p) => p.spl));
   if (!isNum(minSpl)) return null;
 
+  // Sound Proof 1 dB favourable ceil — higher-is-better SPL capability (Group B).
+  const designSpl = resolveRp22DesignValue(14, minSpl);
+
   let level = 0;
-  if (minSpl >= 123) level = 4;
-  else if (minSpl >= 120) level = 3;
-  else if (minSpl >= 117) level = 2;
-  else if (minSpl >= 114) level = 1;
+  if (designSpl >= 123) level = 4;
+  else if (designSpl >= 120) level = 3;
+  else if (designSpl >= 117) level = 2;
+  else if (designSpl >= 114) level = 1;
 
   return {
-    value: minSpl,
+    value: designSpl,
+    rawValue: minSpl,
     level: level >= 1 ? `L${level}` : null,
-    formatted: `${minSpl.toFixed(1)} dB`,
+    formatted: `${designSpl} dB`,
     designEqEnabled: !!designEqEnabled,
     band,
     note: 'Post-EQ design estimate at RSP using selected subwoofer product data.',
@@ -320,13 +325,15 @@ export function computeParam18AchievedExtension({ rspPostEqCurve, perSeatPostEqC
     const complete = sourceExtensions.every(isNum);
     const extensionHz = complete ? Math.max(...sourceExtensions) : null;
     const worstSeat = seatExtensions.filter((seat) => isNum(seat.extensionHz)).sort((a, b) => b.extensionHz - a.extensionHz)[0] || null;
-    return { level: definition.level, cutoffDb: definition.p18CutoffDb, limitHz: definition.p18LimitHz, extensionHz,
+    const designHz = resolveRp22DesignValue(18, extensionHz);
+    return { level: definition.level, cutoffDb: definition.p18CutoffDb, limitHz: definition.p18LimitHz, extensionHz: designHz,
+      extensionHzRaw: extensionHz,
       rspExtensionHz, productExtensionHz: productTarget?.extensionHz ?? null, worstSeatId: worstSeat?.seatId ?? null,
-      worstSeatExtensionHz: worstSeat?.extensionHz ?? null, passesFrequency: extensionHz != null && extensionHz <= definition.p18LimitHz };
+      worstSeatExtensionHz: worstSeat?.extensionHz ?? null, passesFrequency: designHz != null && designHz <= definition.p18LimitHz };
   });
   const winningTarget = targets.slice().reverse().find((target) => target.passesFrequency) || null;
   return { targets, level: winningTarget?.level || null, value: winningTarget?.extensionHz ?? null,
-    formatted: winningTarget ? `${Math.round(winningTarget.extensionHz)} Hz` : null,
+    formatted: winningTarget ? `${winningTarget.extensionHz} Hz` : null,
     productCapability: product, source: "post-eq-rsp-worst-seat-achieved-extension",
     note: "Achieved in-room extension from post-EQ RSP, conservatively bounded by product capability and worst-seat post-EQ response." };
 }
@@ -355,14 +362,16 @@ export function computeParam18BassExtension(rspResponse) {
         }
       }
     }
+    const designHz = resolveRp22DesignValue(18, extensionHz);
     return {
       level: definition.level,
       targetSplDb: definition.p14TargetDb,
       cutoffDb,
       limitHz: definition.p18LimitHz,
-      extensionHz,
+      extensionHz: designHz,
+      extensionHzRaw: extensionHz,
       bounded,
-      passesFrequency: extensionHz != null && extensionHz <= definition.p18LimitHz,
+      passesFrequency: designHz != null && designHz <= definition.p18LimitHz,
     };
   });
 
@@ -371,7 +380,7 @@ export function computeParam18BassExtension(rspResponse) {
     targets,
     level: winningTarget?.level || null,
     value: winningTarget?.extensionHz ?? null,
-    formatted: winningTarget == null ? null : winningTarget.bounded ? `≤ ${Math.round(winningTarget.extensionHz)} Hz` : `${Math.round(winningTarget.extensionHz)} Hz`,
+    formatted: winningTarget == null ? null : winningTarget.bounded ? `≤ ${winningTarget.extensionHz} Hz` : `${winningTarget.extensionHz} Hz`,
     note: "Predicted design-stage extension from the shared calibrated response; independently graded from P14.",
   };
 }
@@ -405,7 +414,9 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
     const d = Math.abs(below[i].spl - refDb);
     if (d > rawMaxDev) rawMaxDev = d;
   }
-  const maxDev = Math.ceil(Math.abs(rawMaxDev));
+  // Sound Proof 0.5 dB favourable floor — remove previous Math.ceil (which was
+  // the OPPOSITE of favourable). Group C ±dB deviation parameter.
+  const maxDev = resolveRp22DesignValue(19, Math.abs(rawMaxDev));
 
   let level = "FAIL";
   if (maxDev <= 2) level = "L4";
@@ -415,6 +426,7 @@ export function computeParam19Deviation(rspResponse, transitionHz) {
 
   return {
     maxDevDb: maxDev,
+    rawMaxDev: rawMaxDev,
     targetDb: refDb,
     transitionHz,
     level,
@@ -466,12 +478,14 @@ export function computeParam20SeatConsistency({ rspResponse, perSeatResponses, t
     }
     const isRsp = rspSeatId != null && String(entry.seatId) === String(rspSeatId);
     const dev = isRsp ? 0 : maxDev;
+    const designDev = resolveRp22DesignValue(20, dev);
     perSeat.push({
       seatId: entry.seatId,
       isPrimary: !!entry.isPrimary,
       isRsp,
-      deviationDb: dev,
-      level: levelForDeviation(dev),
+      deviationDb: designDev,
+      deviationDbRaw: dev,
+      level: levelForDeviation(designDev),
     });
   }
   if (perSeat.length === 0) return null;

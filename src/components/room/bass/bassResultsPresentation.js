@@ -1,3 +1,5 @@
+import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 
 const isFiniteNumber = (value) => value !== null
@@ -26,7 +28,11 @@ export function formatBassParameterValue(key, value) {
   const number = normalizeIntegerNoise(value);
   if (key === "p14") return `${Math.floor(number + 1e-8)} dBC`;
   if (key === "p18") return `${Math.floor(number)} Hz`;
-  if (key === "p19" || key === "p20") return `±${Math.abs(number).toFixed(1)} dB`;
+  if (key === "p19" || key === "p20") {
+    const pid = key === "p19" ? 19 : 20;
+    const designVal = resolveRp22DesignValue(pid, Math.abs(number));
+    return `±${designVal} dB`;
+  }
   return `${number.toFixed(1)} dB`;
 }
 

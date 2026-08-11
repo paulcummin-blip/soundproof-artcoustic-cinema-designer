@@ -23,8 +23,12 @@ function columnNumber(seat, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+
 export function formatAuthoritativeP20Result(result) {
-  return finite(result?.variationDbRaw) ? `±${Math.abs(Number(result.variationDbRaw)).toFixed(1)} dB` : "—";
+  if (!finite(result?.variationDbRaw)) return "—";
+  const designVal = resolveRp22DesignValue(20, Math.abs(Number(result.variationDbRaw)));
+  return `±${designVal} dB`;
 }
 
 export function buildP20SeatRows(seatingPositions = [], perSeatP20Results = []) {

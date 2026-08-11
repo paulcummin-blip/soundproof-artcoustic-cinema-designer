@@ -28,6 +28,7 @@ import {
 } from "@/components/utils/rp22BassMetrics";
 import { evaluateCanonicalP2 } from "@/components/utils/rp22/canonicalP2Authority";
 import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNormalisation";
+import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
 import { computeP11Compliance } from "@/components/utils/rp22/computeP11Compliance";
 
@@ -724,7 +725,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         
         if (isNum(lSpl) && isNum(cSpl) && isNum(rSpl)) {
           const minSplRaw = Math.min(lSpl, cSpl, rSpl);
-          const minSpl = Math.ceil(minSplRaw); // Round UP to whole dB
+          const minSpl = resolveRp22DesignValue(12, minSplRaw); // 1 dB favourable ceil
           
           let level12 = 1;
           if (minSpl >= 111) level12 = 4;
@@ -801,7 +802,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         if (groups.length > 0) {
           // Find minimum SPL across all groups (raw)
           const minSplRaw = Math.min(...groups.map(g => g.spl));
-          const minSpl = Math.ceil(minSplRaw); // Round UP to whole dB
+          const minSpl = resolveRp22DesignValue(13, minSplRaw); // 1 dB favourable ceil
           
           // Find limiting group (with tie-breaking by priority) - use raw for detection
           const limitingGroup = groups
@@ -1284,15 +1285,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             }
             
             if (isNum(maxDelta)) {
+              const p4DesignDb = resolveRp22DesignValue(4, maxDelta);
               let level4 = 1;
-              if (maxDelta <= 2) level4 = 4;
-              else if (maxDelta <= 4) level4 = 3;
-              else if (maxDelta <= 6) level4 = 2;
-              
+              if (p4DesignDb <= 2) level4 = 4;
+              else if (p4DesignDb <= 4) level4 = 3;
+              else if (p4DesignDb <= 6) level4 = 2;
+
               metrics.p4 = {
-                valueDb: maxDelta,
+                valueDb: p4DesignDb,
                 level: level4,
-                formatted: `${Math.floor(maxDelta)} dB`
+                formatted: `${p4DesignDb} dB`
               };
             }
           }
@@ -1375,7 +1377,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             // fractions of a predicted dB do not cause a Performance Level loss.
             // This flooring is a Sound Proof design-grading policy, NOT a claim that
             // RP22 mandates rounding. RP22 thresholds themselves are unchanged.
-            const p6DesignDb = Math.floor(maxDeltaRaw);
+            const p6DesignDb = resolveRp22DesignValue(6, maxDeltaRaw);
 
             let level6;
             if      (p6DesignDb <= 2)  level6 = 4;
@@ -1519,7 +1521,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
           metrics.p17 = {
             value: valueDb,
-            formatted: `±${valueDb.toFixed(1)} dB`,
+            formatted: `±${valueDb} dB`,
             level: level17,
             worstRole: p17Data.worstRole,
             worstAngleDeg: p17Data.worstAngleDeg,
