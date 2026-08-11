@@ -103,11 +103,13 @@ export function yHalfExtentM_physical(depthM, widthM, yawDeg = 0) {
 }
 
 // Single source of truth for target MLP Y (RP23 57.5° H FOV)
+// roomFrontY is the screen front plane Y (already includes screen depth).
+// Do NOT add planeDepth_m — that double-counts the screen depth and shifts
+// the RSP beyond the canonical mlpY_m (screenFrontPlaneM + d57).
 export function targetMlpY57_5(screen, roomFrontY = 0) {
   const visibleW_m = (Number(screen?.visibleWidthInches || 100) * 0.0254);
-  const planeDepth_m = Math.max(0, Number(screen?.floatDepthM) || 0.20);
   const d57 = (visibleW_m / 2) / Math.tan((57.5 * RAD) / 2);
-  return roomFrontY + planeDepth_m + d57;
+  return roomFrontY + d57;
 }
 
 // ---- Render primitives ----

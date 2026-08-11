@@ -3,7 +3,7 @@ import { targetMlpY57_5 } from "@/components/room/rv/RenderPrimitives";
 
 const SAFETY_MARGIN_M = 0.05;
 
-export function useShiftSeatsToAngle({ lengthM, screen, seatingPositions, onSetSeatingPositions }) {
+export function useShiftSeatsToAngle({ lengthM, screen, seatingPositions, onSetSeatingPositions, screenFrontPlaneM = 0 }) {
   const findFrontRowY = useCallback((seats = []) => {
     if (!seats.length) return null;
     return Math.min(...seats.map(s => Number(s.y) || 0));
@@ -16,7 +16,7 @@ export function useShiftSeatsToAngle({ lengthM, screen, seatingPositions, onSetS
 
   const shiftSeatsToMaintainAngle = useCallback((mlpRefKey) => {
     const roomLenM = lengthM || 6.0;
-    const targetMLP_Y = targetMlpY57_5(screen, 0);
+    const targetMLP_Y = targetMlpY57_5(screen, screenFrontPlaneM);
 
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return;
 
@@ -40,7 +40,7 @@ export function useShiftSeatsToAngle({ lengthM, screen, seatingPositions, onSetS
     onSetSeatingPositions?.((prev) =>
       (prev || []).map(s => ({ ...s, y: (Number(s.y) || 0) + deltaY }))
     );
-  }, [lengthM, screen, seatingPositions, onSetSeatingPositions, findFrontRowY, findBackRowY]);
+  }, [lengthM, screen, seatingPositions, onSetSeatingPositions, screenFrontPlaneM, findFrontRowY, findBackRowY]);
 
   return { shiftSeatsToMaintainAngle };
 }

@@ -33,10 +33,8 @@ function targetDistanceFromPlaneM(visibleWidthM, targetDeg) {
 // which were used for the *old* anchoring logic inside this component, are removed.
 function targetMlpY57_5(screen, roomFrontY = 0) {
   const visibleW_m = getVisibleScreenWidthM(screen);
-  const planeDepth_m = Math.max(0, Number(screen?.floatDepthM) || 0.20);
-  const screenPlaneY = roomFrontY + planeDepth_m;
   const targetDist_m = targetDistanceFromPlaneM(visibleW_m, 57.5);
-  return screenPlaneY + targetDist_m; // THIS is the green dot Y (in meters)
+  return roomFrontY + targetDist_m; // THIS is the green dot Y (in meters)
 }
 
 
