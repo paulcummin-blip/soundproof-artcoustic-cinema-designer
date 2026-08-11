@@ -1,7 +1,7 @@
 {
   "name": "ProductPrice",
   "type": "object",
-  "description": "Canonical editable retail price for a Sound Proof commercial product. One record per SKU. Admin-only authority \u2014 Stage 2 will rewire usePriceCalculation to read from here.",
+  "description": "Canonical editable retail price for a Sound Proof commercial product. One record per SKU. All authenticated users can READ; admin-only writes. Stage 2 will rewire usePriceCalculation to read from here.",
   "properties": {
     "sku": {
       "type": "string",
@@ -39,11 +39,7 @@
     "category"
   ],
   "rls": {
-    "read": {
-      "user_condition": {
-        "role": "admin"
-      }
-    },
+    "read": {},
     "create": {
       "user_condition": {
         "role": "admin"
