@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { useAuth } from "@/lib/AuthContext";
 import { DEFAULT_TERRITORY, getTerritoryConfig } from "./territoryConfig";
-import { ABFUSER_SKU, ABFUSER_LABEL } from "@/components/utils/abfuserRecommendation";
 
 const VAT_RATE = 0.2;
 const CPH_1000D_PRICE_EX_VAT = 675;
@@ -35,7 +34,6 @@ const FIXED_RETAIL_PRICES_EX_VAT = {
   "sub3-12": 3116.67,
   "sub4-12": 5500,
   "cph-1000d": CPH_1000D_PRICE_EX_VAT,
-  [ABFUSER_SKU]: 466.67,
 };
 
 export const SOUNDBAR_PRICE_OPTIONS = {
