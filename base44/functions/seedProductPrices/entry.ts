@@ -4,15 +4,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 //   FIXED_RETAIL_PRICES_EX_VAT  (usePriceCalculation.jsx:10-38)
 //   SOUNDBAR_PRICE_OPTIONS     (usePriceCalculation.jsx:40-73)
 //   CPH_1000D_PRICE_EX_VAT     (usePriceCalculation.jsx:8)
-// Plus 4 selectable products that have no runtime price (price_ex_vat = null).
-//
-// MIGRATION-ONLY BEHAVIOUR:
-//   This seed creates missing ProductPrice records only. It NEVER updates
-//   existing records. Once a record exists (by SKU), the seed skips it
-//   entirely — so Admin-entered prices, labels, categories, and active flags
-//   are never overwritten by re-running this function.
-//   The code constants below are SEED DEFAULTS, not permanent authority.
-//   Running multiple times is idempotent: first run creates, later runs no-op.
+// Stage 1: this function is the seed source only; it does NOT rewire runtime pricing.
+// Running it multiple times is idempotent — existing SKUs are updated, missing SKUs are created.
 const SEED_DATA = [
   // ── Fixed retail prices (LCR + surrounds + architect + center + subs + amp + abfuser) ──
   { sku: "q4-3",             label: "Q4-3",                     category: "Loudspeaker",        price_ex_vat: 1516.67 },
@@ -66,12 +59,6 @@ const SEED_DATA = [
   { sku: "hspl-mono:1801-2000", label: "HSPL (Mono) — 1801–2000mm", category: "Loudspeaker", price_ex_vat: 4400 },
   { sku: "hspl-mono:2001-2200", label: "HSPL (Mono) — 2001–2200mm", category: "Loudspeaker", price_ex_vat: 6150 },
   { sku: "hspl-mono:2201-2600", label: "HSPL (Mono) — 2201–2600mm", category: "Loudspeaker", price_ex_vat: 6808.33 },
-
-  // ── Selectable products with no current runtime price (price_ex_vat = null) ──
-  { sku: "architect-mikro",   label: "MIKRO Ci",            category: "Loudspeaker", price_ex_vat: null },
-  { sku: "spitfire-cloud",    label: "SPITFIRE CLOUD",      category: "Loudspeaker", price_ex_vat: null },
-  { sku: "architect-4-2-mk2", label: "ARCHITECT 4-2 mk II", category: "Loudspeaker", price_ex_vat: null },
-  { sku: "evolve-1-1_s",      label: "EVOLVE 1-1 (Surround)", category: "Loudspeaker", price_ex_vat: null },
 ];
 
 export default async function(req) {
@@ -83,20 +70,38 @@ export default async function(req) {
 
     // Service-role: seed is an admin migration op, must bypass per-user RLS.
     const existing = await base44.asServiceRole.entities.ProductPrice.list('-created_date', 500);
-    const existingBySku = new Set();
+    const existingBySku = new Map();
     for (const rec of existing) {
-      if (rec.sku) existingBySku.add(rec.sku);
+      if (rec.sku) existingBySku.set(rec.sku, rec);
     }
 
     let created = 0;
+    let updated = 0;
     let unchanged = 0;
     const details = [];
 
     for (const seed of SEED_DATA) {
-      if (existingBySku.has(seed.sku)) {
-        // MIGRATION-ONLY: never touch existing records — Admin edits are authoritative.
-        unchanged++;
-        details.push({ sku: seed.sku, action: 'unchanged' });
+      const existingRec = existingBySku.get(seed.sku);
+      if (existingRec) {
+        const needsUpdate =
+          existingRec.label !== seed.label ||
+          existingRec.category !== seed.category ||
+          Number(existingRec.price_ex_vat) !== Number(seed.price_ex_vat) ||
+          existingRec.active !== true;
+
+        if (needsUpdate) {
+          await base44.asServiceRole.entities.ProductPrice.update(existingRec.id, {
+            label: seed.label,
+            category: seed.category,
+            price_ex_vat: seed.price_ex_vat,
+            active: true,
+          });
+          updated++;
+          details.push({ sku: seed.sku, action: 'updated' });
+        } else {
+          unchanged++;
+          details.push({ sku: seed.sku, action: 'unchanged' });
+        }
       } else {
         await base44.asServiceRole.entities.ProductPrice.create({
           sku: seed.sku,
@@ -114,7 +119,7 @@ export default async function(req) {
       status: 'ok',
       seed_count: SEED_DATA.length,
       created,
-      updated: 0,
+      updated,
       unchanged,
       total_in_db: existing.length,
       details,
