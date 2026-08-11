@@ -160,67 +160,34 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
 
   return (
     <div className="space-y-4 font-body">
-      {/* CREATE ROOM ELEMENT */}
-      <div
-        className="rounded-lg border p-3"
-        style={{
-          borderColor: '#DCDBD6',
-          background: 'rgba(27, 26, 26, 0.04)',
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold" style={{ color: '#1B1A1A', letterSpacing: 0.3 }}>
+      {/* CREATE CONTROLS — side-by-side, whole-card clickable */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* CREATE ROOM ELEMENT — warm taupe/brown */}
+        <button
+          type="button"
+          onClick={addDoor}
+          className="group flex items-center justify-between rounded-lg border p-3 text-left transition-all duration-150 border-[#C4B5A8] bg-[rgba(98,81,67,0.06)] hover:bg-[rgba(98,81,67,0.1)] hover:border-[#625143] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#625143] focus-visible:ring-offset-1 active:translate-y-[1px]"
+          aria-label="Create Room Element"
+        >
+          <span className="text-xs font-semibold" style={{ color: '#625143', letterSpacing: 0.3 }}>
             CREATE ROOM ELEMENT
-          </div>
+          </span>
+          <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" style={{ color: '#625143' }} />
+        </button>
 
-          <button
-            type="button"
-            onClick={addDoor}
-            className="inline-flex items-center justify-center rounded-md"
-            style={{
-              width: 34,
-              height: 34,
-              border: '1px solid #DCDBD6',
-              background: '#FFFFFF',
-              color: '#213428',
-            }}
-            aria-label="Add Element"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* CREATE PROJECTOR */}
-      <div
-        className="rounded-lg border p-3 mt-3"
-        style={{
-          borderColor: '#DCDBD6',
-          background: 'rgba(27, 26, 26, 0.04)',
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold" style={{ color: '#1B1A1A', letterSpacing: 0.3 }}>
+        {/* CREATE PROJECTOR — dark muted green */}
+        <button
+          type="button"
+          onClick={addProjector}
+          className="group flex items-center justify-between rounded-lg border p-3 text-left transition-all duration-150 border-[#7A9B8C] bg-[rgba(33,52,40,0.06)] hover:bg-[rgba(33,52,40,0.1)] hover:border-[#213428] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428] focus-visible:ring-offset-1 active:translate-y-[1px]"
+          aria-label="Create Projector"
+          title="Add Projector"
+        >
+          <span className="text-xs font-semibold" style={{ color: '#213428', letterSpacing: 0.3 }}>
             CREATE PROJECTOR
-          </div>
-
-          <button
-            type="button"
-            onClick={addProjector}
-            className="inline-flex items-center justify-center rounded-md"
-            style={{
-              width: 34,
-              height: 34,
-              border: '1px solid #DCDBD6',
-              background: '#FFFFFF',
-              color: '#213428',
-            }}
-            aria-label="Add Projector"
-            title="Add Projector"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
+          </span>
+          <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" style={{ color: '#213428' }} />
+        </button>
       </div>
 
       {(elements || []).map((element) => {
@@ -232,13 +199,15 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
               key={element.id}
               className="rounded-lg border p-4"
               style={{
-                borderColor: '#DCDBD6',
-                background: 'rgba(27, 26, 26, 0.04)',
+                borderColor: element?.type === 'projector' ? '#7A9B8C' : '#C4B5A8',
+                background: element?.type === 'projector' ? 'rgba(33, 52, 40, 0.05)' : 'rgba(98, 81, 67, 0.05)',
+                borderLeftWidth: 3,
+                borderLeftColor: element?.type === 'projector' ? '#213428' : '#625143',
               }}
             >
               <div className="flex justify-between items-center mb-3">
                 <div>
-                  <div className="text-sm font-medium" style={{ color: '#1B1A1A' }}>
+                  <div className="text-sm font-medium" style={{ color: element?.type === 'projector' ? '#213428' : '#625143' }}>
                     {element?.label || 'Element'}
                   </div>
                 </div>
