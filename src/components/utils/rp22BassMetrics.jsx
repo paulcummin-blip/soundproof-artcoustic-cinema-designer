@@ -213,7 +213,7 @@ export function computeParam14LfeCapability(rspResponse, designEqEnabled, band =
     value: designSpl,
     rawValue: minSpl,
     level: level >= 1 ? `L${level}` : null,
-    formatted: `${designSpl} dB`,
+    formatted: `${designSpl} dBC`,
     designEqEnabled: !!designEqEnabled,
     band,
     note: 'Post-EQ design estimate at RSP using selected subwoofer product data.',

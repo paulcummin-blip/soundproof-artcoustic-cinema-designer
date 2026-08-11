@@ -71,7 +71,7 @@ export function computeP10RspNormalisedSpread(seatUppers, rspUppers) {
     spread,
     deltaRounded,
     level,
-    formatted: `±${deltaRounded} dB`,
+    formatted: `${deltaRounded} dB`,
     rolesUsed,
     normalisedDeltas,
   };

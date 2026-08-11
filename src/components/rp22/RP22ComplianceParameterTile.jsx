@@ -115,6 +115,8 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
                             ? " Hz"
                             : param.unit === "± dB" || param.unit === "dB"
                             ? " dB"
+                            : param.unit === "dB SPL (C)"
+                            ? " dBC"
                             : param.unit === "m"
                             ? " m"
                             : ""

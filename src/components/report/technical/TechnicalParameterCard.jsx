@@ -49,6 +49,8 @@ const formatThresholdValue = (value, unit, direction) => {
       ? " Hz"
       : unit === "± dB" || unit === "dB" || unit === "dB (min)"
       ? " dB"
+      : unit === "dB SPL (C)"
+      ? " dBC"
       : unit === "m"
       ? " m"
       : "";

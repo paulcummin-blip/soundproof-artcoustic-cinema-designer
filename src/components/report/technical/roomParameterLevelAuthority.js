@@ -31,6 +31,40 @@ export function resolveParamThresholds(param, p12Mode, p13Mode, p14Mode) {
   return param.thresholds;
 }
 
+/* ---------- P12/P13 dual Minimum/Recommended level resolver ---------- */
+
+/**
+ * Resolve both Minimum and Recommended levels for P12/P13 from a single
+ * quantised design value. Returns { minimum: "L4"|…|"—", recommended: … }
+ * using the canonical threshold tables. Presentation-only — does not
+ * change which level the grid pill shows (that follows the active mode).
+ */
+const LEVEL_FROM_VALUE = (v, t) => {
+  if (!Number.isFinite(v)) return "—";
+  if (v >= t.L4) return "L4";
+  if (v >= t.L3) return "L3";
+  if (v >= t.L2) return "L2";
+  if (v >= t.L1) return "L1";
+  return "—";
+};
+
+export function resolveP12P13DualLevels(paramId, value) {
+  const pid = Number(paramId);
+  if (pid === 12) {
+    return {
+      minimum: LEVEL_FROM_VALUE(value, P12_THRESHOLDS_MINIMUM),
+      recommended: LEVEL_FROM_VALUE(value, P12_THRESHOLDS_RECOMMENDED),
+    };
+  }
+  if (pid === 13) {
+    return {
+      minimum: LEVEL_FROM_VALUE(value, P13_THRESHOLDS_MINIMUM),
+      recommended: LEVEL_FROM_VALUE(value, P13_THRESHOLDS_RECOMMENDED),
+    };
+  }
+  return null;
+}
+
 /* ---------- Level normalisation ---------- */
 
 export function normalizeRoomLevel(rawLevel) {

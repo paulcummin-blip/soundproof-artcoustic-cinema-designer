@@ -737,7 +737,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
             level: `L${level12}`,
             value: minSpl,
-            formatted: `${minSpl} dB`,
+            formatted: `${minSpl} dBC`,
             unit: p12CatalogEntry?.unit || "dB SPL (C)",
             status: "ok"
           };
@@ -820,7 +820,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
             level: `L${level13}`,
             value: minSpl,
-            formatted: `${minSpl} dB (${limitingGroup.label})`,
+            formatted: `${minSpl} dBC (${limitingGroup.label})`,
             unit: p13CatalogEntry?.unit || "dB SPL (C)",
             limitingGroup: limitingGroup.label,
             status: "ok"

@@ -6,7 +6,7 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { useAppState } from "@/components/AppStateProvider";
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { getP21PresetResult } from "@/components/utils/rp22/levels";
-import { resolveParamThresholds, resolveRoomParameterLevel } from "@/components/report/technical/roomParameterLevelAuthority";
+import { resolveParamThresholds, resolveRoomParameterLevel, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import P20SeatBlock from "@/components/room/bass/P20SeatBlock";
 import { formatAuthoritativeP20Result, p20LevelText } from "@/components/room/bass/p20SeatPresentation";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
@@ -35,6 +35,7 @@ const formatMetricFallback = (n, unit) => {
   const u = String(unit || "").trim();
   if (u === "m") return `${n.toFixed(2)}m`;
   if (u === "dB" || u === "± dB") return `${n.toFixed(1)} dB`;
+  if (u === "dB SPL (C)") return `${Math.round(n)} dBC`;
   if (u === "Hz") return `${Math.round(n)} Hz`;
   if (u === "°") return `${Math.round(n)}°`;
   if (u === "%") return `${Math.round(n)}%`;
@@ -382,10 +383,13 @@ export default function RP22ReportParameterGrid({
       ? { ...param, thresholds: resolvedThresholds }
       : param;
     const targetBasisNote =
-      param.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
-      param.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
-      param.id === 14 ? bassPresentation.parameters.p14.detail :
-      null;
+      (param.id === 12 || param.id === 13)
+        ? (() => {
+            const v = analysisResult?.gradedParameters?.primary?.[param.id]?.value;
+            const dual = resolveP12P13DualLevels(param.id, v);
+            return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
+          })()
+        : param.id === 14 ? bassPresentation.parameters.p14.detail : null;
     return (
       <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
         <RP22ComplianceParameterTile
@@ -472,10 +476,13 @@ export default function RP22ReportParameterGrid({
       ? { ...param, thresholds: resolvedThresholds }
       : param;
     const targetBasisNote =
-      param.id === 12 ? (p12Mode === "recommended" ? "Recommended" : "Minimum") :
-      param.id === 13 ? (p13Mode === "recommended" ? "Recommended" : "Minimum") :
-      param.id === 14 ? bassPresentation.parameters.p14.detail :
-      null;
+      (param.id === 12 || param.id === 13)
+        ? (() => {
+            const v = analysisResult?.gradedParameters?.primary?.[param.id]?.value;
+            const dual = resolveP12P13DualLevels(param.id, v);
+            return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
+          })()
+        : param.id === 14 ? bassPresentation.parameters.p14.detail : null;
     const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
     const seatGridData = isSeatScope ? buildSeatGridData(param.id) : null;
     const humanTitle = getHumanTitleForParam(param.id);
