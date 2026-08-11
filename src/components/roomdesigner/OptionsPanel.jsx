@@ -37,10 +37,16 @@ export default function OptionsPanel({
 
   const handleAcousticTreatmentToggle = (nextEnabled) => {
     setAcousticTreatmentEnabled(nextEnabled);
-    if (nextEnabled && !selectedAbfuserQty && recommendedAbfuserQty > 0) {
+  };
+
+  // Auto-seed selectedAbfuserQty from recommendedAbfuserQty when treatment is
+  // enabled and no quantity has been set yet. Handles both the manual toggle
+  // case and new projects that default to treatment ON.
+  React.useEffect(() => {
+    if (acousticTreatmentEnabled && !selectedAbfuserQty && recommendedAbfuserQty > 0) {
       setSelectedAbfuserQty(recommendedAbfuserQty);
     }
-  };
+  }, [acousticTreatmentEnabled, selectedAbfuserQty, recommendedAbfuserQty]);
 
   const commercialPriceData = usePriceCalculation({
     placedSpeakers,

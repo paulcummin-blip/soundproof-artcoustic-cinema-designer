@@ -107,7 +107,11 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
         onProjectUpdated && onProjectUpdated(updated);
         onOpenChange(false);
       } else {
-        const created = await Project.create({ ...payload, account_id: user?.account_id || null });
+        const created = await Project.create({
+          ...payload,
+          account_id: user?.account_id || null,
+          acoustic_treatment_enabled: true,
+        });
         setFormData(EMPTY_FORM);
         onProjectCreated && onProjectCreated(created);
         onOpenChange(false);

@@ -73,9 +73,8 @@ export function selectClientAcousticTreatment({
       rearPanels: zoneData.rearPanels,
       recommendedQty: zoneData.recommendedQty,
       treatmentSurfaceArea: zoneData.treatmentSurfaceArea,
-      leftZoneLength: zoneData.leftZone.length,
-      rightZoneLength: zoneData.rightZone.length,
-      rearZoneWidth: zoneData.rearZone.width,
+      listeningAreaWidth: zoneData.listeningAreaWidth,
+      listeningAreaDepth: zoneData.listeningAreaDepth,
     },
   };
 }

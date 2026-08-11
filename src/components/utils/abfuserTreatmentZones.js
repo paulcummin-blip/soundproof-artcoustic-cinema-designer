@@ -3,9 +3,13 @@
 // Shared utility: derives Abfuser treatment zones from actual room geometry,
 // speaker positions, and seating positions using the image-source method.
 //
-// This is a SOUND PROOF PRACTICAL GUIDANCE RULE — not an RP22 prescription.
-// RP22 establishes WHY these treatment regions matter; Sound Proof converts
-// their physical extent into a practical Artcoustic product recommendation.
+// QUANTITY AUTHORITY: Simple strategic baseline, not zone-length coverage.
+//   Base: 1 left + 1 right + 2 rear = 4 Abfusers
+//   Side escalation: +1 per side when listening area is deep (>= 2.8 m)
+//   Rear escalation: +2 rear when listening area is wide (>= 3.5 m)
+//
+// A treatment zone represents WHERE a panel can usefully be positioned,
+// not an instruction to cover the full zone continuously.
 
 export const ABFUSER_SKU = "500027";
 export const ABFUSER_LABEL = "Artcoustic Abfuser, Black";
@@ -20,6 +24,10 @@ export const ZONE_DEPTH_M = 0.12;
 const ZONE_PADDING_M = 0.20;
 // Margin outside the seating envelope for the rear zone
 const REAR_MARGIN_M = 0.20;
+
+// Listening-area escalation thresholds
+const SIDE_DEPTH_THRESHOLD_M = 2.8;  // deep listening area → 2 panels per side
+const REAR_WIDTH_THRESHOLD_M = 3.5;   // wide listening area → 4 rear panels
 
 function getFrontSpeakers(placedSpeakers) {
   if (!Array.isArray(placedSpeakers)) return [];
@@ -121,10 +129,20 @@ export function computeAbfuserTreatmentZones({ roomDims, placedSpeakers, seating
   }
   const rearWidth = Math.max(0, rearMaxX - rearMinX);
 
-  // ── Recommended quantity (zone-size based) ──
-  const leftPanels = Math.max(1, Math.ceil(leftLength / ABFUSER_PANEL_LENGTH_M));
-  const rightPanels = Math.max(1, Math.ceil(rightLength / ABFUSER_PANEL_LENGTH_M));
-  const rearPanels = Math.max(2, Math.ceil(rearWidth / ABFUSER_PANEL_LENGTH_M));
+  // ── Listening area dimensions (from actual seat envelope) ──
+  let listeningAreaWidth = 0;
+  let listeningAreaDepth = 0;
+  if (seats.length > 0) {
+    const seatXs = seats.map((s) => s.x);
+    const seatYs = seats.map((s) => s.y);
+    listeningAreaWidth = Math.max(...seatXs) - Math.min(...seatXs);
+    listeningAreaDepth = Math.max(...seatYs) - Math.min(...seatYs);
+  }
+
+  // ── Strategic quantity (simple ladder, not zone-length coverage) ──
+  const leftPanels = listeningAreaDepth >= SIDE_DEPTH_THRESHOLD_M ? 2 : 1;
+  const rightPanels = listeningAreaDepth >= SIDE_DEPTH_THRESHOLD_M ? 2 : 1;
+  const rearPanels = listeningAreaWidth >= REAR_WIDTH_THRESHOLD_M ? 4 : 2;
   const recommendedQty = leftPanels + rightPanels + rearPanels;
 
   const treatmentSurfaceArea = recommendedQty * ABFUSER_PANEL_AREA_M2;
@@ -140,6 +158,8 @@ export function computeAbfuserTreatmentZones({ roomDims, placedSpeakers, seating
     recommendedQty,
     treatmentSurfaceArea,
     panelArea: ABFUSER_PANEL_AREA_M2,
+    listeningAreaWidth,
+    listeningAreaDepth,
     usedFallback: useFallbackSide,
   };
 }
