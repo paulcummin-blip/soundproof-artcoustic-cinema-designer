@@ -34,8 +34,8 @@ export default function TechnicalParameterPage({ params, children, isFirst = fal
         display: "flex",
         flexDirection: "column",
         gap: "5mm",
-        breakInside: "avoid",
-        pageBreakInside: "avoid",
+        breakInside: "auto",
+        pageBreakInside: "auto",
       }}
     >
       {/* Category heading bar — small, does not consume excessive vertical space */}
