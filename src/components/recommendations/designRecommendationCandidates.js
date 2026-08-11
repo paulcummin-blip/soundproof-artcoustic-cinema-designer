@@ -8,7 +8,7 @@
  * authorities.
  */
 
-import { MODELS, getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
+import { MODELS, getSpeakerModelMeta, normaliseModelKey, getLcrRecommendationFamily } from "@/components/models/speakers/registry";
 import { getCommercialPrice } from "@/components/pricing/usePriceCalculation";
 import { screenRows } from "@/components/data/screenSizes";
 import { compareViewingPriority, compareViewingPriorityFine } from "@/components/utils/viewingPriorityAuthority";
@@ -159,13 +159,16 @@ export function buildDesignRecommendationCandidates({
     }
   }
 
-  // LCR selection (Stage A — price-free):
-  // - evaluate every registry-backed weaker compatible discrete LCR model as a
-  //   cost-down candidate;
-  // - evaluate every registry-backed stronger compatible discrete LCR model as
-  //   an upgrade candidate.
-  // No model is chosen by price. Each scenario still runs through the canonical
-  // SPL → RP22 → ASDR chain below and is ranked on solved performance.
+  // LCR selection (Stage A — price-free, Stage D — family-guardrailed):
+  // The designer has already chosen a product family for the front LCR.
+  // Candidates are restricted to the SAME recommendation family only:
+  //   EVOLVE       → other EVOLVE models
+  //   SPITFIRE_Q   → other Q-series models
+  //   TV_SOUNDBAR  → Multi / C4-1 / C-1 / HSPL TV-LCR options
+  //   OTHER        → existing discrete fallback
+  // Family filtering happens BEFORE performance evaluation. No model is
+  // chosen by price. Each scenario runs through the canonical SPL → RP22 →
+  // ASDR chain below and is ranked on solved performance.
   const currentLcr = safeSpeakers.filter((speaker) => LCR_ROLES.has(roleOf(speaker)));
   const currentKeys = currentLcr.map((speaker) => normaliseModelKey(speaker?.model)).filter(Boolean);
   const canCompareDiscreteLcr = currentLcr.length >= 3 && currentKeys.length === currentLcr.length;
@@ -182,9 +185,16 @@ export function buildDesignRecommendationCandidates({
 
     const currentRepresentative = getSpeakerModelMeta(currentKeys[0]);
     const currentCapability = Number(currentRepresentative?.max_spl_cont_db_1m_halfspace ?? currentRepresentative?.max_spl ?? 0);
+    const currentFamily = getLcrRecommendationFamily(currentKeys[0]);
 
-    const discreteModels = MODELS
-      .filter((model) => model?.category === "LCR" && !model?.frontStageType)
+    const familyModels = MODELS
+      .filter((model) => model?.category === "LCR")
+      .filter((model) => {
+        if (currentFamily === "TV_SOUNDBAR") return Boolean(model.frontStageType);
+        if (currentFamily === "EVOLVE") return !model.frontStageType && String(model.key).startsWith("evolve-");
+        if (currentFamily === "SPITFIRE_Q") return !model.frontStageType && /^q\d+-\d+$/.test(String(model.key));
+        return !model.frontStageType;
+      })
       .filter((model, index, array) => array.findIndex((other) => other.key === model.key) === index)
       .map((model) => ({
         model,
@@ -199,10 +209,10 @@ export function buildDesignRecommendationCandidates({
     // stronger compatible discrete models become upgrade candidates. Price is
     // not used to select or order candidates — each scenario is solved by the
     // canonical SPL → RP22 → ASDR chain and ranked on performance.
-    const weaker = discreteModels
+    const weaker = familyModels
       .filter((entry) => entry.capability < currentCapability)
       .sort((a, b) => b.capability - a.capability); // strongest weaker first
-    const stronger = discreteModels
+    const stronger = familyModels
       .filter((entry) => entry.capability > currentCapability)
       .sort((a, b) => a.capability - b.capability); // weakest stronger first
 

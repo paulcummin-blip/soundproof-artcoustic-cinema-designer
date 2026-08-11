@@ -459,6 +459,25 @@ export function getSpeakerModelMeta(modelName, orientation) {
   };
 }
 
+/**
+ * Canonical LCR recommendation-family resolver.
+ * Returns one of: "EVOLVE" | "SPITFIRE_Q" | "TV_SOUNDBAR" | "OTHER".
+ *
+ * Uses the existing registry `frontStageType` field to identify TV/soundbar
+ * products (center_only / integrated_lcr). Discrete families are resolved
+ * from the canonical model key. This is the single recommendation-family
+ * authority — do not replicate family detection in recommendation components.
+ */
+export function getLcrRecommendationFamily(modelKey) {
+  const meta = getSpeakerModelMeta(modelKey);
+  if (!meta || meta.notFound) return "OTHER";
+  if (meta.frontStageType) return "TV_SOUNDBAR";
+  const key = meta.key || normaliseModelKey(modelKey);
+  if (typeof key === "string" && key.startsWith("evolve-")) return "EVOLVE";
+  if (typeof key === "string" && /^q\d+-\d+$/.test(key)) return "SPITFIRE_Q";
+  return "OTHER";
+}
+
 // SUBWOOFER RESPONSE CURVE ACCESSOR (for engine use)
 export function hasSpeakerModel(modelName) {
         const key = normaliseModelKey(modelName);

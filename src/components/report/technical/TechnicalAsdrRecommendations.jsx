@@ -29,20 +29,17 @@ const COLORS = {
   muted: "#9B8E82",
 };
 
-function formatMoney(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
 function formatPct(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
   return `${Math.round(n)}%`;
+}
+
+function formatLevelChanges(levelChanges) {
+  if (!Array.isArray(levelChanges) || levelChanges.length === 0) return "";
+  return levelChanges
+    .map((c) => `${c.display}: ${c.beforeLevel} → ${c.afterLevel}`)
+    .join(" · ");
 }
 
 /** Shorten the channel-count caveat to its first sentence (no invented text). */
@@ -74,8 +71,11 @@ function RecommendationCard({ heading, item, mode }) {
   const isSaving = mode === "saving";
   const from = formatPct(item?.currentPercentage);
   const to = formatPct(item?.newPercentage);
-  const affected = Array.isArray(item?.affectedParameters) ? item.affectedParameters : [];
-  const affectedText = affected.length ? affected.join(" · ") : null;
+  const levelChanges = Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [];
+  const levelChangeText = formatLevelChanges(levelChanges);
+  const consequenceText = isSaving
+    ? (levelChangeText || "Profile preserved")
+    : (levelChangeText || "Profile improved");
   const viewingText = formatViewingRecommendationSummary(item);
   const powerBeforeW = Number(item?.lcrPowerBeforeW);
   const powerAfterW = Number(item?.lcrPowerAfterW);
@@ -86,29 +86,6 @@ function RecommendationCard({ heading, item, mode }) {
       ? `Amplification: ${Math.round(powerBeforeW)} → ${Math.round(powerAfterW)} W/ch`
       : null;
 
-  // Cost / saving line — unknown is never shown as £0.
-  let costLine = null;
-  if (isSaving) {
-    const saving = Number(item?.savingExVat);
-    costLine = Number.isFinite(saving) && saving > 0
-      ? `Save ${formatMoney(saving)} ex VAT`
-      : "Price not connected";
-  } else {
-    const cost = item?.costDeltaExVat;
-    if (cost == null) {
-      costLine = "Price not connected";
-    } else if (Number(cost) === 0) {
-      costLine = "Equipment: £0";
-    } else if (Number(cost) > 0) {
-      costLine = item?.amplifierUpgradeRequired
-        ? `LCR speakers: ${formatMoney(cost)} ex VAT · amplifier not priced`
-        : `Equipment: ${formatMoney(cost)} ex VAT`;
-    } else {
-      costLine = `saves ${formatMoney(Math.abs(cost))} ex VAT`;
-    }
-  }
-
-  const showP12 = isSaving && item?.kind === "lcr" && item?.p12Level;
   const caveatText = shortenCaveat(item?.caveat, item?.kind);
 
   return (
@@ -149,9 +126,9 @@ function RecommendationCard({ heading, item, mode }) {
       >
         {item.title}
       </div>
-      {costLine && (
+      {consequenceText && (
         <div style={{ fontSize: "9pt", color: COLORS.body, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
-          {costLine}
+          {consequenceText}
         </div>
       )}
       <div style={{ fontSize: "9pt", color: COLORS.body, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
@@ -160,16 +137,6 @@ function RecommendationCard({ heading, item, mode }) {
       {amplifierLine && (
         <div style={{ fontSize: "8.5pt", color: COLORS.body, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
           {amplifierLine}
-        </div>
-      )}
-      {affectedText && (
-        <div style={{ fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
-          {isSaving ? "Affected" : "Improves"}: {affectedText}
-        </div>
-      )}
-      {showP12 && (
-        <div style={{ fontSize: "8.5pt", color: COLORS.body, fontFamily: FONT_BODY, marginBottom: "1mm" }}>
-          P12 after change: {item.p12Level}
         </div>
       )}
       {viewingText && (
@@ -228,7 +195,7 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
   const bestSaving = savings[0] || null;
 
   const emptyImprovement = "No material improvement identified.";
-  const emptySaving = "No material cost-saving compromise identified.";
+  const emptySaving = "No material simplification identified.";
 
   return (
     <div style={{ marginTop: "3mm" }}>
@@ -256,9 +223,9 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
               <EmptyCard heading="Best improvement" text={emptyImprovement} />
             )}
             {bestSaving ? (
-              <RecommendationCard heading="Best cost saving" item={bestSaving} mode="saving" />
+              <RecommendationCard heading="Best simplification" item={bestSaving} mode="saving" />
             ) : (
-              <EmptyCard heading="Best cost saving" text={emptySaving} />
+              <EmptyCard heading="Best simplification" text={emptySaving} />
             )}
           </div>
         )}

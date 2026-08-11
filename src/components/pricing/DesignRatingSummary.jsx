@@ -9,16 +9,6 @@ function formatPoints(value, signed = false) {
   return `${prefix}${number.toFixed(1)} pts`;
 }
 
-function formatMoney(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return null;
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    maximumFractionDigits: 0,
-  }).format(number);
-}
-
 function formatLevelChanges(levelChanges) {
   if (!Array.isArray(levelChanges) || levelChanges.length === 0) return '';
   return levelChanges
@@ -32,10 +22,6 @@ function RecommendationRow({ item, mode }) {
   const isSaving = mode === 'saving';
   const levelChanges = Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [];
   const levelChangeText = formatLevelChanges(levelChanges);
-  const saving = formatMoney(item?.savingExVat);
-  const cost = formatMoney(item?.costDeltaExVat);
-  const showP12 = isSaving && item?.kind === 'lcr' && item?.p12Level;
-  const p12Warning = item?.p12Level === 'L1' && ['L2', 'L3', 'L4'].includes(item?.p12BaselineLevel);
   const viewingText = formatViewingRecommendationSummary(item);
   const powerBeforeW = Number(item?.lcrPowerBeforeW);
   const powerAfterW = Number(item?.lcrPowerAfterW);
@@ -46,24 +32,9 @@ function RecommendationRow({ item, mode }) {
       ? `Amplification: ${Math.round(powerBeforeW)} → ${Math.round(powerAfterW)} W/ch`
       : null;
 
-  let valueText;
-  if (isSaving) {
-    const preservation = levelChangeText || 'Profile preserved';
-    valueText = saving
-      ? `Save ${saving} ex VAT · ${preservation}`
-      : preservation;
-  } else if (item?.costDeltaExVat === 0) {
-    valueText = levelChangeText || 'Profile improved';
-  } else if (Number(item?.costDeltaExVat) < 0) {
-    valueText = `${levelChangeText ? levelChangeText + ' · ' : ''}saves ${formatMoney(Math.abs(item.costDeltaExVat))} ex VAT`;
-  } else if (cost) {
-    const priceScope = item?.amplifierUpgradeRequired
-      ? ' (LCR speakers; amplifier not priced)'
-      : '';
-    valueText = `${levelChangeText ? levelChangeText + ' · ' : ''}${cost} ex VAT${priceScope}`;
-  } else {
-    valueText = levelChangeText || 'Profile improved';
-  }
+  const valueText = isSaving
+    ? (levelChangeText || 'Profile preserved')
+    : (levelChangeText || 'Profile improved');
 
   return (
     <div style={{ padding: '9px 0', borderTop: '1px solid #ECEAE6' }}>
@@ -99,14 +70,6 @@ function RecommendationRow({ item, mode }) {
       <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
         {item.disruption} disruption · {item.confidence} confidence
       </div>
-      {showP12 && (
-        <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#3E4349' }}>
-          P12 after change: {item.p12Level}
-          {p12Warning && (
-            <span style={{ color: '#9a6800' }}> · Leaves limited screen-channel dynamic-range capability.</span>
-          )}
-        </div>
-      )}
       {item.caveat && (
         <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B', fontStyle: 'italic' }}>
           {item.caveat}
@@ -197,10 +160,10 @@ export default function DesignRatingSummary({
                 emptyText="No material improvement identified."
               />
               <RecommendationGroup
-                title="REDUCE PROJECT COST"
+                title="SIMPLIFY THE DESIGN"
                 items={savings}
                 mode="saving"
-                emptyText="No material cost-saving compromise identified."
+                emptyText="No material simplification identified."
               />
               <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6', fontSize: 8.5, lineHeight: 1.4, color: '#8A867D' }}>
                 Bass is held at the current verified result. Subwoofer alternatives will be added only when scenario re-runs are connected and trusted.
