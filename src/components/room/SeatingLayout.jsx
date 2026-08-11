@@ -13,6 +13,7 @@ import ViewingAnglePanel from './ViewingAnglePanel';
 import ViewingPriorityControl from './ViewingPriorityControl';
 import { useAppState } from '@/components/AppStateProvider';
 import { cancelMlpGrab } from '@/components/state/mlpGrabStore';
+import { normaliseSeatCount, stepSeatCount } from './seatCount';
 
 // Single source of truth for target MLP Y computation - now using WIDTH for horizontal FOV
 const RAD = Math.PI / 180;
@@ -120,7 +121,18 @@ export default function SeatingLayout({
   // Use this everywhere instead of seatingRows for how many rows we have
   const rowCount = rowsArray.length;
 
+  const commitSeatCount = useCallback((rowIndex, rawCount) => {
+    if (disabled) return;
+    const next = [...rowsArray];
+    next[rowIndex] = normaliseSeatCount(rawCount);
 
+    onGenerateSeating?.({
+      seatsPerRowByRow: next,
+      numberOfRows: next.length,
+      seatSpacing,
+      rowSpacingM,
+    });
+  }, [disabled, rowsArray, onGenerateSeating, seatSpacing, rowSpacingM]);
 
   const totalSeats = seatingPositions.length;
 
@@ -440,33 +452,50 @@ export default function SeatingLayout({
                 Row {idx + 1}
               </div>
 
-              {/* Seats in this row */}
-              <Input
-                  type="number"
-                  min="1"
-                  step="1"
+              {/* Seats in this row — explicit controls avoid browser-native spinner double stepping. */}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Remove one seat from row ${idx + 1}`}
+                  disabled={disabled || count <= 1}
+                  className="h-10 w-10 shrink-0"
+                  onClick={() => commitSeatCount(idx, stepSeatCount(count, -1))}>
+                  –
+                </Button>
+
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  aria-label={`Seats in row ${idx + 1}`}
                   value={count}
                   disabled={disabled}
-                  className="h-10 w-28"
+                  className="h-10 w-20 text-center"
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #C1B6AD',
                     color: '#1B1A1A'
                   }}
-                  onChange={(e) => {
-                    if (disabled) return;
+                  onKeyDown={(e) => {
+                    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+                    e.preventDefault();
+                    commitSeatCount(idx, stepSeatCount(count, e.key === 'ArrowUp' ? 1 : -1));
+                  }}
+                  onChange={(e) => commitSeatCount(idx, e.target.value)} />
 
-                    const n = Math.max(1, parseInt(e.target.value || '1', 10));
-                    const next = [...rowsArray];
-                    next[idx] = n;
-
-                    onGenerateSeating?.({
-                      seatsPerRowByRow: next,
-                      numberOfRows: next.length,
-                      seatSpacing,
-                      rowSpacingM
-                    });
-                  }} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Add one seat to row ${idx + 1}`}
+                  disabled={disabled}
+                  className="h-10 w-10 shrink-0"
+                  onClick={() => commitSeatCount(idx, stepSeatCount(count, 1))}>
+                  +
+                </Button>
+              </div>
 
 
               {/* Remove this row */}
