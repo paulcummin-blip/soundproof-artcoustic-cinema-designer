@@ -11,6 +11,7 @@ import { useOptionalSharedBassResults } from "@/components/room/bass/bassResults
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
+import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 
 /* ---------- Helpers */
 
@@ -217,21 +218,6 @@ const getMetricDebugText = (paramId, metric) => {
 
 /* ---------- Canonical RP22 Parameters (FULL, with scope) ---------- */
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
-
-/* ---------- P12/P13 mode-aware threshold constants ---------- */
-const P12_THRESHOLDS_MINIMUM     = { direction: ">=", L1: 99,  L2: 102, L3: 105, L4: 108 };
-const P12_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 102, L2: 105, L3: 108, L4: 111 };
-const P13_THRESHOLDS_MINIMUM     = { direction: ">=", L1: 96,  L2: 99,  L3: 102, L4: 105 };
-const P13_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 99,  L2: 102, L3: 105, L4: 108 };
-const P14_THRESHOLDS_MINIMUM     = { direction: ">=", L1: 109, L2: 112, L3: 115, L4: 118 };
-const P14_THRESHOLDS_RECOMMENDED = { direction: ">=", L1: 114, L2: 117, L3: 120, L4: 123 };
-
-function resolveParamThresholds(param, p12Mode, p13Mode, p14Mode) {
-  if (param.id === 12) return p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM;
-  if (param.id === 13) return p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM;
-  if (param.id === 14) return p14Mode === "recommended" ? P14_THRESHOLDS_RECOMMENDED : P14_THRESHOLDS_MINIMUM;
-  return param.thresholds;
-}
 
 /* ---------- Panel ---------- */
 
@@ -512,6 +498,7 @@ export default function RP22CompliancePanel({
 
     if (u === "m") return `${n.toFixed(2)}m`;
     if (u === "dB" || u === "± dB") return `${n.toFixed(1)} dB`;
+    if (u === "dB SPL (C)") return `${Math.round(n)} dBC`;
     if (u === "Hz") return `${Math.round(n)} Hz`;
     if (u === "°") return `${Math.round(n)}°`;
     if (u === "%") return `${Math.round(n)}%`;
@@ -558,11 +545,9 @@ export default function RP22CompliancePanel({
     if (isRoomScope) {
       const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
 
-      // P12/P13: re-grade from raw value using the user-selected mode thresholds
+      // P12/P13: re-grade from raw value using the canonical mode-aware thresholds
       if ((pid === 12 || pid === 13) && res && res.status !== "no_data" && Number.isFinite(res.value)) {
-        const thresholds = pid === 12
-          ? (p12Mode === "recommended" ? P12_THRESHOLDS_RECOMMENDED : P12_THRESHOLDS_MINIMUM)
-          : (p13Mode === "recommended" ? P13_THRESHOLDS_RECOMMENDED : P13_THRESHOLDS_MINIMUM);
+        const thresholds = resolveParamThresholds({ id: pid }, p12Mode, p13Mode, p14Mode);
         const v = res.value;
         if (v >= thresholds.L4) return "L4";
         if (v >= thresholds.L3) return "L3";
@@ -662,9 +647,9 @@ export default function RP22CompliancePanel({
           return unit ? `${Math.round(v)} ${unit}` : String(Math.round(v));
         }
 
-        // P14: display ceil'd achieved SPL (e.g. 111.4 → "112 dB"). Display only.
+        // P14: display ceil'd achieved SPL (e.g. 111.4 → "112 dBC"). Display only.
         if (pid === 14 && typeof v === "number" && Number.isFinite(v)) {
-          return `${Math.ceil(v)} dB`;
+          return `${Math.ceil(v)} dBC`;
         }
 
         if (res.formatted) return res.formatted;
@@ -673,7 +658,8 @@ export default function RP22CompliancePanel({
           if (typeof v === "number" && Number.isFinite(v)) {
             const paramDef = RP22_PARAMS.find(p => p.id === pid);
             const unit = paramDef?.unit || "";
-            return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
+            const unitStr = unit === "dB SPL (C)" ? "dBC" : unit;
+            return unit ? `${v.toFixed(1)} ${unitStr}` : v.toFixed(1);
           }
           return String(v);
         }
@@ -785,9 +771,13 @@ export default function RP22CompliancePanel({
             ? { ...p, thresholds: resolveParamThresholds(p, p12Mode, p13Mode, p14Mode) }
             : p;
           const targetBasisNote =
-            p.id === 12 ? `Target basis: ${p12Mode === "recommended" ? "Recommended" : "Minimum"}` :
-            p.id === 13 ? `Target basis: ${p13Mode === "recommended" ? "Recommended" : "Minimum"}` :
-            p.id === 14 ? bassPresentation.parameters.p14.detail :
+            (p.id === 12 || p.id === 13)
+              ? (() => {
+                  const v = analysisResult?.gradedParameters?.primary?.[p.id]?.value;
+                  const dual = resolveP12P13DualLevels(p.id, v);
+                  return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
+                })()
+              : p.id === 14 ? bassPresentation.parameters.p14.detail :
             p.id === 18 ? "Official room result from the completed authoritative bass analysis." :
             p.id === 19 ? "Official RSP-versus-target result from the completed authoritative bass analysis." :
             null;
@@ -927,6 +917,8 @@ export default function RP22CompliancePanel({
                                     ? " Hz"
                                     : resolvedParam.unit === "± dB" || resolvedParam.unit === "dB"
                                     ? " dB"
+                                    : resolvedParam.unit === "dB SPL (C)"
+                                    ? " dBC"
                                     : resolvedParam.unit === "m"
                                     ? " m"
                                     : ""

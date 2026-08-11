@@ -211,7 +211,8 @@ export default function RP22ReportParameterGrid({
           if (typeof v === "number" && Number.isFinite(v)) {
             const paramDef = RP22_PARAMS.find(p => p.id === pid);
             const unit = paramDef?.unit || "";
-            return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
+            const unitStr = unit === "dB SPL (C)" ? "dBC" : unit;
+            return unit ? `${v.toFixed(1)} ${unitStr}` : v.toFixed(1);
           }
           return String(v);
         }
