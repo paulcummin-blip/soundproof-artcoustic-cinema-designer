@@ -882,10 +882,11 @@ function RoomDesignerWithState() {
         showPrices,
         baseTotal: priceData.baseTotal,
         finalTotal: priceData.finalTotal,
-        difficultyMultiplier
+        difficultyMultiplier,
+        incompletePriceCount: priceData.incompletePriceCount || 0,
       };
     }
-  }, [showPrices, priceData.baseTotal, priceData.finalTotal, difficultyMultiplier]);
+  }, [showPrices, priceData.baseTotal, priceData.finalTotal, difficultyMultiplier, priceData.incompletePriceCount]);
 
 
 

@@ -53,6 +53,7 @@ export default function Layout({ children, currentPageName }) {
     territoryCode: 'UK',
     currency: 'GBP',
     priceListAvailable: true,
+    incompletePriceCount: 0,
   });
 
   // ASDR visibility (shared between app and report) + rating data from RoomDesigner
@@ -292,6 +293,7 @@ export default function Layout({ children, currentPageName }) {
                   territoryCode={priceSummary.territoryCode}
                   currency={priceSummary.currency}
                   priceListAvailable={priceSummary.priceListAvailable}
+                  incompletePriceCount={priceSummary.incompletePriceCount}
                 />
               </div>
             )}

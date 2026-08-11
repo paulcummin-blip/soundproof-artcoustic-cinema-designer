@@ -3,74 +3,9 @@ import { useMemo } from 'react';
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { useAuth } from "@/lib/AuthContext";
 import { DEFAULT_TERRITORY, getTerritoryConfig } from "./territoryConfig";
+import { useProductPriceMap } from "./useProductPriceMap";
 
 const VAT_RATE = 0.2;
-const CPH_1000D_PRICE_EX_VAT = 675;
-
-const FIXED_RETAIL_PRICES_EX_VAT = {
-  "q4-3": 1516.67,
-  "q4-3_s": 1516.67,
-  "q6-3": 1741.67,
-  "q6-3_s": 1741.67,
-  "q4-5": 3258.33,
-  "q4-5_s": 3258.33,
-  "q8-5": 4775,
-  "q8-5_s": 4775,
-  "evolve-2-1": 650,
-  "evolve-2-1_s": 650,
-  "evolve-3-1": 975,
-  "evolve-3-1_s": 975,
-  "evolve-4-2": 1483.33,
-  "evolve-4-2_s": 1483.33,
-  "evolve-6-3": 1875,
-  "evolve-6-3_s": 1875,
-  "evolve-8-4": 2266.67,
-  "evolve-8-4_s": 2266.67,
-  "architect-2-1": 616.67,
-  "architect-4-2": 1025,
-  "architect-pas2-2": 1000,
-  "c-1": 766.67,
-  "sub2-12": 1825,
-  "sub3-12": 3116.67,
-  "sub4-12": 5500,
-  "cph-1000d": CPH_1000D_PRICE_EX_VAT,
-  "500027": 466.67,
-};
-
-export const SOUNDBAR_PRICE_OPTIONS = {
-  "c4-1": [
-    { value: "1222", label: "1222mm", priceExVat: 1616.67 },
-    { value: "1449", label: "1449mm", priceExVat: 1733.33 },
-    { value: "1672", label: "1672mm", priceExVat: 1825 },
-    { value: "1904", label: "1904mm", priceExVat: 1991.67 },
-  ],
-  "multi-lcr": [
-    { value: "1222-m", label: "1222 M", priceExVat: 2383.33 },
-    { value: "1441-l", label: "1441 L", priceExVat: 2650 },
-    { value: "1711-xl", label: "1711 XL", priceExVat: 2866.67 },
-    { value: "1842-xxl", label: "1842 XXL", priceExVat: 3366.67 },
-    { value: "2230-xxxl", label: "2230 XXXL", priceExVat: 4641.67 },
-  ],
-  "multi-mono": [
-    { value: "1222-m", label: "1222 M", priceExVat: 2383.33 },
-    { value: "1441-l", label: "1441 L", priceExVat: 2650 },
-    { value: "1711-xl", label: "1711 XL", priceExVat: 2866.67 },
-    { value: "1842-xxl", label: "1842 XXL", priceExVat: 3366.67 },
-    { value: "2230-xxxl", label: "2230 XXXL", priceExVat: 4641.67 },
-  ],
-  "hspl-lcr": [
-    { value: "1669-1800", label: "1669–1800mm", priceExVat: 4141.67 },
-    { value: "1801-2000", label: "1801–2000mm", priceExVat: 4400 },
-    { value: "2001-2200", label: "2001–2200mm", priceExVat: 6150 },
-    { value: "2201-2600", label: "2201–2600mm", priceExVat: 6808.33 },
-  ],
-  "hspl-mono": [
-    { value: "1669-1800", label: "1669–1800mm", priceExVat: 4141.67 },
-    { value: "1801-2000", label: "1801–2000mm", priceExVat: 4400 },
-    { value: "2001-2200", label: "2001–2200mm", priceExVat: 6150 },
-    { value: "2201-2600", label: "2201–2600mm", priceExVat: 6808.33 },
-  ],
-};
 
 function displayAmount(exVatAmount, priceMode) {
   const safe = Number(exVatAmount) || 0;
@@ -85,40 +20,61 @@ function getModelLabel(modelKey) {
   return meta?.notFound ? String(modelKey) : (meta?.label || String(modelKey));
 }
 
-export function getCommercialPrice(modelKey, soundbarSelections = {}) {
+export function getCommercialPrice(modelKey, soundbarSelections = {}, priceMap = null, soundbarOptions = null) {
   const key = normaliseModelKey(modelKey);
-  const soundbarOptions = SOUNDBAR_PRICE_OPTIONS[key];
+  const options = (soundbarOptions || {})[key];
 
-  if (soundbarOptions) {
-    const selectedValue = soundbarSelections[key] || soundbarOptions[0]?.value;
-    const selectedOption = soundbarOptions.find((option) => option.value === selectedValue) || soundbarOptions[0];
+  if (options) {
+    const selectedValue = soundbarSelections[key] || options[0]?.value;
+    const selectedOption = options.find((option) => option.value === selectedValue) || options[0];
+    const priceExVat = selectedOption?.priceExVat;
+    const hasPrice = priceExVat !== null && priceExVat !== undefined;
     return {
       key,
-      priceExVat: Number(selectedOption?.priceExVat) || 0,
+      priceExVat: hasPrice ? Number(priceExVat) : null,
       sizeLabel: selectedOption?.label || '',
       sizeValue: selectedOption?.value || '',
       isSoundbar: true,
-      note: selectedOption ? '' : 'price not set',
+      note: selectedOption && hasPrice ? '' : 'price not set',
     };
   }
 
-  if (Object.prototype.hasOwnProperty.call(FIXED_RETAIL_PRICES_EX_VAT, key)) {
-    return { key, priceExVat: Number(FIXED_RETAIL_PRICES_EX_VAT[key]) || 0, sizeLabel: '', sizeValue: '', isSoundbar: false, note: '' };
+  if (priceMap && priceMap.has(key)) {
+    const rec = priceMap.get(key);
+    if (rec.active === false) {
+      return { key, priceExVat: null, sizeLabel: '', sizeValue: '', isSoundbar: false, note: 'inactive' };
+    }
+    const priceExVat = rec.price_ex_vat;
+    const hasPrice = priceExVat !== null && priceExVat !== undefined;
+    return {
+      key,
+      priceExVat: hasPrice ? Number(priceExVat) : null,
+      sizeLabel: '',
+      sizeValue: '',
+      isSoundbar: false,
+      note: hasPrice ? '' : 'price not set',
+    };
   }
 
-  return { key, priceExVat: 0, sizeLabel: '', sizeValue: '', isSoundbar: false, note: 'price not set' };
+  return { key, priceExVat: null, sizeLabel: '', sizeValue: '', isSoundbar: false, note: 'price not set' };
 }
 
 const ABFUSER_LABEL = "Artcoustic Abfuser, Black";
 
-function addAbfuserLine(linesByKey, qty) {
+function addAbfuserLine(linesByKey, qty, priceMap) {
   if (!qty || qty <= 0) return;
-  const priceExVat = Number(FIXED_RETAIL_PRICES_EX_VAT["500027"]) || 0;
+  const rec = priceMap?.get("500027");
+  const priceExVat = rec && rec.price_ex_vat !== null && rec.price_ex_vat !== undefined ? Number(rec.price_ex_vat) : null;
+  const hasPrice = priceExVat !== null;
   const existing = linesByKey.get("500027");
   if (existing) {
     existing.count = qty;
     existing.qty = qty;
-    existing.subtotalExVat = priceExVat * qty;
+    existing.subtotalExVat = hasPrice ? priceExVat * qty : null;
+    existing.subtotal = existing.subtotalExVat;
+    existing.price = priceExVat;
+    existing.unitPriceExVat = priceExVat;
+    existing.note = hasPrice ? "" : "price not set";
     return;
   }
   linesByKey.set("500027", {
@@ -128,10 +84,10 @@ function addAbfuserLine(linesByKey, qty) {
     unitPriceExVat: priceExVat,
     count: qty,
     qty,
-    subtotal: priceExVat * qty,
-    subtotalExVat: priceExVat * qty,
+    subtotal: hasPrice ? priceExVat * qty : null,
+    subtotalExVat: hasPrice ? priceExVat * qty : null,
     rolesList: ["Acoustic treatment"],
-    note: "",
+    note: hasPrice ? "" : "price not set",
     isSoundbar: false,
     sizeValue: "",
     sizeLabel: "",
@@ -139,18 +95,22 @@ function addAbfuserLine(linesByKey, qty) {
   });
 }
 
-function addProductLine(linesByKey, modelKey, qty, roles, soundbarSelections) {
+function addProductLine(linesByKey, modelKey, qty, roles, soundbarSelections, priceMap, soundbarOptions) {
   if (!modelKey || modelKey === 'off' || modelKey === 'OFF') return;
 
-  const resolved = getCommercialPrice(modelKey, soundbarSelections);
+  const resolved = getCommercialPrice(modelKey, soundbarSelections, priceMap, soundbarOptions);
   const lineKey = resolved.isSoundbar ? `${resolved.key}:${resolved.sizeValue}` : resolved.key;
   const existing = linesByKey.get(lineKey);
+  const hasPrice = resolved.priceExVat !== null && resolved.priceExVat !== undefined;
 
   if (existing) {
     existing.count += qty;
     existing.qty = existing.count;
     existing.rolesList.push(...roles);
-    existing.subtotalExVat = existing.unitPriceExVat * existing.count;
+    existing.subtotalExVat = hasPrice && existing.unitPriceExVat !== null
+      ? existing.unitPriceExVat * existing.count
+      : null;
+    existing.subtotal = existing.subtotalExVat;
     return;
   }
 
@@ -164,8 +124,8 @@ function addProductLine(linesByKey, modelKey, qty, roles, soundbarSelections) {
     unitPriceExVat: resolved.priceExVat,
     count: qty,
     qty,
-    subtotal: resolved.priceExVat * qty,
-    subtotalExVat: resolved.priceExVat * qty,
+    subtotal: hasPrice ? resolved.priceExVat * qty : null,
+    subtotalExVat: hasPrice ? resolved.priceExVat * qty : null,
     rolesList: [...roles],
     note: resolved.note,
     isSoundbar: resolved.isSoundbar,
@@ -189,6 +149,7 @@ export function usePriceCalculation({
   const territory = user?.territory || DEFAULT_TERRITORY;
   const territoryConfig = getTerritoryConfig(territory);
   const priceListAvailable = !!territoryConfig?.priceListAvailable;
+  const { priceMap, soundbarOptions, loading: priceMapLoading } = useProductPriceMap();
 
   return useMemo(() => {
     const mode = priceMode === 'exVat' ? 'exVat' : 'incVat';
@@ -199,27 +160,27 @@ export function usePriceCalculation({
       if (!spk?.model || spk.model === 'off') continue;
       const role = String(spk.role || '').toUpperCase();
       if (role === 'LFE') continue;
-      addProductLine(linesByKey, String(spk.model), 1, [role], soundbarSelections);
+      addProductLine(linesByKey, String(spk.model), 1, [role], soundbarSelections, priceMap, soundbarOptions);
     }
 
     if (frontSubsCfg?.model && Number(frontSubsCfg?.count) > 0) {
       const count = Number(frontSubsCfg.count) || 0;
       subwooferCount += count;
-      addProductLine(linesByKey, frontSubsCfg.model, count, ['SUB (Front)'], soundbarSelections);
+      addProductLine(linesByKey, frontSubsCfg.model, count, ['SUB (Front)'], soundbarSelections, priceMap, soundbarOptions);
     }
 
     if (rearSubsCfg?.model && Number(rearSubsCfg?.count) > 0) {
       const count = Number(rearSubsCfg.count) || 0;
       subwooferCount += count;
-      addProductLine(linesByKey, rearSubsCfg.model, count, ['SUB (Rear)'], soundbarSelections);
+      addProductLine(linesByKey, rearSubsCfg.model, count, ['SUB (Rear)'], soundbarSelections, priceMap, soundbarOptions);
     }
 
     if (subwooferCount > 0) {
-      addProductLine(linesByKey, 'cph-1000d', subwooferCount, ['Subwoofer amp'], soundbarSelections);
+      addProductLine(linesByKey, 'cph-1000d', subwooferCount, ['Subwoofer amp'], soundbarSelections, priceMap, soundbarOptions);
     }
 
     if (acousticTreatmentEnabled && Number(selectedAbfuserQty) > 0) {
-      addAbfuserLine(linesByKey, Number(selectedAbfuserQty));
+      addAbfuserLine(linesByKey, Number(selectedAbfuserQty), priceMap);
     }
 
     // Territory without a connected price list: return product structure with
@@ -250,16 +211,22 @@ export function usePriceCalculation({
         finalTotalExVat: null,
         finalTotalIncVat: null,
         priceMode: mode,
+        incompletePriceCount: 0,
+        soundbarOptions: null,
+        priceMapLoading,
       };
     }
 
-    const productBreakdown = Array.from(linesByKey.values()).map((line) => ({
-      ...line,
-      roles: line.rolesList.join(', '),
-      subtotal: line.subtotalExVat,
-      displayUnitPrice: displayAmount(line.unitPriceExVat, mode),
-      displaySubtotal: displayAmount(line.subtotalExVat, mode),
-    }));
+    const productBreakdown = Array.from(linesByKey.values()).map((line) => {
+      const hasPrice = line.unitPriceExVat !== null && line.unitPriceExVat !== undefined;
+      return {
+        ...line,
+        roles: line.rolesList.join(', '),
+        subtotal: line.subtotalExVat,
+        displayUnitPrice: hasPrice ? displayAmount(line.unitPriceExVat, mode) : null,
+        displaySubtotal: hasPrice ? displayAmount(line.subtotalExVat, mode) : null,
+      };
+    });
 
     const manualBreakdown = (Array.isArray(manualExtras) ? manualExtras : [])
       .map((item) => {
@@ -288,7 +255,13 @@ export function usePriceCalculation({
       .filter(Boolean);
 
     const breakdown = [...productBreakdown, ...manualBreakdown];
-    const baseTotalExVat = breakdown.reduce((sum, line) => sum + (Number(line.subtotalExVat) || 0), 0);
+    const incompletePriceCount = productBreakdown.filter(
+      (line) => line.unitPriceExVat === null || line.unitPriceExVat === undefined
+    ).length;
+    const baseTotalExVat = breakdown.reduce((sum, line) => {
+      if (line.subtotalExVat === null || line.subtotalExVat === undefined) return sum;
+      return sum + (Number(line.subtotalExVat) || 0);
+    }, 0);
     const multiplier = Number.isFinite(difficultyMultiplier) && difficultyMultiplier > 0 ? difficultyMultiplier : 1.0;
     const finalTotalExVat = baseTotalExVat * multiplier;
     const vatAmount = finalTotalExVat * VAT_RATE;
@@ -311,6 +284,9 @@ export function usePriceCalculation({
       finalTotalIncVat,
       displayTotal,
       priceMode: mode,
+      incompletePriceCount,
+      soundbarOptions,
+      priceMapLoading,
     };
-  }, [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections, priceListAvailable, territory, acousticTreatmentEnabled, selectedAbfuserQty]);
+  }, [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections, priceListAvailable, territory, acousticTreatmentEnabled, selectedAbfuserQty, priceMap, soundbarOptions, priceMapLoading]);
 }

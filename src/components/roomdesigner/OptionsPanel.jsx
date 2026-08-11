@@ -1,7 +1,7 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { SOUNDBAR_PRICE_OPTIONS, usePriceCalculation } from "@/components/pricing/usePriceCalculation";
+import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value || 0));
@@ -72,6 +72,7 @@ export default function OptionsPanel({
       territoryLabel: activePriceData.territoryLabel,
       territoryCode: activePriceData.territoryCode,
       currency: activePriceData.currency,
+      incompletePriceCount: activePriceData.incompletePriceCount || 0,
     };
   }, [
     showPrices,
@@ -84,6 +85,7 @@ export default function OptionsPanel({
     activePriceData?.territoryLabel,
     activePriceData?.territoryCode,
     activePriceData?.currency,
+    activePriceData?.incompletePriceCount,
     priceMode,
   ]);
 
@@ -192,7 +194,7 @@ export default function OptionsPanel({
                 <div className="px-2 py-3 text-xs text-gray-500">No priced products selected.</div>
               ) : (
                 (activePriceData.breakdown || []).map((line, index) => {
-                  const soundbarOptions = SOUNDBAR_PRICE_OPTIONS[line.model] || null;
+                  const soundbarOptions = (activePriceData?.soundbarOptions || {})[line.model] || null;
                   return (
                     <div key={`${line.model}-${line.sizeValue || 'fixed'}-${index}`} className="grid grid-cols-[1fr_42px_76px_82px] gap-2 px-2 py-2 border-t border-[#EEEDEA] text-xs items-start">
                       <div className="min-w-0">
@@ -211,8 +213,8 @@ export default function OptionsPanel({
                         {line.note && <div className="text-[11px] text-amber-700 mt-1">{line.note}</div>}
                       </div>
                       <div>{line.qty ?? line.count}</div>
-                      <div>{priceListAvailable ? formatPrice(line.displayUnitPrice ?? line.price) : '—'}</div>
-                      <div className="font-medium">{priceListAvailable ? formatPrice(line.displaySubtotal ?? line.subtotal) : '—'}</div>
+                      <div>{priceListAvailable ? (line.displayUnitPrice != null ? formatPrice(line.displayUnitPrice) : '—') : '—'}</div>
+                      <div className="font-medium">{priceListAvailable ? (line.displaySubtotal != null ? formatPrice(line.displaySubtotal) : '—') : '—'}</div>
                     </div>
                   );
                 })

@@ -17,6 +17,7 @@ export default function PriceSummary({
   territoryCode = 'UK',
   currency = 'GBP',
   priceListAvailable = true,
+  incompletePriceCount = 0,
 }) {
   // Don't render anything when prices are hidden
   if (!showPrices) {
@@ -47,11 +48,16 @@ export default function PriceSummary({
       {priceListAvailable ? (
         <>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8 }}>
-            System Price, {priceMode === "exVat" ? "ex VAT" : "inc VAT"}
+            {incompletePriceCount > 0 ? 'System Price incomplete' : 'System Price'}, {priceMode === "exVat" ? "ex VAT" : "inc VAT"}
           </div>
           <div style={{ fontSize: 18, fontWeight: 700, color: '#213428' }}>
             {formatPrice(finalTotal)}
           </div>
+          {incompletePriceCount > 0 && (
+            <div style={{ fontSize: 11, color: '#B8860B', marginTop: 4, fontWeight: 500 }}>
+              {incompletePriceCount} product{incompletePriceCount > 1 ? 's' : ''} requires a price
+            </div>
+          )}
         </>
       ) : (
         <>

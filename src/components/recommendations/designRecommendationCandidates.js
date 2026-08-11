@@ -84,15 +84,16 @@ function cloneSeatWithDelta(seat, deltaY) {
   };
 }
 
-function priceForModel(model, soundbarSelections) {
-  const result = getCommercialPrice(model, soundbarSelections);
-  return result?.note ? null : Number(result?.priceExVat);
+function priceForModel(model, soundbarSelections, priceMap, soundbarOptions) {
+  const result = getCommercialPrice(model, soundbarSelections, priceMap, soundbarOptions);
+  if (!result || result.note || result.priceExVat === null || result.priceExVat === undefined) return null;
+  return Number(result.priceExVat);
 }
 
-function removedSpeakerSaving(speakers, soundbarSelections) {
+function removedSpeakerSaving(speakers, soundbarSelections, priceMap, soundbarOptions) {
   let total = 0;
   for (const speaker of speakers) {
-    const price = priceForModel(speaker?.model, soundbarSelections);
+    const price = priceForModel(speaker?.model, soundbarSelections, priceMap, soundbarOptions);
     if (!finite(price)) return null;
     total += Number(price);
   }
@@ -126,6 +127,8 @@ export function buildDesignRecommendationCandidates({
   allowUkPricing = true,
   lcrPowerW = 100,
   appState = null,
+  priceMap = null,
+  soundbarOptions = null,
 }) {
   const candidates = [];
   const safeSeats = Array.isArray(seats) ? seats : [];
@@ -206,7 +209,7 @@ export function buildDesignRecommendationCandidates({
   if (canCompareDiscreteLcr) {
     const currentCost = allowUkPricing
       ? currentLcr.reduce((sum, speaker) => {
-          const price = priceForModel(speaker.model, soundbarSelections);
+          const price = priceForModel(speaker.model, soundbarSelections, priceMap, soundbarOptions);
           return sum == null || !finite(price) ? null : sum + Number(price);
         }, 0)
       : null;
@@ -229,7 +232,7 @@ export function buildDesignRecommendationCandidates({
       .filter((model, index, array) => array.findIndex((other) => other.key === model.key) === index)
       .map((model) => ({
         model,
-        price: allowUkPricing ? priceForModel(model.key, soundbarSelections) : null,
+        price: allowUkPricing ? priceForModel(model.key, soundbarSelections, priceMap, soundbarOptions) : null,
         capability: Number(model.max_spl_cont_db_1m_halfspace ?? model.max_spl ?? 0),
         maxPowerW: finite(model.max_power) ? Number(model.max_power) : null,
       }))
@@ -392,7 +395,7 @@ export function buildDesignRecommendationCandidates({
       const removed = safeSpeakers.filter((speaker) => WIDE_ROLES.has(roleOf(speaker)));
       if (removed.length) {
         const nextLayout = `7.${layout.subs}.${layout.uppers}`;
-        const saving = allowUkPricing ? removedSpeakerSaving(removed, soundbarSelections) : null;
+        const saving = allowUkPricing ? removedSpeakerSaving(removed, soundbarSelections, priceMap, soundbarOptions) : null;
         pushCandidate(candidates, {
           id: `layout:${nextLayout}:remove-wides`,
           kind: "channel-count",
@@ -415,7 +418,7 @@ export function buildDesignRecommendationCandidates({
       const removed = safeSpeakers.filter((speaker) => MID_UPPER_ROLES.has(roleOf(speaker)));
       if (removed.length) {
         const nextLayout = `${layout.bed}.${layout.subs}.4`;
-        const saving = allowUkPricing ? removedSpeakerSaving(removed, soundbarSelections) : null;
+        const saving = allowUkPricing ? removedSpeakerSaving(removed, soundbarSelections, priceMap, soundbarOptions) : null;
         pushCandidate(candidates, {
           id: `layout:${nextLayout}:remove-mid-uppers`,
           kind: "channel-count",

@@ -21,6 +21,7 @@ import {
   isViewingGeometryCandidate,
   rankDesignRecommendations,
 } from "./designRecommendationCandidates";
+import { useProductPriceMap } from "@/components/pricing/useProductPriceMap";
 import { buildPerRowViewingData } from "@/components/utils/viewingAngleUtils";
 import {
   buildViewingPrioritySummary,
@@ -303,6 +304,7 @@ export default function DesignRecommendationEngine({
   onRecommendationsChange,
 }) {
   const safeSoundbarSelections = soundbarSelections || EMPTY_SELECTIONS;
+  const { priceMap, soundbarOptions } = useProductPriceMap();
   const candidates = useMemo(() => buildDesignRecommendationCandidates({
     seats,
     placedSpeakers,
@@ -314,6 +316,8 @@ export default function DesignRecommendationEngine({
     allowUkPricing,
     lcrPowerW: appState?.splConfig?.lcrW,
     appState,
+    priceMap,
+    soundbarOptions,
   }), [
     seats,
     placedSpeakers,
@@ -328,6 +332,8 @@ export default function DesignRecommendationEngine({
     appState?.aimFrontWidesAtMLP,
     appState?.aimSideSurroundsAtMLP,
     appState?.aimRearSurroundsAtMLP,
+    priceMap,
+    soundbarOptions,
   ]);
 
   const viewingContext = useMemo(() => {
