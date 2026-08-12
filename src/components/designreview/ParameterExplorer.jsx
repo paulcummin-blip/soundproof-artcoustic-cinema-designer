@@ -325,6 +325,18 @@ export default function ParameterExplorer({
         })}
       </div>
 
+      <div
+        style={{
+          padding: "7px 14px",
+          borderBottom: `1px solid ${COLORS.border}`,
+          color: COLORS.muted,
+          fontSize: 10,
+          fontFamily: FONT_BODY,
+        }}
+      >
+        Select a parameter to view its detail. SEAT rows open the seating result map.
+      </div>
+
       {/* Compact rows */}
       <div>
         {filteredParams.length === 0 ? (
@@ -352,7 +364,18 @@ export default function ParameterExplorer({
               <div key={param.id} ref={isExpanded ? expandedRef : null}>
                 {/* Compact row: P-number | Title | Scope | Result */}
                 <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  aria-label={`${isExpanded ? "Collapse" : "Expand"} P${param.id} ${humanTitle}${result?.isSeat ? " seat result map" : " details"}`}
+                  title={result?.isSeat ? "Open seating result map" : "Open parameter details"}
                   onClick={() => handleRowClick(param)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleRowClick(param);
+                    }
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -435,6 +458,34 @@ export default function ParameterExplorer({
                         value={result?.value}
                       />
                     )}
+                  </span>
+
+                  {/* Explicit expansion affordance — especially important for SEAT maps. */}
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      gap: 5,
+                      minWidth: 48,
+                      flexShrink: 0,
+                      color: isExpanded ? COLORS.primary : COLORS.muted,
+                      fontFamily: FONT_BODY,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 8,
+                        fontWeight: 700,
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      {result?.isSeat ? "MAP" : "DETAIL"}
+                    </span>
+                    <span style={{ fontSize: 13, lineHeight: 1 }}>
+                      {isExpanded ? "▾" : "▸"}
+                    </span>
                   </span>
                 </div>
 
