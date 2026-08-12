@@ -21,8 +21,19 @@ export function CollapsiblePanel({
   className,
   headerBg,
   keepMounted = false,
+  isOpen: controlledIsOpen,
+  onToggle,
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [uncontrolledIsOpen, setUncontrolledIsOpen] = useState(defaultOpen);
+  const isControlled = controlledIsOpen !== undefined;
+  const isOpen = isControlled ? controlledIsOpen : uncontrolledIsOpen;
+  const handleToggle = () => {
+    if (isControlled) {
+      onToggle?.();
+    } else {
+      setUncontrolledIsOpen(prev => !prev);
+    }
+  };
   const [hovered, setHovered] = useState(false);
 
   const resolvedBg = headerBg ?? HEADER_BG_MAP[title] ?? "#FFFFFF";
@@ -30,7 +41,7 @@ export function CollapsiblePanel({
   return (
     <div className={cn("bg-white border border-[#DCDBD6] rounded-lg overflow-visible", className)}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className="w-full px-4 py-3 flex items-center justify-between text-left transition-colors"
