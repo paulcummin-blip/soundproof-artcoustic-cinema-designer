@@ -10,9 +10,9 @@
  *      breakdown published by the Room Designer.
  *   3. Price Breakdown — compact table with subtotal, multiplier, VAT, total.
  *
- * Does NOT mount DesignRecommendationEngine or usePriceCalculation. Reads
- * from the shared window.__ROOM_DESIGNER_ASDR__ and
- * window.__ROOM_DESIGNER_PRICE__ stores.
+ * Does NOT mount DesignRecommendationEngine or usePriceCalculation. Receives
+ * the complete project-scoped analysis and commercial price snapshots from
+ * DesignReviewPage.
  */
 
 import React, { useMemo } from "react";
