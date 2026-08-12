@@ -25,7 +25,12 @@ function rankingMetrics(curve, candidate, protectedNullRegions) {
 }
 
 function preEqCurve(candidate) {
-  const corrections = new Map((candidate?.combinedEqCurve || []).map((point) => [Number(point.frequency), Number(point.spl)]));
+  if (Array.isArray(candidate?.rspBeforePeqAtOperatingLevel)
+    && candidate.rspBeforePeqAtOperatingLevel.length) {
+    return candidate.rspBeforePeqAtOperatingLevel;
+  }
+  const corrections = new Map((candidate?.combinedEqCurve || [])
+    .map((point) => [Number(point.frequency), Number(point.spl)]));
   return (candidate?.finalPostEqCurve || []).map((point) => ({
     frequency: point.frequency,
     spl: point.spl - (corrections.get(Number(point.frequency)) || 0),
