@@ -1,7 +1,6 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { useAppState } from "@/components/AppStateProvider";
 
 const formatPrice = (value) =>
@@ -22,18 +21,18 @@ export default function OptionsPanel({
   difficultyMultiplier,
   setDifficultyMultiplier,
   priceData,
-  placedSpeakers = [],
-  frontSubsCfg = null,
-  rearSubsCfg = null,
+  priceMode = 'incVat',
+  setPriceMode = () => {},
+  manualExtras = [],
+  setManualExtras = () => {},
+  soundbarSelections = {},
+  setSoundbarSelections = () => {},
   acousticTreatmentEnabled = false,
   setAcousticTreatmentEnabled = () => {},
   selectedAbfuserQty = 0,
   setSelectedAbfuserQty = () => {},
   recommendedAbfuserQty = 0,
 }) {
-  const [priceMode, setPriceMode] = React.useState('incVat');
-  const [manualExtras, setManualExtras] = React.useState([]);
-  const [soundbarSelections, setSoundbarSelections] = React.useState({});
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
 
   // Source authority from app state — distinguishes auto-seeded ("recommended")
@@ -59,52 +58,11 @@ export default function OptionsPanel({
     }
   }, [acousticTreatmentEnabled, selectedAbfuserQty, recommendedAbfuserQty, abfuserQtySource]);
 
-  const commercialPriceData = usePriceCalculation({
-    placedSpeakers,
-    frontSubsCfg,
-    rearSubsCfg,
-    difficultyMultiplier,
-    priceMode,
-    manualExtras,
-    soundbarSelections,
-    acousticTreatmentEnabled,
-    selectedAbfuserQty,
-  });
-
-  const activePriceData = commercialPriceData || priceData;
+  // Pricing is calculated once in RoomDesigner and passed to every surface.
+  // This panel only edits canonical pricing inputs; it never creates a second
+  // calculation or publishes a competing partial snapshot.
+  const activePriceData = priceData;
   const priceListAvailable = activePriceData?.priceListAvailable !== false;
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined' || !activePriceData) return;
-
-    window.__ROOM_DESIGNER_PRICE__ = {
-      showPrices,
-      baseTotal: activePriceData.baseTotal,
-      finalTotal: activePriceData.displayTotal ?? activePriceData.finalTotal,
-      displayTotal: activePriceData.displayTotal ?? activePriceData.finalTotal,
-      priceMode,
-      vatAmount: activePriceData.vatAmount,
-      difficultyMultiplier: activePriceData.difficultyMultiplier,
-      priceListAvailable: activePriceData.priceListAvailable,
-      territoryLabel: activePriceData.territoryLabel,
-      territoryCode: activePriceData.territoryCode,
-      currency: activePriceData.currency,
-      incompletePriceCount: activePriceData.incompletePriceCount || 0,
-    };
-  }, [
-    showPrices,
-    activePriceData?.baseTotal,
-    activePriceData?.finalTotal,
-    activePriceData?.displayTotal,
-    activePriceData?.vatAmount,
-    activePriceData?.difficultyMultiplier,
-    activePriceData?.priceListAvailable,
-    activePriceData?.territoryLabel,
-    activePriceData?.territoryCode,
-    activePriceData?.currency,
-    activePriceData?.incompletePriceCount,
-    priceMode,
-  ]);
 
   const updateManualItem = (id, patch) => {
     setManualExtras((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
