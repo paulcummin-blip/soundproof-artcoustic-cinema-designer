@@ -96,25 +96,25 @@ export function buildBassGraphSeries({
   const graphIdentity = buildGraphSourceIdentity(optimisationResult);
   let series;
   if (!designEqEnabled) {
-    series = normalizedSeries
-      ? [{ ...normalizedSeries, data: applyBassSmoothing(normalizedSeries.data, smoothingMode) }]
-      : [];
-    const target = showHouseCurve ? buildNormalizedHouseCurveSeries(normalizedSeries) : null;
+    // The simulation graph is always product-aware. Disabling Design EQ must
+    // not replace the physical response with a 94 dB normalized diagnostic.
+    series = rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : [];
+    const target = showHouseCurve ? buildAbsoluteHouseCurveSeries(optimisationResult) : null;
     if (target) series.push(target);
   } else {
     const selectedRealIds = selectedSeatIds.filter((id) => id !== "rsp");
     const selectedRawSeats = selectedRealIds.map((id) => multiSeries.find((item) => item.id === id)).filter(Boolean);
     const postEqBySeat = new Map((finalResponse?.postEqPerSeatCurves || []).map((seat) => [seat.seatId, seat]));
     const seatValidationActive = selectedRawSeats.length > 0;
-    // Blue curve authority: use the stored rspBeforePeqAtOperatingLevel when
-    // available (the level-normalised curve from the optimiser). Do NOT
-    // independently reconstruct the same curve with a separate render-time shift.
-    const storedRspBeforePeq = finalResponse?.rspBeforePeqAtOperatingLevel;
+    // Blue curve authority: the product-aware physical response from the
+    // room engine. The RP22 target is demand only and must never vertically
+    // normalise this curve.
+    const storedRspBeforePeq = finalResponse?.physicalRawResponseCurve;
     const hasStoredBlueCurve = Array.isArray(storedRspBeforePeq) && storedRspBeforePeq.length > 0;
     series = seatValidationActive
       ? selectedRawSeats.map((seat) => ({ ...seat, id: `${seat.id}-raw`, kind: "raw", label: `${seat.id} before EQ`, tooltipLabel: `${seat.id} before EQ`, strokeDasharray: "6 4", strokeWidth: 1.5, data: applyBassSmoothing(seat.data, smoothingMode) }))
       : (hasStoredBlueCurve
-        ? [{ id: "rsp-raw", kind: "raw", label: "RSP before EQ", tooltipLabel: "RSP before EQ at operating level", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }]
+        ? [{ id: "rsp-raw", kind: "raw", label: "Physical RSP before EQ", tooltipLabel: "Product-aware physical RSP before EQ", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }]
         : (rspRawCurve.length ? [rawRspSeries(rspRawCurve, smoothingMode)] : []));
     if (hasMatchingDetailedResult && finalResponse?.postEqRspCurve?.length) {
       if (seatValidationActive) {
@@ -159,14 +159,8 @@ export function buildBassGraphSeries({
       if (target) series.push(target);
       const maximumSpl = buildMaximumSplSeries(finalResponse, smoothingMode);
       if (maximumSpl) series.push(maximumSpl);
-      // When using the stored blue curve, it is already at the operating level —
-      // no render-time shift needed. Only apply the shift when falling back to
-      // the unnormalised rspRawCurve (legacy path without stored curve).
-      if (!hasStoredBlueCurve) {
-        series = series.map((item) => item.kind === "raw"
-          ? { ...item, data: shiftCurve(item.data, operatingLevelOffsetDb) }
-          : item);
-      }
+      // Raw curves remain in the physical product/room domain. No target- or
+      // operating-level render-time shift is permitted.
     }
     if (overlayProductionSeries) series.push(overlayProductionSeries);
   }
@@ -175,7 +169,7 @@ export function buildBassGraphSeries({
 }
 
 export function detailedEqStatusText({ designEqEnabled, hasMatchingDetailedResult, detailedStatus, optimisationResult, error }) {
-  if (!designEqEnabled) return "Showing product-independent normalized room response (94 dB flat reference) — not predicted product SPL";
+  if (!designEqEnabled) return "Showing the product-aware physical RSP before EQ";
   if (hasMatchingDetailedResult) {
     const selectedProfile = optimisationResult?.selectedCandidate?.designEqFitProfile;
     if (selectedProfile === "identity") {
