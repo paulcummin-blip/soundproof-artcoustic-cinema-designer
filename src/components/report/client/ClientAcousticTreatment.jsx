@@ -70,18 +70,15 @@ export default function ClientAcousticTreatment({
   const isSelectedOverride = selectedQty !== recommendedQty;
   const surfaceArea = qb.treatmentSurfaceArea ? qb.treatmentSurfaceArea.toFixed(1) : null;
 
-  // The "WHY X?" heading and explanation always use the SELECTED quantity
-  // so the heading and result card are always internally consistent.
-  const whyHeading = `WHY ${selectedQty} ABFUSERS?`;
+  // ONE QUANTITY AUTHORITY PER BLOCK:
+  // The "WHY X?" heading, allocation table, surface area, and result card
+  // ALWAYS refer to the Sound Proof RECOMMENDED quantity. When the designer
+  // has overridden the quantity, a separate "DESIGNER SELECTED" block shows
+  // the selected quantity without inventing a selected-allocation breakdown.
+  const whyHeading = `WHY ${recommendedQty} ABFUSERS?`;
   const sideWord = (qb.leftPanels || 1) >= 2 ? "two Abfusers" : "one Abfuser";
   const rearWord = (qb.rearPanels || 2) >= 4 ? "two pairs" : "a pair";
-  const whyBody = isSelectedOverride
-    ? `The designer has selected ${selectedQty} Abfusers for this room. The standard Sound Proof recommendation for this listening area is ${recommendedQty}. The selected quantity provides ${selectedQty < recommendedQty ? "focused" : "expanded"} coverage of the priority treatment areas.`
-    : `This room has ${(qb.leftPanels || 1) >= 2 ? "extended first-reflection areas" : "first-reflection areas"} along both side walls, so ${sideWord} ${((qb.leftPanels || 1) >= 2) ? "are" : "is"} recommended for each side to provide useful coverage without treating the entire wall. A further ${rearWord} ${((qb.rearPanels || 2) >= 4) ? "are" : "is"} recommended across the rear treatment zone to help manage returning reflections while preserving a natural, immersive soundfield.`;
-
-  const resultCardHeading = isSelectedOverride
-    ? "SELECTED ACOUSTIC TREATMENT"
-    : "RECOMMENDED ACOUSTIC TREATMENT";
+  const whyBody = `This room has ${(qb.leftPanels || 1) >= 2 ? "extended first-reflection areas" : "first-reflection areas"} along both side walls, so ${sideWord} ${((qb.leftPanels || 1) >= 2) ? "are" : "is"} recommended for each side to provide useful coverage without treating the entire wall. A further ${rearWord} ${((qb.rearPanels || 2) >= 4) ? "are" : "is"} recommended across the rear treatment zone to help manage returning reflections while preserving a natural, immersive soundfield.`;
 
   return (
     <div style={{ fontFamily: FONT_BODY, color: COLORS.body }}>
@@ -119,7 +116,7 @@ export default function ClientAcousticTreatment({
             if (!Number.isFinite(sx) || !Number.isFinite(sy)) return null;
             return (
               <circle key={seat?.id || i} cx={toX(sx)} cy={toY(sy)} r={0.1}
-                fill={seat?.isPrimary ? COLORS.rspFill : COLORS.seatFill} opacity={0.5} />
+                fill={COLORS.seatFill} opacity={0.5} />
             );
           })}
 
@@ -169,7 +166,7 @@ export default function ClientAcousticTreatment({
             Treatment zone (on wall)
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
-            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: COLORS.rspFill, opacity: 0.5 }} />
+            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: COLORS.seatFill, opacity: 0.5 }} />
             Listening position
           </span>
         </div>
@@ -198,8 +195,8 @@ export default function ClientAcousticTreatment({
         </p>
       </div>
 
-      {/* ── WHY [X] ABFUSERS? (always uses selectedQty for consistency) ── */}
-      {selectedQty > 0 && (
+      {/* ── WHY [recommendedQty] ABFUSERS? ── */}
+      {recommendedQty > 0 && (
         <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5mm 6mm", marginBottom: "4mm" }}>
           <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: COLORS.primary, marginBottom: "2mm", fontFamily: FONT_BODY }}>
             {whyHeading}
@@ -207,7 +204,7 @@ export default function ClientAcousticTreatment({
           <p style={{ margin: 0, fontSize: "10pt", lineHeight: 1.5, color: COLORS.body, fontFamily: FONT_BODY }}>
             {whyBody}
           </p>
-          {/* Compact allocation table */}
+          {/* Compact allocation table (recommended) */}
           <div style={{ marginTop: "3mm", fontSize: "8pt", color: COLORS.secondary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
             Left reflection zone      {qb.leftPanels || 1}
           </div>
@@ -218,7 +215,7 @@ export default function ClientAcousticTreatment({
             Rear sound control        {qb.rearPanels || 2}
           </div>
           <div style={{ marginTop: "1mm", paddingTop: "1mm", borderTop: `1px solid ${COLORS.border}`, fontSize: "8pt", fontWeight: 700, color: COLORS.primary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
-            Total                     {selectedQty}
+            Total                     {recommendedQty}
           </div>
           {surfaceArea && (
             <div style={{ marginTop: "1.5mm", fontSize: "8pt", color: COLORS.secondary, fontFamily: FONT_BODY, lineHeight: 1.6 }}>
@@ -228,18 +225,16 @@ export default function ClientAcousticTreatment({
         </div>
       )}
 
-      {/* ── Result card (heading changes based on selected vs recommended) ── */}
+      {/* ── Result card: RECOMMENDED (always uses recommendedQty) ── */}
       <div style={{ background: COLORS.primary, color: "#FFFFFF", borderRadius: 6, padding: "5mm 6mm" }}>
         <div style={{ fontSize: "8pt", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.7, marginBottom: "2mm", fontFamily: FONT_BODY }}>
-          {resultCardHeading}
+          RECOMMENDED ACOUSTIC TREATMENT
         </div>
         <div style={{ fontFamily: FONT_HEADING, fontSize: "16pt", fontWeight: 400, lineHeight: 1.2, marginBottom: "2mm" }}>
-          {selectedQty} × Artcoustic Abfuser
+          {recommendedQty} × Artcoustic Abfuser
         </div>
         <div style={{ fontSize: "9pt", opacity: 0.8, lineHeight: 1.4, fontFamily: FONT_BODY }}>
-          {isSelectedOverride
-            ? `Designer-selected quantity for the highlighted wall zones. Sound Proof recommendation: ${recommendedQty}.`
-            : "Recommended for the highlighted wall zones identified from this room and seating layout."}
+          Recommended for the highlighted wall zones identified from this room and seating layout.
         </div>
         {surfaceArea && (
           <div style={{ fontSize: "8pt", opacity: 0.6, lineHeight: 1.4, fontFamily: FONT_BODY, marginTop: "1.5mm" }}>
@@ -247,6 +242,18 @@ export default function ClientAcousticTreatment({
           </div>
         )}
       </div>
+
+      {/* ── Designer selected (only when quantity has been overridden) ── */}
+      {isSelectedOverride && (
+        <div style={{ marginTop: "3mm", background: "#FFFFFF", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4mm 5mm" }}>
+          <div style={{ fontSize: "7.5pt", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: COLORS.secondary, marginBottom: "1.5mm", fontFamily: FONT_BODY }}>
+            DESIGNER SELECTED
+          </div>
+          <div style={{ fontFamily: FONT_HEADING, fontSize: "13pt", fontWeight: 400, lineHeight: 1.2, color: COLORS.primary }}>
+            {selectedQty} × Artcoustic Abfuser
+          </div>
+        </div>
+      )}
     </div>
   );
 }

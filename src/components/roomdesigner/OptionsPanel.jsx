@@ -2,6 +2,7 @@ import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
+import { useAppState } from "@/components/AppStateProvider";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value || 0));
@@ -35,18 +36,28 @@ export default function OptionsPanel({
   const [soundbarSelections, setSoundbarSelections] = React.useState({});
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
 
+  // Source authority from app state — distinguishes auto-seeded ("recommended")
+  // from designer-manually-set ("user"). When "recommended", the selected
+  // quantity auto-follows recommendation changes. When "user", the designer's
+  // manual override is preserved.
+  const { abfuserQtySource, setAbfuserQtySource } = useAppState() || {};
+
   const handleAcousticTreatmentToggle = (nextEnabled) => {
     setAcousticTreatmentEnabled(nextEnabled);
   };
 
-  // Auto-seed selectedAbfuserQty from recommendedAbfuserQty when treatment is
-  // enabled and no quantity has been set yet. Handles both the manual toggle
-  // case and new projects that default to treatment ON.
+  // Auto-follow: when source is "recommended" (or legacy/null) and the
+  // recommendation changes, update selectedAbfuserQty to match. This covers
+  // both initial seeding (qty 0 → recommended) and recommendation changes
+  // (old recommended → new recommended). When source is "user", the
+  // designer's manual override is preserved.
   React.useEffect(() => {
-    if (acousticTreatmentEnabled && !selectedAbfuserQty && recommendedAbfuserQty > 0) {
+    if (!acousticTreatmentEnabled || recommendedAbfuserQty <= 0) return;
+    if (abfuserQtySource === "user") return;
+    if (selectedAbfuserQty !== recommendedAbfuserQty) {
       setSelectedAbfuserQty(recommendedAbfuserQty);
     }
-  }, [acousticTreatmentEnabled, selectedAbfuserQty, recommendedAbfuserQty]);
+  }, [acousticTreatmentEnabled, selectedAbfuserQty, recommendedAbfuserQty, abfuserQtySource]);
 
   const commercialPriceData = usePriceCalculation({
     placedSpeakers,
@@ -137,7 +148,10 @@ export default function OptionsPanel({
                 min="0"
                 step="1"
                 value={selectedAbfuserQty}
-                onChange={(e) => setSelectedAbfuserQty(parseInt(e.target.value, 10) || 0)}
+                onChange={(e) => {
+                  setSelectedAbfuserQty(parseInt(e.target.value, 10) || 0);
+                  setAbfuserQtySource("user");
+                }}
                 className="w-20 px-2 py-1 border border-gray-300 rounded text-xs"
               />
             </div>

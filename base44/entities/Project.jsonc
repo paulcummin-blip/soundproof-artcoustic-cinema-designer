@@ -399,6 +399,15 @@
       "type": "number",
       "default": 0,
       "description": "Designer-selected Abfuser quantity. Drives System Price and RP22 Products Selected. 0 when acoustic treatment is off."
+    },
+    "abfuser_qty_source": {
+      "type": "string",
+      "enum": [
+        "recommended",
+        "user"
+      ],
+      "default": "recommended",
+      "description": "Whether selected_abfuser_qty was auto-seeded from the recommendation ('recommended') or manually set by the designer ('user'). When 'recommended', the selected quantity auto-follows recommendation changes."
     }
   },
   "required": [

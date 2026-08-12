@@ -820,6 +820,11 @@ function useDesignerState() {
     const n = Math.max(0, Math.floor(Number(v) || 0));
     _setSelectedAbfuserQty(n);
   }, []);
+  const [abfuserQtySource, setAbfuserQtySource] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.abfuserQtySource === "string")
+      ? __autosavePayload.abfuserQtySource
+      : "recommended"
+  ));
   // ── END ACOUSTIC TREATMENT ────────────────────────────────────────────────
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
@@ -1586,6 +1591,7 @@ function useDesignerState() {
       p12Mode,
       acousticTreatmentEnabled,
       selectedAbfuserQty,
+      abfuserQtySource,
       // screenFrontPlaneM, mlpY_m, rowCentersM intentionally excluded — always recalculated from live inputs
       roomElements: normaliseRoomElements(roomElements),
       };
@@ -1650,6 +1656,7 @@ function useDesignerState() {
     viewingPriority,
     acousticTreatmentEnabled,
     selectedAbfuserQty,
+    abfuserQtySource,
     ]);
 
   const restoreAutosave = useCallback(() => {
@@ -1959,6 +1966,7 @@ function useDesignerState() {
     // Acoustic treatment defaults to off
     setAcousticTreatmentEnabled(false);
     setSelectedAbfuserQty(0);
+    setAbfuserQtySource("recommended");
 
     // Per-seat metrics
     setPerSeatMetrics({});
@@ -2080,6 +2088,8 @@ function useDesignerState() {
     setAcousticTreatmentEnabled,
     selectedAbfuserQty,
     setSelectedAbfuserQty,
+    abfuserQtySource,
+    setAbfuserQtySource,
     };
   }, [
     dimensions, setDimensions,
@@ -2188,6 +2198,8 @@ function useDesignerState() {
     setAcousticTreatmentEnabled,
     selectedAbfuserQty,
     setSelectedAbfuserQty,
+    abfuserQtySource,
+    setAbfuserQtySource,
   ]);
 
   value.setP21EarlyReflectionPreset = setP21EarlyReflectionPresetSafe;

@@ -538,6 +538,10 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     const qty = Number(p?.selected_abfuser_qty);
     appState.setSelectedAbfuserQty(Number.isFinite(qty) && qty > 0 ? Math.floor(qty) : 0);
   }
+  if (typeof appState?.setAbfuserQtySource === "function") {
+    const src = p?.abfuser_qty_source;
+    appState.setAbfuserQtySource(src === "user" ? "user" : "recommended");
+  }
 
   // 11) PLACED SPEAKERS
   const loadedSpeakers = (() => {

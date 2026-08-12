@@ -115,6 +115,7 @@ export function serializeProject(input = {}) {
     // Acoustic treatment (Abfuser product selection)
     acousticTreatmentEnabled = false,
     selectedAbfuserQty = 0,
+    abfuserQtySource = "recommended",
   } = input;
 
   // Normalised room dims (support legacy dimensions as a fallback)
@@ -306,5 +307,6 @@ export function serializeProject(input = {}) {
     // Acoustic treatment (Abfuser product selection)
     acoustic_treatment_enabled: !!acousticTreatmentEnabled,
     selected_abfuser_qty: acousticTreatmentEnabled ? (Math.max(0, Math.floor(Number(selectedAbfuserQty) || 0))) : 0,
+    abfuser_qty_source: acousticTreatmentEnabled ? (abfuserQtySource || "recommended") : "recommended",
   };
 }
