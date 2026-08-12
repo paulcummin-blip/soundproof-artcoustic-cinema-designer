@@ -22,9 +22,9 @@ export default function RoomDesignerHeader({
 
   const effectiveProjectId = activeProjectId || projectIdState || null;
 
-  const handleRP22ReportClick = () => {
+  const handleDesignReviewClick = () => {
     if (effectiveProjectId) {
-      navigate(`/RP22Report?projectId=${effectiveProjectId}`);
+      navigate(`/DesignReview?projectId=${effectiveProjectId}`);
     }
   };
 
@@ -67,12 +67,12 @@ export default function RoomDesignerHeader({
             size="sm"
             variant="secondary"
             className="font-semibold border-[#625143] text-[#625143] whitespace-nowrap"
-            onClick={handleRP22ReportClick}
+            onClick={handleDesignReviewClick}
             disabled={!effectiveProjectId}
             style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <FileText className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
-            Technical Report
+            Design Review
           </Button>
         </div>
       </div>

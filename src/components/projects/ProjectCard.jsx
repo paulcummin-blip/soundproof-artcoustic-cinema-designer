@@ -89,9 +89,9 @@ function ProjectCard({ project, onDelete }) {
                     <ArrowRight className="w-4 h-4 mr-2" />
                     Open Designer
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleNavigate('RP22Report')} className="cursor-pointer hover:!bg-[#F8F8F7]">
+                  <DropdownMenuItem onClick={() => handleNavigate('DesignReview')} className="cursor-pointer hover:!bg-[#F8F8F7]">
                     <BarChart4 className="w-4 h-4 mr-2" />
-                    View RP22 Report
+                    Design Review
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleDeleteClick} className="cursor-pointer !text-red-500 hover:!bg-red-500/10">
                     <Trash2 className="w-4 h-4 mr-2" />

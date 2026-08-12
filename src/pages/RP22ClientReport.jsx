@@ -495,7 +495,7 @@ export default function RP22ClientReport() {
 
   const handleTechnicalReport = () => {
     if (!projectId) return;
-    navigate(`/RP22Report?projectId=${projectId}`);
+    navigate(`/DesignReview?projectId=${projectId}`);
   };
 
   return (

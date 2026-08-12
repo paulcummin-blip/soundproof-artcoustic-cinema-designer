@@ -22,7 +22,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
@@ -30,7 +30,8 @@ import DesignOverviewBlock from "@/components/designreview/DesignOverviewBlock";
 import ParameterExplorer from "@/components/designreview/ParameterExplorer";
 import DrawingsBlock from "@/components/designreview/DrawingsBlock";
 import RecommendationsBlock from "@/components/designreview/RecommendationsBlock";
-import { ArrowLeft, BarChart3, PenTool, ListChecks, Package } from "lucide-react";
+import DesignReviewActions from "@/components/designreview/DesignReviewActions";
+import { BarChart3, PenTool, ListChecks, Package } from "lucide-react";
 
 const COLORS = {
   bg: "#F1F0EE",
@@ -45,13 +46,13 @@ const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
 export default function DesignReviewPage() {
-  const navigate = useNavigate();
   const { projectId: routeProjectId } = useParams();
   const [searchParams] = useSearchParams();
   const activeProjectId = useActiveProjectId();
   const projectId =
     routeProjectId ||
     searchParams.get("projectId") ||
+    searchParams.get("project") ||
     searchParams.get("id") ||
     activeProjectId;
 
@@ -147,10 +148,6 @@ export default function DesignReviewPage() {
     setActiveFilter(filter);
   }, []);
 
-  const handleBack = () => {
-    if (projectId) navigate(`/RoomDesigner?projectId=${projectId}`);
-  };
-
   return (
     <div style={{
       minHeight: "100vh",
@@ -163,9 +160,9 @@ export default function DesignReviewPage() {
         padding: "20px 24px",
         borderBottom: `1px solid ${COLORS.border}`,
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "space-between",
-        gap: 12,
+        gap: 16,
         flexWrap: "wrap",
       }}>
         <div>
@@ -178,9 +175,17 @@ export default function DesignReviewPage() {
           }}>
             Design Review
           </h1>
+          <p style={{
+            margin: "4px 0 0 0",
+            fontSize: 12,
+            color: COLORS.muted,
+            fontFamily: FONT_BODY,
+          }}>
+            Review performance, geometry and recommendations before export.
+          </p>
           {projectDetails && (
             <p style={{
-              margin: "4px 0 0 0",
+              margin: "6px 0 0 0",
               fontSize: 13,
               color: COLORS.secondary,
               fontFamily: FONT_BODY,
@@ -191,7 +196,7 @@ export default function DesignReviewPage() {
           )}
           {!projectId && !loadingProject && (
             <p style={{
-              margin: "4px 0 0 0",
+              margin: "6px 0 0 0",
               fontSize: 13,
               color: COLORS.muted,
               fontFamily: FONT_BODY,
@@ -200,28 +205,7 @@ export default function DesignReviewPage() {
             </p>
           )}
         </div>
-        {projectId && (
-          <button
-            onClick={handleBack}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 16px",
-              fontSize: 13,
-              fontFamily: FONT_BODY,
-              background: "#F8F8F7",
-              border: `1px solid ${COLORS.primary}`,
-              color: COLORS.primary,
-              borderRadius: 6,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <ArrowLeft style={{ width: 16, height: 16, color: COLORS.primary }} />
-            Back to Room Designer
-          </button>
-        )}
+        <DesignReviewActions projectId={projectId} />
       </div>
 
       {/* Four collapsible sections */}

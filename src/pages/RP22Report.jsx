@@ -287,6 +287,23 @@ function RP22ReportInner() {
     usePlanCapture({ isPrinting, imageDataUrl: planDimsImageDataUrl, setImageDataUrl: setPlanDimsImageDataUrl, selector: '[data-plan-capture-dims]', planLabel: 'DIMS', debugPlanCapture, exportTimeoutRef, exportGuardRef, setExportStatus, setIsPrinting, setExportDebug });
     usePlanCapture({ isPrinting, imageDataUrl: planSpeakerDimsImageDataUrl, setImageDataUrl: setPlanSpeakerDimsImageDataUrl, selector: '[data-plan-capture-speaker-dims]', planLabel: 'SPEAKER', debugPlanCapture, exportTimeoutRef, exportGuardRef, setExportStatus, setIsPrinting, setExportDebug });
 
+    // autoPrint: when navigated from Design Review with ?autoPrint=1, auto-trigger
+    // the print pipeline once the report is hydrated and ready.
+    const autoPrintRequested = searchParams.get("autoPrint") === "1";
+    const autoPrintTriggeredRef = React.useRef(false);
+    useEffect(() => {
+        if (!autoPrintRequested || autoPrintTriggeredRef.current) return;
+        if (reportHydrating || !effectiveProjectId || reportReadyProjectId !== effectiveProjectId) return;
+        if (isPrinting) return;
+        autoPrintTriggeredRef.current = true;
+        setExportStatus("Auto-printing from Design Review…");
+        setHasPrintedOnce(false);
+        setPlanImageDataUrl(null);
+        setPlanDimsImageDataUrl(null);
+        setPlanSpeakerDimsImageDataUrl(null);
+        setIsPrinting(true);
+    }, [autoPrintRequested, reportHydrating, effectiveProjectId, reportReadyProjectId, isPrinting]);
+
     // Mark printReady when all captures are done
     useEffect(() => {
         if (!isPrinting || reportHydrating || !effectiveProjectId || reportReadyProjectId !== effectiveProjectId) return;
