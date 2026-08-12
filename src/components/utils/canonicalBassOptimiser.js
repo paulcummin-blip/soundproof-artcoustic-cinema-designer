@@ -297,7 +297,7 @@ function buildCanonicalCandidate({
     finalPostEqCurve,
     combinedEqCurve: eq.combinedEqCurve || [],
     perSeatPostEqCurves,
-    maximumPerSeatPostEqCurves,
+    maximumPerSeatPostEqCurves: maximumPerSeatAfterEqCurves,
     capabilityLimitedRegions: limitedRegions,
     capabilityLimitedPointCount: finalPostEqCurve.filter((point) => point.capabilityLimited).length,
     pairedP14P18Authority,
