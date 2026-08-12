@@ -163,26 +163,44 @@ export default function AcousticTreatmentDrawing({
           fontFamily: FONT_BODY,
           marginBottom: 8,
         }}>
-          Artcoustic Abfuser Selection
-        </div>
-        <div style={{
-          fontSize: 14,
-          fontWeight: 600,
-          color: COLORS.primary,
-          fontFamily: FONT_BODY,
-        }}>
-          {selectedAbfuserQty} panel{selectedAbfuserQty !== 1 ? "s" : ""}
+          Artcoustic Abfuser Recommendation
         </div>
         {qtyBreakdown && (
-          <div style={{
-            fontSize: 11,
-            color: COLORS.body,
-            fontFamily: FONT_BODY,
-            marginTop: 4,
-            lineHeight: 1.5,
-          }}>
-            {qtyBreakdown}
-          </div>
+          <>
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: COLORS.primary,
+              fontFamily: FONT_BODY,
+            }}>
+              Recommended: {qtyBreakdown.recommendedQty} × Artcoustic Abfuser
+            </div>
+            <div style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "4px 16px",
+              fontSize: 11,
+              color: COLORS.body,
+              fontFamily: FONT_BODY,
+              marginTop: 6,
+              lineHeight: 1.5,
+            }}>
+              <span>Left: {qtyBreakdown.leftPanels}</span>
+              <span>Right: {qtyBreakdown.rightPanels}</span>
+              <span>Rear: {qtyBreakdown.rearPanels}</span>
+            </div>
+            {Number.isFinite(qtyBreakdown.treatmentSurfaceArea) && (
+              <div style={{
+                fontSize: 11,
+                color: COLORS.secondary,
+                fontFamily: FONT_BODY,
+                marginTop: 4,
+                lineHeight: 1.5,
+              }}>
+                Approximate treatment surface: {qtyBreakdown.treatmentSurfaceArea.toFixed(1)} m²
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
