@@ -57,8 +57,8 @@ export default function DesignReviewPage() {
 
   const [projectDetails, setProjectDetails] = useState(null);
   const [asdrData, setAsdrData] = useState(null);
-  const [priceData, setPriceData] = useState(null);
   const [loadingProject, setLoadingProject] = useState(true);
+  const priceData = asdrData?.priceData?.showPrices ? asdrData.priceData : null;
 
   // ── Resolved seating authority ──
   // Same-project Room Designer seats are carried with the canonical result
@@ -127,20 +127,13 @@ export default function DesignReviewPage() {
     return () => clearInterval(interval);
   }, [projectId, projectDetails?.updated_date, loadingProject]);
 
-  // Stage D: Poll the shared price store published by the Room Designer.
+  // Keep the persistent sidebar on the same project-scoped price snapshot,
+  // including on a direct/new-tab Design Review load.
   useEffect(() => {
-    const read = () => {
-      const shared = typeof window !== "undefined" ? window.__ROOM_DESIGNER_PRICE__ : null;
-      if (shared && shared.showPrices) {
-        setPriceData(shared);
-      } else {
-        setPriceData(null);
-      }
-    };
-    read();
-    const interval = setInterval(read, 500);
-    return () => clearInterval(interval);
-  }, []);
+    if (typeof window === "undefined" || !priceData) return;
+    if (String(priceData.projectId || "") !== String(projectId || "")) return;
+    window.__ROOM_DESIGNER_PRICE__ = priceData;
+  }, [priceData, projectId]);
 
   // Stage C: Handle Lowest Performance Results row click from Design Overview
   const handleParamClick = useCallback((paramKey) => {
