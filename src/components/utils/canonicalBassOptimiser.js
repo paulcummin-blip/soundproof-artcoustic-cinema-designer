@@ -18,6 +18,7 @@ import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomai
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
+const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
 
 /**
  * Clamp a positive global operating-level offset to the maximum safe scalar
@@ -71,6 +72,83 @@ function applyBankToSeats(seats, correction) {
         spl: point.spl + interpolateCorrection(correction, point.frequency),
       })),
     }));
+}
+
+function applyMaximumSplSafetyMargin(curve) {
+  return (Array.isArray(curve) ? curve : []).map((point) => ({
+    ...point,
+    spl: Number.isFinite(point?.spl) ? point.spl - MAXIMUM_SPL_SAFETY_MARGIN_DB : point?.spl,
+  }));
+}
+
+function maximumPositiveEqDb(correction, startHz, endHz) {
+  return (Array.isArray(correction) ? correction : []).reduce((maximum, point) => {
+    const frequency = Number(point?.frequency);
+    const value = Number(point?.spl);
+    if (!Number.isFinite(frequency) || !Number.isFinite(value)
+      || frequency < startHz || frequency > endHz) return maximum;
+    return Math.max(maximum, value);
+  }, 0);
+}
+
+function buildMaximumSplCurveAfterEq(maximumBeforeEq, correction, domains) {
+  const globalEqTrimDb = maximumPositiveEqDb(
+    correction, domains.correctionStartHz, domains.correctionEndHz,
+  );
+  return {
+    globalEqTrimDb,
+    curve: (Array.isArray(maximumBeforeEq) ? maximumBeforeEq : []).map((point) => ({
+      frequency: point.frequency,
+      spl: point.spl + interpolateCorrection(correction, point.frequency) - globalEqTrimDb,
+    })),
+  };
+}
+
+function capCurveToEnvelope(requestedCurve, maximumCurve) {
+  if (!Array.isArray(maximumCurve) || !maximumCurve.length) {
+    return (Array.isArray(requestedCurve) ? requestedCurve : []).map((point) => ({ ...point }));
+  }
+  return (Array.isArray(requestedCurve) ? requestedCurve : []).map((point) => {
+    const maximumSpl = interpolateCorrection(maximumCurve, point.frequency);
+    const requestedSpl = Number(point?.spl);
+    if (!Number.isFinite(requestedSpl) || !Number.isFinite(maximumSpl)) return { ...point };
+    return {
+      ...point,
+      spl: Math.min(requestedSpl, maximumSpl),
+      requestedSpl,
+      maximumSpl,
+      capabilityLimited: requestedSpl > maximumSpl + 0.05,
+    };
+  });
+}
+
+function capabilityLimitedRegions(curve) {
+  const points = (Array.isArray(curve) ? curve : []).filter((point) => point.capabilityLimited);
+  if (!points.length) return [];
+  const regions = [];
+  let current = [];
+  const close = () => {
+    if (!current.length) return;
+    const worst = current.reduce((result, point) => {
+      const shortfallDb = point.requestedSpl - point.maximumSpl;
+      return !result || shortfallDb > result.shortfallDb
+        ? { frequencyHz: point.frequency, shortfallDb }
+        : result;
+    }, null);
+    regions.push({
+      startHz: current[0].frequency,
+      endHz: current.at(-1).frequency,
+      worstFrequencyHz: worst?.frequencyHz ?? null,
+      maximumShortfallDb: worst?.shortfallDb ?? null,
+    });
+    current = [];
+  };
+  (Array.isArray(curve) ? curve : []).forEach((point) => {
+    if (point.capabilityLimited) current.push(point);
+    else close();
+  });
+  close();
+  return regions;
 }
 
 function bankLimits(eq) {
@@ -128,11 +206,41 @@ function buildOperatingOutputDiagnostics(activeSubs, usableLfHz, selectedOperati
   };
 }
 
-function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb, perSeatRawCurves, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics }) {
-  const perSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, eq.combinedEqCurve);
+function buildCanonicalCandidate({
+  rawCurve, maximumSplCurveBeforeEq, levelNormalisedRawCurve, operatingLevelOffsetDb,
+  perSeatRawCurves, perSeatMaximumSplCurves, eq, domains, targetCurve, targetShape,
+  verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb,
+  operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb,
+  operatingOutputDiagnostics,
+}) {
+  const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
+  const achievedPreEqCurve = capCurveToEnvelope(requestedPreEqCurve, maximumSplCurveBeforeEq);
+  const maximumAfterEq = buildMaximumSplCurveAfterEq(
+    maximumSplCurveBeforeEq, eq.combinedEqCurve, domains,
+  );
+  const unconstrainedPostEqCurve = (eq.curve || []).map((point) => ({ ...point }));
+  const finalPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumAfterEq.curve);
+  const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, eq.combinedEqCurve);
+  const maximumPerSeatAfterEqCurves = (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])
+    .filter((seat) => seat?.seatId !== "rsp" && Array.isArray(seat?.responseData))
+    .map((seat) => ({
+      seatId: seat.seatId,
+      isPrimary: !!seat.isPrimary,
+      responseData: buildMaximumSplCurveAfterEq(
+        seat.responseData, eq.combinedEqCurve, domains,
+      ).curve,
+    }));
+  const maximumSeatById = new Map(maximumPerSeatAfterEqCurves.map((seat) => [seat.seatId, seat]));
+  const perSeatPostEqCurves = requestedPerSeatPostEqCurves.map((seat) => ({
+    ...seat,
+    responseData: capCurveToEnvelope(
+      seat.responseData,
+      maximumSeatById.get(seat.seatId)?.responseData || [],
+    ),
+  }));
   const seatsForMetrics = perSeatPostEqCurves.length
     ? perSeatPostEqCurves
-    : [{ seatId: "rsp", isPrimary: true, responseData: eq.curve }];
+    : [{ seatId: "rsp", isPrimary: true, responseData: finalPostEqCurve }];
   const seatMetrics = calculateAllSeatMetricsFromCorrected(
     seatsForMetrics,
     domains.p19StartHz,
@@ -145,8 +253,9 @@ function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingL
     frequency: point.frequency,
     demandDb: Math.max(0, Number(point.spl) || 0),
   }));
-  const smoothed = applyBassSmoothing(eq.curve || [], "third")
+  const smoothed = applyBassSmoothing(finalPostEqCurve, "third")
     .filter((point) => point.frequency >= domains.correctionStartHz && point.frequency <= domains.correctionEndHz);
+  const limitedRegions = capabilityLimitedRegions(finalPostEqCurve);
   return {
     canonical: true,
     designEqFitProfile: eq.designEqFitProfile || "standard",
@@ -154,7 +263,20 @@ function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingL
     startStrategy: eq.designEqFitProfile === "house_curve" ? "multi-start" : "single",
     selectedStart: eq.selectedStart ?? null,
     rawResponseCurve: rawCurve.map((point) => ({ ...point })),
-    rspBeforePeqAtOperatingLevel: (levelNormalisedRawCurve || []).map((point) => ({ ...point })),
+    maximumSplCurveBeforeEq: (maximumSplCurveBeforeEq || []).map((point) => ({ ...point })),
+    maximumSplCurveAfterEq: maximumAfterEq.curve.map((point) => ({ ...point })),
+    maximumSplSafetyMarginDb: MAXIMUM_SPL_SAFETY_MARGIN_DB,
+    maximumSplGlobalEqTrimDb: maximumAfterEq.globalEqTrimDb,
+    maximumSplAuthority: {
+      method: "authoritative-position-aware-engine-envelope",
+      version: "1.0.0",
+      includesRoomGeometry: true,
+      includesProductFrequencyResponse: true,
+      includesProductOutputLimit: true,
+      safetyMarginDb: MAXIMUM_SPL_SAFETY_MARGIN_DB,
+    },
+    requestedPreEqOperatingCurve: requestedPreEqCurve,
+    rspBeforePeqAtOperatingLevel: achievedPreEqCurve,
     operatingLevelOffsetDb: Number.isFinite(operatingLevelOffsetDb) ? operatingLevelOffsetDb : 0,
     requestedOperatingLevelOffsetDb: Number.isFinite(requestedOperatingLevelOffsetDb) ? requestedOperatingLevelOffsetDb : 0,
     baseRequestedSystemOutputDb: Number.isFinite(baseRequestedSystemOutputDb) ? baseRequestedSystemOutputDb : null,
@@ -163,9 +285,13 @@ function buildCanonicalCandidate({ rawCurve, levelNormalisedRawCurve, operatingL
     operatingOutputDiagnostics: operatingOutputDiagnostics || null,
     rawResponseSignature: buildCurveSignature(rawCurve),
     generatedFilterBank: eq.filters || [],
-    finalPostEqCurve: eq.curve || [],
+    unconstrainedPostEqCurve,
+    finalPostEqCurve,
     combinedEqCurve: eq.combinedEqCurve || [],
     perSeatPostEqCurves,
+    maximumPerSeatPostEqCurves,
+    capabilityLimitedRegions: limitedRegions,
+    capabilityLimitedPointCount: finalPostEqCurve.filter((point) => point.capabilityLimited).length,
     productionHouseCurveTarget: targetCurve.map((point) => ({ ...point })),
     fitterHouseCurveTarget: (eq.fitterHouseCurveTarget || targetCurve).map((point) => ({ ...point })),
     canonicalHouseCurveShape: targetShape.map((point) => ({ ...point })),
