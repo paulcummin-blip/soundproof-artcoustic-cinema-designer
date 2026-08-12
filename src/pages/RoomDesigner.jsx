@@ -1884,6 +1884,39 @@ function RoomDesignerWithState() {
                       }}
                       onFrontSubHeightChange={(bottomHeightM) => compat.setFrontBottomHeight(bottomHeightM)}
                       onRearSubHeightChange={(bottomHeightM) => compat.setRearBottomHeight(bottomHeightM)}
+                      onSeatRowDragCommit={({ rowNumber, newY }) => {
+                        if (!Number.isFinite(newY) || !Number.isInteger(rowNumber)) return;
+                        const roundedY = Math.round(newY * 100) / 100;
+
+                        // 1) Update seatingPositions — all seats in the dragged row get the new Y
+                        if (appState?.setSeatingPositions) {
+                          appState.setSeatingPositions(prev =>
+                            (Array.isArray(prev) ? prev : []).map(s => {
+                              if (Number(s?.rowNumber) !== rowNumber) return s;
+                              return { ...s, y: roundedY };
+                            })
+                          );
+                        }
+
+                        // 2) Update rowCentersM — the dragged row's centre
+                        if (appState?.setRowCentersM) {
+                          appState.setRowCentersM(prev => {
+                            const next = Array.isArray(prev) ? prev.slice() : [];
+                            const idx = rowNumber - 1;
+                            if (idx >= 0 && idx < next.length) {
+                              next[idx] = roundedY;
+                            } else if (idx === next.length) {
+                              next.push(roundedY);
+                            }
+                            return next;
+                          });
+                        }
+
+                        // 3) Update seatingBlockOffset if row 1 changed
+                        if (rowNumber === 1 && appState?.setSeatingBlockOffset) {
+                          appState.setSeatingBlockOffset(roundedY);
+                        }
+                      }}
                     />
                   </>
                 )}

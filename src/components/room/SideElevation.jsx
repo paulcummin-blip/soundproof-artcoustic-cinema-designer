@@ -94,6 +94,7 @@ export default function SideElevation({
   onSideSpeakerMoved = null,
   onFrontSubHeightChange = null,
   onRearSubHeightChange = null,
+  onSeatRowDragCommit = null,
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
@@ -283,6 +284,11 @@ export default function SideElevation({
         window.removeEventListener('mouseup', speakerListenersRef.current.up);
         speakerListenersRef.current = null;
       }
+      if (seatRowListenersRef.current) {
+        window.removeEventListener('mousemove', seatRowListenersRef.current.move);
+        window.removeEventListener('mouseup', seatRowListenersRef.current.up);
+        seatRowListenersRef.current = null;
+      }
     };
   }, []);
 
@@ -297,6 +303,11 @@ export default function SideElevation({
   // Sub vertical-only drag state — local only, committed once on mouseup
   const [liveSubDrag, setLiveSubDrag] = useState(null); // { group, liveBottomHeightM } | null
   const liveSubDragRef = useRef(null);
+
+  // Seat row horizontal drag state — local only, committed once on mouseup
+  const [liveSeatRowDrag, setLiveSeatRowDrag] = useState(null); // { rowNumber, liveY } | null
+  const seatRowDragRef = useRef(null);
+  const seatRowListenersRef = useRef(null);
 
   // Sightline overlay toggle
   const [showSightlines, setShowSightlines] = useState(false);
@@ -422,6 +433,51 @@ export default function SideElevation({
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
   }, [onScreenHeightFromFloorChange, liveFloorM, roomH, screenData.h, drawH, SVG_H]);
+
+  // --- Seat row horizontal drag handler ---
+  // Moves an entire row along Y (room depth). Draft-only during pointer move;
+  // commits one canonical state write on pointer-up via onSeatRowDragCommit.
+  const handleSeatRowMouseDown = useCallback((e, rowNumber, startY) => {
+    if (!onSeatRowDragCommit) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    seatRowDragRef.current = { rowNumber, startClientX: e.clientX, startY, liveY: startY };
+    setLiveSeatRowDrag({ rowNumber, liveY: startY });
+    const handleMove = (me) => {
+      const svgRect = svgEl.getBoundingClientRect();
+      const svgScale = svgRect.width / SVG_W;
+      const deltaY = ((me.clientX - seatRowDragRef.current.startClientX) / svgScale / drawW) * roomL;
+      // Reuse existing seat margin from Plan View seat drag (SEAT_MARGIN_M = 0.3)
+      const SEAT_MARGIN_M = 0.3;
+      const clampedY = Math.max(
+        SEAT_MARGIN_M,
+        Math.min(roomL - SEAT_MARGIN_M, seatRowDragRef.current.startY + deltaY)
+      );
+      seatRowDragRef.current.liveY = clampedY;
+      setLiveSeatRowDrag({ rowNumber, liveY: clampedY });
+    };
+    const handleUp = () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      seatRowListenersRef.current = null;
+      const finalY = seatRowDragRef.current?.liveY ?? startY;
+      const rowNum = seatRowDragRef.current?.rowNumber ?? rowNumber;
+      seatRowDragRef.current = null;
+      setLiveSeatRowDrag(null);
+      onSeatRowDragCommit({ rowNumber: rowNum, newY: Math.round(finalY * 100) / 100 });
+    };
+    seatRowListenersRef.current = { move: handleMove, up: handleUp };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [onSeatRowDragCommit, roomL, drawW, SVG_W]);
+
+  // Resolve effective Y for a row (draft Y during drag, static Y otherwise)
+  const getRowY = (row) => {
+    if (liveSeatRowDrag && liveSeatRowDrag.rowNumber === row.rowIdx) return liveSeatRowDrag.liveY;
+    return row.y;
+  };
 
   // Populate snap targets — draggable side/rear surround speakers, updated every render
   const isDraggableSideRole = (r) => {
@@ -820,11 +876,13 @@ export default function SideElevation({
           {seatRows.map((row, i) => {
             if (i === 0 || row.platformH <= 0) return null;
             const prevRow = seatRows[i - 1];
+            const prevRowY = getRowY(prevRow);
+            const rowY = getRowY(row);
             // Seat icon spans: front = cx - 0.90m, back = cx + 0.08m (from SeatPersonIcon geometry)
             const SEAT_FRONT_M = 0.90;
             const SEAT_BACK_M = 0.08;
-            const x1 = rx(prevRow.y + SEAT_BACK_M);  // back edge of row-in-front chair → riser front
-            const x2 = rx(row.y + SEAT_BACK_M);       // back edge of raised row chair → riser back
+            const x1 = rx(prevRowY + SEAT_BACK_M);  // back edge of row-in-front chair → riser front
+            const x2 = rx(rowY + SEAT_BACK_M);       // back edge of raised row chair → riser back
             if (x2 <= x1 + 2) return null; // skip if rows are too close
             const platformTopY = rz(row.platformH);
             const floorY = rz(0);
@@ -840,20 +898,36 @@ export default function SideElevation({
 
           {/* Seat rows */}
           {seatRows.map((row, i) => {
-            const isRsp = Math.abs(row.y - rspY) < 0.15;
+            const rowY = getRowY(row);
+            const isRsp = Math.abs(rowY - rspY) < 0.15;
             const label = isRsp ? "RSP" : `R${i + 1}`;
+            const isDraggingRow = liveSeatRowDrag?.rowNumber === row.rowIdx;
             return (
-              <SeatPersonIcon
-                key={`row-${row.rowIdx}`}
-                view="side"
-                cx={rx(row.y)}
-                cy={rz(row.earZ)}
-                scale={(drawH / roomH)}
-                earHeightM={row.earZ}
-                platformHeightM={row.platformH}
-                label={label}
-                isRsp={isRsp}
-              />
+              <g key={`row-${row.rowIdx}`}>
+                <SeatPersonIcon
+                  view="side"
+                  cx={rx(rowY)}
+                  cy={rz(row.earZ)}
+                  scale={(drawH / roomH)}
+                  earHeightM={row.earZ}
+                  platformHeightM={row.platformH}
+                  label={label}
+                  isRsp={isRsp}
+                />
+                {/* Horizontal drag hit rect — moves entire row along Y */}
+                {onSeatRowDragCommit && (
+                  <rect
+                    x={rx(rowY) - 22}
+                    y={rz(row.earZ) - 22}
+                    width={44}
+                    height={44}
+                    fill="transparent"
+                    pointerEvents="all"
+                    style={{ cursor: 'ew-resize', opacity: isDraggingRow ? 0.3 : 0 }}
+                    onMouseDown={(e) => handleSeatRowMouseDown(e, row.rowIdx, row.y)}
+                  />
+                )}
+              </g>
             );
           })}
 
