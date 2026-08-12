@@ -496,15 +496,13 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           const oW = (overallW / roomW) * drawW;
           const oH = (overallH / roomH) * drawH;
           const ox = rx(screenCenterX) - oW / 2;
-          const oy = ry(screenFloorM + overallH);
+          const oy = ry(screenFloorM + screenData.h + borderM);
 
           // Viewable rect
           const sw = (screenData.w / roomW) * drawW;
           const sh = (screenData.h / roomH) * drawH;
           const sx = rx(screenCenterX) - sw / 2;
-          const sy = ry(screenFloorM + overallH - borderM) - (sh);
-          // sy = top of viewable area in SVG coords
-          const syTop = ry(screenFloorM + overallH - borderM);
+          const syTop = ry(screenFloorM + screenData.h);
 
           const labelViewable = `${(screenData.w * 100).toFixed(0)} × ${(screenData.h * 100).toFixed(0)} cm (viewable)`;
           const labelOverall = `${(overallW * 100).toFixed(0)} × ${(overallH * 100).toFixed(0)} cm overall${!hasBorderData ? ' (est. frame)' : ''}`;
