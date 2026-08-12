@@ -1,4 +1,13 @@
-import { assessP14Capability } from "@/components/utils/p14CapabilityAuthority";
+import {
+  assessP14Capability,
+  formatP14Capability,
+  formatP14BasisLabel,
+  gradeP14ForBasis,
+  gradeP14Minimum,
+  gradeP14Recommended,
+  normalizeP14TargetBasis,
+} from "@/components/utils/p14CapabilityAuthority";
+import { integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { computeParam18AchievedExtension } from "@/components/utils/rp22BassMetrics";
 import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
@@ -7,6 +16,71 @@ import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassC
 import { assessP18AgainstRequiredExtension, requiredP14ExtensionHz, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
 
 const numericLevel = (label) => Number(String(label || "").replace("L", "")) || 0;
+
+function buildPositionAwareP14Capability({
+  canonicalResult,
+  productDiagnostic,
+  targetBasis,
+  requiredExtensionHz,
+}) {
+  const maximumAfterEq = canonicalResult?.maximumSplCurveAfterEq || [];
+  const maximumBeforeEq = canonicalResult?.maximumSplCurveBeforeEq || [];
+  const deliveredDbC = integrateRawResponseLevelDbC({
+    rawCurve: maximumAfterEq,
+    lowerHz: requiredExtensionHz,
+    upperHz: 120,
+  });
+  if (!Number.isFinite(deliveredDbC)) return productDiagnostic;
+
+  const beforeEqDbC = integrateRawResponseLevelDbC({
+    rawCurve: maximumBeforeEq,
+    lowerHz: requiredExtensionHz,
+    upperHz: 120,
+  });
+  const basis = normalizeP14TargetBasis(targetBasis);
+  const assessmentPoints = maximumAfterEq.filter((point) =>
+    Number.isFinite(point?.frequency)
+    && Number.isFinite(point?.spl)
+    && point.frequency >= requiredExtensionHz
+    && point.frequency <= 120
+  );
+  const limitingPoint = assessmentPoints.reduce((lowest, point) =>
+    !lowest || point.spl < lowest.spl ? point : lowest, null);
+  const headroomConsumedByEqDb = Number.isFinite(beforeEqDbC)
+    ? Math.max(0, beforeEqDbC - deliveredDbC)
+    : productDiagnostic?.headroomConsumedByEqDb ?? null;
+
+  return {
+    ...(productDiagnostic || {}),
+    p14CapabilityDb: deliveredDbC,
+    value: deliveredDbC,
+    formatted: formatP14Capability(deliveredDbC),
+    level: gradeP14ForBasis(deliveredDbC, basis),
+    targetBasis: basis,
+    targetBasisLabel: formatP14BasisLabel(basis),
+    minimumLevel: gradeP14Minimum(deliveredDbC),
+    recommendedLevel: gradeP14Recommended(deliveredDbC),
+    rawCapabilityDb: beforeEqDbC,
+    productCapabilityBeforeEqDb: beforeEqDbC,
+    capabilityRemainingAfterEqDb: deliveredDbC,
+    eqHeadroomConsumedDb: headroomConsumedByEqDb,
+    headroomConsumedByEqDb,
+    limitingFrequency: limitingPoint?.frequency ?? null,
+    capabilityCurve: maximumAfterEq.map((point) => ({
+      frequency: point.frequency,
+      rawCapabilityDb: null,
+      positiveEqBoostDb: null,
+      remainingCapabilityDb: point.spl,
+    })),
+    requiredExtensionHz,
+    positionAware: true,
+    includesRoomGeometry: true,
+    includesProductFrequencyResponse: true,
+    includesProductOutputLimit: true,
+    source: "position-aware-authoritative-engine-maximum-spl-envelope-post-eq",
+    productOnlyDiagnostic: productDiagnostic || null,
+  };
+}
 
 export function evaluateCanonicalBassAuthority({
   canonicalResult,
@@ -17,16 +91,27 @@ export function evaluateCanonicalBassAuthority({
 } = {}) {
   if (!canonicalResult?.selectedCandidateId || !canonicalResult.canonicalPostEqRsp?.length) return null;
 
+  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
+  const requested = definitions.find((definition) => definition.value === requestedLevel) || definitions.at(-1);
+  const selectedTargetDb = requested?.p14TargetDb ?? null;
+  const requiredExtensionHz = requiredP14ExtensionHz(p14TargetBasis, requestedLevel);
   const positiveEqDemandCurve = (canonicalResult.positiveEqDemandCurve || []).map((point) => ({
     frequency: point.frequency,
     spl: Number(point.demandDb ?? point.spl) || 0,
   }));
 
-  // P14: approved continuous, frequency-dependent product capability less positive EQ demand.
-  const p14 = assessP14Capability({
+  // Retain the approved product-only assessment as a diagnostic/fallback, but
+  // publish P14 from the product-aware maximum SPL envelope at the actual RSP.
+  const productP14Diagnostic = assessP14Capability({
     activeSubs,
     combinedEqCurve: positiveEqDemandCurve,
     targetBasis: p14TargetBasis,
+  });
+  const p14 = buildPositionAwareP14Capability({
+    canonicalResult,
+    productDiagnostic: productP14Diagnostic,
+    targetBasis: p14TargetBasis,
+    requiredExtensionHz,
   });
   const achievedP14Db = p14?.value ?? null;
   const achievedP14Level = p14?.level ?? 0;
@@ -63,10 +148,6 @@ export function evaluateCanonicalBassAuthority({
   const achievedP20Level = p20?.worstSeat?.level ?? 0;
   const p20Available = !!p20?.available;
 
-  const definitions = getRp22BassOperatingDefinitions(p14TargetBasis);
-  const requested = definitions.find((definition) => definition.value === requestedLevel) || definitions.at(-1);
-  const selectedTargetDb = requested?.p14TargetDb ?? null;
-  const requiredExtensionHz = requiredP14ExtensionHz(p14TargetBasis, requestedLevel);
   const requestedP14Pass = Number.isFinite(achievedP14Db) && Number.isFinite(selectedTargetDb)
     ? achievedP14Db >= selectedTargetDb
     : null;
