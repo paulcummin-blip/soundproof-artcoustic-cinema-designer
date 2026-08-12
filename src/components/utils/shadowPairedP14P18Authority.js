@@ -2,7 +2,12 @@ import { getApprovedContinuousSplDb, getSubwooferCurve, normaliseModelKey } from
 import { p14ThresholdsForBasis, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { smoothThirdOctavePowerMean } from "@/components/utils/thirdOctavePowerMean";
 
-export const SHADOW_P18_FREQUENCIES = Object.freeze({ L1: 30, L2: 25, L3: 18, L4: 15 });
+export const SHADOW_P18_FREQUENCIES_BY_BASIS = Object.freeze({
+  minimum: Object.freeze({ L1: 35, L2: 30, L3: 20, L4: 18 }),
+  recommended: Object.freeze({ L1: 30, L2: 25, L3: 18, L4: 15 }),
+});
+// Legacy export retained for diagnostic consumers that do not supply a basis.
+export const SHADOW_P18_FREQUENCIES = SHADOW_P18_FREQUENCIES_BY_BASIS.recommended;
 export const SHADOW_SEVERE_NULL_DEPTH_DB = 10;
 const LEVELS_DESC = ["L4", "L3", "L2", "L1"];
 const REFERENCE_SOURCE_DB = 94;
@@ -164,15 +169,24 @@ export function assessShadowPairedP14P18({ activeSubs = [], perSourceComplexTran
   }
   if (!rawDeliveredCurve.length) return { status: "INCOMPLETE DATA", reason: "No shared product-and-transfer frequency range is available.", targetBasis: basis, levelResults: [] };
 
-  const postEqDeliveredCurve = rawDeliveredCurve.map((point) => {
+  const maximumPositiveEqDb = rawDeliveredCurve.reduce((maximum, point) => {
     const eqValue = interpolateInRange(combinedEqCurve, point.frequency, "spl");
-    const positiveEqCostDb = Math.max(0, finite(eqValue) ? Number(eqValue) : 0);
-    return { frequency: point.frequency, spl: point.spl - positiveEqCostDb, positiveEqCostDb };
+    return Math.max(maximum, finite(eqValue) ? Number(eqValue) : 0);
+  }, 0);
+  const postEqDeliveredCurve = rawDeliveredCurve.map((point) => {
+    const eqResponseDb = interpolateInRange(combinedEqCurve, point.frequency, "spl");
+    const appliedEqResponseDb = finite(eqResponseDb) ? Number(eqResponseDb) : 0;
+    return {
+      frequency: point.frequency,
+      spl: point.spl + appliedEqResponseDb - maximumPositiveEqDb,
+      positiveEqCostDb: maximumPositiveEqDb,
+      eqResponseDb: appliedEqResponseDb,
+    };
   });
   const smoothedDeliveredCurve = smoothThirdOctavePowerMean(postEqDeliveredCurve);
   const thresholds = p14ThresholdsForBasis(basis);
   const levelResults = LEVELS_DESC.map((level) => {
-    const cutoffHz = SHADOW_P18_FREQUENCIES[level];
+    const cutoffHz = SHADOW_P18_FREQUENCIES_BY_BASIS[basis][level];
     const unsupported = sourceDiagnostics.filter((source) => source.transferRangeHz[0] > cutoffHz || source.productRangeHz[0] > cutoffHz || source.transferRangeHz[1] < upperFrequencyHz || source.productRangeHz[1] < upperFrequencyHz);
     if (unsupported.length) return { level, cutoffHz, status: "INCOMPLETE DATA", passes: null, reason: `Required ${cutoffHz}–${upperFrequencyHz} Hz data is unsupported for ${unsupported.map((source) => source.sourceId).join(", ")}.` };
     const assessed = smoothedDeliveredCurve.filter((point) => point.frequency >= cutoffHz && point.frequency <= upperFrequencyHz);
