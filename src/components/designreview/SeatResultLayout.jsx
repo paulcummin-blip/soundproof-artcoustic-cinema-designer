@@ -29,6 +29,11 @@ import { normalizeLevel } from "@/components/designreview/needsAttentionAuthorit
 
 const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
 
+const finiteNumber = (value, fallback = 0) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
 /** Map a raw level to a compact label + canonical level colours. */
 function levelVisuals(level) {
   const norm = normalizeLevel(level);
@@ -75,8 +80,8 @@ export default function SeatResultLayout({
     }
 
     const rowEntries = Array.from(byRow.entries()).map(([rowNum, list]) => {
-      const sorted = list.slice().sort((a, b) => (Number(a?.x) ?? 0) - (Number(b?.x) ?? 0));
-      const minY = sorted.reduce((m, s) => Math.min(m, Number(s?.y) ?? 0), Infinity);
+      const sorted = list.slice().sort((a, b) => finiteNumber(a?.x) - finiteNumber(b?.x));
+      const minY = sorted.reduce((m, s) => Math.min(m, finiteNumber(s?.y)), Infinity);
       return { rowNum, seats: sorted, minY };
     });
     rowEntries.sort((a, b) => a.minY - b.minY);
@@ -143,7 +148,7 @@ export default function SeatResultLayout({
                 const val = valueFormatter ? valueFormatter(result, seat) : (result.value || "—");
                 const colors = levelVisuals(lvl);
                 const isRsp = !!seat?.isPrimary || (rspSeatId && seat.id === rspSeatId);
-                const pct = xToPct(Number(seat?.x) ?? 0);
+                const pct = xToPct(finiteNumber(seat?.x));
                 return (
                   <div
                     key={seat.id || `seat-${pct}`}
