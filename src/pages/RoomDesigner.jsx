@@ -255,6 +255,9 @@ function RoomDesignerWithState() {
 
   // NEW: Options panel state
   const [showPrices, setShowPrices] = useState(true);
+  const [priceMode, setPriceMode] = useState('incVat');
+  const [manualExtras, setManualExtras] = useState([]);
+  const [soundbarSelections, setSoundbarSelections] = useState({});
   const showAsdr = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
   const recommendedAbfuserQty = useMemo(
@@ -868,37 +871,46 @@ function RoomDesignerWithState() {
     return subs.filter(s => s?.group === 'rear');
   }, [appState?.subwoofers]);
 
-  // NEW: Calculate live room price total
+  // Single commercial pricing authority for every app surface. Product choices,
+  // acoustic treatment and manual extras all enter this one calculation.
   const priceData = usePriceCalculation({
     placedSpeakers,
     frontSubsCfg: _frontSubsCfg,
     rearSubsCfg: _rearSubsCfg,
-    difficultyMultiplier
+    difficultyMultiplier,
+    priceMode,
+    manualExtras,
+    soundbarSelections,
+    acousticTreatmentEnabled: appState?.acousticTreatmentEnabled ?? false,
+    selectedAbfuserQty: appState?.selectedAbfuserQty ?? 0,
   });
 
-  // Publish price data to window for sidebar consumption
+  const publishedPriceData = useMemo(() => ({
+    projectId: resolvedProjectId || null,
+    showPrices,
+    baseTotal: priceData.baseTotal,
+    finalTotal: priceData.displayTotal ?? priceData.finalTotal,
+    displayTotal: priceData.displayTotal ?? priceData.finalTotal,
+    difficultyMultiplier: priceData.difficultyMultiplier,
+    incompletePriceCount: priceData.incompletePriceCount || 0,
+    priceMode: priceData.priceMode,
+    territoryLabel: priceData.territoryLabel,
+    territoryCode: priceData.territoryCode,
+    currency: priceData.currency,
+    priceListAvailable: priceData.priceListAvailable,
+    breakdown: priceData.breakdown,
+    baseTotalExVat: priceData.baseTotalExVat,
+    vatAmount: priceData.vatAmount,
+    finalTotalExVat: priceData.finalTotalExVat,
+    finalTotalIncVat: priceData.finalTotalIncVat,
+  }), [resolvedProjectId, showPrices, priceData]);
+
+  // Publish the same complete snapshot for the persistent sidebar.
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.__ROOM_DESIGNER_PRICE__ = {
-        showPrices,
-        baseTotal: priceData.baseTotal,
-        finalTotal: priceData.finalTotal,
-        difficultyMultiplier,
-        incompletePriceCount: priceData.incompletePriceCount || 0,
-        // Stage D: full breakdown for Design Review
-        priceMode: priceData.priceMode,
-        territoryLabel: priceData.territoryLabel,
-        territoryCode: priceData.territoryCode,
-        currency: priceData.currency,
-        priceListAvailable: priceData.priceListAvailable,
-        breakdown: priceData.breakdown,
-        baseTotalExVat: priceData.baseTotalExVat,
-        vatAmount: priceData.vatAmount,
-        finalTotalExVat: priceData.finalTotalExVat,
-        finalTotalIncVat: priceData.finalTotalIncVat,
-      };
+      window.__ROOM_DESIGNER_PRICE__ = publishedPriceData;
     }
-  }, [showPrices, priceData, difficultyMultiplier]);
+  }, [publishedPriceData]);
 
 
 
@@ -1636,8 +1648,9 @@ function RoomDesignerWithState() {
       screen: _screen,
       dolbyLayout: dolbyPreset,
       mlpPoint: mlpAnchorEffective,
+      priceData: publishedPriceData,
     });
-  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective, loadState?.phase, appState?.isProjectHydrationReady]);
+  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective, publishedPriceData, loadState?.phase, appState?.isProjectHydrationReady]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
@@ -2028,6 +2041,12 @@ function RoomDesignerWithState() {
             difficultyMultiplier={difficultyMultiplier}
             setDifficultyMultiplier={setDifficultyMultiplier}
             priceData={priceData}
+            priceMode={priceMode}
+            setPriceMode={setPriceMode}
+            manualExtras={manualExtras}
+            setManualExtras={setManualExtras}
+            soundbarSelections={soundbarSelections}
+            setSoundbarSelections={setSoundbarSelections}
             _frontSubsCfg={_frontSubsCfg}
             _rearSubsCfg={_rearSubsCfg}
             rspMode={appState?.rspMode || "auto_from_screen"}
