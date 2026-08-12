@@ -90,6 +90,13 @@ function levelColor(norm) {
   return LEVEL_TEXT_COLORS[norm] || COLORS.body;
 }
 
+function formatPoints(earned, maximum) {
+  if (!Number.isFinite(earned) || !Number.isFinite(maximum)) return "—";
+  const roundedEarned = Math.round(earned * 100) / 100;
+  const roundedMaximum = Math.round(maximum * 100) / 100;
+  return `${roundedEarned} / ${roundedMaximum}`;
+}
+
 // ── Sub-components ───────────────────────────────────────────────────
 
 function RatingCard({ rating }) {
@@ -266,9 +273,187 @@ function LowestResultRow({ contrib, onParamClick }) {
   );
 }
 
+function ScorecardGroup({ pillar, contribs }) {
+  if (!contribs.length) return null;
+
+  return (
+    <div data-scorecard-pillar={pillar}>
+      <div
+        style={{
+          padding: "8px 14px",
+          background: "#F8F7F5",
+          borderTop: `1px solid ${COLORS.borderStrong}`,
+          borderBottom: `1px solid ${COLORS.border}`,
+          fontSize: 9,
+          fontWeight: 700,
+          color: COLORS.secondary,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          fontFamily: FONT_BODY,
+        }}
+      >
+        {pillar}
+      </div>
+      {contribs.map((contrib) => {
+        const norm = normalizeLevel(contrib.resultLevel);
+        const isFail = norm === "FAIL";
+        return (
+          <div
+            key={contrib.key}
+            data-scorecard-param={contrib.key}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(250px, 1fr) minmax(150px, 0.6fr) 70px 110px",
+              gap: 14,
+              alignItems: "center",
+              padding: "10px 14px",
+              borderBottom: `1px solid ${COLORS.border}`,
+              fontSize: 11,
+              fontFamily: FONT_BODY,
+              color: COLORS.body,
+            }}
+          >
+            <div style={{ color: COLORS.primary, fontWeight: 600 }}>
+              {getParamLabel(contrib)}
+            </div>
+            <div style={{ color: levelColor(norm), fontWeight: 700 }}>
+              {contrib.resultLevel || "—"}
+              {contrib.mode === "recommended" && (
+                <span style={{ marginLeft: 6, color: COLORS.secondary, fontSize: 9, fontWeight: 400 }}>
+                  Recommended
+                </span>
+              )}
+            </div>
+            <div style={{ textAlign: "center", color: COLORS.secondary }}>
+              {contrib.effectiveWeight ?? "—"}
+            </div>
+            <div
+              style={{
+                textAlign: "right",
+                color: isFail ? COLORS.fail : COLORS.primary,
+                fontWeight: 600,
+              }}
+            >
+              {formatPoints(contrib.earnedPoints, contrib.maximumPoints)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FullScorecard({ contributions, pillarMap, scorecardPillars, open, onToggle }) {
+  const panelId = "design-overview-full-scorecard";
+
+  return (
+    <div
+      data-testid="design-overview-scorecard"
+      style={{
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 8,
+        overflow: "hidden",
+      }}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={onToggle}
+        style={{
+          width: "100%",
+          padding: "13px 16px",
+          border: 0,
+          background: "transparent",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          cursor: "pointer",
+          color: COLORS.primary,
+          fontFamily: FONT_BODY,
+          textAlign: "left",
+        }}
+      >
+        <span>
+          <span
+            style={{
+              display: "block",
+              fontSize: 10,
+              fontWeight: 700,
+              color: COLORS.secondary,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
+            Full Scorecard
+          </span>
+          <span style={{ display: "block", marginTop: 3, fontSize: 11, color: COLORS.muted }}>
+            {contributions.length} scored parameter{contributions.length !== 1 ? "s" : ""}
+          </span>
+        </span>
+        <span aria-hidden="true" style={{ fontSize: 15, lineHeight: 1 }}>
+          {open ? "⌃" : "⌄"}
+        </span>
+      </button>
+
+      {open && (
+        <div id={panelId} style={{ borderTop: `1px solid ${COLORS.borderStrong}` }}>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 650 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(250px, 1fr) minmax(150px, 0.6fr) 70px 110px",
+                  gap: 14,
+                  padding: "9px 14px",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: COLORS.secondary,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  fontFamily: FONT_BODY,
+                }}
+              >
+                <div>Parameter</div>
+                <div>Result</div>
+                <div style={{ textAlign: "center" }}>Weight</div>
+                <div style={{ textAlign: "right" }}>Score</div>
+              </div>
+              {scorecardPillars.map((pillar) => (
+                <ScorecardGroup
+                  key={pillar}
+                  pillar={pillar}
+                  contribs={pillarMap[pillar] || []}
+                />
+              ))}
+            </div>
+          </div>
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "#F8F7F5",
+              color: COLORS.secondary,
+              fontSize: 10,
+              fontFamily: FONT_BODY,
+              lineHeight: 1.45,
+            }}
+          >
+            Score is points earned / maximum available. Only active, definitively scored
+            parameters are included.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ──────────────────────────────────────────────────
 
 export default function DesignOverviewBlock({ rating, recommendations, onParamClick, onShowRecommendations }) {
+  const [scorecardOpen, setScorecardOpen] = React.useState(false);
+
   if (!rating || rating.status === "NOT_ASSESSED") {
     return (
       <div
@@ -295,6 +480,10 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
     if (!pillarMap[pillar]) pillarMap[pillar] = [];
     pillarMap[pillar].push(contrib);
   }
+  const scorecardPillars = [
+    ...PILLAR_ORDER,
+    ...Object.keys(pillarMap).filter((pillar) => !PILLAR_ORDER.includes(pillar)),
+  ];
 
   // Lowest performance results (FAIL first, then L1, then L2)
   const lowestResults = getLowestPerformanceResults(contributions);
@@ -332,6 +521,15 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
           />
         ))}
       </div>
+
+      {/* Full canonical scorecard — collapsed by default */}
+      <FullScorecard
+        contributions={contributions}
+        pillarMap={pillarMap}
+        scorecardPillars={scorecardPillars}
+        open={scorecardOpen}
+        onToggle={() => setScorecardOpen((current) => !current)}
+      />
 
       {/* Lowest Performance Results */}
       <div
