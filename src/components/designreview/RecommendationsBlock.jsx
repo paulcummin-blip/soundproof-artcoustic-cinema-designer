@@ -34,9 +34,13 @@ const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
 function formatCurrency(amount, currency) {
-  if (!Number.isFinite(Number(amount))) return "—";
-  const sym = currency === "GBP" ? "£" : currency === "EUR" ? "€" : currency === "USD" ? "$" : "";
-  return `${sym}${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  if (amount == null || !Number.isFinite(Number(amount))) return "—";
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: currency || 'GBP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(Number(amount)));
 }
 
 export default function RecommendationsBlock({ asdrData, priceData }) {
@@ -140,7 +144,9 @@ export default function RecommendationsBlock({ asdrData, priceData }) {
                       fontWeight: 600,
                       whiteSpace: "nowrap",
                     }}>
-                      {line.displaySubtotal || (line.unitPriceExVat == null ? "price not set" : "—")}
+                      {line.displaySubtotal != null
+                        ? formatCurrency(line.displaySubtotal, currency)
+                        : (line.unitPriceExVat == null ? "Price not set" : "—")}
                     </span>
                   </div>
                 ))}
@@ -156,7 +162,7 @@ export default function RecommendationsBlock({ asdrData, priceData }) {
             flexDirection: "column",
             gap: 4,
           }}>
-            <PriceRow label="Subtotal" value={priceData.baseTotal} muted />
+            <PriceRow label="Subtotal" value={formatCurrency(priceData.baseTotal, currency)} muted />
             {difficultyMultiplier !== 1.0 && (
               <PriceRow label={`Difficulty multiplier ×${difficultyMultiplier.toFixed(2)}`} value={null} muted />
             )}
@@ -185,7 +191,7 @@ export default function RecommendationsBlock({ asdrData, priceData }) {
                 color: COLORS.primary,
                 fontFamily: FONT_HEADING,
               }}>
-                {priceData.finalTotal || "—"}
+                {formatCurrency(priceData.finalTotal, currency)}
               </span>
             </div>
             {territoryLabel && (
