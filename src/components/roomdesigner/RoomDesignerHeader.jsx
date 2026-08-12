@@ -72,7 +72,7 @@ export default function RoomDesignerHeader({
             style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <FileText className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
-            Design Review
+            Technical Report
           </Button>
         </div>
       </div>
