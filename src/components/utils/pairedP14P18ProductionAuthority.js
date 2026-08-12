@@ -6,7 +6,7 @@ import {
 } from "@/components/utils/shadowPairedP14P18Authority";
 
 export const PAIRED_P14_P18_AUTHORITY_METHOD = "position-aware-paired-p14-p18";
-export const PAIRED_P14_P18_AUTHORITY_VERSION = "1.1.0";
+export const PAIRED_P14_P18_AUTHORITY_VERSION = "1.2.0";
 export const PAIRED_P14_P18_CONTRACT_SCHEMA_VERSION = "paired-p14-p18-production-contract:v2";
 export const PAIRED_ASSESSMENT_STATUSES = Object.freeze(["PASS", "FAIL", "INCOMPLETE DATA"]);
 
