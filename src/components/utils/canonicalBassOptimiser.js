@@ -388,6 +388,14 @@ export function generateCanonicalCandidatePool({
   // Resolve seat curves before computing the operating-level offset.
   const seats = (Array.isArray(perSeatRawCurves) ? perSeatRawCurves : [])
     .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
+  // The authoritative engine output is the maximum product-aware response at
+  // each position. Reserve the same continuous-output safety margin used by
+  // the P14 authority before it becomes the hard graph/EQ envelope.
+  const maximumSplCurveBeforeEq = applyMaximumSplSafetyMargin(rawCurve);
+  const perSeatMaximumSplCurves = seats.map((seat) => ({
+    ...seat,
+    responseData: applyMaximumSplSafetyMargin(seat.responseData),
+  }));
   // ── Source output before and after global trim ──
   // baseRequestedSystemOutputDb is the configured LFE output level (the level
   // the headroom calculation subtracts from the manufacturer capability curve).
@@ -500,7 +508,10 @@ export function generateCanonicalCandidatePool({
   report("Canonical house-curve fit complete");
 
   const eqCandidates = eqResults.map((eq) => buildCanonicalCandidate({
-    rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
+    rawCurve, maximumSplCurveBeforeEq, levelNormalisedRawCurve,
+    operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
+    perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
+    eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
   }));
 
@@ -563,8 +574,10 @@ export function generateCanonicalCandidatePool({
         stopReason: `salvaged sanitised bank — ${salvage.sanitisedFilters.length} filter(s) retained`,
       });
       salvagedCandidates.push(buildCanonicalCandidate({
-        rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
-        perSeatRawCurves: levelNormalisedSeats, eq: sanitisedEq, domains, targetCurve, targetShape,
+        rawCurve, maximumSplCurveBeforeEq, levelNormalisedRawCurve,
+        operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
+        perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
+        eq: sanitisedEq, domains, targetCurve, targetShape,
         verticalOffsetDb, protectedNullRegions,
         baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
       }));
@@ -581,8 +594,10 @@ export function generateCanonicalCandidatePool({
         stopReason: `salvaged cut-only bank — ${salvage.cutOnlyFilters.length} cut filter(s) retained`,
       });
       salvagedCandidates.push(buildCanonicalCandidate({
-        rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
-        perSeatRawCurves: levelNormalisedSeats, eq: cutOnlyEq, domains, targetCurve, targetShape,
+        rawCurve, maximumSplCurveBeforeEq, levelNormalisedRawCurve,
+        operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
+        perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
+        eq: cutOnlyEq, domains, targetCurve, targetShape,
         verticalOffsetDb, protectedNullRegions,
         baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
       }));
@@ -627,7 +642,10 @@ export function generateCanonicalCandidatePool({
     perSeatMetrics: [],
   };
   const identityCandidate = buildCanonicalCandidate({
-    rawCurve, levelNormalisedRawCurve, operatingLevelOffsetDb: appliedOperatingLevelOffsetDb, perSeatRawCurves: levelNormalisedSeats, eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
+    rawCurve, maximumSplCurveBeforeEq, levelNormalisedRawCurve,
+    operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
+    perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
+    eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
     baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
   });
   const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, ...salvagedCandidates, identityCandidate]);
