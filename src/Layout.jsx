@@ -118,8 +118,19 @@ export default function Layout({ children, currentPageName }) {
   // Listen for price updates from Room Designer
   React.useEffect(() => {
     const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && window.__ROOM_DESIGNER_PRICE__) {
-        setPriceSummary(window.__ROOM_DESIGNER_PRICE__);
+      if (typeof window !== 'undefined') {
+        const sharedPrice = window.__ROOM_DESIGNER_PRICE__;
+        const sameProject =
+          sharedPrice &&
+          activeProjectId &&
+          String(sharedPrice.projectId || '') === String(activeProjectId);
+        if (sameProject) {
+          setPriceSummary(sharedPrice);
+        } else {
+          setPriceSummary((previous) => previous.showPrices
+            ? { ...previous, showPrices: false }
+            : previous);
+        }
       }
       if (typeof window !== 'undefined' && window.__ROOM_DESIGNER_ASDR__) {
         setAsdrRating(window.__ROOM_DESIGNER_ASDR__.rating || null);
@@ -128,7 +139,7 @@ export default function Layout({ children, currentPageName }) {
     }, 500); // Poll every 500ms for updates
     
     return () => clearInterval(interval);
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     log.debug(`[Layout] Page: ${currentPageName}`);
