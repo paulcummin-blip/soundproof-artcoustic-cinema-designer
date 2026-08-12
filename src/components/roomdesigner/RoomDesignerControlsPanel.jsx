@@ -139,6 +139,12 @@ export default function RoomDesignerControlsPanel({
   difficultyMultiplier,
   setDifficultyMultiplier,
   priceData,
+  priceMode,
+  setPriceMode,
+  manualExtras,
+  setManualExtras,
+  soundbarSelections,
+  setSoundbarSelections,
   _frontSubsCfg,
   _rearSubsCfg,
   // RSP mode
@@ -638,9 +644,12 @@ export default function RoomDesignerControlsPanel({
             difficultyMultiplier={difficultyMultiplier}
             setDifficultyMultiplier={setDifficultyMultiplier}
             priceData={priceData}
-            placedSpeakers={placedSpeakers}
-            frontSubsCfg={_frontSubsCfg}
-            rearSubsCfg={_rearSubsCfg}
+            priceMode={priceMode}
+            setPriceMode={setPriceMode}
+            manualExtras={manualExtras}
+            setManualExtras={setManualExtras}
+            soundbarSelections={soundbarSelections}
+            setSoundbarSelections={setSoundbarSelections}
             acousticTreatmentEnabled={acousticTreatmentEnabled}
             setAcousticTreatmentEnabled={setAcousticTreatmentEnabled}
             selectedAbfuserQty={selectedAbfuserQty}
