@@ -59,6 +59,7 @@ export function publishDesignReviewHandoff(snapshot) {
     screen: published.screen,
     dolbyLayout: published.dolbyLayout,
     mlpPoint: published.mlpPoint,
+    priceData: published.priceData,
   };
 
   try {
