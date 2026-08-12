@@ -25,6 +25,7 @@
 import React from "react";
 import TechnicalLevelBadge from "@/components/report/technical/TechnicalLevelBadge";
 import SeatDetailTable from "@/components/designreview/SeatDetailTable";
+import SeatResultLayout from "@/components/designreview/SeatResultLayout";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
 
 const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
@@ -126,6 +127,7 @@ export default function ExpandedParameterDetail({
   lockedSeatId,
   category,
   humanTitle,
+  seatingPositions,
 }) {
   const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
   const resolvedThresholds = resolveThresholds(param);
@@ -216,6 +218,17 @@ export default function ExpandedParameterDetail({
           {achievedValue || "—"}
         </div>
       </div>
+
+      {/* Seat result layout map for SEAT-scope parameters — actual seating geometry */}
+      {isSeatScope && seatGridData && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <SeatResultLayout
+            seatingPositions={seatingPositions}
+            seatResults={seatGridData}
+            rspSeatId={lockedSeatId}
+          />
+        </div>
+      )}
 
       {/* Seat table for SEAT-scope parameters — every real seat */}
       {isSeatScope && seatGridData && (

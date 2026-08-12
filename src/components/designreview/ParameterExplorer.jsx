@@ -453,6 +453,7 @@ export default function ParameterExplorer({
                     lockedSeatId={lockedSeatId}
                     category={category}
                     humanTitle={humanTitle}
+                    seatingPositions={seats}
                   />
                 )}
               </div>
