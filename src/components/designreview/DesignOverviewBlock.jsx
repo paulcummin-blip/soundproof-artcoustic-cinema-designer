@@ -13,6 +13,7 @@
 
 import React from "react";
 import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
+import { getNeedsAttention, getWeaknessBand } from "@/components/designreview/needsAttentionAuthority";
 
 const COLORS = {
   bg: "transparent",
@@ -54,19 +55,6 @@ function getParamLabel(contrib) {
   return `P${num}  ${getHumanTitleForParam(num)}`;
 }
 
-/** Returns 3 (FAIL) > 2 (L1) > 1 (L2) > 0 (OK). Display-only. */
-function getWeaknessBand(resultLevel) {
-  const str = String(resultLevel || "");
-  if (str.includes("FAIL")) return 3;
-  if (str.includes("L1")) return 2;
-  if (str.includes("L2")) return 1;
-  return 0;
-}
-
-function getContributionLoss(c) {
-  return (c.maximumPoints || 0) - (c.earnedPoints || 0);
-}
-
 function summarizePillar(contribs) {
   const counts = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0, total: 0 };
   for (const c of contribs) {
@@ -90,22 +78,6 @@ function formatPillarSummary(counts) {
   if (counts.L1) parts.push(`${counts.L1}×L1`);
   if (counts.FAIL) parts.push(`${counts.FAIL}×FAIL`);
   return parts.length ? parts.join(" · ") : "—";
-}
-
-/** Display-order sort: FAIL first, then L1, then L2. Within band, larger loss first. */
-function getNeedsAttention(contributions) {
-  return contributions
-    .filter((c) => c.resultLevel && getWeaknessBand(c.resultLevel) > 0)
-    .sort((a, b) => {
-      const bandA = getWeaknessBand(a.resultLevel);
-      const bandB = getWeaknessBand(b.resultLevel);
-      if (bandA !== bandB) return bandB - bandA;
-      const lossA = getContributionLoss(a);
-      const lossB = getContributionLoss(b);
-      if (lossA !== lossB) return lossB - lossA;
-      return (b.effectiveWeight || 0) - (a.effectiveWeight || 0);
-    })
-    .slice(0, 5);
 }
 
 function getSeverityLabel(band) {
@@ -243,7 +215,7 @@ function PillarSummaryCard({ pillar, contribs }) {
   );
 }
 
-function NeedsAttentionRow({ contrib }) {
+function NeedsAttentionRow({ contrib, onParamClick }) {
   const band = getWeaknessBand(contrib.resultLevel);
   const sev = getSeverityColors(band);
 
@@ -251,7 +223,8 @@ function NeedsAttentionRow({ contrib }) {
     <div
       data-param-key={contrib.key}
       data-param-number={contrib.parameter}
-      title="Parameter explorer coming in Stage C"
+      onClick={() => onParamClick?.(contrib.key)}
+      title="Click to explore parameter"
       style={{
         display: "flex",
         alignItems: "center",
@@ -306,7 +279,7 @@ function NeedsAttentionRow({ contrib }) {
 
 // ── Main component ──────────────────────────────────────────────────
 
-export default function DesignOverviewBlock({ rating, recommendations }) {
+export default function DesignOverviewBlock({ rating, recommendations, onParamClick }) {
   if (!rating || rating.status === "NOT_ASSESSED") {
     return (
       <div style={{
@@ -390,7 +363,7 @@ export default function DesignOverviewBlock({ rating, recommendations }) {
           </div>
         ) : (
           needsAttention.map((contrib) => (
-            <NeedsAttentionRow key={contrib.key} contrib={contrib} />
+            <NeedsAttentionRow key={contrib.key} contrib={contrib} onParamClick={onParamClick} />
           ))
         )}
       </div>

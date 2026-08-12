@@ -1,27 +1,32 @@
 /**
  * DesignReviewPage.jsx
  * ---------------------
- * Stage B — In-app Design Review workspace.
+ * Stage B + C — In-app Design Review workspace.
  *
  * Route: /DesignReview?projectId={projectId}
  *
  * Four collapsible sections:
  *   1. Design Overview (OPEN by default) — rating, pillar summaries, needs attention, rec snapshot
  *   2. Drawings & Geometry (collapsed) — placeholder
- *   3. Parameter Details (collapsed) — placeholder
+ *   3. Parameter Details (controlled) — compact parameter explorer
  *   4. Recommendations & Products (collapsed) — placeholder
  *
+ * Stage C: Design Overview → Parameter Details navigation.
+ * Clicking a Needs Attention row opens Parameter Details, sets filter to
+ * Needs Attention, expands the clicked parameter, and scrolls to it.
+ *
  * CRITICAL: Does NOT mount useRP22AnalysisEngine or DesignRecommendationEngine.
- * Reads the already-settled rating + recommendations from the shared
- * window.__ROOM_DESIGNER_ASDR__ store published by the Room Designer.
+ * Reads the already-settled rating + recommendations + analysisResult from the
+ * shared window.__ROOM_DESIGNER_ASDR__ store published by the Room Designer.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import DesignOverviewBlock from "@/components/designreview/DesignOverviewBlock";
+import ParameterExplorer from "@/components/designreview/ParameterExplorer";
 import { ArrowLeft, BarChart3, PenTool, ListChecks, Package } from "lucide-react";
 
 const COLORS = {
@@ -51,6 +56,11 @@ export default function DesignReviewPage() {
   const [asdrData, setAsdrData] = useState(null);
   const [loadingProject, setLoadingProject] = useState(true);
 
+  // Stage C: Parameter Explorer state (page-level)
+  const [paramDetailsOpen, setParamDetailsOpen] = useState(false);
+  const [expandedParamKey, setExpandedParamKey] = useState(null);
+  const [activeFilter, setActiveFilter] = useState("needs");
+
   // Fetch project details (name, client) for the header
   useEffect(() => {
     if (!projectId) {
@@ -77,7 +87,6 @@ export default function DesignReviewPage() {
   }, [projectId]);
 
   // Poll the shared ASDR store published by the Room Designer.
-  // No second analysis engine — reads the already-settled rating + recommendations.
   useEffect(() => {
     const read = () => {
       const shared = typeof window !== "undefined" ? window.__ROOM_DESIGNER_ASDR__ : null;
@@ -94,6 +103,22 @@ export default function DesignReviewPage() {
     const interval = setInterval(read, 500);
     return () => clearInterval(interval);
   }, [projectId]);
+
+  // Stage C: Handle Needs Attention row click from Design Overview
+  const handleParamClick = useCallback((paramKey) => {
+    if (!paramKey) return;
+    setParamDetailsOpen(true);
+    setActiveFilter("needs");
+    setExpandedParamKey(paramKey);
+  }, []);
+
+  const handleExpandParam = useCallback((key) => {
+    setExpandedParamKey(key);
+  }, []);
+
+  const handleFilterChange = useCallback((filter) => {
+    setActiveFilter(filter);
+  }, []);
 
   const handleBack = () => {
     if (projectId) navigate(`/RoomDesigner?projectId=${projectId}`);
@@ -189,6 +214,7 @@ export default function DesignReviewPage() {
           <DesignOverviewBlock
             rating={asdrData?.rating}
             recommendations={asdrData?.recommendations}
+            onParamClick={handleParamClick}
           />
         </CollapsiblePanel>
 
@@ -202,8 +228,18 @@ export default function DesignReviewPage() {
         <CollapsiblePanel
           title="Parameter Details"
           icon={<ListChecks style={{ width: 16, height: 16, color: COLORS.primary }} />}
+          isOpen={paramDetailsOpen}
+          onToggle={() => setParamDetailsOpen(prev => !prev)}
         >
-          <PlaceholderBlock text="Parameter explorer will appear here in Stage C." />
+          <ParameterExplorer
+            rating={asdrData?.rating}
+            analysisResult={asdrData?.analysisResult}
+            projectId={projectId}
+            expandedParamKey={expandedParamKey}
+            onExpandParam={handleExpandParam}
+            activeFilter={activeFilter}
+            onFilterChange={handleFilterChange}
+          />
         </CollapsiblePanel>
 
         <CollapsiblePanel

@@ -57,7 +57,7 @@ const formatThresholdValue = (value, unit, direction) => {
   return isEq ? `${value}${unitStr}` : `${ineq} ${value}${unitStr}`;
 };
 
-function ThresholdStrip({ thresholds, unit }) {
+function ThresholdStrip({ thresholds, unit, fontSize = "8pt" }) {
   const levels = ["L4", "L3", "L2", "L1"];
   return (
     <div
@@ -66,7 +66,7 @@ function ThresholdStrip({ thresholds, unit }) {
         alignItems: "center",
         justifyContent: "center",
         gap: 0,
-        fontSize: "8pt",
+        fontSize: fontSize,
         color: "#625143",
         fontFamily: BODY_FONT,
         flexWrap: "wrap",
@@ -109,8 +109,28 @@ export default function TechnicalParameterCard({
   targetBasisNote,
   rspLabel,
   asdrFooter = null,
+  variant = "print",
 }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
+  const isScreen = variant === "screen";
+
+  // Screen variant: px/rem units, no print-only styles, responsive width.
+  // Print variant: mm units, print pagination (unchanged).
+  const u = isScreen
+    ? {
+        pad: "16px 20px", gap: "10px", brk: false,
+        mt1: "4px", mt2: "6px", ptTop: "10px", ptTop2: "6px",
+        resultPad: "10px 14px", metaGap: "6px 14px",
+        fsLabel: "11px", fsCategory: "10px", fsTitle: "18px",
+        fsValue: "22px", fsBody: "13px", fsThreshold: "11px",
+      }
+    : {
+        pad: "5mm 6mm", gap: "2.5mm", brk: true,
+        mt1: "1mm", mt2: "1.5mm", ptTop: "2.5mm", ptTop2: "1.5mm",
+        resultPad: "3mm 4mm", metaGap: "2mm 4mm",
+        fsLabel: "7.5pt", fsCategory: "7pt", fsTitle: "12.5pt",
+        fsValue: "18pt", fsBody: "8.5pt", fsThreshold: "8pt",
+      };
 
   return (
     <div
@@ -119,12 +139,11 @@ export default function TechnicalParameterCard({
         background: "#FFFFFF",
         border: "1px solid #E6E4DD",
         borderRadius: 6,
-        padding: "5mm 6mm",
+        padding: u.pad,
         display: "flex",
         flexDirection: "column",
-        gap: "2.5mm",
-        breakInside: "avoid",
-        pageBreakInside: "avoid",
+        gap: u.gap,
+        ...(u.brk ? { breakInside: "avoid", pageBreakInside: "avoid" } : {}),
         boxSizing: "border-box",
       }}
     >
@@ -140,7 +159,7 @@ export default function TechnicalParameterCard({
         >
           <span
             style={{
-              fontSize: "7.5pt",
+              fontSize: u.fsLabel,
               fontWeight: 600,
               color: "#625143",
               letterSpacing: "0.08em",
@@ -152,7 +171,7 @@ export default function TechnicalParameterCard({
           </span>
           <span
             style={{
-              fontSize: "7pt",
+              fontSize: u.fsCategory,
               color: "#9B8E82",
               letterSpacing: "0.06em",
               textTransform: "uppercase",
@@ -164,12 +183,12 @@ export default function TechnicalParameterCard({
         </div>
         <div
           style={{
-            fontSize: "12.5pt",
+            fontSize: u.fsTitle,
             fontWeight: 400,
             color: "#213428",
             fontFamily: HEADING_FONT,
             lineHeight: 1.2,
-            marginTop: "1mm",
+            marginTop: u.mt1,
             letterSpacing: "0.005em",
           }}
         >
@@ -183,7 +202,7 @@ export default function TechnicalParameterCard({
           display: "flex",
           alignItems: "center",
           gap: 12,
-          padding: "3mm 4mm",
+          padding: u.resultPad,
           background: "#F8F7F5",
           borderRadius: 4,
           border: "1px solid #EFEEEA",
@@ -192,7 +211,7 @@ export default function TechnicalParameterCard({
         <TechnicalLevelBadge level={lvl} />
         <div
           style={{
-            fontSize: "18pt",
+            fontSize: u.fsValue,
             fontWeight: 700,
             color: "#213428",
             fontFamily: HEADING_FONT,
@@ -207,7 +226,7 @@ export default function TechnicalParameterCard({
       {/* 3. SHORT TECHNICAL EXPLANATION */}
       <div
         style={{
-          fontSize: "8.5pt",
+          fontSize: u.fsBody,
           color: "#3E4349",
           lineHeight: 1.45,
           fontFamily: BODY_FONT,
@@ -221,8 +240,8 @@ export default function TechnicalParameterCard({
         style={{
           display: "flex",
           flexWrap: "wrap",
-          gap: "2mm 4mm",
-          fontSize: "7.5pt",
+          gap: u.metaGap,
+          fontSize: u.fsLabel,
           color: "#625143",
           fontFamily: BODY_FONT,
           lineHeight: 1.3,
@@ -247,7 +266,7 @@ export default function TechnicalParameterCard({
 
       {/* 5. SEAT PARAMETERS */}
       {isSeatScope && seatGridData && (
-        <div style={{ paddingTop: "1mm" }}>
+        <div style={{ paddingTop: u.ptTop2 }}>
           <TechnicalSeatGrid data={seatGridData} />
         </div>
       )}
@@ -256,21 +275,21 @@ export default function TechnicalParameterCard({
       <div
         style={{
           marginTop: "auto",
-          paddingTop: "2.5mm",
+          paddingTop: u.ptTop,
           borderTop: "1px solid #EFEEEA",
         }}
       >
-        <ThresholdStrip thresholds={param.thresholds} unit={param.unit} />
+        <ThresholdStrip thresholds={param.thresholds} unit={param.unit} fontSize={u.fsThreshold} />
       </div>
 
       {/* 7. ASDR FOOTER — subtle engineering annotation (only when participating) */}
       {asdrFooter && (
         <div
           style={{
-            marginTop: "1.5mm",
-            paddingTop: "1.5mm",
+            marginTop: u.mt2,
+            paddingTop: u.mt2,
             borderTop: "1px solid #EFEEEA",
-            fontSize: "7pt",
+            fontSize: u.fsCategory,
             color: "#625143",
             fontFamily: BODY_FONT,
             letterSpacing: "0.04em",
