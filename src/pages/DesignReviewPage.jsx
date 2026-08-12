@@ -23,7 +23,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { useAppState } from "@/components/AppStateProvider";
+import { readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import ReportCover from "@/components/report/ReportCover";
@@ -61,25 +61,23 @@ export default function DesignReviewPage() {
   const [loadingProject, setLoadingProject] = useState(true);
 
   // ── Resolved seating authority ──
-  // Live AppState seats are only used when the ASDR store (published by Room
-  // Designer) confirms they belong to the SAME current project. Otherwise we
-  // fall back to the persisted Project entity's seating_positions. This prevents
-  // stale seats from a different project (or a fresh tab) from polluting the
-  // Design Review seat result map.
-  const app = useAppState();
+  // Same-project Room Designer seats are carried with the canonical result
+  // handoff. A direct load (or a project without a usable handoff) falls back
+  // to the persisted Project geometry. Never infer seat ownership from whatever
+  // AppState happens to contain on this route.
   const resolvedSeatingPositions = useMemo(() => {
-    const liveSeats = Array.isArray(app?.seatingPositions) ? app.seatingPositions : [];
-    const asdrProjectId = asdrData?.projectId;
-    const liveBelongsToCurrentProject =
-      asdrData &&
-      String(asdrProjectId || "") === String(projectId || "") &&
-      liveSeats.length > 0;
-    if (liveBelongsToCurrentProject) return liveSeats;
-    const persistedSeats = Array.isArray(projectDetails?.seating_positions)
+    const handoffSeats = Array.isArray(asdrData?.seatingPositions)
+      ? asdrData.seatingPositions
+      : [];
+    const handoffBelongsToCurrentProject =
+      String(asdrData?.projectId || "") === String(projectId || "") &&
+      handoffSeats.length > 0;
+    if (handoffBelongsToCurrentProject) return handoffSeats;
+
+    return Array.isArray(projectDetails?.seating_positions)
       ? projectDetails.seating_positions
       : [];
-    return persistedSeats;
-  }, [app?.seatingPositions, asdrData, projectId, projectDetails]);
+  }, [asdrData, projectId, projectDetails]);
 
   // Stage C: Parameter Explorer state (page-level)
   const [paramDetailsOpen, setParamDetailsOpen] = useState(false);
@@ -97,6 +95,9 @@ export default function DesignReviewPage() {
       return;
     }
     let cancelled = false;
+    // Clear the previous project's record before fetching the next one so its
+    // seat geometry cannot render under the new project identity.
+    setProjectDetails(null);
     setLoadingProject(true);
     base44.entities.Project.filter({ id: projectId }).then((results) => {
       if (cancelled) return;
@@ -110,23 +111,21 @@ export default function DesignReviewPage() {
     return () => { cancelled = true; };
   }, [projectId]);
 
-  // Poll the shared ASDR store published by the Room Designer.
+  // Read the live same-window handoff first, then the project-scoped stored
+  // snapshot for direct/new-tab loads. Stored data is accepted only after the
+  // current Project record has loaded and passed the freshness check.
   useEffect(() => {
     const read = () => {
-      const shared = typeof window !== "undefined" ? window.__ROOM_DESIGNER_ASDR__ : null;
-      if (
-        shared &&
-        String(shared.projectId || "") === String(projectId || "")
-      ) {
-        setAsdrData(shared);
-      } else {
-        setAsdrData(null);
-      }
+      const shared = readDesignReviewHandoff(projectId, {
+        projectUpdatedAt: projectDetails?.updated_date,
+        allowStored: !loadingProject,
+      });
+      setAsdrData(shared);
     };
     read();
     const interval = setInterval(read, 500);
     return () => clearInterval(interval);
-  }, [projectId]);
+  }, [projectId, projectDetails?.updated_date, loadingProject]);
 
   // Stage D: Poll the shared price store published by the Room Designer.
   useEffect(() => {
