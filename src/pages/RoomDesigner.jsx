@@ -17,6 +17,7 @@ import {
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
+import { publishDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -1594,25 +1595,26 @@ function RoomDesignerWithState() {
 
   const [designRecommendations, setDesignRecommendations] = React.useState(null);
 
-  // Publish ASDR rating + evaluated recommendations to the shared sidebar.
+  // Publish the already-settled Room Designer authority for same-window and
+  // direct/new-tab Design Review loads. This is transport only — Design Review
+  // still does not mount another analysis or recommendation engine.
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.__ROOM_DESIGNER_ASDR__ = {
-        projectId: resolvedProjectId || projectIdState || "free",
-        showAsdr,
-        rating: appDesignRating,
-        recommendations: designRecommendations,
-        analysisResult,
-        // Stage D: drawing state for Design Review (read-only, no second engine)
-        placedSpeakers,
-        frontSubs: frontSubsForRendering,
-        rearSubs: rearSubsForRendering,
-        screen: _screen,
-        dolbyLayout: dolbyPreset,
-        mlpPoint: mlpAnchorEffective,
-      };
-    }
-  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective]);
+    publishDesignReviewHandoff({
+      projectId: resolvedProjectId || projectIdState || "free",
+      showAsdr,
+      rating: appDesignRating,
+      recommendations: designRecommendations,
+      analysisResult,
+      seatingPositions: _seatingPositions,
+      // Stage D: drawing state for Design Review (read-only, no second engine)
+      placedSpeakers,
+      frontSubs: frontSubsForRendering,
+      rearSubs: rearSubsForRendering,
+      screen: _screen,
+      dolbyLayout: dolbyPreset,
+      mlpPoint: mlpAnchorEffective,
+    });
+  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
