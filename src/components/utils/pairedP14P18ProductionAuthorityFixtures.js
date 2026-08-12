@@ -70,7 +70,7 @@ function runCoverageFixtures() {
   const missingProduct = production({ activeSubs: [{ id: "s1", modelKey: "not-approved" }] });
   return [
     check("20 Hz data assesses L1 and L2", ["PASS", "FAIL"].includes(startsAt20.assessments.minimum.levels.L1.status) && ["PASS", "FAIL"].includes(startsAt20.assessments.minimum.levels.L2.status), "L1/L2 assessed", `${startsAt20.assessments.minimum.levels.L1.status}/${startsAt20.assessments.minimum.levels.L2.status}`),
-    check("20 Hz data leaves L3 and L4 incomplete", startsAt20.assessments.minimum.levels.L3.status === "INCOMPLETE DATA" && startsAt20.assessments.minimum.levels.L4.status === "INCOMPLETE DATA", "INCOMPLETE DATA/INCOMPLETE DATA", `${startsAt20.assessments.minimum.levels.L3.status}/${startsAt20.assessments.minimum.levels.L4.status}`),
+    check("20 Hz data assesses Minimum L3 but leaves Minimum L4 incomplete", ["PASS", "FAIL"].includes(startsAt20.assessments.minimum.levels.L3.status) && startsAt20.assessments.minimum.levels.L4.status === "INCOMPLETE DATA", "L3 assessed / L4 INCOMPLETE DATA", `${startsAt20.assessments.minimum.levels.L3.status}/${startsAt20.assessments.minimum.levels.L4.status}`),
     check("Missing complex transfer awards no grade", missingTransfer.status === "INCOMPLETE DATA" && missingTransfer.assessments.minimum.winningLevel == null, "INCOMPLETE DATA, no grade", `${missingTransfer.status}/${missingTransfer.assessments.minimum.winningLevel}`),
     check("Missing product capability awards no grade", missingProduct.status === "INCOMPLETE DATA" && missingProduct.assessments.minimum.winningLevel == null, "INCOMPLETE DATA, no grade", `${missingProduct.status}/${missingProduct.assessments.minimum.winningLevel}`),
   ];
@@ -98,10 +98,12 @@ function runEqFixtures() {
   const boost80 = production({ combinedEqCurve: [{ frequency: 15, spl: 0 }, { frequency: 79, spl: 0 }, { frequency: 80, spl: 3 }, { frequency: 81, spl: 0 }, { frequency: 120, spl: 0 }] });
   const boost150 = production({ combinedEqCurve: [{ frequency: 15, spl: 0 }, { frequency: 120, spl: 0 }, { frequency: 150, spl: 6 }] });
   const cuts = production({ combinedEqCurve: [{ frequency: 15, spl: -4 }, { frequency: 120, spl: -4 }] });
+  const raw79 = boost80.curves.rawDeliveredCurve.find((point) => Math.abs(point.frequency - 79) < 1e-9);
+  const post79 = boost80.curves.postEqDeliveredCurve.find((point) => Math.abs(point.frequency - 79) < 1e-9);
   const raw80 = boost80.curves.rawDeliveredCurve.find((point) => Math.abs(point.frequency - 80) < 1e-9);
   const post80 = boost80.curves.postEqDeliveredCurve.find((point) => Math.abs(point.frequency - 80) < 1e-9);
   return [
-    check("Positive EQ at 80 Hz consumes capability", Math.abs((raw80.spl - post80.spl) - 3) < 1e-9 && boost80.eqHeadroom.maximumPositiveEqCostDb === 3, "3 dB", boost80.eqHeadroom.maximumPositiveEqCostDb),
+    check("Positive EQ consumes global headroom while preserving maximum at the boosted frequency", Math.abs(raw80.spl - post80.spl) < 1e-9 && Math.abs((raw79.spl - post79.spl) - 3) < 1e-9 && boost80.eqHeadroom.maximumPositiveEqCostDb === 3, "3 dB global trim; boosted frequency unchanged", boost80.eqHeadroom.maximumPositiveEqCostDb),
     check("Positive EQ above 120 Hz consumes no capability", boost150.eqHeadroom.maximumPositiveEqCostDb === 0 && curveEqual(noEq.curves.postEqDeliveredCurve, boost150.curves.postEqDeliveredCurve), "0 dB", boost150.eqHeadroom.maximumPositiveEqCostDb),
     check("Cut-only EQ consumes no headroom", cuts.eqHeadroom.maximumPositiveEqCostDb === 0, "0 dB", cuts.eqHeadroom.maximumPositiveEqCostDb),
   ];
