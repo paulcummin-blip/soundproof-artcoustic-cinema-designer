@@ -241,7 +241,7 @@ function ElevationTab({ dimensions, screen, seatingPositions, mlpPoint, roomElem
           placedSpeakers={placedSpeakers}
           frontSubs={frontSubs}
           frontSubsCfg={frontSubsCfg}
-          roomElements={roomElements}
+          roomElements={(roomElements || []).filter(el => el?.type !== 'projector')}
         />
       </div>
     </div>
