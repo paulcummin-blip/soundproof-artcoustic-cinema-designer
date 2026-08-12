@@ -14,7 +14,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useAppState } from "@/components/AppStateProvider";
-import RvStaticCanvas from "@/components/report/RvStaticCanvas";
+import ResponsivePlanCanvas from "@/components/designreview/ResponsivePlanCanvas";
 import SideElevation from "@/components/room/SideElevation";
 import FrontElevation from "@/components/room/FrontElevation";
 import AcousticTreatmentDrawing from "@/components/designreview/AcousticTreatmentDrawing";
@@ -153,7 +153,7 @@ function PlanTab({ placedSpeakers, frontSubs, rearSubs, screen, dolbyLayout, mlp
       borderRadius: 8,
       overflow: "hidden",
     }}>
-      <RvStaticCanvas
+      <ResponsivePlanCanvas
         placedSpeakers={placedSpeakers}
         seatingPositions={seatingPositions}
         mlpPoint={mlpPoint}
@@ -249,38 +249,127 @@ function ElevationTab({ dimensions, screen, seatingPositions, mlpPoint, roomElem
 }
 
 // ── Zones tab ─────────────────────────────────────────────────────────
-function ZonesTab({ placedSpeakers, frontSubs, rearSubs, screen, dolbyLayout, mlpPoint, dimensions, seatingPositions, roomElements, frontSubsCfg, rearSubsCfg, screenFrontPlaneM, lcrAimMode, aimAtMLP, rspMode, manualRspY_m, overlays, app }) {
+function ZonesTab({ placedSpeakers, frontSubs, rearSubs, screen, dolbyLayout, mlpPoint, dimensions, seatingPositions, roomElements, frontSubsCfg, rearSubsCfg, screenFrontPlaneM, lcrAimMode, aimAtMLP, rspMode, manualRspY_m, app }) {
+  const [showRp22Zones, setShowRp22Zones] = useState(true);
+  const [showDolby, setShowDolby] = useState(true);
+
+  // Derive overhead count from dolby layout (e.g. "7.1.4" → 4)
+  const ohCount = useMemo(() => {
+    const parts = String(dolbyLayout || "5.1").split(".");
+    return parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
+  }, [dolbyLayout]);
+
+  // Build complete overlay set — equivalent to switching on ALL RP22 zone
+  // overlays in Room Designer. Reuses the same zone authorities (frontWideZones,
+  // overheadZones, etc. are computed inside RvStaticCanvas from the same hooks).
+  const zonesOverlays = useMemo(() => {
+    if (!showRp22Zones) {
+      return {
+        ROOM_DIMS: true,
+        enableDolbyZones: showDolby,
+      };
+    }
+    return {
+      ROOM_DIMS: true,
+      showZones: true,
+      enableFrontWides: true,
+      SIDE_SURROUND: true,
+      REAR_SURROUND: true,
+      OVERHEADS_2: ohCount === 2,
+      OVERHEADS_4: ohCount === 4,
+      OVERHEADS_6: ohCount === 6,
+      enableDolbyZones: showDolby,
+    };
+  }, [showRp22Zones, showDolby, ohCount]);
+
   return (
-    <div style={{
-      background: COLORS.cardBg,
-      border: `1px solid ${COLORS.border}`,
-      borderRadius: 8,
-      overflow: "hidden",
-    }}>
-      <RvStaticCanvas
-        placedSpeakers={placedSpeakers}
-        seatingPositions={seatingPositions}
-        mlpPoint={mlpPoint}
-        screen={screen}
-        dolbyLayout={dolbyLayout}
-        frontSubs={frontSubs}
-        rearSubs={rearSubs}
-        frontSubsCfg={frontSubsCfg}
-        rearSubsCfg={rearSubsCfg}
-        roomElements={roomElements}
-        exportMode="dimensions"
-        showBaffle={true}
-        showScreen={true}
-        screenFrontPlaneM={screenFrontPlaneM}
-        speakerPositionsView="off"
-        showMlpRuler={true}
-        overlays={overlays}
-        lcrAimMode={lcrAimMode}
-        aimAtMLP={aimAtMLP}
-        rspMode={rspMode}
-        manualRspY_m={manualRspY_m}
-        appState={app}
-      />
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      {/* Local display controls — Design Review only, do not alter the design */}
+      <div style={{
+        display: "flex",
+        gap: 12,
+        padding: "8px 14px",
+        borderBottom: `1px solid ${COLORS.border}`,
+        background: COLORS.cardBg,
+      }}>
+        <ZoneToggle label="RP22 Zones" checked={showRp22Zones} onChange={setShowRp22Zones} />
+        <ZoneToggle label="Dolby" checked={showDolby} onChange={setShowDolby} />
+      </div>
+      <div style={{
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.border}`,
+        borderTop: "none",
+        borderRadius: "0 0 8px 8px",
+        overflow: "hidden",
+      }}>
+        <ResponsivePlanCanvas
+          placedSpeakers={placedSpeakers}
+          seatingPositions={seatingPositions}
+          mlpPoint={mlpPoint}
+          screen={screen}
+          dolbyLayout={dolbyLayout}
+          frontSubs={frontSubs}
+          rearSubs={rearSubs}
+          frontSubsCfg={frontSubsCfg}
+          rearSubsCfg={rearSubsCfg}
+          roomElements={roomElements}
+          exportMode="dimensions"
+          showBaffle={true}
+          showScreen={true}
+          screenFrontPlaneM={screenFrontPlaneM}
+          speakerPositionsView="off"
+          showMlpRuler={true}
+          overlays={zonesOverlays}
+          lcrAimMode={lcrAimMode}
+          aimAtMLP={aimAtMLP}
+          rspMode={rspMode}
+          manualRspY_m={manualRspY_m}
+          appState={app}
+        />
+      </div>
     </div>
+  );
+}
+
+// ── Zone toggle control ───────────────────────────────────────────────
+function ZoneToggle({ label, checked, onChange }) {
+  return (
+    <label style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 600,
+      letterSpacing: "0.04em",
+      fontFamily: FONT_BODY,
+      color: checked ? COLORS.primary : COLORS.muted,
+      userSelect: "none",
+    }}>
+      <span
+        onClick={() => onChange(!checked)}
+        style={{
+          width: 28,
+          height: 16,
+          borderRadius: 8,
+          background: checked ? COLORS.primary : "#D9D5CE",
+          position: "relative",
+          transition: "background 0.15s",
+          flexShrink: 0,
+        }}
+      >
+        <span style={{
+          position: "absolute",
+          top: 2,
+          left: checked ? 14 : 2,
+          width: 12,
+          height: 12,
+          borderRadius: "50%",
+          background: "#FFFFFF",
+          transition: "left 0.15s",
+        }} />
+      </span>
+      {label}
+    </label>
   );
 }

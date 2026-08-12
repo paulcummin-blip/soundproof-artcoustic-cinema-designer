@@ -324,9 +324,10 @@ export default function RvStaticCanvas({
     if (!hasRoomRect) return {};
     const base = { ...(overlays || {}) };
     base.FRONT_WIDE = frontWideZones;
-    // Report-safe: never inject enableFrontWides from interactive appState.
-    // All placement zones are interactive-only — reports use a whitelist.
-    base.enableFrontWides = false;
+    // Report-safe default: front-wides off unless explicitly requested via overlays.
+    // Reports don't pass this flag (defaults to false); Design Review Zones tab
+    // passes enableFrontWides: true to show all canonical zones.
+    base.enableFrontWides = overlays?.enableFrontWides ?? false;
     base.enableRp22Angles = false;
     return base;
   }, [overlays, hasRoomRect, frontWideZones]);
