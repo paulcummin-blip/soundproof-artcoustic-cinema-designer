@@ -1599,13 +1599,36 @@ function RoomDesignerWithState() {
   // direct/new-tab Design Review loads. This is transport only — Design Review
   // still does not mount another analysis or recommendation engine.
   React.useEffect(() => {
+    const handoffProjectId = resolvedProjectId || projectIdState || null;
+    const currentSeats = Array.isArray(_seatingPositions) ? _seatingPositions : [];
+    const perSeatResults = analysisResult?.perSeatRp22 || {};
+    const hasCompleteSeatJoin =
+      currentSeats.length > 0 &&
+      currentSeats.every((seat) => seat?.id && perSeatResults[seat.id]);
+    const analysisCountsMatch =
+      Number(analysisResult?.analysisDetails?.totalSeats) === currentSeats.length &&
+      Number(analysisResult?.analysisDetails?.totalSpeakers) === placedSpeakers.length;
+
+    // Do not persist transient default/previous-project results while the next
+    // project is hydrating or before every current seat joins to its result.
+    if (
+      !handoffProjectId ||
+      loadState?.phase !== "loaded" ||
+      appState?.isProjectHydrationReady !== true ||
+      !appDesignRating ||
+      !hasCompleteSeatJoin ||
+      !analysisCountsMatch
+    ) {
+      return;
+    }
+
     publishDesignReviewHandoff({
-      projectId: resolvedProjectId || projectIdState || "free",
+      projectId: handoffProjectId,
       showAsdr,
       rating: appDesignRating,
       recommendations: designRecommendations,
       analysisResult,
-      seatingPositions: _seatingPositions,
+      seatingPositions: currentSeats,
       // Stage D: drawing state for Design Review (read-only, no second engine)
       placedSpeakers,
       frontSubs: frontSubsForRendering,
@@ -1614,7 +1637,7 @@ function RoomDesignerWithState() {
       dolbyLayout: dolbyPreset,
       mlpPoint: mlpAnchorEffective,
     });
-  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective]);
+  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, _seatingPositions, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective, loadState?.phase, appState?.isProjectHydrationReady]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {
