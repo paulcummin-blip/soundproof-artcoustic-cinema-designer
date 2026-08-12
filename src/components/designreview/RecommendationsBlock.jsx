@@ -162,7 +162,11 @@ export default function RecommendationsBlock({ asdrData, priceData }) {
             flexDirection: "column",
             gap: 4,
           }}>
-            <PriceRow label="Subtotal" value={formatCurrency(priceData.baseTotal, currency)} muted />
+            <PriceRow
+              label="Subtotal (ex VAT)"
+              value={formatCurrency(priceData.finalTotalExVat, currency)}
+              muted
+            />
             {difficultyMultiplier !== 1.0 && (
               <PriceRow label={`Difficulty multiplier ×${difficultyMultiplier.toFixed(2)}`} value={null} muted />
             )}
