@@ -111,10 +111,10 @@ export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLf
     boostLimitOk,
     cutLimitOk,
     sourceDomainHeadroomOk,
-    // Stage B: sourceDomainHeadroomOk remains as a diagnostic field but is
-    // no longer part of the allOk gate. Per-filter clamping in
-    // scaleCandidateForBankLimits is the frequency-dependent authority.
-    allOk: boostLimitOk && cutLimitOk,
+    // The whole bank must remain inside the frequency-dependent source
+    // headroom envelope. Per-filter centre-frequency clamping is necessary,
+    // but overlapping filters can still exceed the allowance between centres.
+    allOk: boostLimitOk && cutLimitOk && sourceDomainHeadroomOk,
   };
 }
 
@@ -166,9 +166,8 @@ export function scaleCandidateForBankLimits(candidate, existingFilters, raw, act
   const initial = evaluateProvisionalBankLimits([...existingFilters, clampedCandidate], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   if (initial.allOk) return { filter: clampedCandidate, scaled: clampedCandidate.gainDb !== candidate.gainDb, limits: initial, perFilterDiagnostics };
 
-  // Binary search on gain for boost/cut limit violations only.
-  // sourceDomainHeadroomOk is not part of allOk (Stage B) so the search
-  // constrains only on aggregate boost/cut envelope limits.
+  // Binary-search the proposed gain against aggregate boost, cut and
+  // frequency-dependent source-headroom limits.
   let low = 0;
   let high = Math.abs(clampedCandidate.gainDb);
   for (let index = 0; index < 14; index += 1) {
