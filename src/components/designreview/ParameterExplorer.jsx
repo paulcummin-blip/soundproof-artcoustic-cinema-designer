@@ -1,16 +1,26 @@
 /**
  * ParameterExplorer.jsx
  * ----------------------
- * Stage C — Compact parameter explorer for the Design Review workspace.
+ * Compact parameter explorer for the Design Review workspace.
  *
- * Renders compact rows for all RP22 parameters with filter bar.
- * One parameter expands at a time into a TechnicalParameterCard (screen variant).
+ * Reports RP22 Performance Levels as neutral RESULTS — no subjective status
+ * (OK / Needs Attention). L1–L4 are legitimate Performance Levels and may be
+ * the deliberate project brief. FAIL is the only genuine failure state
+ * (parameter does not achieve Level 1).
  *
- * Uses the shared useParameterGridAuthority hook — same computation
- * authority as RP22ReportParameterGrid. No parallel parameter grading.
+ * Compact row format:
+ *   P-number | TITLE | SCOPE | RESULT
  *
- * Does NOT mount useRP22AnalysisEngine. Reads analysisResult from the
- * shared window.__ROOM_DESIGNER_ASDR__ store.
+ * RESULT:
+ *   - ROOM-scope: the achieved Performance Level (e.g. "L4")
+ *   - SEAT-scope: the full distribution (e.g. "1×L4 · 2×L3 · 2×L2")
+ *   - N/A or — where a parameter is genuinely not applicable or has no result
+ *
+ * Filters: ALL · ROOM · SEAT · SPATIAL · DYNAMIC · TIMBRE
+ * (ROOM/SEAT use canonical param.scope; SPATIAL/DYNAMIC/TIMBRE use category)
+ *
+ * Uses the shared useParameterGridAuthority hook — same computation authority
+ * as RP22ReportParameterGrid. No parallel parameter grading.
  */
 
 import React, { useMemo, useCallback, useRef, useEffect } from "react";
@@ -19,9 +29,8 @@ import { useCompletedBassAuthority } from "@/components/room/bass/completedBassR
 import { useParameterGridAuthority } from "@/components/report/technical/useParameterGridAuthority.jsx";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
-import { formatSeatLabel } from "@/components/utils/seatLabel";
-import TechnicalParameterCard from "@/components/report/technical/TechnicalParameterCard";
-import { getWeaknessBand, needsAttention } from "@/components/designreview/needsAttentionAuthority";
+import ExpandedParameterDetail from "@/components/designreview/ExpandedParameterDetail";
+import { normalizeLevel, LEVEL_TEXT_COLORS } from "@/components/designreview/needsAttentionAuthority";
 
 const RP22_PARAMS = RP22_PRESENTATION_PARAMETERS;
 
@@ -34,18 +43,16 @@ const COLORS = {
   border: "#E6E4DD",
   borderStrong: "#D9D5CE",
   label: "#9B8E82",
-  fail: "#8B2E2E",
-  warn: "#8B5E34",
   muted: "#77736B",
   hover: "#F8F7F5",
 };
 
-const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
 const FILTERS = [
-  { key: "needs", label: "NEEDS ATTENTION" },
   { key: "all", label: "ALL" },
+  { key: "room", label: "ROOM" },
+  { key: "seat", label: "SEAT" },
   { key: "spatial", label: "SPATIAL" },
   { key: "dynamic", label: "DYNAMIC" },
   { key: "timbre", label: "TIMBRE" },
@@ -78,18 +85,73 @@ function buildSeatHudFromAnalysis(analysisResult, seats) {
   return out;
 }
 
-function getSeverityColors(band) {
-  if (band === 3) return { color: COLORS.fail, bg: "#FCF0F0", border: COLORS.fail };
-  if (band === 2) return { color: COLORS.warn, bg: "#F5EDE3", border: "#E0D4C2" };
-  if (band === 1) return { color: COLORS.secondary, bg: "#F0EFEA", border: COLORS.borderStrong };
-  return { color: COLORS.label, bg: "#F3F2EF", border: COLORS.border };
+/** Neutral coloured level text (identifies the level, no judgement). */
+function levelColor(norm) {
+  if (!norm) return COLORS.muted;
+  return LEVEL_TEXT_COLORS[norm] || COLORS.body;
 }
 
-function getSeverityLabel(band) {
-  if (band === 3) return "FAIL";
-  if (band === 2) return "L1";
-  if (band === 1) return "L2";
-  return "L3+";
+/** Render a single room-scope level as neutral coloured text. */
+function RoomLevelText({ param, level, value }) {
+  // P8 is N/A when no upfiring / elevation speakers
+  if (param.id === 8) {
+    if (value === "No" || value === "—" || value === "N/A" || !value) {
+      return <span style={{ fontSize: 11, color: COLORS.label, fontFamily: FONT_BODY }}>N/A</span>;
+    }
+  }
+  const norm = normalizeLevel(level);
+  if (!norm || norm === "N/A") {
+    return <span style={{ fontSize: 11, color: COLORS.label, fontFamily: FONT_BODY }}>N/A</span>;
+  }
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, color: levelColor(norm), fontFamily: FONT_BODY }}>
+      {norm}
+    </span>
+  );
+}
+
+/** Render a seat-scope distribution as neutral coloured segments. */
+function DistributionText({ gridData }) {
+  if (!gridData || !gridData.length) {
+    return <span style={{ fontSize: 11, color: COLORS.label, fontFamily: FONT_BODY }}>—</span>;
+  }
+  const order = ["L4", "L3", "L2", "L1", "FAIL"];
+  const counts = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0, NA: 0 };
+  for (const row of gridData) {
+    for (const seat of row.seats) {
+      const norm = normalizeLevel(seat.level);
+      if (norm === "N/A") counts.NA++;
+      else if (norm && counts[norm] != null) counts[norm]++;
+    }
+  }
+  const parts = order.filter((l) => counts[l] > 0).map((l) => ({ label: l, count: counts[l] }));
+  if (!parts.length) {
+    return (
+      <span style={{ fontSize: 11, color: COLORS.label, fontFamily: FONT_BODY }}>
+        {counts.NA > 0 ? "N/A" : "—"}
+      </span>
+    );
+  }
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        fontSize: 11,
+        fontFamily: FONT_BODY,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {parts.map((p, i) => (
+        <span key={p.label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {i > 0 && <span style={{ color: "#C1B6AD" }}>·</span>}
+          <span style={{ color: COLORS.body }}>{p.count}×</span>
+          <span style={{ fontWeight: 700, color: levelColor(p.label) }}>{p.label}</span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 export default function ParameterExplorer({
@@ -104,7 +166,7 @@ export default function ParameterExplorer({
   const app = useAppState();
   const seats = app?.seatingPositions || [];
   const mlpSeatId = useMemo(() => {
-    const primary = seats.find(s => s?.isPrimary && s?.id);
+    const primary = seats.find((s) => s?.isPrimary && s?.id);
     return primary?.id || seats[0]?.id || "";
   }, [seats]);
 
@@ -151,21 +213,39 @@ export default function ParameterExplorer({
     lockedSeatId,
   } = authority;
 
-  // Filter parameters
+  // Filter parameters — ROOM/SEAT use canonical param.scope
   const filteredParams = useMemo(() => {
     if (activeFilter === "all") return RP22_PARAMS;
-    if (activeFilter === "needs") {
-      return RP22_PARAMS.filter((p) => {
-        const key = `p${p.id}`;
-        const contrib = contributionsByKey?.[key];
-        return contrib && needsAttention(contrib);
-      });
-    }
-    if (activeFilter === "spatial") return RP22_PARAMS.filter(p => getCategoryForParam(p.id) === "Spatial Resolution");
-    if (activeFilter === "dynamic") return RP22_PARAMS.filter(p => getCategoryForParam(p.id) === "Dynamic Range");
-    if (activeFilter === "timbre") return RP22_PARAMS.filter(p => getCategoryForParam(p.id) === "Timbre Matching");
+    if (activeFilter === "room")
+      return RP22_PARAMS.filter((p) => String(p.scope || "").toLowerCase() === "room");
+    if (activeFilter === "seat")
+      return RP22_PARAMS.filter((p) => String(p.scope || "").toLowerCase() === "seat");
+    if (activeFilter === "spatial")
+      return RP22_PARAMS.filter((p) => getCategoryForParam(p.id) === "Spatial Resolution");
+    if (activeFilter === "dynamic")
+      return RP22_PARAMS.filter((p) => getCategoryForParam(p.id) === "Dynamic Range");
+    if (activeFilter === "timbre")
+      return RP22_PARAMS.filter((p) => getCategoryForParam(p.id) === "Timbre Matching");
     return RP22_PARAMS;
-  }, [activeFilter, contributionsByKey]);
+  }, [activeFilter]);
+
+  // Pre-compute row result data for every parameter (seat distribution or room level)
+  const rowResultData = useMemo(() => {
+    const map = {};
+    for (const param of RP22_PARAMS) {
+      const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
+      if (isSeatScope) {
+        map[param.id] = { isSeat: true, gridData: buildSeatGridData(param.id) };
+      } else {
+        map[param.id] = {
+          isSeat: false,
+          level: getHudLevelForParam(param),
+          value: getHudValueForParam(param),
+        };
+      }
+    }
+    return map;
+  }, [buildSeatGridData, getHudLevelForParam, getHudValueForParam]);
 
   // Scroll expanded detail into view
   const expandedRef = useRef(null);
@@ -175,19 +255,31 @@ export default function ParameterExplorer({
     }
   }, [expandedParamKey]);
 
-  const handleRowClick = useCallback((param) => {
-    const key = `p${param.id}`;
-    if (expandedParamKey === key) {
-      onExpandParam(null);
-    } else {
-      onExpandParam(key);
-    }
-  }, [expandedParamKey, onExpandParam]);
+  const handleRowClick = useCallback(
+    (param) => {
+      const key = `p${param.id}`;
+      if (expandedParamKey === key) {
+        onExpandParam(null);
+      } else {
+        onExpandParam(key);
+      }
+    },
+    [expandedParamKey, onExpandParam]
+  );
 
   if (!analysisResult) {
     return (
-      <div style={{ padding: "24px 16px", textAlign: "center", color: COLORS.muted, fontFamily: FONT_BODY, fontSize: 13 }}>
-        Parameter data not available. Open the project in the Room Designer to populate the Parameter Explorer.
+      <div
+        style={{
+          padding: "24px 16px",
+          textAlign: "center",
+          color: COLORS.muted,
+          fontFamily: FONT_BODY,
+          fontSize: 13,
+        }}
+      >
+        Parameter data not available. Open the project in the Room Designer to populate the
+        Parameter Explorer.
       </div>
     );
   }
@@ -195,13 +287,15 @@ export default function ParameterExplorer({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       {/* Filter bar */}
-      <div style={{
-        display: "flex",
-        gap: 0,
-        borderBottom: `1px solid ${COLORS.border}`,
-        overflowX: "auto",
-      }}>
-        {FILTERS.map(f => {
+      <div
+        style={{
+          display: "flex",
+          gap: 0,
+          borderBottom: `1px solid ${COLORS.border}`,
+          overflowX: "auto",
+        }}
+      >
+        {FILTERS.map((f) => {
           const isActive = activeFilter === f.key;
           return (
             <button
@@ -216,7 +310,9 @@ export default function ParameterExplorer({
                 color: isActive ? COLORS.primary : COLORS.muted,
                 background: isActive ? "#F8F7F5" : "transparent",
                 border: "none",
-                borderBottom: isActive ? `2px solid ${COLORS.primary}` : "2px solid transparent",
+                borderBottom: isActive
+                  ? `2px solid ${COLORS.primary}`
+                  : "2px solid transparent",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
                 transition: "all 0.15s",
@@ -231,22 +327,29 @@ export default function ParameterExplorer({
       {/* Compact rows */}
       <div>
         {filteredParams.length === 0 ? (
-          <div style={{ padding: "20px 16px", textAlign: "center", color: COLORS.muted, fontFamily: FONT_BODY, fontSize: 12 }}>
+          <div
+            style={{
+              padding: "20px 16px",
+              textAlign: "center",
+              color: COLORS.muted,
+              fontFamily: FONT_BODY,
+              fontSize: 12,
+            }}
+          >
             No parameters in this filter.
           </div>
         ) : (
           filteredParams.map((param) => {
             const key = `p${param.id}`;
-            const contrib = contributionsByKey?.[key];
-            const resultLevel = contrib?.resultLevel || "";
-            const band = getWeaknessBand(resultLevel);
             const isExpanded = expandedParamKey === key;
             const humanTitle = getHumanTitleForParam(param.id);
             const category = getCategoryForParam(param.id);
+            const scopeLabel = String(param.scope || "").toUpperCase();
+            const result = rowResultData[param.id];
 
             return (
               <div key={param.id} ref={isExpanded ? expandedRef : null}>
-                {/* Compact row */}
+                {/* Compact row: P-number | Title | Scope | Result */}
                 <div
                   onClick={() => handleRowClick(param)}
                   style={{
@@ -259,78 +362,82 @@ export default function ParameterExplorer({
                     background: isExpanded ? "#F8F7F5" : "transparent",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.background = COLORS.hover; }}
-                  onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.background = "transparent"; }}
+                  onMouseEnter={(e) => {
+                    if (!isExpanded) e.currentTarget.style.background = COLORS.hover;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isExpanded) e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   {/* P-number */}
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: COLORS.primary,
-                    fontFamily: FONT_BODY,
-                    minWidth: 28,
-                    flexShrink: 0,
-                  }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: COLORS.primary,
+                      fontFamily: FONT_BODY,
+                      minWidth: 28,
+                      flexShrink: 0,
+                    }}
+                  >
                     P{param.id}
                   </span>
 
                   {/* Title */}
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: COLORS.primary,
-                    fontFamily: FONT_BODY,
-                    flex: 1,
-                    minWidth: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: COLORS.primary,
+                      fontFamily: FONT_BODY,
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {humanTitle}
                   </span>
 
-                  {/* Result level */}
-                  <span style={{
-                    fontSize: 11,
-                    color: COLORS.body,
-                    fontFamily: FONT_BODY,
-                    whiteSpace: "nowrap",
-                  }}>
-                    {resultLevel || "—"}
-                  </span>
-
-                  {/* Status badge */}
-                  {band > 0 ? (
-                    <span style={{
+                  {/* Scope */}
+                  <span
+                    style={{
                       fontSize: 9,
                       fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 3,
-                      fontFamily: FONT_BODY,
-                      whiteSpace: "nowrap",
-                      ...getSeverityColors(band),
-                      border: `1px solid ${getSeverityColors(band).border}`,
-                    }}>
-                      {getSeverityLabel(band)}
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: 9,
-                      fontWeight: 600,
-                      padding: "2px 8px",
-                      borderRadius: 3,
-                      fontFamily: FONT_BODY,
-                      whiteSpace: "nowrap",
                       color: COLORS.label,
-                      background: "#F3F2EF",
-                      border: `1px solid ${COLORS.border}`,
-                    }}>
-                      OK
-                    </span>
-                  )}
+                      letterSpacing: "0.06em",
+                      fontFamily: FONT_BODY,
+                      minWidth: 42,
+                      textAlign: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {scopeLabel}
+                  </span>
+
+                  {/* Result */}
+                  <span
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      minWidth: 120,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {result?.isSeat ? (
+                      <DistributionText gridData={result.gridData} />
+                    ) : (
+                      <RoomLevelText
+                        param={param}
+                        level={result?.level}
+                        value={result?.value}
+                      />
+                    )}
+                  </span>
                 </div>
 
-                {/* Expanded detail — one at a time, only for expanded row */}
+                {/* Expanded detail — one at a time */}
                 {isExpanded && (
                   <ExpandedParameterDetail
                     param={param}
@@ -353,70 +460,6 @@ export default function ParameterExplorer({
           })
         )}
       </div>
-    </div>
-  );
-}
-
-/** Expanded parameter detail — renders TechnicalParameterCard with variant="screen". */
-function ExpandedParameterDetail({
-  param,
-  analysisResult,
-  contributionsByKey,
-  bassPresentation,
-  resolveThresholds,
-  resolveP12P13DualLevels,
-  getHudValueForParam,
-  getHudLevelForParam,
-  buildSeatGridData,
-  buildAsdrFooter,
-  buildP6Presentation,
-  lockedSeatId,
-  category,
-  humanTitle,
-}) {
-  const resolvedThresholds = resolveThresholds(param);
-  const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14)
-    ? { ...param, thresholds: resolvedThresholds }
-    : param;
-
-  const targetBasisNote = (param.id === 12 || param.id === 13)
-    ? (() => {
-        const v = analysisResult?.gradedParameters?.primary?.[param.id]?.value;
-        const dual = resolveP12P13DualLevels(param.id, v);
-        return dual ? `Minimum ${dual.minimum} · Recommended ${dual.recommended}` : null;
-      })()
-    : param.id === 14 ? bassPresentation.parameters.p14.detail : null;
-
-  const isSeatScope = String(param.scope || "").toLowerCase() === "seat";
-  const seatGridData = isSeatScope ? buildSeatGridData(param.id) : null;
-  const asdrFooter = buildAsdrFooter(param.id);
-
-  let achievedValue = getHudValueForParam(param);
-  let lvl = getHudLevelForParam(param);
-  let rspLabel = lockedSeatId ? formatSeatLabel(lockedSeatId) : null;
-
-  // P6 special case: worst seat spread
-  if (param.id === 6) {
-    const p6 = buildP6Presentation();
-    achievedValue = p6.achievedValue;
-    if (p6.lvl !== null) lvl = p6.lvl;
-    rspLabel = null;
-  }
-
-  return (
-    <div style={{ padding: "8px 14px 16px", background: "#FBFAF8", borderTop: `1px solid ${COLORS.border}` }}>
-      <TechnicalParameterCard
-        param={resolvedParam}
-        achievedValue={achievedValue}
-        lvl={lvl}
-        category={category}
-        humanTitle={humanTitle}
-        seatGridData={seatGridData}
-        targetBasisNote={targetBasisNote}
-        rspLabel={rspLabel}
-        asdrFooter={asdrFooter}
-        variant="screen"
-      />
     </div>
   );
 }

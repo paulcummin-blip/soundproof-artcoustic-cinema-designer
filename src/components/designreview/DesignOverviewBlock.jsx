@@ -1,19 +1,28 @@
 /**
  * DesignOverviewBlock.jsx
  * ------------------------
- * Stage B — Design Overview content for the in-app Design Review workspace.
+ * Design Overview content for the in-app Design Review workspace.
  *
  * Consumes the canonical roomDesignRating and designRecommendations from the
  * shared window.__ROOM_DESIGNER_ASDR__ store. Does NOT mount any analysis engine
  * or recommendation engine. Does NOT recalculate or reinterpret scoring.
  *
- * Presentation-only: derives pillar summaries, weakest areas, and a
- * recommendation snapshot from the existing contributions array.
+ * Presentation-only: derives pillar summaries, lowest performance results, and
+ * a recommendation snapshot from the existing contributions array.
+ *
+ * RP22 Performance Levels (L1–L4) are neutral RESULTS. The "LOWEST PERFORMANCE
+ * RESULTS" section is a diagnostic shortcut to the lowest current results — it
+ * does NOT mean those results are wrong. If the project brief deliberately
+ * targets L1, that is still simply the lowest current result.
  */
 
 import React from "react";
 import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
-import { getNeedsAttention, getWeaknessBand } from "@/components/designreview/needsAttentionAuthority";
+import {
+  getLowestPerformanceResults,
+  normalizeLevel,
+  LEVEL_TEXT_COLORS,
+} from "@/components/designreview/needsAttentionAuthority";
 
 const COLORS = {
   bg: "transparent",
@@ -25,10 +34,6 @@ const COLORS = {
   borderStrong: "#D9D5CE",
   label: "#9B8E82",
   fail: "#8B2E2E",
-  failBg: "#FCF0F0",
-  warn: "#8B5E34",
-  warnBg: "#F5EDE3",
-  warnBorder: "#E0D4C2",
   muted: "#77736B",
 };
 
@@ -80,78 +85,80 @@ function formatPillarSummary(counts) {
   return parts.length ? parts.join(" · ") : "—";
 }
 
-function getSeverityLabel(band) {
-  if (band === 3) return "FAIL";
-  if (band === 2) return "L1";
-  if (band === 1) return "L2";
-  return "L3+";
-}
-
-function getSeverityColors(band) {
-  if (band === 3) return { color: COLORS.fail, bg: COLORS.failBg, border: COLORS.fail };
-  if (band === 2) return { color: COLORS.warn, bg: COLORS.warnBg, border: COLORS.warnBorder };
-  if (band === 1) return { color: COLORS.secondary, bg: "#F0EFEA", border: COLORS.borderStrong };
-  return { color: COLORS.label, bg: "#F3F2EF", border: COLORS.border };
+function levelColor(norm) {
+  if (!norm) return COLORS.muted;
+  return LEVEL_TEXT_COLORS[norm] || COLORS.body;
 }
 
 // ── Sub-components ───────────────────────────────────────────────────
 
 function RatingCard({ rating }) {
   const pct = rating?.displayPercentage != null ? Math.round(rating.displayPercentage) : null;
-  const total = rating?.actualPoints != null && rating?.maximumAvailablePoints != null
-    ? `${Math.round(rating.actualPoints * 100) / 100} / ${Math.round(rating.maximumAvailablePoints * 100) / 100}`
-    : "—";
+  const total =
+    rating?.actualPoints != null && rating?.maximumAvailablePoints != null
+      ? `${Math.round(rating.actualPoints * 100) / 100} / ${Math.round(rating.maximumAvailablePoints * 100) / 100}`
+      : "—";
 
   return (
-    <div style={{
-      background: COLORS.cardBg,
-      border: `1px solid ${COLORS.border}`,
-      borderRadius: 8,
-      padding: "20px 24px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 16,
-    }}>
+    <div
+      style={{
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 8,
+        padding: "20px 24px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+      }}
+    >
       <div>
-        <div style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: COLORS.secondary,
-          letterSpacing: "0.1em",
-          fontFamily: FONT_BODY,
-          marginBottom: 6,
-        }}>
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: COLORS.secondary,
+            letterSpacing: "0.1em",
+            fontFamily: FONT_BODY,
+            marginBottom: 6,
+          }}
+        >
           ARTCOUSTIC SYSTEM DESIGN RATING
         </div>
-        <div style={{
-          fontSize: 36,
-          fontWeight: 400,
-          color: COLORS.primary,
-          fontFamily: FONT_HEADING,
-          lineHeight: 1,
-        }}>
+        <div
+          style={{
+            fontSize: 36,
+            fontWeight: 400,
+            color: COLORS.primary,
+            fontFamily: FONT_HEADING,
+            lineHeight: 1,
+          }}
+        >
           {pct != null ? `${pct}%` : "NOT ASSESSED"}
         </div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <div style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: COLORS.secondary,
-          letterSpacing: "0.1em",
-          fontFamily: FONT_BODY,
-          marginBottom: 6,
-        }}>
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: COLORS.secondary,
+            letterSpacing: "0.1em",
+            fontFamily: FONT_BODY,
+            marginBottom: 6,
+          }}
+        >
           TOTAL SCORE
         </div>
-        <div style={{
-          fontSize: 18,
-          fontWeight: 400,
-          color: COLORS.primary,
-          fontFamily: FONT_HEADING,
-          lineHeight: 1,
-        }}>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 400,
+            color: COLORS.primary,
+            fontFamily: FONT_HEADING,
+            lineHeight: 1,
+          }}
+        >
           {total}
         </div>
       </div>
@@ -161,63 +168,50 @@ function RatingCard({ rating }) {
 
 function PillarSummaryCard({ pillar, contribs }) {
   const counts = summarizePillar(contribs);
-  const needsAttn = contribs.filter((c) => getWeaknessBand(c.resultLevel) > 0).length;
   const hasFail = counts.FAIL > 0;
 
   return (
-    <div style={{
-      background: COLORS.cardBg,
-      border: `1px solid ${COLORS.border}`,
-      borderRadius: 8,
-      padding: "14px 16px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
-    }}>
-      <div style={{
-        fontSize: 9,
-        fontWeight: 700,
-        color: COLORS.secondary,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        fontFamily: FONT_BODY,
-      }}>
+    <div
+      style={{
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 8,
+        padding: "14px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          fontWeight: 700,
+          color: COLORS.secondary,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          fontFamily: FONT_BODY,
+        }}
+      >
         {pillar}
       </div>
-      <div style={{
-        fontSize: 13,
-        fontWeight: 600,
-        color: hasFail ? COLORS.fail : COLORS.primary,
-        fontFamily: FONT_BODY,
-        lineHeight: 1.3,
-      }}>
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: hasFail ? COLORS.fail : COLORS.primary,
+          fontFamily: FONT_BODY,
+          lineHeight: 1.3,
+        }}
+      >
         {formatPillarSummary(counts)}
       </div>
-      {needsAttn > 0 ? (
-        <div style={{
-          fontSize: 10,
-          color: hasFail ? COLORS.fail : COLORS.warn,
-          fontFamily: FONT_BODY,
-          fontWeight: 600,
-        }}>
-          {needsAttn} need{needsAttn !== 1 ? "s" : ""} attention
-        </div>
-      ) : (
-        <div style={{
-          fontSize: 10,
-          color: COLORS.muted,
-          fontFamily: FONT_BODY,
-        }}>
-          No issues
-        </div>
-      )}
     </div>
   );
 }
 
-function NeedsAttentionRow({ contrib, onParamClick }) {
-  const band = getWeaknessBand(contrib.resultLevel);
-  const sev = getSeverityColors(band);
+function LowestResultRow({ contrib, onParamClick }) {
+  const norm = normalizeLevel(contrib.resultLevel);
+  const color = levelColor(norm);
 
   return (
     <div
@@ -235,44 +229,39 @@ function NeedsAttentionRow({ contrib, onParamClick }) {
         cursor: "pointer",
         transition: "background 0.15s",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "#F8F7F5"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "#F8F7F5";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "transparent";
+      }}
     >
-      <div style={{
-        fontSize: 12,
-        fontWeight: 600,
-        color: COLORS.primary,
-        fontFamily: FONT_BODY,
-        flex: 1,
-        minWidth: 0,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      }}>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: COLORS.primary,
+          fontFamily: FONT_BODY,
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
         {getParamLabel(contrib)}
       </div>
-      <div style={{
-        fontSize: 11,
-        color: COLORS.body,
-        fontFamily: FONT_BODY,
-        whiteSpace: "nowrap",
-      }}>
-        {contrib.resultLevel}
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color,
+          fontFamily: FONT_BODY,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {contrib.resultLevel || "—"}
       </div>
-      <span style={{
-        fontSize: 9,
-        fontWeight: 700,
-        color: sev.color,
-        background: sev.bg,
-        border: `1px solid ${sev.border}`,
-        padding: "2px 8px",
-        borderRadius: 3,
-        letterSpacing: "0.06em",
-        fontFamily: FONT_BODY,
-        whiteSpace: "nowrap",
-      }}>
-        {getSeverityLabel(band)}
-      </span>
     </div>
   );
 }
@@ -282,14 +271,17 @@ function NeedsAttentionRow({ contrib, onParamClick }) {
 export default function DesignOverviewBlock({ rating, recommendations, onParamClick, onShowRecommendations }) {
   if (!rating || rating.status === "NOT_ASSESSED") {
     return (
-      <div style={{
-        padding: "32px 16px",
-        textAlign: "center",
-        color: COLORS.secondary,
-        fontFamily: FONT_BODY,
-        fontSize: 13,
-      }}>
-        Design Rating not assessed yet. Open the project in the Room Designer to populate the Design Review.
+      <div
+        style={{
+          padding: "32px 16px",
+          textAlign: "center",
+          color: COLORS.secondary,
+          fontFamily: FONT_BODY,
+          fontSize: 13,
+        }}
+      >
+        Design Rating not assessed yet. Open the project in the Room Designer to populate the
+        Design Review.
       </div>
     );
   }
@@ -304,13 +296,19 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
     pillarMap[pillar].push(contrib);
   }
 
-  // Needs attention
-  const needsAttention = getNeedsAttention(contributions);
+  // Lowest performance results (FAIL first, then L1, then L2)
+  const lowestResults = getLowestPerformanceResults(contributions);
 
   // Recommendation counts
-  const improvementCount = Array.isArray(recommendations?.improvements) ? recommendations.improvements.length : 0;
-  const bestPracticeCount = Array.isArray(recommendations?.bestPractice) ? recommendations.bestPractice.length : 0;
-  const simplificationCount = Array.isArray(recommendations?.savings) ? recommendations.savings.length : 0;
+  const improvementCount = Array.isArray(recommendations?.improvements)
+    ? recommendations.improvements.length
+    : 0;
+  const bestPracticeCount = Array.isArray(recommendations?.bestPractice)
+    ? recommendations.bestPractice.length
+    : 0;
+  const simplificationCount = Array.isArray(recommendations?.savings)
+    ? recommendations.savings.length
+    : 0;
   const recsAvailable = recommendations?.isSettled === true;
 
   return (
@@ -319,11 +317,13 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
       <RatingCard rating={rating} />
 
       {/* Pillar summaries */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        gap: 10,
-      }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 10,
+        }}
+      >
         {PILLAR_ORDER.map((pillar) => (
           <PillarSummaryCard
             key={pillar}
@@ -333,73 +333,87 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
         ))}
       </div>
 
-      {/* Needs Attention */}
-      <div style={{
-        background: COLORS.cardBg,
-        border: `1px solid ${COLORS.border}`,
-        borderRadius: 8,
-        overflow: "hidden",
-      }}>
-        <div style={{
-          padding: "10px 14px",
-          fontSize: 10,
-          fontWeight: 700,
-          color: COLORS.secondary,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          fontFamily: FONT_BODY,
-          borderBottom: `1px solid ${COLORS.border}`,
-        }}>
-          Needs Attention
-        </div>
-        {needsAttention.length === 0 ? (
-          <div style={{
-            padding: "14px",
-            fontSize: 12,
-            color: COLORS.muted,
+      {/* Lowest Performance Results */}
+      <div
+        style={{
+          background: COLORS.cardBg,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "10px 14px",
+            fontSize: 10,
+            fontWeight: 700,
+            color: COLORS.secondary,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
             fontFamily: FONT_BODY,
-          }}>
-            No parameters need attention.
+            borderBottom: `1px solid ${COLORS.border}`,
+          }}
+        >
+          Lowest Performance Results
+        </div>
+        {lowestResults.length === 0 ? (
+          <div
+            style={{
+              padding: "14px",
+              fontSize: 12,
+              color: COLORS.muted,
+              fontFamily: FONT_BODY,
+            }}
+          >
+            All parameters at L3 or above.
           </div>
         ) : (
-          needsAttention.map((contrib) => (
-            <NeedsAttentionRow key={contrib.key} contrib={contrib} onParamClick={onParamClick} />
+          lowestResults.map((contrib) => (
+            <LowestResultRow key={contrib.key} contrib={contrib} onParamClick={onParamClick} />
           ))
         )}
       </div>
 
       {/* Recommendation snapshot */}
-      <div style={{
-        background: COLORS.cardBg,
-        border: `1px solid ${COLORS.border}`,
-        borderRadius: 8,
-        padding: "14px 16px",
-      }}>
-        <div style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: COLORS.secondary,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          fontFamily: FONT_BODY,
-          marginBottom: 8,
-        }}>
+      <div
+        style={{
+          background: COLORS.cardBg,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 8,
+          padding: "14px 16px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: COLORS.secondary,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            fontFamily: FONT_BODY,
+            marginBottom: 8,
+          }}
+        >
           Recommendation Snapshot
         </div>
         {recsAvailable ? (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-          }}>
-            <div style={{
-              fontSize: 12,
-              color: COLORS.body,
-              fontFamily: FONT_BODY,
-              lineHeight: 1.5,
-            }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: COLORS.body,
+                fontFamily: FONT_BODY,
+                lineHeight: 1.5,
+              }}
+            >
               {improvementCount} design improvement{improvementCount !== 1 ? "s" : ""}
               {" · "}
               {bestPracticeCount} best-practice improvement{bestPracticeCount !== 1 ? "s" : ""}
@@ -422,19 +436,25 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
                   whiteSpace: "nowrap",
                   transition: "background 0.15s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#F8F7F5"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#F8F7F5";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
               >
                 View Details →
               </button>
             )}
           </div>
         ) : (
-          <div style={{
-            fontSize: 12,
-            color: COLORS.muted,
-            fontFamily: FONT_BODY,
-          }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: COLORS.muted,
+              fontFamily: FONT_BODY,
+            }}
+          >
             Evaluating recommendations…
           </div>
         )}

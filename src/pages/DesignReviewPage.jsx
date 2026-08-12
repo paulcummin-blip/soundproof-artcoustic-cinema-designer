@@ -62,7 +62,7 @@ export default function DesignReviewPage() {
   // Stage C: Parameter Explorer state (page-level)
   const [paramDetailsOpen, setParamDetailsOpen] = useState(false);
   const [expandedParamKey, setExpandedParamKey] = useState(null);
-  const [activeFilter, setActiveFilter] = useState("needs");
+  const [activeFilter, setActiveFilter] = useState("all");
 
   // Stage D: Recommendations & Products panel state
   const [recsOpen, setRecsOpen] = useState(false);
@@ -121,11 +121,11 @@ export default function DesignReviewPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Stage C: Handle Needs Attention row click from Design Overview
+  // Stage C: Handle Lowest Performance Results row click from Design Overview
   const handleParamClick = useCallback((paramKey) => {
     if (!paramKey) return;
     setParamDetailsOpen(true);
-    setActiveFilter("needs");
+    setActiveFilter("all");
     setExpandedParamKey(paramKey);
   }, []);
 
