@@ -16,6 +16,8 @@ import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz, integrateRawResp
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { salvagePartialBank, buildSalvageEqResult } from "@/components/utils/designEqPartialBankSalvage";
+import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pairedP14P18ProductionAuthority";
+import { buildPairedP14P18CandidateSummary } from "@/components/utils/pairedP14P18CandidateSummary";
 
 const FIT_PROFILES = [DESIGN_EQ_FIT_PROFILES.standard, DESIGN_EQ_FIT_PROFILES.accuracy];
 const MAXIMUM_SPL_SAFETY_MARGIN_DB = 2;
@@ -211,7 +213,7 @@ function buildCanonicalCandidate({
   perSeatRawCurves, perSeatMaximumSplCurves, eq, domains, targetCurve, targetShape,
   verticalOffsetDb, protectedNullRegions, baseRequestedSystemOutputDb,
   operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb,
-  operatingOutputDiagnostics,
+  operatingOutputDiagnostics, pairedAuthorityInputs,
 }) {
   const requestedPreEqCurve = (levelNormalisedRawCurve || []).map((point) => ({ ...point }));
   const achievedPreEqCurve = capCurveToEnvelope(requestedPreEqCurve, maximumSplCurveBeforeEq);
@@ -256,6 +258,12 @@ function buildCanonicalCandidate({
   const smoothed = applyBassSmoothing(finalPostEqCurve, "third")
     .filter((point) => point.frequency >= domains.correctionStartHz && point.frequency <= domains.correctionEndHz);
   const limitedRegions = capabilityLimitedRegions(finalPostEqCurve);
+  const pairedP14P18Authority = calculatePairedP14P18ProductionAuthority({
+    ...(pairedAuthorityInputs || {}),
+    combinedEqCurve: eq.combinedEqCurve || [],
+    selectedEqBankIdentity: buildFilterBankSignature({ generatedFilterBank: eq.filters || [] }),
+  });
+  const pairedP14P18Summary = buildPairedP14P18CandidateSummary(pairedP14P18Authority);
   return {
     canonical: true,
     designEqFitProfile: eq.designEqFitProfile || "standard",
@@ -292,6 +300,8 @@ function buildCanonicalCandidate({
     maximumPerSeatPostEqCurves,
     capabilityLimitedRegions: limitedRegions,
     capabilityLimitedPointCount: finalPostEqCurve.filter((point) => point.capabilityLimited).length,
+    pairedP14P18Authority,
+    pairedP14P18Summary,
     productionHouseCurveTarget: targetCurve.map((point) => ({ ...point })),
     fitterHouseCurveTarget: (eq.fitterHouseCurveTarget || targetCurve).map((point) => ({ ...point })),
     canonicalHouseCurveShape: targetShape.map((point) => ({ ...point })),
@@ -343,6 +353,8 @@ export function generateCanonicalCandidatePool({
   correctionEndHz = 200, perSeatRawCurves = [], collectDiagnostics = false,
   onProgress = null, reuseExactHouseCurveEvaluations = true,
   selectedP14TargetDb = 109, p14TargetBasis = "minimum", p14TargetLevel = 1,
+  perSourceComplexTransfers = [], normalizedTransferFingerprint = null,
+  calibrationFingerprint = null,
 } = {}) {
   const missingInputs = [!rawCurve.length && "rawCurve", !activeSubs.length && "activeSubs"].filter(Boolean);
   if (missingInputs.length) return stampPoolAuthority({
@@ -441,6 +453,15 @@ export function generateCanonicalCandidatePool({
   const operatingOutputDiagnostics = buildOperatingOutputDiagnostics(
     activeSubs, usableLfHz, selectedOperatingOutputDb, domains.correctionStartHz, domains.correctionEndHz,
   );
+  const pairedAuthorityInputs = {
+    activeSubs,
+    perSourceComplexTransfers,
+    targetBasis: p14TargetBasis,
+    requestedLevel: p14TargetLevel,
+    requestedTargetSplDb: selectedP14TargetDb,
+    normalizedTransferFingerprint,
+    calibrationFingerprint,
+  };
   const levelNormalisedRawCurve = rawCurve.map((point) => ({
     ...point,
     spl: Number.isFinite(point.spl) ? point.spl + appliedOperatingLevelOffsetDb : point.spl,
@@ -512,7 +533,8 @@ export function generateCanonicalCandidatePool({
     operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
     perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
     eq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
-    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
+    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs,
   }));
 
   // ── Partial-bank salvage ──
@@ -579,7 +601,8 @@ export function generateCanonicalCandidatePool({
         perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
         eq: sanitisedEq, domains, targetCurve, targetShape,
         verticalOffsetDb, protectedNullRegions,
-        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
+        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+        selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs,
       }));
     }
     if (salvage.cutOnlyFilters.length > 0 && salvage.cutOnlyBankLimits.allOk) {
@@ -599,7 +622,8 @@ export function generateCanonicalCandidatePool({
         perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
         eq: cutOnlyEq, domains, targetCurve, targetShape,
         verticalOffsetDb, protectedNullRegions,
-        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
+        baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+        selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs,
       }));
     }
   }
@@ -646,7 +670,8 @@ export function generateCanonicalCandidatePool({
     operatingLevelOffsetDb: appliedOperatingLevelOffsetDb,
     perSeatRawCurves: levelNormalisedSeats, perSeatMaximumSplCurves,
     eq: identityEq, domains, targetCurve, targetShape, verticalOffsetDb, protectedNullRegions,
-    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb, selectedOperatingOutputDb, operatingOutputDiagnostics,
+    baseRequestedSystemOutputDb, operatingSystemOutputDb, requestedOperatingLevelOffsetDb,
+    selectedOperatingOutputDb, operatingOutputDiagnostics, pairedAuthorityInputs,
   });
   const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, ...salvagedCandidates, identityCandidate]);
   const __canonicalTrace__ = {
