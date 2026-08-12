@@ -279,7 +279,7 @@ function NeedsAttentionRow({ contrib, onParamClick }) {
 
 // ── Main component ──────────────────────────────────────────────────
 
-export default function DesignOverviewBlock({ rating, recommendations, onParamClick }) {
+export default function DesignOverviewBlock({ rating, recommendations, onParamClick, onShowRecommendations }) {
   if (!rating || rating.status === "NOT_ASSESSED") {
     return (
       <div style={{
@@ -388,16 +388,46 @@ export default function DesignOverviewBlock({ rating, recommendations, onParamCl
         </div>
         {recsAvailable ? (
           <div style={{
-            fontSize: 12,
-            color: COLORS.body,
-            fontFamily: FONT_BODY,
-            lineHeight: 1.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
           }}>
-            {improvementCount} design improvement{improvementCount !== 1 ? "s" : ""}
-            {" · "}
-            {bestPracticeCount} best-practice improvement{bestPracticeCount !== 1 ? "s" : ""}
-            {" · "}
-            {simplificationCount} simplification{simplificationCount !== 1 ? "s" : ""}
+            <div style={{
+              fontSize: 12,
+              color: COLORS.body,
+              fontFamily: FONT_BODY,
+              lineHeight: 1.5,
+            }}>
+              {improvementCount} design improvement{improvementCount !== 1 ? "s" : ""}
+              {" · "}
+              {bestPracticeCount} best-practice improvement{bestPracticeCount !== 1 ? "s" : ""}
+              {" · "}
+              {simplificationCount} simplification{simplificationCount !== 1 ? "s" : ""}
+            </div>
+            {onShowRecommendations && (
+              <button
+                onClick={onShowRecommendations}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: COLORS.primary,
+                  fontFamily: FONT_BODY,
+                  background: "transparent",
+                  border: `1px solid ${COLORS.primary}`,
+                  borderRadius: 4,
+                  padding: "4px 10px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#F8F7F5"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                View Details →
+              </button>
+            )}
           </div>
         ) : (
           <div style={{

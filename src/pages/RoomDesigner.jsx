@@ -884,9 +884,20 @@ function RoomDesignerWithState() {
         finalTotal: priceData.finalTotal,
         difficultyMultiplier,
         incompletePriceCount: priceData.incompletePriceCount || 0,
+        // Stage D: full breakdown for Design Review
+        priceMode: priceData.priceMode,
+        territoryLabel: priceData.territoryLabel,
+        territoryCode: priceData.territoryCode,
+        currency: priceData.currency,
+        priceListAvailable: priceData.priceListAvailable,
+        breakdown: priceData.breakdown,
+        baseTotalExVat: priceData.baseTotalExVat,
+        vatAmount: priceData.vatAmount,
+        finalTotalExVat: priceData.finalTotalExVat,
+        finalTotalIncVat: priceData.finalTotalIncVat,
       };
     }
-  }, [showPrices, priceData.baseTotal, priceData.finalTotal, difficultyMultiplier, priceData.incompletePriceCount]);
+  }, [showPrices, priceData, difficultyMultiplier]);
 
 
 
@@ -1592,9 +1603,16 @@ function RoomDesignerWithState() {
         rating: appDesignRating,
         recommendations: designRecommendations,
         analysisResult,
+        // Stage D: drawing state for Design Review (read-only, no second engine)
+        placedSpeakers,
+        frontSubs: frontSubsForRendering,
+        rearSubs: rearSubsForRendering,
+        screen: _screen,
+        dolbyLayout: dolbyPreset,
+        mlpPoint: mlpAnchorEffective,
       };
     }
-  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState]);
+  }, [showAsdr, appDesignRating, designRecommendations, analysisResult, resolvedProjectId, projectIdState, placedSpeakers, frontSubsForRendering, rearSubsForRendering, _screen, dolbyPreset, mlpAnchorEffective]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {

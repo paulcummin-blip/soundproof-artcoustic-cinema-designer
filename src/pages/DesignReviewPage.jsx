@@ -1,23 +1,24 @@
 /**
  * DesignReviewPage.jsx
  * ---------------------
- * Stage B + C — In-app Design Review workspace.
+ * Stage B + C + D — In-app Design Review workspace.
  *
  * Route: /DesignReview?projectId={projectId}
  *
  * Four collapsible sections:
  *   1. Design Overview (OPEN by default) — rating, pillar summaries, needs attention, rec snapshot
- *   2. Drawings & Geometry (collapsed) — placeholder
+ *   2. Drawings & Geometry — lazy-mounted plan, elevation, zones, acoustic treatment
  *   3. Parameter Details (controlled) — compact parameter explorer
- *   4. Recommendations & Products (collapsed) — placeholder
+ *   4. Recommendations & Products (controlled) — design recs, products selected, price breakdown
  *
  * Stage C: Design Overview → Parameter Details navigation.
- * Clicking a Needs Attention row opens Parameter Details, sets filter to
- * Needs Attention, expands the clicked parameter, and scrolls to it.
+ * Stage D: Drawings & Geometry + Recommendations & Products sections.
+ *   - "View Details" in Recommendation Snapshot opens Recommendations & Products.
  *
  * CRITICAL: Does NOT mount useRP22AnalysisEngine or DesignRecommendationEngine.
  * Reads the already-settled rating + recommendations + analysisResult from the
- * shared window.__ROOM_DESIGNER_ASDR__ store published by the Room Designer.
+ * shared window.__ROOM_DESIGNER_ASDR__ store, and price breakdown from
+ * window.__ROOM_DESIGNER_PRICE__, both published by the Room Designer.
  */
 
 import React, { useEffect, useState, useCallback } from "react";
@@ -27,6 +28,8 @@ import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import DesignOverviewBlock from "@/components/designreview/DesignOverviewBlock";
 import ParameterExplorer from "@/components/designreview/ParameterExplorer";
+import DrawingsBlock from "@/components/designreview/DrawingsBlock";
+import RecommendationsBlock from "@/components/designreview/RecommendationsBlock";
 import { ArrowLeft, BarChart3, PenTool, ListChecks, Package } from "lucide-react";
 
 const COLORS = {
@@ -54,12 +57,16 @@ export default function DesignReviewPage() {
 
   const [projectDetails, setProjectDetails] = useState(null);
   const [asdrData, setAsdrData] = useState(null);
+  const [priceData, setPriceData] = useState(null);
   const [loadingProject, setLoadingProject] = useState(true);
 
   // Stage C: Parameter Explorer state (page-level)
   const [paramDetailsOpen, setParamDetailsOpen] = useState(false);
   const [expandedParamKey, setExpandedParamKey] = useState(null);
   const [activeFilter, setActiveFilter] = useState("needs");
+
+  // Stage D: Recommendations & Products panel state
+  const [recsOpen, setRecsOpen] = useState(false);
 
   // Fetch project details (name, client) for the header
   useEffect(() => {
@@ -104,12 +111,32 @@ export default function DesignReviewPage() {
     return () => clearInterval(interval);
   }, [projectId]);
 
+  // Stage D: Poll the shared price store published by the Room Designer.
+  useEffect(() => {
+    const read = () => {
+      const shared = typeof window !== "undefined" ? window.__ROOM_DESIGNER_PRICE__ : null;
+      if (shared && shared.showPrices) {
+        setPriceData(shared);
+      } else {
+        setPriceData(null);
+      }
+    };
+    read();
+    const interval = setInterval(read, 500);
+    return () => clearInterval(interval);
+  }, []);
+
   // Stage C: Handle Needs Attention row click from Design Overview
   const handleParamClick = useCallback((paramKey) => {
     if (!paramKey) return;
     setParamDetailsOpen(true);
     setActiveFilter("needs");
     setExpandedParamKey(paramKey);
+  }, []);
+
+  // Stage D: Handle "View Recommendations" click from Design Overview
+  const handleShowRecommendations = useCallback(() => {
+    setRecsOpen(true);
   }, []);
 
   const handleExpandParam = useCallback((key) => {
@@ -215,6 +242,7 @@ export default function DesignReviewPage() {
             rating={asdrData?.rating}
             recommendations={asdrData?.recommendations}
             onParamClick={handleParamClick}
+            onShowRecommendations={handleShowRecommendations}
           />
         </CollapsiblePanel>
 
@@ -222,7 +250,7 @@ export default function DesignReviewPage() {
           title="Drawings & Geometry"
           icon={<PenTool style={{ width: 16, height: 16, color: COLORS.primary }} />}
         >
-          <PlaceholderBlock text="Detailed review tools will appear here." />
+          <DrawingsBlock asdrData={asdrData} />
         </CollapsiblePanel>
 
         <CollapsiblePanel
@@ -245,24 +273,12 @@ export default function DesignReviewPage() {
         <CollapsiblePanel
           title="Recommendations & Products"
           icon={<Package style={{ width: 16, height: 16, color: COLORS.primary }} />}
+          isOpen={recsOpen}
+          onToggle={() => setRecsOpen(prev => !prev)}
         >
-          <PlaceholderBlock text="Recommendations and product selection will appear here in Stage D." />
+          <RecommendationsBlock asdrData={asdrData} priceData={priceData} />
         </CollapsiblePanel>
       </div>
-    </div>
-  );
-}
-
-function PlaceholderBlock({ text }) {
-  return (
-    <div style={{
-      padding: "24px 16px",
-      textAlign: "center",
-      color: COLORS.muted,
-      fontFamily: FONT_BODY,
-      fontSize: 12,
-    }}>
-      {text}
     </div>
   );
 }
