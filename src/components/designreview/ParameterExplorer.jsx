@@ -162,9 +162,10 @@ export default function ParameterExplorer({
   onExpandParam,
   activeFilter,
   onFilterChange,
+  seatingPositions,
 }) {
   const app = useAppState();
-  const seats = app?.seatingPositions || [];
+  const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
   const mlpSeatId = useMemo(() => {
     const primary = seats.find((s) => s?.isPrimary && s?.id);
     return primary?.id || seats[0]?.id || "";

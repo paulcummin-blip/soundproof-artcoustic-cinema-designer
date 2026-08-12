@@ -20,9 +20,10 @@
  * window.__ROOM_DESIGNER_PRICE__, both published by the Room Designer.
  */
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
+import { useAppState } from "@/components/AppStateProvider";
 import { base44 } from "@/api/base44Client";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import ReportCover from "@/components/report/ReportCover";
@@ -58,6 +59,27 @@ export default function DesignReviewPage() {
   const [asdrData, setAsdrData] = useState(null);
   const [priceData, setPriceData] = useState(null);
   const [loadingProject, setLoadingProject] = useState(true);
+
+  // ── Resolved seating authority ──
+  // Live AppState seats are only used when the ASDR store (published by Room
+  // Designer) confirms they belong to the SAME current project. Otherwise we
+  // fall back to the persisted Project entity's seating_positions. This prevents
+  // stale seats from a different project (or a fresh tab) from polluting the
+  // Design Review seat result map.
+  const app = useAppState();
+  const resolvedSeatingPositions = useMemo(() => {
+    const liveSeats = Array.isArray(app?.seatingPositions) ? app.seatingPositions : [];
+    const asdrProjectId = asdrData?.projectId;
+    const liveBelongsToCurrentProject =
+      asdrData &&
+      String(asdrProjectId || "") === String(projectId || "") &&
+      liveSeats.length > 0;
+    if (liveBelongsToCurrentProject) return liveSeats;
+    const persistedSeats = Array.isArray(projectDetails?.seating_positions)
+      ? projectDetails.seating_positions
+      : [];
+    return persistedSeats;
+  }, [app?.seatingPositions, asdrData, projectId, projectDetails]);
 
   // Stage C: Parameter Explorer state (page-level)
   const [paramDetailsOpen, setParamDetailsOpen] = useState(false);
@@ -227,6 +249,7 @@ export default function DesignReviewPage() {
             onExpandParam={handleExpandParam}
             activeFilter={activeFilter}
             onFilterChange={handleFilterChange}
+            seatingPositions={resolvedSeatingPositions}
           />
         </CollapsiblePanel>
 
