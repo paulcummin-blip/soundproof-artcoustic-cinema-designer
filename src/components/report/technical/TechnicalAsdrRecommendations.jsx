@@ -214,6 +214,12 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
 
   return (
     <div className="tech-asdr-recommendations" style={{ marginTop: "3mm" }}>
+      <style>{`
+        @media (max-width: 640px) {
+          .tech-rec-columns { flex-direction: column !important; }
+          .tech-rec-columns > div { flex: 1 1 auto !important; }
+        }
+      `}</style>
       <div style={{
         fontSize: "9pt",
         fontWeight: 700,
@@ -237,27 +243,33 @@ export default function TechnicalAsdrRecommendations({ recommendations }) {
           No material recommendations identified.
         </div>
       ) : (
-        <>
-          {improvements.length > 0 && (
-            <Group label="Improve the Design">
-              {improvements.map((item) =>
-                isLcrUpgrade(item)
-                  ? <LcrUpgradeRow key={item.id} item={item} />
-                  : <GenericImprovementRow key={item.id} item={item} />
-              )}
-            </Group>
-          )}
-          {bestPractice.length > 0 && (
-            <Group label="Best Practice">
-              {bestPractice.map((item) => <BestPracticeRow key={item.id} item={item} />)}
-            </Group>
-          )}
-          {savings.length > 0 && (
-            <Group label="Simplify the Design">
-              {savings.map((item) => <SimplifyRow key={item.id} item={item} />)}
-            </Group>
-          )}
-        </>
+        <div className="tech-rec-columns" style={{ display: "flex", gap: "4mm", alignItems: "flex-start" }}>
+          {/* LEFT COLUMN — Material Upgrades (~59%) */}
+          <div style={{ flex: "0 0 59%", minWidth: 0 }}>
+            {improvements.length > 0 && (
+              <Group label="Improve the Design">
+                {improvements.map((item) =>
+                  isLcrUpgrade(item)
+                    ? <LcrUpgradeRow key={item.id} item={item} />
+                    : <GenericImprovementRow key={item.id} item={item} />
+                )}
+              </Group>
+            )}
+          </div>
+          {/* RIGHT COLUMN — Best Practice + Simplify (~41%) */}
+          <div style={{ flex: "0 0 41%", minWidth: 0 }}>
+            {bestPractice.length > 0 && (
+              <Group label="Best Practice">
+                {bestPractice.map((item) => <BestPracticeRow key={item.id} item={item} />)}
+              </Group>
+            )}
+            {savings.length > 0 && (
+              <Group label="Simplify the Design">
+                {savings.map((item) => <SimplifyRow key={item.id} item={item} />)}
+              </Group>
+            )}
+          </div>
+        </div>
       )}
 
       <div style={{
