@@ -43,8 +43,26 @@ export function publishDesignReviewHandoff(snapshot) {
 
   window.__ROOM_DESIGNER_ASDR__ = published;
 
+  // Keep the persistent handoff intentionally compact. Recommendations can
+  // contain full scenario reruns and remain a live same-window authority; the
+  // direct-load cache carries only the settled report/result fields.
+  const stored = {
+    projectId,
+    publishedAt: published.publishedAt,
+    showAsdr: published.showAsdr,
+    rating: published.rating,
+    analysisResult: published.analysisResult,
+    seatingPositions: published.seatingPositions,
+    placedSpeakers: published.placedSpeakers,
+    frontSubs: published.frontSubs,
+    rearSubs: published.rearSubs,
+    screen: published.screen,
+    dolbyLayout: published.dolbyLayout,
+    mlpPoint: published.mlpPoint,
+  };
+
   try {
-    window.localStorage.setItem(storageKey(projectId), JSON.stringify(published));
+    window.localStorage.setItem(storageKey(projectId), JSON.stringify(stored));
   } catch {
     // Live same-window handoff remains authoritative if storage is unavailable
     // or the browser quota cannot hold the snapshot.
