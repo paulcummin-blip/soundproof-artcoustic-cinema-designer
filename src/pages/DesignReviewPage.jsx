@@ -14,10 +14,9 @@
  *      - Parameter Details (controlled)
  *      - Recommendations & Products (controlled)
  *
- * CRITICAL: Does NOT mount useRP22AnalysisEngine or DesignRecommendationEngine.
- * Reads the already-settled rating + recommendations + analysisResult from the
- * shared window.__ROOM_DESIGNER_ASDR__ store, and price breakdown from
- * window.__ROOM_DESIGNER_PRICE__, both published by the Room Designer.
+ * CRITICAL: Does NOT mount useRP22AnalysisEngine, DesignRecommendationEngine,
+ * or a second pricing calculation. Reads the already-settled analysis and full
+ * commercial price snapshot from the project-scoped Room Designer handoff.
  */
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
