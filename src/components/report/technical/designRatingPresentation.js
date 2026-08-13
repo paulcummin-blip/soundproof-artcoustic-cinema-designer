@@ -154,18 +154,60 @@ function getGroupForContrib(contrib) {
   return null;
 }
 
+// ── Screen / Viewing Geometry — single-parameter category ──────────────────
+// This category contains only the authoritative RP23 horizontal viewing-angle
+// result. It bypasses the normal multi-parameter weighted aggregation: the
+// achieved RP23 level is read directly and translated to a fixed category
+// descriptor. No category Design Performance Index is calculated for this
+// category. The overall room rating and its six designations are unaffected.
+const SCREEN_CATEGORY_LABEL = "Screen / Viewing Geometry";
+
+const SCREEN_LEVEL_DESCRIPTOR = {
+  L4: "Exceptional Performance",
+  L3: "Reference Performance",
+  L2: "Good Performance",
+  L1: "Acceptable Performance",
+  FAIL: "Design Improvement Recommended",
+};
+
 /**
- * Derive per-category qualitative summaries from the same existing weighted
- * contribution data. Each category's earned/maximum points are summed and the
- * resulting percentage is mapped through the index bands.
+ * Extract the worst (lowest) achieved level from a resultLevel string.
+ * A single level ("L4") returns itself. A seat-scope distribution
+ * ("3×L4 · 2×L3 · 1×L1") returns the lowest level present.
+ * Returns null for unrecognised input.
+ */
+function worstLevelFromResultLevel(resultLevel) {
+  if (!resultLevel || typeof resultLevel !== "string") return null;
+  const trimmed = resultLevel.trim();
+  if (/^(L[1-4]|FAIL)$/.test(trimmed)) return trimmed;
+  const counts = parseLevelCounts(trimmed);
+  if (counts.FAIL) return "FAIL";
+  if (counts.L1) return "L1";
+  if (counts.L2) return "L2";
+  if (counts.L3) return "L3";
+  if (counts.L4) return "L4";
+  return null;
+}
+
+/**
+ * Derive per-category qualitative summaries.
  *
- * Failure wording ("Design Improvement Recommended") is shown ONLY when an
- * authoritative result within that category is genuinely FAIL. An L1 result
- * is a valid achieved level and never triggers failure wording.
+ * Spatial Resolution, Dynamic Range and Timbre Matching use the existing
+ * multi-parameter weighted aggregation: each category's earned/maximum points
+ * are summed and the resulting percentage is mapped through the index bands.
  *
- * For Screen / Viewing Geometry, L1 makes the category visibly weaker (via a
- * lower category index → lower band) but never triggers failure wording on
- * its own — only a genuine FAIL does.
+ * Screen / Viewing Geometry is a single-parameter category containing only the
+ * authoritative RP23 horizontal viewing-angle result. It bypasses the weighted
+ * aggregation: the achieved RP23 level is read directly from the "screen"
+ * contribution and translated via SCREEN_LEVEL_DESCRIPTOR. No category Design
+ * Performance Index is calculated for this category.
+ *
+ * Failure wording ("Design Improvement Recommended") for the three weighted
+ * categories is shown ONLY when an authoritative result within that category
+ * is genuinely FAIL. An L1 result is a valid achieved level and never triggers
+ * failure wording. For Screen / Viewing Geometry, only an authoritative RP23
+ * FAIL produces "Design Improvement Recommended"; L1 produces "Acceptable
+ * Performance".
  *
  * @param {Object} roomDesignRating
  * @returns {Array<{label, designation, index}>}
@@ -188,6 +230,17 @@ export function getCategorySummaries(roomDesignRating) {
     const data = groups[g.label];
     if (!data || data.max === 0) {
       return { label: g.label, designation: null, index: null };
+    }
+    // Screen / Viewing Geometry: single-parameter category — read the
+    // authoritative RP23 result directly, bypassing weighted aggregation.
+    if (g.label === SCREEN_CATEGORY_LABEL) {
+      const screenContrib = data.contribs.find((c) => c.key === "screen");
+      const worst = screenContrib ? worstLevelFromResultLevel(screenContrib.resultLevel) : null;
+      return {
+        label: g.label,
+        designation: worst ? (SCREEN_LEVEL_DESCRIPTOR[worst] ?? null) : null,
+        index: null,
+      };
     }
     const pct = (data.earned / data.max) * 100;
     const fail = hasFailResult(data.contribs);
