@@ -23,11 +23,10 @@
  *   A seat with no stored priority (legacy projects) resolves to "primary",
  *   so old projects load without migration.
  *
- * RSP RULE
- *   The Reference Seating Position (the seat with `isPrimary === true`,
- *   determined by enforceOnePrimary / computeMLPAndPrimary) must always
- *   resolve to Primary. `enforceRspPriority` guarantees this at the data
- *   level. The UI must also prevent toggling the RSP to Secondary.
+ * RSP INDEPENDENCE
+ *   Priority is a user classification independent of the internal Reference
+ *   Seating Position / `isPrimary` flag. Every seat may be Primary or
+ *   Secondary, including whichever seat is nearest the acoustic RSP.
  *
  * This module is the single shared helper consumed by the UI selector and
  * (in the next stage) by the report aggregation.
@@ -48,43 +47,7 @@ export function resolveSeatPriority(seat) {
 }
 
 /**
- * Is this seat the current RSP?
- * The RSP is the seat flagged `isPrimary === true` by the canonical
- * RSP selection (enforceOnePrimary / computeMLPAndPrimary).
- * @param {object} seat
- * @returns {boolean}
- */
-export function isRspSeat(seat) {
-  return Boolean(seat && seat.isPrimary === true);
-}
-
-/**
- * Enforce that the RSP seat (isPrimary === true) has priority === "primary".
- * Returns the SAME array reference when no change is needed (so it is safe to
- * use inside React state setters and effects without causing render loops).
- *
- * This does NOT change which seat is the RSP — it only guarantees the RSP
- * seat's priority classification. The previous RSP (if it loses isPrimary)
- * keeps its existing explicit priority; Primary is the safe fallback when no
- * reliable prior value exists.
- *
- * @param {Array<object>} seats
- * @returns {Array<object>} same ref if unchanged, new array otherwise
- */
-export function enforceRspPriority(seats) {
-  if (!Array.isArray(seats) || seats.length === 0) return seats;
-  const rspIdx = seats.findIndex((s) => s && s.isPrimary === true);
-  if (rspIdx === -1) return seats; // no RSP seat present — nothing to enforce
-  const rsp = seats[rspIdx];
-  if (resolveSeatPriority(rsp) === PRIMARY) return seats; // already primary
-  const next = seats.slice();
-  next[rspIdx] = { ...rsp, priority: PRIMARY };
-  return next;
-}
-
-/**
- * Toggle a seat's priority between Primary and Secondary.
- * The RSP seat can never become Secondary — toggling it is a no-op.
+ * Toggle any seat's priority between Primary and Secondary.
  * Returns the SAME array reference when no change is made.
  *
  * @param {Array<object>} seats
@@ -96,8 +59,6 @@ export function toggleSeatPriority(seats, seatId) {
   const idx = seats.findIndex((s) => s && s.id === seatId);
   if (idx === -1) return seats;
   const seat = seats[idx];
-  // RSP can never become Secondary
-  if (isRspSeat(seat)) return seats;
   const nextPriority = resolveSeatPriority(seat) === PRIMARY ? SECONDARY : PRIMARY;
   const next = seats.slice();
   next[idx] = { ...seat, priority: nextPriority };
