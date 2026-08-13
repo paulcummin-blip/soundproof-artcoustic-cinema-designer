@@ -674,8 +674,10 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const fl = speakersForP3.find(s => { const r = String(s.role || '').toUpperCase(); return r === 'FL' || r === 'L'; });
       const fr = speakersForP3.find(s => { const r = String(s.role || '').toUpperCase(); return r === 'FR' || r === 'R'; });
 
-      // No FL/FR present at all → P3 unavailable (not FAIL)
-      if (!fl && !fr) {
+      // P3 requires valid authoritative geometry for BOTH FL and FR before it
+      // can be definitively scored. A missing speaker for either channel
+      // means P3 cannot be evaluated → no_data.
+      if (!fl || !fr) {
         gradedParameters.primary[3] = {
           title: "Number of screen wall speakers allowed outside of recommended zonal locations",
           level: null,
@@ -687,10 +689,23 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         return;
       }
 
-      // Centre-within-zone test (inclusive boundaries). null = invalid/missing
-      // geometry — NOT counted as outside.
-      const flResult = fl ? isCentreInZone(fl.position?.x, zones.left) : null;
-      const frResult = fr ? isCentreInZone(fr.position?.x, zones.right) : null;
+      // Centre-within-zone test (inclusive boundaries). null = non-finite
+      // authoritative position — P3 cannot be scored without valid geometry
+      // for both channels.
+      const flResult = isCentreInZone(fl.position?.x, zones.left);
+      const frResult = isCentreInZone(fr.position?.x, zones.right);
+
+      if (flResult == null || frResult == null) {
+        gradedParameters.primary[3] = {
+          title: "Number of screen wall speakers allowed outside of recommended zonal locations",
+          level: null,
+          value: null,
+          unit: "speakers",
+          formatted: null,
+          status: "no_data"
+        };
+        return;
+      }
 
       const failCount =
         (flResult === false ? 1 : 0) +
