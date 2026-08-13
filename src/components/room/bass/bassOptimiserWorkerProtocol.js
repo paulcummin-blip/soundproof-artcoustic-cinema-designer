@@ -1,6 +1,6 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
 export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v20-per-sub-amplifier-and-width-aware-null-authority";
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v24-exact-bank-validation-memo";
+export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v25-shared-stage-exact-memo";
 export const BASS_RESULT_SCHEMA_VERSION = 19;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 
