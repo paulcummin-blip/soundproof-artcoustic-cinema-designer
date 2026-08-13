@@ -6,11 +6,17 @@ const curve = (values) => values.map((spl, index) => ({ frequency: 20 + index * 
 function fixtureInputs(overrides = {}) {
   const before = curve([100, 101, 102]);
   const eq = curve([1, -2, 0.5]);
-  const after = before.map((point, index) => ({ frequency: point.frequency, spl: point.spl + eq[index].spl }));
+  const operatingLevelOffsetDb = 2;
+  const maximumAfterEq = curve([110, 100.5, 104]);
+  const after = before.map((point, index) => ({
+    frequency: point.frequency,
+    spl: Math.min(point.spl + operatingLevelOffsetDb + eq[index].spl, maximumAfterEq[index].spl),
+  }));
   const target = curve([106, 105, 104]);
   const candidate = {
     candidateId: "candidate-1", generatedFilterBank: [{ enabled: true, frequencyHz: 30, gainDb: -2, Q: 2 }],
-    combinedEqCurve: eq, finalPostEqCurve: after, productionHouseCurveTarget: target, fitterHouseCurveTarget: target,
+    combinedEqCurve: eq, finalPostEqCurve: after, maximumSplCurveAfterEq: maximumAfterEq,
+    operatingLevelOffsetDb, productionHouseCurveTarget: target, fitterHouseCurveTarget: target,
     assessmentStartHz: 20, assessmentEndHz: 40, requestedTargetSpl: 100,
     achievedP14Level: 1, achievedP14Db: 101, achievedP18Level: 1, achievedP18FrequencyHz: 20,
     achievedP19Level: 1, achievedP19VariationDb: 4, achievedP20Level: 1, achievedP20VariationDb: 3, p20Available: true,
@@ -49,7 +55,8 @@ export function runExactHouseCurveCaptureFixtures() {
     ["SPL serializer", serializeSplCurve([{ frequency: 20, spl: 100 }])[0]?.spl === 100],
     ["EQ gain serializer", serializeEqCurve([{ frequency: 20, spl: 2 }])[0]?.gainDb === 2],
     ["Exact target authority", capture.targetSource === "exact-live-authority" && capture.productionHouseCurveTarget.length === 3],
-    ["Before plus EQ equals after", capture.captureValidation.maximumAfterEqReconstructionErrorDb === 0],
+    ["Raw plus operating trim plus EQ, capped by product ceiling, equals after", capture.captureValidation.maximumAfterEqReconstructionErrorDb === 0],
+    ["Operating-level trim is captured", capture.globalTrimDb === 2 && capture.maximumAvailableAfterEq.length === 3],
     ["Candidate identity pass", capture.captureValidation.identityPass && capture.captureValidation.valid],
     ["Identity mismatch rejection", !mismatch.captureValidation.valid && !mismatch.captureValidation.identityPass],
     ["Empty aggregate EQ rejection", !emptyEq.captureValidation.valid && emptyEq.captureValidation.failures.some((failure) => failure.includes("aggregate EQ is empty"))],
