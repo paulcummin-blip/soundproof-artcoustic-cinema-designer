@@ -11,6 +11,7 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { classifyEqCorrectionRegion, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
+import { evaluatePreparedBankLimits } from "@/components/utils/preparedBankValidation";
 
 const MAX_FILTERS = 10;
 const MAX_Q = 10;
@@ -241,10 +242,13 @@ function worstSeatDeviationWorsening(currentFilters, candidateFilters, perSeatRa
 
 function rejectionForTrial({ trial, currentFilters, currentPoints, currentQuality, raw, perSeatRawCurves,
   region, protectedNullRegions, canonicalTargetCurve, anchorDb, assessmentStartHz, assessmentEndHz,
-  correctionStartHz, correctionEndHz, activeSubs, usableLfHz, requestedSystemOutputDb, profile }) {
+  correctionStartHz, correctionEndHz, activeSubs, usableLfHz, requestedSystemOutputDb, profile,
+  preparedBankValidation = null, operationCounts = null }) {
   if (trial.filters.filter((filter) => filter.enabled).length > MAX_FILTERS) return { reason: "filter-count-limit: more than ten enabled filters" };
   if (trial.filter.Q > MAX_Q || trial.filter.Q < 0.5) return { reason: `filter-Q-limit: Q ${trial.filter.Q} is outside 0.5–${MAX_Q}` };
-  const limits = evaluateProvisionalBankLimits(trial.filters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  const limits = preparedBankValidation
+    ? evaluatePreparedBankLimits(preparedBankValidation, trial.filters, profile, operationCounts)
+    : evaluateProvisionalBankLimits(trial.filters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   if (!limits.allOk) {
     const failures = [];
     if (!limits.cutLimitOk) failures.push(`aggregate cut ${limits.maxAggregateCutDb.toFixed(3)} dB exceeds −15 dB`);
@@ -362,7 +366,8 @@ function rejectionForTrial({ trial, currentFilters, currentPoints, currentQualit
 export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], perSeatRawCurves = [], anchorDb = 0,
   canonicalTargetCurve = [], protectedNullRegions = [], activeSubs = [], usableLfHz, requestedSystemOutputDb,
   assessmentStartHz = 20, assessmentEndHz = 120, correctionStartHz = 20, correctionEndHz = 200,
-  profile = { maximumCutDb: 15, maximumAggregateBoostDb: 6 }, priorIterationTrace = [], cleanupPass = 0 }) {
+  profile = { maximumCutDb: 15, maximumAggregateBoostDb: 6 }, priorIterationTrace = [], cleanupPass = 0,
+  preparedBankValidation = null, operationCounts = null }) {
   const raw = normaliseCurve(rawCurve);
   let selectedFilters = filters.filter((filter) => filter?.enabled).map((filter) => ({ ...filter }));
   let bankEvaluationCount = 0;
@@ -375,7 +380,9 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
     const currentPoints = rawResidualPoints(raw, selectedFilters, correctionStartHz, correctionEndHz, anchorDb, canonicalTargetCurve);
     const nearest = currentPoints.reduce((best, point) => Math.abs(point.frequency - initialRegion.centre.frequency) < Math.abs(best.frequency - initialRegion.centre.frequency) ? point : best);
     const region = { ...initialRegion, centre: nearest };
-    const limitsBefore = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+    const limitsBefore = preparedBankValidation
+      ? evaluatePreparedBankLimits(preparedBankValidation, selectedFilters, profile, operationCounts)
+      : evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
     bankEvaluationCount++;
     const permittedBoostDb = 6;
     const diagnostic = {
@@ -421,6 +428,7 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
         trial, currentFilters: selectedFilters, currentPoints, currentQuality, raw, perSeatRawCurves,
         region, protectedNullRegions, canonicalTargetCurve, anchorDb, assessmentStartHz, assessmentEndHz,
         correctionStartHz, correctionEndHz, activeSubs, usableLfHz, requestedSystemOutputDb, profile,
+        preparedBankValidation, operationCounts,
       });
       bankEvaluationCount++;
       const attempt = {
@@ -459,7 +467,9 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
     acceptedOperationCount++;
   }
 
-  const finalLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  const finalLimits = preparedBankValidation
+    ? evaluatePreparedBankLimits(preparedBankValidation, selectedFilters, profile, operationCounts)
+    : evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
   bankEvaluationCount++;
   const finalPoints = rawResidualPoints(raw, selectedFilters, correctionStartHz, correctionEndHz, anchorDb, canonicalTargetCurve);
   if (acceptedOperationCount > 0 && cleanupPass < 4) {
@@ -468,6 +478,7 @@ export function runProfessionalResidualCleanup({ filters = [], rawCurve = [], pe
       protectedNullRegions, activeSubs, usableLfHz, requestedSystemOutputDb,
       assessmentStartHz, assessmentEndHz, correctionStartHz, correctionEndHz,
       profile, priorIterationTrace, cleanupPass: cleanupPass + 1,
+      preparedBankValidation, operationCounts,
     });
     return {
       ...nextPass,
