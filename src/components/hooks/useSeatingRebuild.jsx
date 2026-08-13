@@ -471,11 +471,8 @@ export function useSeatingRebuild({
       }
     });
 
-    // 5) Commit to app state. RSP priority is NOT enforced here — the rebuild
-    // may run on intermediate hydration states where isPrimary is transient.
-    // Priority is enforced atomically at the final RSP-setting commit
-    // (RoomDesigner isPrimary normalisation effect). Priority is preserved
-    // per-seat via resolveSeatPriority(prev) above.
+    // 5) Commit to app state. Priority is independent of the acoustic RSP
+    // and is preserved per-seat via resolveSeatPriority(prev) above.
     setSeats((prev) => (seatsEqualWithin1mm(prev, seats) ? prev : seats));
 
     // Update seatingBlockOffset ref so next render can detect further changes
