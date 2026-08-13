@@ -6,6 +6,64 @@ let bankEvaluationCounter = 0;
 export const resetDesignEqBankEvaluationCount = () => { bankEvaluationCounter = 0; };
 export const getDesignEqBankEvaluationCount = () => bankEvaluationCounter;
 
+const filterSignature = (filter) => [
+  filter?.enabled ? 1 : 0,
+  Number(filter?.frequencyHz),
+  Number(filter?.gainDb),
+  Number(filter?.Q),
+].join(":");
+const bankSignature = (filters) => (filters || []).map(filterSignature).join("|");
+
+export function createDesignEqBankEvaluationContext(raw, activeSubs, usableLfHz, requestedSystemOutputDb) {
+  const rawPoints = Array.isArray(raw) ? raw : [];
+  const bandIndices = rawPoints
+    .map((point, index) => ({ point, index }))
+    .filter(({ point }) => point.frequency >= 20 && point.frequency <= 200);
+  return {
+    raw,
+    rawPoints,
+    bandIndices,
+    permittedBoostDb: bandIndices.map(({ point }) => {
+      const allowance = getSourceDomainBoostAllowance({
+        frequency: point.frequency,
+        requestedBoostDb: 6,
+        activeSubs,
+        usableLfHz,
+        maxBoostDb: 6,
+        requestedSystemOutputDb,
+      });
+      return Math.max(0, Math.min(6, allowance.allowedBoostDb));
+    }),
+    filterResponses: new Map(),
+    bankLimitResults: new Map(),
+    curveResults: new Map(),
+    stats: {
+      bankRequests: 0,
+      uniqueBankEvaluations: 0,
+      reusedBankEvaluations: 0,
+      uniqueFilterResponses: 0,
+      curveRequests: 0,
+      reusedCurves: 0,
+    },
+  };
+}
+
+export function getDesignEqBankEvaluationContextStats(context) {
+  return context?.stats ? { ...context.stats } : null;
+}
+
+function responseForFilter(context, filter) {
+  const key = filterSignature(filter);
+  if (!context.filterResponses.has(key)) {
+    context.filterResponses.set(
+      key,
+      context.rawPoints.map((point) => peakingEqResponseDb(point.frequency, filter)),
+    );
+    context.stats.uniqueFilterResponses += 1;
+  }
+  return context.filterResponses.get(key);
+}
+
 export function peakingEqResponseDb(frequencyHz, filter) {
   const evaluationHz = Number(frequencyHz);
   const requestedCentreHz = Number(filter?.frequencyHz);
