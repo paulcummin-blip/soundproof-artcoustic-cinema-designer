@@ -542,6 +542,15 @@ export function getApprovedPeakSplDb(modelKey) {
     : null;
 }
 
+export function getApprovedFrequencyRangeHz(modelKey) {
+  const key = normaliseModelKey(modelKey);
+  const model = MODELS.find(m => m.key === key);
+  const range = model?.dolbyDartApproved ? model.approvedFrequencyRangeHz : null;
+  return Array.isArray(range) && range.length === 2 && range.every(Number.isFinite)
+    ? [...range]
+    : null;
+}
+
 // VALIDATION HELPER
 export function isValidCurve(curve) {
   if (!Array.isArray(curve)) return false;
@@ -585,4 +594,4 @@ export function getModelsByCategoryOrdered() {
   return ordered;
 }
 
-export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, CATEGORY_ORDER, MODELS };
+export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, getApprovedFrequencyRangeHz, CATEGORY_ORDER, MODELS };
