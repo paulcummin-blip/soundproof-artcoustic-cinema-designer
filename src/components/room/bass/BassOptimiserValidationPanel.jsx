@@ -142,7 +142,12 @@ export default function BassOptimiserValidationPanel({ result, activeSubs, usabl
     {result.priorityRerankTimeMs != null && <div className="mt-1 font-mono text-[10px] text-slate-600">Priority rerank: {fmtMs(result.priorityRerankTimeMs)} ms | Heavy pool reused: {result.heavyPoolReused ? "Yes" : "No"} | Pool: {result.physicallyCredibleCount ?? 0} credible / {result.requestedEnvelopeValidCount ?? 0} valid / {result.generatedCandidateCount ?? 0} generated</div>}
     {result.performanceSummary && (
       <div className="mt-1 font-mono text-[10px] text-slate-500">
-        Optimiser: {fmtMs(result.performanceSummary.totalOptimiserTimeMs)} ms | Requests: {result.performanceSummary.requestCount ?? 0} × {result.performanceSummary.profileCount ?? 2} profiles | Core fits: {result.performanceSummary.uniqueCoreFitCount ?? 0} (Standard: {result.performanceSummary.standardFitCount ?? 0}, Accuracy: {result.performanceSummary.accuracyFitCount ?? 0}) | Core time: {fmtMs(result.performanceSummary.coreFitTimeMs)} ms | Diagnostic refit: {fmtMs(result.performanceSummary.selectedDiagnosticFitTimeMs)} ms (included in core fits) | Revisions: {result.performanceSummary.selectedRevisionCandidateCount ?? 0} | Bank evals: {result.performanceSummary.completedBankEvaluationCount ?? 0}
+        <div>
+          Optimiser: {fmtMs(result.performanceSummary.totalOptimiserTimeMs)} ms | Requests: {result.performanceSummary.requestCount ?? 0} × {result.performanceSummary.profileCount ?? 2} profiles | Core fits: {result.performanceSummary.uniqueCoreFitCount ?? 0} (Standard: {result.performanceSummary.standardFitCount ?? 0}, Accuracy: {result.performanceSummary.accuracyFitCount ?? 0}, House curve: {result.performanceSummary.houseCurveFitCount ?? 0}) | Core time: {fmtMs(result.performanceSummary.coreFitTimeMs)} ms | Revisions: {result.performanceSummary.selectedRevisionCandidateCount ?? 0} | Bank evals: {result.performanceSummary.completedBankEvaluationCount ?? 0}
+        </div>
+        <div>
+          Profile time — Standard: {fmtMs(result.performanceSummary.standardFitTimeMs)} ms | Accuracy: {fmtMs(result.performanceSummary.accuracyFitTimeMs)} ms | House curve: {fmtMs(result.performanceSummary.houseCurveFitTimeMs)} ms | Exact bank validations: {result.performanceSummary.uniqueBankValidations ?? 0} calculated + {result.performanceSummary.reusedBankValidations ?? 0} reused / {result.performanceSummary.bankValidationRequests ?? 0} requests
+        </div>
       </div>
     )}
     <div className="mt-2 overflow-x-auto">
