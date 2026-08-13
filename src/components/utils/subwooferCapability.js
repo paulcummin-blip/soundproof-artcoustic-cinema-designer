@@ -8,34 +8,44 @@ const isPositivePower = (value) => value !== null
   && Number(value) > 0;
 const dbToPressure = (db) => Math.pow(10, Number(db) / 20);
 
-export const DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W = 1000;
+export const DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W = 1000;
 
-export function getSharedSubwooferAmplifierAuthority(activeSubs, configuredPowerW = null) {
+export function getPerSubwooferAmplifierAuthority(activeSubs, configuredPowerPerSubW = null) {
   const subs = Array.isArray(activeSubs) ? activeSubs : [];
-  const sourceConfiguredPowerW = subs
-    .map((sub) => sub?.sharedAmplifierPowerW ?? sub?.subwooferAmplifierPowerW)
+  const firstConfiguredPowerW = subs
+    .map((sub) => sub?.subwooferAmplifierPowerW ?? sub?.amplifierPowerPerSubW)
     .find(isPositivePower);
-  const sharedPowerW = isPositivePower(configuredPowerW)
-    ? Number(configuredPowerW)
-    : isPositivePower(sourceConfiguredPowerW)
-      ? Number(sourceConfiguredPowerW)
-      : DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W;
-  const totalProductPowerHandlingW = subs.reduce((sum, sub) => {
+  const defaultPowerPerSubW = isPositivePower(configuredPowerPerSubW)
+    ? Number(configuredPowerPerSubW)
+    : isPositivePower(firstConfiguredPowerW)
+      ? Number(firstConfiguredPowerW)
+      : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
+  const sourceAuthorities = subs.map((sub, index) => {
     const model = MODELS.find((candidate) => candidate.key === getModelKey(sub));
-    const ratedPowerW = Number(model?.max_power);
-    return sum + (Number.isFinite(ratedPowerW) && ratedPowerW > 0 ? ratedPowerW : 0);
-  }, 0);
-  const powerRatio = totalProductPowerHandlingW > 0
-    ? Math.max(0, Math.min(1, sharedPowerW / totalProductPowerHandlingW))
-    : 1;
-  const deratingDb = powerRatio > 0 ? 10 * Math.log10(powerRatio) : -Infinity;
+    const productPowerHandlingW = Number(model?.max_power);
+    const amplifierPowerW = isPositivePower(sub?.subwooferAmplifierPowerW ?? sub?.amplifierPowerPerSubW)
+      ? Number(sub?.subwooferAmplifierPowerW ?? sub?.amplifierPowerPerSubW)
+      : defaultPowerPerSubW;
+    const powerRatio = Number.isFinite(productPowerHandlingW) && productPowerHandlingW > 0
+      ? Math.max(0, Math.min(1, amplifierPowerW / productPowerHandlingW))
+      : 1;
+    return {
+      index,
+      modelKey: getModelKey(sub),
+      amplifierPowerW,
+      productPowerHandlingW: Number.isFinite(productPowerHandlingW) ? productPowerHandlingW : null,
+      powerRatio,
+      deratingDb: powerRatio > 0 ? 10 * Math.log10(powerRatio) : -Infinity,
+      powerLimited: powerRatio < 1 - 1e-9,
+    };
+  });
   return {
-    sharedPowerW,
-    totalProductPowerHandlingW,
-    powerRatio,
-    deratingDb,
-    powerLimited: powerRatio < 1 - 1e-9,
-    allocationPolicy: "shared-amplifier-power-proportional-to-product-rating",
+    powerPerSubW: defaultPowerPerSubW,
+    totalAvailablePowerW: sourceAuthorities.reduce((sum, source) => sum + source.amplifierPowerW, 0),
+    totalProductPowerHandlingW: sourceAuthorities.reduce((sum, source) => sum + (source.productPowerHandlingW || 0), 0),
+    sourceAuthorities,
+    powerLimited: sourceAuthorities.some((source) => source.powerLimited),
+    allocationPolicy: "one-dedicated-amplifier-per-subwoofer",
   };
 }
 
@@ -76,14 +86,14 @@ export function getUsableLfHz(activeSubs) {
   return values.length ? Math.max(...values) : null;
 }
 
-export function getSystemSourceCapability(activeSubs, frequency, sharedAmplifierPowerW = null) {
-  const amplifier = getSharedSubwooferAmplifierAuthority(activeSubs, sharedAmplifierPowerW);
+export function getSystemSourceCapability(activeSubs, frequency, amplifierPowerPerSubW = null) {
+  const amplifier = getPerSubwooferAmplifierAuthority(activeSubs, amplifierPowerPerSubW);
   const levels = (activeSubs || []).map((sub) => interpolateCapabilityCurve(getSubwooferCurve(getModelKey(sub)), frequency));
-  if (!levels.length || levels.some((level) => !isFiniteNumber(level)) || !isFiniteNumber(amplifier.deratingDb)) return null;
-  return 20 * Math.log10(levels.reduce(
-    (sum, level) => sum + dbToPressure(level + amplifier.deratingDb),
-    0,
-  ));
+  if (!levels.length || levels.some((level) => !isFiniteNumber(level))) return null;
+  return 20 * Math.log10(levels.reduce((sum, level, index) => {
+    const deratingDb = amplifier.sourceAuthorities[index]?.deratingDb ?? 0;
+    return sum + dbToPressure(level + deratingDb);
+  }, 0));
 }
 
 export function getCurrentSystemSourceOutput(activeSubs) {
@@ -93,10 +103,10 @@ export function getCurrentSystemSourceOutput(activeSubs) {
   return getCombinedRequestedOutputDb(activeSubs) + getOverallLfeGainDb(activeSubs);
 }
 
-export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6, requestedSystemOutputDb, sharedAmplifierPowerW = null }) {
+export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6, requestedSystemOutputDb, amplifierPowerPerSubW = null }) {
   const requested = Math.max(0, Number(requestedBoostDb) || 0);
-  const amplifierAuthority = getSharedSubwooferAmplifierAuthority(activeSubs, sharedAmplifierPowerW);
-  const systemCapabilityDb = getSystemSourceCapability(activeSubs, frequency, sharedAmplifierPowerW);
+  const amplifierAuthority = getPerSubwooferAmplifierAuthority(activeSubs, amplifierPowerPerSubW);
+  const systemCapabilityDb = getSystemSourceCapability(activeSubs, frequency, amplifierPowerPerSubW);
   const configuredSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
   const currentSystemSourceOutputDb = isFiniteNumber(requestedSystemOutputDb)
     ? Number(requestedSystemOutputDb)
