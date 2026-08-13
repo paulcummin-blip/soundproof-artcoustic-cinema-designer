@@ -4,8 +4,8 @@
  * Shared RP22 seating-coverage summary sentence builder.
  *
  * Consumes the existing canonical per-seat RP22 results from
- * useRP22AnalysisEngine (analysisResult.perSeatRp22) and the existing
- * canonical primary-seat designation (perSeatRp22[seatId].isPrimary).
+ * useRP22AnalysisEngine (analysisResult.perSeatRp22) and the canonical
+ * user-selected Primary seat IDs supplied by the report.
  *
  * Does NOT recalculate any RP22 parameter, threshold, seat classification,
  * or report eligibility rule. Presentation + aggregation only.
@@ -55,17 +55,22 @@ function normalizeSeatLevel(rawLevel) {
  * @param {Object} params
  * @param {Object} params.analysisResult           — from useRP22AnalysisEngine
  * @param {string[]} params.realSeatIds            — IDs of real (non-synthetic) seats
+ * @param {string[]} params.primarySeatIds         — IDs classified Primary by seat priority authority
  * @param {boolean} params.allParametersReportable — true when all 21 RP22 params are authoritative
  * @returns {string|null} — the sentence, or null when no valid primary/all-seat result exists
  */
 export function buildRp22SeatCoverageSentence({
   analysisResult,
   realSeatIds,
+  primarySeatIds,
   allParametersReportable,
 }) {
   if (!analysisResult?.perSeatRp22) return null;
   const perSeatRp22 = analysisResult.perSeatRp22;
   if (!Array.isArray(realSeatIds) || realSeatIds.length === 0) return null;
+  const suppliedPrimaryIds = Array.isArray(primarySeatIds)
+    ? new Set(primarySeatIds.map(String))
+    : null;
 
   // ── Collect per-seat achieved floors from canonical per-seat RP22 results ──
   // Each seat's floor = the lowest achieved level across all its assessed
@@ -88,7 +93,9 @@ export function buildRp22SeatCoverageSentence({
     if (!hasAnyAssessed) continue; // no valid results → seat not evaluated
     seatFloors.push({
       seatId,
-      isPrimary: seatData.isPrimary === true,
+      isPrimary: suppliedPrimaryIds
+        ? suppliedPrimaryIds.has(String(seatId))
+        : seatData.isPrimary === true,
       floor,
     });
   }
