@@ -430,9 +430,12 @@ export function generateCanonicalCandidatePool({
     generatedCandidateCount: 0, physicallyCredibleCount: 0, generationStatus: "invalid-anchor",
     missingInputs: ["canonicalVerticalOffsetDb"], warningMessage: "Could not align the house-curve shape to the raw response.",
   });
+  // Publish the target on the complete canonical response grid so graph,
+  // P18 and metric authority all compare like-for-like. The fitter still only
+  // applies filters inside the separate correction domain below.
   const targetCurve = buildCanonicalAbsoluteHouseCurveTarget({
     frequencyGrid: rawCurve.map((point) => point.frequency), targetAnchorDb: verticalOffsetDb,
-    correctionStartHz: domains.correctionStartHz, correctionEndHz: domains.correctionEndHz,
+    correctionStartHz: rawCurve[0].frequency, correctionEndHz: rawCurve.at(-1).frequency,
   });
   const targetShape = targetCurve.map((point) => ({ frequency: point.frequency, offsetDb: point.spl - verticalOffsetDb }));
   // Resolve seat curves before computing the operating-level offset.
