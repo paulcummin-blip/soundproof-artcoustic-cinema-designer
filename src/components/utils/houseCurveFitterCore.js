@@ -272,6 +272,22 @@ function buildProposedBank(trial, filters) {
 function validateAndScaleTrial(proposedFilters, scalableFilterIndex, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, operationCounts, preparedBankValidation) {
   if (operationCounts) operationCounts.bankValidationRequests += 1;
   const startedAt = operationCounts ? performance.now() : 0;
+  const validationCache = preparedBankValidation?.trialValidationResults;
+  const validationCacheKey = validationCache
+    ? [
+        scalableFilterIndex ?? "none",
+        profile?.maximumAggregateBoostDb ?? 6,
+        profile?.maximumCutDb ?? 10,
+        bankResponseSignature(proposedFilters),
+      ].join("|")
+    : null;
+  if (validationCacheKey && validationCache.has(validationCacheKey)) {
+    if (operationCounts) {
+      operationCounts.reusedBankValidations += 1;
+      operationCounts.candidateBankValidationTimeMs += performance.now() - startedAt;
+    }
+    return validationCache.get(validationCacheKey);
+  }
   const limits = preparedBankValidation
     ? evaluatePreparedBankLimits(preparedBankValidation, proposedFilters, profile, operationCounts)
     : evaluateProvisionalBankLimits(proposedFilters, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
@@ -309,6 +325,7 @@ function validateAndScaleTrial(proposedFilters, scalableFilterIndex, bankRaw, ac
       }
     }
   }
+  if (validationCacheKey) validationCache.set(validationCacheKey, result);
   if (operationCounts) {
     operationCounts.uniqueBankValidations += 1;
     operationCounts.candidateBankValidationTimeMs += performance.now() - startedAt;
