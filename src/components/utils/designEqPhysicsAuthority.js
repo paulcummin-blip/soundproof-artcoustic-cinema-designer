@@ -66,7 +66,8 @@ export function findAggregatePeakBoostViolations(rawCurve, postEqCurve, targetCu
     const rawResidualDb = finite(targetSpl) ? Number(point.spl) - Number(targetSpl) : null;
     const aggregateCorrectionDb = finite(finalSpl) ? Number(finalSpl) - Number(point.spl) : null;
     return { frequencyHz: Number(point.frequency), rawSpl: Number(point.spl), targetSpl, rawResidualDb, aggregateCorrectionDb };
-  }).filter((point) => finite(point.rawResidualDb) && point.rawResidualDb > 1
+  }).filter((point) => finite(point.rawResidualDb)
+    && point.rawResidualDb > PEAK_CLASSIFICATION_THRESHOLD_DB
     && finite(point.aggregateCorrectionDb) && point.aggregateCorrectionDb > 0.05);
 }
 
