@@ -11,43 +11,52 @@
  * weight, level, or recommendation. Consumes only the existing
  * `displayPercentage` and `contributions` from calculateRoomDesignRating().
  *
- * The six designation bands:
- *   80+        → Exceptional Performance
- *   70–79      → Reference Performance
- *   65–69      → Excellent Performance
- *   50–64      → High Performance
- *   40–49      → Good Performance
- *   below 40   → Design Improvement Recommended
+ * ── Failure logic (failure-driven, NOT index-driven) ──────────────────────
+ * "Design Improvement Recommended" is shown ONLY when an active, definitively
+ * scored system-design parameter has FAIL as its authoritative result.
+ * An RP22 Level 1 (L1) result is a valid achieved performance level and is
+ * NEVER treated as a failure.
+ *
+ * Overall room designation resolves in this order:
+ *   1. Any contribution with FAIL  → "Design Improvement Recommended"
+ *   2. Otherwise, Design Performance Index:
+ *        80+        → Exceptional Performance
+ *        70–79      → Reference Performance
+ *        65–69      → Excellent Performance
+ *        50–64      → High Performance
+ *        below 50   → Good Performance
  */
 
-const DESIGNATION_BANDS = [
+const FAIL_LABEL = "Design Improvement Recommended";
+
+const INDEX_BANDS = [
   { min: 80, label: "Exceptional Performance" },
   { min: 70, label: "Reference Performance" },
   { min: 65, label: "Excellent Performance" },
   { min: 50, label: "High Performance" },
-  { min: 40, label: "Good Performance" },
-  { min: 0, label: "Design Improvement Recommended" },
+  { min: 0, label: "Good Performance" },
 ];
 
 /**
- * Map a numerical displayPercentage to the client-facing designation.
+ * Pure Design Performance Index → band mapping (no failure logic).
+ * Used for category summaries and as the index fallback for the room.
  * @param {number|null|undefined} displayPercentage
- * @returns {string|null} designation label, or null if not a finite number.
+ * @returns {string|null}
  */
 export function getDesignRatingDesignation(displayPercentage) {
   const v = Number(displayPercentage);
   if (!Number.isFinite(v)) return null;
-  for (const band of DESIGNATION_BANDS) {
+  for (const band of INDEX_BANDS) {
     if (v >= band.min) return band.label;
   }
-  return "Design Improvement Recommended";
+  return "Good Performance";
 }
 
 /**
  * The rounded numerical value exposed as the "Design Performance Index".
  * Never displayed with a % symbol, /100, or "out of 100" wording.
  * @param {number|null|undefined} displayPercentage
- * @returns {number|null} rounded integer index, or null.
+ * @returns {number|null}
  */
 export function getDesignPerformanceIndex(displayPercentage) {
   const v = Number(displayPercentage);
@@ -55,26 +64,7 @@ export function getDesignPerformanceIndex(displayPercentage) {
   return Math.round(v);
 }
 
-// ── Category grouping (matches TechnicalAsdrScorecard CATEGORY_GROUPS) ──────
-
-const CATEGORY_GROUPS = [
-  { label: "Spatial Resolution", range: [1, 11] },
-  { label: "Dynamic Range", range: [12, 15] },
-  { label: "Timbre Matching", range: [16, 21] },
-  { label: "Screen / Viewing Geometry", range: null },
-];
-
-function getGroupForContrib(contrib) {
-  if (contrib.key === "screen") return "Screen / Viewing Geometry";
-  const num = contrib.parameter;
-  if (!Number.isFinite(num)) return null;
-  for (const g of CATEGORY_GROUPS) {
-    if (g.range && num >= g.range[0] && num <= g.range[1]) return g.label;
-  }
-  return null;
-}
-
-// ── Level profile aggregation ───────────────────────────────────────────────
+// ── Level parsing / aggregation ─────────────────────────────────────────────
 
 const LEVEL_ORDER = ["L4", "L3", "L2", "L1", "FAIL"];
 const DIST_RE = /(\d+)\s*[×x]\s*(L[1-4]|FAIL)/g;
@@ -100,7 +90,19 @@ function parseLevelCounts(resultLevel) {
 }
 
 /**
- * Aggregate the weighted L4/L3/L2/L1/FAIL profile across all contributions.
+ * Does any contribution in the given set have a genuine FAIL result?
+ * L1 is NOT a failure — only an explicit FAIL counts.
+ */
+function hasFailResult(contributions) {
+  if (!Array.isArray(contributions)) return false;
+  return contributions.some((c) => {
+    const counts = parseLevelCounts(c.resultLevel);
+    return (counts.FAIL || 0) > 0;
+  });
+}
+
+/**
+ * Aggregate the weighted L4/L3/L2/L1/FAIL profile across contributions.
  * Each contribution's per-level count is multiplied by its effectiveWeight.
  */
 function aggregateLevelProfile(contributions) {
@@ -118,74 +120,55 @@ function aggregateLevelProfile(contributions) {
   return profile;
 }
 
-function dominantLevel(profile) {
-  let best = null;
-  let bestCount = -1;
-  for (const lvl of LEVEL_ORDER) {
-    const c = profile[lvl] || 0;
-    if (c > bestCount) {
-      best = lvl;
-      bestCount = c;
-    }
-  }
-  return best;
-}
+// ── Overall room designation (failure-driven) ───────────────────────────────
 
 /**
- * Build a concise supporting sentence from the actual weighted L4/L3/L2/L1
- * contribution profile. Reflects the real project profile — not hard-coded
- * to the overall designation.
- * @param {Object} roomDesignRating - from calculateRoomDesignRating()
+ * Resolve the overall room designation.
+ * FAIL-driven: any genuine FAIL → "Design Improvement Recommended".
+ * Otherwise the Design Performance Index maps to the six bands.
+ * @param {Object|null|undefined} roomDesignRating
  * @returns {string|null}
  */
-export function getDesignRatingSupportingSentence(roomDesignRating) {
+export function getRoomDesignRatingDesignation(roomDesignRating) {
   if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED") return null;
-  const contributions = roomDesignRating.contributions || [];
-  if (contributions.length === 0) return null;
+  if (hasFailResult(roomDesignRating.contributions)) return FAIL_LABEL;
+  return getDesignRatingDesignation(roomDesignRating.displayPercentage);
+}
 
-  const profile = aggregateLevelProfile(contributions);
-  const dom = dominantLevel(profile);
-  if (!dom) return null;
+// ── Category grouping (matches TechnicalAsdrScorecard CATEGORY_GROUPS) ──────
 
-  const l4 = Math.round(profile.L4 || 0);
-  const l3 = Math.round(profile.L3 || 0);
+const CATEGORY_GROUPS = [
+  { label: "Spatial Resolution", range: [1, 11] },
+  { label: "Dynamic Range", range: [12, 15] },
+  { label: "Timbre Matching", range: [16, 21] },
+  { label: "Screen / Viewing Geometry", range: null },
+];
 
-  if (dom === "L4") {
-    return l4 >= 2
-      ? "Strong Level 4 performance across multiple parameters"
-      : "Level 4 performance";
-  }
-  if (dom === "L3") {
-    if (l4 >= 2) return "Strong Level 3 performance with multiple Level 4 results";
-    if (l4 === 1) return "Strong Level 3 performance with one Level 4 result";
-    return "Strong Level 3 performance across the assessed parameters";
-  }
-  if (dom === "L2") {
-    const extras = [];
-    if (l4 > 0) extras.push(`${l4} Level 4`);
-    if (l3 > 0) extras.push(`${l3} Level 3`);
-    return extras.length
-      ? `Level 2 performance with ${extras.join(" and ")} results`
-      : "Level 2 performance across the assessed parameters";
-  }
-  if (dom === "L1") {
-    return "Level 1 performance across the assessed parameters";
-  }
-  if (dom === "FAIL") {
-    return "Design improvement recommended across multiple parameters";
+function getGroupForContrib(contrib) {
+  if (contrib.key === "screen") return "Screen / Viewing Geometry";
+  const num = contrib.parameter;
+  if (!Number.isFinite(num)) return null;
+  for (const g of CATEGORY_GROUPS) {
+    if (g.range && num >= g.range[0] && num <= g.range[1]) return g.label;
   }
   return null;
 }
 
 /**
  * Derive per-category qualitative summaries from the same existing weighted
- * contribution data. Each category's earned/maximum points are summed and
- * the resulting percentage is mapped through the same six-band designation.
+ * contribution data. Each category's earned/maximum points are summed and the
+ * resulting percentage is mapped through the index bands.
  *
- * @param {Object} roomDesignRating - from calculateRoomDesignRating()
- * @returns {Array<{label, designation, index}>} one entry per category (in
- *   fixed order); designation/index are null when the category has no scored
- *   contributions.
+ * Failure wording ("Design Improvement Recommended") is shown ONLY when an
+ * authoritative result within that category is genuinely FAIL. An L1 result
+ * is a valid achieved level and never triggers failure wording.
+ *
+ * For Screen / Viewing Geometry, L1 makes the category visibly weaker (via a
+ * lower category index → lower band) but never triggers failure wording on
+ * its own — only a genuine FAIL does.
+ *
+ * @param {Object} roomDesignRating
+ * @returns {Array<{label, designation, index}>}
  */
 export function getCategorySummaries(roomDesignRating) {
   if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED") return [];
@@ -195,9 +178,10 @@ export function getCategorySummaries(roomDesignRating) {
   for (const c of contributions) {
     const g = getGroupForContrib(c);
     if (!g) continue;
-    if (!groups[g]) groups[g] = { earned: 0, max: 0 };
+    if (!groups[g]) groups[g] = { earned: 0, max: 0, contribs: [] };
     groups[g].earned += Number(c.earnedPoints) || 0;
     groups[g].max += Number(c.maximumPoints) || 0;
+    groups[g].contribs.push(c);
   }
 
   return CATEGORY_GROUPS.map((g) => {
@@ -206,18 +190,129 @@ export function getCategorySummaries(roomDesignRating) {
       return { label: g.label, designation: null, index: null };
     }
     const pct = (data.earned / data.max) * 100;
+    const fail = hasFailResult(data.contribs);
     return {
       label: g.label,
-      designation: getDesignRatingDesignation(pct),
+      designation: fail ? FAIL_LABEL : getDesignRatingDesignation(pct),
       index: getDesignPerformanceIndex(pct),
     };
   });
 }
 
+// ── Supporting sentence (descriptive, not mechanical) ──────────────────────
+
+function levelNum(key) {
+  return Number(key.replace("L", ""));
+}
+
 /**
- * Format a recommendation comparison line as "Design Performance Index {from} → {to}".
- * @param {number} fromPct - currentPercentage
- * @param {number} toPct - newPercentage
+ * Convert a weighted share into a qualitative descriptor, or null if too
+ * small to mention. Avoids raw counts in the headline sentence.
+ */
+function qualifier(weighted, total) {
+  if (weighted <= 0 || total <= 0) return null;
+  const frac = weighted / total;
+  if (frac >= 0.4) return "multiple";
+  if (frac >= 0.2) return "significant";
+  if (frac >= 0.08) return "several";
+  if (frac >= 0.03) return "some";
+  return null;
+}
+
+/**
+ * Build a concise supporting sentence describing the dominant weighted
+ * L4/L3/L2/L1 profile naturally — not by listing raw counts.
+ * @param {Object} roomDesignRating
+ * @returns {string|null}
+ */
+export function getDesignRatingSupportingSentence(roomDesignRating) {
+  if (!roomDesignRating || roomDesignRating.status === "NOT_ASSESSED") return null;
+  const contributions = roomDesignRating.contributions || [];
+  if (contributions.length === 0) return null;
+
+  const profile = aggregateLevelProfile(contributions);
+  const total = profile.L4 + profile.L3 + profile.L2 + profile.L1;
+
+  // No achieved levels at all — everything failed.
+  if (total <= 0) {
+    return "Design improvement recommended across multiple parameters";
+  }
+
+  const achieved = [
+    { key: "L4", w: profile.L4 },
+    { key: "L3", w: profile.L3 },
+    { key: "L2", w: profile.L2 },
+    { key: "L1", w: profile.L1 },
+  ]
+    .filter((l) => l.w > 0)
+    .sort((a, b) => b.w - a.w);
+
+  const dom = achieved[0];
+  const second = achieved[1];
+  // "Balanced" only when the top two are genuinely co-dominant (nearly equal
+  // weight) AND adjacent levels — otherwise the dominant level leads.
+  const balanced =
+    second &&
+    second.w > 0 &&
+    dom.w > 0 &&
+    second.w / dom.w >= 0.9 &&
+    Math.abs(levelNum(dom.key) - levelNum(second.key)) === 1;
+
+  let prefix;
+  let floorNum;
+  const mentioned = new Set();
+  if (balanced) {
+    const a = levelNum(dom.key);
+    const b = levelNum(second.key);
+    floorNum = Math.min(a, b);
+    mentioned.add(dom.key);
+    mentioned.add(second.key);
+    prefix = `Balanced Level ${Math.min(a, b)} and Level ${Math.max(a, b)} performance`;
+  } else {
+    floorNum = levelNum(dom.key);
+    mentioned.add(dom.key);
+    prefix =
+      dom.key === "L1"
+        ? "Level 1 performance"
+        : `Strong Level ${floorNum} performance`;
+  }
+
+  // Higher-level strengths above the floor (excluding the mentioned pair).
+  const higher = achieved
+    .filter((l) => !mentioned.has(l.key) && levelNum(l.key) > floorNum)
+    .sort((a, b) => levelNum(a.key) - levelNum(b.key));
+  const higherWeight = higher.reduce((s, l) => s + l.w, 0);
+  const qual = qualifier(higherWeight, total);
+
+  if (!qual || higher.length === 0) {
+    if (dom.key === "L4" && !balanced) {
+      return "Strong Level 4 performance across multiple parameters";
+    }
+    return prefix;
+  }
+
+  let suffix;
+  if (balanced) {
+    suffix = `with ${qual} higher-level results`;
+  } else if (higher.length === 1) {
+    suffix = `with ${qual} Level ${levelNum(higher[0].key)} results`;
+  } else if (higher.length === 2) {
+    const names = higher
+      .map((l) => `Level ${levelNum(l.key)}`)
+      .join(" and ");
+    suffix = `with ${qual} ${names} strengths`;
+  } else {
+    suffix = `with ${qual} higher-level results`;
+  }
+
+  return `${prefix} ${suffix}`;
+}
+
+/**
+ * Format a recommendation comparison line as
+ * "Design Performance Index {from} → {to}".
+ * @param {number} fromPct
+ * @param {number} toPct
  * @returns {string|null}
  */
 export function formatDesignIndexComparison(fromPct, toPct) {

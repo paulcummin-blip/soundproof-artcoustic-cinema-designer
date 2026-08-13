@@ -18,7 +18,7 @@
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import {
-  getDesignRatingDesignation,
+  getRoomDesignRatingDesignation,
   getDesignRatingSupportingSentence,
   getDesignPerformanceIndex,
 } from "./designRatingPresentation";
@@ -321,7 +321,7 @@ export default function TechnicalPerformanceSummary({
             >
               {roomDesignRating.status === "NOT_ASSESSED"
                 ? "NOT ASSESSED"
-                : (getDesignRatingDesignation(roomDesignRating.displayPercentage) || "—")}
+                : (getRoomDesignRatingDesignation(roomDesignRating) || "—")}
             </div>
             {roomDesignRating.status !== "NOT_ASSESSED" && (
               <>

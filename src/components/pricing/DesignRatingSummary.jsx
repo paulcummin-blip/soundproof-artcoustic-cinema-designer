@@ -13,7 +13,7 @@ import {
 } from '@/components/recommendations/p12RecommendationPresentation';
 import { applyRecommendationDisplayOrder } from '@/components/recommendations/recommendationDisplayOrder';
 import {
-  getDesignRatingDesignation,
+  getRoomDesignRatingDesignation,
   getDesignRatingSupportingSentence,
   getDesignPerformanceIndex,
   getCategorySummaries,
@@ -240,7 +240,7 @@ export default function DesignRatingSummary({
   const status = rating?.status || 'NOT_ASSESSED';
   const pct = rating?.displayPercentage;
   const displayPct = pct != null ? Math.round(pct) : null;
-  const designation = rating ? getDesignRatingDesignation(rating.displayPercentage) : null;
+  const designation = rating ? getRoomDesignRatingDesignation(rating) : null;
   const supportingSentence = rating ? getDesignRatingSupportingSentence(rating) : null;
   const index = rating ? getDesignPerformanceIndex(rating.displayPercentage) : null;
   const categories = rating ? getCategorySummaries(rating) : [];

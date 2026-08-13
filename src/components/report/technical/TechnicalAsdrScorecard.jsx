@@ -19,7 +19,7 @@ import React from "react";
 import { getHumanTitleForParam } from "./technicalParameterMeta";
 import TechnicalAsdrRecommendations from "./TechnicalAsdrRecommendations";
 import {
-  getDesignRatingDesignation,
+  getRoomDesignRatingDesignation,
   getDesignRatingSupportingSentence,
   getDesignPerformanceIndex,
 } from "./designRatingPresentation";
@@ -168,7 +168,7 @@ export default function TechnicalAsdrScorecard({
 
   const contributions = roomDesignRating.contributions || [];
   const total = formatTotal(roomDesignRating);
-  const designation = getDesignRatingDesignation(roomDesignRating?.displayPercentage);
+  const designation = getRoomDesignRatingDesignation(roomDesignRating);
   const supportingSentence = getDesignRatingSupportingSentence(roomDesignRating);
   const index = getDesignPerformanceIndex(roomDesignRating?.displayPercentage);
 
