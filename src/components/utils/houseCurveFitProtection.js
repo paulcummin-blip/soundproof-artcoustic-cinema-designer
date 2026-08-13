@@ -1,13 +1,16 @@
-import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 
 const octaveWidth = (startHz, endHz) => startHz > 0 && endHz > startHz ? Math.log2(endHz / startHz) : 0;
+export const MAX_PROTECTED_NULL_WIDTH_HZ = 6;
 
 export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, canonicalTargetCurve = null) {
   const nullThresholdDb = -10;
   const boundaryThresholdDb = -6;
-  const points = applyBassSmoothing(curve, "third")
+  // Cancellation protection is intentionally assessed on the unsmoothed
+  // physical response. Fractional-octave smoothing broadens a knife-edge null
+  // and can incorrectly classify a recoverable wide valley as untouchable.
+  const points = (Array.isArray(curve) ? curve : [])
     .filter((point) => Number.isFinite(point.frequency) && Number.isFinite(point.spl)
       && point.frequency >= assessmentStartHz && point.frequency <= assessmentEndHz)
     .map((point, index) => ({
@@ -76,11 +79,22 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
     const requiredBoostDb = Math.max(0, -worst.residualDb);
     const permittedBoostDb = 6;
     const capabilityLimited = false;
+    const widthHz = endHz - startHz;
     const widthOctaves = octaveWidth(startHz, endHz);
-    const reason = "Localized cancellation null at least 10 dB below neighbouring broad response";
+    const narrowCancellation = widthHz <= MAX_PROTECTED_NULL_WIDTH_HZ + 1e-9;
+    if (!narrowCancellation) {
+      // Broad valleys remain eligible for a partial, capability-limited boost.
+      // The +6 dB bank ceiling and product/amplifier headroom decide how much
+      // can actually be recovered.
+      current = [];
+      return;
+    }
+    const protectionPaddingHz = Math.max(0.25, Math.min(1, widthHz * 0.1));
+    const reason = `Narrow cancellation null (≤ ${MAX_PROTECTED_NULL_WIDTH_HZ} Hz) at least 10 dB below neighbouring broad response`;
     regions.push({
-      startHz: startHz / 2 ** (1 / 12), endHz: endHz * 2 ** (1 / 12),
-      widthHz: endHz - startHz, widthOctaves,
+      startHz: Math.max(assessmentStartHz, startHz - protectionPaddingHz),
+      endHz: Math.min(assessmentEndHz, endHz + protectionPaddingHz),
+      widthHz, widthOctaves,
       centreFrequencyHz: worst.frequency, signedResidualDb: worst.residualDb,
       centreAssessmentIndex: worst.assessmentIndex,
       centreSplDb: worst.spl,
@@ -95,14 +109,14 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
       nullDepthThresholdDb: nullThresholdDb,
       localMinimum: worst.isLocalMinimum,
       protected: true,
-      assessmentCurveDomain: "third-octave-smoothed-response",
+      assessmentCurveDomain: "unsmoothed-physical-response",
       depthFormula: "centreSplDb - shoulderReferenceSplDb",
       depthRelativeToTargetDb: requiredBoostDb,
       neighbouringShoulderResidualDb: worst.shoulderReferenceSplDb
         - (interpolateCanonicalTarget(canonicalTargetCurve, worst.frequency) ?? (anchorDb + artcousticHouseCurveOffsetAt(worst.frequency))),
       depthRelativeToShouldersDb: -worst.nullDepthDb,
       requiredBoostDb, permittedBoostDb, boostRejectedDb: requiredBoostDb,
-      narrowCancellation: widthOctaves < 1 / 3, capabilityLimited,
+      narrowCancellation, maximumProtectedWidthHz: MAX_PROTECTED_NULL_WIDTH_HZ, capabilityLimited,
       rejectionReason: reason, reason,
     });
     current = [];
@@ -117,10 +131,10 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
 export function runProtectedNullClassificationValidation() {
   const frequencies = Array.from({ length: 201 }, (_, index) => 20 + index * 0.5);
   const gaussian = (frequency, centre, width, gain) => gain * Math.exp(-0.5 * ((frequency - centre) / width) ** 2);
-  const classify = (centreHz, gainDb, baselineDb = 100) => {
+  const classify = (centreHz, gainDb, baselineDb = 100, widthHz = 0.75) => {
     const curve = frequencies.map((frequency) => ({
       frequency,
-      spl: baselineDb + gaussian(frequency, centreHz, 2, gainDb),
+      spl: baselineDb + gaussian(frequency, centreHz, widthHz, gainDb),
     }));
     return identifyProtectedNullRegions(curve, 20, 120, baselineDb, [], 20, baselineDb, null);
   };
@@ -128,6 +142,7 @@ export function runProtectedNullClassificationValidation() {
   const modalPeak = classify(50, 40);
   const current67PeakShape = classify(67, 10, 91.8);
   const current34NullShape = classify(34, -35, 95.8);
+  const broadRecoverableValley = classify(50, -20, 100, 5);
   const regionNear = (regions, frequency) => regions.find((region) => Math.abs(region.centreFrequencyHz - frequency) <= 3);
   const region34 = regionNear(current34NullShape, 34);
   const arithmeticDeltaDb = region34
@@ -138,6 +153,7 @@ export function runProtectedNullClassificationValidation() {
     { id: "B", expected: "modal peak not protected", passed: !regionNear(modalPeak, 50) },
     { id: "C", expected: "67 Hz positive peak not protected", passed: !regionNear(current67PeakShape, 67) },
     { id: "D", expected: "34 Hz decision uses exact signed arithmetic", passed: !region34 || Math.abs(arithmeticDeltaDb) < 1e-9 },
+    { id: "E", expected: "broad deep valley remains eligible for limited EQ", passed: !regionNear(broadRecoverableValley, 50) },
   ];
   return {
     checks,
@@ -146,6 +162,7 @@ export function runProtectedNullClassificationValidation() {
     modalPeakRegions: modalPeak,
     current67PeakRegions: current67PeakShape,
     current34Regions: current34NullShape,
+    broadRecoverableValleyRegions: broadRecoverableValley,
     current34ArithmeticDeltaDb: arithmeticDeltaDb,
   };
 }
