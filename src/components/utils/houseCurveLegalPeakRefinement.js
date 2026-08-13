@@ -3,6 +3,7 @@ import { buildCurveFromBank, evaluateProvisionalBankLimits, peakingEqResponseDb 
 import { calculateAllSeatMetrics } from "@/components/utils/houseCurveFitterCore";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
+import { evaluatePreparedBankLimits } from "@/components/utils/preparedBankValidation";
 
 const EQ_ACTIVITY = (filters) => filters.reduce((sum, filter) => sum + Math.abs(filter.gainDb || 0), 0);
 
@@ -34,7 +35,8 @@ function better(left, right) {
 }
 
 export function refineLegalUnprotectedPeak({ filters, rawCurve, targetCurve, protectedNullRegions, assessmentStartHz,
-  assessmentEndHz, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, objectiveSeats, fitStartHz, fitEndHz, anchorDb }) {
+  assessmentEndHz, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, objectiveSeats, fitStartHz, fitEndHz, anchorDb,
+  evaluationMemo = null, preparedBankValidation = null, operationCounts = null }) {
   const current = filters.filter((filter) => filter?.enabled).map((filter) => ({ ...filter }));
   const currentCurve = buildCurveFromBank(rawCurve, current);
   const residualCurve = currentCurve
@@ -48,7 +50,7 @@ export function refineLegalUnprotectedPeak({ filters, rawCurve, targetCurve, pro
     .sort((left, right) => right.residual - left.residual);
   if (!peaks.length) return { filters: current, changed: false, reason: "no unprotected raw peak remained above +3 dB" };
 
-  const baselineMetrics = calculateAllSeatMetrics(objectiveSeats, current, fitStartHz, fitEndHz, anchorDb, null, null, {
+  const baselineMetrics = calculateAllSeatMetrics(objectiveSeats, current, fitStartHz, fitEndHz, anchorDb, operationCounts, evaluationMemo, {
     protectedNullRegions, canonicalTargetCurve: targetCurve,
   });
   let best = null;
@@ -63,7 +65,9 @@ export function refineLegalUnprotectedPeak({ filters, rawCurve, targetCurve, pro
           reason: "Legal unprotected-peak frequency refinement",
         };
         const proposed = current.map((entry, index) => index === filterIndex ? revised : entry);
-        const limits = evaluateProvisionalBankLimits(proposed, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+        const limits = preparedBankValidation
+          ? evaluatePreparedBankLimits(preparedBankValidation, proposed, profile, operationCounts)
+          : evaluateProvisionalBankLimits(proposed, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
         if (!limits.allOk || limits.maxAggregateCutDb < -15.0001) continue;
         const post = buildCurveFromBank(rawCurve, proposed);
         const postPoint = post.reduce((nearest, point) => Math.abs(point.frequency - peak.frequency) < Math.abs(nearest.frequency - peak.frequency) ? point : nearest);
@@ -71,7 +75,7 @@ export function refineLegalUnprotectedPeak({ filters, rawCurve, targetCurve, pro
         if (rawPeakResidual > 3.0001) continue;
         const proposedQuality = quality(rawCurve, proposed, targetCurve, assessmentStartHz, assessmentEndHz, protectedNullRegions);
         if (!proposedQuality || proposedQuality.maximum > 3.0001) continue;
-        const metrics = calculateAllSeatMetrics(objectiveSeats, proposed, fitStartHz, fitEndHz, anchorDb, null, null, {
+        const metrics = calculateAllSeatMetrics(objectiveSeats, proposed, fitStartHz, fitEndHz, anchorDb, operationCounts, evaluationMemo, {
           protectedNullRegions, canonicalTargetCurve: targetCurve,
         });
         const realSeatsSafe = (metrics?.seatMetrics || []).filter((seat) => seat.seatId !== "rsp").every((seat) => {
