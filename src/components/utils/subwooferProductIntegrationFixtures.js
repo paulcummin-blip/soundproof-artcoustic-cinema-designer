@@ -30,7 +30,7 @@ export function runSubwooferProductIntegrationFixtures() {
   const checks = [];
   const sub2 = curve("sub2-12");
   const sub4 = curve("sub4-12");
-  checks.push(check("SUB2-12 has a full frequency curve", "15–200 Hz", `${sub2[0]?.frequency}–${sub2.at(-1)?.frequency} Hz`, sub2.length > 40 && sub2[0]?.frequency <= 15));
+  checks.push(check("SUB2-12 raw engineering trace is retained", "15–100 Hz", `${sub2[0]?.frequency}–${sub2.at(-1)?.frequency} Hz`, sub2.length > 40 && sub2[0]?.frequency === 15 && sub2.at(-1)?.frequency === 100));
   checks.push(check("SUB4-12 has a full frequency curve", "12–200 Hz", `${sub4[0]?.frequency}–${sub4.at(-1)?.frequency} Hz`, sub4.length > 40 && sub4[0]?.frequency <= 12));
   checks.push(check("SUB4-12 exceeds SUB2-12 at 20 Hz", "> 6 dB", at(sub4, 20) - at(sub2, 20), at(sub4, 20) - at(sub2, 20) > 6));
   checks.push(check("SUB4-12 extends below SUB2-12", "lower first frequency", `${sub4[0]?.frequency} vs ${sub2[0]?.frequency}`, sub4[0]?.frequency < sub2[0]?.frequency));
@@ -51,6 +51,20 @@ export function runSubwooferProductIntegrationFixtures() {
   const twoSub4 = authority("sub4-12", 2);
   const fourSub4 = authority("sub4-12", 4);
   const deliveredAt = (result, frequency) => at(result.curves.rawDeliveredCurve, frequency);
+  checks.push(check(
+    "SUB2-12 paired P14/P18 authority covers the 120 Hz assessment boundary",
+    "complete PASS/FAIL assessment, never incomplete data",
+    { status: oneSub2.status, sharedRangeHz: oneSub2.coverage.sharedFrequencyRangeHz },
+    oneSub2.status !== "INCOMPLETE DATA" && oneSub2.coverage.sharedFrequencyRangeHz[1] >= 120,
+  ));
+  checks.push(check(
+    "SUB2-12 upper-band completion is explicit and approved-range bounded",
+    "edge hold from measured 100 Hz through approved 170 Hz",
+    oneSub2.sources.sourceDiagnostics[0]?.approvedRangeCompletion,
+    oneSub2.sources.sourceDiagnostics[0]?.approvedRangeCompletion?.method === "approved-range-edge-hold"
+      && oneSub2.sources.sourceDiagnostics[0]?.approvedRangeCompletion?.measuredThroughHz === 100
+      && oneSub2.sources.sourceDiagnostics[0]?.approvedRangeCompletion?.completedThroughHz === 170,
+  ));
   checks.push(check("Two spatial sources change delivered SPL", "not identical to one source", deliveredAt(twoSub2, 30) - deliveredAt(oneSub2, 30), Math.abs(deliveredAt(twoSub2, 30) - deliveredAt(oneSub2, 30)) > 0.1));
   checks.push(check("Four spatial sources change delivered SPL", "not identical to two sources", deliveredAt(fourSub2, 30) - deliveredAt(twoSub2, 30), Math.abs(deliveredAt(fourSub2, 30) - deliveredAt(twoSub2, 30)) > 0.1));
   const twoSubDelta30 = deliveredAt(twoSub2, 30) - deliveredAt(oneSub2, 30);
