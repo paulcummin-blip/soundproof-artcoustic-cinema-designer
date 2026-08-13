@@ -21,7 +21,7 @@ function renderSentenceWithBoldLevels(sentence) {
     .map((part, index) =>
       /^(?:Below Level 1|Level [1-4])$/.test(part)
         ? <strong key={index} style={{ fontWeight: 700, color: "#1B1A1A" }}>{part}</strong>
-        : <React.Fragment key={index}>{part}</React.Fragment>
+        : <span key={index}>{part}</span>
     );
 }
 
