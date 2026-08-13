@@ -55,7 +55,6 @@ import { useProjectLoader } from "@/components/hooks/useProjectLoader";
 import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore";
 import { useSpeakerReconciliation } from "@/components/hooks/useSpeakerReconciliation";
 import { useSeatingRebuild } from "@/components/hooks/useSeatingRebuild";
-import { enforceRspPriority, resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 import { useSubwooferSync } from "@/components/hooks/useSubwooferSync";
 import { useInRoomDepths } from "@/components/hooks/useInRoomDepths";
 import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
@@ -1457,17 +1456,8 @@ function RoomDesignerWithState() {
   );
 
   // Normalise isPrimary flags: mark the seat closest to mlpAnchorEffective as
-  // primary, and atomically enforce that the final RSP resolves to Primary
-  // priority — in the same state update. This is the single canonical RSP
-  // priority enforcement point (Stage A1).
-  //
-  // GATED: skip while a project is still loading (loadState.phase === 'loading').
-  // During hydration the RSP anchor (mlpAnchorEffective) is transient — it
-  // depends on screen / roomDims / rspMode which settle in sequence. Running
-  // enforcement on a transient anchor would promote a temporary RSP and
-  // corrupt a stored non-RSP Secondary priority. Stored isPrimary / priority
-  // are preserved through hydration by useSeatingRebuild; this effect only
-  // (re)asserts the final RSP once hydration is complete.
+  // primary for the existing acoustic/RSP authority. Seat priority is a
+  // separate user classification and is never changed by this effect.
   useEffect(() => {
     if (loadState?.phase === 'loading') return;
 
@@ -1490,16 +1480,12 @@ function RoomDesignerWithState() {
       closestId = prev[0]?.id;
     }
 
-    // Only update if an isPrimary flag differs OR the final RSP is not Primary.
+    // Only update if an isPrimary flag differs.
     const flagsChanged = prev.some(s => !!s.isPrimary !== (s.id === closestId));
-    const rspSeat = closestId ? prev.find(s => s.id === closestId) : null;
-    const rspPriorityWrong = rspSeat ? resolveSeatPriority(rspSeat) !== PRIMARY : false;
-    if (!flagsChanged && !rspPriorityWrong) return;
+    if (!flagsChanged) return;
 
-    // Atomic: set final isPrimary AND enforce RSP priority in one commit.
     const seatsWithFlags = prev.map(s => ({ ...s, isPrimary: s.id === closestId }));
-    const enforced = enforceRspPriority(seatsWithFlags);
-    (appState?.setSeatingPositions || (() => {}))(enforced);
+    (appState?.setSeatingPositions || (() => {}))(seatsWithFlags);
   }, [_seatingPositions, mlpAnchorEffective, appState?.setSeatingPositions, loadState?.phase]);
 
   const handleResetPositions = React.useCallback(() => {
