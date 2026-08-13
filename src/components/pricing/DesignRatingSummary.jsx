@@ -12,6 +12,12 @@ import {
   formatAmplificationGuidance,
 } from '@/components/recommendations/p12RecommendationPresentation';
 import { applyRecommendationDisplayOrder } from '@/components/recommendations/recommendationDisplayOrder';
+import {
+  getDesignRatingDesignation,
+  getDesignRatingSupportingSentence,
+  getDesignPerformanceIndex,
+  getCategorySummaries,
+} from '@/components/report/technical/designRatingPresentation';
 
 function formatPoints(value, signed = false) {
   const number = Number(value);
@@ -153,7 +159,7 @@ function RecommendationRow({ item, mode }) {
         </div>
       )}
       <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
-        Rating {from}% → {to}% · {formatPoints(item.scoreDelta, true)}
+        Design Performance Index {from} → {to} · {formatPoints(item.scoreDelta, true)}
       </div>
       <div style={{ marginTop: 2, fontSize: 9, lineHeight: 1.35, color: '#77736B' }}>
         {item.disruption} disruption · {item.confidence} confidence
@@ -234,6 +240,10 @@ export default function DesignRatingSummary({
   const status = rating?.status || 'NOT_ASSESSED';
   const pct = rating?.displayPercentage;
   const displayPct = pct != null ? Math.round(pct) : null;
+  const designation = rating ? getDesignRatingDesignation(rating.displayPercentage) : null;
+  const supportingSentence = rating ? getDesignRatingSupportingSentence(rating) : null;
+  const index = rating ? getDesignPerformanceIndex(rating.displayPercentage) : null;
+  const categories = rating ? getCategorySummaries(rating) : [];
   const isNotAssessed = status === 'NOT_ASSESSED';
   const orderedRecommendations = applyRecommendationDisplayOrder(recommendations);
   const improvements = Array.isArray(orderedRecommendations?.improvements) ? orderedRecommendations.improvements : [];
@@ -265,8 +275,32 @@ export default function DesignRatingSummary({
           NOT ASSESSED
         </div>
       ) : (
-        <div style={{ fontSize: 22, fontWeight: 700, color: '#213428' }}>
-          {displayPct != null ? `${displayPct}%` : '—'}
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#213428', lineHeight: 1.2 }}>
+            {designation || '—'}
+          </div>
+          {supportingSentence && (
+            <div style={{ marginTop: 4, fontSize: 10, lineHeight: 1.4, color: '#3E4349' }}>
+              {supportingSentence}
+            </div>
+          )}
+          <div style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#625143', letterSpacing: '0.03em' }}>
+            Design Performance Index {index ?? '—'}
+          </div>
+          {categories.length > 0 && (
+            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+              {categories.map((cat) => (
+                <div key={cat.label} style={{ borderTop: '1px solid #ECEAE6', paddingTop: 4 }}>
+                  <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    {cat.label}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#213428' }}>
+                    {cat.designation || '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

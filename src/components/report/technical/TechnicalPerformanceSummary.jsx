@@ -17,6 +17,11 @@
 
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
+import {
+  getDesignRatingDesignation,
+  getDesignRatingSupportingSentence,
+  getDesignPerformanceIndex,
+} from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -49,14 +54,6 @@ function LevelCountBlock({ level, count }) {
       </span>
     </div>
   );
-}
-
-/** Format a design rating percentage for display. */
-function formatRatingPct(rating) {
-  if (!rating || rating.status === "NOT_ASSESSED") return null;
-  const pct = rating.displayPercentage;
-  if (!Number.isFinite(pct)) return null;
-  return `${Math.round(pct)}%`;
 }
 
 /** Compact per-seat summary card: seat label, Active count, level distribution. */
@@ -185,7 +182,7 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
             DESIGN RATING{" "}
             {designRating.status === "NOT_ASSESSED"
               ? "NOT ASSESSED"
-              : formatRatingPct(designRating)}
+              : `Index ${getDesignPerformanceIndex(designRating.displayPercentage) ?? "—"}`}
           </div>
 
         </div>
@@ -315,17 +312,40 @@ export default function TechnicalPerformanceSummary({
             </div>
             <div
               style={{
-                fontSize: "24pt",
+                fontSize: "18pt",
                 fontWeight: 400,
                 color: COLORS.primary,
                 fontFamily: FONT_HEADING,
-                lineHeight: 1,
+                lineHeight: 1.1,
               }}
             >
               {roomDesignRating.status === "NOT_ASSESSED"
                 ? "NOT ASSESSED"
-                : formatRatingPct(roomDesignRating)}
+                : (getDesignRatingDesignation(roomDesignRating.displayPercentage) || "—")}
             </div>
+            {roomDesignRating.status !== "NOT_ASSESSED" && (
+              <>
+                <div style={{
+                  fontSize: "8pt",
+                  color: COLORS.body,
+                  fontFamily: FONT_BODY,
+                  lineHeight: 1.4,
+                  marginTop: "2mm",
+                }}>
+                  {getDesignRatingSupportingSentence(roomDesignRating)}
+                </div>
+                <div style={{
+                  fontSize: "9pt",
+                  fontWeight: 600,
+                  color: COLORS.secondary,
+                  fontFamily: FONT_BODY,
+                  marginTop: "2mm",
+                  letterSpacing: "0.03em",
+                }}>
+                  Design Performance Index {getDesignPerformanceIndex(roomDesignRating.displayPercentage) ?? "—"}
+                </div>
+              </>
+            )}
 
             <div
               style={{

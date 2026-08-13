@@ -18,6 +18,11 @@
 import React from "react";
 import { getHumanTitleForParam } from "./technicalParameterMeta";
 import TechnicalAsdrRecommendations from "./TechnicalAsdrRecommendations";
+import {
+  getDesignRatingDesignation,
+  getDesignRatingSupportingSentence,
+  getDesignPerformanceIndex,
+} from "./designRatingPresentation";
 
 const FONT_HEADING = "'Futura PT Light', 'Century Gothic', sans-serif";
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -47,14 +52,6 @@ function formatPoints(earned, maximum) {
   const e = Math.round(earned * 100) / 100;
   const m = Math.round(maximum * 100) / 100;
   return `${e} / ${m}`;
-}
-
-/** Format the overall percentage. */
-function formatPct(rating) {
-  if (!rating || rating.status === "NOT_ASSESSED") return null;
-  const pct = rating.displayPercentage;
-  if (!Number.isFinite(pct)) return null;
-  return `${Math.round(pct)}%`;
 }
 
 /** Format the total score line. */
@@ -170,8 +167,10 @@ export default function TechnicalAsdrScorecard({
   }
 
   const contributions = roomDesignRating.contributions || [];
-  const pct = formatPct(roomDesignRating);
   const total = formatTotal(roomDesignRating);
+  const designation = getDesignRatingDesignation(roomDesignRating?.displayPercentage);
+  const supportingSentence = getDesignRatingSupportingSentence(roomDesignRating);
+  const index = getDesignPerformanceIndex(roomDesignRating?.displayPercentage);
 
   // Group contributions by category
   const grouped = {};
@@ -259,14 +258,36 @@ export default function TechnicalAsdrScorecard({
             </div>
             <div
               style={{
-                fontSize: "36pt",
+                fontSize: "22pt",
                 fontWeight: 400,
                 color: COLORS.primary,
                 fontFamily: FONT_HEADING,
-                lineHeight: 1,
+                lineHeight: 1.1,
               }}
             >
-              {pct || "NOT ASSESSED"}
+              {designation || "NOT ASSESSED"}
+            </div>
+            {supportingSentence && (
+              <div style={{
+                fontSize: "9pt",
+                color: COLORS.body,
+                fontFamily: FONT_BODY,
+                lineHeight: 1.4,
+                marginTop: "2mm",
+                maxWidth: "60mm",
+              }}>
+                {supportingSentence}
+              </div>
+            )}
+            <div style={{
+              fontSize: "9pt",
+              fontWeight: 600,
+              color: COLORS.secondary,
+              fontFamily: FONT_BODY,
+              marginTop: "2mm",
+              letterSpacing: "0.03em",
+            }}>
+              Design Performance Index {index ?? "—"}
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
