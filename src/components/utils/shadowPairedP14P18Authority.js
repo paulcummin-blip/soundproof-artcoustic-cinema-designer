@@ -1,4 +1,4 @@
-import { getApprovedContinuousSplDb, getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
+import { getApprovedContinuousSplDb, getApprovedFrequencyRangeHz, getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
 import { p14ThresholdsForBasis, normalizeP14TargetBasis } from "@/components/utils/p14CapabilityAuthority";
 import { smoothThirdOctavePowerMean } from "@/components/utils/thirdOctavePowerMean";
 
@@ -43,7 +43,23 @@ function productCapabilityDefinition(sub) {
   const approvedDb = getApprovedContinuousSplDb(modelKey);
   const registryCurve = getSubwooferCurve(modelKey);
   if (!finite(approvedDb) || !Array.isArray(registryCurve) || registryCurve.length < 2) return null;
-  const sourceCurve = registryCurve.map((point) => ({ frequency: Number(point.hz), spl: Number(point.db) }));
+  let sourceCurve = registryCurve.map((point) => ({ frequency: Number(point.hz), spl: Number(point.db) }));
+  const approvedRangeHz = getApprovedFrequencyRangeHz(modelKey);
+  const approvedUpperHz = Array.isArray(approvedRangeHz) ? Number(approvedRangeHz[1]) : null;
+  const lastMeasuredPoint = sourceCurve[sourceCurve.length - 1];
+  let approvedRangeCompletion = null;
+  if (finite(approvedUpperHz) && approvedUpperHz > lastMeasuredPoint.frequency) {
+    // The paired RP22 assessment needs continuous authority through 120 Hz.
+    // Where an approved operating range extends beyond the engineering trace,
+    // conservatively hold the final measured point. This does not alter the
+    // plotted product response or infer new LF extension.
+    sourceCurve = [...sourceCurve, { frequency: approvedUpperHz, spl: lastMeasuredPoint.spl }];
+    approvedRangeCompletion = {
+      method: "approved-range-edge-hold",
+      measuredThroughHz: lastMeasuredPoint.frequency,
+      completedThroughHz: approvedUpperHz,
+    };
+  }
   const anchorBand = sourceCurve.filter((point) => point.frequency >= 30 && point.frequency <= 120);
   if (!anchorBand.length) return null;
   const shapeAnchorDb = Math.max(...anchorBand.map((point) => point.spl));
@@ -51,6 +67,7 @@ function productCapabilityDefinition(sub) {
   return {
     modelKey,
     amplifierLimitDb: finite(amplifierLimitDb) ? Number(amplifierLimitDb) : null,
+    approvedRangeCompletion,
     curve: sourceCurve.map((point) => ({
       frequency: point.frequency,
       spl: Math.min(Number(approvedDb) + point.spl - shapeAnchorDb, finite(amplifierLimitDb) ? Number(amplifierLimitDb) : Infinity),
@@ -139,6 +156,7 @@ export function assessShadowPairedP14P18({ activeSubs = [], perSourceComplexTran
     amplifierLimitDb: capability.amplifierLimitDb,
     transferRangeHz: [transfer.points[0].frequency, transfer.points[transfer.points.length - 1].frequency],
     productRangeHz: [capability.curve[0].frequency, capability.curve[capability.curve.length - 1].frequency],
+    approvedRangeCompletion: capability.approvedRangeCompletion || null,
     capabilityCurve: capability.curve,
   }));
 
