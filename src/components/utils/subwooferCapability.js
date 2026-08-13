@@ -1,6 +1,11 @@
 import { MODELS, getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
 
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
+const isPositivePower = (value) => value !== null
+  && value !== undefined
+  && value !== ""
+  && Number.isFinite(Number(value))
+  && Number(value) > 0;
 const dbToPressure = (db) => Math.pow(10, Number(db) / 20);
 
 export const DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W = 1000;
@@ -9,10 +14,10 @@ export function getSharedSubwooferAmplifierAuthority(activeSubs, configuredPower
   const subs = Array.isArray(activeSubs) ? activeSubs : [];
   const sourceConfiguredPowerW = subs
     .map((sub) => sub?.sharedAmplifierPowerW ?? sub?.subwooferAmplifierPowerW)
-    .find(isFiniteNumber);
-  const sharedPowerW = isFiniteNumber(configuredPowerW)
+    .find(isPositivePower);
+  const sharedPowerW = isPositivePower(configuredPowerW)
     ? Number(configuredPowerW)
-    : isFiniteNumber(sourceConfiguredPowerW)
+    : isPositivePower(sourceConfiguredPowerW)
       ? Number(sourceConfiguredPowerW)
       : DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W;
   const totalProductPowerHandlingW = subs.reduce((sum, sub) => {
