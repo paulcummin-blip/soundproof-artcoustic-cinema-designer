@@ -92,7 +92,11 @@ export function buildPostEqBassCapabilityOutcome({
     limitingFrequencyHz: limitation?.limitingFrequency ?? null,
     maximumAvailableSplAfterEqDb: requestedResult?.worstCapabilityDb ?? scalarP14?.value ?? null,
     splShortfallDb: limitation?.shortfallDb ?? null,
-    failureMessage: limitation ? `${requestedLabel} was not achieved; overall capability reached ${achievedLabel || "below L1"}.` : null,
+    failureMessage: p14Failed
+      ? `${requestedLabel} P14 output was not achieved; P14 capability reached ${achievedLabel || "below L1"}.`
+      : p18Failed
+        ? `P14 output achieved at ${requestedLabel}; P18 extension was not achieved at that operating level.`
+        : null,
     authorityComplete: !!pairedComplete || scalarComplete,
     authoritySource: pairedComplete ? "position-aware-post-eq-design-authority" : "post-eq-product-capability-authority",
     p18RequiredExtensionAssessment: p18RequiredExtensionAssessment || null,
