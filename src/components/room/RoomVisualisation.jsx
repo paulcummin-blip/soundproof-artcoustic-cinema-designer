@@ -74,6 +74,7 @@ import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation"
 import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic";
 import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState";
 import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
+import { computeLcrZones } from "@/components/utils/rp22/lcrZoneAuthority";
 import { useLiveImpactBaseline } from "@/components/room/rv/hooks/useLiveImpactBaseline";
 import { useResetSideSurrounds } from "@/components/room/rv/hooks/useResetSideSurrounds";
 import { rvIsOverheadRole, getByRoleArray } from "@/components/room/rv/utils/roomVisualisationUtils";
@@ -1114,38 +1115,18 @@ const byId = useEntitiesById({
   const screenCenterX_m = (widthM || 4.5) / 2;
   const visibleWidthM = Math.max(0.1, Number(screen?.visibleWidthInches || 100) * 0.0254);
 
-  // Compute LCR zone blocks with ZONE_DEPTH_M
+  // Compute LCR zone blocks — canonical authority: computeLcrZones (shared with
+  // P3 and lcrConstraints). Uses the same ZONE_DEPTH_M (screen front-plane depth)
+  // and 22.5°–30° angular wedge construction as the analysis engine.
   const lcrZoneBlocks = useMemo(() => {
     if (!mlp) return null;
-
-    const angle1 = 22.5 * (Math.PI / 180);
-    const angle2 = 30.0 * (Math.PI / 180);
-    const baffleInnerY = ZONE_DEPTH_M;
-
-    const yTopM = 0;
-    const yBottomM = ZONE_DEPTH_M;
-
-    const x_inner_left = mlp.x + (mlp.y - baffleInnerY) * Math.tan(-angle1);
-    const x_outer_left = mlp.x + (mlp.y - baffleInnerY) * Math.tan(-angle2);
-
-    const x_inner_right = mlp.x + (mlp.y - baffleInnerY) * Math.tan(angle1);
-    const x_outer_right = mlp.x + (mlp.y - baffleInnerY) * Math.tan(angle2);
-
+    const zones = computeLcrZones({ mlpX: mlp.x, mlpY: mlp.y, zoneDepthM: ZONE_DEPTH_M });
+    if (!zones) return null;
     return {
-      left: {
-        x_start: Math.min(x_inner_left, x_outer_left),
-        x_end: Math.max(x_inner_left, x_outer_left),
-        y_top: yTopM,
-        y_bottom: yBottomM
-      },
-      right: {
-        x_start: Math.min(x_inner_right, x_outer_right),
-        x_end: Math.max(x_inner_right, x_outer_right),
-        y_top: yTopM,
-        y_bottom: yBottomM
-      }
+      left: { x_start: zones.left.xMin, x_end: zones.left.xMax, y_top: 0, y_bottom: ZONE_DEPTH_M },
+      right: { x_start: zones.right.xMin, x_end: zones.right.xMax, y_top: 0, y_bottom: ZONE_DEPTH_M },
     };
-  }, [mlp, screen?.mountMode, ZONE_DEPTH_M]);
+  }, [mlp, ZONE_DEPTH_M]);
 
   // This useMemo prepares the visual zones for `calculateLcrConstraints`
   const visualConstraintZones = useMemo(() => {
@@ -1323,6 +1304,7 @@ const byId = useEntitiesById({
     aimState: engineState,
     p15ConstructionLevel: appState?.p15ConstructionLevel ?? null,
     screen,
+    screenFrontPlaneM,
     visiblePlanSpeakers,
   });
 

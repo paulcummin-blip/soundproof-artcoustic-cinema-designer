@@ -31,6 +31,7 @@ import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNor
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
 import { computeP11Compliance } from "@/components/utils/rp22/computeP11Compliance";
+import { clampLcrZoneDepth, computeLcrZones, isCentreInZone } from "@/components/utils/rp22/lcrZoneAuthority";
 
 // TEMPORARY P18/P19 execution trace — display-only, no calculation control flow.
 let temporaryAnalysisRunId = 0;
@@ -397,7 +398,7 @@ const getCanonicalRole = (role) => String(role || "").toUpperCase();
 // so that the seatResponses reference never changes between unrelated renders.
 const EMPTY_SEAT_RESPONSES = Object.freeze([]);
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, screenFrontPlaneM, dolbyLayout, visiblePlanSpeakers, includeBassAnalysis = true, diagnosticOwner = "unknown/unattributed" }) => {
   // Report consumers disable this calculation path and present only the completed bass authority.
   const liveSeatResponses = useSeatResponses(includeBassAnalysis);
   const seatResponses = includeBassAnalysis ? liveSeatResponses : EMPTY_SEAT_RESPONSES;
@@ -623,25 +624,27 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // RP22 Parameter 11 — computed after speakersWithResolvedOverheads (see below)
 
     // RP22 Parameter 3 — Screen wall speakers in LCR zones (binary: L4 or FAIL)
+    // Canonical authority: lcrZoneAuthority.js — same zone geometry, RSP, and
+    // screen front-plane depth as the Room Designer visible LCR overlay and drag
+    // constraint. Compliance = cabinet centre within zone (inclusive), directly
+    // implementing the permitted 50% cabinet overhang rule.
     (() => {
-      // Only skip if screen is completely missing
-      if (!screen) {
-        gradedParameters.primary[3] = {
-          title: "Number of screen wall speakers allowed outside of recommended zonal locations",
-          level: null,
-          value: null,
-          unit: "speakers",
-          formatted: null,
-          status: "no_data"
-        };
-        return;
-      }
-
       const mlpForP3 = mlpPointOverride && isNum(mlpPointOverride.x) && isNum(mlpPointOverride.y)
         ? mlpPointOverride
         : (mlp && isNum(mlp.x) && isNum(mlp.y) ? mlp : null);
 
-      if (!mlpForP3) {
+      // Resolve the authoritative screen front-plane depth — same authority as
+      // the Room Designer overlay (ZONE_DEPTH_M). screenFrontPlaneM is the
+      // live-computed screen plane Y passed from RoomVisualisation; fall back to
+      // the project-stored value only when the live value is unavailable.
+      const screenPlaneYForP3 = Number.isFinite(Number(screenFrontPlaneM))
+        ? Number(screenFrontPlaneM)
+        : Number(screen?.frontPlaneM);
+
+      const zoneDepthM = clampLcrZoneDepth(screenPlaneYForP3);
+
+      // Missing authoritative geometry → P3 unavailable (not FAIL)
+      if (!mlpForP3 || zoneDepthM == null) {
         gradedParameters.primary[3] = {
           title: "Number of screen wall speakers allowed outside of recommended zonal locations",
           level: null,
@@ -653,35 +656,25 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         return;
       }
 
-      const rawDepth = Number(screen?.floatDepthM) || 0.20;
-      const zoneDepthM = Math.max(0.10, Math.min(0.60, rawDepth));
-      const spanY = mlpForP3.y - zoneDepthM;
-      const tan22_5 = Math.tan(22.5 * Math.PI / 180);
-      const tan30   = Math.tan(30.0 * Math.PI / 180);
+      const zones = computeLcrZones({ mlpX: mlpForP3.x, mlpY: mlpForP3.y, zoneDepthM });
 
-      const xIL = mlpForP3.x - spanY * tan22_5;
-      const xOL = mlpForP3.x - spanY * tan30;
-      const xIR = mlpForP3.x + spanY * tan22_5;
-      const xOR = mlpForP3.x + spanY * tan30;
-
-      const zoneLeft  = { xMin: Math.min(xIL, xOL), xMax: Math.max(xIL, xOL) };
-      const zoneRight = { xMin: Math.min(xIR, xOR), xMax: Math.max(xIR, xOR) };
+      if (!zones) {
+        gradedParameters.primary[3] = {
+          title: "Number of screen wall speakers allowed outside of recommended zonal locations",
+          level: null,
+          value: null,
+          unit: "speakers",
+          formatted: null,
+          status: "no_data"
+        };
+        return;
+      }
 
       const speakersForP3 = Array.isArray(visiblePlanSpeakers) ? visiblePlanSpeakers : safeSpeakers;
       const fl = speakersForP3.find(s => { const r = String(s.role || '').toUpperCase(); return r === 'FL' || r === 'L'; });
       const fr = speakersForP3.find(s => { const r = String(s.role || '').toUpperCase(); return r === 'FR' || r === 'R'; });
 
-      const checkSpk = (spk, zone) => {
-        if (!spk || !isNum(spk.position?.x)) return null;
-        const cx = Number(spk.position.x);
-        const meta = getSpeakerModelMeta(spk.model) || {};
-        const halfW = (Number(meta.widthM) || 0.20) / 2;
-        return cx >= (zone.xMin - halfW) && cx <= (zone.xMax + halfW);
-      };
-
-      const flPass = checkSpk(fl, zoneLeft);
-      const frPass = checkSpk(fr, zoneRight);
-
+      // No FL/FR present at all → P3 unavailable (not FAIL)
       if (!fl && !fr) {
         gradedParameters.primary[3] = {
           title: "Number of screen wall speakers allowed outside of recommended zonal locations",
@@ -694,9 +687,15 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         return;
       }
 
+      // Centre-within-zone test (inclusive boundaries). null = invalid/missing
+      // geometry — NOT counted as outside.
+      const flResult = fl ? isCentreInZone(fl.position?.x, zones.left) : null;
+      const frResult = fr ? isCentreInZone(fr.position?.x, zones.right) : null;
+
       const failCount =
-        (flPass === false || flPass === null ? 1 : 0) +
-        (frPass === false || frPass === null ? 1 : 0);
+        (flResult === false ? 1 : 0) +
+        (frResult === false ? 1 : 0);
+
       gradedParameters.primary[3] = {
         title: "Number of screen wall speakers allowed outside of recommended zonal locations",
         level: failCount > 0 ? "FAIL" : "L4",
@@ -1705,6 +1704,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     screen?.floatDepthM,
     screen?.visibleWidthInches,
     screen?.frontPlaneM,
+    screenFrontPlaneM,
     seatResponses,
     includeBassAnalysis,
     designEqUsableLfHz,
