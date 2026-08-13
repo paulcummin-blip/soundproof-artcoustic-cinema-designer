@@ -1310,6 +1310,9 @@ const byId = useEntitiesById({
   ]);
   const liveRp22 = useRP22AnalysisEngine({
     diagnosticOwner: rp22DiagnosticOwner,
+    // Live impact uses the completed bass contract for P19/P20. Keep the
+    // geometry overlay pass free of the retired synchronous bass simulator.
+    includeBassAnalysis: false,
     placedSpeakers,
     seatingPositions,
     dimensions: engineDimensions,
