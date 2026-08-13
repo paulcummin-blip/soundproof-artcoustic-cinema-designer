@@ -12,6 +12,7 @@ import {
   resolveHouseCurveDomains,
 } from "@/components/utils/houseCurveTargetAuthority";
 import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
+import { findAggregatePeakBoostViolations } from "@/components/utils/designEqPhysicsAuthority";
 import { normaliseHouseCurveToP14Total, requiredP14ExtensionHz, integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
 import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouseCurve";
 import { getCurrentSystemSourceOutput, getSystemSourceCapability, getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
@@ -222,6 +223,13 @@ function buildCanonicalCandidate({
   );
   const unconstrainedPostEqCurve = (eq.curve || []).map((point) => ({ ...point }));
   const finalPostEqCurve = capCurveToEnvelope(unconstrainedPostEqCurve, maximumAfterEq.curve);
+  // Candidate authority must judge the response that can actually be delivered
+  // after product/output caps and the global gain reserve required by positive
+  // EQ. The fitter's unconstrained curve remains diagnostic-only.
+  const achievedPhysicalAuthorityViolations = findAggregatePeakBoostViolations(
+    achievedPreEqCurve, finalPostEqCurve, targetCurve,
+  );
+  const achievedPhysicalEqAuthorityPassed = achievedPhysicalAuthorityViolations.length === 0;
   const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, eq.combinedEqCurve);
   const maximumPerSeatAfterEqCurves = (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])
     .filter((seat) => seat?.seatId !== "rsp" && Array.isArray(seat?.responseData))
@@ -312,11 +320,12 @@ function buildCanonicalCandidate({
     assessmentEndHz: domains.p19EndHz,
     correctionStartHz: domains.correctionStartHz,
     correctionEndHz: domains.correctionEndHz,
-    physicalEqAuthorityPassed: eq.physicalEqAuthorityPassed !== false,
-    physicalAuthorityViolations: eq.physicalAuthorityViolations || [],
+    physicalEqAuthorityPassed: achievedPhysicalEqAuthorityPassed,
+    physicalAuthorityViolations: achievedPhysicalAuthorityViolations,
+    requestedPhysicalAuthorityViolations: eq.physicalAuthorityViolations || [],
     bankValidationResult: limits,
     aggregateBankLimits: limits,
-    physicalValidation: { passed: eq.physicalEqAuthorityPassed !== false && limits.allOk !== false, bankLimits: limits },
+    physicalValidation: { passed: achievedPhysicalEqAuthorityPassed && limits.allOk !== false, bankLimits: limits },
     fitMetrics: {
       maximumResidualDb: eq.rspObjectiveMaxDeviationDb ?? eq.rspMaxDeviationDb ?? eq.selectedCheckpoint?.maximumAbsoluteDeviationDb ?? null,
       rmsResidualDb: eq.rspRmsDeviationDb ?? eq.selectedCheckpoint?.rmsDeviationDb ?? null,
