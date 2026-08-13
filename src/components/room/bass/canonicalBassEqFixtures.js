@@ -56,7 +56,9 @@ export function runCanonicalBassEqFixtures() {
       sources: [{ id: "sub-1", modelKey: "SUB2-12", x: 1, y: 0.5, z: 0.3 }],
       houseCurveFingerprint: "artcoustic-shape-v1", eqConstraints: { maxBoostDb: 6, maxCutDb: 15 },
       assessmentStartHz: 20, assessmentEndHz: 200, optimisationTransitionHz: 120, usableLfHz: 20,
-      requestedLevel, requestedTargetSplDb, targetBasis,
+      selectedP14TargetDb: requestedTargetSplDb,
+      p14TargetBasis: targetBasis,
+      p14TargetLevel: requestedLevel,
     });
     return {
       requestedLevel,
