@@ -1,6 +1,7 @@
 import { evaluateProvisionalBankLimits, limitBoostForCapability, peakingEqResponseDb } from "@/components/utils/designEqCalibration";
 import { calculateAllSeatMetrics, compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
 import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { evaluatePreparedBankLimits } from "@/components/utils/preparedBankValidation";
 
 const Q_VALUES = [6, 8, 10];
 const GAIN_SCALES = [0.25, 0.5, 0.75, 1];
@@ -27,7 +28,7 @@ function realSeatsRemainConstrained(baseline, after, protectedNullRegions) {
   });
 }
 
-export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetrics, seats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve }) {
+export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetrics, seats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve, evaluationMemo = null, preparedBankValidation = null, operationCounts = null }) {
   const points = (metrics?.rspResidualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
   const peak = points.filter((point) => point.deviationDb > 0).sort((a, b) => b.deviationDb - a.deviationDb)[0];
   const valley = points.filter((point) => point.deviationDb < 0).sort((a, b) => a.deviationDb - b.deviationDb)[0];
@@ -54,10 +55,15 @@ export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetri
       const boost = limitBoostForCapability(requestedBoost, activeSubs, usableLfHz, requestedSystemOutputDb);
       if (boost.gainDb <= 0.1) continue;
       const proposed = [...filters, cut, boost];
-      const limits = evaluateProvisionalBankLimits(proposed, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+      const limits = preparedBankValidation
+        ? evaluatePreparedBankLimits(preparedBankValidation, proposed, profile, operationCounts)
+        : evaluateProvisionalBankLimits(proposed, bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
       bankEvaluationCount++;
       if (!limits.allOk) continue;
-      const candidateMetrics = calculateAllSeatMetrics(seats, proposed, fitStartHz, fitEndHz, anchorDb, null, null, { protectedNullRegions, canonicalTargetCurve });
+      const candidateMetrics = calculateAllSeatMetrics(
+        seats, proposed, fitStartHz, fitEndHz, anchorDb, operationCounts, evaluationMemo,
+        { protectedNullRegions, canonicalTargetCurve },
+      );
       if (!candidateMetrics) continue;
       if (!realSeatsRemainConstrained(seatBaselineMetrics, candidateMetrics, protectedNullRegions)) continue;
       const maxImprovementDb = bestMetrics.rspMaxDeviationDb - candidateMetrics.rspMaxDeviationDb;
