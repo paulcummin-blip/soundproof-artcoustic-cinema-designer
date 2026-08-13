@@ -2,6 +2,7 @@
 // Pure calculation engine for bass simulation (no React)
 
 import { getSubwooferCurve, getApprovedContinuousSplDb } from "@/components/models/speakers/registry";
+import { getSharedSubwooferAmplifierAuthority } from "@/components/utils/subwooferCapability";
 import { 
   computeP14MaxLfeSpl, 
   computeP18InRoomF3, 
@@ -513,6 +514,11 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
   }
   
   const powerW = splConfig?.globalPowerW ?? 100;
+  const amplifierAuthority = getSharedSubwooferAmplifierAuthority(
+    subs,
+    splConfig?.subwooferAmplifierPowerW,
+  );
+  const dbAmplifier = amplifierAuthority.deratingDb;
   const eqHeadroomDb = splConfig?.globalEqHeadroomDb ?? 0;
   const radiationMode = splConfig?.radiationMode ?? 'half-space';
   const modesEnabled = splConfig?.modesEnabled ?? false;
@@ -591,7 +597,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
         const dbGain = tuning.gainDb;
 
         // Total magnitude
-        const dbMag = db0 + dbDist + dbPower + dbEq + dbBoundary + dbGain;
+        const dbMag = db0 + dbAmplifier + dbDist + dbPower + dbEq + dbBoundary + dbGain;
         const amplitude = Math.pow(10, dbMag / 20);
 
         // Guard against non-finite amplitude
@@ -654,7 +660,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
             const d_img = Math.max(MIN_DISTANCE, Math.sqrt(dx_img*dx_img + dy_img*dy_img + dz_img*dz_img));
             
             // Image path magnitude (no boundary gain for reflected paths)
-            const dbMag_img = db0 + (-20 * Math.log10(d_img / 1)) + dbPower + dbEq + dbGain;
+            const dbMag_img = db0 + dbAmplifier + (-20 * Math.log10(d_img / 1)) + dbPower + dbEq + dbGain;
             const amplitude_img = Math.pow(10, dbMag_img / 20) * reflCoeff;
             
             if (!isFinite(amplitude_img)) return;
@@ -687,6 +693,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
             subId: sub.id || `sub-${subIdx}`,
             modelKey: sub.modelKey,
             db0,
+            dbAmplifier,
             distance: d,
             dbDist,
             dbBoundary,
@@ -711,6 +718,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
             distance: d,
             // Raw dB components
             db0,
+            dbAmplifier,
             dbDist,
             dbBoundary,
             dbPower,
