@@ -6,6 +6,8 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
+import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { formatBassResults } from "@/components/room/bass/bassResultsPresentation";
 
 const RoomDimensions = React.lazy(() =>
   import("@/components/room/RoomDimensions").then((m) => ({ default: m.default ?? m.RoomDimensions }))
@@ -165,6 +167,8 @@ export default function RoomDesignerControlsPanel({
   recommendedAbfuserQty,
 }) {
   const [rightPanelView, setRightPanelView] = useState('controls');
+  const sharedBassResults = useOptionalSharedBassResults();
+  const formattedBassResults = formatBassResults(sharedBassResults?.contract);
 
   return (
     <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0 }}>
@@ -326,6 +330,13 @@ export default function RoomDesignerControlsPanel({
                 // P8: upfiring/elevation speakers are never used in this app → always L4
                 if (num === 8) {
                   return <DataRow key={num} label={label} value="L4 · No upfiring/elevation speakers" />;
+                }
+                // P14–P20 bass values come from the same completed,
+                // product-aware contract as the graph and compliance outputs.
+                const bassKey = ({ 14: 'p14', 18: 'p18', 19: 'p19', 20: 'p20' })[num];
+                if (bassKey) {
+                  const bassDisplay = formattedBassResults?.pills?.[bassKey]?.resultText || NOT_CALC;
+                  return <DataRow key={num} label={label} value={bassDisplay} />;
                 }
                 const isSeatScope = SEAT_SCOPE.has(num);
                 const p = resolve(num, isSeatScope);
