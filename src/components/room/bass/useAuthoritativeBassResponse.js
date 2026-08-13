@@ -9,8 +9,8 @@ import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve"
 import { computeCalibrationFingerprint, computeGeometryFingerprint, computeHouseCurveFingerprint, computeProductFingerprint } from "./bassAnalysisFingerprints";
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import {
-  DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W,
-  getSharedSubwooferAmplifierAuthority,
+  DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W,
+  getPerSubwooferAmplifierAuthority,
 } from "@/components/utils/subwooferCapability";
 
 const POSITION_LABELS = ["left", "right"];
@@ -61,7 +61,7 @@ export function buildAuthoritativeAutoAlignDelays({ enabled, rspPosition, frontS
 
 export function buildAuthoritativeBassSources({
   frontSubsLive, rearSubsLive, frontSubsCfg, rearSubsCfg, autoAlignDelays,
-  sharedAmplifierPowerW = DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W,
+  amplifierPowerPerSubW = DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W,
 }) {
   const resolveAutoDelay = (subId, group, index) => {
     if (autoAlignDelays[subId] != null) return autoAlignDelays[subId];
@@ -89,7 +89,7 @@ export function buildAuthoritativeBassSources({
       id,
       modelKey,
       bassCapability: resolveSubwooferBassCapability(modelKey),
-      sharedAmplifierPowerW,
+      subwooferAmplifierPowerW: amplifierPowerPerSubW,
       x,
       y,
       z: Number.isFinite(Number(position?.z)) ? Number(position.z) : 0.35,
@@ -110,7 +110,7 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
   if (!sources.length || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
     return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] } };
   }
-  const amplifierAuthority = getSharedSubwooferAmplifierAuthority(sources);
+  const amplifierAuthority = getPerSubwooferAmplifierAuthority(sources);
   const seatResponses = {};
   let stepDebug = null;
   let wholeCurveDebugRows = null;
@@ -124,16 +124,17 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
     let freqsHz = null;
     let sumRe = null;
     let sumIm = null;
-    sources.forEach((sub) => {
+    sources.forEach((sub, sourceIndex) => {
       const subCurve = getSubwooferCurve(sub.modelKey);
       if (!subCurve?.length) return;
+      const sourceAmplifierDeratingDb = amplifierAuthority.sourceAuthorities[sourceIndex]?.deratingDb ?? 0;
       const rawSourceCurve = REW_SOURCE_CURVES[physics.rewSourceCurveMode] || subCurve;
       const sourceCurve = physics.rewSourceCurveMode === "product"
         ? rawSourceCurve.map((point) => {
             const spl = Number(point?.spl);
             const db = Number(point?.db);
-            if (Number.isFinite(spl)) return { ...point, spl: spl + amplifierAuthority.deratingDb };
-            if (Number.isFinite(db)) return { ...point, db: db + amplifierAuthority.deratingDb };
+            if (Number.isFinite(spl)) return { ...point, spl: spl + sourceAmplifierDeratingDb };
+            if (Number.isFinite(db)) return { ...point, db: db + sourceAmplifierDeratingDb };
             return { ...point };
           })
         : rawSourceCurve;
@@ -339,16 +340,16 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   // ERROR GATE: When instance status is ERROR or UNINITIALISED, produce zero sources.
   // This blocks all downstream analysis: no worker jobs, no fingerprints, no cache.
   const analysisBlocked = instanceStatus === INSTANCE_STATUS.ERROR || instanceStatus === INSTANCE_STATUS.UNINITIALISED;
-  const sharedSubAmplifierPowerW = Number.isFinite(Number(splConfig?.subwooferAmplifierPowerW))
+  const amplifierPowerPerSubW = Number.isFinite(Number(splConfig?.subwooferAmplifierPowerW))
     ? Number(splConfig.subwooferAmplifierPowerW)
-    : DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W;
+    : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
   const sources = useMemo(() => {
     if (analysisBlocked) return [];
     return buildAuthoritativeBassSources({
       frontSubsLive, rearSubsLive, frontSubsCfg, rearSubsCfg, autoAlignDelays,
-      sharedAmplifierPowerW: sharedSubAmplifierPowerW,
+      amplifierPowerPerSubW,
     });
-  }, [frontSubsLive, rearSubsLive, autoAlignDelays, sharedSubAmplifierPowerW, analysisBlocked]);
+  }, [frontSubsLive, rearSubsLive, autoAlignDelays, amplifierPowerPerSubW, analysisBlocked]);
   const physics = useMemo(() => ({
     surfaceAbsorption, roomDamping, enableRewCoreReflections, rewSourceCurveMode, modalSourceReferenceMode,
     modalGainScalar, axialQ, modalStorageMode, propagationPhaseScale, disableReflectionPhaseJitter,
@@ -383,9 +384,9 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     return {
       activeSubs: sources,
       usableLfHz: usable.length ? Math.max(...usable) : null,
-      amplifierAuthority: getSharedSubwooferAmplifierAuthority(sources, sharedSubAmplifierPowerW),
+      amplifierAuthority: getPerSubwooferAmplifierAuthority(sources, amplifierPowerPerSubW),
     };
-  }, [sources, sharedSubAmplifierPowerW]);
+  }, [sources, amplifierPowerPerSubW]);
   const optimisationTransitionHz = useMemo(() => {
     const volume = Number(roomDims?.widthM) * Number(roomDims?.lengthM) * Number(roomDims?.heightM);
     return volume > 0 ? 2000 * Math.sqrt(0.4 / volume) : 120;
@@ -394,8 +395,8 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const p14TargetBasis = requested.p14TargetBasis;
   const productCapabilities = useMemo(() => sources.map((sub) => {
     const model = MODELS.find((item) => item.key === normaliseModelKey(sub.modelKey));
-    return model ? { modelKey: model.key, bassCapability: model.bassCapability ?? null, response: model.frequency_response_curve, usableLfHz: model.approvedUsableLfHzMinus6dB, continuousSplDb: model.approvedContinuousSplAt1mDb, continuousSpl30HzDb: model.approvedContinuousSplAt30HzDb, peakSplDb: model.approvedPeakSplDb, maxPowerW: model.max_power, sharedAmplifierPowerW: sharedSubAmplifierPowerW } : { modelKey: sub.modelKey, sharedAmplifierPowerW: sharedSubAmplifierPowerW };
-  }), [sources, sharedSubAmplifierPowerW]);
+    return model ? { modelKey: model.key, bassCapability: model.bassCapability ?? null, response: model.frequency_response_curve, usableLfHz: model.approvedUsableLfHzMinus6dB, continuousSplDb: model.approvedContinuousSplAt1mDb, continuousSpl30HzDb: model.approvedContinuousSplAt30HzDb, peakSplDb: model.approvedPeakSplDb, maxPowerW: model.max_power, amplifierPowerPerSubW } : { modelKey: sub.modelKey, amplifierPowerPerSubW };
+  }), [sources, amplifierPowerPerSubW]);
   const fingerprintInputs = useMemo(() => ({
     roomDims, sources, rspPosition, seatingPositions, surfaceAbsorption, roomDamping, axialQ,
     modalSourceReferenceMode, modalGainScalar, modalDistanceBlend, modalStorageMode, propagationPhaseScale,
@@ -409,7 +410,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     assessmentStartHz: 20, assessmentEndHz: 200,
     activeFitProfile: null,
     usableLfHz: designEqSystemLimits.usableLfHz, evaluatedProfiles: requested.evaluatedProfiles,
-    productDataVersion: 4, productCapabilities,
+    productDataVersion: 5, productCapabilities,
     selectedP14TargetDb: requested.selectedP14TargetDb,
     p14TargetBasis: requested.p14TargetBasis,
     p14TargetLevel: requested.requestedLevel,
