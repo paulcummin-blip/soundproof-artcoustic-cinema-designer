@@ -125,6 +125,27 @@ function capCurveToEnvelope(requestedCurve, maximumCurve) {
   });
 }
 
+function findAchievedProtectedNullBoostViolations(beforeCurve, afterCurve, protectedNullRegions) {
+  return (Array.isArray(afterCurve) ? afterCurve : []).map((point) => {
+    const region = (Array.isArray(protectedNullRegions) ? protectedNullRegions : [])
+      .find((candidate) => point.frequency >= candidate.startHz && point.frequency <= candidate.endHz);
+    if (!region) return null;
+    const beforeSpl = interpolateCorrection(beforeCurve, point.frequency);
+    const finalSpl = Number(point?.spl);
+    const aggregateCorrectionDb = finalSpl - beforeSpl;
+    return {
+      authorityType: "protected-null-boost",
+      frequencyHz: point.frequency,
+      beforeSpl,
+      finalSpl,
+      aggregateCorrectionDb,
+      protectedRegionStartHz: region.startHz,
+      protectedRegionEndHz: region.endHz,
+    };
+  }).filter((point) => point && Number.isFinite(point.aggregateCorrectionDb)
+    && point.aggregateCorrectionDb > 0.05);
+}
+
 function capabilityLimitedRegions(curve) {
   const points = (Array.isArray(curve) ? curve : []).filter((point) => point.capabilityLimited);
   if (!points.length) return [];
@@ -226,9 +247,16 @@ function buildCanonicalCandidate({
   // Candidate authority must judge the response that can actually be delivered
   // after product/output caps and the global gain reserve required by positive
   // EQ. The fitter's unconstrained curve remains diagnostic-only.
-  const achievedPhysicalAuthorityViolations = findAggregatePeakBoostViolations(
+  const achievedPeakBoostViolations = findAggregatePeakBoostViolations(
     achievedPreEqCurve, finalPostEqCurve, targetCurve,
   );
+  const achievedProtectedNullBoostViolations = findAchievedProtectedNullBoostViolations(
+    achievedPreEqCurve, finalPostEqCurve, protectedNullRegions,
+  );
+  const achievedPhysicalAuthorityViolations = [
+    ...achievedPeakBoostViolations,
+    ...achievedProtectedNullBoostViolations,
+  ];
   const achievedPhysicalEqAuthorityPassed = achievedPhysicalAuthorityViolations.length === 0;
   const requestedPerSeatPostEqCurves = applyBankToSeats(perSeatRawCurves, eq.combinedEqCurve);
   const maximumPerSeatAfterEqCurves = (Array.isArray(perSeatMaximumSplCurves) ? perSeatMaximumSplCurves : [])
@@ -322,6 +350,7 @@ function buildCanonicalCandidate({
     correctionEndHz: domains.correctionEndHz,
     physicalEqAuthorityPassed: achievedPhysicalEqAuthorityPassed,
     physicalAuthorityViolations: achievedPhysicalAuthorityViolations,
+    achievedProtectedNullBoostViolations,
     requestedPhysicalAuthorityViolations: eq.physicalAuthorityViolations || [],
     bankValidationResult: limits,
     aggregateBankLimits: limits,
