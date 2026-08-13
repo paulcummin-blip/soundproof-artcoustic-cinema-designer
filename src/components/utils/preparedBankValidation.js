@@ -16,6 +16,7 @@ export function prepareBankValidation(raw, activeSubs, usableLfHz, requestedSyst
     frequencies,
     permittedBoostDb,
     filterResponses: new Map(),
+    bankLimitResults: new Map(),
     // Stage B.5: exact high-level validation results are immutable for this
     // prepared context (same raw grid, products, output target and limits).
     // Reuse them when another residual region proposes the identical bank.
@@ -38,8 +39,19 @@ function responseForFilter(context, filter, operationCounts) {
 }
 
 export function evaluatePreparedBankLimits(context, filters, profile, operationCounts) {
+  if (operationCounts) operationCounts.bankLimitRequests = (operationCounts.bankLimitRequests || 0) + 1;
   const maximumAggregateBoostDb = (profile?.maximumAggregateBoostDb ?? 6) + 0.05;
   const aggregateCutFloorDb = -((profile?.maximumCutDb ?? 10) + 0.05);
+  const bankKey = [
+    maximumAggregateBoostDb,
+    aggregateCutFloorDb,
+    filters.map(filterSignature).join("|"),
+  ].join("::");
+  const cached = context.bankLimitResults?.get(bankKey);
+  if (cached) {
+    if (operationCounts) operationCounts.reusedBankLimitEvaluations = (operationCounts.reusedBankLimitEvaluations || 0) + 1;
+    return cached;
+  }
   const filterResponses = filters.map((filter) => responseForFilter(context, filter, operationCounts));
   let maxAggregateBoostDb = 0;
   let maxAggregateBoostHz = null;
@@ -68,9 +80,12 @@ export function evaluatePreparedBankLimits(context, filters, profile, operationC
   const limitingPermittedBoostDb = maxAggregateBoostIndex >= 0
     ? context.permittedBoostDb[maxAggregateBoostIndex]
     : 6;
-  return {
+  const result = {
     maxAggregateBoostDb, maxAggregateBoostHz, maxAggregateCutDb, maxAggregateCutHz,
     limitingPermittedBoostDb, boostLimitOk, cutLimitOk, sourceDomainHeadroomOk,
     allOk: boostLimitOk && cutLimitOk && sourceDomainHeadroomOk,
   };
+  context.bankLimitResults?.set(bankKey, result);
+  if (operationCounts) operationCounts.uniqueBankLimitEvaluations = (operationCounts.uniqueBankLimitEvaluations || 0) + 1;
+  return result;
 }
