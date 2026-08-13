@@ -6,6 +6,7 @@ import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapab
 import {
   aggregateResponseDbAt,
   buildCurveFromBank,
+  createDesignEqBankEvaluationContext,
   countSameSignFiltersInRegion,
   emptyFilters,
   evaluateProvisionalBankLimits,
@@ -17,6 +18,7 @@ import {
   scaleRevisionForBankLimits,
   resetDesignEqBankEvaluationCount,
   getDesignEqBankEvaluationCount,
+  getDesignEqBankEvaluationContextStats,
 } from "@/components/utils/designEqBankLimits";
 
 const isNumber = (value) => Number.isFinite(Number(value));
@@ -338,11 +340,16 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     : [];
   const hasInitialFilters = initialFilters.length > 0;
   resetDesignEqBankEvaluationCount();
+  // Exact memoisation only: the physical equations and candidate acceptance
+  // order remain unchanged, while repeated bank/filter evaluations are reused.
+  const bankEvaluationContext = createDesignEqBankEvaluationContext(
+    raw, activeSubs, usableLfHz, requestedSystemOutputDb,
+  );
   // Seed the filter bank from the Standard fit when provided (Accuracy profile).
   // The seeded state is the first checkpoint — it guarantees the Accuracy result
   // retains or improves the Standard checkpoint's maximum house-curve deviation.
   const filters = hasInitialFilters ? initialFilters.map((f) => ({ ...f })) : [];
-  let curve = hasInitialFilters ? buildCurveFromBank(raw, filters) : raw;
+  let curve = hasInitialFilters ? buildCurveFromBank(raw, filters, bankEvaluationContext) : raw;
   let stopReason = "no safe improvement remained";
   const checkpoints = [buildCheckpoint({
     filters,
@@ -495,12 +502,12 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
           if (isDuplicate || sameRegionCount >= 2) continue;
 
           const gainBeforeBankLimiting = candidate.gainDb;
-          const bankResult = scaleCandidateForBankLimits(candidate, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile);
+          const bankResult = scaleCandidateForBankLimits(candidate, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile, bankEvaluationContext);
           if (!bankResult.filter) { bankLimitRejectedCount++; continue; }
           if (bankResult.scaled) bankLimitScaledCount++;
           const finalCandidate = bankResult.filter;
           const gainAfterBankLimiting = finalCandidate.gainDb;
-          const nextCurve = buildCurveFromBank(raw, [...filters, finalCandidate]);
+          const nextCurve = buildCurveFromBank(raw, [...filters, finalCandidate], bankEvaluationContext);
           const nextTrend = applyBassSmoothing(nextCurve, "third");
           const nextMetrics = completeBandResidualMetrics(nextTrend, assessmentStartHz, assessmentEndHz, anchorDb);
           if (!nextMetrics) continue;
@@ -581,7 +588,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
               if (seenRevisionsRegion.has(revisionKey)) continue;
               seenRevisionsRegion.add(revisionKey);
               const proposedGainDb = existingFilter.gainDb + proposedGainDelta;
-              const revisionResult = scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile);
+              const revisionResult = scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile, bankEvaluationContext);
               revisionAttemptCount++;
               const attempt = {
                 filterIndex, oldGainDb: existingFilter.gainDb, proposedGainDb,
@@ -601,7 +608,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
               }
               const revisedFilter = revisionResult.filter;
               const revisedFilters = filters.map((f, i) => i === filterIndex ? revisedFilter : f);
-              const revisedCurve = buildCurveFromBank(raw, revisedFilters);
+              const revisedCurve = buildCurveFromBank(raw, revisedFilters, bankEvaluationContext);
               const revisedTrend = applyBassSmoothing(revisedCurve, "third");
               const revisedMetrics = completeBandResidualMetrics(revisedTrend, assessmentStartHz, assessmentEndHz, anchorDb);
               if (!revisedMetrics) {
@@ -728,7 +735,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       filters[chosen.replacedFilterIndex] = chosen.filter;
       selectedRevisionOperationCount++;
     }
-    curve = buildCurveFromBank(raw, filters);
+    curve = buildCurveFromBank(raw, filters, bankEvaluationContext);
     const checkpoint = buildCheckpoint({
       filters, curve, originalTrend: thirdOctave,
       assessmentStartHz, assessmentEndHz, anchorDb, fittingToleranceDb,
@@ -819,7 +826,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
   let seedCheckpoint = null;
   for (const checkpoint of seedEligibleCheckpoints) {
     const limits = evaluateProvisionalBankLimits(
-      checkpoint.filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile,
+      checkpoint.filters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile, bankEvaluationContext,
     );
     if (limits.allOk) {
       seedCheckpoint = checkpoint;
@@ -903,7 +910,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
     };
   }) : [];
 
-  const finalBankLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile);
+  const finalBankLimits = evaluateProvisionalBankLimits(selectedFilters, raw, activeSubs, usableLfHz, options.requestedSystemOutputDb, profile, bankEvaluationContext);
   const sameRegionFilterCount = maxSameRegionFilterCount(selectedFilters);
   const diagnosticTargetCurve = canonicalTargetCurve.length
     ? canonicalTargetCurve
@@ -980,6 +987,7 @@ export function calculateDesignEqCurve(curveData, usableLfHz, activeSubs = [], o
       evaluatedVariantsRejectedAsNearDuplicates: nearDuplicateRejectedCount,
       evaluatedVariantsRejectedBySameRegionGuard: sameRegionRejectedCount,
       completedBankEvaluationCount: getDesignEqBankEvaluationCount(),
+      exactMemoisation: getDesignEqBankEvaluationContextStats(bankEvaluationContext),
       selectedBankLimits: {
         maxAggregateBoostDb: finalBankLimits.maxAggregateBoostDb,
         maxAggregateBoostHz: finalBankLimits.maxAggregateBoostHz,
