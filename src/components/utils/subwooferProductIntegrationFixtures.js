@@ -1,5 +1,9 @@
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
-import { interpolateCapabilityCurve } from "@/components/utils/subwooferCapability";
+import {
+  getPerSubwooferAmplifierAuthority,
+  getSystemSourceCapability,
+  interpolateCapabilityCurve,
+} from "@/components/utils/subwooferCapability";
 import { calculatePairedP14P18ProductionAuthority } from "@/components/utils/pairedP14P18ProductionAuthority";
 
 const REF_AMPLITUDE = 10 ** (94 / 20);
