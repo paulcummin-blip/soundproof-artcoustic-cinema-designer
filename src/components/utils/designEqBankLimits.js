@@ -205,7 +205,7 @@ export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLf
   return result;
 }
 
-export function scaleCandidateForBankLimits(candidate, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
+export function scaleCandidateForBankLimits(candidate, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext = null) {
   // Stage B: Frequency-dependent boost authority.
   // Each positive-gain filter is individually clamped to the source-domain
   // boost allowance available at its own centre frequency. A single unsafe
@@ -243,14 +243,14 @@ export function scaleCandidateForBankLimits(candidate, existingFilters, raw, act
       return {
         filter: null,
         scaled: true,
-        limits: evaluateProvisionalBankLimits([...existingFilters, { ...candidate, gainDb: 0 }], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile),
+        limits: evaluateProvisionalBankLimits([...existingFilters, { ...candidate, gainDb: 0 }], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext),
         perFilterDiagnostics,
       };
     }
     clampedCandidate = { ...candidate, gainDb: appliedGainDb };
   }
 
-  const initial = evaluateProvisionalBankLimits([...existingFilters, clampedCandidate], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  const initial = evaluateProvisionalBankLimits([...existingFilters, clampedCandidate], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext);
   if (initial.allOk) return { filter: clampedCandidate, scaled: clampedCandidate.gainDb !== candidate.gainDb, limits: initial, perFilterDiagnostics };
 
   // Binary-search the proposed gain against aggregate boost, cut and
@@ -261,7 +261,7 @@ export function scaleCandidateForBankLimits(candidate, existingFilters, raw, act
     const magnitude = (low + high) / 2;
     const gainDb = isBoost ? magnitude : -magnitude;
     const limits = evaluateProvisionalBankLimits(
-      [...existingFilters, { ...clampedCandidate, gainDb }], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile,
+      [...existingFilters, { ...clampedCandidate, gainDb }], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext,
     );
     if (limits.allOk) low = magnitude;
     else high = magnitude;
@@ -272,7 +272,7 @@ export function scaleCandidateForBankLimits(candidate, existingFilters, raw, act
   return {
     filter,
     scaled: true,
-    limits: evaluateProvisionalBankLimits([...existingFilters, filter], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile),
+    limits: evaluateProvisionalBankLimits([...existingFilters, filter], raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext),
     perFilterDiagnostics,
   };
 }
@@ -301,14 +301,32 @@ export function maxSameRegionFilterCount(filters) {
   ), 0);
 }
 
-export function buildCurveFromBank(raw, filters) {
-  return raw.map((point) => ({
-    frequency: point.frequency,
-    spl: point.spl + aggregateResponseDbAt(point.frequency, filters),
-  }));
+export function buildCurveFromBank(raw, filters, evaluationContext = null) {
+  const prepared = evaluationContext?.raw === raw ? evaluationContext : null;
+  if (!prepared) {
+    return raw.map((point) => ({
+      frequency: point.frequency,
+      spl: point.spl + aggregateResponseDbAt(point.frequency, filters),
+    }));
+  }
+  prepared.stats.curveRequests += 1;
+  const key = bankSignature(filters);
+  const cached = prepared.curveResults.get(key);
+  if (cached) {
+    prepared.stats.reusedCurves += 1;
+    return cached;
+  }
+  const responses = filters.map((filter) => responseForFilter(prepared, filter));
+  const curve = raw.map((point, pointIndex) => {
+    let aggregateDb = 0;
+    for (const response of responses) aggregateDb += response[pointIndex];
+    return { frequency: point.frequency, spl: point.spl + aggregateDb };
+  });
+  prepared.curveResults.set(key, curve);
+  return curve;
 }
 
-export function scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
+export function scaleRevisionForBankLimits(existingFilter, proposedGainDelta, filterIndex, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext = null) {
   const maximumCutDb = profile?.maximumCutDb ?? 15;
   const maximumAggregateBoostDb = profile?.maximumAggregateBoostDb ?? 6;
   const proposedGain = existingFilter.gainDb + proposedGainDelta;
@@ -319,7 +337,7 @@ export function scaleRevisionForBankLimits(existingFilter, proposedGainDelta, fi
   if (Math.abs(clampedDelta) <= 0.1) return { filter: null, scaled: false, limits: null, acceptedDelta: 0 };
   const revisedFilter = { ...existingFilter, gainDb: clampedGain };
   const initialFilters = existingFilters.map((filter, index) => index === filterIndex ? revisedFilter : filter);
-  const initial = evaluateProvisionalBankLimits(initialFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+  const initial = evaluateProvisionalBankLimits(initialFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext);
   if (initial.allOk) return { filter: revisedFilter, scaled: false, limits: initial, acceptedDelta: clampedDelta };
 
   const isBoost = clampedDelta > 0;
@@ -330,7 +348,7 @@ export function scaleRevisionForBankLimits(existingFilter, proposedGainDelta, fi
     const delta = isBoost ? magnitude : -magnitude;
     const trial = { ...existingFilter, gainDb: existingFilter.gainDb + delta };
     const trialFilters = existingFilters.map((filter, candidateIndex) => candidateIndex === filterIndex ? trial : filter);
-    const limits = evaluateProvisionalBankLimits(trialFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile);
+    const limits = evaluateProvisionalBankLimits(trialFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext);
     if (limits.allOk) low = magnitude;
     else high = magnitude;
   }
@@ -341,7 +359,7 @@ export function scaleRevisionForBankLimits(existingFilter, proposedGainDelta, fi
   return {
     filter,
     scaled: true,
-    limits: evaluateProvisionalBankLimits(acceptedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile),
+    limits: evaluateProvisionalBankLimits(acceptedFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext),
     acceptedDelta,
   };
 }
