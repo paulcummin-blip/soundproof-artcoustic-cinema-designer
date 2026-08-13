@@ -1,7 +1,7 @@
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { buildCurveFromBank, evaluateProvisionalBankLimits, peakingEqResponseDb } from "@/components/utils/designEqCalibration";
 import { calculateAllSeatMetrics } from "@/components/utils/houseCurveFitterCore";
-import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { isProtectedFrequency, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget } from "@/components/utils/houseCurveTargetAuthority";
 import { evaluatePreparedBankLimits } from "@/components/utils/preparedBankValidation";
 
@@ -10,7 +10,7 @@ const EQ_ACTIVITY = (filters) => filters.reduce((sum, filter) => sum + Math.abs(
 function quality(raw, filters, target, startHz, endHz, protectedRegions) {
   const residuals = applyBassSmoothing(buildCurveFromBank(raw, filters), "third")
     .filter((point) => point.frequency >= startHz && point.frequency <= endHz)
-    .filter((point) => !isProtectedFrequency(point.frequency, protectedRegions))
+    .filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedRegions))
     .map((point) => point.spl - interpolateCanonicalTarget(target, point.frequency))
     .filter(Number.isFinite);
   if (!residuals.length) return null;
