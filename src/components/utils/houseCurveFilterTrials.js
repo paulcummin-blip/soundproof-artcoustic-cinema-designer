@@ -11,11 +11,20 @@ export function generateHouseCurveTrials(region, filters, profile, activeSubs, u
     currentPostEqSplDb: region.centrePoint.deviationDb,
     protectedNull: !!region.protectedNull,
   });
+  // Public trial fixtures and diagnostic callers may provide only a signed
+  // residual. Preserve that residual-domain contract by constructing an
+  // equivalent zero-referenced SPL pair when absolute SPL fields are absent.
+  const residualDb = Number(region.centrePoint.deviationDb);
+  const hasAbsoluteSpl = Number.isFinite(Number(region.centrePoint.spl))
+    && Number.isFinite(Number(region.centrePoint.targetSpl));
+  const currentSpl = hasAbsoluteSpl ? Number(region.centrePoint.spl) : residualDb;
+  const targetSpl = hasAbsoluteSpl ? Number(region.centrePoint.targetSpl) : 0;
+  const rawSpl = Number.isFinite(Number(region.rawSpl)) ? Number(region.rawSpl) : currentSpl;
   const authority = classifyEqCorrectionRegion({
     frequency: region.centrePoint.frequency,
-    rawSpl: region.rawSpl,
-    currentSpl: region.centrePoint.spl,
-    targetSpl: region.centrePoint.targetSpl,
+    rawSpl,
+    currentSpl,
+    targetSpl,
     protectedNull: !!region.protectedNull,
     widthOctaves: region.widthOctaves,
   });
