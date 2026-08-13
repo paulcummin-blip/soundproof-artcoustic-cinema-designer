@@ -1,6 +1,6 @@
 import { evaluateProvisionalBankLimits, limitBoostForCapability, peakingEqResponseDb } from "@/components/utils/designEqCalibration";
 import { calculateAllSeatMetrics, compareHouseCurveMetrics } from "@/components/utils/houseCurveFitterCore";
-import { isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { evaluatePreparedBankLimits } from "@/components/utils/preparedBankValidation";
 
 const Q_VALUES = [6, 8, 10];
@@ -20,16 +20,16 @@ function realSeatsRemainConstrained(baseline, after, protectedNullRegions) {
     if (metric.seatId === "rsp") return true;
     const baseline = beforeById.get(metric.seatId);
     if (!baseline) return true;
-    const scored = (metric.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+    const scored = (metric.residualPoints || []).filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
     const candidateMax = scored.length ? Math.max(...scored.map((point) => Math.abs(point.deviationDb))) : metric.maxAbsDeviationDb;
-    const baselineScored = (baseline.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+    const baselineScored = (baseline.residualPoints || []).filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
     const baselineMax = baselineScored.length ? Math.max(...baselineScored.map((point) => Math.abs(point.deviationDb))) : baseline.maxAbsDeviationDb;
     return candidateMax <= baselineMax + 0.5;
   });
 }
 
 export function refineOpposingResidualPair({ filters, metrics, seatBaselineMetrics, seats, bankRaw, fitStartHz, fitEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, protectedNullRegions, canonicalTargetCurve, evaluationMemo = null, preparedBankValidation = null, operationCounts = null }) {
-  const points = (metrics?.rspResidualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+  const points = (metrics?.rspResidualPoints || []).filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
   const peak = points.filter((point) => point.deviationDb > 0).sort((a, b) => b.deviationDb - a.deviationDb)[0];
   const valley = points.filter((point) => point.deviationDb < 0).sort((a, b) => a.deviationDb - b.deviationDb)[0];
   const enabledFilterCount = filters.filter((filter) => filter.enabled).length;
