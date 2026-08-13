@@ -8,7 +8,7 @@ const TV_KEY_TO_INCHES = {
   tv83: 72.52,
   tv100: 87.80,
 };
-function resolveVisibleWidthInches(screen) {
+export function resolveVisibleWidthInches(screen) {
   const tvKey = screen?.tvPresetKey;
   const tvMm = Number(screen?.tvWidthMm);
   if (tvKey && TV_KEY_TO_INCHES[tvKey]) return TV_KEY_TO_INCHES[tvKey];

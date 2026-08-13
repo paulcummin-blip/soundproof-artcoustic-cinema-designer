@@ -98,11 +98,11 @@ export const SelectTrigger = forwardRef(function SelectTrigger({ className, chil
   );
 });
 
-export function SelectValue({ placeholder, className, style }) {
+export function SelectValue({ placeholder, className, style, children }) {
   const { selectedLabel, value } = useSelect?.() ?? {};
   return (
     <span className={cn(className)} style={style}>
-      {selectedLabel ?? value ?? placeholder ?? ""}
+      {children ?? selectedLabel ?? value ?? placeholder ?? ""}
     </span>
   );
 }

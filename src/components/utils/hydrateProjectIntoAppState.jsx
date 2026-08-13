@@ -11,6 +11,7 @@ import {
 } from "@/components/utils/subwooferInstanceMigration";
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
+import { resolveVisibleWidthInches } from "@/components/hooks/useSeatingRebuild";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -124,10 +125,16 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   if (typeof setScreen === "function") {
     setScreen((prev) => ({
       ...prev,
-      // When a TV preset is saved, do not overwrite visibleWidthInches with the stale
-      // numeric screen_size value — the TV preset width map is the authority.
-      // For projector/manual projects (no tv_preset_key), always restore screen_size.
-      ...(!hasTvPreset ? { visibleWidthInches: screenSizeInches } : {}),
+      // For TV presets, derive visibleWidthInches from the canonical preset key/mm
+      // so live state stays coherent with persisted tv_preset_key/tv_width_mm.
+      // For projector/manual projects (no tv_preset_key), restore screen_size directly.
+      visibleWidthInches: hasTvPreset
+        ? resolveVisibleWidthInches({
+            tvPresetKey: p?.tv_preset_key ?? null,
+            tvWidthMm: Number(p?.tv_width_mm) || null,
+            visibleWidthInches: screenSizeInches,
+          })
+        : screenSizeInches,
       aspectRatio,
       manualMode: !!p?.manual_dimensions,
       manualWidthM: Number(p?.manual_width_m) || 0,
