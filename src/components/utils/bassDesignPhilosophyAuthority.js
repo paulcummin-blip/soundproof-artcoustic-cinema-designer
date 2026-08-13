@@ -94,63 +94,102 @@ function curveValueAt(curve, frequency) {
 // achieved extension and shortfall reported separately.
 export function assessP18AgainstRequiredExtension({
   rspPostEqCurve,
+  canonicalTargetCurve,
   perSeatPostEqCurves = [],
   selectedP14TargetDb,
   requiredExtensionHz,
   p18CutoffDb,
+  configuredUsableLfHz = null,
   upperLfeHz = 120,
 }) {
   if (!Array.isArray(rspPostEqCurve) || !rspPostEqCurve.length) return null;
+  if (!Array.isArray(canonicalTargetCurve) || !canonicalTargetCurve.length) return null;
   const targetDb = Number(selectedP14TargetDb);
   const requiredHz = Number(requiredExtensionHz);
-  const cutoffDb = Number.isFinite(Number(p18CutoffDb)) ? Number(p18CutoffDb) : (Number.isFinite(targetDb) ? targetDb - 3 : null);
-  if (!Number.isFinite(requiredHz) || !Number.isFinite(cutoffDb)) return null;
+  const absoluteCutoffDb = Number.isFinite(Number(p18CutoffDb)) ? Number(p18CutoffDb) : null;
+  const usableLfHz = Number.isFinite(Number(configuredUsableLfHz))
+    ? Number(configuredUsableLfHz)
+    : null;
+  if (!Number.isFinite(requiredHz)) return null;
 
-  const rspSmoothed = smoothedCurve(rspPostEqCurve).filter((point) => point.frequency <= upperLfeHz);
+  const targetSmoothed = smoothedCurve(canonicalTargetCurve)
+    .filter((point) => point.frequency <= upperLfeHz);
   const seatCurves = (Array.isArray(perSeatPostEqCurves) ? perSeatPostEqCurves : [])
     .filter((seat) => Array.isArray(seat?.responseData) && seat.responseData.length);
 
-  // Sustained extension: lowest frequency where the response reaches cutoffDb and stays above.
-  function sustainedExtension(curve) {
-    const points = smoothedCurve(curve).filter((point) => point.frequency <= upperLfeHz);
-    for (let index = 0; index < points.length; index += 1) {
-      if (points[index].spl < cutoffDb) continue;
-      if (points.slice(index).some((point) => point.spl < cutoffDb)) continue;
-      const previous = points[index - 1];
-      if (!previous || previous.spl >= cutoffDb) return points[index].frequency;
-      const ratio = (cutoffDb - previous.spl) / (points[index].spl - previous.spl);
-      return previous.frequency + (points[index].frequency - previous.frequency) * ratio;
+  // RP22 P18 is the in-room -3 dB extension at the selected P14 operating
+  // condition. P14 supplies the total-system SPL gate; P18 therefore measures
+  // the RSP shape relative to the selected house curve, not against the P14
+  // dBC number as though it were a per-frequency SPL threshold.
+  //
+  // Require one-third octave of support after the crossing so a narrow modal
+  // spike cannot create a false extension pass. Later modal dips belong to P19,
+  // while seat-to-seat variation belongs to P20.
+  function targetRelativeExtension(curve) {
+    const residual = smoothedCurve(curve)
+      .filter((point) => point.frequency <= upperLfeHz)
+      .map((point) => {
+        const targetSpl = curveValueAt(targetSmoothed, point.frequency);
+        return Number.isFinite(targetSpl)
+          ? { frequency: point.frequency, residualDb: point.spl - targetSpl }
+          : null;
+      })
+      .filter(Boolean);
+    const startIndex = usableLfHz == null
+      ? 0
+      : residual.findIndex((point) => point.frequency >= usableLfHz);
+    if (startIndex < 0) return null;
+
+    for (let index = startIndex; index < residual.length; index += 1) {
+      const point = residual[index];
+      if (point.residualDb < -3) continue;
+      const guardEndHz = Math.min(upperLfeHz, point.frequency * Math.pow(2, 1 / 3));
+      const guardPoints = residual.filter((candidate) =>
+        candidate.frequency >= point.frequency && candidate.frequency <= guardEndHz
+      );
+      if (!guardPoints.length || guardPoints.some((candidate) => candidate.residualDb < -3)) continue;
+
+      const previous = residual[index - 1];
+      let crossingHz = point.frequency;
+      if (previous && previous.residualDb < -3 && point.residualDb !== previous.residualDb) {
+        const ratio = (-3 - previous.residualDb) / (point.residualDb - previous.residualDb);
+        crossingHz = previous.frequency + (point.frequency - previous.frequency) * ratio;
+      }
+      return usableLfHz == null ? crossingHz : Math.max(usableLfHz, crossingHz);
     }
     return null;
   }
 
-  const rspExtensionHz = sustainedExtension(rspPostEqCurve);
+  const rspExtensionHz = targetRelativeExtension(rspPostEqCurve);
   const seatResults = seatCurves.map((seat) => ({
     seatId: seat.seatId,
-    extensionHz: sustainedExtension(seat.responseData),
+    extensionHz: targetRelativeExtension(seat.responseData),
   }));
   const validSeatExtensions = seatResults.map((seat) => seat.extensionHz).filter(isFiniteNumber);
   const worstSeatExtensionHz = validSeatExtensions.length ? Math.max(...validSeatExtensions) : null;
-  const achievedExtensionHz = [rspExtensionHz, worstSeatExtensionHz].filter(isFiniteNumber).length
-    ? Math.max(...[rspExtensionHz, worstSeatExtensionHz].filter(isFiniteNumber))
-    : null;
-
-  const passes = isFiniteNumber(achievedExtensionHz) && achievedExtensionHz <= requiredHz;
-  const shortfallHz = passes ? null : (isFiniteNumber(achievedExtensionHz) ? achievedExtensionHz - requiredHz : null);
   const worstSeatId = seatResults.filter((seat) => isFiniteNumber(seat.extensionHz))
     .sort((a, b) => b.extensionHz - a.extensionHz)[0]?.seatId ?? null;
+  const achievedExtensionHz = rspExtensionHz;
+  const passes = isFiniteNumber(achievedExtensionHz) && achievedExtensionHz <= requiredHz;
+  const shortfallHz = passes
+    ? null
+    : (isFiniteNumber(achievedExtensionHz) ? achievedExtensionHz - requiredHz : null);
 
   return {
-    selectedP14TargetDb: targetDb,
+    selectedP14TargetDb: Number.isFinite(targetDb) ? targetDb : null,
     requiredExtensionHz: requiredHz,
-    p18CutoffDb: cutoffDb,
+    p18CutoffDb: absoluteCutoffDb,
+    relativeCutoffDb: -3,
+    configuredUsableLfHz: usableLfHz,
     rspExtensionHz,
     worstSeatExtensionHz,
     worstSeatId,
+    seatResults,
+    seatConsistencyExcludedFromP18: true,
     achievedExtensionHz,
     passes,
     shortfallHz,
-    assessmentSource: "fixed-post-eq-against-required-extension",
+    assessmentSource: "canonical-target-relative-post-eq-rsp",
   };
 }
 
