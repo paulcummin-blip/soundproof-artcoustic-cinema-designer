@@ -401,7 +401,8 @@ export function generateCanonicalCandidatePool({
     warningMessage: `Missing mandatory optimiser input${missingInputs.length > 1 ? "s" : ""}: ${missingInputs.join(", ")}`,
   });
 
-  const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const nowMs = () => typeof performance !== "undefined" ? performance.now() : Date.now();
+  const startedAt = nowMs();
   const domains = resolveHouseCurveDomains(rawCurve.map((point) => point.frequency), correctionEndHz);
 
   // ── Fixed house target: P14-normalised global vertical offset ──
@@ -536,7 +537,9 @@ export function generateCanonicalCandidatePool({
     requestedSystemOutputDb: selectedOperatingOutputDb,
   });
   const eqResults = [];
+  const standardFitStartedAt = nowMs();
   const standardEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("standard"));
+  const standardFitTimeMs = nowMs() - standardFitStartedAt;
   eqResults.push(standardEq);
   completedTasks += 1;
   report("Canonical standard fit complete");
@@ -551,10 +554,13 @@ export function generateCanonicalCandidatePool({
       ? standardEq.bestSeedFilters
       : (standardEq.filters || []);
   const seed = seedSource.filter((filter) => filter?.enabled);
+  const accuracyFitStartedAt = nowMs();
   const accuracyEq = calculateDesignEqCurve(levelNormalisedRawCurve, usableLfHz, activeSubs, fitOptions("accuracy", seed));
+  const accuracyFitTimeMs = nowMs() - accuracyFitStartedAt;
   eqResults.push(accuracyEq);
   completedTasks += 1;
   report("Canonical accuracy fit complete");
+  const houseCurveFitStartedAt = nowMs();
   const houseEq = calculateHouseCurveEqCurve(levelNormalisedRawCurve, levelNormalisedSeats, usableLfHz, activeSubs, {
     ...fitOptions("house_curve", seed),
     assessmentStartHz: domains.p19StartHz,
@@ -565,6 +571,7 @@ export function generateCanonicalCandidatePool({
     correctionEndHz: domains.correctionEndHz,
     reuseExactEvaluations: reuseExactHouseCurveEvaluations,
   });
+  const houseCurveFitTimeMs = nowMs() - houseCurveFitStartedAt;
   eqResults.push(houseEq);
   completedTasks += 1;
   report("Canonical house-curve fit complete");
@@ -759,7 +766,7 @@ export function generateCanonicalCandidatePool({
   });
   const eqSelectableCount = selectablePool.filter((c) => c.designEqFitProfile !== "identity").length;
   const identityOnlyFallback = eqSelectableCount === 0 && selectablePool.length > 0;
-  const endedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const endedAt = nowMs();
   const poolId = `canonical:${buildCurveSignature(rawCurve)}:${activeSubs.length}:${seats.length}:${verticalOffsetDb.toFixed(4)}`;
   // Mark diagnosticsIncluded: true ONLY when collectDiagnostics was requested
   // AND the real production candidates actually carry acceptance diagnostic
@@ -804,6 +811,31 @@ export function generateCanonicalCandidatePool({
       totalOptimiserTimeMs: endedAt - startedAt,
       requestCount: 1,
       profileCount: totalTasks,
+      uniqueCoreFitCount: totalTasks,
+      standardFitCount: 1,
+      accuracyFitCount: 1,
+      houseCurveFitCount: 1,
+      coreFitTimeMs: standardFitTimeMs + accuracyFitTimeMs + houseCurveFitTimeMs,
+      selectedDiagnosticFitTimeMs: 0,
+      standardFitTimeMs,
+      accuracyFitTimeMs,
+      houseCurveFitTimeMs,
+      candidateAssemblyTimeMs: Math.max(0, endedAt - startedAt - standardFitTimeMs - accuracyFitTimeMs - houseCurveFitTimeMs),
+      selectedRevisionCandidateCount: eqResults.reduce((sum, eq) => sum + (eq?.revisionDiagnostics?.revisionAttemptCount || 0), 0),
+      completedBankEvaluationCount: eqResults.reduce((sum, eq) =>
+        sum + (eq?.bankDiagnostics?.completedBankEvaluationCount || 0), 0),
+      bankValidationRequests: houseEq?.operationCounts?.bankValidationRequests || 0,
+      uniqueBankValidations: houseEq?.operationCounts?.uniqueBankValidations || 0,
+      reusedBankValidations: houseEq?.operationCounts?.reusedBankValidations || 0,
+      filterResponseRequests: houseEq?.operationCounts?.filterResponseRequests || 0,
+      uniqueFilterResponses: houseEq?.operationCounts?.uniqueFilterResponses || 0,
+      metricGridPreparationRequests: houseEq?.operationCounts?.metricGridPreparationRequests || 0,
+      uniqueMetricGridPreparations: houseEq?.operationCounts?.uniqueMetricGridPreparations || 0,
+      curveEvaluationRequests: houseEq?.operationCounts?.curveEvaluationRequests || 0,
+      reusedCurveEvaluationRequests: houseEq?.operationCounts?.reusedCurveEvaluationRequests || 0,
+      perSeatMetricEvaluations: houseEq?.operationCounts?.perSeatMetricEvaluations || 0,
+      candidateBankValidationTimeMs: houseEq?.operationCounts?.candidateBankValidationTimeMs || 0,
+      perSeatEvaluationTimeMs: houseEq?.operationCounts?.perSeatEvaluationTimeMs || 0,
       candidateBankCount: candidates.length,
       seatCount: seats.length,
     },
