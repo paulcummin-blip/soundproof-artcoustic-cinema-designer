@@ -14,6 +14,12 @@ import {
 } from "@/components/utils/subwooferCapability";
 
 const POSITION_LABELS = ["left", "right"];
+const EMPTY_SIMULATION_RESULT = Object.freeze({
+  seatResponses: Object.freeze({}),
+  metrics: null,
+  audit: null,
+  runtimeVectorCapture: Object.freeze({ rows: Object.freeze([]) }),
+});
 const clampAbsorption = (value) => Math.max(0, Math.min(0.95, Number(value) || 0.30));
 
 export function buildAuthoritativeRspPosition(roomDims, mlpY_m, mlpX_m) {
@@ -210,10 +216,76 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride: strategy,
     });
   }, [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy, analysisBlocked]);
-  const simulationResults = useMemo(() => {
-    if (analysisBlocked) return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] } };
-    return runSimulation(qStrategy);
-  }, [runSimulation, qStrategy, analysisBlocked]);
+  const simulationRequest = useMemo(() => ({
+    roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride: qStrategy,
+  }), [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy]);
+  const simulationGenerationRef = useRef(0);
+  const [simulationState, setSimulationState] = useState({
+    request: null,
+    status: "idle",
+    result: null,
+    error: null,
+  });
+  useEffect(() => {
+    const generation = simulationGenerationRef.current + 1;
+    simulationGenerationRef.current = generation;
+
+    if (analysisBlocked) {
+      setSimulationState({ request: simulationRequest, status: "blocked", result: null, error: null });
+      return undefined;
+    }
+
+    setSimulationState({ request: simulationRequest, status: "calculating", result: null, error: null });
+    let cancelled = false;
+    const finish = (nextState) => {
+      if (!cancelled && simulationGenerationRef.current === generation) {
+        setSimulationState({ request: simulationRequest, ...nextState });
+      }
+    };
+
+    if (typeof Worker === "undefined") {
+      const timer = setTimeout(() => {
+        try {
+          finish({ status: "complete", result: runSimulation(qStrategy), error: null });
+        } catch (error) {
+          finish({ status: "error", result: null, error: error?.message || String(error) });
+        }
+      }, 0);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }
+
+    const worker = new Worker(
+      new URL("./authoritativeBassResponse.worker.js", import.meta.url),
+      { type: "module" },
+    );
+    worker.onmessage = (event) => {
+      const message = event.data || {};
+      if (message.generation !== generation) return;
+      if (message.type === "complete") {
+        finish({ status: "complete", result: message.result, error: null });
+      } else {
+        finish({ status: "error", result: null, error: message.error || "Authoritative bass simulation failed" });
+      }
+      worker.terminate();
+    };
+    worker.onerror = (event) => {
+      finish({ status: "error", result: null, error: event?.message || "Authoritative bass worker failed" });
+      worker.terminate();
+    };
+    worker.postMessage({ generation, payload: simulationRequest });
+
+    return () => {
+      cancelled = true;
+      worker.terminate();
+    };
+  }, [analysisBlocked, simulationRequest, runSimulation, qStrategy]);
+  const simulationReady = simulationState.request === simulationRequest
+    && simulationState.status === "complete"
+    && !!simulationState.result;
+  const simulationResults = simulationReady ? simulationState.result : EMPTY_SIMULATION_RESULT;
   const { rspRawCurve, perSeatRawCurves } = useMemo(() => {
     if (!simulationResults) return { rspRawCurve: [], perSeatRawCurves: [] };
     return buildAuthoritativeResponseCurves(simulationResults.seatResponses);
@@ -274,10 +346,16 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const inputsValid = !!rspPosition && seatingPositions.length > 0 && rspRawCurve.length > 0 && sources.length > 0 && [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
   const blockedReason = analysisBlocked
     ? (instanceStatus === INSTANCE_STATUS.ERROR ? "subwoofer_instance_error" : "subwoofer_instances_uninitialised")
-    : null;
+    : simulationState.request === simulationRequest && simulationState.status === "error"
+      ? simulationState.error || "authoritative_simulation_error"
+      : null;
+  const responseStatus = analysisBlocked
+    ? "blocked"
+    : blockedReason ? "error"
+      : simulationReady ? "ready" : "calculating";
 
   return {
-    status: analysisBlocked ? "blocked" : "ready",
+    status: responseStatus,
     reason: blockedReason,
     exportable: !analysisBlocked && inputsValid,
     roomDims, seatingPositions, splConfig, rspPosition, sources, subsForSimulation: sources, simulationResults,
