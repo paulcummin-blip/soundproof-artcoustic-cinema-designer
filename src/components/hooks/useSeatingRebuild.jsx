@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { buildRowCenters, distanceFor57_5FromWidth } from "@/components/room/seatingUtils";
+import { resolveSeatPriority, enforceRspPriority } from "@/components/utils/seatPriorityAuthority";
 
 const TV_KEY_TO_INCHES = {
   tv65: 55.55,
@@ -37,6 +38,7 @@ const seatsEqualWithin1mm = (prev = [], next = []) => {
     if (Boolean(a?.isPrimary) !== Boolean(b?.isPrimary)) return false;
     if (Boolean(a?.isSecondary) !== Boolean(b?.isSecondary)) return false;
     if (Math.abs(Number(a?.platformHeightM ?? 0) - Number(b?.platformHeightM ?? 0)) > EQ_EPS) return false;
+    if (resolveSeatPriority(a) !== resolveSeatPriority(b)) return false;
   }
   return true;
 };
@@ -178,6 +180,7 @@ export function useSeatingRebuild({
             z: getRowZ(rowIndex),
             rowNumber: rowIndex + 1,
             platformHeightM: Number.isFinite(scratchPrev?.platformHeightM) ? scratchPrev.platformHeightM : defaultPlatformH,
+            priority: resolveSeatPriority(scratchPrev),
           });
         }
       });
@@ -463,12 +466,14 @@ export function useSeatingRebuild({
           isPrimary: prev?.isPrimary || false,
           isSecondary: prev?.isSecondary || false,
           platformHeightM: Number.isFinite(prev?.platformHeightM) ? prev.platformHeightM : defaultPlatformH,
+          priority: resolveSeatPriority(prev),
         });
       }
     });
 
-    // 5) Commit to app state
-    setSeats((prev) => (seatsEqualWithin1mm(prev, seats) ? prev : seats));
+    // 5) Commit to app state — enforce RSP priority on the rebuilt seats.
+    const finalSeats = enforceRspPriority(seats);
+    setSeats((prev) => (seatsEqualWithin1mm(prev, finalSeats) ? prev : finalSeats));
 
     // Update seatingBlockOffset ref so next render can detect further changes
     prevSeatingBlockOffsetRef.current = liveRow1AbsoluteY;

@@ -14,6 +14,7 @@ import ViewingPriorityControl from './ViewingPriorityControl';
 import { useAppState } from '@/components/AppStateProvider';
 import { cancelMlpGrab } from '@/components/state/mlpGrabStore';
 import { normaliseSeatCount, stepSeatCount } from './seatCount';
+import SeatPrioritySelector from './SeatPrioritySelector';
 
 // Single source of truth for target MLP Y computation - now using WIDTH for horizontal FOV
 const RAD = Math.PI / 180;
@@ -563,6 +564,15 @@ export default function SeatingLayout({
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Seat Priority (Primary / Secondary classification) */}
+      <div className="space-y-2 col-span-2">
+        <SeatPrioritySelector
+          seatingPositions={seatingPositions}
+          onSetSeatingPositions={onSetSeatingPositions}
+          disabled={disabled}
+        />
       </div>
 
       {/* Seat Spacing (m) */}
