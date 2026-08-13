@@ -14,8 +14,6 @@ import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOper
 import { buildPostEqBassCapabilityOutcome } from "@/components/utils/postEqBassCapabilityOutcome";
 import { assessP18AgainstRequiredExtension, requiredP14ExtensionHz, buildBassTargetWarning } from "@/components/utils/bassDesignPhilosophyAuthority";
 
-const numericLevel = (label) => Number(String(label || "").replace("L", "")) || 0;
-
 function buildPositionAwareP14Capability({
   canonicalResult,
   productDiagnostic,
