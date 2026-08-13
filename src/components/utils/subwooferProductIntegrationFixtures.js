@@ -35,6 +35,16 @@ export function runSubwooferProductIntegrationFixtures() {
   checks.push(check("SUB4-12 exceeds SUB2-12 at 20 Hz", "> 6 dB", at(sub4, 20) - at(sub2, 20), at(sub4, 20) - at(sub2, 20) > 6));
   checks.push(check("SUB4-12 extends below SUB2-12", "lower first frequency", `${sub4[0]?.frequency} vs ${sub2[0]?.frequency}`, sub4[0]?.frequency < sub2[0]?.frequency));
 
+  const oneSub2Amp = getPerSubwooferAmplifierAuthority(subs("sub2-12", 1));
+  const fourSub2Amp = getPerSubwooferAmplifierAuthority(subs("sub2-12", 4));
+  const fourSub4Amp = getPerSubwooferAmplifierAuthority(subs("sub4-12", 4));
+  checks.push(check("Each subwoofer receives its own 1000 W amplifier", "4000 W for four subs", fourSub2Amp.totalAvailablePowerW, fourSub2Amp.totalAvailablePowerW === 4000));
+  checks.push(check("SUB2-12 remains product-limited below 1000 W", "0 dB amplifier derating", oneSub2Amp.sourceAuthorities[0]?.deratingDb, oneSub2Amp.sourceAuthorities[0]?.deratingDb === 0));
+  checks.push(check("Each SUB4-12 is individually limited by its 1000 W amplifier", "-1.46 dB per cabinet", fourSub4Amp.sourceAuthorities.map((source) => source.deratingDb), fourSub4Amp.sourceAuthorities.every((source) => Math.abs(source.deratingDb + 1.46128) < 0.001)));
+  const oneSub4At50 = getSystemSourceCapability(subs("sub4-12", 1), 50);
+  const fourSub4At50 = getSystemSourceCapability(subs("sub4-12", 4), 50);
+  checks.push(check("Four co-located SUB4-12 retain coherent quantity gain", "+12.04 dB", fourSub4At50 - oneSub4At50, Math.abs((fourSub4At50 - oneSub4At50) - 20 * Math.log10(4)) < 0.001));
+
   const oneSub2 = authority("sub2-12", 1);
   const twoSub2 = authority("sub2-12", 2);
   const fourSub2 = authority("sub2-12", 4);
