@@ -14,6 +14,17 @@ import React from "react";
 
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
+function renderSentenceWithBoldLevels(sentence) {
+  return String(sentence)
+    .split(/(Below Level 1|Level [1-4])/g)
+    .filter(Boolean)
+    .map((part, index) =>
+      /^(?:Below Level 1|Level [1-4])$/.test(part)
+        ? <strong key={index} style={{ fontWeight: 700, color: "#1B1A1A" }}>{part}</strong>
+        : <React.Fragment key={index}>{part}</React.Fragment>
+    );
+}
+
 export default function Rp22SeatCoverageSentence({
   sentence,
   variant = "screen",
@@ -21,35 +32,43 @@ export default function Rp22SeatCoverageSentence({
   if (!sentence) return null;
 
   const style =
-    variant === "print"
+    variant === "cover"
       ? {
-          fontSize: "9pt",
+          fontSize: "10.5pt",
           color: "#3E4349",
           fontFamily: FONT_BODY,
-          lineHeight: 1.5,
-          marginTop: "3mm",
-          marginBottom: "4mm",
-          padding: "2.5mm 3.5mm",
-          background: "#F8F8F7",
-          borderRadius: "1.5mm",
-          border: "0.5pt solid #E6E4DD",
+          lineHeight: 1.75,
+          marginTop: "5mm",
         }
-      : {
-          fontSize: 13,
-          color: "#3E4349",
-          fontFamily: FONT_BODY,
-          lineHeight: 1.5,
-          marginTop: 12,
-          marginBottom: 4,
-          padding: "10px 14px",
-          background: "#F8F8F7",
-          borderRadius: 8,
-          border: "1px solid #E6E4DD",
-        };
+      : variant === "print"
+        ? {
+            fontSize: "9pt",
+            color: "#3E4349",
+            fontFamily: FONT_BODY,
+            lineHeight: 1.5,
+            marginTop: "3mm",
+            marginBottom: "4mm",
+            padding: "2.5mm 3.5mm",
+            background: "#F8F8F7",
+            borderRadius: "1.5mm",
+            border: "0.5pt solid #E6E4DD",
+          }
+        : {
+            fontSize: 13,
+            color: "#3E4349",
+            fontFamily: FONT_BODY,
+            lineHeight: 1.5,
+            marginTop: 12,
+            marginBottom: 4,
+            padding: "10px 14px",
+            background: "#F8F8F7",
+            borderRadius: 8,
+            border: "1px solid #E6E4DD",
+          };
 
   return (
     <div style={style} className="rp22-seat-coverage-sentence">
-      {sentence}
+      {renderSentenceWithBoldLevels(sentence)}
     </div>
   );
 }
