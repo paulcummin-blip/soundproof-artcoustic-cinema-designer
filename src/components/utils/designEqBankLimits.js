@@ -122,11 +122,27 @@ export function aggregateResponseDbAt(frequency, filters) {
   return filters.reduce((sum, filter) => sum + peakingEqResponseDb(frequency, filter), 0);
 }
 
-export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
+export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile, evaluationContext = null) {
   bankEvaluationCounter += 1;
   const maximumAggregateBoostDb = (profile?.maximumAggregateBoostDb ?? 6) + 0.05;
   const aggregateCutFloorDb = -((profile?.maximumCutDb ?? 15) + 0.05);
-  const bandPoints = raw.filter((point) => point.frequency >= 20 && point.frequency <= 200);
+  const prepared = evaluationContext?.raw === raw ? evaluationContext : null;
+  const resultKey = prepared
+    ? [maximumAggregateBoostDb, aggregateCutFloorDb, bankSignature(filters)].join("::")
+    : null;
+  if (prepared) {
+    prepared.stats.bankRequests += 1;
+    const cached = prepared.bankLimitResults.get(resultKey);
+    if (cached) {
+      prepared.stats.reusedBankEvaluations += 1;
+      return cached;
+    }
+  }
+
+  const bandPoints = prepared
+    ? prepared.bandIndices.map(({ point }) => point)
+    : raw.filter((point) => point.frequency >= 20 && point.frequency <= 200);
+  const preparedResponses = prepared ? filters.map((filter) => responseForFilter(prepared, filter)) : null;
   let maxAggregateBoostDb = 0;
   let maxAggregateBoostHz = null;
   let maxAggregateCutDb = 0;
@@ -136,17 +152,25 @@ export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLf
   let cutLimitOk = true;
   let sourceDomainHeadroomOk = true;
 
-  for (const point of bandPoints) {
-    const aggregateDb = aggregateResponseDbAt(point.frequency, filters);
-    const allowance = getSourceDomainBoostAllowance({
-      frequency: point.frequency,
-      requestedBoostDb: 6,
-      activeSubs,
-      usableLfHz,
-      maxBoostDb: 6,
-      requestedSystemOutputDb,
-    });
-    const permittedBoostDb = Math.max(0, Math.min(6, allowance.allowedBoostDb));
+  for (let pointIndex = 0; pointIndex < bandPoints.length; pointIndex += 1) {
+    const point = bandPoints[pointIndex];
+    let aggregateDb = 0;
+    if (prepared) {
+      const rawIndex = prepared.bandIndices[pointIndex].index;
+      for (const response of preparedResponses) aggregateDb += response[rawIndex];
+    } else {
+      aggregateDb = aggregateResponseDbAt(point.frequency, filters);
+    }
+    const permittedBoostDb = prepared
+      ? prepared.permittedBoostDb[pointIndex]
+      : Math.max(0, Math.min(6, getSourceDomainBoostAllowance({
+          frequency: point.frequency,
+          requestedBoostDb: 6,
+          activeSubs,
+          usableLfHz,
+          maxBoostDb: 6,
+          requestedSystemOutputDb,
+        }).allowedBoostDb));
     limitingPermittedBoostDb = Math.min(limitingPermittedBoostDb, permittedBoostDb);
     if (aggregateDb > maxAggregateBoostDb) {
       maxAggregateBoostDb = aggregateDb;
@@ -160,7 +184,7 @@ export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLf
     if (aggregateDb > permittedBoostDb + 0.05) sourceDomainHeadroomOk = false;
     if (aggregateDb < aggregateCutFloorDb) cutLimitOk = false;
   }
-  return {
+  const result = {
     maxAggregateBoostDb,
     maxAggregateBoostHz,
     maxAggregateCutDb,
@@ -174,6 +198,11 @@ export function evaluateProvisionalBankLimits(filters, raw, activeSubs, usableLf
     // but overlapping filters can still exceed the allowance between centres.
     allOk: boostLimitOk && cutLimitOk && sourceDomainHeadroomOk,
   };
+  if (prepared) {
+    prepared.bankLimitResults.set(resultKey, result);
+    prepared.stats.uniqueBankEvaluations += 1;
+  }
+  return result;
 }
 
 export function scaleCandidateForBankLimits(candidate, existingFilters, raw, activeSubs, usableLfHz, requestedSystemOutputDb, profile) {
