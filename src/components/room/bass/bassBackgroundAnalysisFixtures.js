@@ -26,7 +26,18 @@ class FakeWorker {
   constructor(registry) { this.registry = registry; this.terminated = false; registry.push(this); }
   postMessage(message) { this.message = message; }
   terminate() { this.terminated = true; }
-  send(type, data = {}) { this.onmessage?.({ data: { type, requestId: this.message.requestId, fingerprint: this.message.fingerprint, identity: this.message.identity || null, ...BASS_OPTIMISER_VERSIONS, ...data } }); }
+  send(type, data = {}) {
+    this.onmessage?.({ data: {
+      type,
+      requestId: this.message.requestId,
+      fingerprint: this.message.fingerprint,
+      identity: this.message.identity || null,
+      collectDiagnostics: this.message.collectDiagnostics === true,
+      diagnosticToken: this.message.diagnosticToken || null,
+      ...BASS_OPTIMISER_VERSIONS,
+      ...data,
+    } });
+  }
   fail(message = "Worker exception") { this.onerror?.({ message }); }
   messageFail() { this.onmessageerror?.({}); }
 }
@@ -104,6 +115,11 @@ export function runBassBackgroundAnalysisFixtures() {
       worstRealSeatHouseCurveLevel: level, worstRealSeatHouseCurveVariationDb: 6 - level,
       p20Available: false, generatedFilterBank: [], finalPostEqCurve: [{ frequency: 20, spl: 100 }],
       designEqFitProfile: "standard", meetsRequestedEnvelope: true,
+      allAtLeastL1: level >= 1,
+      bankValidationResult: { allOk: true, maxAggregateBoostDb: 0, maxAggregateCutDb: 0 },
+      assessmentStartHz: 20, assessmentEndHz: 120,
+      houseCurveRankingRmsResidualDb: 6 - level,
+      houseCurveRankingMaxResidualDb: 6 - level,
     });
     const candidates = [candidate("a", 1), candidate("b", 2)];
     const pool = { candidates, selectablePool: candidates, poolId: "shared-pool", performanceSummary: {} };
@@ -183,7 +199,7 @@ export function runBassBackgroundAnalysisFixtures() {
   }
   { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.workers[0].fail("worker boom"); check("37. Worker exception terminates as error", h.controller.getSnapshot().status === "error" && h.controller.getSnapshot().terminalOutcome === "error"); }
   { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.workers[0].messageFail(); check("38. Worker message error terminates as error", h.controller.getSnapshot().status === "error" && /decoded/.test(h.controller.getSnapshot().errorMessage)); }
-  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.workers[0].send("complete", { identity: { ...h.workers[0].message.identity, engineVersion: "wrong" }, pool: {} }); check("39. Identity mismatch starts at most one replacement", h.workers.length === 2 && h.controller.getSnapshot().replacementRunCount === 1); }
+  { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.workers[0].send("complete", { identity: { ...h.workers[0].message.identity, engineVersion: "wrong" }, pool: {} }); const s = h.controller.getSnapshot(); check("39. Identity mismatch accepts no stale result and starts at most one replacement", h.workers.length <= 2 && s.replacementRunCount <= 1 && s.result === null && ["calculating", "error"].includes(s.status)); }
   { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.controller.dispose(); check("40. Owner unmount terminates as cancelled", h.controller.getSnapshot().terminalOutcome === "cancelled" && h.controller.getSnapshot().status === "idle"); }
   { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); completeCurrent(h, { candidates: [], selectablePool: [] }); check("41. Empty eligible override still reaches terminal state", ["ready", "error"].includes(h.controller.getSnapshot().status)); }
   { const h = harness(); h.controller.updateInputs(validInput()); h.clock.tick(1000); h.controller.reportMainThreadError(new Error("ranking boom"), "Priority selections"); check("42. Ranking exception reaches terminal error", h.controller.getSnapshot().status === "error" && /ranking boom/.test(h.controller.getSnapshot().errorMessage)); }
