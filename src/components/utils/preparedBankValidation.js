@@ -12,7 +12,15 @@ export function prepareBankValidation(raw, activeSubs, usableLfHz, requestedSyst
   const permittedBoostDb = frequencies.map((frequency) => getSourceDomainBoostAllowance({
     frequency, requestedBoostDb: 6, activeSubs, usableLfHz, maxBoostDb: 6, requestedSystemOutputDb,
   }).allowedBoostDb);
-  return { frequencies, permittedBoostDb, filterResponses: new Map() };
+  return {
+    frequencies,
+    permittedBoostDb,
+    filterResponses: new Map(),
+    // Stage B.5: exact high-level validation results are immutable for this
+    // prepared context (same raw grid, products, output target and limits).
+    // Reuse them when another residual region proposes the identical bank.
+    trialValidationResults: new Map(),
+  };
 }
 
 function responseForFilter(context, filter, operationCounts) {
