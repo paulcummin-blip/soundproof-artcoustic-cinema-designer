@@ -172,13 +172,27 @@ export function isProtectedFrequency(frequency, regions) {
   return (regions || []).some((region) => frequency >= region.startHz && frequency <= region.endHz);
 }
 
+// Correctable-error scoring uses a one-third-octave smoothed response. A protected
+// knife-edge cancellation influences that smoothed curve for half the smoothing
+// width beyond each raw protection edge. Exclude those skirts from optimiser and
+// diagnostic "correctable" scores without widening the physical no-boost region.
+export const PROTECTED_NULL_SCORING_SMOOTHING_OCTAVES = 1 / 3;
+export function isProtectedSmoothedFrequency(frequency, regions, smoothingWidthOctaves = PROTECTED_NULL_SCORING_SMOOTHING_OCTAVES) {
+  const halfWidthOctaves = Math.max(0, Number(smoothingWidthOctaves) || 0) / 2;
+  const edgeScale = 2 ** halfWidthOctaves;
+  return (regions || []).some((region) => (
+    frequency >= region.startHz / edgeScale
+    && frequency <= region.endHz * edgeScale
+  ));
+}
+
 const NEAR_TARGET_INFLUENCE_THRESHOLD_DB = 0.25;
 
 export function evaluateNearTargetProtection(baselinePoints, candidatePoints, maximumResidualImprovementDb, protectedNullRegions = []) {
   const candidateByFrequency = new Map((candidatePoints || []).map((point) => [point.frequency, point]));
   const violations = [];
   for (const before of baselinePoints || []) {
-    if (isProtectedFrequency(before.frequency, protectedNullRegions) || Math.abs(before.deviationDb) > 1) continue;
+    if (isProtectedSmoothedFrequency(before.frequency, protectedNullRegions) || Math.abs(before.deviationDb) > 1) continue;
     const after = candidateByFrequency.get(before.frequency);
     if (!after) continue;
     // Only evaluate frequencies materially influenced by this candidate.
