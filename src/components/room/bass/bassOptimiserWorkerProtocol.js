@@ -1,7 +1,7 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
-export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v16-position-aware-output-envelope-target-constrained-eq";
-export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v20-physical-raw-and-capability-limited-achieved";
-export const BASS_RESULT_SCHEMA_VERSION = 15;
+export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v17-achieved-response-physical-authority";
+export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v21-achieved-curve-authority";
+export const BASS_RESULT_SCHEMA_VERSION = 16;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 
 export const BASS_OPTIMISER_VERSIONS = Object.freeze({
