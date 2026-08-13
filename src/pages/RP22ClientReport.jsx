@@ -42,6 +42,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import { useAppState } from "@/components/AppStateProvider";
 import { buildRp22SeatCoverageSentence } from "@/components/utils/rp22SeatCoverageSentence";
+import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -88,19 +89,29 @@ export default function RP22ClientReport() {
   // ── RP22 seating-coverage summary sentence (shared helper) ──
   // Visual Report intentionally excludes RP22 parameters from its pages, so
   // allParametersReportable is always false → "currently assessed" wording.
-  // The sentence reuses the canonical per-seat RP22 results + primary-seat
-  // designation from the shared analysisResult — no recalculation.
+  // The sentence reuses canonical per-seat RP22 results plus the user's
+  // independent Primary / Secondary classification — no recalculation.
   const realSeatIds = useMemo(
     () => (Array.isArray(seatingPositions) ? seatingPositions.map((s) => s.id).filter(Boolean) : []),
+    [seatingPositions]
+  );
+  const primarySeatIds = useMemo(
+    () => (Array.isArray(seatingPositions)
+      ? seatingPositions
+          .filter((seat) => resolveSeatPriority(seat) === "primary")
+          .map((seat) => seat.id)
+          .filter(Boolean)
+      : []),
     [seatingPositions]
   );
   const coverageSentence = useMemo(
     () => buildRp22SeatCoverageSentence({
       analysisResult,
       realSeatIds,
+      primarySeatIds,
       allParametersReportable: false,
     }),
-    [analysisResult, realSeatIds]
+    [analysisResult, realSeatIds, primarySeatIds]
   );
 
   // ── Published recommendations (from Room Designer ASDR engine) ──
