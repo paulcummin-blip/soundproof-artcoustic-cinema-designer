@@ -41,11 +41,20 @@ function buildTarget(parameters, basis, selectedCandidate) {
     p20Available: targetParameters.p20.status !== "not_applicable" && Number.isFinite(targetParameters.p20.level),
     worstP20SeatId: selectedCandidate?.worstP20SeatId ?? null,
   });
+  const limitingParameter = postEqCapability?.limitingParameter || "P14";
+  const limitingParameterKey = limitingParameter.toLowerCase();
+  const limitingLevel = postEqCapability?.parameterLevels?.[limitingParameter];
+  const shortfallSuffix = limitingParameter === "P14" && Number.isFinite(postEqCapability?.splShortfallDb)
+    ? ` ${postEqCapability.splShortfallDb.toFixed(1)} dB shortfall`
+    : "";
+  const limitingFrequencySuffix = Number.isFinite(postEqCapability?.limitingFrequencyHz)
+    ? ` at ${postEqCapability.limitingFrequencyHz.toFixed(1)} Hz.`
+    : "";
   const recommendation = postEqCapability?.limitation ? {
-    parameterKey: "p14",
-    parameterName: "Bass output capability",
-    achievedLevel: postEqCapability.achievedP14LevelLabel,
-    reason: `${postEqCapability.failureMessage || postEqCapability.limitation}${Number.isFinite(postEqCapability.splShortfallDb) ? ` ${postEqCapability.splShortfallDb.toFixed(1)} dB shortfall` : ""}${Number.isFinite(postEqCapability.limitingFrequencyHz) ? ` at ${postEqCapability.limitingFrequencyHz.toFixed(1)} Hz.` : ""}`,
+    parameterKey: limitingParameterKey,
+    parameterName: limitingParameter === "P18" ? "Bass extension at selected output" : "Bass output capability",
+    achievedLevel: Number.isFinite(limitingLevel) && limitingLevel > 0 ? `L${limitingLevel}` : "FAIL",
+    reason: `${postEqCapability.failureMessage || postEqCapability.limitation}${shortfallSuffix}${limitingFrequencySuffix}`,
     recommendedImprovement: postEqCapability.recommendation,
   } : genericRecommendation;
   return { ...targetParameters, achievedLevel: achievedLevel(targetParameters), designRecommendation: recommendation };
