@@ -1,7 +1,7 @@
 export const BASS_OPTIMISER_PROTOCOL_VERSION = "bass-optimiser-protocol-v1";
-export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v19-shared-amplifier-and-width-aware-null-authority";
+export const BASS_OPTIMISER_POOL_VERSION = "bass-optimiser-pool-v20-per-sub-amplifier-and-width-aware-null-authority";
 export const HOUSE_CURVE_ENGINE_VERSION = "house-curve-shape-fit-v23-arc-constrained-recovery";
-export const BASS_RESULT_SCHEMA_VERSION = 18;
+export const BASS_RESULT_SCHEMA_VERSION = 19;
 export const BASS_OPTIMISER_POOL_PROPERTY = "pool";
 
 export const BASS_OPTIMISER_VERSIONS = Object.freeze({
