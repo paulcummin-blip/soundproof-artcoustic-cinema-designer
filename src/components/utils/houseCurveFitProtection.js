@@ -60,25 +60,26 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
       isLocalMinimum,
     };
   });
+  // Classify each local minimum against its own fixed broad-shoulder reference.
+  // Using every neighbouring point's independently moving shoulder reference
+  // can make a knife-edge cancellation appear artificially wide when it sits
+  // beside a modal peak. A fixed reference measures the actual notch width.
   const regions = [];
-  let current = [];
-  const finish = () => {
-    if (!current.length) return;
-    const localMinima = current.filter((point) => point.isLocalMinimum && point.nullDepthDb <= nullThresholdDb);
-    if (!localMinima.length) {
-      current = [];
-      return;
-    }
-    const worst = localMinima.reduce((a, b) => b.nullDepthDb < a.nullDepthDb ? b : a);
-    let startIndex = localized.indexOf(current[0]);
-    let endIndex = localized.indexOf(current.at(-1));
-    while (startIndex > 0 && localized[startIndex - 1].nullDepthDb <= boundaryThresholdDb) startIndex--;
-    while (endIndex < localized.length - 1 && localized[endIndex + 1].nullDepthDb <= boundaryThresholdDb) endIndex++;
+  const localMinima = localized
+    .filter((point) => point.isLocalMinimum
+      && point.nullDepthDb <= nullThresholdDb
+      && Number.isFinite(point.shoulderReferenceSplDb))
+    .sort((a, b) => a.nullDepthDb - b.nullDepthDb);
+
+  for (const worst of localMinima) {
+    let startIndex = worst.assessmentIndex;
+    let endIndex = worst.assessmentIndex;
+    const depthFromFixedShoulders = (point) => point.spl - worst.shoulderReferenceSplDb;
+    while (startIndex > 0 && depthFromFixedShoulders(localized[startIndex - 1]) <= boundaryThresholdDb) startIndex--;
+    while (endIndex < localized.length - 1 && depthFromFixedShoulders(localized[endIndex + 1]) <= boundaryThresholdDb) endIndex++;
+
     const startHz = localized[startIndex].frequency;
     const endHz = localized[endIndex].frequency;
-    const requiredBoostDb = Math.max(0, -worst.residualDb);
-    const permittedBoostDb = 6;
-    const capabilityLimited = false;
     const widthHz = endHz - startHz;
     const widthOctaves = octaveWidth(startHz, endHz);
     const narrowCancellation = widthHz <= MAX_PROTECTED_NULL_WIDTH_HZ + 1e-9;
@@ -86,9 +87,14 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
       // Broad valleys remain eligible for a partial, capability-limited boost.
       // The +6 dB bank ceiling and product/amplifier headroom decide how much
       // can actually be recovered.
-      current = [];
-      return;
+      continue;
     }
+    // Multiple sampled minima inside one notch describe the same cancellation.
+    if (regions.some((region) => startHz <= region.endHz && endHz >= region.startHz)) continue;
+
+    const requiredBoostDb = Math.max(0, -worst.residualDb);
+    const permittedBoostDb = 6;
+    const capabilityLimited = requiredBoostDb > permittedBoostDb + 1e-9;
     const protectionPaddingHz = Math.max(0.25, Math.min(1, widthHz * 0.1));
     const reason = `Narrow cancellation null (≤ ${MAX_PROTECTED_NULL_WIDTH_HZ} Hz) at least 10 dB below neighbouring broad response`;
     regions.push({
@@ -119,13 +125,8 @@ export function identifyProtectedNullRegions(curve, assessmentStartHz, assessmen
       narrowCancellation, maximumProtectedWidthHz: MAX_PROTECTED_NULL_WIDTH_HZ, capabilityLimited,
       rejectionReason: reason, reason,
     });
-    current = [];
-  };
-  for (const point of localized) {
-    if (point.nullDepthDb <= nullThresholdDb) current.push(point); else finish();
   }
-  finish();
-  return regions;
+  return regions.sort((a, b) => a.startHz - b.startHz);
 }
 
 export function runProtectedNullClassificationValidation() {
