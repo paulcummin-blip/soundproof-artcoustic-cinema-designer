@@ -11,26 +11,23 @@
  * symmetry even when row seat counts differ.
  *
  * Interaction:
- *   - Click a non-RSP seat to toggle Primary <-> Secondary (immediate, no
- *     modal).
- *   - The RSP seat (isPrimary === true) is shown as Primary and cannot be
- *     toggled to Secondary.
+ *   - Click any seat to toggle Primary <-> Secondary (immediate, no modal).
+ *   - Priority is independent of the internal RSP / isPrimary calculation.
  *
  * Visual design is deliberately simple and monochrome. No RP22 Level
  * colours, SPL, pass/fail, or compliance results are shown here.
  */
 
 import React, { useMemo } from "react";
-import { toggleSeatPriority, resolveSeatPriority, isRspSeat } from "@/components/utils/seatPriorityAuthority";
+import { toggleSeatPriority, resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 
 const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
 
-// Compact seat label derived from the canonical seat id ("seat-r1-c1").
-// Reuses the existing Row/Seat identity; no competing numbering convention.
+// The surrounding row label already identifies the row, so each button only
+// needs its seat number within that row.
 function compactSeatLabel(seat, indexInRow) {
-  const row = seat?.rowNumber ?? 1;
   const col = Number.isFinite(indexInRow) ? indexInRow + 1 : 1;
-  return `R${row}S${col}`;
+  return `S${col}`;
 }
 
 export default function SeatPrioritySelector({
@@ -104,8 +101,8 @@ export default function SeatPrioritySelector({
       </div>
 
       <p className="text-[11px] leading-snug" style={{ color: "#625143", fontFamily: BODY_FONT }}>
-        Tap a seat to toggle Primary / Secondary. Secondary seats stay fully
-        included in every calculation. The RSP is always Primary.
+        Tap any seat to toggle Primary / Secondary. Secondary seats stay fully
+        included in every calculation.
       </p>
 
       <div className="space-y-2 p-3 rounded-lg" style={{ border: "1px solid #C1B6AD", background: "#F8F8F7" }}>
@@ -120,7 +117,6 @@ export default function SeatPrioritySelector({
             <div className="flex-1 flex justify-center">
               <div className="flex items-center gap-1.5">
                 {seats.map((seat, idxInRow) => {
-                  const rsp = isRspSeat(seat);
                   const isSecondary = resolveSeatPriority(seat) === "secondary";
                   const label = compactSeatLabel(seat, idxInRow);
 
@@ -134,22 +130,13 @@ export default function SeatPrioritySelector({
                     fontSize: 10,
                     fontWeight: 600,
                     fontFamily: BODY_FONT,
-                    cursor: rsp || disabled ? "default" : "pointer",
+                    cursor: disabled ? "default" : "pointer",
                     transition: "background-color 120ms ease, border-color 120ms ease, color 120ms ease",
                     userSelect: "none",
                   };
 
                   let style;
-                  if (rsp) {
-                    // RSP: solid dark with a subtle ring to distinguish it.
-                    style = {
-                      ...baseStyle,
-                      background: "#1B1A1A",
-                      color: "#FFFFFF",
-                      border: "1px solid #1B1A1A",
-                      boxShadow: "0 0 0 2px #213428",
-                    };
-                  } else if (isSecondary) {
+                  if (isSecondary) {
                     style = {
                       ...baseStyle,
                       background: "#EDECE8",
@@ -166,11 +153,9 @@ export default function SeatPrioritySelector({
                     };
                   }
 
-                  const tooltip = rsp
-                    ? `Primary seat · RSP (${label})`
-                    : isSecondary
-                      ? `Secondary seat (${label}) — click to make Primary`
-                      : `Primary seat (${label}) — click to make Secondary`;
+                  const tooltip = isSecondary
+                    ? `Secondary seat (${label}) — click to make Primary`
+                    : `Primary seat (${label}) — click to make Secondary`;
 
                   return (
                     <button
@@ -178,15 +163,14 @@ export default function SeatPrioritySelector({
                       key={seat?.id || label}
                       title={tooltip}
                       aria-label={tooltip}
-                      disabled={disabled || rsp}
+                      disabled={disabled}
                       style={style}
                       onClick={() => handleToggle(seat?.id)}
                       onMouseEnter={(e) => {
-                        if (rsp || disabled) return;
+                        if (disabled) return;
                         e.currentTarget.style.borderColor = "#213428";
                       }}
                       onMouseLeave={(e) => {
-                        if (rsp) return;
                         e.currentTarget.style.borderColor = isSecondary ? "#C1B6AD" : "#1B1A1A";
                       }}
                     >
