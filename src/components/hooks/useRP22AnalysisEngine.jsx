@@ -15,7 +15,7 @@ import { getSpeakerModelMeta, MODELS, normaliseModelKey } from "@/components/mod
 import { useAppState } from "@/components/AppStateProvider";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
-import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
+import { rp23LevelForAngleDeg, rp23DisplayAngleDeg, resolveVisibleScreenWidthInches } from '@/components/utils/viewingAngleUtils';
 import { useSeatResponses } from "@/components/room/hooks/useSeatResponses";
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import {
@@ -1629,16 +1629,24 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     for (const seat of seatsWithRoles) {
       const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
       
-      // Import the HUD calculation for RP23 from buildSeatHudSnapshot
-      // Screen width in meters (from screen.visibleWidthInches)
-      const screenWidthInches = screen?.visibleWidthInches || 100;
-      const screenWidthM = screenWidthInches * 0.0254;
-      
-      // Distance from seat to screen (screen is at Y coordinate near front of room)
-      const screenFrontY = screen?.frontPlaneM || 0;
-      const seatY = seat.y || 0;
-      const distanceToScreenM = Math.abs(seatY - screenFrontY);
-      
+      // RP23 horizontal viewing angle — same authoritative inputs as ViewingAnglePanel:
+      //   screen width  → resolveVisibleScreenWidthInches(screen) (TV-preset-aware)
+      //   screen plane  → screenFrontPlaneM parameter (live, same as P3/LCR overlay)
+      //   viewer Y      → seat.y (per-seat; engine remains per-seat, not RSP-only)
+      const screenWidthInches = resolveVisibleScreenWidthInches(screen);
+      const screenWidthM = Number.isFinite(Number(screenWidthInches)) && screenWidthInches > 0
+        ? screenWidthInches * 0.0254
+        : 0;
+      const screenPlaneY = Number.isFinite(Number(screenFrontPlaneM)) ? Number(screenFrontPlaneM) : null;
+      const seatY = Number.isFinite(Number(seat.y)) ? Number(seat.y) : null;
+
+      if (screenPlaneY === null || seatY === null) {
+        perSeatRp23[seatId] = { angleDeg: null, displayDeg: null, level: null, formatted: '—' };
+        continue;
+      }
+
+      const distanceToScreenM = Math.abs(seatY - screenPlaneY);
+
       if (distanceToScreenM > 0.1 && screenWidthM > 0) {
         // Calculate horizontal viewing angle (RP23)
         const rp23AngleRad = 2 * Math.atan((screenWidthM / 2) / distanceToScreenM);
