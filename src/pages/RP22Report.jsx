@@ -60,6 +60,7 @@ import DesignRecommendationEngine from '@/components/recommendations/DesignRecom
 import { useAuth } from '@/lib/AuthContext';
 import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
 import { buildRp22SeatCoverageSentence, resolveAllParametersReportable } from '@/components/utils/rp22SeatCoverageSentence';
+import { resolveSeatPriority } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 
 // --- Main component ---
@@ -772,13 +773,20 @@ function RP22ReportInner() {
     }, [seats, reportSeatHudById]);
 
     // ── RP22 seating-coverage summary sentence (shared helper) ──────────────
-    // Reuses the canonical per-seat RP22 results + primary-seat designation
-    // from analysisResult.perSeatRp22. No recalculation of any RP22 parameter.
+    // Reuses the canonical per-seat RP22 results plus the user's independent
+    // Primary / Secondary classification. No RP22 parameter is recalculated.
     // allParametersReportable auto-detects bass authority from the existing
     // bass presentation — when bass becomes authoritative, the stronger
     // "across every parameter" wording activates automatically.
     const realSeatIdsForCoverage = React.useMemo(
         () => safeArray(seats).map(s => s?.id).filter(Boolean),
+        [seats]
+    );
+    const primarySeatIdsForCoverage = React.useMemo(
+        () => safeArray(seats)
+            .filter(s => resolveSeatPriority(s) === 'primary')
+            .map(s => s?.id)
+            .filter(Boolean),
         [seats]
     );
     const allParametersReportable = React.useMemo(
@@ -789,9 +797,10 @@ function RP22ReportInner() {
         () => buildRp22SeatCoverageSentence({
             analysisResult,
             realSeatIds: realSeatIdsForCoverage,
+            primarySeatIds: primarySeatIdsForCoverage,
             allParametersReportable,
         }),
-        [analysisResult, realSeatIdsForCoverage, allParametersReportable]
+        [analysisResult, realSeatIdsForCoverage, primarySeatIdsForCoverage, allParametersReportable]
     );
 
     // ── Artcoustic System Design Rating ────────────────────────────────────
@@ -1381,6 +1390,9 @@ function RP22ReportInner() {
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '8mm', paddingTop: '8mm', borderTop: '1px solid #D9D5CE', fontFamily: 'Century Gothic, Futura PT Light, Didact Gothic, sans-serif', fontSize: '10.5pt', color: '#3E4349', lineHeight: 1.75, textAlign: 'left' }}>
                                     <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', fontSize: '11pt' }}>RP23 - Image Performance</div>
                                     <div>CEDIA's forthcoming RP23 document will address best practice for image. Currently, we only have the size of the images based on the horizontal viewing angle, and the brightness which is known.</div>
+                                    {coverageSentence && (
+                                        <Rp22SeatCoverageSentence sentence={coverageSentence} variant="cover" />
+                                    )}
                                 </div>
                             </div>
 
@@ -1412,7 +1424,6 @@ function RP22ReportInner() {
                                     showDesignRating={showDesignRating}
                                     roomDesignRating={roomDesignRating}
                                     seatDesignRatings={seatDesignRatings}
-                                    coverageSentence={coverageSentence}
                                 />
                             </div>
 
