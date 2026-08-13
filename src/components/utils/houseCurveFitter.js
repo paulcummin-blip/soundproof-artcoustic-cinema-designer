@@ -15,7 +15,7 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 import { houseCurveP19Level, calculateAllSeatMetrics, runSingleStart, compareHouseCurveMetrics, createHouseCurveOperationCounts } from "@/components/utils/houseCurveFitterCore";
 import { createHouseCurveEvaluationMemo } from "@/components/utils/houseCurveEvaluationMemo";
 import { prepareBankValidation } from "@/components/utils/preparedBankValidation";
-import { identifyProtectedNullRegions } from "@/components/utils/houseCurveFitProtection";
+import { identifyProtectedNullRegions, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 import { refineOpposingResidualPair } from "@/components/utils/houseCurvePairedRefinement";
 import { runProfessionalResidualCleanup } from "@/components/utils/houseCurveResidualCleanup";
@@ -167,7 +167,7 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
   const correctableP19FromFitMetrics = (metrics) => {
     const points = (metrics?.rspResidualPoints || []).filter((point) => point.frequency >= assessmentStartHz
       && point.frequency <= assessmentEndHz
-      && !protectedNullRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz));
+      && !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
     return points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : null;
   };
   for (let refinementPass = 0; refinementPass < 2; refinementPass++) {
@@ -260,14 +260,14 @@ export function calculateHouseCurveEqCurve(rawCurve, perSeatRawCurves, usableLfH
     })
     .filter((p) => isNumber(p.deviationDb));
   const rspMaxDev = rspAssessed.length ? Math.max(...rspAssessed.map((p) => Math.abs(p.deviationDb))) : null;
-  const rspCorrectableAssessed = rspAssessed.filter((point) => !protectedNullRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz));
+  const rspCorrectableAssessed = rspAssessed.filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
   const rspCorrectableMaxDev = rspCorrectableAssessed.length
     ? Math.max(...rspCorrectableAssessed.map((point) => Math.abs(point.deviationDb)))
     : null;
   const upperFitStats = (smoothedCurve) => {
     const residuals = smoothedCurve
       .filter((point) => point.frequency > assessmentEndHz && point.frequency <= fitEndHz)
-      .filter((point) => !protectedNullRegions.some((region) => point.frequency >= region.startHz && point.frequency <= region.endHz))
+      .filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions))
       .map((point) => point.spl - (interpolateCanonicalTarget(canonicalTargetCurve, point.frequency)
         ?? (anchorDb + artcousticHouseCurveOffsetAt(point.frequency))))
       .filter(Number.isFinite);
