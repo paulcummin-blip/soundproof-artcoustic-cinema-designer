@@ -15,6 +15,9 @@ const strictlyIncreasing = (curve) => curve.every((point, index) => index === 0 
 const sameCurve = (left, right, valueKey, tolerance = 1e-9) => left.length === right.length && left.every((point, index) => (
   close(point.frequency, right[index]?.frequency, tolerance) && close(point[valueKey], right[index]?.[valueKey], tolerance)
 ));
+const sameFrequencyGrid = (left, right, tolerance = 1e-9) => left.length === right.length && left.every((point, index) => (
+  close(point.frequency, right[index]?.frequency, tolerance)
+));
 
 const parameterParity = (candidate, parameters) => {
   const pairs = [
@@ -43,7 +46,7 @@ export function contentFingerprint(value) {
     hash ^= text.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
-  return `exact-case-v2-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  return `exact-case-v3-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
 export function validateExactHouseCurveCapture(capture, live) {
@@ -51,10 +54,12 @@ export function validateExactHouseCurveCapture(capture, live) {
   const before = capture.productionSeries.rspBeforeEq.data;
   const after = capture.productionSeries.rspAfterEq.data;
   const eq = capture.aggregateEqResponse;
+  const maximumAvailableAfterEq = capture.maximumAvailableAfterEq || [];
   const targets = [capture.productionHouseCurveTarget, capture.graphHouseCurveTarget, capture.fitterHouseCurveTarget];
   const namedCurves = [
     ["RSP before EQ", before, "spl"], ["RSP after EQ", after, "spl"],
-    ["aggregate EQ", eq, "gainDb"], ["production target", targets[0], "spl"],
+    ["aggregate EQ", eq, "gainDb"], ["post-EQ maximum SPL envelope", maximumAvailableAfterEq, "spl"],
+    ["production target", targets[0], "spl"],
     ["graph target", targets[1], "spl"], ["fitter target", targets[2], "spl"],
   ];
   namedCurves.forEach(([name, curve, key]) => {
@@ -62,13 +67,18 @@ export function validateExactHouseCurveCapture(capture, live) {
     else if (!strictlyIncreasing(curve)) failures.push(`${name} frequencies are not strictly increasing`);
     else if (!curve.every((point) => finite(point.frequency) && finite(point[key]))) failures.push(`${name} contains non-finite values`);
   });
-  if (!sameCurve(before, after, "spl", Infinity) || !sameCurve(before.map(({ frequency }) => ({ frequency, value: 0 })), eq.map(({ frequency }) => ({ frequency, value: 0 })), "value")) {
-    failures.push("before, after and aggregate EQ frequency grids differ");
+  if (!sameFrequencyGrid(before, after) || !sameFrequencyGrid(before, eq) || !sameFrequencyGrid(before, maximumAvailableAfterEq)) {
+    failures.push("before, after, aggregate EQ and post-EQ ceiling frequency grids differ");
   }
   let maximumError = null;
-  if (before.length && before.length === after.length && before.length === eq.length) {
-    maximumError = Math.max(...before.map((point, index) => Math.abs(after[index].spl - point.spl - eq[index].gainDb)));
-    if (maximumError > 1e-9) failures.push(`after-EQ reconstruction error is ${maximumError} dB`);
+  if (before.length && sameFrequencyGrid(before, after) && sameFrequencyGrid(before, eq) && sameFrequencyGrid(before, maximumAvailableAfterEq)) {
+    const globalTrimDb = finite(capture.globalTrimDb) ? Number(capture.globalTrimDb) : 0;
+    maximumError = Math.max(...before.map((point, index) => {
+      const requestedAfterEq = point.spl + globalTrimDb + eq[index].gainDb;
+      const reconstructedAfterEq = Math.min(requestedAfterEq, maximumAvailableAfterEq[index].spl);
+      return Math.abs(after[index].spl - reconstructedAfterEq);
+    }));
+    if (maximumError > 1e-9) failures.push("after-EQ reconstruction error is " + maximumError + " dB");
   }
   if (!sameCurve(targets[0], targets[1], "spl") || !sameCurve(targets[0], targets[2], "spl")) failures.push("production, graph and fitter targets differ");
   const assessmentTargets = targets[0].filter((point) => point.frequency >= capture.assessment.startHz && point.frequency <= capture.assessment.endHz);
