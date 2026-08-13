@@ -22,7 +22,7 @@ export default function BassCapabilitySummary({ capability, targetWarning }) {
           ? `${capability.shortfallDb.toFixed(1)} ${capability.limitingParameter === "P18" ? "Hz" : "dB"}`
           : "—"}{Number.isFinite(capability.limitingFrequency) ? ` at ${capability.limitingFrequency.toFixed(1)} Hz` : ""}
       </div>}
-    </>
+    </>}
     <BassTargetWarning warning={targetWarning} />
   </div>;
 }
