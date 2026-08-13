@@ -2,7 +2,7 @@
 // Pure calculation engine for bass simulation (no React)
 
 import { getSubwooferCurve, getApprovedContinuousSplDb } from "@/components/models/speakers/registry";
-import { getSharedSubwooferAmplifierAuthority } from "@/components/utils/subwooferCapability";
+import { getPerSubwooferAmplifierAuthority } from "@/components/utils/subwooferCapability";
 import { 
   computeP14MaxLfeSpl, 
   computeP18InRoomF3, 
@@ -514,11 +514,10 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
   }
   
   const powerW = splConfig?.globalPowerW ?? 100;
-  const amplifierAuthority = getSharedSubwooferAmplifierAuthority(
+  const amplifierAuthority = getPerSubwooferAmplifierAuthority(
     subs,
     splConfig?.subwooferAmplifierPowerW,
   );
-  const dbAmplifier = amplifierAuthority.deratingDb;
   const eqHeadroomDb = splConfig?.globalEqHeadroomDb ?? 0;
   const radiationMode = splConfig?.radiationMode ?? 'half-space';
   const modesEnabled = splConfig?.modesEnabled ?? false;
@@ -574,6 +573,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
       subs.forEach((sub, subIdx) => {
         const curve = modelCurves[sub.modelKey];
         if (!curve) return;
+        const dbAmplifier = amplifierAuthority.sourceAuthorities[subIdx]?.deratingDb ?? 0;
 
         // Normalize tuning
         const tuning = normalizeSubTuning(sub.tuning);
