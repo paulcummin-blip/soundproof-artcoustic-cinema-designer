@@ -3,6 +3,37 @@ import { MODELS, getSubwooferCurve, normaliseModelKey } from "@/components/model
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
 const dbToPressure = (db) => Math.pow(10, Number(db) / 20);
 
+export const DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W = 1000;
+
+export function getSharedSubwooferAmplifierAuthority(activeSubs, configuredPowerW = null) {
+  const subs = Array.isArray(activeSubs) ? activeSubs : [];
+  const sourceConfiguredPowerW = subs
+    .map((sub) => sub?.sharedAmplifierPowerW ?? sub?.subwooferAmplifierPowerW)
+    .find(isFiniteNumber);
+  const sharedPowerW = isFiniteNumber(configuredPowerW)
+    ? Number(configuredPowerW)
+    : isFiniteNumber(sourceConfiguredPowerW)
+      ? Number(sourceConfiguredPowerW)
+      : DEFAULT_SHARED_SUB_AMPLIFIER_POWER_W;
+  const totalProductPowerHandlingW = subs.reduce((sum, sub) => {
+    const model = MODELS.find((candidate) => candidate.key === getModelKey(sub));
+    const ratedPowerW = Number(model?.max_power);
+    return sum + (Number.isFinite(ratedPowerW) && ratedPowerW > 0 ? ratedPowerW : 0);
+  }, 0);
+  const powerRatio = totalProductPowerHandlingW > 0
+    ? Math.max(0, Math.min(1, sharedPowerW / totalProductPowerHandlingW))
+    : 1;
+  const deratingDb = powerRatio > 0 ? 10 * Math.log10(powerRatio) : -Infinity;
+  return {
+    sharedPowerW,
+    totalProductPowerHandlingW,
+    powerRatio,
+    deratingDb,
+    powerLimited: powerRatio < 1 - 1e-9,
+    allocationPolicy: "shared-amplifier-power-proportional-to-product-rating",
+  };
+}
+
 export function interpolateCapabilityCurve(curve, frequency) {
   const points = Array.isArray(curve) ? curve
     .map((point) => ({ frequency: Number(point?.frequency ?? point?.hz ?? point?.[0]), spl: Number(point?.spl ?? point?.db ?? point?.[1]) }))
@@ -40,10 +71,14 @@ export function getUsableLfHz(activeSubs) {
   return values.length ? Math.max(...values) : null;
 }
 
-export function getSystemSourceCapability(activeSubs, frequency) {
+export function getSystemSourceCapability(activeSubs, frequency, sharedAmplifierPowerW = null) {
+  const amplifier = getSharedSubwooferAmplifierAuthority(activeSubs, sharedAmplifierPowerW);
   const levels = (activeSubs || []).map((sub) => interpolateCapabilityCurve(getSubwooferCurve(getModelKey(sub)), frequency));
-  if (!levels.length || levels.some((level) => !isFiniteNumber(level))) return null;
-  return 20 * Math.log10(levels.reduce((sum, level) => sum + dbToPressure(level), 0));
+  if (!levels.length || levels.some((level) => !isFiniteNumber(level)) || !isFiniteNumber(amplifier.deratingDb)) return null;
+  return 20 * Math.log10(levels.reduce(
+    (sum, level) => sum + dbToPressure(level + amplifier.deratingDb),
+    0,
+  ));
 }
 
 export function getCurrentSystemSourceOutput(activeSubs) {
@@ -53,9 +88,10 @@ export function getCurrentSystemSourceOutput(activeSubs) {
   return getCombinedRequestedOutputDb(activeSubs) + getOverallLfeGainDb(activeSubs);
 }
 
-export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6, requestedSystemOutputDb }) {
+export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, activeSubs, usableLfHz, maxBoostDb = 6, requestedSystemOutputDb, sharedAmplifierPowerW = null }) {
   const requested = Math.max(0, Number(requestedBoostDb) || 0);
-  const systemCapabilityDb = getSystemSourceCapability(activeSubs, frequency);
+  const amplifierAuthority = getSharedSubwooferAmplifierAuthority(activeSubs, sharedAmplifierPowerW);
+  const systemCapabilityDb = getSystemSourceCapability(activeSubs, frequency, sharedAmplifierPowerW);
   const configuredSystemOutputDb = getCurrentSystemSourceOutput(activeSubs);
   const currentSystemSourceOutputDb = isFiniteNumber(requestedSystemOutputDb)
     ? Number(requestedSystemOutputDb)
@@ -67,6 +103,7 @@ export function getSourceDomainBoostAllowance({ frequency, requestedBoostDb, act
   const rampFraction = lf == null ? 1 : Number(frequency) >= lf ? 1 : 0;
   return {
     systemCapabilityDb,
+    amplifierAuthority,
     currentSystemSourceOutputDb,
     availableHeadroomDb,
     headroomDb: availableHeadroomDb,
