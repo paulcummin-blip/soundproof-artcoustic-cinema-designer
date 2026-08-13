@@ -14,7 +14,7 @@ import { artcousticHouseCurveOffsetAt } from "@/components/utils/artcousticHouse
 import { bankResponseSignature, createHouseCurveEvaluationMemo, readExactMemo, writeExactMemo } from "@/components/utils/houseCurveEvaluationMemo";
 import { calculatePreparedBassCurveMetrics, prepareBassCurveMetricGrid } from "@/components/utils/preparedBassCurveMetrics";
 import { evaluatePreparedBankLimits, prepareBankValidation } from "@/components/utils/preparedBankValidation";
-import { evaluateNearTargetProtection, isProtectedFrequency } from "@/components/utils/houseCurveFitProtection";
+import { evaluateNearTargetProtection, isProtectedFrequency, isProtectedSmoothedFrequency } from "@/components/utils/houseCurveFitProtection";
 import { interpolateCanonicalTarget, requiredCorrectionDb } from "@/components/utils/houseCurveTargetAuthority";
 import { evaluateSeatRegressionTolerance } from "@/components/utils/houseCurveSeatRegressionTolerance";
 import { classifyEqCorrectionRegion, curveSplAt, validatePhysicalEqAction } from "@/components/utils/designEqPhysicsAuthority";
@@ -104,13 +104,13 @@ function correctedCurvesForSharedBank(seats, filters, operationCounts, memo = nu
 function summarizeSeatMetrics(seatMetrics, protectedNullRegions = []) {
   if (!seatMetrics.length) return null;
   const rsp = seatMetrics.find((metric) => metric.seatId === "rsp") || null;
-  const scoredRspPoints = (rsp?.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+  const scoredRspPoints = (rsp?.residualPoints || []).filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
   const rspMaxDeviationDb = scoredRspPoints.length ? Math.max(...scoredRspPoints.map((point) => Math.abs(point.deviationDb))) : rsp?.maxAbsDeviationDb ?? null;
   const rspRmsDeviationDb = scoredRspPoints.length ? Math.sqrt(scoredRspPoints.reduce((sum, point) => sum + point.deviationDb ** 2, 0) / scoredRspPoints.length) : rsp?.rmsDeviationDb ?? null;
   const rspMeanSignedResidualDb = scoredRspPoints.length ? scoredRspPoints.reduce((sum, point) => sum + point.deviationDb, 0) / scoredRspPoints.length : rsp?.meanSignedResidualDb ?? null;
   const rspShapeRmsDeviationDb = scoredRspPoints.length ? Math.sqrt(scoredRspPoints.reduce((sum, point) => sum + (point.deviationDb - rspMeanSignedResidualDb) ** 2, 0) / scoredRspPoints.length) : rsp?.shapeRmsDeviationDb ?? null;
   const objectiveMetric = (metric) => {
-    const points = (metric.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+    const points = (metric.residualPoints || []).filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
     return { ...metric,
       objectiveMaxAbsDeviationDb: points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : metric.maxAbsDeviationDb,
       objectiveRmsDeviationDb: points.length ? Math.sqrt(points.reduce((sum, point) => sum + point.deviationDb ** 2, 0) / points.length) : metric.rmsDeviationDb,
@@ -208,7 +208,7 @@ function findAllResidualRegions(seats, filters, assessmentStartHz, assessmentEnd
     const unprotectedSegments = [];
     let currentSegment = [];
     for (const point of trendPoints) {
-      if (isProtectedFrequency(point.frequency, protectedNullRegions)) {
+      if (isProtectedSmoothedFrequency(point.frequency, protectedNullRegions)) {
         if (currentSegment.length) unprotectedSegments.push(currentSegment);
         currentSegment = [];
       } else {
@@ -350,7 +350,7 @@ function evaluateCutInfluenceAcceptance(currentMetrics, trialMetrics, protectedN
   for (const current of currentPoints) {
     const after = trialByFreq.get(current.frequency);
     if (!after) continue;
-    if (isProtectedFrequency(current.frequency, protectedNullRegions)) continue;
+    if (isProtectedSmoothedFrequency(current.frequency, protectedNullRegions)) continue;
     const change = after.deviationDb - current.deviationDb;
     if (Math.abs(change) < CUT_INFLUENCE_THRESHOLD_DB) continue;
     inInfluence = true;
@@ -436,7 +436,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
   const baselineSeatMaxDeviations = new Map();
   if (currentMetrics.seatMetrics) {
     for (const m of currentMetrics.seatMetrics) {
-      const points = (m.residualPoints || []).filter((point) => !isProtectedFrequency(point.frequency, protectedNullRegions));
+      const points = (m.residualPoints || []).filter((point) => !isProtectedSmoothedFrequency(point.frequency, protectedNullRegions));
       baselineSeatMaxDeviations.set(m.seatId, points.length ? Math.max(...points.map((point) => Math.abs(point.deviationDb))) : m.maxAbsDeviationDb);
     }
   }
@@ -592,7 +592,7 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
           seatMetrics: trialMetrics.seatMetrics || [],
           baselineSeatMaxDeviations,
           protectedNullRegions,
-          isProtectedFrequency,
+          isProtectedFrequency: isProtectedSmoothedFrequency,
           rspImprovementDb: maxImprovementDb,
           isCorrectiveCut: region.kind === "peak" && Number(trial.filter?.gainDb) < 0,
           protectedNull,
