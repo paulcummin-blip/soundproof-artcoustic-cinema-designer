@@ -7,20 +7,20 @@ import { deriveRequestedCalibrationConfig } from "./requestedCalibrationConfig";
 import { buildAuthoritativeAutoAlignDelays, buildAuthoritativeBassSources, buildAuthoritativeResponseCurves, buildAuthoritativeRspPosition, simulateAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
 
 const EXPECTED = {
-  rspFrequencies: "a0508a09",
-  rspSpl: "c55df033",
-  perSeatResponses: "cfd03f6c",
+  rspFrequencies: "6af9d268",
+  rspSpl: "9cc8a1b6",
+  perSeatResponses: "d1ad498d",
   fingerprints: {
-    geometry: "geo:v1:3596cd7dff97dc17",
-    product: "prod:v1:3f55cab9863453b3",
-    calibration: "cal:v1:7fed44f4d51a6386",
+    geometry: "geo:v4:6f64e13bf554292d",
+    product: "prod:v4:889cf433492248a5",
+    calibration: "cal:v4:97e304c3930ed2e1",
   },
-  // Audited fitting-output update: authority inputs and calibration fingerprints
-  // remain unchanged; the selected bank, reconstructed curve and derived values change.
-  selectedCandidate: "069caf0c",
-  filterBank: "46e7db8f",
-  postEqCurve: "90a4b8a1",
-  parameters: "ab968989",
+  // Audited B6.5 golden refresh after the approved v4 authority and fitting
+  // changes. Any future physics, fingerprint, bank, curve or metric drift fails.
+  selectedCandidate: "6b9b2fd5",
+  filterBank: "b1ee05e7",
+  postEqCurve: "c987a3ac",
+  parameters: "5c35d9f1",
 };
 
 function stable(value) {
@@ -46,7 +46,7 @@ const APPROVED_AUTHORITY_FIELDS = [
   "perSeatP20Results",
   "p20Label",
 ];
-const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "3088219a";
+const PRE_AUTHORITY_SELECTED_CANDIDATE_HASH = "6b9b2fd5";
 
 function withoutApprovedAuthorityFields(candidate) {
   return Object.fromEntries(Object.entries(candidate || {}).filter(([key]) => !APPROVED_AUTHORITY_FIELDS.includes(key)));
