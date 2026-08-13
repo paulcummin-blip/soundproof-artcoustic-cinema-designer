@@ -4,6 +4,8 @@ import { generateCandidatePool, selectCandidateFromPool } from "@/components/uti
 import { computeCalibrationFingerprint, computeGeometryFingerprint, computeHouseCurveFingerprint, computeProductFingerprint } from "./bassAnalysisFingerprints";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS as DEFAULTS } from "./bassPhysicsDefaults";
 import { deriveRequestedCalibrationConfig } from "./requestedCalibrationConfig";
+import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
+import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
 import { buildAuthoritativeAutoAlignDelays, buildAuthoritativeBassSources, buildAuthoritativeResponseCurves, buildAuthoritativeRspPosition, simulateAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
 
 const EXPECTED = {
@@ -143,6 +145,50 @@ export function runBassAuthorityParityFixtures() {
   const pool = generateCandidatePool({ rawCurve: curves.rspRawCurve, activeSubs: inputs.sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz, perSeatRawCurves: curves.perSeatRawCurves });
   const selected = selectCandidateFromPool(pool, "balanced");
   const candidate = selected.selectedCandidate;
+
+  // B6.6: protect the distinction between the acoustic RSP and the real-seat
+  // layout. Moving the acoustic RSP must change its response, geometry identity
+  // and published P14 capability. Moving only the seats must not silently move
+  // the RSP or alter the RSP-only P14 authority.
+  const movedRspPosition = buildAuthoritativeRspPosition(inputs.roomDims, 5.4);
+  const movedRspInputs = { ...inputs, rspPosition: movedRspPosition };
+  const movedRspSimulation = simulateAuthoritativeBassResponse({ ...movedRspInputs, qStrategyOverride: DEFAULTS.qStrategy });
+  const movedRspCurves = buildAuthoritativeResponseCurves(movedRspSimulation.seatResponses);
+  const movedRspPool = generateCandidatePool({
+    rawCurve: movedRspCurves.rspRawCurve,
+    activeSubs: inputs.sources,
+    usableLfHz: designEqSystemLimits.usableLfHz,
+    transitionHz,
+    perSeatRawCurves: movedRspCurves.perSeatRawCurves,
+  });
+  const movedRspCandidate = selectCandidateFromPool(movedRspPool, "balanced").selectedCandidate;
+  const currentFinalResponse = buildFinalOptimisedBassResponse({ optimisationResult: { selectedCandidate: candidate } });
+  const movedRspFinalResponse = buildFinalOptimisedBassResponse({ optimisationResult: { selectedCandidate: movedRspCandidate } });
+  const currentAuthority = evaluateCanonicalBassAuthority({
+    canonicalResult: currentFinalResponse,
+    activeSubs: inputs.sources,
+    usableLfHz: designEqSystemLimits.usableLfHz,
+    p14TargetBasis: "minimum",
+    requestedLevel: 1,
+  });
+  const movedRspAuthority = evaluateCanonicalBassAuthority({
+    canonicalResult: movedRspFinalResponse,
+    activeSubs: inputs.sources,
+    usableLfHz: designEqSystemLimits.usableLfHz,
+    p14TargetBasis: "minimum",
+    requestedLevel: 1,
+  });
+  const seatOnlyInputs = {
+    ...inputs,
+    seatingPositions: inputs.seatingPositions.map((seat) => ({ ...seat, y: Math.min(inputs.roomDims.lengthM - 0.2, seat.y + 0.35) })),
+  };
+  const seatOnlySimulation = simulateAuthoritativeBassResponse({ ...seatOnlyInputs, qStrategyOverride: DEFAULTS.qStrategy });
+  const movedRspGeometryFingerprint = computeGeometryFingerprint({ ...fingerprintInputs, rspPosition: movedRspPosition });
+  const positionAwareP14DeltaDb = Number.isFinite(currentAuthority?.availableP14CapabilityDb)
+    && Number.isFinite(movedRspAuthority?.availableP14CapabilityDb)
+    ? movedRspAuthority.availableP14CapabilityDb - currentAuthority.availableP14CapabilityDb
+    : null;
+
   const observed = {
     rspFrequencies: hash(simulation.seatResponses.rsp.freqsHz),
     rspSpl: hash(simulation.seatResponses.rsp.splDb),
@@ -154,7 +200,31 @@ export function runBassAuthorityParityFixtures() {
     parameters: hash({ p14: [candidate.achievedP14Level, candidate.achievedP14Db], p18: [candidate.achievedP18Level, candidate.achievedP18FrequencyHz], p19: [candidate.achievedP19Level, candidate.achievedP19VariationDb], p20: [candidate.achievedP20Level, candidate.achievedP20VariationDb] }),
   };
   const fields = Object.keys(observed);
-  const results = fields.map((field) => ({ name: field, passed: EXPECTED != null && stable(observed[field]) === stable(EXPECTED[field]) }));
+  const goldenResults = fields.map((field) => ({ name: field, passed: EXPECTED != null && stable(observed[field]) === stable(EXPECTED[field]) }));
+  const positionChecks = [
+    {
+      name: "B6.6 acoustic RSP move changes RSP response",
+      passed: hash(movedRspSimulation.seatResponses.rsp.splDb) !== observed.rspSpl,
+    },
+    {
+      name: "B6.6 acoustic RSP move changes geometry fingerprint",
+      passed: movedRspGeometryFingerprint !== fingerprints.geometry,
+    },
+    {
+      name: "B6.6 published P14 follows the position-aware maximum SPL envelope",
+      passed: currentAuthority?.p14CapabilityDetails?.positionAware === true
+        && movedRspAuthority?.p14CapabilityDetails?.positionAware === true
+        && currentAuthority?.p14CapabilityDetails?.source === "position-aware-authoritative-engine-maximum-spl-envelope-post-eq"
+        && movedRspAuthority?.p14CapabilityDetails?.source === "position-aware-authoritative-engine-maximum-spl-envelope-post-eq"
+        && Number.isFinite(positionAwareP14DeltaDb)
+        && Math.abs(positionAwareP14DeltaDb) >= 0.05,
+    },
+    {
+      name: "B6.6 seat-only move preserves the acoustic RSP response",
+      passed: hash(seatOnlySimulation.seatResponses.rsp.splDb) === observed.rspSpl,
+    },
+  ].map((result) => ({ ...result, passed: !!result.passed }));
+  const results = [...goldenResults, ...positionChecks];
   const structuralAudit = {
     approvedFields: APPROVED_AUTHORITY_FIELDS,
     strippedCandidateHash: hash(withoutApprovedAuthorityFields(candidate)),
@@ -162,6 +232,15 @@ export function runBassAuthorityParityFixtures() {
     candidateIdentityPass: candidate?.candidateId === selected.selectedCandidateId
       && candidate?.candidateId === selected.productionCandidateId
       && candidate?.filterBankSignature === selected.filterBankSignature,
+    positionAwareP14: {
+      currentRspY: inputs.rspPosition.y,
+      movedRspY: movedRspPosition.y,
+      currentCapabilityDb: currentAuthority?.availableP14CapabilityDb ?? null,
+      movedCapabilityDb: movedRspAuthority?.availableP14CapabilityDb ?? null,
+      deltaDb: positionAwareP14DeltaDb,
+      currentSource: currentAuthority?.p14CapabilityDetails?.source ?? null,
+      movedSource: movedRspAuthority?.p14CapabilityDetails?.source ?? null,
+    },
   };
   structuralAudit.approvedOnly = structuralAudit.strippedCandidateHash === structuralAudit.expectedPreAuthorityHash
     && structuralAudit.candidateIdentityPass;
