@@ -6,7 +6,7 @@ import { INSTANCE_STATUS } from '@/components/utils/subwooferInstanceCompatibili
 
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 
-export const useSeatResponses = () => {
+export const useSeatResponses = (enabled = true) => {
   const appState = useAppState();
   const { subwoofers, seatingPositions, dimensions, roomDims, mlpY_m } = appState || {};
   const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
@@ -57,7 +57,7 @@ export const useSeatResponses = () => {
   }, [mlpY_m, dims.width]);
 
   const seatResponses = useMemo(() => {
-    if (isBlocked) return [];
+    if (!enabled || isBlocked) return [];
     if (simSubs.length === 0) return [];
     const hasRsp = rspCoord && isNum(rspCoord.x) && isNum(rspCoord.y);
     if (seatsSafe.length === 0 && !hasRsp) return [];
@@ -104,7 +104,7 @@ export const useSeatResponses = () => {
       }));
     }
   // stringify to avoid stale results when arrays mutate in place
-  }, [JSON.stringify(seatsSafe), JSON.stringify(simSubs), dims.width, dims.length, dims.height, rspCoord, isBlocked]);
+  }, [JSON.stringify(seatsSafe), JSON.stringify(simSubs), dims.width, dims.length, dims.height, rspCoord, isBlocked, enabled]);
 
   return seatResponses;
 };
