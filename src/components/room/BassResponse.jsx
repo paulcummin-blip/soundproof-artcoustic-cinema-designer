@@ -183,6 +183,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // EQ response overlay toggles — control visibility of raw and post-EQ traces
   const [showRawResponse, setShowRawResponse] = useState(true);
   const [showOptimisedResponse, setShowOptimisedResponse] = useState(true);
+  // Historical physics investigations are intentionally opt-in. They include
+  // dozens of retired simulations and must never block live geometry/product
+  // changes merely because current engineering receipts are enabled.
+  const [showLegacyBassDiagnostics, setShowLegacyBassDiagnostics] = useState(false);
+  useEffect(() => {
+    if (!includeDiagnostics) setShowLegacyBassDiagnostics(false);
+  }, [includeDiagnostics]);
 
   // Modal Resonance Line Toggles — display-only, session-only state. Does not affect
   // bass calculation, SPL response, or mode generation; only filters which resonance
@@ -981,8 +988,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         <NullDepthAuditBadge rawData={multiSeries[0].data} smoothingMode={bassSmoothingMode} />
       )}
 
-      {/* ── Diagnostic panel wiring extracted to BassDiagnosticsPanel.jsx ── */}
-      {includeDiagnostics && <BassDiagnosticsPanel
+      {/* Historical/retired investigations are loaded only on explicit request.
+          Current EQ receipts remain available above without mounting this archive. */}
+      {includeDiagnostics && (
+        <div style={{ marginBottom: 8 }}>
+          <button
+            type="button"
+            aria-expanded={showLegacyBassDiagnostics}
+            onClick={() => setShowLegacyBassDiagnostics((open) => !open)}
+            style={{ border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC', color: '#334155', padding: '6px 10px', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer' }}
+          >
+            {showLegacyBassDiagnostics ? 'Hide legacy physics investigations' : 'Load legacy physics investigations'}
+          </button>
+          {showLegacyBassDiagnostics && <BassDiagnosticsPanel
         roomDims={roomDims}
         seatingPositions={seatingPositions}
         subsForSimulation={subsForSimulation}
@@ -1049,7 +1067,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         setNormalizeRewOverlay={setNormalizeRewOverlay}
         rewOverlaySeries={rewOverlaySeries}
         qStrategy={qStrategy}
-      />}
+          />}
+        </div>
+      )}
 
       {/* ── Deep null warning — always visible ── */}
       {multiSeries.length > 0 && (() => {
