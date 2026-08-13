@@ -370,18 +370,8 @@ function evaluateCutInfluenceAcceptance(currentMetrics, trialMetrics, protectedN
   return peakReduced && areaReduced && rmsImproved;
 }
 
-// Run a single-start optimisation loop. Returns { filters, metrics, baselineWorstSeatDeviation,
-// blockedResiduals, stopReason, bankEvalCount, operations }.
-export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, options = {}) {
-  const peakThresholdDb = profile.peakDiscoveryThresholdDb || 1;
-  const valleyThresholdDb = profile.valleyDiscoveryThresholdDb || 1;
-  const maxOperations = 30;
-  const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
-  const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : null;
-  const correctionStartHz = Number.isFinite(Number(options.correctionStartHz)) ? Number(options.correctionStartHz) : assessmentStartHz;
-  const correctionEndHz = Number.isFinite(Number(options.correctionEndHz)) ? Number(options.correctionEndHz) : assessmentEndHz;
-
-  const operationCounts = {
+export function createHouseCurveOperationCounts() {
+  return {
     curveEvaluationRequests: 0,
     uniqueCurveFilterEvaluations: 0,
     reusedCurveEvaluationRequests: 0,
@@ -395,6 +385,9 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     bankValidationRequests: 0,
     uniqueBankValidations: 0,
     reusedBankValidations: 0,
+    bankLimitRequests: 0,
+    uniqueBankLimitEvaluations: 0,
+    reusedBankLimitEvaluations: 0,
     filterResponseRequests: 0,
     uniqueFilterResponses: 0,
     bankFilterPointEvaluations: 0,
@@ -407,6 +400,20 @@ export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz
     seatRegressionToleranceAccepted: 0,
     seatRegressionToleranceRejected: 0,
   };
+}
+
+// Run a single-start optimisation loop. Returns { filters, metrics, baselineWorstSeatDeviation,
+// blockedResiduals, stopReason, bankEvalCount, operations }.
+export function runSingleStart(initialFilters, seats, bankRaw, assessmentStartHz, assessmentEndHz, anchorDb, activeSubs, usableLfHz, requestedSystemOutputDb, profile, options = {}) {
+  const peakThresholdDb = profile.peakDiscoveryThresholdDb || 1;
+  const valleyThresholdDb = profile.valleyDiscoveryThresholdDb || 1;
+  const maxOperations = 30;
+  const protectedNullRegions = Array.isArray(options.protectedNullRegions) ? options.protectedNullRegions : [];
+  const canonicalTargetCurve = Array.isArray(options.canonicalTargetCurve) ? options.canonicalTargetCurve : null;
+  const correctionStartHz = Number.isFinite(Number(options.correctionStartHz)) ? Number(options.correctionStartHz) : assessmentStartHz;
+  const correctionEndHz = Number.isFinite(Number(options.correctionEndHz)) ? Number(options.correctionEndHz) : assessmentEndHz;
+
+  const operationCounts = createHouseCurveOperationCounts();
   const memo = options.memo || createHouseCurveEvaluationMemo(options.reuseExactEvaluations !== false);
   const preparedBankValidation = options.preparedBankValidation || (options.reuseExactEvaluations !== false
     ? prepareBankValidation(bankRaw, activeSubs, usableLfHz, requestedSystemOutputDb)
