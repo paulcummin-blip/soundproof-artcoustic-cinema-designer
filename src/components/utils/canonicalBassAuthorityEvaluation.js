@@ -8,7 +8,6 @@ import {
   normalizeP14TargetBasis,
 } from "@/components/utils/p14CapabilityAuthority";
 import { integrateRawResponseLevelDbC } from "@/components/utils/p14HouseCurveNormalisation";
-import { computeParam18AchievedExtension } from "@/components/utils/rp22BassMetrics";
 import { computeOfficialP19Assessment, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 import { houseCurveP19Level } from "@/components/utils/houseCurveFitterCore";
 import { getRp22BassOperatingDefinitions } from "@/components/utils/rp22BassOperatingDefinitions";
@@ -116,17 +115,6 @@ export function evaluateCanonicalBassAuthority({
   const achievedP14Db = p14?.value ?? null;
   const achievedP14Level = p14?.level ?? 0;
 
-  // P18: same canonical post-EQ RSP/seat result, bounded by the same product capability.
-  const p18 = computeParam18AchievedExtension({
-    rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
-    perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
-    activeSubs,
-    configuredUsableLfHz: usableLfHz,
-    p14TargetBasis,
-  });
-  const achievedP18FrequencyHz = p18?.value ?? null;
-  const achievedP18Level = numericLevel(p18?.level);
-
   // P19: canonical post-EQ RSP versus the canonical target.
   const p19 = computeOfficialP19Assessment({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
@@ -154,14 +142,37 @@ export function evaluateCanonicalBassAuthority({
   // P18: assess the fixed post-EQ design against the required extension at the
   // selected operating level. Do not lower the operating level or shorten the
   // target curve to create a pass.
-  const p18RequiredExtensionAssessment = assessP18AgainstRequiredExtension({
+  const extensionAssessment = assessP18AgainstRequiredExtension({
     rspPostEqCurve: canonicalResult.canonicalPostEqRsp,
+    canonicalTargetCurve: canonicalResult.canonicalTargetCurve,
     perSeatPostEqCurves: canonicalResult.canonicalPostEqSeatResponses,
     selectedP14TargetDb: selectedTargetDb,
     requiredExtensionHz,
     p18CutoffDb: requested?.p18CutoffDb,
+    configuredUsableLfHz: usableLfHz,
   });
-  const requestedP18Pass = p18RequiredExtensionAssessment?.passes ?? null;
+  const extensionShapePass = extensionAssessment?.passes ?? null;
+  const requestedP18Pass = requestedP14Pass == null || extensionShapePass == null
+    ? null
+    : requestedP14Pass && extensionShapePass;
+  const p18RequiredExtensionAssessment = extensionAssessment ? {
+    ...extensionAssessment,
+    extensionShapePass,
+    p14CapabilityPass: requestedP14Pass,
+    conditionalOnP14: true,
+    passes: requestedP18Pass,
+    failureReason: requestedP14Pass === false
+      ? "p14-capability-below-selected-target"
+      : (extensionShapePass === false ? "target-relative-extension-shortfall" : null),
+  } : null;
+  const achievedP18FrequencyHz = extensionAssessment?.achievedExtensionHz ?? null;
+  const achievedP18Level = requestedP18Pass === true ? requestedLevel : 0;
+  const p18 = extensionAssessment ? {
+    ...extensionAssessment,
+    value: achievedP18FrequencyHz,
+    level: achievedP18Level > 0 ? `L${achievedP18Level}` : null,
+    source: "selected-p14-conditional-target-relative-rsp-extension",
+  } : null;
   const postEqCapabilityAssessment = buildPostEqBassCapabilityOutcome({
     authority: { selectedTargetBasis: p14TargetBasis },
     requestedLevel,
