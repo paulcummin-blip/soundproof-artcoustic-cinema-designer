@@ -23,7 +23,7 @@ const ICONS = { MessageCircle, Headphones, ChevronUp, Waves, Zap };
 
 const CATEGORY_ORDER = ["Spatial Resolution", "Dynamic Range", "Timbre Matching"];
 
-export default function ClientDesignHighlights({ highlights, print, recommendationFooter }) {
+export default function ClientDesignHighlights({ highlights, print, recommendationFooter, coverageSentence }) {
   const grouped = useMemo(() => {
     const map = {};
     for (const h of (highlights || [])) {
@@ -85,6 +85,21 @@ export default function ClientDesignHighlights({ highlights, print, recommendati
           }}>
             Design Summary
           </h1>
+        </div>
+      )}
+      {!print && coverageSentence && (
+        <div style={{
+          fontSize: 13,
+          color: "#3E4349",
+          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+          lineHeight: 1.5,
+          marginBottom: 20,
+          padding: "10px 14px",
+          background: "#F8F8F7",
+          borderRadius: 8,
+          border: "1px solid #E6E4DD",
+        }}>
+          {coverageSentence}
         </div>
       )}
       {grouped.map(({ category, items }) => (

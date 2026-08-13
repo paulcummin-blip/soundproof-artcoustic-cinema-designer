@@ -59,6 +59,8 @@ import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/a
 import DesignRecommendationEngine from '@/components/recommendations/DesignRecommendationEngine';
 import { useAuth } from '@/lib/AuthContext';
 import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
+import { buildRp22SeatCoverageSentence, resolveAllParametersReportable } from '@/components/utils/rp22SeatCoverageSentence';
+import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -769,6 +771,29 @@ function RP22ReportInner() {
         return out;
     }, [seats, reportSeatHudById]);
 
+    // ── RP22 seating-coverage summary sentence (shared helper) ──────────────
+    // Reuses the canonical per-seat RP22 results + primary-seat designation
+    // from analysisResult.perSeatRp22. No recalculation of any RP22 parameter.
+    // allParametersReportable auto-detects bass authority from the existing
+    // bass presentation — when bass becomes authoritative, the stronger
+    // "across every parameter" wording activates automatically.
+    const realSeatIdsForCoverage = React.useMemo(
+        () => safeArray(seats).map(s => s?.id).filter(Boolean),
+        [seats]
+    );
+    const allParametersReportable = React.useMemo(
+        () => resolveAllParametersReportable(completedBassPresentation),
+        [completedBassPresentation]
+    );
+    const coverageSentence = React.useMemo(
+        () => buildRp22SeatCoverageSentence({
+            analysisResult,
+            realSeatIds: realSeatIdsForCoverage,
+            allParametersReportable,
+        }),
+        [analysisResult, realSeatIdsForCoverage, allParametersReportable]
+    );
+
     // ── Artcoustic System Design Rating ────────────────────────────────────
     // Wires Page 3 into the approved Stage B adapter. The UI layer supplies
     // ONLY existing canonical authority inputs — no thresholds, FAIL rules,
@@ -1210,6 +1235,10 @@ function RP22ReportInner() {
                         totalSeatParameters={seatScopedParamCount}
                     />
 
+                    {coverageSentence && (
+                        <Rp22SeatCoverageSentence sentence={coverageSentence} variant="screen" />
+                    )}
+
                     {/* ── Report assumptions + RP23 row + RP22 Parameters — all inside one card so widths match ── */}
                     <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                         <CardHeader>
@@ -1383,6 +1412,7 @@ function RP22ReportInner() {
                                     showDesignRating={showDesignRating}
                                     roomDesignRating={roomDesignRating}
                                     seatDesignRatings={seatDesignRatings}
+                                    coverageSentence={coverageSentence}
                                 />
                             </div>
 

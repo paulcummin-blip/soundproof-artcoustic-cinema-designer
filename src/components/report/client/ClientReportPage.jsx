@@ -21,6 +21,7 @@ import ClientTimbreConsistency from "@/components/report/client/ClientTimbreCons
 import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
 import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScreenDynamicRange";
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
+import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
 
 // Level → brand colour for P12/P13 print result badges (mirrors shared card)
 const PRINT_LEVEL_COLOR = {
@@ -97,6 +98,11 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             <div className="client-report-print-heading">
               <h1 className="client-report-print-heading__title">Design Summary</h1>
             </div>
+            {printData.coverageSentence && (
+              <div style={{ padding: "0 24px", marginBottom: 12 }}>
+                <Rp22SeatCoverageSentence sentence={printData.coverageSentence} variant="print" />
+              </div>
+            )}
             <div className="client-report-print-drawing" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
               <ClientDesignHighlights highlights={printData.highlights} print />
             </div>

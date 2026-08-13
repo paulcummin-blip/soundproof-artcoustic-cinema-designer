@@ -205,6 +205,7 @@ export default function TechnicalPerformanceSummary({
   showDesignRating = false,
   roomDesignRating = null,
   seatDesignRatings = null,
+  coverageSentence = null,
 }) {
   return (
     <div
@@ -235,6 +236,27 @@ export default function TechnicalPerformanceSummary({
           RP22 PERFORMANCE SUMMARY
         </div>
       </div>
+
+      {/* ── RP22 seating-coverage summary sentence ── */}
+      {coverageSentence && (
+        <div
+          style={{
+            fontSize: "9pt",
+            color: COLORS.body,
+            fontFamily: FONT_BODY,
+            lineHeight: 1.5,
+            marginBottom: "6mm",
+            padding: "2.5mm 3.5mm",
+            background: "#F8F8F7",
+            borderRadius: "1.5mm",
+            border: `0.5pt solid ${COLORS.border}`,
+            breakInside: "avoid",
+            pageBreakInside: "avoid",
+          }}
+        >
+          {coverageSentence}
+        </div>
+      )}
 
       {/* ── Room parameters card ── */}
       <div

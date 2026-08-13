@@ -41,6 +41,7 @@ import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import { useAppState } from "@/components/AppStateProvider";
+import { buildRp22SeatCoverageSentence } from "@/components/utils/rp22SeatCoverageSentence";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -83,6 +84,24 @@ export default function RP22ClientReport() {
 
   // ── Design Summary (static intro — pure selector, no analysis) ──
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
+
+  // ── RP22 seating-coverage summary sentence (shared helper) ──
+  // Visual Report intentionally excludes RP22 parameters from its pages, so
+  // allParametersReportable is always false → "currently assessed" wording.
+  // The sentence reuses the canonical per-seat RP22 results + primary-seat
+  // designation from the shared analysisResult — no recalculation.
+  const realSeatIds = useMemo(
+    () => (Array.isArray(seatingPositions) ? seatingPositions.map((s) => s.id).filter(Boolean) : []),
+    [seatingPositions]
+  );
+  const coverageSentence = useMemo(
+    () => buildRp22SeatCoverageSentence({
+      analysisResult,
+      realSeatIds,
+      allParametersReportable: false,
+    }),
+    [analysisResult, realSeatIds]
+  );
 
   // ── Published recommendations (from Room Designer ASDR engine) ──
   // Read from the shared window store populated by DesignRecommendationEngine.
@@ -208,6 +227,7 @@ export default function RP22ClientReport() {
         visual: (
           <ClientDesignHighlights
             highlights={highlights}
+            coverageSentence={coverageSentence}
             recommendationFooter={<ClientRecommendationFooter recommendations={publishedRecommendations} />}
           />
         ),
@@ -215,6 +235,7 @@ export default function RP22ClientReport() {
           type: "highlights",
           highlights,
           recommendations: publishedRecommendations,
+          coverageSentence,
         },
       });
     }
@@ -480,7 +501,7 @@ export default function RP22ClientReport() {
       });
     }
     return pages;
-  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations]);
+  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence]);
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: activePages.length,
